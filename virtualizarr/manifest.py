@@ -4,8 +4,9 @@ import numpy as np
 
 from .types import KerchunkArrRefs, ZArray
 
-
-HANDLED_ARRAY_FUNCTIONS: Dict[str, Callable] = {}  # populated by the @implements decorators below
+HANDLED_ARRAY_FUNCTIONS: Dict[
+    str, Callable
+] = {}  # populated by the @implements decorators below
 
 
 class ChunkEntry(TypedDict):
@@ -43,7 +44,7 @@ class ChunkManifest(Mapping):
     shape_chunk_grid: Tuple[int, ...]
 
     def __init__(self, chunkentries: Mapping[str, ChunkEntry]):
-        self.ndim_chunk_grid, self.shape_chunk_grid = self.validate_chunk_keys(
+        self.ndim_chunk_grid, self.shape_chunk_grid = validate_chunk_keys(
             chunkentries.keys()
         )
         validate_chunk_entries(chunkentries.values())
@@ -51,42 +52,42 @@ class ChunkManifest(Mapping):
         # TODO allow conversion of strings to `ChunkEntry` objects?
         self._chunks = chunkentries
 
-    @classmethod
+    @staticmethod
     def from_zarr_json(filepath: str) -> "ChunkManifest":
         """Create a ChunkManifest from a Zarr manifest.json file."""
-        ...
+        raise NotImplementedError()
 
     def to_zarr_json(self, filepath: str) -> None:
         """Write a ChunkManifest to a Zarr manifest.json file."""
+        raise NotImplementedError()
+
+
+def get_ndim_from_key(key: str) -> int:
+    """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
+    return len(key.split("."))
+
+
+def validate_chunk_keys(chunk_keys: Iterable[str]) -> Tuple[int, Tuple[int, ...]]:
+    # TODO check if all keys have the correct form
+    for key in chunk_keys:
+        # TODO use a regex instead?
         ...
 
-    def validate_chunk_keys(
-        self, chunk_keys: Iterable[str]
-    ) -> Tuple[int, Tuple[int, ...]]:
-        # TODO check if all keys have the correct form
-        for key in chunk_keys:
-            # TODO use a regex instead?
-            ...
+    # Check if all keys have the same number of dimensions
+    first_key, *other_keys = list(chunk_keys)
+    ndim = get_ndim_from_key(first_key)
+    for key in other_keys:
+        other_ndim = get_ndim_from_key(key)
+        if other_ndim != ndim:
+            raise ValueError(
+                f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
+            )
 
-        # Check if all keys have the same number of dimensions
-        first_key, *other_keys = list(chunk_keys)
-        ndim = self._get_ndim(first_key)
-        for key in other_keys:
-            other_ndim = self._get_ndim(key)
-            if other_ndim != ndim:
-                raise ValueError(
-                    f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
-                )
+    # Check if keys form a complete grid
+    # TODO are zarr arrays allowed to have missing chunks?
+    shape = ...
 
-        # Check if keys form a complete grid
-        # TODO are zarr arrays allowed to have missing chunks?
-        shape = ...
-
-        return ndim, shape
-
-    def _get_ndim(key: str) -> int:
-        """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
-        return len(key.split("."))
+    return ndim, shape
 
 
 def validate_chunk_entries(chunk_entries) -> None:
@@ -113,7 +114,7 @@ class ManifestArray:
     def __init__(self, zarray: ZArray, chunkmanifest: ChunkManifest) -> None:
         ...
 
-    @classmethod
+    @staticmethod
     def from_kerchunk_refs(refs: KerchunkArrRefs) -> "ManifestArray":
         ...
 
@@ -206,7 +207,8 @@ def concatenate(
             "If axis=None the array API requires flattening, which is a reshape, which can't be implemented on a ManifestArray."
         )
 
-    first_codec, *other_codecs = [arr.zarray.codec for arr in arrays]
+    # TODO is a codec the same as a compressor?
+    first_codec, *other_codecs = [arr._zarray.codec for arr in arrays]
     for codec in other_codecs:
         if codec != first_codec:
             raise NotImplementedError(
@@ -215,14 +217,20 @@ def concatenate(
             )
 
     concatenated_manifest = _concat_manifests(
-        [arr.manifest for arr in arrays],
+        [arr._manifest for arr in arrays],
         axis=axis,
     )
+    new_shape = ...
+    new_zarray = _replace_shape(arrays[0]._zarray, new_shape)
 
-    return ManifestArray(concatenated_manifest)
+    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
-def _concat_manifests():
+def _concat_manifests(manifests: Iterable[ChunkManifest], axis: int | Tuple[int, ...]):
+    ...
+
+
+def _replace_shape(zarray: ZArray, new_shape: Tuple[int, ...]) -> ZArray:
     ...
 
 

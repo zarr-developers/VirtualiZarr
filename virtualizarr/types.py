@@ -23,9 +23,9 @@ class ZArray(TypedDict):
 
 # Distinguishing these via type hints makes it a lot easier to keep track of what the opaque kerchunk "reference dicts" actually mean (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
 KerchunkStoreRefs = NewType(
-    "StoreRefs", dict[Literal["version"] | Literal["refs"], int | dict]
+    "KerchunkStoreRefs", dict[Literal["version"] | Literal["refs"], int | dict]
 )  # top-level dict with keys for 'version', 'refs'
 KerchunkArrRefs = NewType(
-    "ArrRefs",
-    dict[Literal[".zattrs"] | Literal[".zarray"] | str, "Zarray" | "Zattrs" | dict],
+    "KerchunkArrRefs",
+    dict[Literal[".zattrs"] | Literal[".zarray"] | str, ZArray | ZAttrs | dict],
 )  # lower-level dict containing just the information for one zarr array
