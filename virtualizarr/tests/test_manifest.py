@@ -1,6 +1,8 @@
+import numpy as np
 import pytest
 
-from virtualizarr.manifest import ChunkManifest
+from virtualizarr.manifest import ChunkManifest, ManifestArray
+from virtualizarr.types import ZArray
 
 
 class TestCreateManifest:
@@ -62,6 +64,7 @@ class TestCreateManifest:
             ChunkManifest(chunkentries=chunks)
 
 
+@pytest.mark.skip(reason="Not implemented")
 class TestSerializeManifest:
     def test_serialize_manifest_to_zarr(self):
         ...
@@ -70,8 +73,38 @@ class TestSerializeManifest:
         ...
 
 
-def test_create_manifestarray():
-    ...
+class TestManifestArray:
+    def test_create_manifestarray(self):
+        chunks_dict = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+        manifest = ChunkManifest(chunkentries=chunks_dict)
+        chunks = (10, 1, 5)
+        zarray = ZArray(
+            {
+                "chunks": chunks,
+                "compressor": "zlib",
+                "dtype": np.dtype("int32"),
+                "fill_value": 0.0,
+                "filters": None,
+                "order": "C",
+                "shape": (100, 11, 20),
+                "zarr_format": 2,
+            }
+        )
+
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        assert marr.chunks == chunks
+        assert marr.dtype == np.dtype("int32")
+        assert marr.shape == (100, 11, 20)
+        assert marr.size == 100 * 11 * 20
+        assert marr.ndim == 3
+
+    def test_create_manifestarray_from_kerchunk_refs(self):
+        ...
 
 
 def test_concat():

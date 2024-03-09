@@ -55,6 +55,9 @@ class ChunkManifest(Mapping):
     }
 
     See the chunk manifest SPEC proposal in https://github.com/zarr-developers/zarr-specs/issues/287 .
+
+    Validation is done when this object is instatiated, and this class is immutable,
+    so it's not possible to have a ChunkManifest object that does not represent a complete valid grid of chunks.
     """
 
     # TODO make this immutable?
@@ -174,6 +177,12 @@ def validate_chunk_entries(chunk_entries) -> None:
             )
 
 
+def validate_zarray(zarray: ZArray) -> ZArray:
+    # TODO actually do this validation
+    # can we use pydantic for this?
+    return zarray
+
+
 class ManifestArray:
     """
     Virtualized array representation of the chunk data in a single Zarr Array.
@@ -192,7 +201,8 @@ class ManifestArray:
     _zarray: ZArray
 
     def __init__(self, zarray: ZArray, chunkmanifest: ChunkManifest) -> None:
-        ...
+        self._manifest = chunkmanifest
+        self._zarray = validate_zarray(zarray)
 
     @staticmethod
     def from_kerchunk_refs(refs: KerchunkArrRefs) -> "ManifestArray":
