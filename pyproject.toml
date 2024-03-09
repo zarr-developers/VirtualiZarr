@@ -1,0 +1,61 @@
+[project]
+name = "virtualizarr"
+description = "Create virtual Zarr stores from archival data using xarray API"
+readme = "README.md"
+authors = [
+    {name = "Thomas Nicholas", email = "tom@cworthy.org"}
+]
+license = {text = "Apache-2"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "xarray >=2024.02.0",
+    "packaging",
+]
+dynamic = ["version"]
+
+[project.urls]
+Home = "https://github.com/TomNicholas/VirtualiZarr"
+Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+
+[build-system]
+requires = [
+    "setuptools>=61.0.0",
+    "wheel",
+    "setuptools_scm[toml]>=7.0",
+    "check-manifest"
+]
+
+[tool.setuptools_scm]
+write_to = "virtualizarr/_version.py"
+write_to_template = '''
+# Do not change! Do not track in version control!
+__version__ = "{version}"
+'''
+
+[tool.setuptools.packages.find]
+exclude = ["docs", "tests", "tests.*", "docs.*"]
+
+[tool.setuptools.package-data]
+datatree = ["py.typed"]
+
+[tool.isort]
+profile = "black"
+skip_gitignore = true
+float_to_top = true
+default_section = "THIRDPARTY"
+known_first_party = "virtualizarr"
+
+[mypy]
+files = "virtualizarr/**/*.py"
+show_error_codes = true
