@@ -23,13 +23,19 @@ class ZArray(TypedDict):
     shape: Tuple[int, ...]
     zarr_format: int
 
+    @classmethod
+    def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
+        # TODO should we be doing some type coercion on the 'fill_value' here?
 
-# Distinguishing these via type hints makes it a lot easier to keep track of what the opaque kerchunk "reference dicts" actually mean
-# (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
-KerchunkStoreRefs = NewType(
-    "KerchunkStoreRefs", dict[Literal["version"] | Literal["refs"], int | dict]
-)  # top-level dict with keys for 'version', 'refs'
-KerchunkArrRefs = NewType(
-    "KerchunkArrRefs",
-    dict[Literal[".zattrs"] | Literal[".zarray"] | str, ZArray | ZAttrs | dict],
-)  # lower-level dict containing just the information for one zarr array
+        return cls(
+            {
+                "chunks": tuple(decoded_arr_refs_zarray["chunks"]),
+                "compressor": decoded_arr_refs_zarray["compressor"],
+                "dtype": np.dtype(decoded_arr_refs_zarray["dtype"]),
+                "fill_value": decoded_arr_refs_zarray["fill_value"],
+                "filters": decoded_arr_refs_zarray["filters"],
+                "order": decoded_arr_refs_zarray["order"],
+                "shape": tuple(decoded_arr_refs_zarray["shape"]),
+                "zarr_format": int(decoded_arr_refs_zarray["zarr_format"]),
+            }
+        )

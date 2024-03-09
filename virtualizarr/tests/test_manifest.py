@@ -104,7 +104,15 @@ class TestManifestArray:
         assert marr.ndim == 3
 
     def test_create_manifestarray_from_kerchunk_refs(self):
-        ...
+        arr_refs = {
+            ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+            "0.0": ["test1.nc", 6144, 48],
+        }
+        marr = ManifestArray.from_kerchunk_refs(arr_refs)
+        assert marr.shape == (2, 3)
+        assert marr.chunks == (2, 3)
+        assert marr.dtype == np.dtype("int64")
+        # TODO check other properties are read properly here?
 
 
 def test_concat():

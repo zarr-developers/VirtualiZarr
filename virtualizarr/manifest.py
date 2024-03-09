@@ -6,15 +6,18 @@ from typing import (
     Dict,
     Iterable,
     Iterator,
+    List,
     Mapping,
     Tuple,
     TypedDict,
+    Union,
     cast,
 )
 
 import numpy as np
 
-from .types import ChunkKey, KerchunkArrRefs, ZArray
+from .kerchunk import KerchunkArrRefs
+from .types import ChunkKey, ZArray
 
 HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
@@ -39,6 +42,19 @@ class ChunkEntry(TypedDict):
     path: str
     offset: int
     length: int
+
+    @classmethod
+    def from_kerchunk(
+        cls, path_and_byte_range_info: List[Union[str, int]]
+    ) -> "ChunkEntry":
+        path, offset, length = path_and_byte_range_info
+        return ChunkEntry(
+            {
+                "path": path,
+                "offset": offset,
+                "length": length,
+            }
+        )
 
 
 class ChunkManifest(Mapping):
@@ -96,6 +112,14 @@ class ChunkManifest(Mapping):
     def to_zarr_json(self, filepath: str) -> None:
         """Write a ChunkManifest to a Zarr manifest.json file."""
         raise NotImplementedError()
+
+    @classmethod
+    def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
+        print(kerchunk_chunk_dict)
+        chunkentries = {
+            k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
+        }
+        return ChunkManifest(chunkentries=chunkentries)
 
 
 def get_ndim_from_key(key: str) -> int:
@@ -204,9 +228,24 @@ class ManifestArray:
         self._manifest = chunkmanifest
         self._zarray = validate_zarray(zarray)
 
-    @staticmethod
-    def from_kerchunk_refs(refs: KerchunkArrRefs) -> "ManifestArray":
-        ...
+    @classmethod
+    def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
+        from virtualizarr.kerchunk import fully_decode_arr_refs
+
+        decoded_arr_refs = fully_decode_arr_refs(arr_refs)
+
+        zarray = ZArray.from_kerchunk_refs(decoded_arr_refs[".zarray"])
+
+        kerchunk_chunk_dict = {
+            k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)
+        }
+        chunkmanifest = ChunkManifest.from_kerchunk_chunk_dict(kerchunk_chunk_dict)
+
+        obj = object.__new__(cls)
+        obj._manifest = chunkmanifest
+        obj._zarray = zarray
+
+        return obj
 
     @property
     def chunks(self) -> tuple[int]:
