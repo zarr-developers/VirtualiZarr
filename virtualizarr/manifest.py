@@ -1,9 +1,20 @@
+import itertools
 import re
-from typing import Any, Callable, Dict, Iterable, Iterator, Mapping, Tuple, TypedDict
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    Mapping,
+    Tuple,
+    TypedDict,
+    cast,
+)
 
 import numpy as np
 
-from .types import KerchunkArrRefs, ZArray
+from .types import ChunkKey, KerchunkArrRefs, ZArray
 
 HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
@@ -17,6 +28,7 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
+# TODO use a dataclass instead?
 class ChunkEntry(TypedDict):
     """
     Information for a single chunk in the manifest.
@@ -47,13 +59,13 @@ class ChunkManifest(Mapping):
 
     # TODO make this immutable?
 
-    _chunks: Mapping[str, ChunkEntry]
+    _chunks: Mapping[ChunkKey, ChunkEntry]
     ndim_chunk_grid: int
     shape_chunk_grid: Tuple[int, ...]
 
-    def __init__(self, chunkentries: Mapping[str, ChunkEntry]):
+    def __init__(self, chunkentries: Mapping[ChunkKey, ChunkEntry]):
         self.ndim_chunk_grid, self.shape_chunk_grid = validate_chunk_keys(
-            chunkentries.keys()
+            list(chunkentries.keys())
         )
         validate_chunk_entries(chunkentries.values())
 
@@ -61,13 +73,13 @@ class ChunkManifest(Mapping):
         self._chunks = chunkentries
 
     @property
-    def chunks(self) -> Mapping[str, ChunkEntry]:
+    def chunks(self) -> Mapping[ChunkKey, ChunkEntry]:
         return self._chunks
 
-    def __getitem__(self, key: str) -> ChunkEntry:
+    def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         return self.chunks[key]
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> Iterator[ChunkKey]:
         return iter(self.chunks.keys())
 
     def __len__(self) -> int:
@@ -88,7 +100,7 @@ def get_ndim_from_key(key: str) -> int:
     return len(key.split("."))
 
 
-def validate_chunk_keys(chunk_keys: Iterable[str]) -> Tuple[int, Tuple[int, ...]]:
+def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, Tuple[int, ...]]:
     # Check if all keys have the correct form
     for key in chunk_keys:
         if not re.match(_CHUNK_KEY, key):
@@ -110,11 +122,34 @@ def validate_chunk_keys(chunk_keys: Iterable[str]) -> Tuple[int, Tuple[int, ...]
     return ndim, chunk_grid_shape
 
 
-def check_keys_form_grid(chunk_keys: Iterable[str]) -> Tuple[int, ...]:
-    # Check if keys form a complete grid
-    # TODO are zarr arrays allowed to have missing chunks?
-    positions_along_each_dim = []
-    lengths = [max(positions) for positions in positions_along_each_dim]
+def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
+    """Check that the chunk keys collectively form a complete grid"""
+
+    def split(key: ChunkKey) -> Iterable[int]:
+        return list(int(i) for i in key.split("."))
+
+    def join(inds: Iterable[int]) -> ChunkKey:
+        return cast(ChunkKey, ".".join(str(i) for i in inds))
+
+    # find maximum along each dimension
+    zipped_indices = zip(*[split(key) for key in chunk_keys])
+    chunk_grid_shape = tuple(
+        max(indices_along_one_dim) for indices_along_one_dim in zipped_indices
+    )
+
+    # create every possible combination
+    all_possible_combos = itertools.product(
+        *[range(max + 1) for max in chunk_grid_shape]
+    )
+    all_required_chunk_keys: set[ChunkKey] = set(
+        join(inds) for inds in all_possible_combos
+    )
+
+    # check that every possible combination is represented once in the list of chunk keys
+    if set(chunk_keys) != all_required_chunk_keys:
+        raise ValueError("Chunk keys do not form a complete grid")
+
+    return chunk_grid_shape
 
 
 def validate_chunk_entries(chunk_entries) -> None:
