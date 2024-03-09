@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Iterable, Mapping, Tuple, TypedDict
+import re
+from typing import Any, Callable, Dict, Iterable, Iterator, Mapping, Tuple, TypedDict
 
 import numpy as np
 
@@ -7,6 +8,13 @@ from .types import KerchunkArrRefs, ZArray
 HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
 ] = {}  # populated by the @implements decorators below
+
+
+_INTEGER = (
+    r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
+)
+_SEPARATOR = r"\."
+_CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
 class ChunkEntry(TypedDict):
@@ -25,7 +33,7 @@ class ChunkManifest(Mapping):
     """
     In-memory representation of a single Zarr chunk manifest.
 
-    Stores the manifest in this form:
+    Stores the manifest as a dictionary under the .chunks attribute, in this form:
 
     {
         "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -39,7 +47,7 @@ class ChunkManifest(Mapping):
 
     # TODO make this immutable?
 
-    chunks: Mapping[str, ChunkEntry]
+    _chunks: Mapping[str, ChunkEntry]
     ndim_chunk_grid: int
     shape_chunk_grid: Tuple[int, ...]
 
@@ -51,6 +59,19 @@ class ChunkManifest(Mapping):
 
         # TODO allow conversion of strings to `ChunkEntry` objects?
         self._chunks = chunkentries
+
+    @property
+    def chunks(self) -> Mapping[str, ChunkEntry]:
+        return self._chunks
+
+    def __getitem__(self, key: str) -> ChunkEntry:
+        return self.chunks[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.chunks.keys())
+
+    def __len__(self) -> int:
+        return len(self.chunks)
 
     @staticmethod
     def from_zarr_json(filepath: str) -> "ChunkManifest":
@@ -68,10 +89,10 @@ def get_ndim_from_key(key: str) -> int:
 
 
 def validate_chunk_keys(chunk_keys: Iterable[str]) -> Tuple[int, Tuple[int, ...]]:
-    # TODO check if all keys have the correct form
+    # Check if all keys have the correct form
     for key in chunk_keys:
-        # TODO use a regex instead?
-        ...
+        if not re.match(_CHUNK_KEY, key):
+            raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
     first_key, *other_keys = list(chunk_keys)
@@ -83,15 +104,39 @@ def validate_chunk_keys(chunk_keys: Iterable[str]) -> Tuple[int, Tuple[int, ...]
                 f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
             )
 
+    # Check that the keys collectively form a complete grid
+    chunk_grid_shape = check_keys_form_grid(chunk_keys)
+
+    return ndim, chunk_grid_shape
+
+
+def check_keys_form_grid(chunk_keys: Iterable[str]) -> Tuple[int, ...]:
     # Check if keys form a complete grid
     # TODO are zarr arrays allowed to have missing chunks?
-    shape = ...
-
-    return ndim, shape
+    positions_along_each_dim = []
+    lengths = [max(positions) for positions in positions_along_each_dim]
 
 
 def validate_chunk_entries(chunk_entries) -> None:
-    ...
+    # TODO is there a neater way of checking that a dict conforms to the `ChunkEntry` pattern?
+    for entry in chunk_entries:
+        path = entry["path"]
+        if not isinstance(path, str):
+            raise TypeError(
+                f"'path' entry in the chunk manifest must be a string, but got type {type(path)}"
+            )
+
+        offset = entry["offset"]
+        if not isinstance(offset, int):
+            raise TypeError(
+                f"'offset' entry in the chunk manifest must be an int but got type {type(offset)} "
+            )
+
+        length = entry["length"]
+        if not isinstance(length, int):
+            raise TypeError(
+                f"'length' entry in the chunk manifest must be an int, but got type {type(length)} "
+            )
 
 
 class ManifestArray:
@@ -208,6 +253,7 @@ def concatenate(
         )
 
     # TODO is a codec the same as a compressor?
+    # ans: codec is compressor + filters
     first_codec, *other_codecs = [arr._zarray.codec for arr in arrays]
     for codec in other_codecs:
         if codec != first_codec:
