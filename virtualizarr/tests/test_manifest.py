@@ -2,7 +2,12 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from virtualizarr.manifests import ChunkManifest, ManifestArray, concat_manifests
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    concat_manifests,
+    stack_manifests,
+)
 from virtualizarr.zarr import ZArray
 
 
@@ -84,7 +89,7 @@ class TestProperties:
 
 # TODO could we use hypothesis to test this?
 # Perhaps by testing the property that splitting along a dimension then concatenating the pieces along that dimension should recreate the original manifest?
-class TestConcatManifests:
+class TestCombineManifests:
     def test_concat(self):
         manifest1 = ChunkManifest(
             entries={
@@ -109,6 +114,32 @@ class TestConcatManifests:
         )
 
         result = concat_manifests([manifest1, manifest2], axis=axis)
+        assert result.dict() == expected.dict()
+
+    def test_stack(self):
+        manifest1 = ChunkManifest(
+            entries={
+                "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+                "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            }
+        )
+        manifest2 = ChunkManifest(
+            entries={
+                "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+                "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            }
+        )
+        axis = 1
+        expected = ChunkManifest(
+            entries={
+                "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+                "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+                "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            }
+        )
+
+        result = stack_manifests([manifest1, manifest2], axis=axis)
         assert result.dict() == expected.dict()
 
 

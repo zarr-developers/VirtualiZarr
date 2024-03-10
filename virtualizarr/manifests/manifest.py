@@ -180,7 +180,8 @@ def concat_manifests(manifests: List["ChunkManifest"], axis: int) -> "ChunkManif
     Concatenate manifests along an existing dimension.
 
     This only requires adjusting one index of chunk keys along a single dimension.
-    Implemented as a method because the .
+
+    Note axis is not expected to be negative.
     """
     if len(manifests) == 1:
         return manifests[0]
@@ -216,5 +217,38 @@ def adjust_chunk_keys(
     return {offset_key(k, axis, offset): v for k, v in entries.items()}
 
 
-def stack_manifests(manifests: Iterable[ChunkManifest], axis: int):
-    raise NotImplementedError()
+def stack_manifests(manifests: List[ChunkManifest], axis: int) -> "ChunkManifest":
+    """
+    Stack manifests along a new dimension.
+
+    This only requires inserting one index into all chunk keys to add a new dimension.
+
+    Note axis is not expected to be negative.
+    """
+    if len(manifests) == 1:
+        return manifests[0]
+
+    chunk_indexes_along_new_dim = range(len(manifests))
+    new_entries = [
+        insert_new_axis_into_chunk_keys(manifest.entries, axis, new_index_value)
+        for manifest, new_index_value in zip(manifests, chunk_indexes_along_new_dim)
+    ]
+    merged_entries = dict((k, v) for d in new_entries for k, v in d.items())
+
+    # Arguably don't need to re-perform validation checks on a manifest we created out of already-validated manifests
+    # Could use pydantic's model_construct classmethod to skip these checks
+    # But we should actually performance test it because it might be pointless, and current implementation is safer
+    return ChunkManifest(entries=merged_entries)
+
+
+def insert_new_axis_into_chunk_keys(
+    entries: Mapping[ChunkKey, ChunkEntry], axis: int, new_index_value: int
+) -> Mapping[ChunkKey, ChunkEntry]:
+    """Replace all chunk keys with keys which have a new axis inserted, with a given value."""
+
+    def insert_axis(key: ChunkKey, new_axis: int, index_value: int) -> ChunkKey:
+        inds = split(key)
+        inds.insert(new_axis, index_value)
+        return join(inds)
+
+    return {insert_axis(k, axis, new_index_value): v for k, v in entries.items()}
