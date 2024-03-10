@@ -1,7 +1,8 @@
 import itertools
 import re
-from typing import Any, Iterable, Iterator, List, Mapping, Union, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Tuple, Union, cast
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, validator
 
 from ..types import ChunkKey
@@ -67,8 +68,21 @@ class ChunkManifest(BaseModel):
 
     @property
     def ndim_chunk_grid(self):
-        """Number of dimensions in the chunk grid."""
-        return get_ndim_from_key(list(self.chunks)[0])
+        """
+        Number of dimensions in the chunk grid.
+
+        Not the same as the dimension of an array backed by this chunk manifest.
+        """
+        return get_ndim_from_key(list(self.entries.keys())[0])
+
+    @property
+    def shape_chunk_grid(self):
+        """
+        Number of separate chunks along each dimension.
+
+        Not the same as the shape of an array backed by this chunk manifest.
+        """
+        return get_chunk_grid_shape(list(self.entries.keys()))
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         return self.chunks[key]
@@ -101,6 +115,14 @@ class ChunkManifest(BaseModel):
         return ChunkManifest(entries=chunkentries)
 
 
+def split(key: ChunkKey) -> List[int]:
+    return list(int(i) for i in key.split("."))
+
+
+def join(inds: Iterable[int]) -> ChunkKey:
+    return cast(ChunkKey, ".".join(str(i) for i in inds))
+
+
 def get_ndim_from_key(key: str) -> int:
     """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
     return len(key.split("."))
@@ -126,24 +148,23 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
     check_keys_form_grid(chunk_keys)
 
 
+def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
+    # find max chunk index along each dimension
+    zipped_indices = zip(*[split(key) for key in chunk_keys])
+    chunk_grid_shape = tuple(
+        max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
+    )
+    return chunk_grid_shape
+
+
 def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]):
     """Check that the chunk keys collectively form a complete grid"""
 
-    def split(key: ChunkKey) -> Iterable[int]:
-        return list(int(i) for i in key.split("."))
-
-    def join(inds: Iterable[int]) -> ChunkKey:
-        return cast(ChunkKey, ".".join(str(i) for i in inds))
-
-    # find maximum along each dimension
-    zipped_indices = zip(*[split(key) for key in chunk_keys])
-    chunk_grid_shape = tuple(
-        max(indices_along_one_dim) for indices_along_one_dim in zipped_indices
-    )
+    chunk_grid_shape = get_chunk_grid_shape(chunk_keys)
 
     # create every possible combination
     all_possible_combos = itertools.product(
-        *[range(max + 1) for max in chunk_grid_shape]
+        *[range(length) for length in chunk_grid_shape]
     )
     all_required_chunk_keys: set[ChunkKey] = set(
         join(inds) for inds in all_possible_combos
@@ -152,3 +173,48 @@ def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]):
     # check that every possible combination is represented once in the list of chunk keys
     if set(chunk_keys) != all_required_chunk_keys:
         raise ValueError("Chunk keys do not form a complete grid")
+
+
+def concat_manifests(manifests: List["ChunkManifest"], axis: int) -> "ChunkManifest":
+    """
+    Concatenate manifests along an existing dimension.
+
+    This only requires adjusting one index of chunk keys along a single dimension.
+    Implemented as a method because the .
+    """
+    if len(manifests) == 1:
+        return manifests[0]
+
+    chunk_grid_shapes = [manifest.shape_chunk_grid for manifest in manifests]
+    lengths_along_concat_dim = [shape[axis] for shape in chunk_grid_shapes]
+
+    # Note we do not need to change the keys of the first manifest
+    chunk_index_offsets = np.cumsum(lengths_along_concat_dim)[:-1]
+    new_entries = [
+        adjust_chunk_keys(manifest.entries, axis, offset)
+        for manifest, offset in zip(manifests[1:], chunk_index_offsets)
+    ]
+    all_entries = [manifests[0].entries] + new_entries
+    merged_entries = dict((k, v) for d in all_entries for k, v in d.items())
+
+    # Arguably don't need to re-perform validation checks on a manifest we created out of already-validated manifests
+    # Could use pydantic's model_construct classmethod to skip these checks
+    # But we should actually performance test it because it might be pointless, and current implementation is safer
+    return ChunkManifest(entries=merged_entries)
+
+
+def adjust_chunk_keys(
+    entries: Mapping[ChunkKey, ChunkEntry], axis: int, offset: int
+) -> Mapping[ChunkKey, ChunkEntry]:
+    """Replace all chunk keys with keys which have been offset along one axis."""
+
+    def offset_key(key: ChunkKey, axis: int, offset: int) -> ChunkKey:
+        inds = split(key)
+        inds[axis] += offset
+        return join(inds)
+
+    return {offset_key(k, axis, offset): v for k, v in entries.items()}
+
+
+def stack_manifests(manifests: Iterable[ChunkManifest], axis: int):
+    raise NotImplementedError()
