@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from virtualizarr.manifest import ChunkManifest, ManifestArray
 from virtualizarr.types import ZArray
@@ -10,8 +11,8 @@ class TestCreateManifest:
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
-        manifest = ChunkManifest(chunkentries=chunks)
-        assert manifest.chunks == chunks
+        manifest = ChunkManifest(entries=chunks)
+        assert manifest.dict() == chunks
 
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -19,35 +20,39 @@ class TestCreateManifest:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest(chunkentries=chunks)
-        assert manifest.chunks == chunks
+        manifest = ChunkManifest(entries=chunks)
+        assert manifest.dict() == chunks
 
     def test_invalid_chunk_entries(self):
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc"},
         }
-        with pytest.raises(KeyError):
-            ChunkManifest(chunkentries=chunks)
+        with pytest.raises(ValidationError, match="missing"):
+            ChunkManifest(entries=chunks)
 
         chunks = {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100.000, "length": 100},
+            "0.0.0": {
+                "path": "s3://bucket/foo.nc",
+                "offset": "some nonsense",
+                "length": 100,
+            },
         }
-        with pytest.raises(TypeError, match="must be an int"):
-            ChunkManifest(chunkentries=chunks)
+        with pytest.raises(ValidationError, match="should be a valid integer"):
+            ChunkManifest(entries=chunks)
 
     def test_invalid_chunk_keys(self):
         chunks = {
             "0.0.": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         with pytest.raises(ValueError, match="Invalid format for chunk key: '0.0.'"):
-            ChunkManifest(chunkentries=chunks)
+            ChunkManifest(entries=chunks)
 
         chunks = {
             "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
         }
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
-            ChunkManifest(chunkentries=chunks)
+            ChunkManifest(entries=chunks)
 
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -55,13 +60,13 @@ class TestCreateManifest:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
         }
         with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest(chunkentries=chunks)
+            ChunkManifest(entries=chunks)
 
         chunks = {
             "1": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest(chunkentries=chunks)
+            ChunkManifest(entries=chunks)
 
 
 @pytest.mark.skip(reason="Not implemented")
@@ -81,7 +86,7 @@ class TestManifestArray:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest(chunkentries=chunks_dict)
+        manifest = ChunkManifest(entries=chunks_dict)
         chunks = (10, 1, 5)
         zarray = ZArray(
             {

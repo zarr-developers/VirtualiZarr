@@ -9,12 +9,12 @@ from typing import (
     List,
     Mapping,
     Tuple,
-    TypedDict,
     Union,
     cast,
 )
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict, validator
 
 from .kerchunk import KerchunkArrRefs
 from .types import ChunkKey, ZArray
@@ -31,15 +31,16 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-# TODO use a dataclass instead?
-class ChunkEntry(TypedDict):
+class ChunkEntry(BaseModel):
     """
     Information for a single chunk in the manifest.
 
     Stored in the form `{"path": "s3://bucket/foo.nc", "offset": 100, "length": 100}`.
     """
 
-    path: str
+    model_config = ConfigDict(frozen=True)
+
+    path: str  # TODO stricter typing/validation of possible local / remote paths?
     offset: int
     length: int
 
@@ -48,16 +49,10 @@ class ChunkEntry(TypedDict):
         cls, path_and_byte_range_info: List[Union[str, int]]
     ) -> "ChunkEntry":
         path, offset, length = path_and_byte_range_info
-        return ChunkEntry(
-            {
-                "path": path,
-                "offset": offset,
-                "length": length,
-            }
-        )
+        return ChunkEntry(path=path, offset=offset, length=length)
 
 
-class ChunkManifest(Mapping):
+class ChunkManifest(BaseModel):
     """
     In-memory representation of a single Zarr chunk manifest.
 
@@ -76,24 +71,22 @@ class ChunkManifest(Mapping):
     so it's not possible to have a ChunkManifest object that does not represent a complete valid grid of chunks.
     """
 
-    # TODO make this immutable?
+    model_config = ConfigDict(frozen=True)
 
-    _chunks: Mapping[ChunkKey, ChunkEntry]
-    ndim_chunk_grid: int
-    shape_chunk_grid: Tuple[int, ...]
+    entries: Mapping[ChunkKey, ChunkEntry]
+    # shape_chunk_grid: Tuple[int, ...]  # TODO do we need this for anything?
 
-    def __init__(self, chunkentries: Mapping[ChunkKey, ChunkEntry]):
-        self.ndim_chunk_grid, self.shape_chunk_grid = validate_chunk_keys(
-            list(chunkentries.keys())
-        )
-        validate_chunk_entries(chunkentries.values())
-
-        # TODO allow conversion of strings to `ChunkEntry` objects?
-        self._chunks = chunkentries
+    @validator("entries")
+    def validate_chunks(cls, entries: Any) -> Mapping[ChunkKey, ChunkEntry]:
+        validate_chunk_keys(list(entries.keys()))
+        
+        # TODO what if pydantic adjusts anything during validation?
+        return entries
 
     @property
-    def chunks(self) -> Mapping[ChunkKey, ChunkEntry]:
-        return self._chunks
+    def ndim_chunk_grid(self):
+        """Number of dimensions in the chunk grid."""
+        return get_ndim_from_key(list(self.chunks)[0])
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         return self.chunks[key]
@@ -103,6 +96,10 @@ class ChunkManifest(Mapping):
 
     def __len__(self) -> int:
         return len(self.chunks)
+
+    def dict(self) -> dict[str, dict[str, Union[str, int]]]:
+        """Converts the entire manifest to a nested dictionary."""
+        return {k: entry.dict() for k, entry in self.entries.items()}
 
     @staticmethod
     def from_zarr_json(filepath: str) -> "ChunkManifest":
@@ -119,7 +116,7 @@ class ChunkManifest(Mapping):
         chunkentries = {
             k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
         }
-        return ChunkManifest(chunkentries=chunkentries)
+        return ChunkManifest(entries=chunkentries)
 
 
 def get_ndim_from_key(key: str) -> int:
@@ -144,9 +141,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, Tuple[int,
             )
 
     # Check that the keys collectively form a complete grid
-    chunk_grid_shape = check_keys_form_grid(chunk_keys)
-
-    return ndim, chunk_grid_shape
+    check_keys_form_grid(chunk_keys)
 
 
 def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
@@ -177,28 +172,6 @@ def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
         raise ValueError("Chunk keys do not form a complete grid")
 
     return chunk_grid_shape
-
-
-def validate_chunk_entries(chunk_entries) -> None:
-    # TODO is there a neater way of checking that a dict conforms to the `ChunkEntry` pattern?
-    for entry in chunk_entries:
-        path = entry["path"]
-        if not isinstance(path, str):
-            raise TypeError(
-                f"'path' entry in the chunk manifest must be a string, but got type {type(path)}"
-            )
-
-        offset = entry["offset"]
-        if not isinstance(offset, int):
-            raise TypeError(
-                f"'offset' entry in the chunk manifest must be an int but got type {type(offset)} "
-            )
-
-        length = entry["length"]
-        if not isinstance(length, int):
-            raise TypeError(
-                f"'length' entry in the chunk manifest must be an int, but got type {type(length)} "
-            )
 
 
 def validate_zarray(zarray: ZArray) -> ZArray:
