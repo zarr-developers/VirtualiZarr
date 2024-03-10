@@ -217,7 +217,7 @@ def concatenate(
     new_shape[axis] = new_length_along_concat_axis
 
     concatenated_manifest = concat_manifests(
-        [arr._manifest for arr in arrays],
+        [arr.manifest for arr in arrays],
         axis=axis,
     )
 
@@ -270,3 +270,66 @@ def result_type(*arrays_and_dtypes) -> np.dtype:
         if other_dtype != first_dtype:
             raise ValueError("dtypes not all consistent")
     return first_dtype
+
+
+@implements(np.concatenate)
+def stack(
+    arrays: tuple[ManifestArray, ...] | list[ManifestArray],
+    /,
+    *,
+    axis: int = 0,
+) -> ManifestArray:
+    """
+    Stack ManifestArrays by merging their chunk manifests.
+
+    The signature of this function is array API compliant, so that it can be called by `xarray.stack`.
+    """
+    if not isinstance(axis, int):
+        raise TypeError()
+
+    # ensure dtypes, shapes, codecs etc. are consistent
+    check_combineable_zarr_arrays(arrays)
+
+    _check_same_ndims([arr.ndim for arr in arrays])
+    arr_shapes = [arr.shape for arr in arrays]
+    _check_same_shapes(arr_shapes)
+
+    # Ensure we handle axis being passed as a negative integer
+    first_arr = arrays[0]
+    axis = axis % first_arr.ndim
+
+    # find what new array shape must be
+    length_along_new_stacked_axis = len(arrays)
+    first_shape, *_ = arr_shapes
+    new_shape = list(first_shape)
+    new_shape.insert(axis, length_along_new_stacked_axis)
+
+    stacked_manifest = stack_manifests(
+        [arr.manifest for arr in arrays],
+        axis=axis,
+    )
+
+    # chunk size has changed because a length-1 axis has been inserted
+    old_chunks = first_arr.chunks
+    new_chunks = list(old_chunks)
+    new_chunks.insert(axis, 1)
+
+    new_zarray = ZArray(
+        chunks=new_chunks,
+        dtype=first_arr.dtype,
+        shape=new_shape,
+        # TODO presumably these things should be checked for consistency across arrays too?
+        order=first_arr.zarray.order,
+        zarr_format=first_arr.zarray.zarr_format,
+    )
+
+    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
+
+
+def _check_same_shapes(shapes: List[Tuple[int, ...]]) -> None:
+    first_shape, *other_shapes = shapes
+    for other_shape in other_shapes:
+        if other_shape != first_shape:
+            raise ValueError(
+                f"Cannot concatenate arrays with differing shapes: {first_shape} vs {other_shape}"
+            )

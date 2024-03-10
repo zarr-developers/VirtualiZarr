@@ -50,3 +50,7 @@ class TestManifestArray:
 
 def test_concat():
     ...
+
+
+def test_stack():
+    ...
