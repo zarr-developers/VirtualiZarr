@@ -1,5 +1,5 @@
 import re
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 import numpy as np
 
@@ -7,7 +7,7 @@ from ..kerchunk import KerchunkArrRefs
 from ..zarr import Codec, ZArray
 from .manifest import _CHUNK_KEY, ChunkManifest, concat_manifests, stack_manifests
 
-HANDLED_ARRAY_FUNCTIONS: Dict[
+MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
 ] = {}  # populated by the @implements decorators below
 
@@ -23,8 +23,6 @@ class ManifestArray:
     Implements subset of the array API standard such that it can be wrapped by xarray.
     Doesn't store the zarr array name, zattrs or ARRAY_DIMENSIONS, as instead those can be stored on a wrapping xarray object.
     """
-
-    # TODO how do we forbid variable-length chunks?
 
     _manifest: ChunkManifest
     _zarray: ZArray
@@ -61,7 +59,7 @@ class ManifestArray:
         return self._zarray
 
     @property
-    def chunks(self) -> tuple[int]:
+    def chunks(self) -> Tuple[int, ...]:
         # TODO do we even need this? The way I implemented concat below I don't think we really do...
         return tuple(self.zarray.chunks)
 
@@ -80,7 +78,7 @@ class ManifestArray:
 
     @property
     def size(self) -> int:
-        return np.prod(self.shape)
+        return int(np.prod(self.shape))
 
     @property
     def T(self) -> "ManifestArray":
@@ -91,7 +89,7 @@ class ManifestArray:
 
     def to_kerchunk_refs(self) -> KerchunkArrRefs:
         # TODO is there enough information to get the attrs and so on here?
-        ...
+        raise NotImplementedError()
 
     def to_zarr(self, store) -> None:
         raise NotImplementedError(
@@ -105,7 +103,7 @@ class ManifestArray:
         Use this instead of __array_namespace__ so that we don't make promises we can't keep.
         """
 
-        if func not in HANDLED_ARRAY_FUNCTIONS:
+        if func not in MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS:
             return NotImplemented
 
         # Note: this allows subclasses that don't override
@@ -113,7 +111,7 @@ class ManifestArray:
         if not all(issubclass(t, ManifestArray) for t in types):
             return NotImplemented
 
-        return HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
+        return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
@@ -126,13 +124,62 @@ class ManifestArray:
 
 
 def implements(numpy_function):
-    """Register an __array_function__ implementation for MyArray objects."""
+    """Register an __array_function__ implementation for ManifestArray objects."""
 
     def decorator(func):
-        HANDLED_ARRAY_FUNCTIONS[numpy_function] = func
+        MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[numpy_function] = func
         return func
 
     return decorator
+
+
+def check_combineable_zarr_arrays(arrays: Iterable[ManifestArray]) -> None:
+    """
+    The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
+    the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
+    """
+    _check_same_dtypes([arr.dtype for arr in arrays])
+
+    # Can't combine different codecs in one manifest
+    # see https://github.com/zarr-developers/zarr-specs/issues/288
+    _check_same_codecs([arr.zarray.codec for arr in arrays])
+
+    # Would require variable-length chunks ZEP
+    _check_same_chunk_shapes([arr.chunks for arr in arrays])
+
+
+def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
+    """Check all the dtypes are the same"""
+
+    first_dtype, *other_dtypes = dtypes
+    for other_dtype in other_dtypes:
+        if other_dtype != first_dtype:
+            raise ValueError(
+                f"Cannot concatenate arrays with inconsistent dtypes: {other_dtype} vs {first_dtype}"
+            )
+
+
+def _check_same_codecs(codecs: List[Codec]) -> None:
+    first_codec, *other_codecs = codecs
+    for codec in other_codecs:
+        if codec != first_codec:
+            raise NotImplementedError(
+                "The ManifestArray class cannot concatenate arrays which were stored using different codecs, "
+                f"But found codecs {first_codec} vs {codec} ."
+                "See https://github.com/zarr-developers/zarr-specs/issues/288"
+            )
+
+
+def _check_same_chunk_shapes(chunks_list: List[Tuple[int, ...]]) -> None:
+    """Check all the chunk shapes are the same"""
+
+    first_chunks, *other_chunks_list = chunks_list
+    for other_chunks in other_chunks_list:
+        if other_chunks != first_chunks:
+            raise ValueError(
+                f"Cannot concatenate arrays with inconsistent chunk shapes: {other_chunks} vs {first_chunks} ."
+                "Requires ZEP003 (Variable-length Chunks)."
+            )
 
 
 @implements(np.concatenate)
@@ -148,21 +195,24 @@ def concatenate(
         raise NotImplementedError(
             "If axis=None the array API requires flattening, which is a reshape, which can't be implemented on a ManifestArray."
         )
+    elif not isinstance(axis, int):
+        raise TypeError()
 
-    # TODO make sure it handles axis being negative
+    # ensure dtypes, shapes, codecs etc. are consistent
+    check_combineable_zarr_arrays(arrays)
 
-    _check_same_dtypes([arr.dtype for arr in arrays])
+    _check_same_ndims([arr.ndim for arr in arrays])
 
-    shapes = [arr.shape for arr in arrays]
-    _check_same_shapes_except_on_concat_axis(shapes, axis)
+    # Ensure we handle axis being passed as a negative integer
+    first_arr = arrays[0]
+    axis = axis % first_arr.ndim
 
-    # Can't combine different codecs in one manifest
-    # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([arr.zarray.codec for arr in arrays])
+    arr_shapes = [arr.shape for arr in arrays]
+    _check_same_shapes_except_on_concat_axis(arr_shapes, axis)
 
-    # find what new shape must be
-    new_length_along_concat_axis = sum([shape[axis] for shape in shapes])
-    first_shape, *_ = shapes
+    # find what new array shape must be
+    new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])
+    first_shape, *_ = arr_shapes
     new_shape = list(first_shape)
     new_shape[axis] = new_length_along_concat_axis
 
@@ -170,20 +220,25 @@ def concatenate(
         [arr._manifest for arr in arrays],
         axis=axis,
     )
-    new_shape = ...
-    new_zarray = _replace_shape(arrays[0]._zarray, new_shape)
+
+    new_zarray = ZArray(
+        chunks=first_arr.chunks,
+        dtype=first_arr.dtype,
+        shape=new_shape,
+        # TODO presumably these things should be checked for consistency across arrays too?
+        order=first_arr.zarray.order,
+        zarr_format=first_arr.zarray.zarr_format,
+    )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
-def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
-    """Check all the dtypes are the same"""
-
-    first_dtype, *other_dtypes = dtypes
-    for other_dtype in other_dtypes:
-        if other_dtype != first_dtype:
+def _check_same_ndims(ndims: list[int]) -> None:
+    first_ndim, *other_ndims = ndims
+    for other_ndim in other_ndims:
+        if other_ndim != first_ndim:
             raise ValueError(
-                f"Cannot concatenate arrays with inconsistent dtypes: {other_dtype} vs {first_dtype}"
+                f"Cannot concatenate arrays with differing number of dimensions: {first_ndim} vs {other_ndim}"
             )
 
 
@@ -201,25 +256,10 @@ def _check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis
             )
 
 
-def _remove_element_at_position(t: tuple[Any], pos: int) -> tuple[Any]:
+def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
     new_l = list(t)
     new_l.pop(pos)
     return tuple(new_l)
-
-
-def _check_same_codecs(codecs: List[Codec]) -> None:
-    first_codec, *other_codecs = codecs
-    for codec in other_codecs:
-        if codec != first_codec:
-            raise NotImplementedError(
-                "The ManifestArray class cannot concatenate arrays which were stored using different codecs, "
-                f"But found codecs {first_codec} vs {codec} ."
-                "See https://github.com/zarr-developers/zarr-specs/issues/288"
-            )
-
-
-def _replace_shape(zarray: ZArray, new_shape: Tuple[int, ...]) -> ZArray:
-    ...
 
 
 @implements(np.result_type)

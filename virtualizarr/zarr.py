@@ -20,7 +20,6 @@ class ZArray(BaseModel):
     # TODO will this work for V3?
 
     model_config = ConfigDict(
-        frozen=True,
         arbitrary_types_allowed=True,  # only here so pydantic doesn't complain about the numpy dtype field
     )
 

@@ -1,11 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from virtualizarr.manifests import (
-    ChunkManifest,
-    concat_manifests,
-    stack_manifests,
-)
+from virtualizarr.manifests import ChunkManifest, concat_manifests, stack_manifests
 
 
 class TestCreateManifest:

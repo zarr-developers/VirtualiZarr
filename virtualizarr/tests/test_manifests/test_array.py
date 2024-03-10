@@ -1,9 +1,6 @@
 import numpy as np
 
-from virtualizarr.manifests import (
-    ChunkManifest,
-    ManifestArray,
-)
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
 
