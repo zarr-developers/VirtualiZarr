@@ -3,7 +3,7 @@ import pytest
 from pydantic import ValidationError
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.types import ZArray
+from virtualizarr.zarr import ZArray
 
 
 class TestCreateManifest:

@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Iterable, Tuple
 import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
-from ..types import ZArray
+from ..zarr import ZArray
 from .manifest import _CHUNK_KEY, ChunkManifest
 
 HANDLED_ARRAY_FUNCTIONS: Dict[

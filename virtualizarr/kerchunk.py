@@ -1,7 +1,7 @@
 import json
 from typing import Literal, NewType
 
-from virtualizarr.types import ZArray, ZAttrs
+from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
