@@ -10,9 +10,7 @@ KerchunkStoreRefs = NewType(
 )  # top-level dict with keys for 'version', 'refs'
 KerchunkArrRefs = NewType(
     "KerchunkArrRefs",
-    dict[Literal[".zattrs"], ZAttrs]
-    | dict[Literal[".zarray"], ZArray]
-    | dict[str, str],
+    dict[Literal[".zattrs"] | Literal[".zarray"] | str, ZAttrs | ZArray | str],
 )  # lower-level dict containing just the information for one zarr array
 
 

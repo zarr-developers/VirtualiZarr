@@ -1,11 +1,11 @@
 import re
-from typing import Any, Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
-from ..zarr import ZArray
-from .manifest import _CHUNK_KEY, ChunkManifest
+from ..zarr import Codec, ZArray
+from .manifest import _CHUNK_KEY, ChunkManifest, concat_manifests, stack_manifests
 
 HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
@@ -149,17 +149,24 @@ def concatenate(
             "If axis=None the array API requires flattening, which is a reshape, which can't be implemented on a ManifestArray."
         )
 
-    # TODO is a codec the same as a compressor?
-    # ans: codec is compressor + filters
-    first_codec, *other_codecs = [arr._zarray.codec for arr in arrays]
-    for codec in other_codecs:
-        if codec != first_codec:
-            raise NotImplementedError(
-                "The ManifestArray class cannot concatenate arrays which were stored using different codecs. "
-                "See https://github.com/zarr-developers/zarr-specs/issues/288"
-            )
+    # TODO make sure it handles axis being negative
 
-    concatenated_manifest = _concat_manifests(
+    _check_same_dtypes([arr.dtype for arr in arrays])
+
+    shapes = [arr.shape for arr in arrays]
+    _check_same_shapes_except_on_concat_axis(shapes, axis)
+
+    # Can't combine different codecs in one manifest
+    # see https://github.com/zarr-developers/zarr-specs/issues/288
+    _check_same_codecs([arr.zarray.codec for arr in arrays])
+
+    # find what new shape must be
+    new_length_along_concat_axis = sum([shape[axis] for shape in shapes])
+    first_shape, *_ = shapes
+    new_shape = list(first_shape)
+    new_shape[axis] = new_length_along_concat_axis
+
+    concatenated_manifest = concat_manifests(
         [arr._manifest for arr in arrays],
         axis=axis,
     )
@@ -169,8 +176,46 @@ def concatenate(
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
-def _concat_manifests(manifests: Iterable[ChunkManifest], axis: int | Tuple[int, ...]):
-    ...
+def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
+    """Check all the dtypes are the same"""
+
+    first_dtype, *other_dtypes = dtypes
+    for other_dtype in other_dtypes:
+        if other_dtype != first_dtype:
+            raise ValueError(
+                f"Cannot concatenate arrays with inconsistent dtypes: {other_dtype} vs {first_dtype}"
+            )
+
+
+def _check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
+    """Check that shapes are compatible for concatenation"""
+    shapes_without_concat_axis = [
+        _remove_element_at_position(shape, axis) for shape in shapes
+    ]
+
+    first_shape, *other_shapes = shapes_without_concat_axis
+    for other_shape in other_shapes:
+        if other_shape != first_shape:
+            raise ValueError(
+                f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}"
+            )
+
+
+def _remove_element_at_position(t: tuple[Any], pos: int) -> tuple[Any]:
+    new_l = list(t)
+    new_l.pop(pos)
+    return tuple(new_l)
+
+
+def _check_same_codecs(codecs: List[Codec]) -> None:
+    first_codec, *other_codecs = codecs
+    for codec in other_codecs:
+        if codec != first_codec:
+            raise NotImplementedError(
+                "The ManifestArray class cannot concatenate arrays which were stored using different codecs, "
+                f"But found codecs {first_codec} vs {codec} ."
+                "See https://github.com/zarr-developers/zarr-specs/issues/288"
+            )
 
 
 def _replace_shape(zarray: ZArray, new_shape: Tuple[int, ...]) -> ZArray:
