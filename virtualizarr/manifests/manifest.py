@@ -225,9 +225,8 @@ def stack_manifests(manifests: List[ChunkManifest], axis: int) -> "ChunkManifest
 
     Note axis is not expected to be negative.
     """
-    if len(manifests) == 1:
-        return manifests[0]
 
+    # even if there is only one manifest it still needs a new axis inserted
     chunk_indexes_along_new_dim = range(len(manifests))
     new_entries = [
         insert_new_axis_into_chunk_keys(manifest.entries, axis, new_index_value)
