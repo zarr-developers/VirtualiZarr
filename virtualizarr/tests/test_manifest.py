@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from virtualizarr.manifest import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.types import ZArray
 
 

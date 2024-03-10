@@ -1,1 +1,1 @@
-from .manifest import ManifestArray  # type: ignore # noqa
+from .manifests import ManifestArray  # type: ignore # noqa
