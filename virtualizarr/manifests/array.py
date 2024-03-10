@@ -12,12 +12,6 @@ HANDLED_ARRAY_FUNCTIONS: Dict[
 ] = {}  # populated by the @implements decorators below
 
 
-def validate_zarray(zarray: ZArray) -> ZArray:
-    # TODO actually do this validation
-    # can we use pydantic for this?
-    return zarray
-
-
 class ManifestArray:
     """
     Virtualized array representation of the chunk data in a single Zarr Array.
@@ -37,7 +31,7 @@ class ManifestArray:
 
     def __init__(self, zarray: ZArray, chunkmanifest: ChunkManifest) -> None:
         self._manifest = chunkmanifest
-        self._zarray = validate_zarray(zarray)
+        self._zarray = zarray
 
     @classmethod
     def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
@@ -59,18 +53,26 @@ class ManifestArray:
         return obj
 
     @property
+    def manifest(self) -> ChunkManifest:
+        return self._manifest
+
+    @property
+    def zarray(self) -> ZArray:
+        return self._zarray
+
+    @property
     def chunks(self) -> tuple[int]:
         # TODO do we even need this? The way I implemented concat below I don't think we really do...
-        return tuple(self._zarray["chunks"])
+        return tuple(self.zarray.chunks)
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self._zarray["dtype"]
+        dtype_str = self.zarray.dtype
         return np.dtype(dtype_str)
 
     @property
     def shape(self) -> tuple[int, ...]:
-        return tuple(int(length) for length in list(self._zarray["shape"]))
+        return tuple(int(length) for length in list(self.zarray.shape))
 
     @property
     def ndim(self) -> int:

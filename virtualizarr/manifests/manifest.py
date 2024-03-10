@@ -1,6 +1,6 @@
 import itertools
 import re
-from typing import Any, Iterable, Iterator, List, Mapping, Tuple, Union, cast
+from typing import Any, Iterable, Iterator, List, Mapping, Union, cast
 
 from pydantic import BaseModel, ConfigDict, validator
 
@@ -106,7 +106,7 @@ def get_ndim_from_key(key: str) -> int:
     return len(key.split("."))
 
 
-def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, Tuple[int, ...]]:
+def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
     # Check if all keys have the correct form
     for key in chunk_keys:
         if not re.match(_CHUNK_KEY, key):
@@ -126,7 +126,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, Tuple[int,
     check_keys_form_grid(chunk_keys)
 
 
-def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
+def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]):
     """Check that the chunk keys collectively form a complete grid"""
 
     def split(key: ChunkKey) -> Iterable[int]:
@@ -152,5 +152,3 @@ def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
     # check that every possible combination is represented once in the list of chunk keys
     if set(chunk_keys) != all_required_chunk_keys:
         raise ValueError("Chunk keys do not form a complete grid")
-
-    return chunk_grid_shape

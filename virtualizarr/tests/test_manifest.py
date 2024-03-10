@@ -89,16 +89,14 @@ class TestManifestArray:
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (10, 1, 5)
         zarray = ZArray(
-            {
-                "chunks": chunks,
-                "compressor": "zlib",
-                "dtype": np.dtype("int32"),
-                "fill_value": 0.0,
-                "filters": None,
-                "order": "C",
-                "shape": (100, 11, 20),
-                "zarr_format": 2,
-            }
+            chunks=chunks,
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(100, 11, 20),
+            zarr_format=2,
         )
 
         marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
