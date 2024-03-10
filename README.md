@@ -6,7 +6,7 @@ VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues
 
 ### What's the difference between VirtualiZarr and Kerchunk?
 
-The Kerchunk idea solves an incredibly important problem: accessing big archival datasets via a cloud-optimized pattern, but without copying or modifying the original data in any way. This is a win-win-win for users, data engineers, and data providers. Users see fast-opening zarr-compliant stores that work performantly with libraries like xarray and dask, data engineers can provide this speed by adding a lightweight virtualization layer on top of existing data - without having to ask anyone's permission, and data providers don't have to change anything about their legacy files for them to be used in a cloud-optimized way.
+The Kerchunk idea solves an incredibly important problem: accessing big archival datasets via a cloud-optimized pattern, but without copying or modifying the original data in any way. This is a win-win-win for users, data engineers, and data providers. Users see fast-opening zarr-compliant stores that work performantly with libraries like xarray and dask, data engineers can provide this speed by adding a lightweight virtualization layer on top of existing data (without having to ask anyone's permission), and data providers don't have to change anything about their legacy files for them to be used in a cloud-optimized way.
 
 However, kerchunk's current design is limited:
 - Store-level abstractions make combining datasets complicated, idiosyncratic, and requires duplicating logic that already exists in libraries like xarray,
