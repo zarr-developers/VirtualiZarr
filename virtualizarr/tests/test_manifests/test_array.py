@@ -117,10 +117,6 @@ class TestConcat:
         assert result.zarray.order == zarray.order
         assert result.zarray.zarr_format == zarray.zarr_format
 
-    def test_refuse_concat(self):
-        # TODO test refusing to concatenate arrays that have conflicting chunk sizes / codecs
-        ...
-
 
 class TestStack:
     def test_stack(self):
@@ -165,3 +161,46 @@ class TestStack:
         assert result.zarray.fill_value == zarray.fill_value
         assert result.zarray.order == zarray.order
         assert result.zarray.zarr_format == zarray.zarr_format
+
+
+def test_refuse_combine():
+    # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
+
+    zarray_common = {
+        "chunks": (5, 1, 10),
+        "compressor": "zlib",
+        "dtype": np.dtype("int32"),
+        "fill_value": 0.0,
+        "filters": None,
+        "order": "C",
+        "shape": (5, 1, 10),
+        "zarr_format": 2,
+    }
+    chunks_dict1 = {
+        "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+    }
+    chunks_dict2 = {
+        "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+    }
+    marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunks_dict1)
+
+    zarray_wrong_compressor = zarray_common.copy()
+    zarray_wrong_compressor["compressor"] = None
+    marr2 = ManifestArray(zarray=zarray_wrong_compressor, chunkmanifest=chunks_dict2)
+    for func in [np.concatenate, np.stack]:
+        with pytest.raises(NotImplementedError, match="different codecs"):
+            func([marr1, marr2], axis=0)
+
+    zarray_wrong_dtype = zarray_common.copy()
+    zarray_wrong_dtype["dtype"] = np.dtype("int64")
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    for func in [np.concatenate, np.stack]:
+        with pytest.raises(ValueError, match="inconsistent dtypes"):
+            func([marr1, marr2], axis=0)
+
+    zarray_wrong_dtype = zarray_common.copy()
+    zarray_wrong_dtype["dtype"] = np.dtype("int64")
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    for func in [np.concatenate, np.stack]:
+        with pytest.raises(ValueError, match="inconsistent dtypes"):
+            func([marr1, marr2], axis=0)

@@ -28,7 +28,9 @@ class ManifestArray:
     _zarray: ZArray
 
     def __init__(
-        self, zarray: Union[ZArray, dict], chunkmanifest: ChunkManifest
+        self,
+        zarray: Union[ZArray, dict],
+        chunkmanifest: Union[dict, ChunkManifest],
     ) -> None:
         """
         Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
@@ -36,12 +38,7 @@ class ManifestArray:
         Parameters
         ----------
         zarray : dict or ZArray
-            File path to open as a set of virtualized zarr arrays.
-        filetype : str, default None
-            Type of file to be opened. Used to determine which kerchunk file format backend to use.
-            If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
-        drop_variables: list[str], default is None
-
+        chunkmanifest : dict or ChunkManifest
         """
 
         if isinstance(zarray, ZArray):
@@ -50,19 +47,23 @@ class ManifestArray:
             # try unpacking the dict
             _zarray = ZArray(**zarray)
 
-        if not isinstance(chunkmanifest, ChunkManifest):
+        if isinstance(chunkmanifest, ChunkManifest):
+            _chunkmanifest = chunkmanifest
+        elif isinstance(chunkmanifest, dict):
+            _chunkmanifest = ChunkManifest(entries=chunkmanifest)
+        else:
             raise TypeError(
                 f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
             )
 
         # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
-        if _zarray.shape_chunk_grid != chunkmanifest.shape_chunk_grid:
+        if _zarray.shape_chunk_grid != _chunkmanifest.shape_chunk_grid:
             raise ValueError(
-                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {chunkmanifest.shape_chunk_grid}"
+                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {_chunkmanifest.shape_chunk_grid}"
             )
 
         self._zarray = _zarray
-        self._manifest = chunkmanifest
+        self._manifest = _chunkmanifest
 
     @classmethod
     def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
