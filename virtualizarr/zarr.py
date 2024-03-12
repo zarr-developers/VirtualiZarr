@@ -47,6 +47,10 @@ class ZArray(BaseModel):
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
         # TODO should we be doing some type coercion on the 'fill_value' here?
 
+        # print(decoded_arr_refs_zarray)
+        # print(type(decoded_arr_refs_zarray))
+        # print(decoded_arr_refs_zarray["chunks"])
+
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=decoded_arr_refs_zarray["compressor"],
