@@ -67,7 +67,7 @@ class ChunkManifest(BaseModel):
         return entries
 
     @property
-    def ndim_chunk_grid(self):
+    def ndim_chunk_grid(self) -> int:
         """
         Number of dimensions in the chunk grid.
 
@@ -76,7 +76,7 @@ class ChunkManifest(BaseModel):
         return get_ndim_from_key(list(self.entries.keys())[0])
 
     @property
-    def shape_chunk_grid(self):
+    def shape_chunk_grid(self) -> Tuple[int, ...]:
         """
         Number of separate chunks along each dimension.
 

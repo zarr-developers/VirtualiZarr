@@ -1,5 +1,5 @@
 import re
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 
@@ -27,9 +27,42 @@ class ManifestArray:
     _manifest: ChunkManifest
     _zarray: ZArray
 
-    def __init__(self, zarray: ZArray, chunkmanifest: ChunkManifest) -> None:
+    def __init__(
+        self, zarray: Union[ZArray, dict], chunkmanifest: ChunkManifest
+    ) -> None:
+        """
+        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+
+        Parameters
+        ----------
+        zarray : dict or ZArray
+            File path to open as a set of virtualized zarr arrays.
+        filetype : str, default None
+            Type of file to be opened. Used to determine which kerchunk file format backend to use.
+            If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
+        drop_variables: list[str], default is None
+
+        """
+
+        if isinstance(zarray, ZArray):
+            _zarray = zarray
+        else:
+            # try unpacking the dict
+            _zarray = ZArray(**zarray)
+
+        if not isinstance(chunkmanifest, ChunkManifest):
+            raise TypeError(
+                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+            )
+
+        # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
+        if _zarray.shape_chunk_grid != chunkmanifest.shape_chunk_grid:
+            raise ValueError(
+                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {chunkmanifest.shape_chunk_grid}"
+            )
+
+        self._zarray = _zarray
         self._manifest = chunkmanifest
-        self._zarray = zarray
 
     @classmethod
     def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
@@ -60,7 +93,6 @@ class ManifestArray:
 
     @property
     def chunks(self) -> Tuple[int, ...]:
-        # TODO do we even need this? The way I implemented concat below I don't think we really do...
         return tuple(self.zarray.chunks)
 
     @property

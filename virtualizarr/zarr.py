@@ -3,7 +3,7 @@ from typing import Any, Literal, NewType, Optional, Tuple
 import numpy as np
 from pydantic import BaseModel, ConfigDict, validator
 
-# TODO replace these with classes imported directly from Zarr?
+# TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
     "ZAttrs", dict[str, Any]
 )  # just the .zattrs (for one array or for the whole store/group)
@@ -38,18 +38,30 @@ class ZArray(BaseModel):
         # Convert numpy.dtype to a format suitable for Pydantic
         return np.dtype(dtype)
 
+    def __post_init__(self) -> None:
+        if len(self.shape) != len(self.chunks):
+            raise ValueError(
+                "Dimension mismatch between array shape and chunk shape. "
+                f"Array shape {self.shape} has ndim={self.shape} but chunk shape {self.chunks} has ndim={len(self.chunks)}"
+            )
+
     @property
     def codec(self) -> Codec:
         """For comparison against other arrays."""
         return Codec(compressor=self.compressor, filters=self.filters)
 
+    @property
+    def shape_chunk_grid(self) -> Tuple[int, ...]:
+        """Shape of the chunk grid implied by the array shape and chunk shape."""
+        chunk_grid_shape = tuple(
+            ceildiv(array_side_length, chunk_length)
+            for array_side_length, chunk_length in zip(self.shape, self.chunks)
+        )
+        return chunk_grid_shape
+
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
         # TODO should we be doing some type coercion on the 'fill_value' here?
-
-        # print(decoded_arr_refs_zarray)
-        # print(type(decoded_arr_refs_zarray))
-        # print(decoded_arr_refs_zarray["chunks"])
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
@@ -61,3 +73,12 @@ class ZArray(BaseModel):
             shape=tuple(decoded_arr_refs_zarray["shape"]),
             zarr_format=int(decoded_arr_refs_zarray["zarr_format"]),
         )
+
+
+def ceildiv(a: int, b: int) -> int:
+    """
+    Ceiling division operator for integers.
+
+    See https://stackoverflow.com/questions/14822184/is-there-a-ceiling-equivalent-of-operator-in-python
+    """
+    return -(a // -b)

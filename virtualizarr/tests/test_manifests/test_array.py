@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
@@ -13,7 +14,8 @@ class TestManifestArray:
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
-        chunks = (10, 1, 5)
+        chunks = (5, 1, 10)
+        shape = (5, 2, 20)
         zarray = ZArray(
             chunks=chunks,
             compressor="zlib",
@@ -21,16 +23,37 @@ class TestManifestArray:
             fill_value=0.0,
             filters=None,
             order="C",
-            shape=(100, 11, 20),
+            shape=shape,
             zarr_format=2,
         )
 
         marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
         assert marr.chunks == chunks
         assert marr.dtype == np.dtype("int32")
-        assert marr.shape == (100, 11, 20)
-        assert marr.size == 100 * 11 * 20
+        assert marr.shape == shape
+        assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+
+    def test_create_invalid_manifestarray(self):
+        chunks_dict = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        chunks = (5, 1, 10)
+        shape = (5, 2, 20)
+        zarray = ZArray(
+            chunks=chunks,
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+
+        with pytest.raises(ValueError, match="Inconsistent chunk grid shape"):
+            ManifestArray(zarray=zarray, chunkmanifest=manifest)
 
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
