@@ -13,6 +13,9 @@ class Codec(BaseModel):
     compressor: Optional[str]
     filters: Optional[str]
 
+    def __repr__(self) -> str:
+        return f"Codec(compressor={self.compressor}, filters={self.filters})"
+
 
 class ZArray(BaseModel):
     """Just the .zarray information"""
@@ -58,6 +61,9 @@ class ZArray(BaseModel):
             for array_side_length, chunk_length in zip(self.shape, self.chunks)
         )
         return chunk_grid_shape
+
+    def __repr__(self) -> str:
+        return f"ZArray(shape={self.shape}, chunks={self.chunks}, dtype={self.dtype}, compressor={self.compressor}, filters={self.filters}, fill_value={self.fill_value})"
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
