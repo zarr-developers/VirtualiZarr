@@ -125,5 +125,49 @@ class TestConcat:
         ...
 
 
-def test_stack():
-    ...
+class TestStack:
+    def test_stack(self):
+        chunks_dict1 = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        zarray1 = ZArray(
+            chunks=(5, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 20),
+            zarr_format=2,
+        )
+        marr1 = ManifestArray(zarray=zarray1, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        zarray2 = ZArray(
+            chunks=(5, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 20),
+            zarr_format=2,
+        )
+        marr2 = ManifestArray(zarray=zarray2, chunkmanifest=manifest2)
+
+        result = np.stack([marr1, marr2], axis=1)
+
+        assert result.shape == (5, 2, 20)
+        assert result.chunks == (5, 1, 10)
+        assert result.manifest.dict() == {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
