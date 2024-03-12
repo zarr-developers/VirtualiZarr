@@ -255,7 +255,10 @@ def concatenate(
 
     new_zarray = ZArray(
         chunks=first_arr.chunks,
+        compressor=first_arr.zarray.compressor,
         dtype=first_arr.dtype,
+        fill_value=first_arr.zarray.fill_value,
+        filters=first_arr.zarray.filters,
         shape=new_shape,
         # TODO presumably these things should be checked for consistency across arrays too?
         order=first_arr.zarray.order,
@@ -304,7 +307,7 @@ def result_type(*arrays_and_dtypes) -> np.dtype:
     return first_dtype
 
 
-@implements(np.concatenate)
+@implements(np.stack)
 def stack(
     arrays: tuple[ManifestArray, ...] | list[ManifestArray],
     /,
@@ -348,7 +351,10 @@ def stack(
 
     new_zarray = ZArray(
         chunks=new_chunks,
+        compressor=first_arr.zarray.compressor,
         dtype=first_arr.dtype,
+        fill_value=first_arr.zarray.fill_value,
+        filters=first_arr.zarray.filters,
         shape=new_shape,
         # TODO presumably these things should be checked for consistency across arrays too?
         order=first_arr.zarray.order,

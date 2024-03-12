@@ -26,7 +26,7 @@ pip install -e .
 
 ### Usage
 
-**NOTE: This package is in development. The usage examples in this section are currently aspirational. Progress towards making these examples work is tracked in [issue #2](https://github.com/TomNicholas/VirtualiZarr/issues/2).** 
+**NOTE: This package is in development. The usage examples in this section are currently aspirational. Progress towards making these examples work is tracked in [issue #2](https://github.com/TomNicholas/VirtualiZarr/issues/2).**
 
 Let's say you have a bunch of legacy files (e.g. netCDF) which together tile to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 
