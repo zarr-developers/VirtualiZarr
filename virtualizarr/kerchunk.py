@@ -1,36 +1,21 @@
 import json
 from pathlib import Path
-from typing import Literal, NewType, Optional, Tuple
+from typing import NewType, Optional, Tuple, cast
 
 import kerchunk
 import xarray as xr
-from pydantic import BaseModel, ConfigDict
 
 from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
 KerchunkStoreRefs = NewType(
-    "KerchunkStoreRefs", dict[Literal["version"] | Literal["refs"], int | dict]
+    "KerchunkStoreRefs", dict
 )  # top-level dict with keys for 'version', 'refs'
 KerchunkArrRefs = NewType(
     "KerchunkArrRefs",
-    dict[Literal[".zattrs"] | Literal[".zarray"] | str, ZAttrs | ZArray | str],
+    dict,
 )  # lower-level dict containing just the information for one zarr array
-
-
-class KerchunkChunkEntry(BaseModel):
-    """Like a ChunkEntry but follows kerchunks' specification"""
-
-    model_config = ConfigDict(frozen=True)
-
-    entry: Tuple[str, int, int]
-
-
-class KerchunkChunkDict(BaseModel):
-    """Like a ChunkManifest but follows kerchunks' specification"""
-
-    model_config = ConfigDict(frozen=True)
 
 
 def read_kerchunk_references_from_file(
@@ -116,9 +101,6 @@ def extract_array_refs(
             if var_name == key.split("/")[0]
         }
 
-        # TODO return this separately?
-        # zattrs = var_refs.pop(".zattrs")  # we are going to store these separately later
-
         return fully_decode_arr_refs(arr_refs)
     else:
         raise KeyError(
@@ -128,7 +110,7 @@ def extract_array_refs(
 
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> Tuple[KerchunkChunkDict, ZArray, ZAttrs]:
+) -> Tuple[dict, ZArray, ZAttrs]:
     zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs")
     chunk_dict = arr_refs
@@ -136,7 +118,7 @@ def parse_array_refs(
     return chunk_dict, zarray, zattrs
 
 
-def fully_decode_arr_refs(d: KerchunkArrRefs) -> KerchunkArrRefs:
+def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:
     """
     Only have to do this because kerchunk.SingleHdf5ToZarr apparently doesn't bother converting .zarray and .zattrs contents to dicts, see https://github.com/fsspec/kerchunk/issues/415 .
     """
@@ -145,10 +127,9 @@ def fully_decode_arr_refs(d: KerchunkArrRefs) -> KerchunkArrRefs:
         if k.startswith("."):
             # ensure contents of .zattrs and .zarray are python dictionaries
             sanitized[k] = json.loads(v)
-        # TODO should we also convert the byte range values stored under chunk keys to python lists? e.g. 'time/0': ['air.nc', 7757515, 11680]
 
-    return sanitized
+    return cast(KerchunkArrRefs, sanitized)
 
 
 def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
-    ...
+    raise NotImplementedError()
