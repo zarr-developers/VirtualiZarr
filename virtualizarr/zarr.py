@@ -1,6 +1,7 @@
 from typing import Any, Literal, NewType, Optional, Tuple
 
 import numpy as np
+import ujson
 from pydantic import BaseModel, ConfigDict, validator
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
@@ -33,7 +34,7 @@ class ZArray(BaseModel):
     filters: Optional[str]
     order: Literal["C"] | Literal["F"]
     shape: Tuple[int, ...]
-    zarr_format: Literal[2] | Literal[3]
+    zarr_format: Literal[2] | Literal[3] = 2
 
     @validator("dtype")
     def validate_dtype(cls, dtype) -> np.dtype:
@@ -79,6 +80,12 @@ class ZArray(BaseModel):
             shape=tuple(decoded_arr_refs_zarray["shape"]),
             zarr_format=int(decoded_arr_refs_zarray["zarr_format"]),
         )
+
+    def to_kerchunk_json(self) -> str:
+        zarray_dict = self.dict()
+        # TODO not sure if there is a better way to get the '<i4' style representation of the dtype out
+        zarray_dict["dtype"] = zarray_dict["dtype"].descr[0][1]
+        return ujson.dumps(zarray_dict)
 
 
 def ceildiv(a: int, b: int) -> int:

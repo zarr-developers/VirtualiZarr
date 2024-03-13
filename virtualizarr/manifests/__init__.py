@@ -3,6 +3,7 @@
 
 from .array import ManifestArray  # type: ignore # noqa
 from .manifest import (  # type: ignore # noqa
+    ChunkEntry,
     ChunkManifest,
     concat_manifests,
     stack_manifests,

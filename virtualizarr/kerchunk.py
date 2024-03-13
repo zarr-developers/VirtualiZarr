@@ -1,8 +1,8 @@
-import json
 from pathlib import Path
 from typing import NewType, Optional, Tuple, cast
 
 import kerchunk
+import ujson
 import xarray as xr
 
 from virtualizarr.zarr import ZArray, ZAttrs
@@ -95,6 +95,10 @@ def extract_array_refs(
 
     refs = ds_reference_dict["refs"]
     if var_name in found_var_names:
+        # name, key = key.split("/")
+
+        # TODO these function probably have more loops in them than they need to...
+
         arr_refs = {
             key.split("/")[1]: refs[key]
             for key in refs.keys()
@@ -126,10 +130,62 @@ def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:
     for k, v in d.items():
         if k.startswith("."):
             # ensure contents of .zattrs and .zarray are python dictionaries
-            sanitized[k] = json.loads(v)
+            sanitized[k] = ujson.loads(v)
 
     return cast(KerchunkArrRefs, sanitized)
 
 
 def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
-    raise NotImplementedError()
+    """
+    Create a dictionary containing kerchunk-style store references from a single xarray.Dataset (which wraps ManifestArray objects).
+    """
+
+    all_arr_refs = {}
+    for var_name, var in ds.variables.items():
+        arr_refs = variable_to_kerchunk_arr_refs(var)
+
+        prepended_with_var_name = {
+            f"{var_name}/{key}": val for key, val in arr_refs.items()
+        }
+
+        all_arr_refs.update(prepended_with_var_name)
+
+    ds_refs = {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            **all_arr_refs,
+        },
+    }
+
+    return ds_refs
+
+
+def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
+    """
+    Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps a ManifestArray).
+
+    Partially encodes the inner dicts to json to match kerchunk behaviour (see )
+    """
+    from virtualizarr.manifests import ManifestArray
+
+    marr = var.data
+
+    if not isinstance(marr, ManifestArray):
+        raise TypeError(
+            f"Can only serialize wrapped arrays of type ManifestArray, but got type {type(marr)}"
+        )
+
+    arr_refs = {
+        chunk_key: chunk_entry.to_kerchunk()
+        for chunk_key, chunk_entry in marr.manifest.entries.items()
+    }
+
+    zarray_dict = marr.zarray.to_kerchunk_json()
+    arr_refs[".zarray"] = zarray_dict
+
+    zattrs = var.attrs
+    zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
+    arr_refs[".zattrs"] = ujson.dumps(zattrs)
+
+    return arr_refs

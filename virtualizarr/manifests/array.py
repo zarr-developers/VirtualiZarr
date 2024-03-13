@@ -155,6 +155,49 @@ class ManifestArray:
             "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
         )
 
+    def __getitem__(
+        self,
+        key,
+        /,
+    ) -> "ManifestArray":
+        """
+        Only supports extremely limited indexing.
+
+        I only added this method because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
+        """
+        from xarray.core.indexing import BasicIndexer
+
+        if isinstance(key, BasicIndexer):
+            indexer = key.tuple
+        else:
+            indexer = key
+
+        indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
+
+        if len(indexer) != self.ndim:
+            raise ValueError(
+                f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
+            )
+
+        if all(
+            isinstance(axis_indexer, slice) and axis_indexer == slice(None)
+            for axis_indexer in indexer
+        ):
+            # indexer is all slice(None)'s, so this is a no-op
+            print("__getitem__ called with a no-op")
+            return self
+        else:
+            raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+
+def _possibly_expand_trailing_ellipsis(key, ndim: int):
+    if key[-1] == ...:
+        extra_slices_needed = ndim - (len(key) - 1)
+        *indexer, ellipsis = key
+        return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
+    else:
+        return key
+
 
 def implements(numpy_function):
     """Register an __array_function__ implementation for ManifestArray objects."""
