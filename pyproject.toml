@@ -38,8 +38,11 @@ docs = [
     "sphinx",
     "pangeo-sphinx-book-theme",
     "sphinx-autodoc-typehints",
+    "sphinx_copybutton",
+    "sphinx_togglebutton",
+    "sphinx_design",
+    "myst_nb"
 ]
-
 
 
 
