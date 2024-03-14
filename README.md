@@ -2,7 +2,7 @@
 
 **VirtualiZarr creates virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
 
-VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
+VirtualiZarr (pronounced "virtualize-arr") grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
 
 ### What's the difference between VirtualiZarr and Kerchunk?
 
@@ -25,6 +25,8 @@ pip install -e .
 ```
 
 ### Usage
+
+**NOTE: This package is in development. The usage examples in this section are currently aspirational. Progress towards making these examples work is tracked in [issue #2](https://github.com/TomNicholas/VirtualiZarr/issues/2).**
 
 Let's say you have a bunch of legacy files (e.g. netCDF) which together tile to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 

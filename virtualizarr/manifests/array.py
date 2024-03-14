@@ -1,5 +1,5 @@
 import re
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 
@@ -27,9 +27,43 @@ class ManifestArray:
     _manifest: ChunkManifest
     _zarray: ZArray
 
-    def __init__(self, zarray: ZArray, chunkmanifest: ChunkManifest) -> None:
-        self._manifest = chunkmanifest
-        self._zarray = zarray
+    def __init__(
+        self,
+        zarray: Union[ZArray, dict],
+        chunkmanifest: Union[dict, ChunkManifest],
+    ) -> None:
+        """
+        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+
+        Parameters
+        ----------
+        zarray : dict or ZArray
+        chunkmanifest : dict or ChunkManifest
+        """
+
+        if isinstance(zarray, ZArray):
+            _zarray = zarray
+        else:
+            # try unpacking the dict
+            _zarray = ZArray(**zarray)
+
+        if isinstance(chunkmanifest, ChunkManifest):
+            _chunkmanifest = chunkmanifest
+        elif isinstance(chunkmanifest, dict):
+            _chunkmanifest = ChunkManifest(entries=chunkmanifest)
+        else:
+            raise TypeError(
+                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+            )
+
+        # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
+        if _zarray.shape_chunk_grid != _chunkmanifest.shape_chunk_grid:
+            raise ValueError(
+                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {_chunkmanifest.shape_chunk_grid}"
+            )
+
+        self._zarray = _zarray
+        self._manifest = _chunkmanifest
 
     @classmethod
     def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
@@ -60,7 +94,6 @@ class ManifestArray:
 
     @property
     def chunks(self) -> Tuple[int, ...]:
-        # TODO do we even need this? The way I implemented concat below I don't think we really do...
         return tuple(self.zarray.chunks)
 
     @property
@@ -223,7 +256,10 @@ def concatenate(
 
     new_zarray = ZArray(
         chunks=first_arr.chunks,
+        compressor=first_arr.zarray.compressor,
         dtype=first_arr.dtype,
+        fill_value=first_arr.zarray.fill_value,
+        filters=first_arr.zarray.filters,
         shape=new_shape,
         # TODO presumably these things should be checked for consistency across arrays too?
         order=first_arr.zarray.order,
@@ -272,7 +308,7 @@ def result_type(*arrays_and_dtypes) -> np.dtype:
     return first_dtype
 
 
-@implements(np.concatenate)
+@implements(np.stack)
 def stack(
     arrays: tuple[ManifestArray, ...] | list[ManifestArray],
     /,
@@ -316,7 +352,10 @@ def stack(
 
     new_zarray = ZArray(
         chunks=new_chunks,
+        compressor=first_arr.zarray.compressor,
         dtype=first_arr.dtype,
+        fill_value=first_arr.zarray.fill_value,
+        filters=first_arr.zarray.filters,
         shape=new_shape,
         # TODO presumably these things should be checked for consistency across arrays too?
         order=first_arr.zarray.order,

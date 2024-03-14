@@ -46,6 +46,11 @@ docs = [
 
 
 
+[project.optional-dependencies]
+test = [
+    "pytest"
+]
+
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"
 Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"

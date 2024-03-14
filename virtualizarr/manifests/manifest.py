@@ -27,6 +27,9 @@ class ChunkEntry(BaseModel):
     offset: int
     length: int
 
+    def __repr__(self) -> str:
+        return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
+
     @classmethod
     def from_kerchunk(
         cls, path_and_byte_range_info: List[Union[str, int]]
@@ -67,7 +70,7 @@ class ChunkManifest(BaseModel):
         return entries
 
     @property
-    def ndim_chunk_grid(self):
+    def ndim_chunk_grid(self) -> int:
         """
         Number of dimensions in the chunk grid.
 
@@ -76,13 +79,16 @@ class ChunkManifest(BaseModel):
         return get_ndim_from_key(list(self.entries.keys())[0])
 
     @property
-    def shape_chunk_grid(self):
+    def shape_chunk_grid(self) -> Tuple[int, ...]:
         """
         Number of separate chunks along each dimension.
 
         Not the same as the shape of an array backed by this chunk manifest.
         """
         return get_chunk_grid_shape(list(self.entries.keys()))
+
+    def __repr__(self) -> str:
+        return f"ChunkManifest<shape={self.shape_chunk_grid}>"
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         return self.chunks[key]
@@ -108,7 +114,6 @@ class ChunkManifest(BaseModel):
 
     @classmethod
     def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
-        print(kerchunk_chunk_dict)
         chunkentries = {
             k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
         }
