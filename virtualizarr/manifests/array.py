@@ -1,4 +1,5 @@
 import re
+import warnings
 from typing import Any, Tuple, Union
 
 import numpy as np
@@ -143,6 +144,8 @@ class ManifestArray:
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
 
+    # Everything beyond here is basically to make this array class wrappable by xarray #
+
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
         return NotImplemented
@@ -151,6 +154,43 @@ class ManifestArray:
         raise NotImplementedError(
             "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
         )
+
+    def __eq__(  # type: ignore[override]
+        self,
+        other: Union[int, float, bool, np.ndarray, "ManifestArray"],
+    ) -> np.ndarray:
+        """
+        Element-wise equality checking.
+
+        Returns a numpy array of booleans.
+        """
+        if isinstance(other, (int, float, bool)):
+            # TODO what should this do when comparing against numpy arrays?
+            return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
+        elif not isinstance(other, ManifestArray):
+            raise TypeError(
+                f"Cannot check equality between a ManifestArray and an object of type {type(other)}"
+            )
+
+        if self.shape != other.shape:
+            raise NotImplementedError("Unsure how to handle broadcasting like this")
+
+        if self.zarray != other.zarray:
+            return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
+        else:
+            if self.manifest == other.manifest:
+                return np.full(shape=self.shape, fill_value=True, dtype=np.dtype(bool))
+            else:
+                # TODO this doesn't yet do what it should - it simply returns all False if any of the chunk entries are different.
+                # What it should do is return True for the locations where the chunk entries are the same.
+                warnings.warn(
+                    "__eq__ currently is over-cautious, returning an array of all False if any of the chunk entries don't match.",
+                    UserWarning,
+                )
+
+                # TODO do chunk-wise comparison
+                # TODO expand it into an element-wise result
+                return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
 
     def __getitem__(
         self,

@@ -71,6 +71,69 @@ class TestManifestArray:
         assert marr.zarray.order == "C"
 
 
+class TestEquals:
+    def test_equals(self):
+        chunks_dict = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        chunks = (5, 1, 10)
+        shape = (5, 2, 20)
+        zarray = ZArray(
+            chunks=chunks,
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        result = marr1 == marr2
+        assert isinstance(result, np.ndarray)
+        assert result.shape == shape
+        assert result.dtype == np.dtype(bool)
+        assert result.all()
+
+    def test_not_equal_chunk_entries(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 1, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 1, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        assert not (marr1 == marr2).all()
+
+    @pytest.mark.skip(reason="Not Implemented")
+    def test_partly_equals(self):
+        ...
+
+
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
 class TestConcat:
