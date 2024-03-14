@@ -37,6 +37,10 @@ class ChunkEntry(BaseModel):
         path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
+    def to_kerchunk(self) -> List[Union[str, int]]:
+        """Write out in the format that kerchunk uses for chunk entries."""
+        return [self.path, self.offset, self.length]
+
 
 class ChunkManifest(BaseModel):
     """

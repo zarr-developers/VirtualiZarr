@@ -143,7 +143,7 @@ def separate_coords(
     return data_vars, coords
 
 
-@register_dataset_accessor("virtualizarr")
+@register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
     def __init__(self, ds):
         self.ds = ds

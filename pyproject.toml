@@ -21,6 +21,7 @@ requires-python = ">=3.9"
 dependencies = [
     "xarray",
     "kerchunk",
+    "ujson",
     "pydantic",
     "packaging",
 ]
