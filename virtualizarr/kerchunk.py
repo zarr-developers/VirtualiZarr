@@ -1,14 +1,14 @@
 from pathlib import Path
-from typing import NewType, Optional, Tuple, cast
+from typing import List, NewType, Optional, Tuple, Union, cast
 
-import kerchunk
-import ujson
+import ujson  # type: ignore
 import xarray as xr
 
 from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
+# TODO I would prefer to be more specific about these types
 KerchunkStoreRefs = NewType(
     "KerchunkStoreRefs", dict
 )  # top-level dict with keys for 'version', 'refs'
@@ -32,6 +32,8 @@ def read_kerchunk_references_from_file(
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     """
+
+    import kerchunk
 
     if filetype is None:
         filetype = _automatically_determine_filetype(filepath)
@@ -95,8 +97,6 @@ def extract_array_refs(
 
     refs = ds_reference_dict["refs"]
     if var_name in found_var_names:
-        # name, key = key.split("/")
-
         # TODO these function probably have more loops in them than they need to...
 
         arr_refs = {
@@ -158,14 +158,14 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
         },
     }
 
-    return ds_refs
+    return cast(KerchunkStoreRefs, ds_refs)
 
 
 def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
     """
     Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps a ManifestArray).
 
-    Partially encodes the inner dicts to json to match kerchunk behaviour (see )
+    Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
     from virtualizarr.manifests import ManifestArray
 
@@ -176,8 +176,8 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
             f"Can only serialize wrapped arrays of type ManifestArray, but got type {type(marr)}"
         )
 
-    arr_refs = {
-        chunk_key: chunk_entry.to_kerchunk()
+    arr_refs: dict[str, Union[str, List[Union[str, int]]]] = {
+        str(chunk_key): chunk_entry.to_kerchunk()
         for chunk_key, chunk_entry in marr.manifest.entries.items()
     }
 
@@ -188,4 +188,4 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = ujson.dumps(zattrs)
 
-    return arr_refs
+    return cast(KerchunkArrRefs, arr_refs)

@@ -1,7 +1,7 @@
 from typing import Any, Literal, NewType, Optional, Tuple
 
 import numpy as np
-import ujson
+import ujson  # type: ignore
 from pydantic import BaseModel, ConfigDict, validator
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
