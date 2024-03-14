@@ -6,7 +6,13 @@ import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
 from ..zarr import Codec, ZArray
-from .manifest import _CHUNK_KEY, ChunkManifest, concat_manifests, stack_manifests
+from .manifest import (
+    _CHUNK_KEY,
+    ChunkManifest,
+    concat_manifests,
+    get_ndim_from_key,
+    stack_manifests,
+)
 
 MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS: Dict[
     str, Callable
@@ -165,7 +171,7 @@ class ManifestArray:
         """
         Element-wise equality checking.
 
-        Returns a numpy array of booleans.
+        Returns a numpy array of booleans, with elements that are True iff the manifests' ChunkEntry that this element would reside in is identical between the two arrays.
         """
         if isinstance(other, (int, float, bool)):
             # TODO what should this do when comparing against numpy arrays?
@@ -181,19 +187,35 @@ class ManifestArray:
         if self.zarray != other.zarray:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
-            if self.manifest == other.manifest:
-                return np.full(shape=self.shape, fill_value=True, dtype=np.dtype(bool))
-            else:
-                # TODO this doesn't yet do what it should - it simply returns all False if any of the chunk entries are different.
-                # What it should do is return True for the locations where the chunk entries are the same.
-                warnings.warn(
-                    "__eq__ currently is over-cautious, returning an array of all False if any of the chunk entries don't match.",
-                    UserWarning,
-                )
+            # do full element-wise comparison
 
-                # TODO do chunk-wise comparison
-                # TODO expand it into an element-wise result
-                return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
+            # do chunk-wise comparison
+            boolean_chunk_dict = {
+                key: entry1 == entry2
+                for key, entry1, entry2 in zip(
+                    self.manifest.entries.keys(),
+                    self.manifest.entries.values(),
+                    other.manifest.entries.values(),
+                )
+            }
+
+            # replace per-chunk booleans with numpy arrays of booleans of the shape of each chunk
+            array_boolean_chunk_dict = {
+                key: np.full(
+                    shape=self.chunks, fill_value=bool_val, dtype=np.dtype(bool)
+                )
+                for key, bool_val in boolean_chunk_dict
+            }
+
+            # assemble chunk-wise boolean blocks into an n-dimensional nested list
+            nested_list = _nested_list_from_chunk_keys(array_boolean_chunk_dict)
+
+            # assemble into the full result
+            result = np.block(nested_list)
+
+            # trim off any extra elements due to the final zarr chunk potentially having a different size
+            indexer = tuple([slice(None, length) for length in self.shape])
+            return result[indexer]
 
     def __getitem__(
         self,
@@ -228,6 +250,29 @@ class ManifestArray:
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+
+# Define type for arbitrarily-nested list of lists recursively:
+OBJECT_LIST_HYPERCUBE = Union[Any, List["OBJECT_LIST_HYPERCUBE"]]
+
+
+def _nested_list_from_chunk_keys(chunk_dict: dict[str, Any]) -> OBJECT_LIST_HYPERCUBE:
+    """Takes a mapping of chunk keys to values and returns an n-dimensional nested list containing those values in order."""
+
+    first_key, *other_keys = chunk_dict.keys()
+    ndim = get_ndim_from_key(first_key)
+
+    _chunk_dict = chunk_dict
+    for _ in range(ndim):
+        _chunk_dict = _stack_along_final_dim(_chunk_dict)
+
+    nested_list = _chunk_dict[""]
+    return nested_list
+
+
+def _stack_along_final_dim(d: dict[str, Any]) -> OBJECT_LIST_HYPERCUBE:
+    *other_key_indices, order = split(key)
+    order =  
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):
