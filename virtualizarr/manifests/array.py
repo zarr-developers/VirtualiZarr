@@ -144,7 +144,7 @@ class ManifestArray:
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
 
-    # Everything beyond here is basically to make this array class wrappable by xarray #
+    # Everything beyond here is basically just to make this array class wrappable by xarray #
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
@@ -192,6 +192,13 @@ class ManifestArray:
                 # TODO expand it into an element-wise result
                 return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
 
+    def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
+        """Needed because xarray will call this even when it's a no-op"""
+        if dtype != self.dtype:
+            raise NotImplementedError()
+        else:
+            return self
+
     def __getitem__(
         self,
         key,
@@ -200,7 +207,7 @@ class ManifestArray:
         """
         Only supports extremely limited indexing.
 
-        I only added this method because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
+        Only here because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
         """
         from xarray.core.indexing import BasicIndexer
 
@@ -221,7 +228,6 @@ class ManifestArray:
             for axis_indexer in indexer
         ):
             # indexer is all slice(None)'s, so this is a no-op
-            print("__getitem__ called with a no-op")
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
