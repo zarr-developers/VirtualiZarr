@@ -30,7 +30,6 @@ installation
 usage
 how_it_works
 dev_status_roadmap
-
+api
 
 ```
-

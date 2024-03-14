@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'virtualizarr'
-copyright = '2024, Thomas Nicholas'
-author = 'Thomas Nicholas'
+project = "virtualizarr"
+copyright = "2024, Thomas Nicholas"
+author = "Thomas Nicholas"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -23,9 +23,8 @@ extensions = [
     "sphinx_togglebutton",
     "sphinx_design",
 ]
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -40,7 +39,7 @@ html_theme_options = {
 
 html_logo = "_static/_future_logo.png"
 
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 
 # issues
