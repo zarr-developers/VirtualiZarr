@@ -101,6 +101,35 @@ class TestEquals:
         assert result.dtype == np.dtype(bool)
         assert result.all()
 
+    def test_not_equal_chunk_entries(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 1, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 1, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        assert not (marr1 == marr2).all()
+
+    @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self):
         ...
 

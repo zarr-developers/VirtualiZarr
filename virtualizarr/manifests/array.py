@@ -1,4 +1,5 @@
 import re
+import warnings
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
@@ -180,10 +181,19 @@ class ManifestArray:
         if self.zarray != other.zarray:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
-            # TODO do chunk-wise comparison
+            if self.manifest == other.manifest:
+                return np.full(shape=self.shape, fill_value=True, dtype=np.dtype(bool))
+            else:
+                # TODO this doesn't yet do what it should - it simply returns all False if any of the chunk entries are different.
+                # What it should do is return True for the locations where the chunk entries are the same.
+                warnings.warn(
+                    "__eq__ currently is over-cautious, returning an array of all False if any of the chunk entries don't match.",
+                    UserWarning,
+                )
 
-            # TODO expand it into an element-wise result
-            return np.full(shape=self.shape, fill_value=True, dtype=np.dtype(bool))
+                # TODO do chunk-wise comparison
+                # TODO expand it into an element-wise result
+                return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
 
     def __getitem__(
         self,
