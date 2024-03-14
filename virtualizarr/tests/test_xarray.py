@@ -5,6 +5,35 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
 
+def test_wrapping():
+    chunks = (5, 10)
+    shape = (5, 20)
+    dtype = np.dtype("int32")
+    zarray = ZArray(
+        chunks=chunks,
+        compressor="zlib",
+        dtype=dtype,
+        fill_value=0.0,
+        filters=None,
+        order="C",
+        shape=shape,
+        zarr_format=2,
+    )
+
+    chunks_dict = {
+        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+    }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+    ds = xr.Dataset({"a": (["x", "y"], marr)})
+
+    assert isinstance(ds["a"].data, ManifestArray)
+    assert ds["a"].shape == shape
+    assert ds["a"].dtype == dtype
+    assert ds["a"].chunks == chunks
+
+
 class TestEquals:
     # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
     def test_equals(self):
