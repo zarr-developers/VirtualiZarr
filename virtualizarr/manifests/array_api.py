@@ -252,7 +252,6 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
     """
     Broadcasts an array to a specified shape, by either manipulating chunk keys or copying chunk manifest entries.
     """
-    print(f"requested broadcasting array from shape {x.shape} to shape {shape}")
 
     if len(x.shape) > len(shape):
         raise ValueError("input operand has more dimensions than allowed")
