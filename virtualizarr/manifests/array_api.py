@@ -86,10 +86,10 @@ def result_type(*arrays_and_dtypes) -> np.dtype:
 
 @implements(np.concatenate)
 def concatenate(
-    arrays: tuple["ManifestArray", ...] | list["ManifestArray"],
+    arrays: Union[tuple["ManifestArray", ...], list["ManifestArray"]],
     /,
     *,
-    axis: int | None = 0,
+    axis: Union[int, None] = 0,
 ) -> "ManifestArray":
     """
     Concatenate ManifestArrays by merging their chunk manifests.
@@ -174,7 +174,7 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
 
 @implements(np.stack)
 def stack(
-    arrays: tuple["ManifestArray", ...] | list["ManifestArray"],
+    arrays: Union[tuple["ManifestArray", ...], list["ManifestArray"]],
     /,
     *,
     axis: int = 0,
