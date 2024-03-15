@@ -1,4 +1,4 @@
-from typing import Any, Literal, NewType, Optional, Tuple
+from typing import Any, Literal, NewType, Optional, Tuple, Union
 
 import numpy as np
 import ujson  # type: ignore
@@ -32,9 +32,9 @@ class ZArray(BaseModel):
     dtype: np.dtype
     fill_value: Optional[float] = None  # float or int?
     filters: Optional[str] = None
-    order: Literal["C"] | Literal["F"]
+    order: Union[Literal["C"], Literal["F"]]
     shape: Tuple[int, ...]
-    zarr_format: Literal[2] | Literal[3] = 2
+    zarr_format: Union[Literal[2], Literal[3]] = 2
 
     @field_validator("dtype")
     @classmethod
