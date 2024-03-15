@@ -2,7 +2,7 @@ from typing import Any, Literal, NewType, Optional, Tuple
 
 import numpy as np
 import ujson  # type: ignore
-from pydantic import BaseModel, ConfigDict, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
@@ -11,8 +11,8 @@ ZAttrs = NewType(
 
 
 class Codec(BaseModel):
-    compressor: Optional[str]
-    filters: Optional[str]
+    compressor: Optional[str] = None
+    filters: Optional[str] = None
 
     def __repr__(self) -> str:
         return f"Codec(compressor={self.compressor}, filters={self.filters})"
@@ -28,15 +28,16 @@ class ZArray(BaseModel):
     )
 
     chunks: Tuple[int, ...]
-    compressor: Optional[str]
+    compressor: Optional[str] = None
     dtype: np.dtype
-    fill_value: Optional[float]  # float or int?
-    filters: Optional[str]
+    fill_value: Optional[float] = None  # float or int?
+    filters: Optional[str] = None
     order: Literal["C"] | Literal["F"]
     shape: Tuple[int, ...]
     zarr_format: Literal[2] | Literal[3] = 2
 
-    @validator("dtype")
+    @field_validator("dtype")
+    @classmethod
     def validate_dtype(cls, dtype) -> np.dtype:
         # Your custom validation logic here
         # Convert numpy.dtype to a format suitable for Pydantic
@@ -82,7 +83,7 @@ class ZArray(BaseModel):
         )
 
     def to_kerchunk_json(self) -> str:
-        zarray_dict = self.dict()
+        zarray_dict = dict(self)
         # TODO not sure if there is a better way to get the '<i4' style representation of the dtype out
         zarray_dict["dtype"] = zarray_dict["dtype"].descr[0][1]
         return ujson.dumps(zarray_dict)

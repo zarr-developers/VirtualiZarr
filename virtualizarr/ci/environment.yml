@@ -1,0 +1,18 @@
+name: virtualizarr-test
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.9
+  - netcdf4
+  - pytest
+  - flake8
+  - black
+  - codecov
+  - pytest-cov
+  - h5netcdf
+  - kerchunk
+  - ujson
+  - pydantic
+  - pip:
+      - xarray>=2024.02.0.dev0
