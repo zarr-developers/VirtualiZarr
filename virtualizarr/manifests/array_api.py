@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union
+import itertools
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union, cast
 
 import numpy as np
 
@@ -237,6 +238,50 @@ def _check_same_shapes(shapes: List[Tuple[int, ...]]) -> None:
             raise ValueError(
                 f"Cannot concatenate arrays with differing shapes: {first_shape} vs {other_shape}"
             )
+
+
+@implements(np.expand_dims)
+def expand_dims(x: "ManifestArray", /, *, axis: int = 0) -> "ManifestArray":
+    """Expands the shape of an array by inserting a new axis (dimension) of size one at the position specified by axis."""
+    # this is just a special case of stacking
+    return stack([x], axis=axis)
+
+
+@implements(np.broadcast_to)
+def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArray":
+    """
+    Broadcasts an array to a specified shape, by either manipulating chunk keys or copying chunk manifest entries.
+    """
+    print(f"requested broadcasting array from shape {x.shape} to shape {shape}")
+
+    if len(x.shape) > len(shape):
+        raise ValueError("input operand has more dimensions than allowed")
+
+    # numpy broadcasting algorithm requires us to start by comparing the length of the final axes and work backwards
+    result = x
+    for axis, d, d_requested in itertools.zip_longest(
+        reversed(range(len(shape))), reversed(x.shape), reversed(shape), fillvalue=None
+    ):
+        # len(shape) check above ensures this can't be type None
+        d_requested = cast(int, d_requested)
+
+        if d == d_requested:
+            pass
+        elif d is None:
+            # stack same array upon itself d_requested number of times, which inserts a new axis at axis=0
+            result = stack([result] * d_requested, axis=0)
+        elif d == 1:
+            # concatenate same array upon itself d_requested number of times along existing axis
+            result = concatenate([result] * d_requested, axis=axis)
+        else:
+            raise ValueError(
+                f"Array with shape {x.shape} cannot be broadcast to shape {shape}"
+            )
+
+    return result
+
+
+# TODO broadcast_arrays, squeeze, permute_dims
 
 
 @implements(np.full_like)
