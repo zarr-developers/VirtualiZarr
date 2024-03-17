@@ -23,7 +23,6 @@ dynamic = ["version"]
 dependencies = [
     "xarray",
     "kerchunk",
-    "ujson",
     "pydantic",
     "packaging",
 ]
@@ -35,22 +34,9 @@ test = [
     "pytest",
 ]
 
-docs = [
-    "sphinx",
-    "pydata_sphinx_theme",
-    "sphinx-autodoc-typehints",
-    "sphinx_copybutton",
-    "sphinx_togglebutton",
-    "sphinx_design",
-    "myst_nb"
-]
 
 
 
-[project.optional-dependencies]
-test = [
-    "pytest"
-]
 
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"
