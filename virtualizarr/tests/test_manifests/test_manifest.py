@@ -9,7 +9,7 @@ class TestCreateManifest:
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
-        manifest = ChunkManifest(entries=chunks)
+        manifest = ChunkManifest.from_dict(chunks)
         assert manifest.dict() == chunks
 
         chunks = {
@@ -18,7 +18,7 @@ class TestCreateManifest:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest(entries=chunks)
+        manifest = ChunkManifest.from_dict(chunks)
         assert manifest.dict() == chunks
 
     def test_invalid_chunk_entries(self):
@@ -26,7 +26,7 @@ class TestCreateManifest:
             "0.0.0": {"path": "s3://bucket/foo.nc"},
         }
         with pytest.raises(ValidationError, match="missing"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
         chunks = {
             "0.0.0": {
@@ -36,21 +36,21 @@ class TestCreateManifest:
             },
         }
         with pytest.raises(ValidationError, match="should be a valid integer"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
     def test_invalid_chunk_keys(self):
         chunks = {
             "0.0.": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         with pytest.raises(ValueError, match="Invalid format for chunk key: '0.0.'"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
         chunks = {
             "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
         }
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -58,13 +58,13 @@ class TestCreateManifest:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
         }
         with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
         chunks = {
             "1": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest(entries=chunks)
+            ChunkManifest.from_dict(chunks)
 
 
 class TestProperties:
