@@ -80,6 +80,24 @@ class TestProperties:
         assert manifest.shape_chunk_grid == (1, 2, 2)
 
 
+class TestEquals:
+    def test_equals(self):
+        manifest1 = ChunkManifest(
+            entries={
+                "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            }
+        )
+        manifest2 = ChunkManifest(
+            entries={
+                "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+                "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            }
+        )
+        assert not manifest1 == manifest2
+        assert manifest1 != manifest2
+
+
 # TODO could we use hypothesis to test this?
 # Perhaps by testing the property that splitting along a dimension then concatenating the pieces along that dimension should recreate the original manifest?
 class TestCombineManifests:

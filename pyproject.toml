@@ -23,6 +23,7 @@ dynamic = ["version"]
 dependencies = [
     "xarray",
     "kerchunk",
+    "ujson",
     "pydantic",
     "packaging",
 ]

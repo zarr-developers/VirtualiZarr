@@ -1,5 +1,6 @@
 from typing import List, Literal, Optional, Union, overload
 
+import ujson  # type: ignore
 import xarray as xr
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
@@ -143,7 +144,7 @@ def separate_coords(
     return data_vars, coords
 
 
-@register_dataset_accessor("virtualizarr")
+@register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
     def __init__(self, ds):
         self.ds = ds
@@ -197,7 +198,13 @@ class VirtualiZarrDatasetAccessor:
         if format == "dict":
             return refs
         elif format == "json":
-            raise NotImplementedError()
+            if filepath is None:
+                raise ValueError("Filepath must be provided when format is 'json'")
+
+            with open(filepath, "w") as json_file:
+                ujson.dump(refs, json_file)
+
+            return None
         elif format == "parquet":
             raise NotImplementedError()
         else:

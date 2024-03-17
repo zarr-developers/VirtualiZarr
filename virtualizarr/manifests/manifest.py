@@ -3,7 +3,7 @@ import re
 from typing import Any, Iterable, Iterator, List, Mapping, Tuple, Union, cast
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..types import ChunkKey
 
@@ -37,6 +37,10 @@ class ChunkEntry(BaseModel):
         path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
+    def to_kerchunk(self) -> List[Union[str, int]]:
+        """Write out in the format that kerchunk uses for chunk entries."""
+        return [self.path, self.offset, self.length]
+
 
 class ChunkManifest(BaseModel):
     """
@@ -62,7 +66,8 @@ class ChunkManifest(BaseModel):
     entries: Mapping[ChunkKey, ChunkEntry]
     # shape_chunk_grid: Tuple[int, ...]  # TODO do we need this for anything?
 
-    @validator("entries")
+    @field_validator("entries")
+    @classmethod
     def validate_chunks(cls, entries: Any) -> Mapping[ChunkKey, ChunkEntry]:
         validate_chunk_keys(list(entries.keys()))
 
@@ -101,7 +106,7 @@ class ChunkManifest(BaseModel):
 
     def dict(self) -> dict[str, dict[str, Union[str, int]]]:
         """Converts the entire manifest to a nested dictionary."""
-        return {k: entry.dict() for k, entry in self.entries.items()}
+        return {k: dict(entry) for k, entry in self.entries.items()}
 
     @staticmethod
     def from_zarr_json(filepath: str) -> "ChunkManifest":

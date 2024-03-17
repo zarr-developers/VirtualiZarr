@@ -1,35 +1,166 @@
 import numpy as np
+import xarray as xr
 
-from virtualizarr.manifests import ManifestArray
-from virtualizarr.xarray import dataset_from_kerchunk_refs
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.zarr import ZArray
 
 
-def test_dataset_from_kerchunk_refs():
-    ds_refs = {
-        "version": 1,
-        "refs": {
-            ".zgroup": '{"zarr_format":2}',
-            "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
-            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
-            "a/0.0": ["test1.nc", 6144, 48],
-        },
+def test_wrapping():
+    chunks = (5, 10)
+    shape = (5, 20)
+    dtype = np.dtype("int32")
+    zarray = ZArray(
+        chunks=chunks,
+        compressor="zlib",
+        dtype=dtype,
+        fill_value=0.0,
+        filters=None,
+        order="C",
+        shape=shape,
+        zarr_format=2,
+    )
+
+    chunks_dict = {
+        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
     }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+    ds = xr.Dataset({"a": (["x", "y"], marr)})
 
-    ds = dataset_from_kerchunk_refs(ds_refs)
+    assert isinstance(ds["a"].data, ManifestArray)
+    assert ds["a"].shape == shape
+    assert ds["a"].dtype == dtype
+    assert ds["a"].chunks == chunks
 
-    assert "a" in ds
-    da = ds["a"]
-    assert isinstance(da.data, ManifestArray)
-    assert da.dims == ("x", "y")
-    assert da.shape == (2, 3)
-    assert da.chunks == (2, 3)
-    assert da.dtype == np.dtype("<i8")
 
-    assert da.data.zarray.compressor is None
-    assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is None
-    assert da.data.zarray.order == "C"
+class TestEquals:
+    # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
+    def test_equals(self):
+        chunks = (5, 10)
+        shape = (5, 20)
+        zarray = ZArray(
+            chunks=chunks,
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
 
-    assert da.data.manifest.dict() == {
-        "0.0": {"path": "test1.nc", "offset": 6144, "length": 48}
-    }
+        chunks_dict1 = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
+
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
+        assert ds1.equals(ds2)
+
+        chunks_dict3 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest3 = ChunkManifest(entries=chunks_dict3)
+        marr3 = ManifestArray(zarray=zarray, chunkmanifest=manifest3)
+        ds3 = xr.Dataset({"a": (["x", "y"], marr3)})
+        assert not ds1.equals(ds3)
+
+
+class TestConcat:
+    def test_concat_along_existing_dim(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(1, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(1, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
+
+        chunks_dict2 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
+
+        result = xr.concat([ds1, ds2], dim="x")["a"]
+
+        assert result.shape == (2, 20)
+        assert result.chunks == (1, 10)
+        assert result.data.manifest.dict() == {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.data.zarray.compressor == zarray.compressor
+        assert result.data.zarray.filters == zarray.filters
+        assert result.data.zarray.fill_value == zarray.fill_value
+        assert result.data.zarray.order == zarray.order
+        assert result.data.zarray.zarr_format == zarray.zarr_format
+
+    def test_concat_along_new_dim(self):
+        # this calls np.stack internally
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 10),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
+
+        chunks_dict2 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
+
+        result = xr.concat([ds1, ds2], dim="z")["a"]
+
+        # xarray.concat adds new dimensions along axis=0
+        assert result.shape == (2, 5, 20)
+        assert result.chunks == (1, 5, 10)
+        assert result.data.manifest.dict() == {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "1.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "1.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.data.zarray.compressor == zarray.compressor
+        assert result.data.zarray.filters == zarray.filters
+        assert result.data.zarray.fill_value == zarray.fill_value
+        assert result.data.zarray.order == zarray.order
+        assert result.data.zarray.zarr_format == zarray.zarr_format
