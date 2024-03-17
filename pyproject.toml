@@ -36,7 +36,7 @@ test = [
 
 docs = [
     "sphinx",
-    "pangeo-sphinx-book-theme",
+    "pydata_sphinx_theme",
     "sphinx-autodoc-typehints",
     "sphinx_copybutton",
     "sphinx_togglebutton",
