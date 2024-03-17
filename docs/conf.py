@@ -30,7 +30,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "pangeo_sphinx_book_theme"
+html_theme = "pydata_sphinx_theme"
 html_theme_options = {
     "repository_url": "https://github.com/TomNicholas/VirtualiZarr",
     "repository_branch": "main",
