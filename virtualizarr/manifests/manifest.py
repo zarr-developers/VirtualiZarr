@@ -1,4 +1,3 @@
-import itertools
 import re
 from typing import Any, Iterable, Iterator, List, Mapping, NewType, Tuple, Union, cast
 
@@ -88,6 +87,7 @@ class ChunkManifest(BaseModel):
     @classmethod
     def from_dict(cls, chunks: ChunkDict) -> "ChunkManifest":
         # TODO do some input validation here first?
+        validate_chunk_keys(chunks.keys())
 
         # TODO should we actually pass shape in, in case there are not enough chunks to give correct idea of full shape?
         shape = get_chunk_grid_shape(chunks.keys())
@@ -97,7 +97,14 @@ class ChunkManifest(BaseModel):
 
         # populate the array
         for key, entry in chunks.items():
-            entries[split(key)] = tuple(entry.values())
+            try:
+                entries[split(key)] = tuple(entry.values())
+            except (ValueError, TypeError) as e:
+                msg = (
+                    "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
+                    f"but got {entry}"
+                )
+                raise ValueError(msg) from e
 
         return ChunkManifest(entries=entries)
 
@@ -214,9 +221,6 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
                 f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
             )
 
-    # Check that the keys collectively form a complete grid
-    check_keys_form_grid(chunk_keys)
-
 
 def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
     # find max chunk index along each dimension
@@ -225,24 +229,6 @@ def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )
     return chunk_grid_shape
-
-
-def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]):
-    """Check that the chunk keys collectively form a complete grid"""
-
-    chunk_grid_shape = get_chunk_grid_shape(chunk_keys)
-
-    # create every possible combination
-    all_possible_combos = itertools.product(
-        *[range(length) for length in chunk_grid_shape]
-    )
-    all_required_chunk_keys: set[ChunkKey] = set(
-        join(inds) for inds in all_possible_combos
-    )
-
-    # check that every possible combination is represented once in the list of chunk keys
-    if set(chunk_keys) != all_required_chunk_keys:
-        raise ValueError("Chunk keys do not form a complete grid")
 
 
 def concat_manifests(manifests: List["ChunkManifest"], axis: int) -> "ChunkManifest":

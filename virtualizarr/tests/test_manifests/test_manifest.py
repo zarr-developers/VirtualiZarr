@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 from virtualizarr.manifests import ChunkManifest, concat_manifests, stack_manifests
 
@@ -25,7 +24,7 @@ class TestCreateManifest:
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc"},
         }
-        with pytest.raises(ValidationError, match="missing"):
+        with pytest.raises(ValueError, match="must be of the form"):
             ChunkManifest.from_dict(chunks)
 
         chunks = {
@@ -35,7 +34,7 @@ class TestCreateManifest:
                 "length": 100,
             },
         }
-        with pytest.raises(ValidationError, match="should be a valid integer"):
+        with pytest.raises(ValueError, match="must be of the form"):
             ChunkManifest.from_dict(chunks)
 
     def test_invalid_chunk_keys(self):
@@ -52,20 +51,6 @@ class TestCreateManifest:
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
             ChunkManifest.from_dict(chunks)
 
-        chunks = {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        }
-        with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest.from_dict(chunks)
-
-        chunks = {
-            "1": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        }
-        with pytest.raises(ValueError, match="do not form a complete grid"):
-            ChunkManifest.from_dict(chunks)
-
 
 class TestProperties:
     def test_chunk_grid_info(self):
@@ -75,21 +60,21 @@ class TestProperties:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest(entries=chunks)
+        manifest = ChunkManifest.from_dict(chunks)
         assert manifest.ndim_chunk_grid == 3
         assert manifest.shape_chunk_grid == (1, 2, 2)
 
 
 class TestEquals:
     def test_equals(self):
-        manifest1 = ChunkManifest(
-            entries={
+        manifest1 = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
             }
         )
-        manifest2 = ChunkManifest(
-            entries={
+        manifest2 = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
             }
@@ -102,21 +87,21 @@ class TestEquals:
 # Perhaps by testing the property that splitting along a dimension then concatenating the pieces along that dimension should recreate the original manifest?
 class TestCombineManifests:
     def test_concat(self):
-        manifest1 = ChunkManifest(
-            entries={
+        manifest1 = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
             }
         )
-        manifest2 = ChunkManifest(
-            entries={
+        manifest2 = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
             }
         )
         axis = 1
-        expected = ChunkManifest(
-            entries={
+        expected = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
                 "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
@@ -128,21 +113,21 @@ class TestCombineManifests:
         assert result.dict() == expected.dict()
 
     def test_stack(self):
-        manifest1 = ChunkManifest(
-            entries={
+        manifest1 = ChunkManifest.from_dict(
+            {
                 "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
             }
         )
-        manifest2 = ChunkManifest(
-            entries={
+        manifest2 = ChunkManifest.from_dict(
+            {
                 "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
                 "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
             }
         )
         axis = 1
-        expected = ChunkManifest(
-            entries={
+        expected = ChunkManifest.from_dict(
+            {
                 "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
                 "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
