@@ -33,23 +33,29 @@ def read_kerchunk_references_from_file(
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     """
 
-    import kerchunk
-
     if filetype is None:
         filetype = _automatically_determine_filetype(filepath)
 
     if filetype == "netCDF3":
-        refs = kerchunk.netCDF3.NetCDF3ToZarr(filepath).translate()
+        from kerchunk.netCDF3 import SingleHdf5ToZarr
+
+        refs = SingleHdf5ToZarr.NetCDF3ToZarr(filepath).translate()
     elif filetype == "netCDF4":
-        refs = kerchunk.hdf.SingleHdf5ToZarr(filepath).translate()
+        from kerchunk.hdf import SingleHdf5ToZarr
+
+        refs = SingleHdf5ToZarr(filepath).translate()
     elif filetype == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
         raise NotImplementedError(f"Unsupported file type: {filetype}")
     elif filetype == "tiff":
-        refs = kerchunk.tiff.tiff_to_zarr(filepath)
+        from kerchunk.tiff import tiff_to_zarr
+
+        refs = tiff_to_zarr(filepath)
     elif filetype == "fits":
-        refs = kerchunk.fits.process_file(filepath)
+        from kerchunk.fits import process_file
+
+        refs = process_file(filepath)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype}")
 
