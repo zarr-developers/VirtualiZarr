@@ -4,13 +4,13 @@ channels:
   - nodefaults
 dependencies:
   - python>=3.9
-  - "sphinx_design"
   - "sphinx"
   - pip
   - pip:
-      - "pydata_sphinx_theme"
       - "myst_nb"
+      - "pydata_sphinx_theme"
       - "sphinx_copybutton"
+      - "sphinx_design"
       - "sphinx_togglebutton"
       - "sphinx-autodoc-typehints"
       - -e ..
