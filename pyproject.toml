@@ -1,3 +1,4 @@
+
 [project]
 name = "virtualizarr"
 description = "Create virtual Zarr stores from archival data using xarray API"
@@ -18,19 +19,24 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 requires-python = ">=3.9"
+dynamic = ["version"]
 dependencies = [
     "xarray",
     "kerchunk",
-    "ujson",
     "pydantic",
     "packaging",
 ]
-dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
-    "pytest"
+    "pre-commit",
+    "pytest-mypy",
+    "pytest",
 ]
+
+
+
+
 
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"
