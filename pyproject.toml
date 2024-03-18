@@ -32,6 +32,8 @@ test = [
     "pre-commit",
     "pytest-mypy",
     "pytest",
+    "pooch",
+    "netcdf4-python",
 ]
 
 
