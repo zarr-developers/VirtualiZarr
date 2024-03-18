@@ -1,6 +1,7 @@
+import numpy as np
 import pytest
 
-from virtualizarr.manifests import ChunkManifest, concat_manifests, stack_manifests
+from virtualizarr.manifests import ChunkManifest
 
 
 class TestCreateManifest:
@@ -108,7 +109,10 @@ class TestCombineManifests:
             }
         )
 
-        result = concat_manifests([manifest1, manifest2], axis=axis)
+        result_manifest = np.concatenate(
+            [manifest1.entries, manifest2.entries], axis=axis
+        )
+        result = ChunkManifest(entries=result_manifest)
         assert result.dict() == expected.dict()
 
     def test_stack(self):
@@ -134,7 +138,8 @@ class TestCombineManifests:
             }
         )
 
-        result = stack_manifests([manifest1, manifest2], axis=axis)
+        result_manifest = np.stack([manifest1.entries, manifest2.entries], axis=axis)
+        result = ChunkManifest(entries=result_manifest)
         assert result.dict() == expected.dict()
 
 

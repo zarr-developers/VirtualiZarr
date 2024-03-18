@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union, 
 import numpy as np
 
 from ..zarr import Codec, ZArray
-from .manifest import concat_manifests, stack_manifests
+from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
     from .array import ManifestArray
@@ -123,10 +123,11 @@ def concatenate(
     new_shape = list(first_shape)
     new_shape[axis] = new_length_along_concat_axis
 
-    concatenated_manifest = concat_manifests(
-        [arr.manifest for arr in arrays],
+    concatenated_manifest_entries = np.concatenate(
+        [arr.manifest.entries for arr in arrays],
         axis=axis,
     )
+    concatenated_manifest = ChunkManifest(entries=concatenated_manifest_entries)
 
     new_zarray = ZArray(
         chunks=first_arr.chunks,
@@ -206,10 +207,11 @@ def stack(
     new_shape = list(first_shape)
     new_shape.insert(axis, length_along_new_stacked_axis)
 
-    stacked_manifest = stack_manifests(
-        [arr.manifest for arr in arrays],
+    stacked_manifest_entries = np.stack(
+        [arr.manifest.entries for arr in arrays],
         axis=axis,
     )
+    stacked_manifest = ChunkManifest(entries=stacked_manifest_entries)
 
     # chunk size has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks

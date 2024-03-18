@@ -1,5 +1,5 @@
 import re
-from typing import Any, Iterable, Iterator, List, Mapping, NewType, Tuple, Union, cast
+from typing import Any, Iterable, Iterator, List, NewType, Tuple, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -13,9 +13,7 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-ChunkDict = NewType(
-    "ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]]
-)  # just the .zattrs (for one array or for the whole store/group)
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]])
 
 
 class ChunkEntry(BaseModel):
@@ -190,7 +188,7 @@ class ChunkManifest(BaseModel):
         chunkentries = {
             k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
         }
-        return ChunkManifest(entries=chunkentries)
+        return ChunkManifest.from_dict(chunkentries)
 
 
 def split(key: ChunkKey) -> Tuple[int, ...]:
@@ -230,81 +228,3 @@ def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )
     return chunk_grid_shape
-
-
-def concat_manifests(manifests: List["ChunkManifest"], axis: int) -> "ChunkManifest":
-    """
-    Concatenate manifests along an existing dimension.
-
-    This only requires adjusting one index of chunk keys along a single dimension.
-
-    Note axis is not expected to be negative.
-    """
-    if len(manifests) == 1:
-        return manifests[0]
-
-    chunk_grid_shapes = [manifest.shape_chunk_grid for manifest in manifests]
-    lengths_along_concat_dim = [shape[axis] for shape in chunk_grid_shapes]
-
-    # Note we do not need to change the keys of the first manifest
-    chunk_index_offsets = np.cumsum(lengths_along_concat_dim)[:-1]
-    new_entries = [
-        adjust_chunk_keys(manifest.entries, axis, offset)
-        for manifest, offset in zip(manifests[1:], chunk_index_offsets)
-    ]
-    all_entries = [manifests[0].entries] + new_entries
-    merged_entries = dict((k, v) for d in all_entries for k, v in d.items())
-
-    # Arguably don't need to re-perform validation checks on a manifest we created out of already-validated manifests
-    # Could use pydantic's model_construct classmethod to skip these checks
-    # But we should actually performance test it because it might be pointless, and current implementation is safer
-    return ChunkManifest(entries=merged_entries)
-
-
-def adjust_chunk_keys(
-    entries: Mapping[ChunkKey, ChunkEntry], axis: int, offset: int
-) -> Mapping[ChunkKey, ChunkEntry]:
-    """Replace all chunk keys with keys which have been offset along one axis."""
-
-    def offset_key(key: ChunkKey, axis: int, offset: int) -> ChunkKey:
-        inds = split(key)
-        inds[axis] += offset
-        return join(inds)
-
-    return {offset_key(k, axis, offset): v for k, v in entries.items()}
-
-
-def stack_manifests(manifests: List[ChunkManifest], axis: int) -> "ChunkManifest":
-    """
-    Stack manifests along a new dimension.
-
-    This only requires inserting one index into all chunk keys to add a new dimension.
-
-    Note axis is not expected to be negative.
-    """
-
-    # even if there is only one manifest it still needs a new axis inserted
-    chunk_indexes_along_new_dim = range(len(manifests))
-    new_entries = [
-        insert_new_axis_into_chunk_keys(manifest.entries, axis, new_index_value)
-        for manifest, new_index_value in zip(manifests, chunk_indexes_along_new_dim)
-    ]
-    merged_entries = dict((k, v) for d in new_entries for k, v in d.items())
-
-    # Arguably don't need to re-perform validation checks on a manifest we created out of already-validated manifests
-    # Could use pydantic's model_construct classmethod to skip these checks
-    # But we should actually performance test it because it might be pointless, and current implementation is safer
-    return ChunkManifest(entries=merged_entries)
-
-
-def insert_new_axis_into_chunk_keys(
-    entries: Mapping[ChunkKey, ChunkEntry], axis: int, new_index_value: int
-) -> Mapping[ChunkKey, ChunkEntry]:
-    """Replace all chunk keys with keys which have a new axis inserted, with a given value."""
-
-    def insert_axis(key: ChunkKey, new_axis: int, index_value: int) -> ChunkKey:
-        inds = split(key)
-        inds.insert(new_axis, index_value)
-        return join(inds)
-
-    return {insert_axis(k, axis, new_index_value): v for k, v in entries.items()}
