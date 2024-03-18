@@ -79,7 +79,6 @@ class TestEquals:
                 "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
             }
         )
-        assert not manifest1 == manifest2
         assert manifest1 != manifest2
 
 

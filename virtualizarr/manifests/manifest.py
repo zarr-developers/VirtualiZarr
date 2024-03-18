@@ -158,22 +158,23 @@ class ChunkManifest(BaseModel):
                 "length": entry[2],
             }
 
-        # print(self.entries.dtype)
-
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
-        # print(coord_vectors)
-        # print(self.entries)
 
-        # TODO don't include entry if path='' ?
         return cast(
             ChunkDict,
             {
                 join(inds): _entry_to_dict(entry.item())
                 for *inds, entry in np.nditer([*coord_vectors, self.entries])
+                if entry.item()[0]
+                != ""  # don't include entry if path='' (i.e. empty chunk)
             },
         )
+
+    def __eq__(self, other: Any) -> bool:
+        """Two manifests are equal if all of their entries are identical."""
+        return (self.entries == other.entries).all()
 
     @staticmethod
     def from_zarr_json(filepath: str) -> "ChunkManifest":
