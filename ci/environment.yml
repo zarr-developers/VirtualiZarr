@@ -15,5 +15,6 @@ dependencies:
   - ujson
   - pydantic
   - pooch
+  - fsspec
   - pip:
       - xarray>=2024.02.0.dev0

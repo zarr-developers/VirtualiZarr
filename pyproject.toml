@@ -32,6 +32,7 @@ test = [
     "pre-commit",
     "pytest-mypy",
     "pytest",
+    "fsspec",
     "pooch",
     "netcdf4-python",
 ]
