@@ -43,6 +43,9 @@ class ChunkEntry(BaseModel):
         """Write out in the format that kerchunk uses for chunk entries."""
         return [self.path, self.offset, self.length]
 
+    def dict(self) -> dict[str, Union[str, int]]:
+        return dict(path=self.path, offset=self.offset, length=self.length)
+
 
 # TODO we want the path field to contain a variable-length string, but that's not available until numpy 2.0
 # See https://numpy.org/neps/nep-0055-string_dtype.html
@@ -186,9 +189,10 @@ class ChunkManifest(BaseModel):
     @classmethod
     def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
         chunkentries = {
-            k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
+            cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
+            for k, v in kerchunk_chunk_dict.items()
         }
-        return ChunkManifest.from_dict(chunkentries)
+        return ChunkManifest.from_dict(cast(ChunkDict, chunkentries))
 
 
 def split(key: ChunkKey) -> Tuple[int, ...]:
