@@ -17,4 +17,4 @@ dependencies:
   - pooch
   - fsspec
   - pip:
-      - xarray>=2024.02.0.dev0
+      - xarray==https://github.com/TomNicholas/xarray.git@opt-out-auto-create-index-variables#egg=xarray
