@@ -3,6 +3,7 @@ import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
 
+from virtualizarr.kerchunk import _automatically_determine_filetype
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
@@ -130,3 +131,17 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
 
     # Assert equal to original dataset
     xrt.assert_equal(roundtrip, ds)
+
+
+def test_automatically_determine_filetype_netcdf3_netcdf4():
+    # test the NetCDF3 vs NetCDF4 automatic file type selection
+
+    ds = xr.Dataset({"a": (["x"], [0, 1])})
+    netcdf3_file_path = "/tmp/netcdf3.nc"
+    netcdf4_file_path = "/tmp/netcdf4.nc"
+
+    # write two version of NetCDF
+    ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
+    ds.to_netcdf(netcdf4_file_path)
+    assert "netCDF3" == _automatically_determine_filetype(netcdf3_file_path)
+    assert "netCDF4" == _automatically_determine_filetype(netcdf4_file_path)
