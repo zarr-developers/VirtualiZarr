@@ -40,7 +40,7 @@ jobs:
 
       - name: Install virtualizarr
         run: |
-           python -m pip install -e  ".[test]" 
+           python -m pip install -e  ".[test]"
 
       - name: Conda list
         run: conda list
