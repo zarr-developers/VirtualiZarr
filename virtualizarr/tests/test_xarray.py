@@ -72,6 +72,7 @@ class TestEquals:
         assert not ds1.equals(ds3)
 
 
+# TODO refactor these tests by making some fixtures
 class TestConcat:
     def test_concat_along_existing_dim(self):
         # both manifest arrays in this example have the same zarray properties
@@ -158,6 +159,61 @@ class TestConcat:
             "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
             "1.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "1.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.data.zarray.compressor == zarray.compressor
+        assert result.data.zarray.filters == zarray.filters
+        assert result.data.zarray.fill_value == zarray.fill_value
+        assert result.data.zarray.order == zarray.order
+        assert result.data.zarray.zarr_format == zarray.zarr_format
+
+    def test_concat_dim_coords_along_existing_dim(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(10,),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(20,),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        coords = xr.Coordinates({"t": (["t"], marr1)}, indexes={})
+        ds1 = xr.Dataset(coords=coords)
+
+        chunks_dict2 = {
+            "0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        coords = xr.Coordinates({"t": (["t"], marr2)}, indexes={})
+        ds2 = xr.Dataset(coords=coords)
+
+        # TODO this fails because xr.concat tries to rebuild indexes on dimension coordinates automatically
+        # should there be a join='ignore' option?
+        result = xr.concat([ds1, ds2], dim="t", coords="minimal", compat="override")[
+            "a"
+        ]
+
+        # TODO this also causes a separate problem
+        # TypeError: Could not find a Chunk Manager which recognises type <class 'virtualizarr.manifests.array.ManifestArray'>
+        # result = xr.concat([ds1, ds2], dim="x")["a"]
+
+        assert result.shape == (40,)
+        assert result.chunks == (10,)
+        assert result.data.manifest.dict() == {
+            "0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "2": {"path": "foo.nc", "offset": 300, "length": 100},
+            "3": {"path": "foo.nc", "offset": 400, "length": 100},
         }
         assert result.data.zarray.compressor == zarray.compressor
         assert result.data.zarray.filters == zarray.filters
