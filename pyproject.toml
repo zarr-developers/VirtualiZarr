@@ -29,12 +29,14 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
+    "netCDF4",
     "pre-commit",
     "pytest-mypy",
     "pytest",
     "fsspec",
     "pooch",
     "netcdf4-python",
+    "scipy"
 ]
 
 

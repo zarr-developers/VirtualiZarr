@@ -1,3 +1,4 @@
+import importlib.util
 from pathlib import Path
 from typing import List, NewType, Optional, Tuple, Union, cast
 
@@ -67,10 +68,26 @@ def _automatically_determine_filetype(filepath: str) -> str:
     file_extension = Path(filepath).suffix
 
     if file_extension == ".nc":
-        # TODO how can we automatically distinguish netCDF3 and 4?
-        raise NotImplementedError(
-            "Cannot unambiguously automatically determine which kerchunk file format reader to use"
-        )
+        # checks if netCDF library is installed.
+        # It currently is not a requirement in the pyproj.toml.
+
+        if importlib.util.find_spec("netCDF4") is None:
+            raise ImportError(
+                "netCDF4 library is required to determine NetCDF file type."
+            )
+
+        import netCDF4
+
+        with netCDF4.Dataset(filepath, "r") as dataset:
+            if dataset.data_model == "NETCDF4":
+                filetype = "netCDF4"
+            elif dataset.data_model == "NETCDF3_CLASSIC":
+                filetype = "netCDF3"
+            else:
+                raise NotImplementedError(
+                    ".nc file does not appear to be NETCDF3 OR NETCDF4"
+                )
+
     elif file_extension == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
