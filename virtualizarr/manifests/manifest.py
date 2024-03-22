@@ -3,6 +3,7 @@ import re
 from typing import Any, Iterable, Iterator, List, Mapping, Tuple, Union, cast
 
 import numpy as np
+import ujson  # type: ignore
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..types import ChunkKey
@@ -115,7 +116,10 @@ class ChunkManifest(BaseModel):
 
     def to_zarr_json(self, filepath: str) -> None:
         """Write a ChunkManifest to a Zarr manifest.json file."""
-        raise NotImplementedError()
+        manifest_dict = self.dict()
+
+        with open(filepath, "w") as json_file:
+            ujson.dump(manifest_dict, json_file)
 
     @classmethod
     def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":

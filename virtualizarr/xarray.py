@@ -8,6 +8,7 @@ from xarray.backends import BackendArray
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.zarr import dataset_to_zarr
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -157,9 +158,7 @@ class VirtualiZarrDatasetAccessor:
         ----------
         filepath : str, default: None
         """
-        raise NotImplementedError(
-            "No point in writing out these virtual arrays to Zarr until at least one Zarr reader can actually read them."
-        )
+        dataset_to_zarr(self.ds, storepath)
 
     @overload
     def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs:
