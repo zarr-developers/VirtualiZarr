@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any, Literal, NewType, Optional, Tuple, Union
 
@@ -128,7 +129,17 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     # TODO should techically loop over groups in a tree but a dataset corresponds to only one group
     # TODO does this mean we need a group kwarg?
 
-    consolidated_metadata = {"zarr_consolidated_format": 1, "metadata": {}}
+    consolidated_metadata: dict = {"metadata": {}}
+
+    # write top-level .zattrs
+    with open(_storepath / ".zattrs", "w") as json_file:
+        json.dump(ds.attrs, json_file, indent=4, separators=(", ", ": "))
+    consolidated_metadata[".zattrs"] = ds.attrs
+
+    # write .zgroup
+    with open(_storepath / ".zgroup", "w") as json_file:
+        json.dump({"zarr_format": 2}, json_file, indent=4, separators=(", ", ": "))
+    consolidated_metadata[".zgroup"] = {"zarr_format": 2}
 
     for name, var in ds.variables.items():
         array_dir = _storepath / name
@@ -149,28 +160,19 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
 
         # write each .zarray
         with open(array_dir / ".zarray", "w") as json_file:
-            ujson.dump(marr.zarray.dict(), json_file)
+            json.dump(marr.zarray.dict(), json_file, indent=4, separators=(", ", ": "))
 
         # write each .zattrs
         zattrs = var.attrs.copy()
         zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
         with open(array_dir / ".zattrs", "w") as json_file:
-            ujson.dump(zattrs, json_file)
+            json.dump(zattrs, json_file, indent=4, separators=(", ", ": "))
 
         # record this info to include in the overall .zmetadata
-        consolidated_metadata["metadata"][name + ".zarray"] = marr.zarray.dict()
-        consolidated_metadata["metadata"][name + ".zattrs"] = zattrs
-
-    # write top-level .zattrs
-    with open(_storepath / ".zattrs", "w") as json_file:
-        ujson.dump(ds.attrs, json_file)
-
-    # write .zgroup
-    with open(_storepath / ".zgroup", "w") as json_file:
-        ujson.dump({"zarr_format": 2}, json_file)
+        consolidated_metadata["metadata"][name + "/.zarray"] = marr.zarray.dict()
+        consolidated_metadata["metadata"][name + "/.zattrs"] = zattrs
 
     # write store-level .zmetadata
-    consolidated_metadata[".zgroup"] = {"zarr_format": 2}
-    consolidated_metadata[".zattrs"] = ds.attrs
+    consolidated_metadata["zarr_consolidated_format"] = 1
     with open(_storepath / ".zmetadata", "w") as json_file:
-        ujson.dump(consolidated_metadata, json_file)
+        json.dump(consolidated_metadata, json_file, indent=4, separators=(", ", ": "))
