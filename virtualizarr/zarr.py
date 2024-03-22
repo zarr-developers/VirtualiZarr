@@ -119,12 +119,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     from virtualizarr.manifests import ManifestArray
 
     _storepath = Path(storepath)
-
-    # TODO check nothing exists at that path
-    # TODO do this using pathlib instead
-    import os
-
-    os.mkdir(_storepath)
+    Path.mkdir(_storepath, exist_ok=False)
 
     # TODO should techically loop over groups in a tree but a dataset corresponds to only one group
     # TODO does this mean we need a group kwarg?
@@ -152,8 +147,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
                 f"but variable {name} wraps an array of type {type(marr)}"
             )
 
-        # TODO do this using pathlib instead
-        os.mkdir(array_dir)
+        Path.mkdir(array_dir, exist_ok=False)
 
         # write the chunk references into a manifest.json file
         marr.manifest.to_zarr_json(array_dir / "manifest.json")
