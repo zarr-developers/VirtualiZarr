@@ -23,6 +23,7 @@ Currently you need to clone VirtualiZarr and install it locally:
 git clone virtualizarr
 pip install -e .
 ```
+You will also need a specific branch of xarray in order for concatenation without indexes to work. (See [this comment](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).) You may want to install the dependencies using the `virtualizarr/ci/environment.yml` conda file, which includes the specific branch of xarray required.
 
 ### Usage
 
