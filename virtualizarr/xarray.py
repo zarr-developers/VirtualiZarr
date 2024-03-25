@@ -16,7 +16,7 @@ class ManifestBackendArray(ManifestArray, BackendArray):
     ...
 
 
-def open_dataset_via_kerchunk(
+def open_virtual_dataset(
     filepath: str,
     filetype: str,
     drop_variables: Optional[List[str]] = None,
