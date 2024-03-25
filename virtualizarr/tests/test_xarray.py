@@ -167,6 +167,9 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
     def test_concat_dim_coords_along_existing_dim(self):
+        # Tests that dimension coordinates don't automatically get new indexes on concat
+        # See https://github.com/pydata/xarray/issues/8871
+
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(10,),
@@ -197,15 +200,7 @@ class TestConcat:
         coords = xr.Coordinates({"t": (["t"], marr2)}, indexes={})
         ds2 = xr.Dataset(coords=coords)
 
-        # TODO this fails because xr.concat tries to rebuild indexes on dimension coordinates automatically
-        # should there be a join='ignore' option?
-        result = xr.concat([ds1, ds2], dim="t", coords="minimal", compat="override")[
-            "a"
-        ]
-
-        # TODO this also causes a separate problem
-        # TypeError: Could not find a Chunk Manager which recognises type <class 'virtualizarr.manifests.array.ManifestArray'>
-        # result = xr.concat([ds1, ds2], dim="x")["a"]
+        result = xr.concat([ds1, ds2], dim="t")["t"]
 
         assert result.shape == (40,)
         assert result.chunks == (10,)
