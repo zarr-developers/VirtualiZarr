@@ -63,11 +63,43 @@ These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects a
 
 ## Chunk Manifests
 
-TODO: Basic concept of what a chunk manifest is
+In the Zarr model N-dimensional arrays are stored as a series of compressed chunks, each labelled by a chunk key which indicates its position in the array. Whilst conventionally each of these Zarr chunks are a separate compressed binary file stored within a Zarr Store, there is no reason why these chunks could not actually already exist as part of another file (e.g. a netCDF file), and be loaded by reading a specific byte range from this pre-existing file.
+
+A "Chunk Manifest" is a list of chunk keys and their corresponding byte ranges in specific files, grouped together such that all the chunks form part of one Zarr-like array. For example, a chunk manifest for a 3-dimensional array made up of 4 chunks might look like this:
+
+```python
+{
+    "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+    "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+    "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+    "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+}
+```
+
+Notice that the `"path"` attribute points to a netCDF file `"foo.nc"` stored in a remote S3 bucket. There is no need for the files the chunk manifest refers to to be local.
+
+Our virtual dataset we opened above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
+
+```python
+marr = vds['air'].data
+manifest = marr.manifest
+manifest.dict()
+```
+```python
+{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+```
+
+In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `air.nc` file at the location given by the `'offset'` and `'length'` attributes.
+
+The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
 
 ## `ManifestArray` class
 
 TODO: A `ManifestArray` as an array-like wrapper of a single chunk manifest, and why that's like a virtualized zarr array
+
+TODO: Discuss concatenation of ManifestArrays via mergin manifests
+
+TODO: Note that this will never support differing codecs
 
 ## Virtual Xarray Datasets as Zarr Groups
 
