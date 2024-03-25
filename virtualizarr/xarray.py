@@ -18,9 +18,10 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 
 def open_virtual_dataset(
     filepath: str,
-    filetype: str,
+    filetype: Optional[str] = None,
     drop_variables: Optional[List[str]] = None,
     virtual_array_class=ManifestArray,
+    indexes={},
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -52,6 +53,7 @@ def open_virtual_dataset(
         ds_refs,
         drop_variables=drop_variables,
         virtual_array_class=virtual_array_class,
+        indexes=indexes,
     )
 
     # TODO we should probably also use ds.set_close() to tell xarray how to close the file we opened
@@ -63,6 +65,7 @@ def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: Optional[List[str]] = None,
     virtual_array_class=ManifestArray,
+    indexes={},
 ) -> xr.Dataset:
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
@@ -92,14 +95,14 @@ def dataset_from_kerchunk_refs(
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
         vars[var_name] = xr.Variable(data=varr, dims=dims, attrs=zattrs)
 
-    data_vars, coords = separate_coords(vars)
+    data_vars, coords = separate_coords(vars, indexes)
 
     ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
 
     ds = xr.Dataset(
         data_vars,
         coords=coords,
-        # indexes={},  # this kwarg does exist in later versions of xarray
+        # indexes={},  # TODO should be added in a later version of xarray
         attrs=ds_attrs,
     )
 
@@ -107,7 +110,8 @@ def dataset_from_kerchunk_refs(
 
 
 def separate_coords(
-    vars: dict[str, xr.Variable]
+    vars: dict[str, xr.Variable],
+    indexes={},
 ) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
@@ -140,7 +144,7 @@ def separate_coords(
         coords = coord_vars
     else:
         # explict Coordinates object with no index passed
-        coords = xr.Coordinates(coord_vars, indexes={})
+        coords = xr.Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
 
