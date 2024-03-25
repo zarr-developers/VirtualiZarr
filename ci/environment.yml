@@ -15,4 +15,4 @@ dependencies:
   - ujson
   - pydantic
   - pip:
-      - xarray>=2024.02.0.dev0
+      - git+https://github.com/TomNicholas/xarray.git@concat-no-indexes#egg=xarray
