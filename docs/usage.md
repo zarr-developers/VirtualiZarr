@@ -95,11 +95,53 @@ The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is vi
 
 ## `ManifestArray` class
 
-TODO: A `ManifestArray` as an array-like wrapper of a single chunk manifest, and why that's like a virtualized zarr array
+A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`. The {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` class stores both the array-level attributes and the corresponding chunk manifest.
 
-TODO: Discuss concatenation of ManifestArrays via mergin manifests
+```python
+marr
+```
+```
+ManifestArray<shape=(2920, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
+```
+```python
+marr.manifest
+```
+```
+ChunkManifest<shape=(1, 1, 1)>
+```
+```python
+marr.zarray
+```
+```
+ZArray(shape=(2920, 25, 53), chunks=(2920, 25, 53), dtype=int16, compressor=None, filters=None, fill_value=None)
+```
 
-TODO: Note that this will never support differing codecs
+A `ManifestArray` can therefore be thought of as a virtualized representation of a single Zarr array.
+
+As it defines various array-like methods, a `ManifestArray` can often be treated like a ["duck array"](https://docs.xarray.dev/en/stable/user-guide/duckarrays.html). In particular, concatenation of multiple `ManifestArray` objects can be done via merging their chunk manifests into one (and re-labelling the chunk keys).
+
+```python
+import numpy as np
+
+concatenated = np.concatenate([marr, marr], axis=0)
+concatenated
+```
+```
+ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
+```
+```python
+concatenated.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000},
+ '1.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+```
+
+This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
+
+```{note}
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+```
 
 ## Virtual Xarray Datasets as Zarr Groups
 
