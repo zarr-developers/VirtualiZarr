@@ -145,7 +145,9 @@ As a single Zarr array has only one array-level set of compression codecs by def
 
 ## Virtual Xarray Datasets as Zarr Groups
 
-TODO: How the whole xarray dataset maps to the zarr model
+The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
+
+The problem of combining many legacy formatted files (e.g. netCDF) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
 ## Concatenation via xarray using given order (i.e. without indexes)
 
