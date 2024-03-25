@@ -1,50 +1,48 @@
+(usage)=
 # Usage
 
-**NOTE: This package is in development. The usage examples in this section are currently aspirational. Progress towards making these examples work is tracked in [issue #2](https://github.com/TomNicholas/VirtualiZarr/issues/2).**
+This page explains how to use VirtualiZarr today, by introducing the key concepts one-by-one.
 
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
+## Opening files as virtual datasets
 
-```python
-ds = xr.open_mfdataset(
-    '/my/files*.nc',
-    engine='h5netcdf',
-    combine='by_coords',  # 'by_coords' requires reading coord data to determine concatenation order
-)
-ds  # the complete lazy xarray dataset
-```
+TODO: `open_virtual_dataset`
 
-However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive. Instead you would prefer to just be able to open a virtualized Zarr store (i.e. `xr.open_dataset('my_virtual_store.zarr')`), as that would open instantly, but still give access to the same data underneath.
+TODO: Note about how in future this will be possible using only `xr.open_dataset`
 
-**`VirtualiZarr` allows you to use the same xarray incantation you would normally use to open and combine all your files, but cache that result as a virtual Zarr store.**
+## Chunk Manifests
 
-What's being cached here, you ask? We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
+TODO: Basic concept of what a chunk manifest is
 
-Creating the virtual store looks very similar to how we normally open data with xarray:
+## `ManifestArray` class
 
-```python
-import virtualizarr  # required for the xarray backend and accessor to be present
+TODO: A `ManifestArray` as an array-like wrapper of a single chunk manifest, and why that's like a virtualized zarr array
 
-virtual_ds = xr.open_mfdataset(
-    '/my/files*.nc',
-    engine='virtualizarr',  # virtualizarr registers an xarray IO backend that returns ManifestArray objects
-    combine='by_coords',  # 'by_coords' stills requires actually reading coordinate data
-)
+## Virtual Xarray Datasets
 
-virtual_ds  # now wraps a bunch of virtual ManifestArray objects directly
+TODO: How the whole xarray dataset maps to the zarr model
 
-# cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
-virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
-```
+## Concatenation via xarray using given order (i.e. without indexes)
 
-Now you can open your shiny new Zarr store instantly:
+TODO: How concatenating in given order works
 
-```python
-fs = fsspec.filesystem('reference', fo='combined.json')
-m = fs.get_mapper('')
+TODO: Note on how this will only work if you have the correct fork of xarray
 
-ds = xr.open_dataset(m, engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
-```
+TODO: Note on how this could be done using `open_mfdataset(..., combine='nested')` in future
 
-(Since we serialized the cached results using the kerchunk specification then opening this zarr store still requires using fsspec via the kerchunk xarray backend.)
+## Concatenation via xarray using order inferred from indexes
 
-No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
+TODO: How to concatenate with order inferred from indexes automatically
+
+TODO: Note on how this could be done using `open_mfdataset(..., combine='by_coords')` in future
+
+## Writing virtual store to disk
+
+### Using kerchunk
+
+TODO: Explanation of how this uses kerchunks format
+
+TODO: Reading using fsspec
+
+### Using zarr
+
+TODO: Explanation of how this requires changes in zarr upstream to be able to read it
