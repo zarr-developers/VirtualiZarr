@@ -16,6 +16,6 @@
 ## Xarray
 
 ```{eval-rst}
-.. autoclass:: virtualizarr.xarray.open_dataset_via_kerchunk
+.. autoclass:: virtualizarr.xarray.open_virtual_dataset
     :members:
 ```
