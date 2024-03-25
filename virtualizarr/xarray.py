@@ -23,7 +23,7 @@ def open_virtual_dataset(
     virtual_array_class=ManifestArray,
 ) -> xr.Dataset:
     """
-    Use kerchunk to open a single legacy file as an xarray Dataset wrapping virtualized zarr arrays.
+    Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
     It's important that we avoid creating any IndexVariables, as our virtualized zarr array objects don't actually contain a collection that can be turned into a pandas.Index.
 
@@ -33,6 +33,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : str, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
+        Can be one of {'netCDF3', 'netCDF4'}.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
