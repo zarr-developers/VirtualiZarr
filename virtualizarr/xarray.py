@@ -28,7 +28,7 @@ def open_virtual_dataset(
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
     No data variables will be loaded.
-    
+
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass indexes={}.
 
     Parameters
@@ -42,6 +42,7 @@ def open_virtual_dataset(
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     indexes : Mapping[str, Index], default is None
+        Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
         To avoid creating any indexes, pass indexes={}.
     virtual_array_class
