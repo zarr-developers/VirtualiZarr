@@ -11,8 +11,8 @@ on:
   push:
   pull_request:
 
-# permissions:
-#   pull-requests: write
+permissions:
+  pull-requests: write
 
 jobs:
   documentation-links:
