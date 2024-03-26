@@ -237,7 +237,7 @@ def netcdf4_file(tmpdir):
     return filepath
 
 
-class TestOpenVirtualDataseIndexes:
+class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
         assert vds.indexes == {}
