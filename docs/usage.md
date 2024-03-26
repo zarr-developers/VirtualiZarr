@@ -165,11 +165,28 @@ TODO: Note on how this could be done using `open_mfdataset(..., combine='by_coor
 
 ## Writing virtual stores to disk
 
-### Writing as kerchunk format and reading via fsspec
+Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
-TODO: Explanation of how this uses kerchunks format
+### Writing to Kerchunk's format and reading via fsspec
 
-TODO: Reading using fsspec
+The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file). 
+
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
+
+```python
+combined_vds.virtualize.to_kerchunk('combined.json', format='json')
+```
+
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using its built-in kerchunk xarray backend.
+
+```python
+import fsspec
+
+fs = fsspec.filesystem("reference", fo=f"combined.json")
+mapper = fs.get_mapper("")
+
+combined_ds = xr.open_dataset(mapper, engine="kerchunk")
+```
 
 ### Writing as Zarr
 
