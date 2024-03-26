@@ -245,8 +245,7 @@ class TestOpenVirtualDatasetIndexes:
     def test_create_default_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes=None)
         ds = xr.open_dataset(netcdf4_file)
-        print(vds.indexes)
-        print(ds.indexes)
+
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
 
