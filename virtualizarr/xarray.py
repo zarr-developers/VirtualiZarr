@@ -28,7 +28,7 @@ def open_virtual_dataset(
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
     No data variables will be loaded.
-    
+
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass indexes={}.
 
     Parameters
