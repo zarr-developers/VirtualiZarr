@@ -143,6 +143,21 @@ This concatenation property is what will allow us to combine the data from multi
 As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
+Remember that you cannot load values from a `ManifestArray` directly. 
+
+```python
+vds['air'].values
+```
+```python
+NotImplementedError: ManifestArrays can't be converted into numpy arrays or pandas Index objects
+```
+
+The whole point is to manipulate references to the data without actually loading any data.
+
+```{note}
+You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/TomNicholas/VirtualiZarr/issues/51)).
+```
+
 ## Virtual Datasets as Zarr Groups
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
