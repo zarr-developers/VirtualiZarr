@@ -143,33 +143,155 @@ This concatenation property is what will allow us to combine the data from multi
 As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
-## Virtual Xarray Datasets as Zarr Groups
+Remember that you cannot load values from a `ManifestArray` directly.
+
+```python
+vds['air'].values
+```
+```python
+NotImplementedError: ManifestArrays can't be converted into numpy arrays or pandas Index objects
+```
+
+The whole point is to manipulate references to the data without actually loading any data.
+
+```{note}
+You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/TomNicholas/VirtualiZarr/issues/51)).
+```
+
+## Virtual Datasets as Zarr Groups
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
 
-The problem of combining many legacy formatted files (e.g. netCDF) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
-## Concatenation via xarray using given order (i.e. without indexes)
+## Combining virtual datasets
 
-TODO: How concatenating in given order works
+In general we should be able to combine all the datasets from our legacy files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
-TODO: Note on how this will only work if you have the correct fork of xarray
+Let's create two new netCDF files, which we would need to open and concatenate in a specific order to represent our entire dataset.
 
-TODO: Note on how this could be done using `open_mfdataset(..., combine='nested')` in future
+```python
+ds1 = ds.isel(time=slice(None, 1460))
+ds2 = ds.isel(time=slice(1460, None))
 
-## Concatenation via xarray using order inferred from indexes
+ds1.to_netcdf('air1.nc')
+ds1.to_netcdf('air2.nc')
+```
+
+Note that we have created these in such a way that each dataset has one equally-sized chunk.
+
+TODO: Note about variable-length chunking?
+
+### Manual concatenation ordering
+
+The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
+
+We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the legacy files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
+
+You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
+
+```python
+vds1 = open_virtual_dataset('air1.nc', indexes={})
+vds2 = open_virtual_dataset('air2.nc', indexes={})
+```
+
+```{note}
+Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple in-progress PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
+```
+
+As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
+
+```
+combined_vds = xr.concat([vds1, vds2], dim='time', coords='minimal', compat='override')
+combined_vds
+```
+```
+<xarray.Dataset> Size: 8MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+    time     (time) float32 12kB ManifestArray<shape=(2920,), dtype=float32, ...
+Data variables:
+    air      (time, lat, lon) int16 8MB ManifestArray<shape=(2920, 25, 53), d...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+
+We can see that the resulting combined manifest has two chunks, as expected.
+
+```python
+combined_vds['air'].data.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'air2.nc', 'offset': 15419, 'length': 3869000}}
+```
+
+```{note}
+The keyword arguments `coords='minimal', compat='override'` are currently necessary because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
+```
+
+The general multi-dimensional version of this contatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
+
+```python
+combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='minimal', compat='override')
+```
+
+In N-dimensions the datasets would need to be passed as an N-deep nested list-of-lists, see the [xarray docs](https://docs.xarray.dev/en/stable/user-guide/combining.html#combining-along-multiple-dimensions).
+
+```{note}
+In future we would like for it to be possible to just use `xr.open_mfdataset` to open the files and combine them in one go, e.g.
+
+    vds = xr.open_mfdataset(
+        ['air1.nc', 'air2.nc'],
+        combine='nested,
+        concat_dim=['time'],
+        coords='minimal',
+        compat='override',
+    )
+
+but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
+```
+
+### Automatic ordering using coordinate data
 
 TODO: How to concatenate with order inferred from indexes automatically
 
 TODO: Note on how this could be done using `open_mfdataset(..., combine='by_coords')` in future
 
+### Automatic ordering using metadata
+
+TODO: Use preprocess to create a new index from the metadata
+
 ## Writing virtual stores to disk
 
-### Writing as kerchunk format and reading via fsspec
+Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
-TODO: Explanation of how this uses kerchunks format
+### Writing to Kerchunk's format and reading via fsspec
 
-TODO: Reading using fsspec
+The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
+
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
+
+```python
+combined_vds.virtualize.to_kerchunk('combined.json', format='json')
+```
+
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using its built-in kerchunk xarray backend.
+
+```python
+import fsspec
+
+fs = fsspec.filesystem("reference", fo=f"combined.json")
+mapper = fs.get_mapper("")
+
+combined_ds = xr.open_dataset(mapper, engine="kerchunk")
+```
 
 ### Writing as Zarr
 
