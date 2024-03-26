@@ -1,6 +1,8 @@
 import numpy as np
+import pytest
 import xarray as xr
 
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
@@ -104,6 +106,7 @@ class TestConcat:
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
         result = xr.concat([ds1, ds2], dim="x")["a"]
+        assert result.indexes == {}
 
         assert result.shape == (2, 20)
         assert result.chunks == (1, 10)
@@ -150,6 +153,7 @@ class TestConcat:
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
         result = xr.concat([ds1, ds2], dim="z")["a"]
+        assert result.indexes == {}
 
         # xarray.concat adds new dimensions along axis=0
         assert result.shape == (2, 5, 20)
@@ -201,6 +205,7 @@ class TestConcat:
         ds2 = xr.Dataset(coords=coords)
 
         result = xr.concat([ds1, ds2], dim="t")["t"]
+        assert result.indexes == {}
 
         assert result.shape == (40,)
         assert result.chunks == (10,)
@@ -215,3 +220,21 @@ class TestConcat:
         assert result.data.zarray.fill_value == zarray.fill_value
         assert result.data.zarray.order == zarray.order
         assert result.data.zarray.zarr_format == zarray.zarr_format
+
+
+@pytest.fixture
+def netcdf4_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath)
+
+    return filepath
+
+
+class TestOpenVirtualDataset:
+    def test_no_indexes(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert vds.indexes == {}
