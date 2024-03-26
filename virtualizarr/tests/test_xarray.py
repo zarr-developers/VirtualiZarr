@@ -1,6 +1,9 @@
+from typing import Mapping
+
 import numpy as np
 import pytest
 import xarray as xr
+from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -234,7 +237,31 @@ def netcdf4_file(tmpdir):
     return filepath
 
 
-class TestOpenVirtualDataset:
+class TestOpenVirtualDataseIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
         assert vds.indexes == {}
+
+    def test_create_default_indexes(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes=None)
+        ds = xr.open_dataset(netcdf4_file)
+        print(vds.indexes)
+        print(ds.indexes)
+        # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
+        assert index_mappings_equal(vds.xindexes, ds.xindexes)
+
+
+def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, Index]):
+    # Check if the mappings have the same keys
+    if set(indexes1.keys()) != set(indexes2.keys()):
+        return False
+
+    # Check if the values for each key are identical
+    for key in indexes1.keys():
+        index1 = indexes1[key]
+        index2 = indexes2[key]
+
+        if not index1.equals(index2):
+            return False
+
+    return True
