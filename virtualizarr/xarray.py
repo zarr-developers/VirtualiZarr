@@ -21,7 +21,7 @@ def open_virtual_dataset(
     filepath: str,
     filetype: Optional[str] = None,
     drop_variables: Optional[List[str]] = None,
-    indexes: Mapping[str, Index] | None = None,
+    indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
 ) -> xr.Dataset:
     """
