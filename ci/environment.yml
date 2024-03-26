@@ -14,5 +14,6 @@ dependencies:
   - kerchunk
   - ujson
   - pydantic
+  - pooch
   - pip:
       - git+https://github.com/TomNicholas/xarray.git@concat-no-indexes#egg=xarray

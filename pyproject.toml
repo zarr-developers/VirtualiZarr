@@ -33,7 +33,8 @@ test = [
     "pre-commit",
     "pytest-mypy",
     "pytest",
-    "scipy"
+    "scipy",
+    "pooch",
 ]
 
 
