@@ -27,7 +27,9 @@ def open_virtual_dataset(
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
-    It's important that we avoid creating any IndexVariables, as our virtualized zarr array objects don't actually contain a collection that can be turned into a pandas.Index.
+    No data variables will be loaded.
+    
+    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass indexes={}.
 
     Parameters
     ----------
