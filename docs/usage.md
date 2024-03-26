@@ -186,7 +186,9 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
+We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the legacy files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
+
+You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
 
 ```python
 vds1 = open_virtual_dataset('air1.nc', indexes={})
@@ -194,7 +196,7 @@ vds2 = open_virtual_dataset('air2.nc', indexes={})
 ```
 
 ```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
+Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple in-progress PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
