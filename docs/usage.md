@@ -143,13 +143,17 @@ This concatenation property is what will allow us to combine the data from multi
 As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
-## Virtual Xarray Datasets as Zarr Groups
+## Virtual Datasets as Zarr Groups
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
 
-The problem of combining many legacy formatted files (e.g. netCDF) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
-## Concatenation via xarray using given order (i.e. without indexes)
+## Combining virtual datasets
+
+In general we should be able to combine all the datasets from our legacy files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
+
+### Concatenation using given order
 
 TODO: How concatenating in given order works
 
@@ -157,7 +161,7 @@ TODO: Note on how this will only work if you have the correct fork of xarray
 
 TODO: Note on how this could be done using `open_mfdataset(..., combine='nested')` in future
 
-## Concatenation via xarray using order inferred from indexes
+### Concatenation using order of indexes
 
 TODO: How to concatenate with order inferred from indexes automatically
 
