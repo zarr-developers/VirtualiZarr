@@ -351,7 +351,7 @@ To write out all the references in the virtual dataset as a single kerchunk-comp
 combined_vds.virtualize.to_kerchunk('combined.json', format='json')
 ```
 
-These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using its built-in kerchunk xarray backend.
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (so you need kerchunk to be installed to use `engine='kerchunk'`).
 
 ```python
 import fsspec
@@ -363,5 +363,7 @@ combined_ds = xr.open_dataset(mapper, engine="kerchunk")
 ```
 
 ### Writing as Zarr
+
+TODO: Write out references as a Zarr v3 store following the [Chunk Manifest ZEP](https://github.com/zarr-developers/zarr-specs/issues/287), see [PR #45](https://github.com/TomNicholas/VirtualiZarr/pull/45)
 
 TODO: Explanation of how this requires changes in zarr upstream to be able to read it
