@@ -1,7 +1,6 @@
 from typing import Mapping
 
 import numpy as np
-import pytest
 import xarray as xr
 from xarray.core.indexes import Index
 
