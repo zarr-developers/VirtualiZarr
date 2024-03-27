@@ -1,6 +1,11 @@
-import numpy as np
-import xarray as xr
+from typing import Mapping
 
+import numpy as np
+import pytest
+import xarray as xr
+from xarray.core.indexes import Index
+
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
@@ -104,6 +109,7 @@ class TestConcat:
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
         result = xr.concat([ds1, ds2], dim="x")["a"]
+        assert result.indexes == {}
 
         assert result.shape == (2, 20)
         assert result.chunks == (1, 10)
@@ -150,6 +156,7 @@ class TestConcat:
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
         result = xr.concat([ds1, ds2], dim="z")["a"]
+        assert result.indexes == {}
 
         # xarray.concat adds new dimensions along axis=0
         assert result.shape == (2, 5, 20)
@@ -201,6 +208,7 @@ class TestConcat:
         ds2 = xr.Dataset(coords=coords)
 
         result = xr.concat([ds1, ds2], dim="t")["t"]
+        assert result.indexes == {}
 
         assert result.shape == (40,)
         assert result.chunks == (10,)
@@ -215,3 +223,76 @@ class TestConcat:
         assert result.data.zarray.fill_value == zarray.fill_value
         assert result.data.zarray.order == zarray.order
         assert result.data.zarray.zarr_format == zarray.zarr_format
+
+
+@pytest.fixture
+def netcdf4_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath)
+
+    return filepath
+
+
+@pytest.fixture
+def netcdf4_files(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # split inrto equal chunks so we can concatenate them back together later
+    ds1 = ds.isel(time=slice(None, 1460))
+    ds2 = ds.isel(time=slice(1460, None))
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath1 = f"{tmpdir}/air1.nc"
+    filepath2 = f"{tmpdir}/air2.nc"
+    ds1.to_netcdf(filepath1)
+    ds2.to_netcdf(filepath2)
+
+    return filepath1, filepath2
+
+
+class TestOpenVirtualDatasetIndexes:
+    def test_no_indexes(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert vds.indexes == {}
+
+    def test_create_default_indexes(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes=None)
+        ds = xr.open_dataset(netcdf4_file)
+
+        # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
+        assert index_mappings_equal(vds.xindexes, ds.xindexes)
+
+
+def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, Index]):
+    # Check if the mappings have the same keys
+    if set(indexes1.keys()) != set(indexes2.keys()):
+        return False
+
+    # Check if the values for each key are identical
+    for key in indexes1.keys():
+        index1 = indexes1[key]
+        index2 = indexes2[key]
+
+        if not index1.equals(index2):
+            return False
+
+    return True
+
+
+class TestCombineUsingIndexes:
+    def test_combine_by_coords(self, netcdf4_files):
+        filepath1, filepath2 = netcdf4_files
+
+        vds1 = open_virtual_dataset(filepath1)
+        vds2 = open_virtual_dataset(filepath2)
+
+        combined_vds = xr.combine_by_coords(
+            [vds2, vds1],
+        )
+
+        assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
