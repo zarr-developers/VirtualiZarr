@@ -271,67 +271,7 @@ but this requires some [upstream changes](https://github.com/TomNicholas/Virtual
 
 ### Automatic ordering using coordinate data
 
-Sometimes we don't have a priori knowledge of which files contain what content, and we would like to concatenate them in an order dictated by their coordinates (e.g. so that a `time` coordinate monotonically increases into the future).
-
-For this we will actually want to create xarray indexes, so that we can use the values in them to determine the correct concatenation order. This requires loading coordinate values into memory, the same way that `xarray.open_dataset` does by default.
-
-To open a virtual dataset but with in-memory indexes along 1D [dimension coordinates](), pass `indexes=None` to `open_virtual_dataset` (which is the default).
-
-```python
-vds1 = open_virtual_dataset('air1.nc')
-vds2 = open_virtual_dataset('air2.nc')
-```
-
-Now we can see that some indexes have been created by default.
-
-```python
-vds1.xindexes
-```
-```
-Indexes:
-    lat      PandasIndex
-    lon      PandasIndex
-    time     PandasIndex
-```
-
-To use these indexes to infer concatenation order we can use `xarray.combine_by_coords`.
-
-```python
-combined_vds = xr.combine_by_coords([vds2, vds1])
-combined_vds
-```
-```
-<xarray.Dataset> Size: 8MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-  * lat      (lat) float32 100B 75.0 72.5 70.0 67.5 65.0 ... 22.5 20.0 17.5 15.0
-  * lon      (lon) float32 212B 200.0 202.5 205.0 207.5 ... 325.0 327.5 330.0
-  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
-Data variables:
-    air      (time, lat, lon) int16 8MB ManifestArray<shape=(2920, 25, 53), d...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
-```
-We can see that despite the fact we passed the datasets out of order, the time coordinate in the result is still ordered correctly.
-
-Note that we can safely omit the `compat='override'` kwarg now, because we have indexes whose values will be compared.
-
-TODO: Improve xarray's error message for if we tried to use `combine_by_coords` without creating indexes first.
-
-```{note}
-In future we would like for it to be possible to just use `xr.open_mfdataset` to open the files and combine them in one go, e.g.
-
-    vds = xr.open_mfdataset(
-        ['air2.nc', 'air1.nc'],
-        combine='by_coords',
-    )
-
-but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
-```
+TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/TomNicholas/VirtualiZarr/issues/18#issuecomment-2023955860) is properly closed.
 
 ### Automatic ordering using metadata
 
