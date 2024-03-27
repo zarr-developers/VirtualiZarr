@@ -237,6 +237,24 @@ def netcdf4_file(tmpdir):
     return filepath
 
 
+@pytest.fixture
+def netcdf4_files(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # split inrto equal chunks so we can concatenate them back together later
+    ds1 = ds.isel(time=slice(None, 1460))
+    ds2 = ds.isel(time=slice(1460, None))
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath1 = f"{tmpdir}/air1.nc"
+    filepath2 = f"{tmpdir}/air2.nc"
+    ds1.to_netcdf(filepath1)
+    ds2.to_netcdf(filepath2)
+
+    return filepath1, filepath2
+
+
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -264,3 +282,17 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
             return False
 
     return True
+
+
+class TestCombineUsingIndexes:
+    def test_combine_by_coords(self, netcdf4_files):
+        filepath1, filepath2 = netcdf4_files
+
+        vds1 = open_virtual_dataset(filepath1)
+        vds2 = open_virtual_dataset(filepath2)
+
+        combined_vds = xr.combine_by_coords(
+            [vds2, vds1],
+        )
+
+        assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
