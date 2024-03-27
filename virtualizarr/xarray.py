@@ -151,6 +151,12 @@ def separate_coords(
 
 @register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
+    """
+    Xarray accessor for writing out virtual datasets to disk.
+
+    Methods on this object are called via `ds.virtualize.{method}`.
+    """
+
     def __init__(self, ds):
         self.ds = ds
 
