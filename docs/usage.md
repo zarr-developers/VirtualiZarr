@@ -198,7 +198,7 @@ vds2 = open_virtual_dataset('air2.nc', indexes={})
 We can see that the datasets have no indexes.
 
 ```python
-vds1
+vds1.indexes
 ```
 ```
 Indexes:
