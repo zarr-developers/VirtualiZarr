@@ -29,3 +29,17 @@ def netcdf4_files(tmpdir):
     ds2.to_netcdf(filepath2)
 
     return filepath1, filepath2
+
+@pytest.fixture
+def concated_virtual_dataset_with_indexes(netcdf4_files):
+        """Fixture to supply concatenated virtual dataset including indexes"""
+        from virtualizarr import open_virtual_dataset
+
+        filepath1, filepath2 = netcdf4_files
+
+        vds1 = open_virtual_dataset(filepath1)
+        vds2 = open_virtual_dataset(filepath2)
+
+        return xr.combine_by_coords(
+            [vds2, vds1],
+        )

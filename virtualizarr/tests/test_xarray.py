@@ -257,14 +257,8 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
 
 
 class TestCombineUsingIndexes:
-    def test_combine_by_coords(self, netcdf4_files):
-        filepath1, filepath2 = netcdf4_files
+    def test_combine_by_coords(self, concated_virtual_dataset_with_indexes):
 
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
-
-        combined_vds = xr.combine_by_coords(
-            [vds2, vds1],
-        )
+        combined_vds = concated_virtual_dataset_with_indexes
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
