@@ -120,7 +120,7 @@ class ChunkManifest(BaseModel):
         raise NotImplementedError()
 
     @classmethod
-    def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
+    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
         chunkentries = {
             k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
         }

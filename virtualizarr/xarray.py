@@ -89,7 +89,7 @@ def dataset_from_kerchunk_refs(
         # TODO abstract all this parsing into a function/method?
         arr_refs = kerchunk.extract_array_refs(refs, var_name)
         chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-        manifest = ChunkManifest.from_kerchunk_chunk_dict(chunk_dict)
+        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
         dims = zattrs["_ARRAY_DIMENSIONS"]
 
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
