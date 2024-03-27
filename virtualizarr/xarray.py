@@ -126,7 +126,7 @@ def variable_from_kerchunk_refs(
 
     arr_refs = kerchunk.extract_array_refs(refs, var_name)
     chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-    manifest = ChunkManifest.from_kerchunk_chunk_dict(chunk_dict)
+    manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
     dims = zattrs["_ARRAY_DIMENSIONS"]
     varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
 
@@ -167,16 +167,22 @@ def separate_coords(
 
 @register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
+    """
+    Xarray accessor for writing out virtual datasets to disk.
+
+    Methods on this object are called via `ds.virtualize.{method}`.
+    """
+
     def __init__(self, ds):
         self.ds = ds
 
     def to_zarr(self, storepath: str) -> None:
         """
-        Write out all virtualized arrays as a new Zarr store on disk.
+        Serialize all virtualized arrays in this xarray dataset as a Zarr store.
 
         Parameters
         ----------
-        filepath : str, default: None
+        storepath : str
         """
         raise NotImplementedError(
             "No point in writing out these virtual arrays to Zarr until at least one Zarr reader can actually read them."
@@ -200,7 +206,7 @@ class VirtualiZarrDatasetAccessor:
         format: Union[Literal["dict"], Literal["json"], Literal["parquet"]] = "dict",
     ) -> Union[KerchunkStoreRefs, None]:
         """
-        Serialize all virtualized arrays into the kerchunk references format.
+        Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
 
         Parameters
         ----------
