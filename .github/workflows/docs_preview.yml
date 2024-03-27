@@ -6,6 +6,7 @@ name: readthedocs/actions
 #     # paths:
 #     #   - "docs/**"
 
+
 on:
   push:
   pull_request:
