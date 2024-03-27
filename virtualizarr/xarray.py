@@ -162,11 +162,11 @@ class VirtualiZarrDatasetAccessor:
 
     def to_zarr(self, storepath: str) -> None:
         """
-        Write out all virtualized arrays as a new Zarr store on disk.
+        Serialize all virtualized arrays in this xarray dataset as a Zarr store.
 
         Parameters
         ----------
-        filepath : str, default: None
+        storepath : str
         """
         raise NotImplementedError(
             "No point in writing out these virtual arrays to Zarr until at least one Zarr reader can actually read them."
@@ -190,7 +190,7 @@ class VirtualiZarrDatasetAccessor:
         format: Union[Literal["dict"], Literal["json"], Literal["parquet"]] = "dict",
     ) -> Union[KerchunkStoreRefs, None]:
         """
-        Serialize all virtualized arrays into the kerchunk references format.
+        Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
 
         Parameters
         ----------
