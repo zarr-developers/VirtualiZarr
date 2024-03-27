@@ -48,12 +48,14 @@ class ChunkManifest(BaseModel):
 
     Stores the manifest as a dictionary under the .chunks attribute, in this form:
 
-    {
-        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-    }
+
+        {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+
 
     See the chunk manifest SPEC proposal in https://github.com/zarr-developers/zarr-specs/issues/287 .
 
@@ -118,7 +120,7 @@ class ChunkManifest(BaseModel):
         raise NotImplementedError()
 
     @classmethod
-    def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
+    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
         chunkentries = {
             k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
         }
