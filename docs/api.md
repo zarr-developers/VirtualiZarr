@@ -1,21 +1,19 @@
 # API Reference
 
-
 ## Manifests
 
-```{eval-rst}
-.. autoclass:: virtualizarr.manifests.manifest.ChunkManifest
-    :members:
-```
+```{autodoc2-summary}
+:renderer: myst
 
-```{eval-rst}
-.. autoclass:: virtualizarr.manifests.ManifestArray
-    :members:
+~virtualizarr.manifests.manifest.ChunkManifest
+~virtualizarr.manifests.array.ManifestArray
 ```
 
 ## Xarray
 
-```{eval-rst}
-.. autoclass:: virtualizarr.xarray.open_virtual_dataset
-    :members:
+```{autodoc2-summary}
+:renderer: myst
+
+~virtualizarr.xarray.open_virtual_dataset
+~virtualizarr.xarray.VirtualiZarrDatasetAccessor
 ```

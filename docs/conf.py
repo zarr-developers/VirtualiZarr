@@ -16,15 +16,19 @@ author = "Thomas Nicholas"
 
 extensions = [
     "myst_nb",
-    "sphinx.ext.autodoc",
+    "autodoc2",
     "sphinx.ext.extlinks",
-    "sphinx_autodoc_typehints",
+    # "sphinx_autodoc_typehints",
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "sphinx_design",
 ]
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+autodoc2_packages = {
+    "path": "../virtualizarr",
+    "auto_mode": False,
+}
 
 
 # -- Options for HTML output -------------------------------------------------
