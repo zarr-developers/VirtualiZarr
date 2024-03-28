@@ -7,7 +7,7 @@ from xarray.backends import BackendArray
 from xarray.core.indexes import Index
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs
+from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
@@ -19,7 +19,7 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 
 def open_virtual_dataset(
     filepath: str,
-    filetype: Optional[str] = None,
+    filetype: Optional[FileType] = None,
     drop_variables: Optional[List[str]] = None,
     indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
@@ -35,7 +35,7 @@ def open_virtual_dataset(
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
-    filetype : str, default None
+    filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4'}.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
