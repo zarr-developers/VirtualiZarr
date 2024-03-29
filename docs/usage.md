@@ -306,12 +306,12 @@ The result is a zarr v3 store on disk which contains the chunk manifest informat
 ```
 combined/zarr.json  <- group metadata
 combined/air/zarr.json  <- array metadata
-combined/air/manifest.json <- array manifest 
+combined/air/manifest.json <- array manifest
 ...
 ```
 
 The advantage of this format is that any zarr v3 reader that understands the chunk manifest ZEP could read from this store, no matter what language it is written in (e.g. via `zarr-python`, `zarr-js`, or rust). This reading would also not require `fsspec`.
 
 ```{note}
-Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this is only of theoretical interest. 
+Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this is only of theoretical interest.
 ```

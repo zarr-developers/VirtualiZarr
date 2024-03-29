@@ -110,10 +110,17 @@ def ceildiv(a: int, b: int) -> int:
 
 def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     """
-    Write an xarray dataset whose variables wrap ManifestArrays to a Zarr store, writing chunk references into manifest.json files.
+    Write an xarray dataset whose variables wrap ManifestArrays to a v3 Zarr store, writing chunk references into manifest.json files.
+
+    Currently requires all variables to be backed by ManifestArray objects.
 
     Not very useful until some implementation of a Zarr reader can actually read these manifest.json files.
     See https://github.com/zarr-developers/zarr-specs/issues/287
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+    storepath: str
     """
 
     from virtualizarr.manifests import ManifestArray

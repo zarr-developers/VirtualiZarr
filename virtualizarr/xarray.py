@@ -159,9 +159,14 @@ class VirtualiZarrDatasetAccessor:
         """
         Write out all virtualized arrays as a new Zarr store on disk.
 
+        Currently requires all variables to be backed by ManifestArray objects.
+
+        Not very useful until some implementation of a Zarr reader can actually read these manifest.json files.
+        See https://github.com/zarr-developers/zarr-specs/issues/287
+
         Parameters
         ----------
-        filepath : str, default: None
+        storepath: str
         """
         dataset_to_zarr(self.ds, storepath)
 
