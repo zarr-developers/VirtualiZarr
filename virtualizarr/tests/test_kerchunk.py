@@ -49,7 +49,7 @@ def test_dataset_from_df_refs_with_filters():
     ds_refs = gen_ds_refs(zarray=ujson.dumps(zarray))
     ds =  dataset_from_kerchunk_refs(ds_refs)
     da = ds["a"]
-    assert da.data.zarray.filters is filters
+    assert da.data.zarray.filters == filters
 
 
 class TestAccessor:
