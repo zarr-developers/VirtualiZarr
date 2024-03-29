@@ -23,6 +23,7 @@ def open_virtual_dataset(
     drop_variables: Optional[List[str]] = None,
     indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
+    reader_options: Optional[dict] = {'storage_options': {'anon': True}}
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -48,12 +49,16 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
+    reader_options: dict, default {'storage_options': {'anon': True}}
+        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
+        so ensure reader_options match selected Kerchunk reader arguments.
     """
 
     # this is the only place we actually always need to use kerchunk directly
     vds_refs = kerchunk.read_kerchunk_references_from_file(
         filepath=filepath,
         filetype=filetype,
+        reader_options=reader_options,
     )
 
     if indexes is None:

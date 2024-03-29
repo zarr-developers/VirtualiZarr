@@ -3,6 +3,7 @@ from typing import Mapping
 import numpy as np
 import xarray as xr
 from xarray.core.indexes import Index
+import pytest
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -268,3 +269,12 @@ class TestCombineUsingIndexes:
         )
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+
+
+pytest.importorskip("s3fs")
+@pytest.mark.xfail(reason="currently should xfail for None filetype and None indexes.",run=False)
+@pytest.mark.parametrize("filetype", ['netcdf4', None], ids=["netcdf4 filetype", "None filetype"])
+@pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
+def test_anon_read_s3(filetype, indexes):
+    fpath = 's3://nex-gddp-cmip6/NEX-GDDP-CMIP6/CESM2/historical/r4i1p1f1/pr/pr_day_CESM2_historical_r4i1p1f1_gn_2010.nc'
+    assert open_virtual_dataset(fpath,filetype=filetype,indexes=indexes,reader_options={'storage_options': {'anon': True}})

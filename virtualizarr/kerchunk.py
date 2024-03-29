@@ -20,7 +20,10 @@ KerchunkArrRefs = NewType(
 
 
 def read_kerchunk_references_from_file(
-    filepath: str, filetype: Optional[str]
+    filepath: str, filetype: Optional[str],
+    reader_options: Optional[dict] = {'storage_options': {'anon': True}}
+
+
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -32,6 +35,9 @@ def read_kerchunk_references_from_file(
     filetype : str, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
+    reader_options: dict, default {'storage_options': {'anon': True}}
+        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
+        so ensure reader_options match selected Kerchunk reader arguments.
     """
 
     if filetype is None:
@@ -39,12 +45,11 @@ def read_kerchunk_references_from_file(
 
     if filetype.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
-        refs = NetCDF3ToZarr(filepath).translate()
+        refs = NetCDF3ToZarr(filepath, **reader_options).translate()
 
     elif filetype.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
-
-        refs = SingleHdf5ToZarr(filepath).translate()
+        refs = SingleHdf5ToZarr(filepath, **reader_options).translate()
     elif filetype == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
@@ -52,11 +57,11 @@ def read_kerchunk_references_from_file(
     elif filetype.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath)
+        refs = tiff_to_zarr(filepath, **reader_options)
     elif filetype.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath)
+        refs = process_file(filepath, **reader_options)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype}")
 
