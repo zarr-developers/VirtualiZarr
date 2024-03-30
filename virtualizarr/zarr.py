@@ -1,11 +1,15 @@
 
 from pathlib import Path
-from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict
+from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict, TYPE_CHECKING
 
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 from pydantic import BaseModel, ConfigDict, field_validator
+from virtualizarr.vendor.zarr.utils import json_dumps
+
+if TYPE_CHECKING:
+    pass
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
@@ -124,22 +128,19 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     """
 
     from virtualizarr.manifests import ManifestArray
-    from virtualizarr.vendor.zarr.utils import json_dumps
 
     _storepath = Path(storepath)
     Path.mkdir(_storepath, exist_ok=False)
 
-    # TODO should techically loop over groups in a tree but a dataset corresponds to only one group
-    # TODO does this mean we need a group kwarg?
+    # should techically loop over groups in a tree but a dataset corresponds to only one group
+    group_metadata = {
+        "zarr_format": 3,
+        "node_type": "group",
+        "attributes": ds.attrs
+    }
+    with open(_storepath / 'zarr.json', "wb") as group_metadata_file:
+        group_metadata_file.write(json_dumps(group_metadata))
 
-    # write top-level .zattrs
-    with open(_storepath / ".zattrs", "wb") as zattrs_file:
-        zattrs_file.write(json_dumps(ds.attrs))
-    
-    # write .zgroup
-    with open(_storepath / ".zgroup", "wb") as zgroup_file:
-        zgroup_file.write(json_dumps({"zarr_format": 2}))
-    
     for name, var in ds.variables.items():
         array_dir = _storepath / name
         marr = var.data
@@ -155,14 +156,66 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         Path.mkdir(array_dir, exist_ok=False)
 
         # write the chunk references into a manifest.json file
-        marr.manifest.to_zarr_json(array_dir / "manifest.json")
+        # and the array metadata into a zarr.json file
+        to_zarr_json(var, array_dir)
 
-        # write each .zarray
-        with open(_storepath / ".zgroup", "wb") as zarray_file:
-            zarray_file.write(json_dumps(marr.zarray.dict()))
 
-        # write each .zattrs
-        zattrs = var.attrs.copy()
-        zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
-        with open(_storepath / ".zattrs", "wb") as zattrs_file:
-            zattrs_file.write(json_dumps(zattrs))
+def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
+    """
+    Write out both the zarr.json and manifest.json file into the given zarr array directory.
+
+    Follows the Zarr v3 manifest storage transformer ZEP (see https://github.com/zarr-developers/zarr-specs/issues/287).
+
+    Parameters
+    ----------
+    var : xr.Variable
+        Must be wrapping a ManifestArray
+    dirpath : str
+        Zarr store array directory into which to write files.
+    """
+
+    marr = var.data
+
+    marr.manifest.to_zarr_json(array_dir / 'manifest.json')
+
+    metadata = zarr_v3_array_metadata(marr.zarray, list(var.dims), var.attrs)
+    with open(array_dir / 'zarr.json', "wb") as metadata_file:
+        metadata_file.write(json_dumps(metadata))
+
+
+def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) -> dict:
+    """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
+    # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
+
+    metadata = zarray.dict()
+
+    # adjust to match v3 spec
+    metadata["zarr_format"] = 3
+    metadata["node_type"] = "array"
+    metadata["data_type"] = str(np.dtype(metadata.pop("dtype")))
+    metadata["chunk_grid"] = {"name": "regular", "configuration": {"chunk_shape": metadata.pop("chunks")}}
+    metadata["chunk_key_encoding"] = {
+        "name": "default",
+        "configuration": {
+            "separator": "/"
+        }
+    }
+    metadata["codecs"] = metadata.pop("filters")
+    metadata.pop("compressor")  # TODO this should be entered in codecs somehow
+    metadata.pop("order")  # TODO this should be replaced by a transpose codec
+
+    # indicate that we're using the manifest storage transformer ZEP
+    metadata["storage_transformers"] = [
+        {
+            "name": "chunk-manifest-json",
+            "configuration": {
+                "manifest": "./manifest.json"
+            }
+        }
+    ]
+
+    # add information from xarray object
+    metadata["dimension_names"] = dim_names
+    metadata["attributes"] = attrs
+
+    return metadata
