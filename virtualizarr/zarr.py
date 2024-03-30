@@ -1,5 +1,4 @@
 
-import json
 from pathlib import Path
 from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict
 
@@ -125,6 +124,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     """
 
     from virtualizarr.manifests import ManifestArray
+    from virtualizarr.vendor.zarr.utils import json_dumps
 
     _storepath = Path(storepath)
     Path.mkdir(_storepath, exist_ok=False)
@@ -135,13 +135,13 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     consolidated_metadata: dict = {"metadata": {}}
 
     # write top-level .zattrs
-    with open(_storepath / ".zattrs", "w") as json_file:
-        json.dump(ds.attrs, json_file, indent=4, separators=(", ", ": "))
+    with open(_storepath / ".zattrs", "wb") as zattrs_file:
+        zattrs_file.write(json_dumps(ds.attrs))
     consolidated_metadata[".zattrs"] = ds.attrs
 
     # write .zgroup
-    with open(_storepath / ".zgroup", "w") as json_file:
-        json.dump({"zarr_format": 2}, json_file, indent=4, separators=(", ", ": "))
+    with open(_storepath / ".zgroup", "wb") as zgroup_file:
+        zgroup_file.write(json_dumps({"zarr_format": 2}))
     consolidated_metadata[".zgroup"] = {"zarr_format": 2}
 
     for name, var in ds.variables.items():
@@ -149,6 +149,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         marr = var.data
 
         # TODO move this check outside the writing loop so we don't write an incomplete store on failure?
+        # TODO at some point this should be generalized to also write in-memory arrays as normal zarr chunks, see GH isse #62.
         if not isinstance(marr, ManifestArray):
             raise TypeError(
                 "Only xarray objects wrapping ManifestArrays can be written to zarr using this method, "
@@ -161,14 +162,14 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         marr.manifest.to_zarr_json(array_dir / "manifest.json")
 
         # write each .zarray
-        with open(array_dir / ".zarray", "w") as json_file:
-            json.dump(marr.zarray.dict(), json_file, indent=4, separators=(", ", ": "))
+        with open(_storepath / ".zgroup", "wb") as zarray_file:
+            zarray_file.write(json_dumps(marr.zarray.dict()))
 
         # write each .zattrs
         zattrs = var.attrs.copy()
         zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
-        with open(array_dir / ".zattrs", "w") as json_file:
-            json.dump(zattrs, json_file, indent=4, separators=(", ", ": "))
+        with open(_storepath / ".zattrs", "wb") as zattrs_file:
+            zattrs_file.write(json_dumps(zattrs))
 
         # record this info to include in the overall .zmetadata
         consolidated_metadata["metadata"][name + "/.zarray"] = marr.zarray.dict()
@@ -176,5 +177,5 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
 
     # write store-level .zmetadata
     consolidated_metadata["zarr_consolidated_format"] = 1
-    with open(_storepath / ".zmetadata", "w") as json_file:
-        json.dump(consolidated_metadata, json_file, indent=4, separators=(", ", ": "))
+    with open(_storepath / ".zmetadata", "wb") as zmetadata_file:
+        zmetadata_file.write(json_dumps(consolidated_metadata))
