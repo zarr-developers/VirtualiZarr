@@ -132,18 +132,14 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     # TODO should techically loop over groups in a tree but a dataset corresponds to only one group
     # TODO does this mean we need a group kwarg?
 
-    consolidated_metadata: dict = {"metadata": {}}
-
     # write top-level .zattrs
     with open(_storepath / ".zattrs", "wb") as zattrs_file:
         zattrs_file.write(json_dumps(ds.attrs))
-    consolidated_metadata[".zattrs"] = ds.attrs
-
+    
     # write .zgroup
     with open(_storepath / ".zgroup", "wb") as zgroup_file:
         zgroup_file.write(json_dumps({"zarr_format": 2}))
-    consolidated_metadata[".zgroup"] = {"zarr_format": 2}
-
+    
     for name, var in ds.variables.items():
         array_dir = _storepath / name
         marr = var.data
@@ -170,12 +166,3 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
         with open(_storepath / ".zattrs", "wb") as zattrs_file:
             zattrs_file.write(json_dumps(zattrs))
-
-        # record this info to include in the overall .zmetadata
-        consolidated_metadata["metadata"][name + "/.zarray"] = marr.zarray.dict()
-        consolidated_metadata["metadata"][name + "/.zattrs"] = zattrs
-
-    # write store-level .zmetadata
-    consolidated_metadata["zarr_consolidated_format"] = 1
-    with open(_storepath / ".zmetadata", "wb") as zmetadata_file:
-        zmetadata_file.write(json_dumps(consolidated_metadata))
