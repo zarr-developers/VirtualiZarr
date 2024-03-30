@@ -175,7 +175,7 @@ ds1 = ds.isel(time=slice(None, 1460))
 ds2 = ds.isel(time=slice(1460, None))
 
 ds1.to_netcdf('air1.nc')
-ds1.to_netcdf('air2.nc')
+ds2.to_netcdf('air2.nc')
 ```
 
 Note that we have created these in such a way that each dataset has one equally-sized chunk.
@@ -193,6 +193,16 @@ You can specify that you don't want any indexes to be created by passing `indexe
 ```python
 vds1 = open_virtual_dataset('air1.nc', indexes={})
 vds2 = open_virtual_dataset('air2.nc', indexes={})
+```
+
+We can see that the datasets have no indexes.
+
+```python
+vds1.indexes
+```
+```
+Indexes:
+    *empty*
 ```
 
 ```{note}
@@ -249,10 +259,11 @@ In future we would like for it to be possible to just use `xr.open_mfdataset` to
 
     vds = xr.open_mfdataset(
         ['air1.nc', 'air2.nc'],
-        combine='nested,
+        combine='nested',
         concat_dim=['time'],
         coords='minimal',
         compat='override',
+        indexes={},
     )
 
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
@@ -260,9 +271,7 @@ but this requires some [upstream changes](https://github.com/TomNicholas/Virtual
 
 ### Automatic ordering using coordinate data
 
-TODO: How to concatenate with order inferred from indexes automatically
-
-TODO: Note on how this could be done using `open_mfdataset(..., combine='by_coords')` in future
+TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/TomNicholas/VirtualiZarr/issues/18#issuecomment-2023955860) is properly closed.
 
 ### Automatic ordering using metadata
 
@@ -282,7 +291,7 @@ To write out all the references in the virtual dataset as a single kerchunk-comp
 combined_vds.virtualize.to_kerchunk('combined.json', format='json')
 ```
 
-These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using its built-in kerchunk xarray backend.
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (so you need kerchunk to be installed to use `engine='kerchunk'`).
 
 ```python
 import fsspec

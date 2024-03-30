@@ -60,7 +60,7 @@ class TestManifestArray:
             ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
             "0.0": ["test1.nc", 6144, 48],
         }
-        marr = ManifestArray.from_kerchunk_refs(arr_refs)
+        marr = ManifestArray._from_kerchunk_refs(arr_refs)
 
         assert marr.shape == (2, 3)
         assert marr.chunks == (2, 3)

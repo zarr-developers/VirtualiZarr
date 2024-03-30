@@ -1,6 +1,7 @@
+
 import json
 from pathlib import Path
-from typing import Any, Literal, NewType, Optional, Tuple, Union
+from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict
 
 import numpy as np
 import ujson  # type: ignore
@@ -15,7 +16,7 @@ ZAttrs = NewType(
 
 class Codec(BaseModel):
     compressor: Optional[str] = None
-    filters: Optional[str] = None
+    filters: Optional[List[Dict]] = None
 
     def __repr__(self) -> str:
         return f"Codec(compressor={self.compressor}, filters={self.filters})"
@@ -34,7 +35,7 @@ class ZArray(BaseModel):
     compressor: Optional[str] = None
     dtype: np.dtype
     fill_value: Optional[float] = None  # float or int?
-    filters: Optional[str] = None
+    filters: Optional[List[Dict]] = None
     order: Union[Literal["C"], Literal["F"]]
     shape: Tuple[int, ...]
     zarr_format: Union[Literal[2], Literal[3]] = 2

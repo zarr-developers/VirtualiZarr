@@ -1,9 +1,10 @@
-from typing import List, Literal, Optional, Union, overload
+from typing import List, Literal, Mapping, Optional, Union, overload
 
 import ujson  # type: ignore
 import xarray as xr
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
+from xarray.core.indexes import Index
 
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import KerchunkStoreRefs
@@ -21,13 +22,15 @@ def open_virtual_dataset(
     filepath: str,
     filetype: Optional[str] = None,
     drop_variables: Optional[List[str]] = None,
+    indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
-    indexes={},
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
-    It's important that we avoid creating any IndexVariables, as our virtualized zarr array objects don't actually contain a collection that can be turned into a pandas.Index.
+    No data variables will be loaded.
+
+    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass indexes={}.
 
     Parameters
     ----------
@@ -39,27 +42,39 @@ def open_virtual_dataset(
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
+    indexes : Mapping[str, Index], default is None
+        Indexes to use on the returned xarray Dataset.
+        Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
+        To avoid creating any indexes, pass indexes={}.
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
     # this is the only place we actually always need to use kerchunk directly
-    ds_refs = kerchunk.read_kerchunk_references_from_file(
+    vds_refs = kerchunk.read_kerchunk_references_from_file(
         filepath=filepath,
         filetype=filetype,
     )
 
-    ds = dataset_from_kerchunk_refs(
-        ds_refs,
+    if indexes is None:
+        # add default indexes by reading data from file
+        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+        ds = xr.open_dataset(filepath)
+        indexes = ds.xindexes
+        ds.close()
+
+    vds = dataset_from_kerchunk_refs(
+        vds_refs,
         drop_variables=drop_variables,
         virtual_array_class=virtual_array_class,
         indexes=indexes,
     )
 
-    # TODO we should probably also use ds.set_close() to tell xarray how to close the file we opened
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
-    return ds
+    return vds
 
 
 def dataset_from_kerchunk_refs(
@@ -87,14 +102,9 @@ def dataset_from_kerchunk_refs(
 
     vars = {}
     for var_name in var_names_to_keep:
-        # TODO abstract all this parsing into a function/method?
-        arr_refs = kerchunk.extract_array_refs(refs, var_name)
-        chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-        manifest = ChunkManifest.from_kerchunk_chunk_dict(chunk_dict)
-        dims = zattrs["_ARRAY_DIMENSIONS"]
-
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
-        vars[var_name] = xr.Variable(data=varr, dims=dims, attrs=zattrs)
+        vars[var_name] = variable_from_kerchunk_refs(
+            refs, var_name, virtual_array_class
+        )
 
     data_vars, coords = separate_coords(vars, indexes)
 
@@ -110,6 +120,20 @@ def dataset_from_kerchunk_refs(
     return ds
 
 
+def variable_from_kerchunk_refs(
+    refs: KerchunkStoreRefs, var_name: str, virtual_array_class
+) -> xr.Variable:
+    """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
+
+    arr_refs = kerchunk.extract_array_refs(refs, var_name)
+    chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
+    manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+    dims = zattrs["_ARRAY_DIMENSIONS"]
+    varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+
+    return xr.Variable(data=varr, dims=dims, attrs=zattrs)
+
+
 def separate_coords(
     vars: dict[str, xr.Variable],
     indexes={},
@@ -122,6 +146,7 @@ def separate_coords(
 
     # this would normally come from CF decoding, let's hope the fact we're skipping that doesn't cause any problems...
     coord_names: List[str] = []
+
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
     coord_vars = {}
@@ -136,28 +161,25 @@ def separate_coords(
         else:
             data_vars[name] = var
 
-    # this is stolen from https://github.com/pydata/xarray/pull/8051
-    # needed otherwise xarray errors whilst trying to turn the KerchunkArrays for the 1D coordinate variables into indexes
-    # but it doesn't appear to work with `main` since #8107, which is why the workaround above is needed
-    # EDIT: actually even the workaround doesn't work - to avoid creating indexes I had to checkout xarray v2023.08.0, the last one before #8107 was merged
-    set_indexes = False
-    if set_indexes:
-        coords = coord_vars
-    else:
-        # explict Coordinates object with no index passed
-        coords = xr.Coordinates(coord_vars, indexes=indexes)
+    coords = xr.Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
 
 
 @register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
+    """
+    Xarray accessor for writing out virtual datasets to disk.
+
+    Methods on this object are called via `ds.virtualize.{method}`.
+    """
+
     def __init__(self, ds):
         self.ds = ds
 
     def to_zarr(self, storepath: str) -> None:
         """
-        Write out all virtualized arrays as a new Zarr store on disk.
+        Serialize all virtualized arrays in this xarray dataset as a Zarr store.
 
         Currently requires all variables to be backed by ManifestArray objects.
 
@@ -166,7 +188,7 @@ class VirtualiZarrDatasetAccessor:
 
         Parameters
         ----------
-        storepath: str
+        storepath : str
         """
         dataset_to_zarr(self.ds, storepath)
 
@@ -188,7 +210,7 @@ class VirtualiZarrDatasetAccessor:
         format: Union[Literal["dict"], Literal["json"], Literal["parquet"]] = "dict",
     ) -> Union[KerchunkStoreRefs, None]:
         """
-        Serialize all virtualized arrays into the kerchunk references format.
+        Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
 
         Parameters
         ----------
