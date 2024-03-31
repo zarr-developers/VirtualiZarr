@@ -1,6 +1,7 @@
 
 from pathlib import Path
 from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict, TYPE_CHECKING
+import json
 
 import numpy as np
 import ujson  # type: ignore
@@ -219,3 +220,40 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) ->
     metadata["attributes"] = attrs
 
     return metadata
+
+
+def attrs_from_zarr_group_json(filepath: Path) -> dict:
+    with open(filepath, "r") as metadata_file:
+        attrs = json.load(metadata_file)
+    return attrs["attributes"]
+
+
+def metadata_from_zarr_json(filepath: Path) -> Tuple[ZArray, List[str], dict]:
+    with open(filepath, "r") as metadata_file:
+        metadata = json.load(metadata_file)
+
+    if {
+            "name": "chunk-manifest-json",
+            "configuration": {
+                "manifest": "./manifest.json",
+            }
+       } not in metadata.get("storage_transformers", []):
+        raise ValueError("Can only read byte ranges from Zarr v3 stores which implement the manifest storage transformer ZEP.")
+
+    attrs = metadata.pop("attributes")
+    dim_names = metadata.pop("dimension_names")
+
+    chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
+
+    zarray = ZArray(
+        chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
+        compressor=metadata["codecs"],
+        dtype=np.dtype(metadata["data_type"]),
+        fill_value=metadata["fill_value"],
+        filters=metadata.get("filters", None),
+        order="C",
+        shape=chunk_shape,
+        zarr_format=3,
+    )
+
+    return zarray, dim_names, attrs

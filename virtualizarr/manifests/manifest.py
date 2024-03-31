@@ -111,10 +111,14 @@ class ChunkManifest(BaseModel):
         """Converts the entire manifest to a nested dictionary."""
         return {k: dict(entry) for k, entry in self.entries.items()}
 
-    @staticmethod
-    def from_zarr_json(filepath: str) -> "ChunkManifest":
+    @classmethod
+    def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
         """Create a ChunkManifest from a Zarr manifest.json file."""
-        raise NotImplementedError()
+        with open(filepath, "r") as manifest_file:
+            entries_dict = json.load(manifest_file)
+
+        entries = {cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()}
+        return cls(entries=entries)
 
     def to_zarr_json(self, filepath: str) -> None:
         """Write a ChunkManifest to a Zarr manifest.json file."""
