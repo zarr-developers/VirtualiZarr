@@ -132,7 +132,7 @@ def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: List[str] = [],
     virtual_array_class: type = ManifestArray,
-    indexes: Mapping[str, Index] = None,
+    indexes: Optional[Mapping[str, Index]] = None,
 ) -> xr.Dataset:
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
