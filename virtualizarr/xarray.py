@@ -64,10 +64,11 @@ def open_virtual_dataset(
         drop_variables = []
     if load_variables is None:
         load_variables = []
-    # TODO check that drop_variables and load_variables don't intersect?
+    if set(drop_variables).intersection(set(load_variables)):
+        raise ValueError("Cannot both load and drop a variable")
 
     # this is the only place we actually always need to use kerchunk directly
-    # TODO drop_variables for variables which will be loaded using xarray later anyway?
+    # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
     vds_refs = kerchunk.read_kerchunk_references_from_file(
         filepath=filepath,
         filetype=filetype,
@@ -92,13 +93,9 @@ def open_virtual_dataset(
             # TODO allow manual specification of index objects
             raise NotImplementedError()
         else:
-            indexes = dict(**indexes)
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-        # TODO explicitly call load here?
         loaded_vars = {name: var for name, var in ds.variables.items() if name in load_variables}
-
-        print("loaded variables types")
-        print({name: type(var) for name, var in loaded_vars.items()})
 
         # if we only read the indexes we can just close the file right away as nothing is lazy
         if loaded_vars == {}:
