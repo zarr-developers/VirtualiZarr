@@ -282,11 +282,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        print(vds)
-
         full_ds = xr.open_dataset(netcdf4_file)
         for name in full_ds.variables:
             if name in vars_to_load:
-                print(vds.variables[name])
-                print(full_ds.variables[name])
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
