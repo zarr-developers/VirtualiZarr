@@ -1,4 +1,4 @@
-from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping
+from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping, Iterable
 
 import ujson  # type: ignore
 import xarray as xr
@@ -21,8 +21,8 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 def open_virtual_dataset(
     filepath: str,
     filetype: Optional[str] = None,
-    drop_variables: Optional[List[str]] = None,
-    load_variables: Optional[List[str]] = None,
+    drop_variables: Optional[Iterable[str]] = None,
+    loadable_variables: Optional[Iterable[str]] = None,
     indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
 ) -> xr.Dataset:
@@ -43,8 +43,8 @@ def open_virtual_dataset(
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    load_variables: list[str], default is None
-        Variables in the file to open using xarray's normal lazy indexing classes (i.e. to be accessible as numpy/dask arrays) instead of opening as instances of virtual_array_class.
+    loadable_variables: list[str], default is None
+        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
@@ -57,15 +57,24 @@ def open_virtual_dataset(
     Returns
     -------
     vds
-        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in load_variables.
+        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
 
     if drop_variables is None:
         drop_variables = []
-    if load_variables is None:
-        load_variables = []
-    if set(drop_variables).intersection(set(load_variables)):
-        raise ValueError("Cannot both load and drop a variable")
+    elif isinstance(drop_variables, str):
+        drop_variables = [drop_variables]
+    else:
+        drop_variables = list(drop_variables)
+    if loadable_variables is None:
+        loadable_variables = []
+    elif isinstance(loadable_variables, str):
+        loadable_variables = [loadable_variables]
+    else:
+        loadable_variables = list(loadable_variables)
+    common = set(drop_variables).intersection(set(loadable_variables))
+    if common:
+        raise ValueError(f"Cannot both load and drop variables {common}")
 
     # this is the only place we actually always need to use kerchunk directly
     # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
@@ -75,12 +84,12 @@ def open_virtual_dataset(
     )
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
-        drop_variables=drop_variables + load_variables,
+        drop_variables=drop_variables + loadable_variables,
         virtual_array_class=virtual_array_class,
     )
     ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
 
-    if indexes is None or len(load_variables) > 0:
+    if indexes is None or len(loadable_variables) > 0:
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
         # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
@@ -95,16 +104,16 @@ def open_virtual_dataset(
         else:
             indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-        loaded_vars = {name: var for name, var in ds.variables.items() if name in load_variables}
+        loadable_vars = {name: var for name, var in ds.variables.items() if name in loadable_variables}
 
         # if we only read the indexes we can just close the file right away as nothing is lazy
-        if loaded_vars == {}:
+        if loadable_vars == {}:
             ds.close()
     else:
-        loaded_vars = {}
+        loadable_vars = {}
         indexes = {}
 
-    vars = {**virtual_vars, **loaded_vars}
+    vars = {**virtual_vars, **loadable_vars}
 
     data_vars, coords = separate_coords(vars, indexes)
 

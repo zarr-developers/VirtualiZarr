@@ -272,9 +272,9 @@ class TestCombineUsingIndexes:
 
 
 class TestLoadVirtualDataset:
-    def test_load_variables(self, netcdf4_file):
+    def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ['air', 'time']
-        vds = open_virtual_dataset(netcdf4_file, load_variables=vars_to_load)
+        vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_load)
 
         for name in vds.variables:
             if name in vars_to_load:
