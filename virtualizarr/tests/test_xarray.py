@@ -2,6 +2,7 @@ from typing import Mapping
 
 import numpy as np
 import xarray as xr
+import xarray.testing as xrt
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
@@ -268,3 +269,20 @@ class TestCombineUsingIndexes:
         )
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+
+
+class TestLoadVirtualDataset:
+    def test_loadable_variables(self, netcdf4_file):
+        vars_to_load = ['air', 'time']
+        vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_load)
+
+        for name in vds.variables:
+            if name in vars_to_load:
+                assert isinstance(vds[name].data, np.ndarray), name
+            else:
+                assert isinstance(vds[name].data, ManifestArray), name
+
+        full_ds = xr.open_dataset(netcdf4_file)
+        for name in full_ds.variables:
+            if name in vars_to_load:
+                xrt.assert_identical(vds.variables[name], full_ds.variables[name])
