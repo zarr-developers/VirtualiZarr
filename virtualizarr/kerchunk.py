@@ -54,12 +54,12 @@ def read_kerchunk_references_from_file(
 
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
-        refs = NetCDF3ToZarr(filepath).translate()
+        refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
 
     elif filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
-        refs = SingleHdf5ToZarr(filepath).translate()
+        refs = SingleHdf5ToZarr(filepath, inline_threshold=0).translate()
     elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
@@ -67,11 +67,11 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath)
+        refs = tiff_to_zarr(filepath, inline_threshold=0)
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath)
+        refs = process_file(filepath, inline_threshold=0)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
