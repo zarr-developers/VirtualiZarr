@@ -6,7 +6,7 @@ dependencies:
   - python>=3.9
   - codecov
   - h5netcdf
-  - kerchunk
+  - kerchunk==0.2.2
   - netcdf4
   - pydantic
   - pooch
