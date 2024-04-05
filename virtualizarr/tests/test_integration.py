@@ -2,7 +2,7 @@ import fsspec
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr import open_dataset_via_kerchunk
+from virtualizarr import open_virtual_dataset
 
 
 def test_kerchunk_roundtrip_no_concat(tmpdir):
@@ -13,7 +13,7 @@ def test_kerchunk_roundtrip_no_concat(tmpdir):
     ds.to_netcdf(f"{tmpdir}/air.nc")
 
     # use open_dataset_via_kerchunk to read it as references
-    vds = open_dataset_via_kerchunk(f"{tmpdir}/air.nc", filetype="netCDF4")
+    vds = open_virtual_dataset(f"{tmpdir}/air.nc")
 
     # write those references to disk as kerchunk json
     vds.virtualize.to_kerchunk(f"{tmpdir}/refs.json", format="json")
@@ -42,8 +42,8 @@ def test_kerchunk_roundtrip_concat(tmpdir):
     ds2.to_netcdf(f"{tmpdir}/air2.nc")
 
     # use open_dataset_via_kerchunk to read it as references
-    vds1 = open_dataset_via_kerchunk(f"{tmpdir}/air1.nc", filetype="netCDF4")
-    vds2 = open_dataset_via_kerchunk(f"{tmpdir}/air2.nc", filetype="netCDF4")
+    vds1 = open_virtual_dataset(f"{tmpdir}/air1.nc")
+    vds2 = open_virtual_dataset(f"{tmpdir}/air2.nc")
 
     # concatenate virtually along time
     vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
