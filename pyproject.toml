@@ -22,7 +22,7 @@ requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
     "xarray",
-    "kerchunk",
+    "kerchunk==0.2.2",
     "pydantic",
     "packaging",
 ]
