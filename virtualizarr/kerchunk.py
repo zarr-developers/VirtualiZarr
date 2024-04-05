@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, NewType, Optional, Tuple, Union, cast
+import base64
 
 import ujson  # type: ignore
 import xarray as xr
@@ -182,6 +183,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
+            ".zattrs": ujson.dumps(ds.attrs),
             **all_arr_refs,
         },
     }
@@ -191,27 +193,46 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
 def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
     """
-    Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps a ManifestArray).
+    Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
 
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
     from virtualizarr.manifests import ManifestArray
 
-    marr = var.data
+    if isinstance(var.data, ManifestArray):
+        marr = var.data
 
-    if not isinstance(marr, ManifestArray):
-        raise TypeError(
-            f"Can only serialize wrapped arrays of type ManifestArray, but got type {type(marr)}"
+        arr_refs: dict[str, Union[str, List[Union[str, int]]]] = {
+            str(chunk_key): chunk_entry.to_kerchunk()
+            for chunk_key, chunk_entry in marr.manifest.entries.items()
+        }
+
+        zarray = marr.zarray
+
+    else:
+        try:
+            np_arr = var.to_numpy()
+        except AttributeError as e:
+            raise TypeError(
+                f"Can only serialize wrapped arrays of type ManifestArray or numpy.ndarray, but got type {type(var.data)}"
+            ) from e
+
+        # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
+        byte_data = np_arr.tobytes()
+        # TODO do I really need to encode then decode like this?
+        inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode('utf-8')
+
+        # TODO can this be generalized to save individual chunks of a dask array?
+        arr_refs = {'0': inlined_data}
+
+        zarray = ZArray(
+            chunks=np_arr.shape,
+            shape=np_arr.shape,
+            dtype=np_arr.dtype,
+            order='C',
         )
 
-    arr_refs: dict[str, Union[str, List[Union[str, int]]]] = {
-        str(chunk_key): chunk_entry.to_kerchunk()
-        for chunk_key, chunk_entry in marr.manifest.entries.items()
-    }
-
-    zarray_dict = marr.zarray.to_kerchunk_json()
-    arr_refs[".zarray"] = zarray_dict
-
+    arr_refs[".zarray"] = zarray.to_kerchunk_json()
     zattrs = var.attrs
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = ujson.dumps(zattrs)
