@@ -30,7 +30,7 @@ class ZArray(BaseModel):
     chunks: Tuple[int, ...]
     compressor: Optional[str] = None
     dtype: np.dtype
-    fill_value: Optional[float] = None  # float or int?
+    fill_value: Union[float, int] = np.NaN  # float or int?
     filters: Optional[List[Dict]] = None
     order: Union[Literal["C"], Literal["F"]]
     shape: Tuple[int, ...]
@@ -69,13 +69,17 @@ class ZArray(BaseModel):
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
-        # TODO should we be doing some type coercion on the 'fill_value' here?
+
+        # coerce type of fill_value as kerchunk can be inconsistent with this
+        fill_value = decoded_arr_refs_zarray["fill_value"]
+        if fill_value is None or fill_value == "NaN":
+            fill_value = np.NaN
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=decoded_arr_refs_zarray["compressor"],
             dtype=np.dtype(decoded_arr_refs_zarray["dtype"]),
-            fill_value=decoded_arr_refs_zarray["fill_value"],
+            fill_value=fill_value,
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
@@ -84,8 +88,13 @@ class ZArray(BaseModel):
 
     def to_kerchunk_json(self) -> str:
         zarray_dict = dict(self)
+
         # TODO not sure if there is a better way to get the '<i4' style representation of the dtype out
         zarray_dict["dtype"] = zarray_dict["dtype"].descr[0][1]
+
+        if zarray_dict['fill_value'] is np.NaN:
+            zarray_dict['fill_value'] = None
+
         return ujson.dumps(zarray_dict)
 
 
