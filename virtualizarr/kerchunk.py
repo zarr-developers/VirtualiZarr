@@ -1,11 +1,13 @@
 from pathlib import Path
 from typing import List, NewType, Optional, Tuple, Union, cast
 import base64
+from enum import Enum, auto
 
 import ujson  # type: ignore
 import xarray as xr
 
 from virtualizarr.zarr import ZArray, ZAttrs
+
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
@@ -19,13 +21,12 @@ KerchunkArrRefs = NewType(
 )  # lower-level dict containing just the information for one zarr array
 
 
-from enum import Enum, auto
-
 class AutoName(Enum):
     # Recommended by official Python docs for auto naming:
     # https://docs.python.org/3/library/enum.html#using-automatic-values
     def _generate_next_value_(name, start, count, last_values):
         return name
+
 
 class FileType(AutoName):
     netcdf3 = auto()
@@ -34,6 +35,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+
 
 def read_kerchunk_references_from_file(
     filepath: str, filetype: Optional[FileType]
