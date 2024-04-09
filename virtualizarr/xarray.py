@@ -158,6 +158,8 @@ def open_virtual_dataset_from_v3_store(
         if var_name in drop_variables:
             break
 
+        print(array_dir)
+
         zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
         manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
 
