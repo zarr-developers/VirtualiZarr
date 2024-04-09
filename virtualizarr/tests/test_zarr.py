@@ -19,9 +19,11 @@ def test_zarr_v3_roundtrip(tmpdir):
                 zarr_format=3,
             ),
         )
-    original = xr.Dataset({"a": (["x", "y"], arr)})
+    original = xr.Dataset({"a": (["x", "y"], arr)}, attrs={"something": 0})
 
     original.virtualize.to_zarr(tmpdir / "store.zarr")
     roundtrip = open_virtual_dataset(tmpdir / "store.zarr", filetype="zarr_v3", indexes={})
 
     xrt.assert_identical(roundtrip, original)
+
+    assert False
