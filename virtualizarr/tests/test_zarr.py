@@ -25,5 +25,3 @@ def test_zarr_v3_roundtrip(tmpdir):
     roundtrip = open_virtual_dataset(tmpdir / "store.zarr", filetype="zarr_v3", indexes={})
 
     xrt.assert_identical(roundtrip, original)
-
-    assert False

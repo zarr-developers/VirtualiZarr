@@ -152,13 +152,16 @@ def open_virtual_dataset_from_v3_store(
     ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
 
     # TODO recursive glob to create a datatree
+    # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
+    # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
+    all_paths = _storepath.glob("*/")
+    directory_paths = [p for p in all_paths if not p.is_file()]
+
     vars = {}
-    for array_dir in _storepath.glob("*/"):
+    for array_dir in directory_paths:
         var_name = array_dir.name
         if var_name in drop_variables:
             break
-
-        print(array_dir)
 
         zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
         manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
