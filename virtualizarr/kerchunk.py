@@ -52,6 +52,9 @@ def read_kerchunk_references_from_file(
     if filetype is None:
         filetype = _automatically_determine_filetype(filepath)
 
+    # if filetype is user defined, convert to FileType
+    filetype = FileType(filetype)
+
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
         refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
