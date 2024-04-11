@@ -4,15 +4,15 @@ channels:
   - nodefaults
 dependencies:
   - python>=3.9
-  - netcdf4
-  - pytest
-  - flake8
-  - black
   - codecov
-  - pytest-cov
   - h5netcdf
-  - kerchunk
-  - ujson
+  - kerchunk==0.2.2
+  - netcdf4
   - pydantic
+  - pooch
+  - pytest
+  - pytest-cov
+  - ruff
+  - ujson
   - pip:
-      - xarray>=2024.02.0.dev0
+      - git+https://github.com/TomNicholas/xarray.git@concat-no-indexes#egg=xarray

@@ -64,7 +64,7 @@ class ManifestArray:
         self._manifest = _chunkmanifest
 
     @classmethod
-    def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
+    def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
         from virtualizarr.kerchunk import fully_decode_arr_refs
 
         decoded_arr_refs = fully_decode_arr_refs(arr_refs)
@@ -74,7 +74,7 @@ class ManifestArray:
         kerchunk_chunk_dict = {
             k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)
         }
-        chunkmanifest = ChunkManifest.from_kerchunk_chunk_dict(kerchunk_chunk_dict)
+        chunkmanifest = ChunkManifest._from_kerchunk_chunk_dict(kerchunk_chunk_dict)
 
         obj = object.__new__(cls)
         obj._manifest = chunkmanifest
@@ -111,21 +111,8 @@ class ManifestArray:
     def size(self) -> int:
         return int(np.prod(self.shape))
 
-    @property
-    def T(self) -> "ManifestArray":
-        raise NotImplementedError()
-
     def __repr__(self) -> str:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
-
-    def to_kerchunk_refs(self) -> KerchunkArrRefs:
-        # TODO is there enough information to get the attrs and so on here?
-        raise NotImplementedError()
-
-    def to_zarr(self, store) -> None:
-        raise NotImplementedError(
-            "Requires the chunk manifest ZEP to be formalized before we know what to write out here."
-        )
 
     def __array_function__(self, func, types, args, kwargs) -> Any:
         """
@@ -193,7 +180,7 @@ class ManifestArray:
                 return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
-        """Needed because xarray will call this even when it's a no-op"""
+        """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
         if dtype != self.dtype:
             raise NotImplementedError()
         else:

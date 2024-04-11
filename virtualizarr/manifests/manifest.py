@@ -62,12 +62,14 @@ class ChunkManifest(BaseModel):
 
     The manifest can be converted to or from a dictionary form looking like this
 
-    {
-        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-    }
+
+        {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+
 
     using the .from_dict() and .dict() methods, so users of this class can think of the manifest as if it were a dict.
 
@@ -187,7 +189,7 @@ class ChunkManifest(BaseModel):
         raise NotImplementedError()
 
     @classmethod
-    def from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
+    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
         chunkentries = {
             cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
             for k, v in kerchunk_chunk_dict.items()

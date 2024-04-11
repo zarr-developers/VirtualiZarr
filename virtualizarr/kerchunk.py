@@ -18,8 +18,24 @@ KerchunkArrRefs = NewType(
 )  # lower-level dict containing just the information for one zarr array
 
 
+from enum import Enum, auto
+
+class AutoName(Enum):
+    # Recommended by official Python docs for auto naming:
+    # https://docs.python.org/3/library/enum.html#using-automatic-values
+    def _generate_next_value_(name, start, count, last_values):
+        return name
+
+class FileType(AutoName):
+    netcdf3 = auto()
+    netcdf4 = auto()
+    grib = auto()
+    tiff = auto()
+    fits = auto()
+    zarr = auto()
+
 def read_kerchunk_references_from_file(
-    filepath: str, filetype: Optional[str]
+    filepath: str, filetype: Optional[FileType]
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -28,52 +44,67 @@ def read_kerchunk_references_from_file(
     ----------
     filepath : str, default: None
         File path to open as a set of virtualized zarr arrays.
-    filetype : str, default: None
+    filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     """
 
-    import kerchunk
-
     if filetype is None:
         filetype = _automatically_determine_filetype(filepath)
 
-    if filetype == "netCDF3":
-        refs = kerchunk.netCDF3.NetCDF3ToZarr(filepath).translate()
-    elif filetype == "netCDF4":
-        refs = kerchunk.hdf.SingleHdf5ToZarr(filepath).translate()
-    elif filetype == "grib":
+    # if filetype is user defined, convert to FileType
+    filetype = FileType(filetype)
+
+    if filetype.name.lower() == "netcdf3":
+        from kerchunk.netCDF3 import NetCDF3ToZarr
+        refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
+
+    elif filetype.name.lower() == "netcdf4":
+        from kerchunk.hdf import SingleHdf5ToZarr
+
+        refs = SingleHdf5ToZarr(filepath, inline_threshold=0).translate()
+    elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
         raise NotImplementedError(f"Unsupported file type: {filetype}")
-    elif filetype == "tiff":
-        refs = kerchunk.tiff.tiff_to_zarr(filepath)
-    elif filetype == "fits":
-        refs = kerchunk.fits.process_file(filepath)
+    elif filetype.name.lower() == "tiff":
+        from kerchunk.tiff import tiff_to_zarr
+
+        refs = tiff_to_zarr(filepath, inline_threshold=0)
+    elif filetype.name.lower() == "fits":
+        from kerchunk.fits import process_file
+
+        refs = process_file(filepath, inline_threshold=0)
     else:
-        raise NotImplementedError(f"Unsupported file type: {filetype}")
+        raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
     # TODO validate the references that were read before returning?
     return refs
 
 
-def _automatically_determine_filetype(filepath: str) -> str:
+def _automatically_determine_filetype(filepath: str) -> FileType:
     file_extension = Path(filepath).suffix
 
     if file_extension == ".nc":
-        # TODO how can we automatically distinguish netCDF3 and 4?
-        raise NotImplementedError(
-            "Cannot unambiguously automatically determine which kerchunk file format reader to use"
-        )
+        # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
+        with open(filepath, 'rb') as f:
+            magic = f.read()
+        if magic[0:3] == b"CDF":
+            filetype = FileType.netcdf3
+        elif magic[1:4] == b"HDF":
+            filetype = FileType.netcdf4
+        else:
+            raise ValueError(".nc file does not appear to be NETCDF3 OR NETCDF4")
+
     elif file_extension == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
     elif file_extension == ".grib":
-        filetype = "grib"
+        filetype = FileType.grib
     elif file_extension == ".tiff":
-        filetype = "tiff"
+        filetype = FileType.tiff
     elif file_extension == ".fits":
-        filetype = "fits"
+        filetype = FileType.fits
     else:
         raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
 
