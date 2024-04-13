@@ -1,5 +1,6 @@
-# How Does This Work?
+# FAQ
 
+### How does this work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of legacy files in some other format as a series of steps:
 
@@ -12,3 +13,6 @@ I'm glad you asked! We can think of the problem of providing virtualized zarr-li
 7) **Open the virtualized dataset from disk** - The virtualized zarr store can now be read from disk, skipping all the work we did above. Chunk reads from this store will be redirected to read the corresponding bytes in the original legacy files.
 
 **Note:** Using the `kerchunk` library alone will perform a similar set of steps overall, but because (3), (4), (5), and (6) are all performed by the `kerchunk.combine.MultiZarrToZarr` function, and no internal abstractions are exposed, the design is much less modular, and the use cases are limited by kerchunk's API surface.
+
+### How does VirtualiZarr compare to Kerchunk?
+

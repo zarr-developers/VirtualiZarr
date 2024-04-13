@@ -80,7 +80,7 @@ Apache 2.0
 self
 installation
 usage
-how_it_works
+faq
 dev_status_roadmap
 api
 
