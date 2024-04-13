@@ -58,7 +58,14 @@ html_theme_options = {
     "repository_url": "https://github.com/TomNicholas/VirtualiZarr",
     "repository_branch": "main",
     "path_to_docs": "docs",
+        "secondary_sidebar_items": {
+        "path/to/page": [],
+    },
 }
+html_sidebars = {
+  "path/to/page": [],
+}
+
 html_title = "VirtualiZarr"
 
 html_logo = "_static/_future_logo.png"
