@@ -81,7 +81,6 @@ self
 installation
 usage
 faq
-dev_status_roadmap
 api
 
 ```

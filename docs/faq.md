@@ -42,3 +42,11 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as JSON                                        | `ujson.dumps(h5chunks.translate())` , then read using an `fsspec.filesystem` mapper                                | `ds.virtualize.to_kerchunk('combined.json', format='JSON')` , then read using an `fsspec.filesystem` mapper                                      |
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.virtualize.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | Zarr v3 store with `manifest.json` files                                 | n/a                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
+
+## What is the Development Status and Roadmap?
+
+VirtualiZarr is ready to use for many of the tasks that we are used to using kerchunk for, but the most general and powerful vision of this library can only be implemented once certain changes upstream in Zarr have occurred.
+
+VirtualiZarr is therefore evolving in tandem with developments in the Zarr Specification, which then need to be implemented in specific Zarr reader implementations (especially the Zarr-Python V3 implementation). There is an [overall roadmap for this integration with Zarr](https://hackmd.io/t9Myqt0HR7O0nq6wiHWCDA), whose final completion requires acceptance of at least two new Zarr Enhancement Proposals (the ["Chunk Manifest"](https://github.com/zarr-developers/zarr-specs/issues/287) and ["Virtual Concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) ZEPs).
+
+Whilst we wait for these upstream changes, in the meantime VirtualiZarr aims to provide utility in a significant subset of cases, for example by enabling writing virtualized zarr stores out to the existing kerchunk references format, so that they can be read by fsspec today.
