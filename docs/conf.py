@@ -61,6 +61,11 @@ html_theme_options = {
 }
 html_title = "VirtualiZarr"
 
+# remove sidebar, see GH issue #82
+html_css_files = [
+    'custom.css',
+]
+
 html_logo = "_static/_future_logo.png"
 
 html_static_path = ["_static"]
