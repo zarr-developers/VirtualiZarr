@@ -4,6 +4,7 @@ API Reference
 
 .. currentmodule:: virtualizarr
 
+VirtualiZarr has a small API surface, because most of the complexity is handled by xarray functions like ``xarray.concat`` and ``xarray.merge``.
 
 Manifests
 =========
@@ -17,8 +18,8 @@ Manifests
     ManifestArray
 
 
-Xarray
-======
+Reading
+=======
 
 .. currentmodule:: virtualizarr.xarray
 .. autosummary::
