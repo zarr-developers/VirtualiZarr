@@ -25,6 +25,7 @@ dependencies = [
     "kerchunk==0.2.2",
     "pydantic",
     "packaging",
+    "h5netcdf",
 ]
 
 [project.optional-dependencies]
