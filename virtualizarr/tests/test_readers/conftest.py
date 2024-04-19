@@ -81,11 +81,11 @@ def chunked_dimensions_netcdf4_file(tmpdir):
     filepath = f"{tmpdir}/chunks_dimension.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((100, 100))
-    x = np.random.random((100, 100))
-    y = np.random.random((100, 100))
+    x = np.random.random((100))
+    y = np.random.random((100))
     f.create_dataset(name="data", data=data, chunks=(50, 50))
-    f.create_dataset(name="x", data=x, chunks=(50, 50))
-    f.create_dataset(name="y", data=y, chunks=(50, 50))
+    f.create_dataset(name="x", data=x)
+    f.create_dataset(name="y", data=y)
     f["data"].dims[0].attach_scale(f["x"])
     f["data"].dims[1].attach_scale(f["y"])
     return filepath
@@ -98,4 +98,12 @@ def string_attribute_netcdf4_file(tmpdir):
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
     f["data"].attrs["attribute_name"] = "attribute_name"
+    return filepath
+
+
+@pytest.fixture
+def group_netcdf4_file(tmpdir):
+    filepath = f"{tmpdir}/group.nc"
+    f = h5py.File(filepath, "w")
+    f.create_group("group")
     return filepath

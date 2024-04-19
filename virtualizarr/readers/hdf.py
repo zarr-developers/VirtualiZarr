@@ -1,4 +1,4 @@
-from typing import List
+from typing import Mapping, List
 
 import h5py
 import numpy as np
@@ -181,3 +181,15 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     attrs = _extract_attrs(dataset)
     variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
     return variable
+
+
+def virtual_vars_from_hdf(path: str, f: h5py.File) -> Mapping[str, xr.Variable]:
+    variables = {}
+    for key in f.keys():
+        if isinstance(f[key], h5py.Dataset):
+            variable = _dataset_to_variable(path, f[key])
+            variables[key] = variable
+        else:
+            raise NotImplementedError("Nested groups are not yet supported")
+
+    return variables

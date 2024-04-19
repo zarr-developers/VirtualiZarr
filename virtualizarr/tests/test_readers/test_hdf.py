@@ -2,7 +2,8 @@ import h5py
 import pytest
 
 from virtualizarr.readers.hdf import (_dataset_chunk_manifest, _dataset_dims,
-                                      _dataset_to_variable, _extract_attrs)
+                                      _dataset_to_variable, _extract_attrs,
+                                      virtual_vars_from_hdf)
 
 
 class TestDatasetChunkManifest:
@@ -83,3 +84,15 @@ class TestExtractAttributes:
         ds = f["data"]
         attrs = _extract_attrs(ds)
         assert attrs["attribute_name"] == "attribute_name"
+
+
+class TestVirtualVarsFromHDF:
+    def test_variable_with_dimensions(self, chunked_dimensions_netcdf4_file):
+        f = h5py.File(chunked_dimensions_netcdf4_file)
+        variables = virtual_vars_from_hdf(chunked_dimensions_netcdf4_file, f)
+        assert len(variables) == 3
+
+    def test_groups_not_implemented(self, group_netcdf4_file):
+        f = h5py.File(group_netcdf4_file)
+        with pytest.raises(NotImplementedError):
+            virtual_vars_from_hdf(group_netcdf4_file, f)
