@@ -2,7 +2,7 @@ import h5py
 import pytest
 
 from virtualizarr.readers.hdf import (_dataset_chunk_manifest, _dataset_dims,
-                                      _dataset_to_variable)
+                                      _dataset_to_variable, _extract_attrs)
 
 
 class TestDatasetChunkManifest:
@@ -69,3 +69,17 @@ class TestDatasetToVariable:
         ds = f["data"]
         var = _dataset_to_variable(single_dimension_scale_netcdf4_file, ds)
         assert var.chunks == (2,)
+
+    def test_dataset_attributes(self, string_attribute_netcdf4_file):
+        f = h5py.File(string_attribute_netcdf4_file)
+        ds = f["data"]
+        var = _dataset_to_variable(string_attribute_netcdf4_file, ds)
+        assert var.attrs["attribute_name"] == "attribute_name"
+
+
+class TestExtractAttributes:
+    def test_string_attribute(self, string_attribute_netcdf4_file):
+        f = h5py.File(string_attribute_netcdf4_file)
+        ds = f["data"]
+        attrs = _extract_attrs(ds)
+        assert attrs["attribute_name"] == "attribute_name"

@@ -1,6 +1,7 @@
 from typing import List
 
 import h5py
+import numpy as np
 import xarray as xr
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
@@ -114,6 +115,52 @@ def _dataset_dims(dataset: h5py.Dataset) -> List[str]:
         return dims
 
 
+def _extract_attrs(dataset: h5py.Dataset):
+    """
+    Extract attributes from an HDF5 dataset.
+
+    Parameters
+    ----------
+    dataset : h5py.Dataset
+        An HDF5 dataset.
+    """
+    _HIDDEN_ATTRS = {
+        "REFERENCE_LIST",
+        "CLASS",
+        "DIMENSION_LIST",
+        "NAME",
+        "_Netcdf4Dimid",
+        "_Netcdf4Coordinates",
+        "_nc3_strict",
+        "_NCProperties",
+    }
+    attrs = {}
+    for n, v in dataset.attrs.items():
+        if n in _HIDDEN_ATTRS:
+            continue
+        # Fix some attribute values to avoid JSON encoding exceptions...
+        if isinstance(v, bytes):
+            v = v.decode("utf-8") or " "
+        elif isinstance(v, (np.ndarray, np.number, np.bool_)):
+            if v.dtype.kind == "S":
+                v = v.astype(str)
+            if n == "_FillValue":
+                continue
+            elif v.size == 1:
+                v = v.flatten()[0]
+                if isinstance(v, (np.ndarray, np.number, np.bool_)):
+                    v = v.tolist()
+            else:
+                v = v.tolist()
+        elif isinstance(v, h5py._hl.base.Empty):
+            v = ""
+        if v == "DIMENSION_SCALE":
+            continue
+
+        attrs[n] = v
+        return attrs
+
+
 def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     # This chunk determination logic mirrors zarr-python's create
     # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
@@ -131,5 +178,6 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     manifest = _dataset_chunk_manifest(path, dataset)
     marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
     dims = _dataset_dims(dataset)
-    variable = xr.Variable(data=marray, dims=dims)
+    attrs = _extract_attrs(dataset)
+    variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
     return variable

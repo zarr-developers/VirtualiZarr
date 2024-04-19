@@ -89,3 +89,13 @@ def chunked_dimensions_netcdf4_file(tmpdir):
     f["data"].dims[0].attach_scale(f["x"])
     f["data"].dims[1].attach_scale(f["y"])
     return filepath
+
+
+@pytest.fixture
+def string_attribute_netcdf4_file(tmpdir):
+    filepath = f"{tmpdir}/attributes.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.random((10, 10))
+    f.create_dataset(name="data", data=data, chunks=None)
+    f["data"].attrs["attribute_name"] = "attribute_name"
+    return filepath
