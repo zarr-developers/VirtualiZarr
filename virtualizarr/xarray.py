@@ -9,7 +9,7 @@ from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import KerchunkStoreRefs, FileType, _automatically_determine_filetype
-from virtualizarr.readers.hdf import virtual_vars_from_hdf, attrs_from_root_group 
+from virtualizarr.readers.hdf import virtual_vars_from_hdf, attrs_from_root_group
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
