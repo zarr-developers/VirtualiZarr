@@ -107,3 +107,13 @@ def group_netcdf4_file(tmpdir):
     f = h5py.File(filepath, "w")
     f.create_group("group")
     return filepath
+
+
+@pytest.fixture
+def multiple_datasets_netcdf4_file(tmpdir):
+    filepath = f"{tmpdir}/multiple_datasets.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.random((10, 10))
+    f.create_dataset(name="data", data=data, chunks=None)
+    f.create_dataset(name="data2", data=data, chunks=None)
+    return filepath

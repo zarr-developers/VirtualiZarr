@@ -1,5 +1,6 @@
-from typing import Mapping, List
+from typing import List, Mapping, Optional
 
+import fsspec
 import h5py
 import numpy as np
 import xarray as xr
@@ -72,6 +73,7 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
             entries=chunk_entries
         )
         return chunk_manifest
+
 
 def _dataset_dims(dataset: h5py.Dataset) -> List[str]:
     """
@@ -183,13 +185,22 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     return variable
 
 
-def virtual_vars_from_hdf(path: str, f: h5py.File) -> Mapping[str, xr.Variable]:
+def virtual_vars_from_hdf(
+    path: str,
+    drop_variables: Optional[List[str]] = None,
+) -> Mapping[str, xr.Variable]:
+    if drop_variables is None:
+        drop_variables = []
+    fs, file_path = fsspec.core.url_to_fs(path)
+    open_file = fs.open(path, "rb")
+    f = h5py.File(open_file, mode="r")
     variables = {}
     for key in f.keys():
-        if isinstance(f[key], h5py.Dataset):
-            variable = _dataset_to_variable(path, f[key])
-            variables[key] = variable
-        else:
-            raise NotImplementedError("Nested groups are not yet supported")
+        if key not in drop_variables:
+            if isinstance(f[key], h5py.Dataset):
+                variable = _dataset_to_variable(path, f[key])
+                variables[key] = variable
+            else:
+                raise NotImplementedError("Nested groups are not yet supported")
 
     return variables
