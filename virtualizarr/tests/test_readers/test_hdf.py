@@ -85,6 +85,11 @@ class TestExtractAttributes:
         attrs = _extract_attrs(ds)
         assert attrs["attribute_name"] == "attribute_name"
 
+    def test_root_attribute(self, root_attributes_netcdf4_file):
+        f = h5py.File(root_attributes_netcdf4_file)
+        attrs = _extract_attrs(f)
+        assert attrs["attribute_name"] == "attribute_name"
+
 
 class TestVirtualVarsFromHDF:
     def test_variable_with_dimensions(self, chunked_dimensions_netcdf4_file):

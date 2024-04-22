@@ -120,14 +120,14 @@ def _dataset_dims(dataset: h5py.Dataset) -> Union[List[str], List[None]]:
     return dims
 
 
-def _extract_attrs(dataset: h5py.Dataset):
+def _extract_attrs(h5obj: Union[h5py.Dataset, h5py.Group]):
     """
-    Extract attributes from an HDF5 dataset.
+    Extract attributes from an HDF5 group or dataset.
 
     Parameters
     ----------
-    dataset : h5py.Dataset
-        An HDF5 dataset.
+    h5obj : h5py.Group or h5py.Dataset
+        An HDF5 group or dataset.
     """
     _HIDDEN_ATTRS = {
         "REFERENCE_LIST",
@@ -140,7 +140,7 @@ def _extract_attrs(dataset: h5py.Dataset):
         "_NCProperties",
     }
     attrs = {}
-    for n, v in dataset.attrs.items():
+    for n, v in h5obj.attrs.items():
         if n in _HIDDEN_ATTRS:
             continue
         # Fix some attribute values to avoid JSON encoding exceptions...
@@ -207,3 +207,11 @@ def virtual_vars_from_hdf(
                 raise NotImplementedError("Nested groups are not yet supported")
 
     return variables
+
+
+def attrs_from_root_group(path: str):
+    fs, file_path = fsspec.core.url_to_fs(path)
+    open_file = fs.open(path, "rb")
+    f = h5py.File(open_file, mode="r")
+    attrs = _extract_attrs(f)
+    return attrs

@@ -102,6 +102,14 @@ def string_attribute_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def root_attributes_netcdf4_file(tmpdir):
+    filepath = f"{tmpdir}/root_attributes.nc"
+    f = h5py.File(filepath, "w")
+    f.attrs["attribute_name"] = "attribute_name"
+    return filepath
+
+
+@pytest.fixture
 def group_netcdf4_file(tmpdir):
     filepath = f"{tmpdir}/group.nc"
     f = h5py.File(filepath, "w")
