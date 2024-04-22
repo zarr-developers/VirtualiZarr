@@ -8,7 +8,8 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
+from virtualizarr.kerchunk import KerchunkStoreRefs, FileType, _automatically_determine_filetype
+from virtualizarr.readers.hdf import virtual_vars_from_hdf, attrs_from_root_group 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
@@ -76,18 +77,28 @@ def open_virtual_dataset(
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
 
+    if filetype is None:
+        filetype = _automatically_determine_filetype(filepath)
+    filetype = FileType(filetype)
+    if filetype.name.lower() == "netcdf4":
+        virtual_vars = virtual_vars_from_hdf(
+            path=filepath,
+            drop_variables=drop_variables
+        )
+        ds_attrs = attrs_from_root_group(path=filepath)
     # this is the only place we actually always need to use kerchunk directly
     # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-    vds_refs = kerchunk.read_kerchunk_references_from_file(
-        filepath=filepath,
-        filetype=filetype,
-    )
-    virtual_vars = virtual_vars_from_kerchunk_refs(
-        vds_refs,
-        drop_variables=drop_variables + loadable_variables,
-        virtual_array_class=virtual_array_class,
-    )
-    ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+    else:
+        vds_refs = kerchunk.read_kerchunk_references_from_file(
+            filepath=filepath,
+            filetype=filetype,
+        )
+        virtual_vars = virtual_vars_from_kerchunk_refs(
+            vds_refs,
+            drop_variables=drop_variables + loadable_variables,
+            virtual_array_class=virtual_array_class,
+        )
+        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
 
     if indexes is None or len(loadable_variables) > 0:
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
