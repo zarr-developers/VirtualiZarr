@@ -1,4 +1,4 @@
-from typing import List, Mapping, Optional
+from typing import List, Mapping, Optional, Union
 
 import fsspec
 import h5py
@@ -7,6 +7,8 @@ import xarray as xr
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
+
+from virtualizarr.types import ChunkKey
 
 
 def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
@@ -38,7 +40,8 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
                 offset=dsid.get_offset(),
                 length=dsid.get_storage_size()
             )
-            chunk_entries = {key: chunk_entry}
+            chunk_key = ChunkKey(key)
+            chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(
                 entries=chunk_entries
             )
@@ -75,7 +78,7 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
         return chunk_manifest
 
 
-def _dataset_dims(dataset: h5py.Dataset) -> List[str]:
+def _dataset_dims(dataset: h5py.Dataset) -> Union[List[str], List[None]]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -114,7 +117,7 @@ def _dataset_dims(dataset: h5py.Dataset) -> List[str]:
                 # In this case, we mimic netCDF4 and assign phony dimension names.
                 # See https://github.com/fsspec/kerchunk/issues/41
                 dims.append(f"phony_dim_{n}")
-        return dims
+    return dims
 
 
 def _extract_attrs(dataset: h5py.Dataset):
