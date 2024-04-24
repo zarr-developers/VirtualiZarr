@@ -21,23 +21,27 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-    "xarray",
+    "xarray@git+https://github.com/TomNicholas/xarray.git@concat-no-indexes#egg=xarray",
     "kerchunk==0.2.2",
+    "h5netcdf",
     "pydantic",
+    "numpy",
+    "ujson",
     "packaging",
 ]
 
 [project.optional-dependencies]
 test = [
+    "codecov",
     "pre-commit",
     "pytest-mypy",
+    "pytest-cov",
     "pytest",
     "scipy",
     "pooch",
+    "ruff",
+
 ]
-
-
-
 
 
 [project.urls]
