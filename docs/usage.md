@@ -206,7 +206,7 @@ Indexes:
 ```
 
 ```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple in-progress PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
+Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
