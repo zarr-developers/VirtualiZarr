@@ -206,7 +206,7 @@ Indexes:
 ```
 
 ```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple in-progress PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
+Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
@@ -277,6 +277,36 @@ TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/Tom
 
 TODO: Use preprocess to create a new index from the metadata
 
+## Loading variables
+
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
+
+```python
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects, and loadable variables backed by (lazy) numpy arrays.
+
+Loading variables can be useful in a few scenarios:
+1. You need to look at the actual values of a muilti-dimensional variable in order to decide what to do next,
+2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
+3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+
 ## Writing virtual stores to disk
 
 Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
@@ -300,6 +330,10 @@ fs = fsspec.filesystem("reference", fo=f"combined.json")
 mapper = fs.get_mapper("")
 
 combined_ds = xr.open_dataset(mapper, engine="kerchunk")
+```
+
+```{note}
+Currently you can only serialize virtual variables backed by `ManifestArray` objects to kerchunk reference files, not real in-memory numpy-backed variables.
 ```
 
 ### Writing as Zarr

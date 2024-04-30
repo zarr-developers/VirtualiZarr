@@ -2,7 +2,7 @@
 
 **VirtualiZarr creates virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
 
-VirtualiZarr (pronounced "virtualize-arr") grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
+VirtualiZarr (pronounced like "virtualize" but more piratey) grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
 
 _Please see the [documentation](https://virtualizarr.readthedocs.io/en/latest/)_
 

@@ -1,13 +1,14 @@
-from typing import List, Literal, Mapping, Optional, Union, overload
+from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping, Iterable
 
 import ujson  # type: ignore
 import xarray as xr
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
-from xarray.core.indexes import Index
+from xarray.core.indexes import Index, PandasIndex
+from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs
+from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
@@ -19,8 +20,9 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 
 def open_virtual_dataset(
     filepath: str,
-    filetype: Optional[str] = None,
-    drop_variables: Optional[List[str]] = None,
+    filetype: Optional[FileType] = None,
+    drop_variables: Optional[Iterable[str]] = None,
+    loadable_variables: Optional[Iterable[str]] = None,
     indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
     reader_options: Optional[dict] = {'storage_options': {'anon': True}}
@@ -36,12 +38,15 @@ def open_virtual_dataset(
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
-    filetype : str, default None
+    filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4'}.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
+    loadable_variables: list[str], default is None
+        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
+        Default is to open all variables as virtual arrays (i.e. ManifestArray).
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
@@ -52,33 +57,111 @@ def open_virtual_dataset(
     reader_options: dict, default {'storage_options': {'anon': True}}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
+
+    Returns
+    -------
+    vds
+        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
 
+    if drop_variables is None:
+        drop_variables = []
+    elif isinstance(drop_variables, str):
+        drop_variables = [drop_variables]
+    else:
+        drop_variables = list(drop_variables)
+    if loadable_variables is None:
+        loadable_variables = []
+    elif isinstance(loadable_variables, str):
+        loadable_variables = [loadable_variables]
+    else:
+        loadable_variables = list(loadable_variables)
+    common = set(drop_variables).intersection(set(loadable_variables))
+    if common:
+        raise ValueError(f"Cannot both load and drop variables {common}")
+
     # this is the only place we actually always need to use kerchunk directly
+    # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
     vds_refs = kerchunk.read_kerchunk_references_from_file(
         filepath=filepath,
         filetype=filetype,
         reader_options=reader_options,
     )
+    virtual_vars = virtual_vars_from_kerchunk_refs(
+        vds_refs,
+        drop_variables=drop_variables + loadable_variables,
+        virtual_array_class=virtual_array_class,
+    )
+    ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
 
-    if indexes is None:
-        # add default indexes by reading data from file
+    if indexes is None or len(loadable_variables) > 0:
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-        ds = xr.open_dataset(filepath)
-        indexes = ds.xindexes
-        ds.close()
+        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
+        ds = xr.open_dataset(filepath, drop_variables=drop_variables)
 
-    vds = dataset_from_kerchunk_refs(
-        vds_refs,
-        drop_variables=drop_variables,
-        virtual_array_class=virtual_array_class,
-        indexes=indexes,
+        if indexes is None:
+            # add default indexes by reading data from file
+            indexes = {name: index for name, index in ds.xindexes.items()}
+        elif indexes != {}:
+            # TODO allow manual specification of index objects
+            raise NotImplementedError()
+        else:
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
+
+        loadable_vars = {name: var for name, var in ds.variables.items() if name in loadable_variables}
+
+        # if we only read the indexes we can just close the file right away as nothing is lazy
+        if loadable_vars == {}:
+            ds.close()
+    else:
+        loadable_vars = {}
+        indexes = {}
+
+    vars = {**virtual_vars, **loadable_vars}
+
+    data_vars, coords = separate_coords(vars, indexes)
+
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=ds_attrs,
     )
 
     # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
     return vds
+
+
+def virtual_vars_from_kerchunk_refs(
+    refs: KerchunkStoreRefs,
+    drop_variables: Optional[List[str]] = None,
+    virtual_array_class=ManifestArray,
+) -> Mapping[str, xr.Variable]:
+    """
+    Translate a store-level kerchunk reference dict into aa set of xarray Variables containing virtualized arrays.
+
+    drop_variables: list[str], default is None
+        Variables in the file to drop before returning.
+    virtual_array_class
+        Virtual array class to use to represent the references to the chunks in each on-disk array.
+        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
+    """
+
+    var_names = kerchunk.find_var_names(refs)
+    if drop_variables is None:
+        drop_variables = []
+    var_names_to_keep = [
+        var_name for var_name in var_names if var_name not in drop_variables
+    ]
+
+    vars = {var_name: variable_from_kerchunk_refs(
+            refs, var_name, virtual_array_class
+        ) for var_name in var_names_to_keep}
+
+    return vars
+
 
 
 def dataset_from_kerchunk_refs(
@@ -97,31 +180,20 @@ def dataset_from_kerchunk_refs(
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
-    var_names = kerchunk.find_var_names(refs)
-    if drop_variables is None:
-        drop_variables = []
-    var_names_to_keep = [
-        var_name for var_name in var_names if var_name not in drop_variables
-    ]
-
-    vars = {}
-    for var_name in var_names_to_keep:
-        vars[var_name] = variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class
-        )
+    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
 
     data_vars, coords = separate_coords(vars, indexes)
 
     ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
 
-    ds = xr.Dataset(
+    vds = xr.Dataset(
         data_vars,
         coords=coords,
         # indexes={},  # TODO should be added in a later version of xarray
         attrs=ds_attrs,
     )
 
-    return ds
+    return vds
 
 
 def variable_from_kerchunk_refs(
@@ -139,13 +211,15 @@ def variable_from_kerchunk_refs(
 
 
 def separate_coords(
-    vars: dict[str, xr.Variable],
-    indexes={},
-) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
+    vars: Mapping[str, xr.Variable],
+    indexes: MutableMapping[str, Index],
+) -> tuple[Mapping[str, xr.Variable], xr.Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
-    I thought this should be easy but it was actually really hard - in the end I had to checkout xarray v2023.08.0, the last one before #8107 was merged.
+    Currently requires a workaround unless xarray 8107 is merged.
+
+    Will also preserve any loaded variables and indexes it is passed.
     """
 
     # this would normally come from CF decoding, let's hope the fact we're skipping that doesn't cause any problems...
@@ -160,6 +234,13 @@ def separate_coords(
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
                 coord_vars[name] = (dim1d, var.data)
+
+                if isinstance(var, IndexVariable):
+                    # unless variable actually already is a loaded IndexVariable,
+                    # in which case we need to keep it and add the corresponding indexes explicitly
+                    coord_vars[name] = var
+                    # TODO this seems suspect - will it handle datetimes?
+                    indexes[name] = PandasIndex(var, dim1d)
             else:
                 coord_vars[name] = var
         else:
