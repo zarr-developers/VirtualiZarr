@@ -75,7 +75,7 @@ def read_kerchunk_references_from_file(
         from kerchunk.tiff import tiff_to_zarr
 
         refs = tiff_to_zarr(filepath, inline_threshold=0, **reader_options)
-    elif filetype.lower() == "fits":
+    elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
         refs = process_file(filepath, inline_threshold=0, **reader_options)
