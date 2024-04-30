@@ -61,7 +61,7 @@ def read_kerchunk_references_from_file(
 
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
-        
+
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
     elif filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
