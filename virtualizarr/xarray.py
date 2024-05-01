@@ -25,7 +25,7 @@ def open_virtual_dataset(
     loadable_variables: Optional[Iterable[str]] = None,
     indexes: Optional[Mapping[str, Index]] = None,
     virtual_array_class=ManifestArray,
-    reader_options: Optional[dict] = {'storage_options': {'anon': True}}
+    reader_options: Optional[dict] = {},
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -54,7 +54,7 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    reader_options: dict, default {'storage_options': {'anon': True}}
+    reader_options: dict, default {}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
 
@@ -63,6 +63,7 @@ def open_virtual_dataset(
     vds
         An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
+
 
     if drop_variables is None:
         drop_variables = []
@@ -98,7 +99,10 @@ def open_virtual_dataset(
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
         # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        ds = xr.open_dataset(filepath, drop_variables=drop_variables)
+        import fsspec
+
+        fsspec_of = fsspec.open(filepath, mode="rb",**reader_options).open()
+        ds = xr.open_dataset(fsspec_of, drop_variables=drop_variables)
 
         if indexes is None:
             # add default indexes by reading data from file

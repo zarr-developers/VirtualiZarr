@@ -23,6 +23,7 @@ dynamic = ["version"]
 dependencies = [
     "xarray@git+https://github.com/TomNicholas/xarray.git@concat-avoid-index-auto-creation#egg=xarray",
     "kerchunk==0.2.2",
+    "universal-pathlib",
     "h5netcdf",
     "pydantic",
     "numpy",

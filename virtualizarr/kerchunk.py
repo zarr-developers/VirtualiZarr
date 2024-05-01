@@ -36,7 +36,7 @@ class FileType(AutoName):
 
 def read_kerchunk_references_from_file(
     filepath: str, filetype: Optional[FileType],
-    reader_options: Optional[dict] = {'storage_options': {'anon': True}}
+    reader_options: Optional[dict] = {}
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -48,8 +48,8 @@ def read_kerchunk_references_from_file(
     filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
-    reader_options: dict, default {'storage_options': {'anon': True}}
-        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
+    reader_options: dict, default {}
+        Dict passed into Kerchunk file readers. ex: {'storage_options': {'anon': True}}. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
     """
 
@@ -86,16 +86,27 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def _automatically_determine_filetype(filepath: str, reader_options: Optional[dict] = {'storage_options': {'anon': True}}) -> FileType:
+def _automatically_determine_filetype(filepath: str, reader_options: Optional[dict]={}) -> FileType:
     file_extension = Path(filepath).suffix
 
     # opens file with fsspec - can be on cloud storage or local
-    import fsspec
-    fsspec_of = fsspec.open(filepath, mode="rb",**reader_options).open()
+    from upath import UPath
+    universal_filepath = UPath(filepath)
+    protocol = universal_filepath.protocol
+
+    # why does UPath give an empty string for a local file protocol :(
+    if protocol == '':
+        fpath = open(filepath, 'rb')
+
+    elif protocol in ["s3"]:
+        import fsspec
+        fpath = fsspec.filesystem(protocol).open(filepath, **reader_options)
+    else:
+        raise NotImplementedError("Only local and s3 file protocols are currently supported")
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        magic = fsspec_of.read()
+        magic = fpath.read()
 
         if magic[0:3] == b"CDF":
             filetype = FileType.netcdf3
@@ -115,7 +126,7 @@ def _automatically_determine_filetype(filepath: str, reader_options: Optional[di
     else:
         raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
 
-    fsspec_of.close()
+    fpath.close()
     return filetype
 
 
