@@ -54,7 +54,7 @@ def read_kerchunk_references_from_file(
     """
 
     if filetype is None:
-        filetype = _automatically_determine_filetype(filepath)
+        filetype = _automatically_determine_filetype(filepath, reader_options)
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -86,20 +86,23 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def _automatically_determine_filetype(filepath: str) -> FileType:
+def _automatically_determine_filetype(filepath: str, reader_options: Optional[dict] = {'storage_options': {'anon': True}}) -> FileType:
     file_extension = Path(filepath).suffix
+
+    # opens file with fsspec - can be on cloud storage or local
+    import fsspec
+    fsspec_of = fsspec.open(filepath, mode="rb",**reader_options).open()
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        with open(filepath, 'rb') as f:
-            magic = f.read()
+        magic = fsspec_of.read()
+
         if magic[0:3] == b"CDF":
             filetype = FileType.netcdf3
         elif magic[1:4] == b"HDF":
             filetype = FileType.netcdf4
         else:
             raise ValueError(".nc file does not appear to be NETCDF3 OR NETCDF4")
-
     elif file_extension == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
@@ -112,6 +115,7 @@ def _automatically_determine_filetype(filepath: str) -> FileType:
     else:
         raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
 
+    fsspec_of.close()
     return filetype
 
 
