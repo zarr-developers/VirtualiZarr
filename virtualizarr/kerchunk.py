@@ -5,6 +5,7 @@ import ujson  # type: ignore
 import xarray as xr
 
 from virtualizarr.zarr import ZArray, ZAttrs
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
@@ -54,7 +55,7 @@ def read_kerchunk_references_from_file(
     """
 
     if filetype is None:
-        filetype = _automatically_determine_filetype(filepath, reader_options)
+        filetype = _automatically_determine_filetype(filepath=filepath, reader_options=reader_options)
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -86,23 +87,9 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def _automatically_determine_filetype(filepath: str, reader_options: Optional[dict]={}) -> FileType:
+def _automatically_determine_filetype(*,filepath: str, reader_options: Optional[dict]={}) -> FileType:
     file_extension = Path(filepath).suffix
-
-    # opens file with fsspec - can be on cloud storage or local
-    from upath import UPath
-    universal_filepath = UPath(filepath)
-    protocol = universal_filepath.protocol
-
-    # why does UPath give an empty string for a local file protocol :(
-    if protocol == '':
-        fpath = open(filepath, 'rb')
-
-    elif protocol in ["s3"]:
-        import fsspec
-        fpath = fsspec.filesystem(protocol).open(filepath, **reader_options)
-    else:
-        raise NotImplementedError("Only local and s3 file protocols are currently supported")
+    fpath = _fsspec_openfile_from_filepath(filepath=filepath,reader_options=reader_options)
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167

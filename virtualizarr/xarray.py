@@ -8,6 +8,7 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
@@ -99,10 +100,11 @@ def open_virtual_dataset(
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
         # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        import fsspec
 
-        fsspec_of = fsspec.open(filepath, mode="rb",**reader_options).open()
-        ds = xr.open_dataset(fsspec_of, drop_variables=drop_variables)
+
+        fpath = _fsspec_openfile_from_filepath(filepath=filepath,reader_options=reader_options)
+
+        ds = xr.open_dataset(fpath, drop_variables=drop_variables)
 
         if indexes is None:
             # add default indexes by reading data from file
@@ -118,6 +120,7 @@ def open_virtual_dataset(
         # if we only read the indexes we can just close the file right away as nothing is lazy
         if loadable_vars == {}:
             ds.close()
+
     else:
         loadable_vars = {}
         indexes = {}
@@ -134,7 +137,6 @@ def open_virtual_dataset(
     )
 
     # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
-
     return vds
 
 

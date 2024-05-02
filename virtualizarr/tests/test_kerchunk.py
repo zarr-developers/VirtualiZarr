@@ -159,8 +159,8 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
     ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
     ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
 
-    assert FileType("netcdf3") == _automatically_determine_filetype(netcdf3_file_path)
-    assert FileType("netcdf4") == _automatically_determine_filetype(netcdf4_file_path)
+    assert FileType("netcdf3") == _automatically_determine_filetype(filepath = netcdf3_file_path)
+    assert FileType("netcdf4") == _automatically_determine_filetype(filepath = netcdf4_file_path)
 
 
 

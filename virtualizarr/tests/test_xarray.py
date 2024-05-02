@@ -273,11 +273,10 @@ class TestCombineUsingIndexes:
 
 
 pytest.importorskip("s3fs")
-@pytest.mark.xfail(reason="currently should xfail for None filetype and None indexes.",run=False)
 @pytest.mark.parametrize("filetype", ['netcdf4', None], ids=["netcdf4 filetype", "None filetype"])
 @pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
 def test_anon_read_s3(filetype, indexes):
-    fpath = 's3://nex-gddp-cmip6/NEX-GDDP-CMIP6/CESM2/historical/r4i1p1f1/pr/pr_day_CESM2_historical_r4i1p1f1_gn_2010.nc'
+    fpath = 's3://carbonplan-share/virtualizarr/local.nc'
     assert open_virtual_dataset(fpath, filetype=filetype, indexes=indexes, reader_options={'storage_options': {'anon': True}})
 
 
@@ -293,6 +292,8 @@ class TestLoadVirtualDataset:
                 assert isinstance(vds[name].data, ManifestArray), name
 
         full_ds = xr.open_dataset(netcdf4_file)
+
         for name in full_ds.variables:
+
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
