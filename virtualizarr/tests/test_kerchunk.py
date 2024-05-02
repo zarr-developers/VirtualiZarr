@@ -2,6 +2,8 @@ import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
+import pytest
+
 
 from virtualizarr.kerchunk import _automatically_determine_filetype, FileType
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
@@ -157,6 +159,21 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
 
     # write two version of NetCDF
     ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
-    ds.to_netcdf(netcdf4_file_path)
+    ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
+
     assert FileType("netcdf3") == _automatically_determine_filetype(netcdf3_file_path)
     assert FileType("netcdf4") == _automatically_determine_filetype(netcdf4_file_path)
+
+
+
+
+def test_FileType():
+    # tests if FileType converts user supplied strings to correct filetype
+    assert 'netcdf3' == FileType("netcdf3").name
+    assert 'netcdf4' == FileType("netcdf4").name
+    assert 'grib' == FileType("grib").name
+    assert 'tiff' == FileType("tiff").name
+    assert 'fits' == FileType("fits").name
+    assert 'zarr' == FileType("zarr").name
+    with pytest.raises(ValueError):
+        FileType(None)
