@@ -3,6 +3,8 @@ from typing import List, NewType, Optional, Tuple, Union, cast
 import base64
 from enum import Enum, auto
 
+import json
+import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 
@@ -35,6 +37,16 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+
+
+class NumpyEncoder(json.JSONEncoder):
+    # TODO I don't understand how kerchunk gets around this problem of encoding numpy types (in the zattrs) whilst only using ujson
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert NumPy array to Python list
+        elif isinstance(obj, np.generic):
+            return obj.item()  # Convert NumPy scalar to Python scalar
+        return json.JSONEncoder.default(self, obj)
 
 
 def read_kerchunk_references_from_file(
@@ -227,8 +239,10 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
         # TODO do I really need to encode then decode like this?
         inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode('utf-8')
 
+        from .manifests.manifest import join
+
         # TODO can this be generalized to save individual chunks of a dask array?
-        arr_refs = {'0': inlined_data}
+        arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
 
         zarray = ZArray(
             chunks=np_arr.shape,
@@ -240,6 +254,6 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
     arr_refs[".zarray"] = zarray.to_kerchunk_json()
     zattrs = var.attrs
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
-    arr_refs[".zattrs"] = ujson.dumps(zattrs)
+    arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 
     return cast(KerchunkArrRefs, arr_refs)
