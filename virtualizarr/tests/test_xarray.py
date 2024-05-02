@@ -277,7 +277,7 @@ pytest.importorskip("s3fs")
 @pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
 def test_anon_read_s3(filetype, indexes):
     fpath = 's3://carbonplan-share/virtualizarr/local.nc'
-    assert open_virtual_dataset(fpath, filetype=filetype, indexes=indexes, reader_options={'storage_options': {'anon': True}})
+    assert open_virtual_dataset(fpath, filetype=filetype, indexes=indexes, reader_options={'storage_options': {'anon': True},'remote_options': {'anon': True}})
 
 
 class TestLoadVirtualDataset:
