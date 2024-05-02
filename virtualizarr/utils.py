@@ -31,8 +31,7 @@ def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[di
             storage_options = {} # type: dict
         else:
             storage_options = reader_options.get('storage_options') #type: ignore
-
-        fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
+        fpath = fsspec.filesystem(protocol, **storage_options).open(filepath,**storage_options)
 
     else:
         raise NotImplementedError("Only local and s3 file protocols are currently supported")
