@@ -41,7 +41,7 @@ test = [
     "scipy",
     "pooch",
     "ruff",
-    "s3sf"
+    "s3fs"
 
 ]
 
