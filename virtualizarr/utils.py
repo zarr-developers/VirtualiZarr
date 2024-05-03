@@ -25,7 +25,7 @@ def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[di
 
         fpath = fsspec.open(filepath, 'rb').open()
 
-    
+
     elif protocol in ["s3"]:
         if not bool(reader_options):
             storage_options = {} # type: dict
