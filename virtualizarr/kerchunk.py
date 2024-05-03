@@ -189,7 +189,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     all_arr_refs = {}
     for var_name, var in ds.variables.items():
-        arr_refs = variable_to_kerchunk_arr_refs(var)
+        arr_refs = variable_to_kerchunk_arr_refs(var, var_name)
 
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
@@ -209,7 +209,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
     return cast(KerchunkStoreRefs, ds_refs)
 
 
-def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
+def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkArrRefs:
     """
     Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
 
@@ -234,6 +234,14 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
             raise TypeError(
                 f"Can only serialize wrapped arrays of type ManifestArray or numpy.ndarray, but got type {type(var.data)}"
             ) from e
+
+        if var.encoding:
+            if 'scale_factor' in var.encoding:
+                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with a scale_factor")
+            if 'offset' in var.encoding:
+                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset")
+            if 'calendar' in var.encoding:
+                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar")
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
