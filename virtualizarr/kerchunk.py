@@ -60,8 +60,6 @@ def read_kerchunk_references_from_file(
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
 
-    fpath = _fsspec_openfile_from_filepath(filepath=filepath,reader_options=reader_options)
-
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
 
@@ -69,7 +67,7 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
-        refs = SingleHdf5ToZarr(fpath, inline_threshold=0).translate()
+        refs = SingleHdf5ToZarr(filepath, inline_threshold=0, storage_options={'key':'', 'secret':'', 'anon':True}).translate()
     elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
