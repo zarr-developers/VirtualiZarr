@@ -332,8 +332,10 @@ mapper = fs.get_mapper("")
 combined_ds = xr.open_dataset(mapper, engine="kerchunk")
 ```
 
+In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes. This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
+
 ```{note}
-Currently you can only serialize virtual variables backed by `ManifestArray` objects to kerchunk reference files, not real in-memory numpy-backed variables.
+Currently you can only serialize in-memory variables to kerchunk references if they do not have any encoding.
 ```
 
 ### Writing as Zarr
