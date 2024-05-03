@@ -13,4 +13,4 @@ dependencies:
       - "sphinx_design"
       - "sphinx_togglebutton"
       - "sphinx-autodoc-typehints"
-      - -e ..
+      - -e  "..[test]"
