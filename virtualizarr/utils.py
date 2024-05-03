@@ -5,12 +5,12 @@ from s3fs.core import S3File
 from fsspec.implementations.local import LocalFileOpener
 
 
-def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[dict]) -> Union[S3File, LocalFileOpener]:
+def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[dict] = {'storage_options':{'key':'', 'secret':'', 'anon':True}}) -> Union[S3File, LocalFileOpener]:
     """Utility function to facilitate reading remote file paths using fsspec.
 
     :param filepath: Input filepath
     :type filepath: str
-    :param reader_options: Dict containing options to pass to fsspec file reader
+    :param reader_options: Dict containing options to pass to fsspec file reader. Default: {'storage_options':{'key':'', 'secret':'', 'anon':True}}
     :type reader_options: Optional[dict]
     :rtype: Union[S3File, LocalFileOpener]
     """
@@ -34,6 +34,7 @@ def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[di
 
         else:
             storage_options = reader_options.get('storage_options') #type: ignore
+
             # using dict merge operator to add in defaults if keys are not specified
             storage_options = s3_anon_defaults | storage_options
 
