@@ -21,18 +21,23 @@ def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[di
     protocol = universal_filepath.protocol
 
     # why does UPath give an empty string for a local file protocol :(
+    # import pdb; pdb.set_trace()
+
     if protocol == '':
 
         fpath = fsspec.open(filepath, 'rb').open()
 
-    
     elif protocol in ["s3"]:
+        s3_anon_defaults = {'key':'', 'secret':'', 'anon':True}
         if not bool(reader_options):
-            storage_options = {} # type: dict
+            storage_options = s3_anon_defaults
+
         else:
             storage_options = reader_options.get('storage_options') #type: ignore
-        target_options = {"anon":True}
-        fpath = fsspec.filesystem(protocol).open(filepath,target_options = {"anon":True})
+            # using dict merge operator to add in defaults if keys are not specified
+            storage_options = s3_anon_defaults | storage_options
+
+        fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
 
     else:
         raise NotImplementedError("Only local and s3 file protocols are currently supported")
