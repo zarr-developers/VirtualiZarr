@@ -9,6 +9,7 @@ import ujson  # type: ignore
 import xarray as xr
 
 from virtualizarr.zarr import ZArray, ZAttrs
+from virtualizarr.manifests.manifest import join
 
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
@@ -238,8 +239,6 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
         byte_data = np_arr.tobytes()
         # TODO do I really need to encode then decode like this?
         inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode('utf-8')
-
-        from .manifests.manifest import join
 
         # TODO can this be generalized to save individual chunks of a dask array?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
