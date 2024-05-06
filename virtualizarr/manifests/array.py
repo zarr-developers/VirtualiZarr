@@ -54,12 +54,6 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
             )
 
-        # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
-        if _zarray.shape_chunk_grid != _chunkmanifest.shape_chunk_grid:
-            raise ValueError(
-                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {_chunkmanifest.shape_chunk_grid}"
-            )
-
         self._zarray = _zarray
         self._manifest = _chunkmanifest
 
