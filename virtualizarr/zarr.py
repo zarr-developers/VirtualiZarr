@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict, TYPE_CHECKING
 import json
@@ -134,12 +133,8 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
     Path.mkdir(_storepath, exist_ok=False)
 
     # should techically loop over groups in a tree but a dataset corresponds to only one group
-    group_metadata = {
-        "zarr_format": 3,
-        "node_type": "group",
-        "attributes": ds.attrs
-    }
-    with open(_storepath / 'zarr.json', "wb") as group_metadata_file:
+    group_metadata = {"zarr_format": 3, "node_type": "group", "attributes": ds.attrs}
+    with open(_storepath / "zarr.json", "wb") as group_metadata_file:
         group_metadata_file.write(json_dumps(group_metadata))
 
     for name, var in ds.variables.items():
@@ -177,10 +172,10 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
 
     marr = var.data
 
-    marr.manifest.to_zarr_json(array_dir / 'manifest.json')
+    marr.manifest.to_zarr_json(array_dir / "manifest.json")
 
     metadata = zarr_v3_array_metadata(marr.zarray, list(var.dims), var.attrs)
-    with open(array_dir / 'zarr.json', "wb") as metadata_file:
+    with open(array_dir / "zarr.json", "wb") as metadata_file:
         metadata_file.write(json_dumps(metadata))
 
 
@@ -194,25 +189,18 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) ->
     metadata["zarr_format"] = 3
     metadata["node_type"] = "array"
     metadata["data_type"] = str(np.dtype(metadata.pop("dtype")))
-    metadata["chunk_grid"] = {"name": "regular", "configuration": {"chunk_shape": metadata.pop("chunks")}}
-    metadata["chunk_key_encoding"] = {
-        "name": "default",
-        "configuration": {
-            "separator": "/"
-        }
+    metadata["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": metadata.pop("chunks")},
     }
+    metadata["chunk_key_encoding"] = {"name": "default", "configuration": {"separator": "/"}}
     metadata["codecs"] = metadata.pop("filters")
     metadata.pop("compressor")  # TODO this should be entered in codecs somehow
     metadata.pop("order")  # TODO this should be replaced by a transpose codec
 
     # indicate that we're using the manifest storage transformer ZEP
     metadata["storage_transformers"] = [
-        {
-            "name": "chunk-manifest-json",
-            "configuration": {
-                "manifest": "./manifest.json"
-            }
-        }
+        {"name": "chunk-manifest-json", "configuration": {"manifest": "./manifest.json"}}
     ]
 
     # add information from xarray object
@@ -233,12 +221,14 @@ def metadata_from_zarr_json(filepath: Path) -> Tuple[ZArray, List[str], dict]:
         metadata = json.load(metadata_file)
 
     if {
-            "name": "chunk-manifest-json",
-            "configuration": {
-                "manifest": "./manifest.json",
-            }
-       } not in metadata.get("storage_transformers", []):
-        raise ValueError("Can only read byte ranges from Zarr v3 stores which implement the manifest storage transformer ZEP.")
+        "name": "chunk-manifest-json",
+        "configuration": {
+            "manifest": "./manifest.json",
+        },
+    } not in metadata.get("storage_transformers", []):
+        raise ValueError(
+            "Can only read byte ranges from Zarr v3 stores which implement the manifest storage transformer ZEP."
+        )
 
     attrs = metadata.pop("attributes")
     dim_names = metadata.pop("dimension_names")

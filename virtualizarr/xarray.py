@@ -78,13 +78,14 @@ def open_virtual_dataset(
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
 
-
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
     if filetype == "zarr_v3":
         # TODO is there a neat way of auto-detecting this?
-        return open_virtual_dataset_from_v3_store(storepath=filepath, drop_variables=drop_variables, indexes=indexes)
+        return open_virtual_dataset_from_v3_store(
+            storepath=filepath, drop_variables=drop_variables, indexes=indexes
+        )
     else:
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
@@ -114,7 +115,9 @@ def open_virtual_dataset(
             else:
                 indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-            loadable_vars = {name: var for name, var in ds.variables.items() if name in loadable_variables}
+            loadable_vars = {
+                name: var for name, var in ds.variables.items() if name in loadable_variables
+            }
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:
@@ -208,16 +211,14 @@ def virtual_vars_from_kerchunk_refs(
     var_names = kerchunk.find_var_names(refs)
     if drop_variables is None:
         drop_variables = []
-    var_names_to_keep = [
-        var_name for var_name in var_names if var_name not in drop_variables
-    ]
+    var_names_to_keep = [var_name for var_name in var_names if var_name not in drop_variables]
 
-    vars = {var_name: variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class
-        ) for var_name in var_names_to_keep}
+    vars = {
+        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
+        for var_name in var_names_to_keep
+    }
 
     return vars
-
 
 
 def dataset_from_kerchunk_refs(
@@ -336,16 +337,13 @@ class VirtualiZarrDatasetAccessor:
         dataset_to_zarr(self.ds, storepath)
 
     @overload
-    def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs:
-        ...
+    def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None: ...
 
     def to_kerchunk(
         self,

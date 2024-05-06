@@ -20,11 +20,13 @@ KerchunkArrRefs = NewType(
 
 from enum import Enum, auto
 
+
 class AutoName(Enum):
     # Recommended by official Python docs for auto naming:
     # https://docs.python.org/3/library/enum.html#using-automatic-values
     def _generate_next_value_(name, start, count, last_values):
         return name
+
 
 class FileType(AutoName):
     netcdf3 = auto()
@@ -33,6 +35,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+
 
 def read_kerchunk_references_from_file(
     filepath: str, filetype: Optional[FileType]
@@ -57,6 +60,7 @@ def read_kerchunk_references_from_file(
 
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
+
         refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
 
     elif filetype.name.lower() == "netcdf4":
@@ -87,7 +91,7 @@ def _automatically_determine_filetype(filepath: str) -> FileType:
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             magic = f.read()
         if magic[0:3] == b"CDF":
             filetype = FileType.netcdf3
@@ -119,9 +123,7 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     return found_var_names
 
 
-def extract_array_refs(
-    ds_reference_dict: KerchunkStoreRefs, var_name: str
-) -> KerchunkArrRefs:
+def extract_array_refs(ds_reference_dict: KerchunkStoreRefs, var_name: str) -> KerchunkArrRefs:
     """Extract only the part of the kerchunk reference dict that is relevant to this one zarr array"""
 
     found_var_names = find_var_names(ds_reference_dict)
@@ -131,9 +133,7 @@ def extract_array_refs(
         # TODO these function probably have more loops in them than they need to...
 
         arr_refs = {
-            key.split("/")[1]: refs[key]
-            for key in refs.keys()
-            if var_name == key.split("/")[0]
+            key.split("/")[1]: refs[key] for key in refs.keys() if var_name == key.split("/")[0]
         }
 
         return fully_decode_arr_refs(arr_refs)
@@ -175,9 +175,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
     for var_name, var in ds.variables.items():
         arr_refs = variable_to_kerchunk_arr_refs(var)
 
-        prepended_with_var_name = {
-            f"{var_name}/{key}": val for key, val in arr_refs.items()
-        }
+        prepended_with_var_name = {f"{var_name}/{key}": val for key, val in arr_refs.items()}
 
         all_arr_refs.update(prepended_with_var_name)
 

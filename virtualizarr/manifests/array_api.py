@@ -154,16 +154,12 @@ def _check_same_ndims(ndims: list[int]) -> None:
 
 def _check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
     """Check that shapes are compatible for concatenation"""
-    shapes_without_concat_axis = [
-        _remove_element_at_position(shape, axis) for shape in shapes
-    ]
+    shapes_without_concat_axis = [_remove_element_at_position(shape, axis) for shape in shapes]
 
     first_shape, *other_shapes = shapes_without_concat_axis
     for other_shape in other_shapes:
         if other_shape != first_shape:
-            raise ValueError(
-                f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}"
-            )
+            raise ValueError(f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}")
 
 
 def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
@@ -273,9 +269,7 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
             # concatenate same array upon itself d_requested number of times along existing axis
             result = concatenate([result] * d_requested, axis=axis)
         else:
-            raise ValueError(
-                f"Array with shape {x.shape} cannot be broadcast to shape {shape}"
-            )
+            raise ValueError(f"Array with shape {x.shape} cannot be broadcast to shape {shape}")
 
     return result
 
