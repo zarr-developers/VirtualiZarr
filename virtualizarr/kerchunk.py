@@ -123,7 +123,9 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     return found_var_names
 
 
-def extract_array_refs(ds_reference_dict: KerchunkStoreRefs, var_name: str) -> KerchunkArrRefs:
+def extract_array_refs(
+    ds_reference_dict: KerchunkStoreRefs, var_name: str
+) -> KerchunkArrRefs:
     """Extract only the part of the kerchunk reference dict that is relevant to this one zarr array"""
 
     found_var_names = find_var_names(ds_reference_dict)
@@ -133,7 +135,9 @@ def extract_array_refs(ds_reference_dict: KerchunkStoreRefs, var_name: str) -> K
         # TODO these function probably have more loops in them than they need to...
 
         arr_refs = {
-            key.split("/")[1]: refs[key] for key in refs.keys() if var_name == key.split("/")[0]
+            key.split("/")[1]: refs[key]
+            for key in refs.keys()
+            if var_name == key.split("/")[0]
         }
 
         return fully_decode_arr_refs(arr_refs)
@@ -175,7 +179,9 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
     for var_name, var in ds.variables.items():
         arr_refs = variable_to_kerchunk_arr_refs(var)
 
-        prepended_with_var_name = {f"{var_name}/{key}": val for key, val in arr_refs.items()}
+        prepended_with_var_name = {
+            f"{var_name}/{key}": val for key, val in arr_refs.items()
+        }
 
         all_arr_refs.update(prepended_with_var_name)
 

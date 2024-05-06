@@ -71,7 +71,9 @@ class ManifestArray:
 
         zarray = ZArray.from_kerchunk_refs(decoded_arr_refs[".zarray"])
 
-        kerchunk_chunk_dict = {k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)}
+        kerchunk_chunk_dict = {
+            k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)
+        }
         chunkmanifest = ChunkManifest._from_kerchunk_chunk_dict(kerchunk_chunk_dict)
 
         obj = object.__new__(cls)
@@ -204,7 +206,9 @@ class ManifestArray:
         indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
 
         if len(indexer) != self.ndim:
-            raise ValueError(f"Invalid indexer for array with ndim={self.ndim}: {indexer}")
+            raise ValueError(
+                f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
+            )
 
         if all(
             isinstance(axis_indexer, slice) and axis_indexer == slice(None)

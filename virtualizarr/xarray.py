@@ -1,5 +1,14 @@
 from pathlib import Path
-from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping, Iterable
+from typing import (
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Union,
+    overload,
+    MutableMapping,
+    Iterable,
+)
 
 import ujson  # type: ignore
 import xarray as xr
@@ -11,7 +20,11 @@ from xarray.core.variable import IndexVariable
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.zarr import dataset_to_zarr, attrs_from_zarr_group_json, metadata_from_zarr_json
+from virtualizarr.zarr import (
+    dataset_to_zarr,
+    attrs_from_zarr_group_json,
+    metadata_from_zarr_json,
+)
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -116,7 +129,9 @@ def open_virtual_dataset(
                 indexes = dict(**indexes)  # for type hinting: to allow mutation
 
             loadable_vars = {
-                name: var for name, var in ds.variables.items() if name in loadable_variables
+                name: var
+                for name, var in ds.variables.items()
+                if name in loadable_variables
             }
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
@@ -211,7 +226,9 @@ def virtual_vars_from_kerchunk_refs(
     var_names = kerchunk.find_var_names(refs)
     if drop_variables is None:
         drop_variables = []
-    var_names_to_keep = [var_name for var_name in var_names if var_name not in drop_variables]
+    var_names_to_keep = [
+        var_name for var_name in var_names if var_name not in drop_variables
+    ]
 
     vars = {
         var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
@@ -337,7 +354,9 @@ class VirtualiZarrDatasetAccessor:
         dataset_to_zarr(self.ds, storepath)
 
     @overload
-    def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs: ...
+    def to_kerchunk(
+        self, filepath: None, format: Literal["dict"]
+    ) -> KerchunkStoreRefs: ...
 
     @overload
     def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...

@@ -1,5 +1,15 @@
 from pathlib import Path
-from typing import Any, Literal, NewType, Optional, Tuple, Union, List, Dict, TYPE_CHECKING
+from typing import (
+    Any,
+    Literal,
+    NewType,
+    Optional,
+    Tuple,
+    Union,
+    List,
+    Dict,
+    TYPE_CHECKING,
+)
 import json
 
 import numpy as np
@@ -193,14 +203,20 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) ->
         "name": "regular",
         "configuration": {"chunk_shape": metadata.pop("chunks")},
     }
-    metadata["chunk_key_encoding"] = {"name": "default", "configuration": {"separator": "/"}}
+    metadata["chunk_key_encoding"] = {
+        "name": "default",
+        "configuration": {"separator": "/"},
+    }
     metadata["codecs"] = metadata.pop("filters")
     metadata.pop("compressor")  # TODO this should be entered in codecs somehow
     metadata.pop("order")  # TODO this should be replaced by a transpose codec
 
     # indicate that we're using the manifest storage transformer ZEP
     metadata["storage_transformers"] = [
-        {"name": "chunk-manifest-json", "configuration": {"manifest": "./manifest.json"}}
+        {
+            "name": "chunk-manifest-json",
+            "configuration": {"manifest": "./manifest.json"},
+        }
     ]
 
     # add information from xarray object

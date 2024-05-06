@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from ..types import ChunkKey
 
-_INTEGER = r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
+_INTEGER = (
+    r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
+)
 _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
@@ -30,7 +32,9 @@ class ChunkEntry(BaseModel):
         return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
 
     @classmethod
-    def from_kerchunk(cls, path_and_byte_range_info: List[Union[str, int]]) -> "ChunkEntry":
+    def from_kerchunk(
+        cls, path_and_byte_range_info: List[Union[str, int]]
+    ) -> "ChunkEntry":
         path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
@@ -113,7 +117,9 @@ class ChunkManifest(BaseModel):
         with open(filepath, "r") as manifest_file:
             entries_dict = json.load(manifest_file)
 
-        entries = {cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()}
+        entries = {
+            cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()
+        }
         return cls(entries=entries)
 
     def to_zarr_json(self, filepath: str) -> None:
@@ -123,7 +129,9 @@ class ChunkManifest(BaseModel):
 
     @classmethod
     def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
-        chunkentries = {k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()}
+        chunkentries = {
+            k: ChunkEntry.from_kerchunk(v) for k, v in kerchunk_chunk_dict.items()
+        }
         return ChunkManifest(entries=chunkentries)
 
 
@@ -175,8 +183,12 @@ def check_keys_form_grid(chunk_keys: Iterable[ChunkKey]):
     chunk_grid_shape = get_chunk_grid_shape(chunk_keys)
 
     # create every possible combination
-    all_possible_combos = itertools.product(*[range(length) for length in chunk_grid_shape])
-    all_required_chunk_keys: set[ChunkKey] = set(join(inds) for inds in all_possible_combos)
+    all_possible_combos = itertools.product(
+        *[range(length) for length in chunk_grid_shape]
+    )
+    all_required_chunk_keys: set[ChunkKey] = set(
+        join(inds) for inds in all_possible_combos
+    )
 
     # check that every possible combination is represented once in the list of chunk keys
     if set(chunk_keys) != all_required_chunk_keys:

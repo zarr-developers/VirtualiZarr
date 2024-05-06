@@ -18,5 +18,10 @@ class NumberEncoder(json.JSONEncoder):
 def json_dumps(o: Any) -> bytes:
     """Write JSON in a consistent, human-readable way."""
     return json.dumps(
-        o, indent=4, sort_keys=True, ensure_ascii=True, separators=(",", ": "), cls=NumberEncoder
+        o,
+        indent=4,
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ": "),
+        cls=NumberEncoder,
     ).encode("ascii")
