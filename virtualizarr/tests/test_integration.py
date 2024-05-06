@@ -12,7 +12,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(netcdf4_file, inline_threshold, v
     from kerchunk.hdf import SingleHdf5ToZarr
 
     # inline_threshold is chosen to test inlining only the variables listed in vars_to_inline
-    expected = SingleHdf5ToZarr(netcdf4_file, spec=1, inline_threshold=inline_threshold).translate()
+    expected = SingleHdf5ToZarr(netcdf4_file, inline_threshold=int(inline_threshold)).translate()
 
     # loading the variables should produce same result as inlining them using kerchunk
     vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_inline, indexes={})
