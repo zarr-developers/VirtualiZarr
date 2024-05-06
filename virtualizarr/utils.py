@@ -6,22 +6,32 @@ from fsspec.implementations.local import LocalFileOpener
 
 
 def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[dict] = {'storage_options':{'key':'', 'secret':'', 'anon':True}}) -> Union[S3File, LocalFileOpener]:
-    """Utility function to facilitate reading remote file paths using fsspec.
+    """Converts input filepath to fsspec openfile object.
 
-    :param filepath: Input filepath
-    :type filepath: str
-    :param reader_options: Dict containing options to pass to fsspec file reader. Default: {'storage_options':{'key':'', 'secret':'', 'anon':True}}
-    :type reader_options: Optional[dict]
-    :rtype: Union[S3File, LocalFileOpener]
+    Parameters
+    ----------
+    filepath : str
+        Input filepath
+    reader_options : _type_, optional
+        Dict containing kwargs to pass to file opener, by default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+
+    Returns
+    -------
+    Union[S3File, LocalFileOpener]
+        Either S3File or LocalFileOpener, depending on which protocol was supplied.
+
+    Raises
+    ------
+    NotImplementedError
+        Raises a Not Implemented Error if filepath protocol is not supported.
     """
+
+
     import fsspec
     from upath import UPath
 
     universal_filepath = UPath(filepath)
     protocol = universal_filepath.protocol
-
-    # why does UPath give an empty string for a local file protocol :(
-    # import pdb; pdb.set_trace()
 
     if protocol == '':
 

@@ -43,6 +43,7 @@ def test_wrapping():
 class TestEquals:
     # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
     def test_equals(self):
+
         chunks = (5, 10)
         shape = (5, 20)
         zarray = ZArray(
