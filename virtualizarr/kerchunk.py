@@ -147,7 +147,7 @@ def parse_array_refs(
     arr_refs: KerchunkArrRefs,
 ) -> Tuple[dict, ZArray, ZAttrs]:
     zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
-    zattrs = arr_refs.pop(".zattrs")
+    zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
     return chunk_dict, zarray, zattrs
