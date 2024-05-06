@@ -75,18 +75,15 @@ datatree = ["py.typed"]
 files = "virtualizarr/**/*.py"
 show_error_codes = true
 
-
-
-
-
 [tool.ruff]
-line-length = 100
+# Same as Black.
+line-length = 88
+indent-width = 4
 target-version = "py39"
 
 exclude = [
     "docs",
     ".eggs"]
-
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -101,7 +98,13 @@ per-file-ignores = {}
 
 ignore = ["E402", "E731"]
 
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
 [tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
 # Indent with spaces, rather than tabs.
 indent-style = "space"
 # Respect magic trailing commas.
