@@ -1,6 +1,5 @@
 import json
 import numbers
-
 from typing import Any
 
 

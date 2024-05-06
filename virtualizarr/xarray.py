@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import (
+    Iterable,
     List,
     Literal,
     Mapping,
+    MutableMapping,
     Optional,
     Union,
     overload,
-    MutableMapping,
-    Iterable,
 )
 
 import ujson  # type: ignore
@@ -18,11 +18,11 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
+from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import (
-    dataset_to_zarr,
     attrs_from_zarr_group_json,
+    dataset_to_zarr,
     metadata_from_zarr_json,
 )
 

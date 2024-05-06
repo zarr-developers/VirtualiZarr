@@ -1,7 +1,8 @@
-import xarray as xr
 import numpy as np
+import xarray as xr
 import xarray.testing as xrt
-from virtualizarr import open_virtual_dataset, ManifestArray
+
+from virtualizarr import ManifestArray, open_virtual_dataset
 from virtualizarr.manifests.manifest import ChunkEntry
 
 

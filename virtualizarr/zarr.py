@@ -1,21 +1,22 @@
+import json
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
+    Dict,
+    List,
     Literal,
     NewType,
     Optional,
     Tuple,
     Union,
-    List,
-    Dict,
-    TYPE_CHECKING,
 )
-import json
 
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 from pydantic import BaseModel, ConfigDict, field_validator
+
 from virtualizarr.vendor.zarr.utils import json_dumps
 
 if TYPE_CHECKING:

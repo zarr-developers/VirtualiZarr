@@ -1,11 +1,10 @@
 import numpy as np
+import pytest
 import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
-import pytest
 
-
-from virtualizarr.kerchunk import _automatically_determine_filetype, FileType
+from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
