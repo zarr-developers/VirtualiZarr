@@ -20,11 +20,13 @@ KerchunkArrRefs = NewType(
 
 from enum import Enum, auto
 
+
 class AutoName(Enum):
     # Recommended by official Python docs for auto naming:
     # https://docs.python.org/3/library/enum.html#using-automatic-values
     def _generate_next_value_(name, start, count, last_values):
         return name
+
 
 class FileType(AutoName):
     netcdf3 = auto()
@@ -33,6 +35,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+
 
 def read_kerchunk_references_from_file(
     filepath: str, filetype: Optional[FileType]
@@ -57,6 +60,7 @@ def read_kerchunk_references_from_file(
 
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
+
         refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
 
     elif filetype.name.lower() == "netcdf4":
@@ -87,7 +91,7 @@ def _automatically_determine_filetype(filepath: str) -> FileType:
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        with open(filepath, 'rb') as f:
+        with open(filepath, "rb") as f:
             magic = f.read()
         if magic[0:3] == b"CDF":
             filetype = FileType.netcdf3

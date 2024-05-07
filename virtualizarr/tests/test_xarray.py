@@ -225,9 +225,6 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-
-
-
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -273,7 +270,7 @@ class TestCombineUsingIndexes:
 
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
-        vars_to_load = ['air', 'time']
+        vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_load)
 
         for name in vds.variables:
