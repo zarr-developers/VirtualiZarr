@@ -1,5 +1,14 @@
 from pathlib import Path
-from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping, Iterable
+from typing import (
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Union,
+    overload,
+)
 
 import ujson  # type: ignore
 import xarray as xr
@@ -9,9 +18,13 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
+from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.zarr import dataset_to_zarr, attrs_from_zarr_group_json, metadata_from_zarr_json
+from virtualizarr.zarr import (
+    attrs_from_zarr_group_json,
+    dataset_to_zarr,
+    metadata_from_zarr_json,
+)
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -78,13 +91,14 @@ def open_virtual_dataset(
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
 
-
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
     if filetype == "zarr_v3":
         # TODO is there a neat way of auto-detecting this?
-        return open_virtual_dataset_from_v3_store(storepath=filepath, drop_variables=drop_variables, indexes=indexes)
+        return open_virtual_dataset_from_v3_store(
+            storepath=filepath, drop_variables=drop_variables, indexes=indexes
+        )
     else:
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
@@ -114,7 +128,11 @@ def open_virtual_dataset(
             else:
                 indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-            loadable_vars = {name: var for name, var in ds.variables.items() if name in loadable_variables}
+            loadable_vars = {
+                name: var
+                for name, var in ds.variables.items()
+                if name in loadable_variables
+            }
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:
@@ -212,12 +230,12 @@ def virtual_vars_from_kerchunk_refs(
         var_name for var_name in var_names if var_name not in drop_variables
     ]
 
-    vars = {var_name: variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class
-        ) for var_name in var_names_to_keep}
+    vars = {
+        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
+        for var_name in var_names_to_keep
+    }
 
     return vars
-
 
 
 def dataset_from_kerchunk_refs(
@@ -336,16 +354,15 @@ class VirtualiZarrDatasetAccessor:
         dataset_to_zarr(self.ds, storepath)
 
     @overload
-    def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs:
-        ...
+    def to_kerchunk(
+        self, filepath: None, format: Literal["dict"]
+    ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None: ...
 
     def to_kerchunk(
         self,

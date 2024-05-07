@@ -117,7 +117,9 @@ class ChunkManifest(BaseModel):
         with open(filepath, "r") as manifest_file:
             entries_dict = json.load(manifest_file)
 
-        entries = {cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()}
+        entries = {
+            cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()
+        }
         return cls(entries=entries)
 
     def to_zarr_json(self, filepath: str) -> None:

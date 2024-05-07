@@ -119,8 +119,7 @@ class TestEquals:
         assert not (marr1 == marr2).all()
 
     @pytest.mark.skip(reason="Not Implemented")
-    def test_partly_equals(self):
-        ...
+    def test_partly_equals(self): ...
 
 
 # TODO we really need some kind of fixtures to generate useful example data
