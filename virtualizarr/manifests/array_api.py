@@ -112,7 +112,8 @@ def concatenate(
 
     # Ensure we handle axis being passed as a negative integer
     first_arr = arrays[0]
-    axis = axis % first_arr.ndim
+    if axis < 0:
+        axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
     _check_same_shapes_except_on_concat_axis(arr_shapes, axis)
@@ -154,6 +155,7 @@ def _check_same_ndims(ndims: list[int]) -> None:
 
 def _check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
     """Check that shapes are compatible for concatenation"""
+
     shapes_without_concat_axis = [
         _remove_element_at_position(shape, axis) for shape in shapes
     ]
@@ -198,7 +200,8 @@ def stack(
 
     # Ensure we handle axis being passed as a negative integer
     first_arr = arrays[0]
-    axis = axis % first_arr.ndim
+    if axis < 0:
+        axis = axis % first_arr.ndim
 
     # find what new array shape must be
     length_along_new_stacked_axis = len(arrays)
@@ -267,8 +270,13 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
         if d == d_requested:
             pass
         elif d is None:
-            # stack same array upon itself d_requested number of times, which inserts a new axis at axis=0
-            result = stack([result] * d_requested, axis=0)
+            if result.shape == ():
+                # scalars are a special case because their manifests already have a chunk key with one dimension
+                # see https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
+                result = _broadcast_scalar(result, new_axis_length=d_requested)
+            else:
+                # stack same array upon itself d_requested number of times, which inserts a new axis at axis=0
+                result = stack([result] * d_requested, axis=0)
         elif d == 1:
             # concatenate same array upon itself d_requested number of times along existing axis
             result = concatenate([result] * d_requested, axis=axis)
@@ -278,6 +286,41 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
             )
 
     return result
+
+
+def _broadcast_scalar(x: "ManifestArray", new_axis_length: int) -> "ManifestArray":
+    """
+    Add an axis to a scalar ManifestArray, but without adding a new axis to the keys of the chunk manifest.
+
+    This is not the same as concatenation, because there is no existing axis along which to concatenate.
+    It's also not the same as stacking, because we don't want to insert a new axis into the chunk keys.
+
+    Scalars are a special case because their manifests still have a chunk key with one dimension.
+    See https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
+    """
+
+    from .array import ManifestArray
+
+    new_shape = (new_axis_length,)
+    new_chunks = (new_axis_length,)
+
+    concatenated_manifest = concat_manifests(
+        [x.manifest] * new_axis_length,
+        axis=0,
+    )
+
+    new_zarray = ZArray(
+        chunks=new_chunks,
+        compressor=x.zarray.compressor,
+        dtype=x.dtype,
+        fill_value=x.zarray.fill_value,
+        filters=x.zarray.filters,
+        shape=new_shape,
+        order=x.zarray.order,
+        zarr_format=x.zarray.zarr_format,
+    )
+
+    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
 # TODO broadcast_arrays, squeeze, permute_dims
