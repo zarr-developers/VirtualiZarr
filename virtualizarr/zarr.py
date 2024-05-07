@@ -73,15 +73,6 @@ class ZArray(BaseModel):
         """For comparison against other arrays."""
         return Codec(compressor=self.compressor, filters=self.filters)
 
-    @property
-    def shape_chunk_grid(self) -> Tuple[int, ...]:
-        """Shape of the chunk grid implied by the array shape and chunk shape."""
-        chunk_grid_shape = tuple(
-            ceildiv(array_side_length, chunk_length)
-            for array_side_length, chunk_length in zip(self.shape, self.chunks)
-        )
-        return chunk_grid_shape
-
     def __repr__(self) -> str:
         return f"ZArray(shape={self.shape}, chunks={self.chunks}, dtype={self.dtype}, compressor={self.compressor}, filters={self.filters}, fill_value={self.fill_value})"
 
