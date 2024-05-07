@@ -99,13 +99,13 @@ class ChunkManifest(BaseModel):
         return f"ChunkManifest<shape={self.shape_chunk_grid}>"
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
-        return self.chunks[key]
+        return self.entries[key]
 
     def __iter__(self) -> Iterator[ChunkKey]:
-        return iter(self.chunks.keys())
+        return iter(self.entries.keys())
 
     def __len__(self) -> int:
-        return len(self.chunks)
+        return len(self.entries)
 
     def dict(self) -> dict[str, dict[str, Union[str, int]]]:
         """Converts the entire manifest to a nested dictionary."""
