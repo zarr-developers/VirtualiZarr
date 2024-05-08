@@ -78,7 +78,6 @@ class ZArray(BaseModel):
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
-
         # coerce type of fill_value as kerchunk can be inconsistent with this
         fill_value = decoded_arr_refs_zarray["fill_value"]
         if fill_value is None or fill_value == "NaN":
@@ -100,8 +99,8 @@ class ZArray(BaseModel):
 
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
 
-        if zarray_dict['fill_value'] is np.NaN:
-            zarray_dict['fill_value'] = None
+        if zarray_dict["fill_value"] is np.NaN:
+            zarray_dict["fill_value"] = None
 
         return zarray_dict
 

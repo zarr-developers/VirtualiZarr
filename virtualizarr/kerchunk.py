@@ -1,16 +1,15 @@
+import base64
+import json
+from enum import Enum, auto
 from pathlib import Path
 from typing import List, NewType, Optional, Tuple, Union, cast
-import base64
-from enum import Enum, auto
 
-import json
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 
-from virtualizarr.zarr import ZArray, ZAttrs
 from virtualizarr.manifests.manifest import join
-
+from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
@@ -237,17 +236,23 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
             ) from e
 
         if var.encoding:
-            if 'scale_factor' in var.encoding:
-                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with a scale_factor")
-            if 'offset' in var.encoding:
-                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset")
-            if 'calendar' in var.encoding:
-                raise NotImplementedError(f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar")
+            if "scale_factor" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a scale_factor"
+                )
+            if "offset" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset"
+                )
+            if "calendar" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar"
+                )
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
         # TODO do I really need to encode then decode like this?
-        inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode('utf-8')
+        inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode("utf-8")
 
         # TODO can this be generalized to save individual chunks of a dask array?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
@@ -256,7 +261,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
             chunks=np_arr.shape,
             shape=np_arr.shape,
             dtype=np_arr.dtype,
-            order='C',
+            order="C",
         )
 
     arr_refs[".zarray"] = zarray.to_kerchunk_json()

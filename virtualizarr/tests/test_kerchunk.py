@@ -85,7 +85,7 @@ class TestAccessor:
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
-                ".zattrs": '{}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
@@ -121,7 +121,7 @@ class TestAccessor:
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
-                ".zattrs": '{}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
