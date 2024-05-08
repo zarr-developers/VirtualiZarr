@@ -1,8 +1,9 @@
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
-# TODO: importing fsspec and s3fs to get typing. Is there a better way incase these are optional deps?
-from s3fs.core import S3File
-from fsspec.implementations.local import LocalFileOpener
+if TYPE_CHECKING:
+    from fsspec.implementations.local import LocalFileOpener
+    from s3fs.core import S3File
+
 
 
 def _fsspec_openfile_from_filepath(*, filepath: str, reader_options: Optional[dict] = {'storage_options':{'key':'', 'secret':'', 'anon':True}}) -> Union[S3File, LocalFileOpener]:
