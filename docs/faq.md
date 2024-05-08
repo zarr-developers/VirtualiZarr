@@ -43,6 +43,14 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.virtualize.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | Zarr v3 store with `manifest.json` files                                 | n/a                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
 
+## Why a new project?
+
+The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
+- Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself,
+- Once the VirtualiZarr feature list above is complete, it will likely not share any code with the Kerchunk library, nor import it,
+- The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality,
+- Refactoring Kerchunk's existing API to maintain backwards compatibility would have been [challenging](https://github.com/fsspec/kerchunk/issues/434).
+
 ## What is the Development Status and Roadmap?
 
 VirtualiZarr is ready to use for many of the tasks that we are used to using kerchunk for, but the most general and powerful vision of this library can only be implemented once certain changes upstream in Zarr have occurred.

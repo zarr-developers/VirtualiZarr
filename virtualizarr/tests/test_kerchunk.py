@@ -1,19 +1,19 @@
 import numpy as np
+import pytest
 import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
-import pytest
 
-
-from virtualizarr.kerchunk import _automatically_determine_filetype, FileType
+from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
+
 def gen_ds_refs(
-        zgroup: str = '{"zarr_format":2}',
-        zarray: str = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
-        zattrs: str = '{"_ARRAY_DIMENSIONS":["x","y"]}',
-        chunk: list = ["test1.nc", 6144, 48],
+    zgroup: str = '{"zarr_format":2}',
+    zarray: str = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+    zattrs: str = '{"_ARRAY_DIMENSIONS":["x","y"]}',
+    chunk: list = ["test1.nc", 6144, 48],
 ):
     return {
         "version": 1,
@@ -25,9 +25,10 @@ def gen_ds_refs(
         },
     }
 
+
 def test_dataset_from_df_refs():
     ds_refs = gen_ds_refs()
-    ds =  dataset_from_kerchunk_refs(ds_refs)
+    ds = dataset_from_kerchunk_refs(ds_refs)
     assert "a" in ds
     da = ds["a"]
     assert isinstance(da.data, ManifestArray)
@@ -45,11 +46,21 @@ def test_dataset_from_df_refs():
         "0.0": {"path": "test1.nc", "offset": 6144, "length": 48}
     }
 
+
 def test_dataset_from_df_refs_with_filters():
-    filters = [{"elementsize":4,"id":"shuffle"},{"id":"zlib","level":4}]
-    zarray = {"chunks":[2,3],"compressor":None,"dtype":"<i8","fill_value":None,"filters":filters,"order":"C","shape":[2,3],"zarr_format":2}
+    filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
+    zarray = {
+        "chunks": [2, 3],
+        "compressor": None,
+        "dtype": "<i8",
+        "fill_value": None,
+        "filters": filters,
+        "order": "C",
+        "shape": [2, 3],
+        "zarr_format": 2,
+    }
     ds_refs = gen_ds_refs(zarray=ujson.dumps(zarray))
-    ds =  dataset_from_kerchunk_refs(ds_refs)
+    ds = dataset_from_kerchunk_refs(ds_refs)
     da = ds["a"]
     assert da.data.zarray.filters == filters
 
@@ -157,20 +168,19 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
 
     # write two version of NetCDF
     ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
-    ds.to_netcdf(netcdf4_file_path)
+    ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
+
     assert FileType("netcdf3") == _automatically_determine_filetype(netcdf3_file_path)
     assert FileType("netcdf4") == _automatically_determine_filetype(netcdf4_file_path)
 
 
-
-
 def test_FileType():
     # tests if FileType converts user supplied strings to correct filetype
-    assert 'netcdf3' == FileType("netcdf3").name
-    assert 'netcdf4' == FileType("netcdf4").name
-    assert 'grib' == FileType("grib").name
-    assert 'tiff' == FileType("tiff").name
-    assert 'fits' == FileType("fits").name
-    assert 'zarr' == FileType("zarr").name
+    assert "netcdf3" == FileType("netcdf3").name
+    assert "netcdf4" == FileType("netcdf4").name
+    assert "grib" == FileType("grib").name
+    assert "tiff" == FileType("tiff").name
+    assert "fits" == FileType("fits").name
+    assert "zarr" == FileType("zarr").name
     with pytest.raises(ValueError):
         FileType(None)
