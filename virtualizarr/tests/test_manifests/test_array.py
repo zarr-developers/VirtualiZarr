@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import create_manifestarray
 from virtualizarr.zarr import ZArray
 
 
@@ -120,6 +121,16 @@ class TestEquals:
 
     @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self): ...
+
+
+class TestBroadcast:
+    def test_broadcast_scalar(self):
+        # regression test
+        marr = create_manifestarray(shape=(), chunks=())
+        expanded = np.broadcast_to(marr, shape=(1,))
+        assert expanded.shape == (1,)
+        assert expanded.chunks == (1,)
+        assert expanded.manifest == marr.manifest
 
 
 # TODO we really need some kind of fixtures to generate useful example data
