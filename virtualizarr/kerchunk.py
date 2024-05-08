@@ -4,8 +4,8 @@ from typing import List, NewType, Optional, Tuple, Union, cast
 import ujson  # type: ignore
 import xarray as xr
 
-from virtualizarr.zarr import ZArray, ZAttrs
 from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
@@ -21,11 +21,13 @@ KerchunkArrRefs = NewType(
 
 from enum import Enum, auto
 
+
 class AutoName(Enum):
     # Recommended by official Python docs for auto naming:
     # https://docs.python.org/3/library/enum.html#using-automatic-values
     def _generate_next_value_(name, start, count, last_values):
         return name
+
 
 class FileType(AutoName):
     netcdf3 = auto()
@@ -35,10 +37,13 @@ class FileType(AutoName):
     fits = auto()
     zarr = auto()
 
-def read_kerchunk_references_from_file(
-    filepath: str, filetype: Optional[FileType],
-    reader_options: Optional[dict] = {'storage_options':{'key':'', 'secret':'', 'anon':True}}
 
+def read_kerchunk_references_from_file(
+    filepath: str,
+    filetype: Optional[FileType],
+    reader_options: Optional[dict] = {
+        "storage_options": {"key": "", "secret": "", "anon": True}
+    },
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -56,7 +61,9 @@ def read_kerchunk_references_from_file(
     """
 
     if filetype is None:
-        filetype = _automatically_determine_filetype(filepath=filepath, reader_options=reader_options)
+        filetype = _automatically_determine_filetype(
+            filepath=filepath, reader_options=reader_options
+        )
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -65,9 +72,13 @@ def read_kerchunk_references_from_file(
         from kerchunk.netCDF3 import NetCDF3ToZarr
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
+
     elif filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
-        refs = SingleHdf5ToZarr(filepath, inline_threshold=0, **reader_options).translate()
+
+        refs = SingleHdf5ToZarr(
+            filepath, inline_threshold=0, **reader_options
+        ).translate()
     elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
@@ -87,9 +98,13 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def _automatically_determine_filetype(*,filepath: str, reader_options: Optional[dict]={}) -> FileType:
+def _automatically_determine_filetype(
+    *, filepath: str, reader_options: Optional[dict] = {}
+) -> FileType:
     file_extension = Path(filepath).suffix
-    fpath = _fsspec_openfile_from_filepath(filepath=filepath,reader_options=reader_options)
+    fpath = _fsspec_openfile_from_filepath(
+        filepath=filepath, reader_options=reader_options
+    )
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
@@ -153,7 +168,7 @@ def parse_array_refs(
     arr_refs: KerchunkArrRefs,
 ) -> Tuple[dict, ZArray, ZAttrs]:
     zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
-    zattrs = arr_refs.pop(".zattrs")
+    zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
     return chunk_dict, zarray, zattrs

@@ -99,13 +99,13 @@ class ChunkManifest(BaseModel):
         return f"ChunkManifest<shape={self.shape_chunk_grid}>"
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
-        return self.chunks[key]
+        return self.entries[key]
 
     def __iter__(self) -> Iterator[ChunkKey]:
-        return iter(self.chunks.keys())
+        return iter(self.entries.keys())
 
     def __len__(self) -> int:
-        return len(self.chunks)
+        return len(self.entries)
 
     def dict(self) -> dict[str, dict[str, Union[str, int]]]:
         """Converts the entire manifest to a nested dictionary."""
@@ -117,7 +117,9 @@ class ChunkManifest(BaseModel):
         with open(filepath, "r") as manifest_file:
             entries_dict = json.load(manifest_file)
 
-        entries = {cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()}
+        entries = {
+            cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()
+        }
         return cls(entries=entries)
 
     def to_zarr_json(self, filepath: str) -> None:

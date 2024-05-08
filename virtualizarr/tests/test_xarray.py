@@ -1,10 +1,10 @@
 from typing import Mapping
 
 import numpy as np
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 from xarray.core.indexes import Index
-import pytest
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -43,7 +43,6 @@ def test_wrapping():
 class TestEquals:
     # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
     def test_equals(self):
-
         chunks = (5, 10)
         shape = (5, 20)
         zarray = ZArray(
@@ -227,9 +226,6 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-
-
-
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -273,22 +269,22 @@ class TestCombineUsingIndexes:
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
 
-
-
-
-
-
 pytest.importorskip("s3fs")
-@pytest.mark.parametrize("filetype", ['netcdf4', None], ids=["netcdf4 filetype", "None filetype"])
+
+
+@pytest.mark.parametrize(
+    "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
+)
 @pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
 def test_anon_read_s3(filetype, indexes):
-    #TODO: Switch away from this s3 url after minIO is implemented.
-    fpath = 's3://carbonplan-share/virtualizarr/local.nc'
+    # TODO: Switch away from this s3 url after minIO is implemented.
+    fpath = "s3://carbonplan-share/virtualizarr/local.nc"
     assert open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
+
 
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
-        vars_to_load = ['air', 'time']
+        vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_load)
 
         for name in vds.variables:
@@ -300,6 +296,5 @@ class TestLoadVirtualDataset:
         full_ds = xr.open_dataset(netcdf4_file)
 
         for name in full_ds.variables:
-
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
