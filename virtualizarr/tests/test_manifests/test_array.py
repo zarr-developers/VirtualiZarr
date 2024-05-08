@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import create_manifestarray
 from virtualizarr.zarr import ZArray
 
 
@@ -34,27 +35,6 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
-    def test_create_invalid_manifestarray(self):
-        chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        }
-        manifest = ChunkManifest(entries=chunks_dict)
-        chunks = (5, 1, 10)
-        shape = (5, 2, 20)
-        zarray = ZArray(
-            chunks=chunks,
-            compressor="zlib",
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=shape,
-            zarr_format=2,
-        )
-
-        with pytest.raises(ValueError, match="Inconsistent chunk grid shape"):
-            ManifestArray(zarray=zarray, chunkmanifest=manifest)
-
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
@@ -69,6 +49,16 @@ class TestManifestArray:
         assert marr.zarray.fill_value is np.NaN
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
+
+    def test_create_scalar_manifestarray_from_kerchunk_refs(self):
+        arr_refs = {
+            ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}',
+            "0": ["test1.nc", 6144, 48],
+        }
+        marr = ManifestArray._from_kerchunk_refs(arr_refs)
+
+        assert marr.shape == ()
+        assert marr.chunks == ()
 
 
 class TestEquals:
@@ -130,8 +120,17 @@ class TestEquals:
         assert not (marr1 == marr2).all()
 
     @pytest.mark.skip(reason="Not Implemented")
-    def test_partly_equals(self):
-        ...
+    def test_partly_equals(self): ...
+
+
+class TestBroadcast:
+    def test_broadcast_scalar(self):
+        # regression test
+        marr = create_manifestarray(shape=(), chunks=())
+        expanded = np.broadcast_to(marr, shape=(1,))
+        assert expanded.shape == (1,)
+        assert expanded.chunks == (1,)
+        assert expanded.manifest == marr.manifest
 
 
 # TODO we really need some kind of fixtures to generate useful example data

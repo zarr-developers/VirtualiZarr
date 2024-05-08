@@ -1,6 +1,7 @@
 import pytest
 import xarray as xr
 
+
 @pytest.fixture
 def netcdf4_file(tmpdir):
     # Set up example xarray dataset

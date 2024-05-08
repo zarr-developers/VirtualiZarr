@@ -46,7 +46,7 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 ## Why a new project?
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
-- Kerchunk aims to support [non-Zarr-like formats too](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself,
+- Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself,
 - Once the VirtualiZarr feature list above is complete, it will likely not share any code with the Kerchunk library, nor import it,
 - The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality,
 - Refactoring Kerchunk's existing API to maintain backwards compatibility would have been [challenging](https://github.com/fsspec/kerchunk/issues/434).

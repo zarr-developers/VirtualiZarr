@@ -1,4 +1,5 @@
 import pytest
+import xarray as xr
 
 from virtualizarr import open_virtual_dataset
 
@@ -24,3 +25,13 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(netcdf4_file, inline_threshold, v
     assert refs['refs']['lon/0'] == expected['refs']['lon/0']
     assert refs['refs']['lat/0'] == expected['refs']['lat/0']
     assert refs['refs']['time/0'] == expected['refs']['time/0']
+
+
+def test_open_scalar_variable(tmpdir):
+    # regression test for GH issue #100
+
+    ds = xr.Dataset(data_vars={"a": 0})
+    ds.to_netcdf(f"{tmpdir}/scalar.nc")
+
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc")
+    assert vds["a"].shape == ()

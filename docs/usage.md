@@ -205,10 +205,6 @@ Indexes:
     *empty*
 ```
 
-```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
-```
-
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
 
 ```
@@ -230,6 +226,10 @@ Attributes:
     platform:     Model
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
+```
+
+```{note}
+Concatenation without indexes like this will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
 ```
 
 We can see that the resulting combined manifest has two chunks, as expected.
