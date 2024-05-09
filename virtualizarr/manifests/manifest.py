@@ -81,6 +81,42 @@ class ChunkManifest(BaseModel):
     _lengths: np.ndarray[Any, np.dtype("int32")]
 
     @classmethod
+    def from_dict(cls, chunks: ChunkDict) -> "ChunkManifest":
+        # TODO do some input validation here first?
+        validate_chunk_keys(chunks.keys())
+
+        # TODO should we actually pass shape in, in case there are not enough chunks to give correct idea of full shape?
+        shape = get_chunk_grid_shape(chunks.keys())
+
+        # Initializing to empty implies that entries with path='' are treated as missing chunks
+        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType)
+        offsets = np.empty(shape=shape, dtype=np.dtype("int32"))
+        lengths = np.empty(shape=shape, dtype=np.dtype("int32"))
+
+        # populate the array
+        for key, entry in chunks.items():
+            try:
+                entry = ChunkEntry(entry)
+            except (ValueError, TypeError) as e:
+                msg = (
+                    "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
+                    f"but got {entry}"
+                )
+                raise ValueError(msg) from e
+
+            split_key = split(key)
+            paths[split_key] = entry.path
+            offsets[split_key] = entry.offset
+            lengths[split_key] = entry.length
+
+        obj = object.__new__(cls)
+        obj._paths = paths
+        obj._offsets = offsets
+        obj._lengths = lengths
+
+        return obj
+
+    @classmethod
     def from_arrays(
         cls,
         paths: np.ndarray[Any, np.dtypes.StringDType],
