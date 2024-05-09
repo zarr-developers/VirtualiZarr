@@ -18,9 +18,13 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs, FileType, _automatically_determine_filetype
-from virtualizarr.readers.hdf import virtual_vars_from_hdf, attrs_from_root_group
+from virtualizarr.kerchunk import (
+    FileType,
+    KerchunkStoreRefs,
+    _automatically_determine_filetype,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.hdf import attrs_from_root_group, virtual_vars_from_hdf
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,

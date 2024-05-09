@@ -6,9 +6,8 @@ import numpy as np
 import xarray as xr
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
-from virtualizarr.zarr import ZArray
-
 from virtualizarr.types import ChunkKey
+from virtualizarr.zarr import ZArray
 
 
 def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:

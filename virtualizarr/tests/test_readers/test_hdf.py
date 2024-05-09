@@ -1,9 +1,13 @@
 import h5py
 import pytest
 
-from virtualizarr.readers.hdf import (_dataset_chunk_manifest, _dataset_dims,
-                                      _dataset_to_variable, _extract_attrs,
-                                      virtual_vars_from_hdf)
+from virtualizarr.readers.hdf import (
+    _dataset_chunk_manifest,
+    _dataset_dims,
+    _dataset_to_variable,
+    _extract_attrs,
+    virtual_vars_from_hdf,
+)
 
 
 class TestDatasetChunkManifest:
