@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-    "xarray@git+https://github.com/TomNicholas/xarray.git@concat-avoid-index-auto-creation#egg=xarray",
+    "xarray@git+https://github.com/pydata/xarray",
     "kerchunk==0.2.2",
     "universal-pathlib",
     "h5netcdf",
