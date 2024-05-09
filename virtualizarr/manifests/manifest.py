@@ -5,7 +5,7 @@ from typing import Any, Iterable, Iterator, List, NewType, Tuple, Union, cast
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from ..types import ChunkKey
+from virtualizarr.types import ChunkKey
 
 _INTEGER = (
     r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
@@ -48,21 +48,13 @@ class ChunkEntry(BaseModel):
         return dict(path=self.path, offset=self.offset, length=self.length)
 
 
-# TODO we want the path field to contain a variable-length string, but that's not available until numpy 2.0
-# See https://numpy.org/neps/nep-0055-string_dtype.html
-MANIFEST_STRUCTURED_ARRAY_DTYPES = np.dtype(
-    [("path", "<U32"), ("offset", np.int32), ("length", np.int32)]
-)
-
-
 class ChunkManifest(BaseModel):
     """
     In-memory representation of a single Zarr chunk manifest.
 
-    Stores the manifest internally as a numpy structured array.
+    Stores the manifest internally as numpy arrays.
 
-    The manifest can be converted to or from a dictionary form looking like this
-
+    The manifest can be converted to or from a dictionary from looking like this
 
         {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -70,7 +62,6 @@ class ChunkManifest(BaseModel):
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-
 
     using the .from_dict() and .dict() methods, so users of this class can think of the manifest as if it were a dict.
 
@@ -85,32 +76,73 @@ class ChunkManifest(BaseModel):
         arbitrary_types_allowed=True,  # so pydantic doesn't complain about the numpy array field
     )
 
-    # TODO how to type hint to indicate a numpy structured array with specifically-typed fields?
-    entries: np.ndarray
+    _paths: np.ndarray[Any, np.dtypes.StringDType]
+    _offsets: np.ndarray[Any, np.dtype("int32")]
+    _lengths: np.ndarray[Any, np.dtype("int32")]
 
     @classmethod
-    def from_dict(cls, chunks: ChunkDict) -> "ChunkManifest":
-        # TODO do some input validation here first?
-        validate_chunk_keys(chunks.keys())
+    def from_arrays(
+        cls,
+        paths: np.ndarray[Any, np.dtypes.StringDType],
+        offsets: np.ndarray[Any, np.dtype("int32")],
+        lengths: np.ndarray[Any, np.dtype("int32")],
+    ) -> "ChunkManifest":
+        """
+        Create manifest directly from numpy arrays containing the path and byte range information.
 
-        # TODO should we actually pass shape in, in case there are not enough chunks to give correct idea of full shape?
-        shape = get_chunk_grid_shape(chunks.keys())
+        Useful if you want to avoid the memory overhead of creating an intermediate dictionary first,
+        as these 3 arrays are what will be used internally to store the references.
 
-        # Initializing to empty implies that entries with path='' are treated as missing chunks
-        entries = np.empty(shape=shape, dtype=MANIFEST_STRUCTURED_ARRAY_DTYPES)
+        Parameters
+        ----------
+        paths: np.ndarray
+        offsets: np.ndarray
+        lengths: np.ndarray
+        """
 
-        # populate the array
-        for key, entry in chunks.items():
-            try:
-                entries[split(key)] = tuple(entry.values())
-            except (ValueError, TypeError) as e:
-                msg = (
-                    "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
-                    f"but got {entry}"
-                )
-                raise ValueError(msg) from e
+        # check types
+        if not isinstance(paths, np.ndarray):
+            raise TypeError(f"paths must be a numpy array, but got type {type(paths)}")
+        if not isinstance(offsets, np.ndarray):
+            raise TypeError(
+                f"offsets must be a numpy array, but got type {type(offsets)}"
+            )
+        if not isinstance(lengths, np.ndarray):
+            raise TypeError(
+                f"lengths must be a numpy array, but got type {type(lengths)}"
+            )
 
-        return ChunkManifest(entries=entries)
+        # check dtypes
+        if paths.dtype is not np.dtypes.StringDType:
+            raise ValueError(
+                f"paths array must have numpy dtype StringDType, but got dtype {paths.dtype}"
+            )
+        if offsets.dtype is not np.dtype("int32"):
+            raise ValueError(
+                f"offsets array must have 32-bit integer dtype, but got dtype {offsets.dtype}"
+            )
+        if lengths.dtype is not np.dtype("int32"):
+            raise ValueError(
+                f"lengths array must have 32-bit integer dtype, but got dtype {lengths.dtype}"
+            )
+
+        # check shapes
+        shape = paths.shape
+        if offsets.shape != shape:
+            raise ValueError(
+                f"Shapes of the arrays must be consistent, but shapes of paths array and offsets array do not match: {paths.shape} vs {offsets.shape}"
+            )
+        if lengths.shape != shape:
+            raise ValueError(
+                f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
+            )
+
+        obj = object.__new__(cls)
+        obj._paths = paths
+        obj._offsets = offsets
+        obj._lengths = lengths
+
+        return obj
 
     @property
     def ndim_chunk_grid(self) -> int:
@@ -119,7 +151,7 @@ class ChunkManifest(BaseModel):
 
         Not the same as the dimension of an array backed by this chunk manifest.
         """
-        return self.entries.ndim
+        return self._paths.ndim
 
     @property
     def shape_chunk_grid(self) -> Tuple[int, ...]:
@@ -128,20 +160,23 @@ class ChunkManifest(BaseModel):
 
         Not the same as the shape of an array backed by this chunk manifest.
         """
-        return self.entries.shape
+        return self._paths.shape
 
     def __repr__(self) -> str:
         return f"ChunkManifest<shape={self.shape_chunk_grid}>"
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         indices = split(key)
-        return ChunkEntry(self.entries[indices])
+        path = self._paths[indices]
+        offset = self._offsets[indices]
+        length = self._lengths[indices]
+        return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:
-        return iter(self.entries.keys())
+        return iter(self._paths.keys())
 
     def __len__(self) -> int:
-        return self.entries.size
+        return self._paths.size
 
     def dict(self) -> ChunkDict:
         """
@@ -178,7 +213,10 @@ class ChunkManifest(BaseModel):
 
     def __eq__(self, other: Any) -> bool:
         """Two manifests are equal if all of their entries are identical."""
-        return (self.entries == other.entries).all()
+        paths_equal = (self.paths == other.paths).all()
+        offsets_equal = (self.offsets == other.offsets).all()
+        lengths_equal = (self.lengths == other.lengths).all()
+        return paths_equal and offsets_equal and lengths_equal
 
     @classmethod
     def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
