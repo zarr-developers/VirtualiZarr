@@ -1,4 +1,14 @@
-from typing import List, Literal, Mapping, Optional, Union, overload, MutableMapping, Iterable
+from pathlib import Path
+from typing import (
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Union,
+    overload,
+)
 
 import ujson  # type: ignore
 import xarray as xr
@@ -8,8 +18,13 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import KerchunkStoreRefs, FileType
+from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.zarr import (
+    attrs_from_zarr_group_json,
+    dataset_to_zarr,
+    metadata_from_zarr_json,
+)
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -39,7 +54,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4'}.
+        Can be one of {'netCDF3', 'netCDF4', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
@@ -76,57 +91,121 @@ def open_virtual_dataset(
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
 
-    # this is the only place we actually always need to use kerchunk directly
-    # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-    vds_refs = kerchunk.read_kerchunk_references_from_file(
-        filepath=filepath,
-        filetype=filetype,
-    )
-    virtual_vars = virtual_vars_from_kerchunk_refs(
-        vds_refs,
-        drop_variables=drop_variables + loadable_variables,
-        virtual_array_class=virtual_array_class,
-    )
-    ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+    if virtual_array_class is not ManifestArray:
+        raise NotImplementedError()
 
-    if indexes is None or len(loadable_variables) > 0:
-        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        ds = xr.open_dataset(filepath, drop_variables=drop_variables)
-
-        if indexes is None:
-            # add default indexes by reading data from file
-            indexes = {name: index for name, index in ds.xindexes.items()}
-        elif indexes != {}:
-            # TODO allow manual specification of index objects
-            raise NotImplementedError()
-        else:
-            indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-        loadable_vars = {name: var for name, var in ds.variables.items() if name in loadable_variables}
-
-        # if we only read the indexes we can just close the file right away as nothing is lazy
-        if loadable_vars == {}:
-            ds.close()
+    if filetype == "zarr_v3":
+        # TODO is there a neat way of auto-detecting this?
+        return open_virtual_dataset_from_v3_store(
+            storepath=filepath, drop_variables=drop_variables, indexes=indexes
+        )
     else:
-        loadable_vars = {}
-        indexes = {}
+        # this is the only place we actually always need to use kerchunk directly
+        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
+        vds_refs = kerchunk.read_kerchunk_references_from_file(
+            filepath=filepath,
+            filetype=filetype,
+        )
+        virtual_vars = virtual_vars_from_kerchunk_refs(
+            vds_refs,
+            drop_variables=drop_variables + loadable_variables,
+            virtual_array_class=virtual_array_class,
+        )
+        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
 
-    vars = {**virtual_vars, **loadable_vars}
+        if indexes is None or len(loadable_variables) > 0:
+            # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+            # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+            # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
+            ds = xr.open_dataset(filepath, drop_variables=drop_variables)
+
+            if indexes is None:
+                # add default indexes by reading data from file
+                indexes = {name: index for name, index in ds.xindexes.items()}
+            elif indexes != {}:
+                # TODO allow manual specification of index objects
+                raise NotImplementedError()
+            else:
+                indexes = dict(**indexes)  # for type hinting: to allow mutation
+
+            loadable_vars = {
+                name: var
+                for name, var in ds.variables.items()
+                if name in loadable_variables
+            }
+
+            # if we only read the indexes we can just close the file right away as nothing is lazy
+            if loadable_vars == {}:
+                ds.close()
+        else:
+            loadable_vars = {}
+            indexes = {}
+
+        vars = {**virtual_vars, **loadable_vars}
+
+        data_vars, coords = separate_coords(vars, indexes)
+
+        vds = xr.Dataset(
+            data_vars,
+            coords=coords,
+            # indexes={},  # TODO should be added in a later version of xarray
+            attrs=ds_attrs,
+        )
+
+        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+        return vds
+
+
+def open_virtual_dataset_from_v3_store(
+    storepath: str,
+    drop_variables: List[str],
+    indexes: Optional[Mapping[str, Index]],
+) -> xr.Dataset:
+    """
+    Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
+    """
+    _storepath = Path(storepath)
+
+    ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
+
+    # TODO recursive glob to create a datatree
+    # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
+    # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
+    all_paths = _storepath.glob("*/")
+    directory_paths = [p for p in all_paths if not p.is_file()]
+
+    vars = {}
+    for array_dir in directory_paths:
+        var_name = array_dir.name
+        if var_name in drop_variables:
+            break
+
+        zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
+        manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
+
+        marr = ManifestArray(chunkmanifest=manifest, zarray=zarray)
+        var = xr.Variable(data=marr, dims=dim_names, attrs=attrs)
+        vars[var_name] = var
+
+    if indexes is None:
+        raise NotImplementedError()
+    elif indexes != {}:
+        # TODO allow manual specification of index objects
+        raise NotImplementedError()
+    else:
+        indexes = dict(**indexes)  # for type hinting: to allow mutation
 
     data_vars, coords = separate_coords(vars, indexes)
 
-    vds = xr.Dataset(
+    ds = xr.Dataset(
         data_vars,
         coords=coords,
         # indexes={},  # TODO should be added in a later version of xarray
         attrs=ds_attrs,
     )
 
-    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
-
-    return vds
+    return ds
 
 
 def virtual_vars_from_kerchunk_refs(
@@ -151,19 +230,19 @@ def virtual_vars_from_kerchunk_refs(
         var_name for var_name in var_names if var_name not in drop_variables
     ]
 
-    vars = {var_name: variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class
-        ) for var_name in var_names_to_keep}
+    vars = {
+        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
+        for var_name in var_names_to_keep
+    }
 
     return vars
 
 
-
 def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
-    drop_variables: Optional[List[str]] = None,
-    virtual_array_class=ManifestArray,
-    indexes={},
+    drop_variables: List[str] = [],
+    virtual_array_class: type = ManifestArray,
+    indexes: Optional[MutableMapping[str, Index]] = None,
 ) -> xr.Dataset:
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
@@ -177,6 +256,8 @@ def dataset_from_kerchunk_refs(
 
     vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
 
+    if indexes is None:
+        indexes = {}
     data_vars, coords = separate_coords(vars, indexes)
 
     ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
@@ -261,25 +342,27 @@ class VirtualiZarrDatasetAccessor:
         """
         Serialize all virtualized arrays in this xarray dataset as a Zarr store.
 
+        Currently requires all variables to be backed by ManifestArray objects.
+
+        Not very useful until some implementation of a Zarr reader can actually read these manifest.json files.
+        See https://github.com/zarr-developers/zarr-specs/issues/287
+
         Parameters
         ----------
         storepath : str
         """
-        raise NotImplementedError(
-            "No point in writing out these virtual arrays to Zarr until at least one Zarr reader can actually read them."
-        )
+        dataset_to_zarr(self.ds, storepath)
 
     @overload
-    def to_kerchunk(self, filepath: None, format: Literal["dict"]) -> KerchunkStoreRefs:
-        ...
+    def to_kerchunk(
+        self, filepath: None, format: Literal["dict"]
+    ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None:
-        ...
+    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None: ...
 
     def to_kerchunk(
         self,

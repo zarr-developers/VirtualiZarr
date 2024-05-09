@@ -205,10 +205,6 @@ Indexes:
     *empty*
 ```
 
-```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
-```
-
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
 
 ```
@@ -230,6 +226,10 @@ Attributes:
     platform:     Model
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
+```
+
+```{note}
+Concatenation without indexes like this will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
 ```
 
 We can see that the resulting combined manifest has two chunks, as expected.
@@ -338,6 +338,25 @@ Currently you can only serialize virtual variables backed by `ManifestArray` obj
 
 ### Writing as Zarr
 
-TODO: Write out references as a Zarr v3 store following the [Chunk Manifest ZEP](https://github.com/zarr-developers/zarr-specs/issues/287), see [PR #45](https://github.com/TomNicholas/VirtualiZarr/pull/45)
+Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`ds.virtualize.to_zarr <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
 
-TODO: Explanation of how this requires changes in zarr upstream to be able to read it
+```python
+combined_vds.virtualize.to_zarr('combined.zarr')
+```
+
+The result is a zarr v3 store on disk which contains the chunk manifest information written out as `manifest.json` files, so the store looks like this:
+
+```
+combined/zarr.json  <- group metadata
+combined/air/zarr.json  <- array metadata
+combined/air/manifest.json <- array manifest
+...
+```
+
+The advantage of this format is that any zarr v3 reader that understands the chunk manifest ZEP could read from this store, no matter what language it is written in (e.g. via `zarr-python`, `zarr-js`, or rust). This reading would also not require `fsspec`.
+
+```{note}
+Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
+
+This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+```
