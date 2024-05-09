@@ -4,7 +4,7 @@ import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.kerchunk import _automatically_determine_filetype, FileType
+from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
