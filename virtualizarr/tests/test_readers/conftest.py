@@ -125,3 +125,29 @@ def multiple_datasets_netcdf4_file(tmpdir):
     f.create_dataset(name="data", data=data, chunks=None)
     f.create_dataset(name="data2", data=data, chunks=None)
     return filepath
+
+
+@pytest.fixture
+def np_uncompressed():
+    return np.arange(100)
+
+
+@pytest.fixture
+def gzip_filter_netcdf4_file(tmpdir, np_uncompressed):
+    filepath = f"{tmpdir}/gzip.nc"
+    f = h5py.File(filepath, "w")
+    f.create_dataset(name="data", data=np_uncompressed, compression="gzip", compression_opts=1)
+    return filepath
+
+
+@pytest.fixture
+def gzip_filter_xarray_netcdf4_file(tmpdir):
+    ds = xr.tutorial.open_dataset("air_temperature")
+    encoding = {}
+    for var_name in ds.variables:
+        #  encoding[var_name] = {"zlib": True, "compression_opts": 1}
+        encoding[var_name] = {"compression": "gzip", "compression_opts": 1}
+
+    filepath = f"{tmpdir}/gzip_xarray.nc"
+    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+    return filepath

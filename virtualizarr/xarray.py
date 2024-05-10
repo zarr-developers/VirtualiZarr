@@ -128,48 +128,47 @@ def open_virtual_dataset(
         )
         ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
 
-        if indexes is None or len(loadable_variables) > 0:
-            # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-            # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-            # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            ds = xr.open_dataset(filepath, drop_variables=drop_variables)
+    if indexes is None or len(loadable_variables) > 0:
+        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
+        ds = xr.open_dataset(filepath, drop_variables=drop_variables)
 
-            if indexes is None:
-                # add default indexes by reading data from file
-                indexes = {name: index for name, index in ds.xindexes.items()}
-            elif indexes != {}:
-                # TODO allow manual specification of index objects
-                raise NotImplementedError()
-            else:
-                indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-            loadable_vars = {
-                name: var
-                for name, var in ds.variables.items()
-                if name in loadable_variables
-            }
-
-            # if we only read the indexes we can just close the file right away as nothing is lazy
-            if loadable_vars == {}:
-                ds.close()
+        if indexes is None:
+            # add default indexes by reading data from file
+            indexes = {name: index for name, index in ds.xindexes.items()}
+        elif indexes != {}:
+            # TODO allow manual specification of index objects
+            raise NotImplementedError()
         else:
-            loadable_vars = {}
-            indexes = {}
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-        vars = {**virtual_vars, **loadable_vars}
+        loadable_vars = {
+            name: var
+            for name, var in ds.variables.items()
+            if name in loadable_variables
+        }
 
-        data_vars, coords = separate_coords(vars, indexes)
+        # if we only read the indexes we can just close the file right away as nothing is lazy
+        if loadable_vars == {}:
+            ds.close()
+    else:
+        loadable_vars = {}
+        indexes = {}
 
-        vds = xr.Dataset(
-            data_vars,
-            coords=coords,
-            # indexes={},  # TODO should be added in a later version of xarray
-            attrs=ds_attrs,
-        )
+    vars = {**virtual_vars, **loadable_vars}
 
-        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+    data_vars, coords = separate_coords(vars, indexes)
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=ds_attrs,
+    )
 
-        return vds
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+    return vds
 
 
 def open_virtual_dataset_from_v3_store(

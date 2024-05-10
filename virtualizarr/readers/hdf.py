@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.readers.hdf_filters import codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.zarr import ZArray
 
@@ -169,12 +170,14 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     # This chunk determination logic mirrors zarr-python's create
     # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
     chunks = dataset.chunks if dataset.chunks else dataset.shape
+    codecs = codecs_from_dataset(dataset)
+    filters = [codec.get_config() for codec in codecs]
     zarray = ZArray(
         chunks=chunks,
-        compressor=dataset.compression,
+        compressor=None,
         dtype=dataset.dtype,
         fill_value=dataset.fillvalue,
-        filters=None,
+        filters=filters,
         order="C",
         shape=dataset.shape,
         zarr_format=2,

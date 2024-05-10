@@ -28,6 +28,7 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
+    "hdf5plugin",
 ]
 
 [project.optional-dependencies]
