@@ -25,7 +25,7 @@ dependencies = [
     "kerchunk==0.2.2",
     "h5netcdf",
     "pydantic",
-    "numpy",
+    "numpy>=2.0.0rc1",
     "ujson",
     "packaging",
 ]
