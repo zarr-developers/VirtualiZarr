@@ -48,7 +48,7 @@ class ChunkEntry(BaseModel):
         return dict(path=self.path, offset=self.offset, length=self.length)
 
 
-class ChunkManifest(BaseModel):
+class ChunkManifest:
     """
     In-memory representation of a single Zarr chunk manifest.
 
@@ -71,11 +71,6 @@ class ChunkManifest(BaseModel):
     so it's not possible to have a ChunkManifest object that does not represent a complete valid grid of chunks.
     """
 
-    model_config = ConfigDict(
-        frozen=True,
-        arbitrary_types_allowed=True,  # so pydantic doesn't complain about the numpy array field
-    )
-
     _paths: np.ndarray[Any, np.dtypes.StringDType]
     _offsets: np.ndarray[Any, np.dtype("int32")]
     _lengths: np.ndarray[Any, np.dtype("int32")]
@@ -96,7 +91,8 @@ class ChunkManifest(BaseModel):
         # populate the array
         for key, entry in chunks.items():
             try:
-                entry = ChunkEntry(entry)
+                path, offset, length = entry.values()
+                entry = ChunkEntry(path=path, offset=offset, length=length)
             except (ValueError, TypeError) as e:
                 msg = (
                     "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
@@ -224,34 +220,35 @@ class ChunkManifest(BaseModel):
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        """
 
-        def _entry_to_dict(entry: Tuple[str, int, int]) -> dict[str, Union[str, int]]:
-            return {
-                "path": entry[0],
-                "offset": entry[1],
-                "length": entry[2],
-            }
+        Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary._
+        """
 
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
 
+        d = {
+            join(inds): dict(
+                path=path.item(), offset=offset.item(), length=length.item()
+            )
+            for *inds, path, offset, length in np.nditer(
+                [*coord_vectors, self._paths, self._offsets, self._lengths],
+                flags=("refs_ok",),
+            )
+            if path.item()[0] != ""  # don't include entry if path='' (i.e. empty chunk)
+        }
+
         return cast(
             ChunkDict,
-            {
-                join(inds): _entry_to_dict(entry.item())
-                for *inds, entry in np.nditer([*coord_vectors, self.entries])
-                if entry.item()[0]
-                != ""  # don't include entry if path='' (i.e. empty chunk)
-            },
+            d,
         )
 
     def __eq__(self, other: Any) -> bool:
         """Two manifests are equal if all of their entries are identical."""
-        paths_equal = (self.paths == other.paths).all()
-        offsets_equal = (self.offsets == other.offsets).all()
-        lengths_equal = (self.lengths == other.lengths).all()
+        paths_equal = (self._paths == other._paths).all()
+        offsets_equal = (self._offsets == other._offsets).all()
+        lengths_equal = (self._lengths == other._lengths).all()
         return paths_equal and offsets_equal and lengths_equal
 
     @classmethod
