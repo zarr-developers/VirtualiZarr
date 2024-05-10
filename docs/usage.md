@@ -140,7 +140,7 @@ concatenated.manifest.dict()
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
 
 ```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
 Remember that you cannot load values from a `ManifestArray` directly.
@@ -228,10 +228,6 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-```{note}
-Concatenation without indexes like this will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
-```
-
 We can see that the resulting combined manifest has two chunks, as expected.
 
 ```python
@@ -246,7 +242,7 @@ combined_vds['air'].data.manifest.dict()
 The keyword arguments `coords='minimal', compat='override'` are currently necessary because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 ```
 
-The general multi-dimensional version of this contatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
+The general multi-dimensional version of this concatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
 
 ```python
 combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='minimal', compat='override')
@@ -303,7 +299,7 @@ Attributes:
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects, and loadable variables backed by (lazy) numpy arrays.
 
 Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a muilti-dimensional variable in order to decide what to do next,
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
 
