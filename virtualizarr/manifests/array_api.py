@@ -124,11 +124,24 @@ def concatenate(
     new_shape = list(first_shape)
     new_shape[axis] = new_length_along_concat_axis
 
-    concatenated_manifest_entries = np.concatenate(
-        [arr.manifest.entries for arr in arrays],
+    # do concatenation of entries in manifest
+    concatenated_paths = np.concatenate(
+        [arr.manifest._paths for arr in arrays],
         axis=axis,
     )
-    concatenated_manifest = ChunkManifest(entries=concatenated_manifest_entries)
+    concatenated_offsets = np.concatenate(
+        [arr.manifest._offsets for arr in arrays],
+        axis=axis,
+    )
+    concatenated_lengths = np.concatenate(
+        [arr.manifest._lengths for arr in arrays],
+        axis=axis,
+    )
+    concatenated_manifest = ChunkManifest.from_arrays(
+        paths=concatenated_paths,
+        offsets=concatenated_offsets,
+        lengths=concatenated_lengths,
+    )
 
     new_zarray = ZArray(
         chunks=first_arr.chunks,
@@ -210,11 +223,24 @@ def stack(
     new_shape = list(first_shape)
     new_shape.insert(axis, length_along_new_stacked_axis)
 
-    stacked_manifest_entries = np.stack(
-        [arr.manifest.entries for arr in arrays],
+    # do stacking of entries in manifest
+    stacked_paths = np.stack(
+        [arr.manifest._paths for arr in arrays],
         axis=axis,
     )
-    stacked_manifest = ChunkManifest(entries=stacked_manifest_entries)
+    stacked_offsets = np.stack(
+        [arr.manifest._offsets for arr in arrays],
+        axis=axis,
+    )
+    stacked_lengths = np.stack(
+        [arr.manifest._lengths for arr in arrays],
+        axis=axis,
+    )
+    stacked_manifest = ChunkManifest.from_arrays(
+        paths=stacked_paths,
+        offsets=stacked_offsets,
+        lengths=stacked_lengths,
+    )
 
     # chunk size has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
