@@ -71,9 +71,9 @@ class ChunkManifest:
     so it's not possible to have a ChunkManifest object that does not represent a complete valid grid of chunks.
     """
 
-    _paths: np.ndarray[Any, np.dtypes.StringDType]
-    _offsets: np.ndarray[Any, np.dtype("int32")]
-    _lengths: np.ndarray[Any, np.dtype("int32")]
+    _paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]]
+    _offsets: np.ndarray[Any, np.dtype[np.int32]]
+    _lengths: np.ndarray[Any, np.dtype[np.int32]]
 
     @classmethod
     def from_dict(cls, chunks: ChunkDict) -> "ChunkManifest":
@@ -115,9 +115,9 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
-        paths: np.ndarray[Any, np.dtypes.StringDType],
-        offsets: np.ndarray[Any, np.dtype("int32")],
-        lengths: np.ndarray[Any, np.dtype("int32")],
+        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],
+        offsets: np.ndarray[Any, np.dtype[np.int32]],
+        lengths: np.ndarray[Any, np.dtype[np.int32]],
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -145,15 +145,15 @@ class ChunkManifest:
             )
 
         # check dtypes
-        if paths.dtype is not np.dtypes.StringDType:
+        if paths.dtype != np.dtypes.StringDType():
             raise ValueError(
                 f"paths array must have numpy dtype StringDType, but got dtype {paths.dtype}"
             )
-        if offsets.dtype is not np.dtype("int32"):
+        if offsets.dtype != np.dtype("int32"):
             raise ValueError(
                 f"offsets array must have 32-bit integer dtype, but got dtype {offsets.dtype}"
             )
-        if lengths.dtype is not np.dtype("int32"):
+        if lengths.dtype != np.dtype("int32"):
             raise ValueError(
                 f"lengths array must have 32-bit integer dtype, but got dtype {lengths.dtype}"
             )
