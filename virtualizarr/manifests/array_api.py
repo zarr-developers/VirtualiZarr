@@ -332,41 +332,6 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
     return ManifestArray(chunkmanifest=broadcast_manifest, zarray=new_zarray)
 
 
-def _broadcast_scalar(x: "ManifestArray", new_axis_length: int) -> "ManifestArray":
-    """
-    Add an axis to a scalar ManifestArray, but without adding a new axis to the keys of the chunk manifest.
-
-    This is not the same as concatenation, because there is no existing axis along which to concatenate.
-    It's also not the same as stacking, because we don't want to insert a new axis into the chunk keys.
-
-    Scalars are a special case because their manifests still have a chunk key with one dimension.
-    See https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
-    """
-
-    from .array import ManifestArray
-
-    new_shape = (new_axis_length,)
-    new_chunks = (new_axis_length,)
-
-    concatenated_manifest = concat_manifests(
-        [x.manifest] * new_axis_length,
-        axis=0,
-    )
-
-    new_zarray = ZArray(
-        chunks=new_chunks,
-        compressor=x.zarray.compressor,
-        dtype=x.dtype,
-        fill_value=x.zarray.fill_value,
-        filters=x.zarray.filters,
-        shape=new_shape,
-        order=x.zarray.order,
-        zarr_format=x.zarray.zarr_format,
-    )
-
-    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
-
-
 # TODO broadcast_arrays, squeeze, permute_dims
 
 
