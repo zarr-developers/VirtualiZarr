@@ -149,10 +149,16 @@ class TestBroadcast:
     def test_broadcast_scalar(self):
         # regression test
         marr = create_manifestarray(shape=(), chunks=())
+        assert marr.shape == ()
+        assert marr.chunks == ()
+        assert marr.manifest.dict() == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
+
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
-        assert expanded.manifest == {
+        assert expanded.manifest.dict() == {
             "0": {"path": "file.0.nc", "offset": 0, "length": 5},
         }
 
