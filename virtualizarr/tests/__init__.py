@@ -33,14 +33,16 @@ def create_manifestarray(
         for axis_length, chunk_length in zip(shape, chunks)
     )
 
-    # create every possible combination of keys
-    all_possible_combos = itertools.product(
-        *[range(length) for length in chunk_grid_shape]
-    )
+    if chunk_grid_shape == ():
+        d = {"0": entry_from_chunk_key((0,))}
+    else:
+        # create every possible combination of keys
+        all_possible_combos = itertools.product(
+            *[range(length) for length in chunk_grid_shape]
+        )
+        d = {join(ind): entry_from_chunk_key(ind) for ind in all_possible_combos}
 
-    chunkmanifest = ChunkManifest.from_dict(
-        {join(ind): entry_from_chunk_key(ind) for ind in all_possible_combos}
-    )
+    chunkmanifest = ChunkManifest.from_dict(d)
 
     return ManifestArray(chunkmanifest=chunkmanifest, zarray=zarray)
 
