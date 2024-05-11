@@ -1,9 +1,10 @@
 import itertools
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union, cast
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 
-from ..zarr import Codec, ZArray
+from virtualizarr.zarr import Codec, ZArray, ceildiv
+
 from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
@@ -281,39 +282,54 @@ def expand_dims(x: "ManifestArray", /, *, axis: int = 0) -> "ManifestArray":
 @implements(np.broadcast_to)
 def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArray":
     """
-    Broadcasts an array to a specified shape, by either manipulating chunk keys or copying chunk manifest entries.
+    Broadcasts a ManifestArray to a specified shape, by either adjusting chunk keys or copying chunk manifest entries.
     """
 
-    if len(x.shape) > len(shape):
-        raise ValueError("input operand has more dimensions than allowed")
+    from .array import ManifestArray
 
-    # numpy broadcasting algorithm requires us to start by comparing the length of the final axes and work backwards
-    result = x
-    for axis, d, d_requested in itertools.zip_longest(
-        reversed(range(len(shape))), reversed(x.shape), reversed(shape), fillvalue=None
-    ):
-        # len(shape) check above ensures this can't be type None
-        d_requested = cast(int, d_requested)
+    new_chunk_grid_shape = tuple(
+        ceildiv(axis_length, chunk_length)
+        for axis_length, chunk_length in itertools.zip_longest(
+            shape, x.chunks, fillvalue=1
+        )
+    )
 
-        if d == d_requested:
-            pass
-        elif d is None:
-            if result.shape == ():
-                # scalars are a special case because their manifests already have a chunk key with one dimension
-                # see https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
-                result = _broadcast_scalar(result, new_axis_length=d_requested)
-            else:
-                # stack same array upon itself d_requested number of times, which inserts a new axis at axis=0
-                result = stack([result] * d_requested, axis=0)
-        elif d == 1:
-            # concatenate same array upon itself d_requested number of times along existing axis
-            result = concatenate([result] * d_requested, axis=axis)
-        else:
-            raise ValueError(
-                f"Array with shape {x.shape} cannot be broadcast to shape {shape}"
-            )
+    # do broadcasting of entries in manifest
+    broadcast_paths = np.broadcast_to(x.manifest._paths, shape=new_chunk_grid_shape)
+    broadcast_offsets = np.broadcast_to(
+        x.manifest._offsets,
+        shape=new_chunk_grid_shape,
+    )
+    broadcast_lengths = np.broadcast_to(
+        x.manifest._lengths,
+        shape=new_chunk_grid_shape,
+    )
+    broadcast_manifest = ChunkManifest.from_arrays(
+        paths=broadcast_paths,
+        offsets=broadcast_offsets,
+        lengths=broadcast_lengths,
+    )
 
-    return result
+    new_shape = np.broadcast_shapes(x.shape, shape)
+    new_chunks = tuple(
+        ceildiv(axis_length, chunk_grid_length)
+        for axis_length, chunk_grid_length in zip(new_shape, new_chunk_grid_shape)
+    )
+
+    # refactor to use a new ZArray.copy(x, shape=..., chunks=..) constructor method
+    new_zarray = ZArray(
+        chunks=new_chunks,
+        compressor=x.zarray.compressor,
+        dtype=x.dtype,
+        fill_value=x.zarray.fill_value,
+        filters=x.zarray.filters,
+        shape=new_shape,
+        # TODO presumably these things should be checked for consistency across arrays too?
+        order=x.zarray.order,
+        zarr_format=x.zarray.zarr_format,
+    )
+
+    return ManifestArray(chunkmanifest=broadcast_manifest, zarray=new_zarray)
 
 
 def _broadcast_scalar(x: "ManifestArray", new_axis_length: int) -> "ManifestArray":
