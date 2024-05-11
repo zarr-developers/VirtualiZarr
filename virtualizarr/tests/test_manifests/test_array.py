@@ -124,13 +124,37 @@ class TestEquals:
 
 
 class TestBroadcast:
+    def test_broadcast_existing_axis(self):
+        marr = create_manifestarray(shape=(1, 2), chunks=(1, 2))
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.chunks == (1, 2)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "1.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "2.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+        }
+
+    def test_broadcast_new_axis(self):
+        marr = create_manifestarray(shape=(3,), chunks=(1,))
+        expanded = np.broadcast_to(marr, shape=(1, 3))
+        assert expanded.shape == (1, 3)
+        assert expanded.chunks == (1, 1)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.nc", "offset": 0, "length": 5},
+            "0.1": {"path": "file.1.nc", "offset": 10, "length": 6},
+            "0.2": {"path": "file.2.nc", "offset": 20, "length": 7},
+        }
+
     def test_broadcast_scalar(self):
         # regression test
         marr = create_manifestarray(shape=(), chunks=())
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
-        assert expanded.manifest == marr.manifest
+        assert expanded.manifest == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
 
 
 # TODO we really need some kind of fixtures to generate useful example data
