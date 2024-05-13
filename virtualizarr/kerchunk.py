@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, NewType, Optional, Tuple, Union, cast
+from typing import NewType, cast
 
 import ujson  # type: ignore
 import xarray as xr
@@ -40,10 +40,11 @@ class FileType(AutoName):
 
 def read_kerchunk_references_from_file(
     filepath: str,
-    filetype: Optional[FileType],
+    filepath: str, filetype: FileType | None
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
+
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -166,7 +167,7 @@ def extract_array_refs(
 
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> Tuple[dict, ZArray, ZAttrs]:
+) -> tuple[dict, ZArray, ZAttrs]:
     zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
@@ -228,7 +229,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
             f"Can only serialize wrapped arrays of type ManifestArray, but got type {type(marr)}"
         )
 
-    arr_refs: dict[str, Union[str, List[Union[str, int]]]] = {
+    arr_refs: dict[str, str | list[str | int]] = {
         str(chunk_key): chunk_entry.to_kerchunk()
         for chunk_key, chunk_entry in marr.manifest.entries.items()
     }
