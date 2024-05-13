@@ -16,6 +16,7 @@ from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
+from virtualizarr.dmrpp import DMRParser
 
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
@@ -99,6 +100,10 @@ def open_virtual_dataset(
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
+    if filetype == "dmr++":
+        with open(filepath, "rb") as f:
+            parser = DMRParser(f.read())
+            return parser.parse_dataset()
     else:
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
