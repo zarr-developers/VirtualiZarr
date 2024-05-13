@@ -359,12 +359,14 @@ class VirtualiZarrDatasetAccessor:
     ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str | Path, format: Literal["json"]) -> None: ...
+    def to_kerchunk(
+        self, filepath: Union[str, Path], format: Literal["json"]
+    ) -> None: ...
 
     @overload
     def to_kerchunk(
         self,
-        filepath: str | Path,
+        filepath: Union[str, Path],
         format: Literal["parquet"],
         record_size: int = 100_000,
         categorical_threshold: int = 10,
@@ -372,7 +374,7 @@ class VirtualiZarrDatasetAccessor:
 
     def to_kerchunk(
         self,
-        filepath: str | Path | None = None,
+        filepath: Optional[Union[str, Path]] = None,
         format: Union[Literal["dict"], Literal["json"], Literal["parquet"]] = "dict",
         record_size: int = 100_000,
         categorical_threshold: int = 10,
@@ -419,11 +421,14 @@ class VirtualiZarrDatasetAccessor:
             elif isinstance(filepath, str):
                 url = filepath
 
-            return refs_to_dataframe(
+            # refs_to_dataframe is responsible for writing to parquet.
+            # at no point does it create a full in-memory dataframe.
+            refs_to_dataframe(
                 refs,
                 url=url,
                 record_size=record_size,
                 categorical_threshold=categorical_threshold,
             )
+            return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
