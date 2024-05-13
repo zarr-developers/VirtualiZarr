@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray, ceildiv
 
