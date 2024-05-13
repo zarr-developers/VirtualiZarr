@@ -114,7 +114,7 @@ class TestAccessor:
 
         ds.virtualize.to_kerchunk(filepath, format="json")
 
-        with open(filepath, "r") as json_file:
+        with open(filepath) as json_file:
             loaded_refs = ujson.load(json_file)
 
         expected_ds_refs = {
