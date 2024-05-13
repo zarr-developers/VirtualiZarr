@@ -1,4 +1,5 @@
 import h5py
+import hdf5plugin
 import numpy as np
 import pytest
 import xarray as xr
@@ -132,22 +133,32 @@ def np_uncompressed():
     return np.arange(100)
 
 
-@pytest.fixture
-def gzip_filter_netcdf4_file(tmpdir, np_uncompressed):
-    filepath = f"{tmpdir}/gzip.nc"
+@pytest.fixture(params=["gzip", "blosc"])
+def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
+    filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
-    f.create_dataset(name="data", data=np_uncompressed, compression="gzip", compression_opts=1)
+    if request.param == "gzip":
+        f.create_dataset(name="data", data=np_uncompressed, compression="gzip", compression_opts=1)
+    if request.param == "blosc":
+        f.create_dataset(name="data", data=np_uncompressed,
+                         **hdf5plugin.Blosc(
+                             cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE
+                         ))
     return filepath
 
 
-@pytest.fixture
-def gzip_filter_xarray_netcdf4_file(tmpdir):
+@pytest.fixture(params=["gzip"])
+def filter_encoded_xarray_netcdf4_files(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
+    if request.param == "gzip":
+        encoding_config = {
+            "zlib": True,
+            "complevel": 1
+        }
     for var_name in ds.variables:
-        #  encoding[var_name] = {"zlib": True, "compression_opts": 1}
-        encoding[var_name] = {"compression": "gzip", "compression_opts": 1}
+        encoding[var_name] = encoding_config
 
-    filepath = f"{tmpdir}/gzip_xarray.nc"
-    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+    filepath = f"{tmpdir}/{request.param}_xarray.nc"
+    ds.to_netcdf(filepath, engine="netcdf4", encoding=encoding)
     return filepath
