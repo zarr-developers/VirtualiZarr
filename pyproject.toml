@@ -41,7 +41,7 @@ test = [
     "scipy",
     "pooch",
     "ruff",
-
+    "fastparquet",
 ]
 
 
