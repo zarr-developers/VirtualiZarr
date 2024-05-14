@@ -28,6 +28,8 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
+    "universal-pathlib"
+
 ]
 
 [project.optional-dependencies]
@@ -40,6 +42,7 @@ test = [
     "scipy",
     "pooch",
     "ruff",
+    "s3fs"
 
 ]
 
