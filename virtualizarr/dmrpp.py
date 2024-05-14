@@ -1,21 +1,36 @@
 import ast
+from xml.etree import ElementTree as ET
+
 import numpy as np
 import xarray as xr
 
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.zarr import ZArray
-from xml.etree import ElementTree as ET
-from virtualizarr.manifests import ManifestArray 
+
 
 class DMRParser:
     dap_namespace = "{http://xml.opendap.org/ns/DAP/4.0#}"
     dmr_namespace = "{http://xml.opendap.org/dap/dmrpp/1.0.0#}"
-    dap_npdtype = {"Byte": "uint8", "UByte": "uint8","Int8": "int8","UInt8": "uint8","Int16": "int16","UInt16": "uint16","Int32": "int32","UInt32": "uint32",
-                "Int64": "int64", "UInt64": "uint64", "Url": "str", "Float32": "float32", "Float64": "float64", "String": "str"
+    dap_npdtype = {
+        "Byte": "uint8",
+        "UByte": "uint8",
+        "Int8": "int8",
+        "UInt8": "uint8",
+        "Int16": "int16",
+        "UInt16": "uint16",
+        "Int32": "int32",
+        "UInt32": "uint32",
+        "Int64": "int64",
+        "UInt64": "uint64",
+        "Url": "str",
+        "Float32": "float32",
+        "Float64": "float64",
+        "String": "str",
     }
 
     def __init__(self, dmr: str):
         self.root = ET.fromstring(dmr)
-        self.data_filepath = self.root.attrib['name']
+        self.data_filepath = self.root.attrib["name"]
         self.global_dims = {}
 
     def parse_dataset(self):
@@ -29,7 +44,7 @@ class DMRParser:
         coord_names = set()
         for var_tag in vars_tags:
             for map_tag in var_tag.iterfind(self.dap_namespace + "Map"):
-                coord_names.add(map_tag.attrib["name"].removeprefix('/'))
+                coord_names.add(map_tag.attrib["name"].removeprefix("/"))
         coords = {}
         data_vars = {}
         for var_tag in vars_tags:
@@ -39,19 +54,23 @@ class DMRParser:
                 #     dim1d, *_ = coords[v.attrib['name']].dims
                 #     indexes[v.attrib['name']] = PandasIndex(coords[v.attrib['name']], dim1d)
             else:
-                data_vars[var_tag.attrib['name']] = self.parse_variable(var_tag)
+                data_vars[var_tag.attrib["name"]] = self.parse_variable(var_tag)
         # find all dataset attributes
         attrs = {}
         for attr_tag in self.root.iterfind(self.dap_namespace + "Attribute"):
             if attr_tag.attrib["type"] != "Container":
                 attrs.update(self.parse_attribute(attr_tag))
-        return xr.Dataset(data_vars=data_vars, coords=xr.Coordinates(coords=coords, indexes={}), attrs=attrs)
-    
+        return xr.Dataset(
+            data_vars=data_vars,
+            coords=xr.Coordinates(coords=coords, indexes={}),
+            attrs=attrs,
+        )
+
     def parse_variable(self, root) -> xr.Variable:
         # parse dimensions
         dims = []
         for d in root.iterfind(self.dap_namespace + "Dim"):
-            dims.append(d.attrib["name"].removeprefix('/'))
+            dims.append(d.attrib["name"].removeprefix("/"))
         shape = tuple([self.global_dims[d] for d in dims])
         # parse chunks
         chunks = shape
@@ -66,15 +85,26 @@ class DMRParser:
             attrs.update(self.parse_attribute(a))
         # create ManifestArray and ZArray
         dtype = np.dtype(self.dap_npdtype[root.tag.removeprefix(self.dap_namespace)])
-        fill_value = attrs["_FillValue"] if "_FillValue" in attrs and attrs["_FillValue"] != '*'  else None
-        zarray = ZArray(chunks=chunks, dtype=dtype, fill_value=fill_value, order='C', shape=shape, zarr_format=3)
+        fill_value = (
+            attrs["_FillValue"]
+            if "_FillValue" in attrs and attrs["_FillValue"] != "*"
+            else None
+        )
+        zarray = ZArray(
+            chunks=chunks,
+            dtype=dtype,
+            fill_value=fill_value,
+            order="C",
+            shape=shape,
+            zarr_format=3,
+        )
         marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
         # create encoding dict (and remove those keys from attrs)
         encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
         encoding = {key: value for key, value in attrs.items() if key in encoding_keys}
         attrs = {key: value for key, value in attrs.items() if key not in encoding_keys}
         return xr.Variable(dims=dims, data=marr, attrs=attrs, encoding=encoding)
-        
+
     def parse_attribute(self, root) -> dict:
         attr = {}
         values = []
@@ -83,12 +113,22 @@ class DMRParser:
             values.append(r.text)
         attr[root.attrib["name"]] = values[0] if len(values) == 1 else str(values)
         return attr
-    
+
     def parse_chunks(self, root, chunks: tuple) -> dict:
         chunkmanifest = {}
         for r in root.iterfind(self.dmr_namespace + "chunk"):
-            chunk_pos = np.zeros(len(chunks), dtype=int) if "chunkPositionInArray" not in r.attrib else np.asarray(ast.literal_eval(r.attrib["chunkPositionInArray"]))
-            chunk_num = chunk_pos // chunks  # [0,1023,10235] // [1, 1023, 2047] -> [0,1,5]
-            chunk_key = '.'.join(map(str, chunk_num))  # [0,0,1] -> "0.0.1"
-            chunkmanifest[chunk_key] = {"path": self.data_filepath, "offset": int(r.attrib["offset"]), "length": int(r.attrib["nBytes"])}
+            chunk_pos = (
+                np.zeros(len(chunks), dtype=int)
+                if "chunkPositionInArray" not in r.attrib
+                else np.asarray(ast.literal_eval(r.attrib["chunkPositionInArray"]))
+            )
+            chunk_num = (
+                chunk_pos // chunks
+            )  # [0,1023,10235] // [1, 1023, 2047] -> [0,1,5]
+            chunk_key = ".".join(map(str, chunk_num))  # [0,0,1] -> "0.0.1"
+            chunkmanifest[chunk_key] = {
+                "path": self.data_filepath,
+                "offset": int(r.attrib["offset"]),
+                "length": int(r.attrib["nBytes"]),
+            }
         return chunkmanifest

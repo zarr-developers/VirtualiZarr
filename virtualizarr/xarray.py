@@ -16,9 +16,9 @@ from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
-from virtualizarr.dmrpp import DMRParser
 
 import virtualizarr.kerchunk as kerchunk
+from virtualizarr.dmrpp import DMRParser
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import (
