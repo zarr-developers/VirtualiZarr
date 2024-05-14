@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import NewType, cast
+from typing import NewType, Optional, cast
 
 import ujson  # type: ignore
 import xarray as xr
 
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
@@ -38,7 +39,11 @@ class FileType(AutoName):
 
 
 def read_kerchunk_references_from_file(
-    filepath: str, filetype: FileType | None
+    filepath: str,
+    filetype: FileType | None,
+    reader_options: Optional[dict] = {
+        "storage_options": {"key": "", "secret": "", "anon": True}
+    },
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -50,10 +55,15 @@ def read_kerchunk_references_from_file(
     filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
+    reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
+        so ensure reader_options match selected Kerchunk reader arguments.
     """
 
     if filetype is None:
-        filetype = _automatically_determine_filetype(filepath)
+        filetype = _automatically_determine_filetype(
+            filepath=filepath, reader_options=reader_options
+        )
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -61,12 +71,14 @@ def read_kerchunk_references_from_file(
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
 
-        refs = NetCDF3ToZarr(filepath, inline_threshold=0).translate()
+        refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
     elif filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
-        refs = SingleHdf5ToZarr(filepath, inline_threshold=0).translate()
+        refs = SingleHdf5ToZarr(
+            filepath, inline_threshold=0, **reader_options
+        ).translate()
     elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
@@ -74,11 +86,11 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, inline_threshold=0)
+        refs = tiff_to_zarr(filepath, inline_threshold=0, **reader_options)
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, inline_threshold=0)
+        refs = process_file(filepath, inline_threshold=0, **reader_options)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
@@ -86,20 +98,24 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def _automatically_determine_filetype(filepath: str) -> FileType:
+def _automatically_determine_filetype(
+    *, filepath: str, reader_options: Optional[dict] = {}
+) -> FileType:
     file_extension = Path(filepath).suffix
+    fpath = _fsspec_openfile_from_filepath(
+        filepath=filepath, reader_options=reader_options
+    )
 
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        with open(filepath, "rb") as f:
-            magic = f.read()
+        magic = fpath.read()
+
         if magic[0:3] == b"CDF":
             filetype = FileType.netcdf3
         elif magic[1:4] == b"HDF":
             filetype = FileType.netcdf4
         else:
             raise ValueError(".nc file does not appear to be NETCDF3 OR NETCDF4")
-
     elif file_extension == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
@@ -112,6 +128,7 @@ def _automatically_determine_filetype(filepath: str) -> FileType:
     else:
         raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
 
+    fpath.close()
     return filetype
 
 
