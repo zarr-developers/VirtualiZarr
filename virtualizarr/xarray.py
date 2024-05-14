@@ -2,6 +2,7 @@ from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
     Literal,
+    Optional,
     overload,
 )
 

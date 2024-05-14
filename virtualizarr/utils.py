@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from fsspec.implementations.local import LocalFileOpener
@@ -13,7 +13,7 @@ def _fsspec_openfile_from_filepath(
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
-) -> Union[S3File, LocalFileOpener]:
+) -> S3File | LocalFileOpener:
     """Converts input filepath to fsspec openfile object.
 
     Parameters
@@ -25,7 +25,7 @@ def _fsspec_openfile_from_filepath(
 
     Returns
     -------
-    Union[S3File, LocalFileOpener]
+    S3File | LocalFileOpener
         Either S3File or LocalFileOpener, depending on which protocol was supplied.
 
     Raises

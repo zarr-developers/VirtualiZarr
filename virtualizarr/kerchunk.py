@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import NewType, cast
+from typing import NewType, Optional, cast
 
 import ujson  # type: ignore
 import xarray as xr
@@ -40,11 +40,10 @@ class FileType(AutoName):
 
 def read_kerchunk_references_from_file(
     filepath: str,
-    filepath: str, filetype: FileType | None
+    filetype: FileType | None,
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
-
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
