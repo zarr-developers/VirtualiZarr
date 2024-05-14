@@ -27,6 +27,7 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.xarray.open_virtual_dataset>` will attempt to automatically infer it.)
 
+
 ```{note}
 In future we would like for it to be possible to just use `xr.open_dataset`, e.g.
 
@@ -60,6 +61,17 @@ Attributes:
 ```
 
 These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+### Opening remote files
+
+To open remote files as virtual datasets pass the `reader_options` options, e.g.
+
+```python
+
+aws_credentials = {"key": "", "secret": ""}
+vds = open_virtual_dataset("s3://fake-bucket/file.nc", reader_options={'storage_options':aws_credentials})
+
+```
 
 ## Chunk Manifests
 
