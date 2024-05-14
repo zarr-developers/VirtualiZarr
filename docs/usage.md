@@ -67,10 +67,8 @@ These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects a
 To open remote files as virtual datasets pass the `reader_options` options, e.g.
 
 ```python
-
-aws_credentials = {"key": "", "secret": ""}
-vds = open_virtual_dataset("s3://fake-bucket/file.nc", reader_options={'storage_options':aws_credentials})
-
+aws_credentials = {"key": ..., "secret": ...}
+vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
 ```
 
 ## Chunk Manifests
