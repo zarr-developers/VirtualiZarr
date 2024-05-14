@@ -1,4 +1,3 @@
-import ast
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -116,16 +115,17 @@ class DMRParser:
 
     def parse_chunks(self, root, chunks: tuple) -> dict:
         chunkmanifest = {}
+        default_num = [0 for i in range(len(chunks))]
+        chunk_key_template = ".".join(["{}" for i in range(len(chunks))])
         for r in root.iterfind(self.dmr_namespace + "chunk"):
-            chunk_pos = (
-                np.zeros(len(chunks), dtype=int)
-                if "chunkPositionInArray" not in r.attrib
-                else np.asarray(ast.literal_eval(r.attrib["chunkPositionInArray"]))
-            )
-            chunk_num = (
-                chunk_pos // chunks
-            )  # [0,1023,10235] // [1, 1023, 2047] -> [0,1,5]
-            chunk_key = ".".join(map(str, chunk_num))  # [0,0,1] -> "0.0.1"
+            chunk_num = default_num
+            if "chunkPositionInArray" in r.attrib:
+                # [0,1023,10235] // [1, 1023, 2047] -> [0,1,5]
+                chunk_pos = r.attrib["chunkPositionInArray"][1:-1].split(",")
+                chunk_num = [int(chunk_pos[i]) // chunks[i]
+                             for i in range(len(chunks))]
+            # [0,0,1] -> "0.0.1"
+            chunk_key = chunk_key_template.format(*chunk_num)
             chunkmanifest[chunk_key] = {
                 "path": self.data_filepath,
                 "offset": int(r.attrib["offset"]),
