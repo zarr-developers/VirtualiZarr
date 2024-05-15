@@ -24,7 +24,7 @@ def test_kerchunk_roundtrip(tmpdir, format):
     ds.to_netcdf(f"{tmpdir}/air.nc")
 
     # use open_virtual_dataset to read it as references
-    vds = open_virtual_dataset(f"{tmpdir}/air.nc")
+    vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
 
     # write those references to disk as kerchunk json
     vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
