@@ -14,20 +14,22 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-    "xarray@git+https://github.com/TomNicholas/xarray.git@concat-avoid-index-auto-creation#egg=xarray",
-    "kerchunk==0.2.2",
+    "xarray>=2024.5.0",
+    "kerchunk>=0.2.5",
     "h5netcdf",
     "pydantic",
     "numpy",
     "ujson",
     "packaging",
+    "universal-pathlib"
+
 ]
 
 [project.optional-dependencies]
@@ -40,6 +42,7 @@ test = [
     "scipy",
     "pooch",
     "ruff",
+    "s3fs"
 
 ]
 

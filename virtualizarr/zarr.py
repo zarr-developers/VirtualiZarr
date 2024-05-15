@@ -3,13 +3,8 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Literal,
     NewType,
-    Optional,
-    Tuple,
-    Union,
 )
 
 import numpy as np
@@ -29,8 +24,8 @@ ZAttrs = NewType(
 
 
 class Codec(BaseModel):
-    compressor: Optional[str] = None
-    filters: Optional[List[Dict]] = None
+    compressor: str | None = None
+    filters: list[dict] | None = None
 
     def __repr__(self) -> str:
         return f"Codec(compressor={self.compressor}, filters={self.filters})"
@@ -45,14 +40,14 @@ class ZArray(BaseModel):
         arbitrary_types_allowed=True,  # only here so pydantic doesn't complain about the numpy dtype field
     )
 
-    chunks: Tuple[int, ...]
-    compressor: Optional[str] = None
+    chunks: tuple[int, ...]
+    compressor: str | None = None
     dtype: np.dtype
-    fill_value: Union[float, int] = np.NaN  # float or int?
-    filters: Optional[List[Dict]] = None
-    order: Union[Literal["C"], Literal["F"]]
-    shape: Tuple[int, ...]
-    zarr_format: Union[Literal[2], Literal[3]] = 2
+    fill_value: float | int | None = np.NaN  # float or int?
+    filters: list[dict] | None = None
+    order: Literal["C", "F"]
+    shape: tuple[int, ...]
+    zarr_format: Literal[2, 3] = 2
 
     @field_validator("dtype")
     @classmethod
@@ -189,7 +184,7 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
         metadata_file.write(json_dumps(metadata))
 
 
-def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) -> dict:
+def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) -> dict:
     """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
     # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
 
@@ -227,13 +222,13 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) ->
 
 
 def attrs_from_zarr_group_json(filepath: Path) -> dict:
-    with open(filepath, "r") as metadata_file:
+    with open(filepath) as metadata_file:
         attrs = json.load(metadata_file)
     return attrs["attributes"]
 
 
-def metadata_from_zarr_json(filepath: Path) -> Tuple[ZArray, List[str], dict]:
-    with open(filepath, "r") as metadata_file:
+def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
+    with open(filepath) as metadata_file:
         metadata = json.load(metadata_file)
 
     if {
