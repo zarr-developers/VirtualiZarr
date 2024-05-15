@@ -28,8 +28,7 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
-    "universal-pathlib"
-
+    "universal-pathlib",
 ]
 
 [project.optional-dependencies]
