@@ -35,15 +35,16 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "codecov",
-    "pre-commit",
-    "pytest-mypy",
-    "pytest-cov",
-    "pytest",
-    "scipy",
-    "pooch",
-    "ruff",
     "fastparquet",
-    "s3fs"
+    "netcdf4",
+    "pooch",
+    "pre-commit",
+    "pytest-cov",
+    "pytest-mypy",
+    "pytest",
+    "ruff",
+    "s3fs",
+    "scipy",
 ]
 
 
