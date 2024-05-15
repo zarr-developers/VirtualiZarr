@@ -43,10 +43,8 @@ test = [
     "pooch",
     "netcdf4-python",
     "scipy",
-    "pooch",
     "ruff",
-    "s3fs"
-
+    "s3fs",
 ]
 
 
