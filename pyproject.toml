@@ -40,7 +40,6 @@ test = [
     "pytest",
     "fsspec",
     "pooch",
-    "netcdf4-python",
     "scipy",
     "ruff",
     "fastparquet",
