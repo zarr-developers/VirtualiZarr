@@ -9,7 +9,7 @@ def netcdf4_file(tmpdir):
 
     # Save it to disk as netCDF (in temporary directory)
     filepath = f"{tmpdir}/air.nc"
-    ds.to_netcdf(filepath)
+    ds.to_netcdf(filepath, format="NETCDF4")
     ds.close()
 
     return filepath
