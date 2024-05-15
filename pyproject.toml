@@ -43,7 +43,8 @@ test = [
     "netcdf4-python",
     "scipy",
     "ruff",
-    "s3fs",
+    "fastparquet",
+    "s3fs"
 ]
 
 

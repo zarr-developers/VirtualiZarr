@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 import ujson  # type: ignore
 import xarray as xr
@@ -126,6 +127,47 @@ class TestAccessor:
             },
         }
         assert loaded_refs == expected_ds_refs
+
+    def test_accessor_to_kerchunk_parquet(self, tmp_path):
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=dict(
+                shape=(2, 4),
+                dtype=np.dtype("<i8"),
+                chunks=(2, 2),
+                compressor=None,
+                filters=None,
+                fill_value=None,
+                order="C",
+            ),
+        )
+        ds = xr.Dataset({"a": (["x", "y"], arr)})
+
+        filepath = tmp_path / "refs"
+
+        ds.virtualize.to_kerchunk(filepath, format="parquet", record_size=2)
+
+        with open(tmp_path / "refs" / ".zmetadata") as f:
+            meta = ujson.load(f)
+            assert list(meta) == ["metadata", "record_size"]
+            assert meta["record_size"] == 2
+
+        df0 = pd.read_parquet(filepath / "a" / "refs.0.parq")
+
+        assert df0.to_dict() == {
+            "offset": {0: 100, 1: 200},
+            "path": {
+                0: "foo.nc",
+                1: "foo.nc",
+            },
+            "size": {0: 100, 1: 100},
+            "raw": {0: None, 1: None},
+        }
 
 
 def test_kerchunk_roundtrip_in_memory_no_concat():
