@@ -321,21 +321,16 @@ Once we've combined references to all the chunks of all our legacy files into on
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
 
-To write out all the references in the virtual dataset as a single kerchunk-compliant JSON file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
 
 ```python
 combined_vds.virtualize.to_kerchunk('combined.json', format='json')
 ```
 
-These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (so you need kerchunk to be installed to use `engine='kerchunk'`).
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (kerchunk must be installed to use `engine='kerchunk'`).
 
 ```python
-import fsspec
-
-fs = fsspec.filesystem("reference", fo=f"combined.json")
-mapper = fs.get_mapper("")
-
-combined_ds = xr.open_dataset(mapper, engine="kerchunk")
+combined_ds = xr.open_dataset('combined.json', engine="kerchunk")
 ```
 
 In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes. This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
@@ -343,6 +338,20 @@ In-memory ("loadable") variables backed by numpy arrays can also be written out 
 ```{note}
 Currently you can only serialize in-memory variables to kerchunk references if they do not have any encoding.
 ```
+
+When you have many chunks, the reference file can get large enough to be unwieldy as json. In that case the references can be instead stored as parquet. Again this uses kerchunk internally.
+
+```python
+combined_vds.virtualize.to_kerchunk('combined.parq', format='parquet')
+```
+
+And again we can read these references using the "kerchunk" backend as if it were a regular Zarr store
+
+```python
+combined_ds = xr.open_dataset('combined.parq', engine="kerchunk")
+```
+
+By default references are placed in separate parquet file when the total number of references exceeds `record_size`. If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
 
 ### Writing as Zarr
 
