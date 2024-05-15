@@ -27,6 +27,7 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.xarray.open_virtual_dataset>` will attempt to automatically infer it.)
 
+
 ```{note}
 In future we would like for it to be possible to just use `xr.open_dataset`, e.g.
 
@@ -60,6 +61,15 @@ Attributes:
 ```
 
 These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+### Opening remote files
+
+To open remote files as virtual datasets pass the `reader_options` options, e.g.
+
+```python
+aws_credentials = {"key": ..., "secret": ...}
+vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
+```
 
 ## Chunk Manifests
 
@@ -140,7 +150,7 @@ concatenated.manifest.dict()
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
 
 ```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
 Remember that you cannot load values from a `ManifestArray` directly.
@@ -205,10 +215,6 @@ Indexes:
     *empty*
 ```
 
-```{note}
-Passing `indexes={}` will only work if you use a [specific branch of xarray](https://github.com/TomNicholas/xarray/tree/concat-no-indexes), as it requires multiple in-progress PR's, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
-```
-
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
 
 ```
@@ -246,7 +252,7 @@ combined_vds['air'].data.manifest.dict()
 The keyword arguments `coords='minimal', compat='override'` are currently necessary because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 ```
 
-The general multi-dimensional version of this contatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
+The general multi-dimensional version of this concatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
 
 ```python
 combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='minimal', compat='override')
@@ -303,7 +309,7 @@ Attributes:
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects, and loadable variables backed by (lazy) numpy arrays.
 
 Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a muilti-dimensional variable in order to decide what to do next,
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
 
@@ -338,6 +344,25 @@ Currently you can only serialize virtual variables backed by `ManifestArray` obj
 
 ### Writing as Zarr
 
-TODO: Write out references as a Zarr v3 store following the [Chunk Manifest ZEP](https://github.com/zarr-developers/zarr-specs/issues/287), see [PR #45](https://github.com/TomNicholas/VirtualiZarr/pull/45)
+Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`ds.virtualize.to_zarr <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
 
-TODO: Explanation of how this requires changes in zarr upstream to be able to read it
+```python
+combined_vds.virtualize.to_zarr('combined.zarr')
+```
+
+The result is a zarr v3 store on disk which contains the chunk manifest information written out as `manifest.json` files, so the store looks like this:
+
+```
+combined/zarr.json  <- group metadata
+combined/air/zarr.json  <- array metadata
+combined/air/manifest.json <- array manifest
+...
+```
+
+The advantage of this format is that any zarr v3 reader that understands the chunk manifest ZEP could read from this store, no matter what language it is written in (e.g. via `zarr-python`, `zarr-js`, or rust). This reading would also not require `fsspec`.
+
+```{note}
+Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
+
+This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+```

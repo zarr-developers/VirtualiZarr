@@ -13,7 +13,7 @@ def test_kerchunk_roundtrip_no_concat(tmpdir):
     ds.to_netcdf(f"{tmpdir}/air.nc")
 
     # use open_dataset_via_kerchunk to read it as references
-    vds = open_virtual_dataset(f"{tmpdir}/air.nc")
+    vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
 
     # write those references to disk as kerchunk json
     vds.virtualize.to_kerchunk(f"{tmpdir}/refs.json", format="json")
@@ -42,8 +42,8 @@ def test_kerchunk_roundtrip_concat(tmpdir):
     ds2.to_netcdf(f"{tmpdir}/air2.nc")
 
     # use open_dataset_via_kerchunk to read it as references
-    vds1 = open_virtual_dataset(f"{tmpdir}/air1.nc")
-    vds2 = open_virtual_dataset(f"{tmpdir}/air2.nc")
+    vds1 = open_virtual_dataset(f"{tmpdir}/air1.nc", indexes={})
+    vds2 = open_virtual_dataset(f"{tmpdir}/air2.nc", indexes={})
 
     # concatenate virtually along time
     vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
@@ -62,3 +62,13 @@ def test_kerchunk_roundtrip_concat(tmpdir):
 
     # assert equal to original dataset
     xrt.assert_equal(roundtrip, ds)
+
+
+def test_open_scalar_variable(tmpdir):
+    # regression test for GH issue #100
+
+    ds = xr.Dataset(data_vars={"a": 0})
+    ds.to_netcdf(f"{tmpdir}/scalar.nc")
+
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc")
+    assert vds["a"].shape == ()

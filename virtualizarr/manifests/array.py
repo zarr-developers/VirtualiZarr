@@ -1,13 +1,12 @@
-import re
 import warnings
-from typing import Any, Tuple, Union
+from typing import Any, Union
 
 import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
 from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS
-from .manifest import _CHUNK_KEY, ChunkManifest
+from .manifest import ChunkManifest
 
 
 class ManifestArray:
@@ -27,8 +26,8 @@ class ManifestArray:
 
     def __init__(
         self,
-        zarray: Union[ZArray, dict],
-        chunkmanifest: Union[dict, ChunkManifest],
+        zarray: ZArray | dict,
+        chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
         Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
@@ -54,30 +53,20 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
             )
 
-        # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
-        if _zarray.shape_chunk_grid != _chunkmanifest.shape_chunk_grid:
-            raise ValueError(
-                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {_chunkmanifest.shape_chunk_grid}"
-            )
-
         self._zarray = _zarray
         self._manifest = _chunkmanifest
 
     @classmethod
     def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
-        from virtualizarr.kerchunk import fully_decode_arr_refs
+        from virtualizarr.kerchunk import fully_decode_arr_refs, parse_array_refs
 
         decoded_arr_refs = fully_decode_arr_refs(arr_refs)
 
-        zarray = ZArray.from_kerchunk_refs(decoded_arr_refs[".zarray"])
-
-        kerchunk_chunk_dict = {
-            k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)
-        }
-        chunkmanifest = ChunkManifest._from_kerchunk_chunk_dict(kerchunk_chunk_dict)
+        chunk_dict, zarray, _zattrs = parse_array_refs(decoded_arr_refs)
+        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
 
         obj = object.__new__(cls)
-        obj._manifest = chunkmanifest
+        obj._manifest = manifest
         obj._zarray = zarray
 
         return obj
@@ -91,7 +80,7 @@ class ManifestArray:
         return self._zarray
 
     @property
-    def chunks(self) -> Tuple[int, ...]:
+    def chunks(self) -> tuple[int, ...]:
         return tuple(self.zarray.chunks)
 
     @property
