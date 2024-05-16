@@ -41,7 +41,10 @@ def _fsspec_openfile_from_filepath(
     protocol = universal_filepath.protocol
 
     if protocol == "":
-        fpath = fsspec.open(filepath, "rb").open()
+        # import pdb; pdb.set_trace()
+        fpath = fsspec.open(universal_filepath, "rb")
+        if universal_filepath.is_file():
+            fpath = fpath.open()
 
     elif protocol in ["s3"]:
         s3_anon_defaults = {"key": "", "secret": "", "anon": True}
@@ -53,8 +56,9 @@ def _fsspec_openfile_from_filepath(
 
             # using dict merge operator to add in defaults if keys are not specified
             storage_options = s3_anon_defaults | storage_options
-
-        fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
+        fpath = fsspec.filesystem(protocol, **storage_options)
+        if universal_filepath.is_file():
+            fpath = fpath.open(filepath)
 
     else:
         raise NotImplementedError(
