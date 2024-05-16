@@ -14,7 +14,6 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.dmrpp import DMRParser
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
@@ -38,6 +37,7 @@ def open_virtual_dataset(
     loadable_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
+    group: Optional[str] = None,
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
@@ -69,6 +69,8 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
+    group : str, default None
+        Group path within the dataset to open. For example netcdf4 and hdf5 groups
     reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
@@ -104,9 +106,13 @@ def open_virtual_dataset(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
     if filetype == "dmr++":
-        with open(filepath, "rb") as f:
-            parser = DMRParser(f.read())
-            return parser.parse_dataset()
+        from virtualizarr.readers.dmrpp import DMRParser
+
+        fpath = _fsspec_openfile_from_filepath(
+            filepath=filepath, reader_options=reader_options
+        )
+        parser = DMRParser(fpath.read())
+        return parser.parse(group=group)
     else:
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
