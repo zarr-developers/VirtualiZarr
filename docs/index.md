@@ -82,5 +82,5 @@ installation
 usage
 faq
 api
-
+releases
 ```
