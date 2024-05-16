@@ -41,7 +41,6 @@ def _fsspec_openfile_from_filepath(
     protocol = universal_filepath.protocol
 
     if protocol == "":
-        # import pdb; pdb.set_trace()
         fpath = fsspec.open(universal_filepath, "rb")
         if universal_filepath.is_file():
             fpath = fpath.open()
