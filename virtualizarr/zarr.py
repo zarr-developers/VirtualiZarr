@@ -43,7 +43,7 @@ class ZArray(BaseModel):
     chunks: tuple[int, ...]
     compressor: str | None = None
     dtype: np.dtype
-    fill_value: float | None = None  # float or int?
+    fill_value: float | int | None = np.NaN  # float or int?
     filters: list[dict] | None = None
     order: Literal["C", "F"]
     shape: tuple[int, ...]
@@ -73,13 +73,16 @@ class ZArray(BaseModel):
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
-        # TODO should we be doing some type coercion on the 'fill_value' here?
+        # coerce type of fill_value as kerchunk can be inconsistent with this
+        fill_value = decoded_arr_refs_zarray["fill_value"]
+        if fill_value is None or fill_value == "NaN":
+            fill_value = np.NaN
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=decoded_arr_refs_zarray["compressor"],
             dtype=np.dtype(decoded_arr_refs_zarray["dtype"]),
-            fill_value=decoded_arr_refs_zarray["fill_value"],
+            fill_value=fill_value,
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
@@ -88,7 +91,12 @@ class ZArray(BaseModel):
 
     def dict(self) -> dict[str, Any]:
         zarray_dict = dict(self)
+
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
+
+        if zarray_dict["fill_value"] is np.NaN:
+            zarray_dict["fill_value"] = None
+
         return zarray_dict
 
     def to_kerchunk_json(self) -> str:
@@ -238,11 +246,16 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
 
     chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
 
+    if metadata["fill_value"] is None:
+        fill_value = np.NaN
+    else:
+        fill_value = metadata["fill_value"]
+
     zarray = ZArray(
         chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
         compressor=metadata["codecs"],
         dtype=np.dtype(metadata["data_type"]),
-        fill_value=metadata["fill_value"],
+        fill_value=fill_value,
         filters=metadata.get("filters", None),
         order="C",
         shape=chunk_shape,

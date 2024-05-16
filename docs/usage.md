@@ -333,8 +333,10 @@ These references can now be interpreted like they were a Zarr store by [fsspec](
 combined_ds = xr.open_dataset('combined.json', engine="kerchunk")
 ```
 
+In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes. This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
+
 ```{note}
-Currently you can only serialize virtual variables backed by `ManifestArray` objects to kerchunk reference files, not real in-memory numpy-backed variables.
+Currently you can only serialize in-memory variables to kerchunk references if they do not have any encoding.
 ```
 
 When you have many chunks, the reference file can get large enough to be unwieldy as json. In that case the references can be instead stored as parquet. Again this uses kerchunk internally.

@@ -35,15 +35,16 @@ dependencies = [
 test = [
     "codecov",
     "pre-commit",
+    "ruff",
     "pytest-mypy",
     "pytest-cov",
     "pytest",
-    "fsspec",
     "pooch",
     "scipy",
-    "ruff",
+    "netcdf4",
+    "fsspec",
+    "s3fs",
     "fastparquet",
-    "s3fs"
 ]
 
 

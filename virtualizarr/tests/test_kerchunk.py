@@ -40,7 +40,7 @@ def test_dataset_from_df_refs():
 
     assert da.data.zarray.compressor is None
     assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is None
+    assert da.data.zarray.fill_value is np.NaN
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {
@@ -76,7 +76,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=None,
+                fill_value=np.NaN,
                 order="C",
             ),
         )
@@ -86,6 +86,7 @@ class TestAccessor:
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
@@ -104,7 +105,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=None,
+                fill_value=np.NaN,
                 order="C",
             ),
         )
@@ -121,6 +122,7 @@ class TestAccessor:
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
@@ -184,7 +186,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=None,
+            fill_value=np.NaN,
             order="C",
         ),
         chunkmanifest=manifest,
