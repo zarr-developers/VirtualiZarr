@@ -66,12 +66,10 @@ class TestKerchunkRoundtrip:
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False).isel(
-            time=slice(None, 2000)
-        )
+        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
 
         # split into two datasets
-        ds1, ds2 = ds.isel(time=slice(None, 1000)), ds.isel(time=slice(1000, None))
+        ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
 
         # save it to disk as netCDF (in temporary directory)
         ds1.to_netcdf(f"{tmpdir}/air1.nc")
