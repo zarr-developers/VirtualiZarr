@@ -28,23 +28,23 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
-    "universal-pathlib"
-
+    "universal-pathlib",
 ]
 
 [project.optional-dependencies]
 test = [
     "codecov",
-    "fastparquet",
-    "netcdf4",
-    "pooch",
     "pre-commit",
-    "pytest-cov",
-    "pytest-mypy",
-    "pytest",
     "ruff",
-    "s3fs",
+    "pytest-mypy",
+    "pytest-cov",
+    "pytest",
+    "pooch",
     "scipy",
+    "netcdf4",
+    "fsspec",
+    "s3fs",
+    "fastparquet",
 ]
 
 
