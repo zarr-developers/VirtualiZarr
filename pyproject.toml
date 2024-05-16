@@ -28,8 +28,7 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
-    "universal-pathlib"
-
+    "universal-pathlib",
 ]
 
 [project.optional-dependencies]
@@ -39,8 +38,9 @@ test = [
     "pytest-mypy",
     "pytest-cov",
     "pytest",
-    "scipy",
+    "fsspec",
     "pooch",
+    "scipy",
     "ruff",
     "fastparquet",
     "s3fs"
