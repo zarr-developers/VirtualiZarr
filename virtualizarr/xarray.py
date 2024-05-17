@@ -108,6 +108,7 @@ def open_virtual_dataset(
         vds_refs = kerchunk.read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
+            reader_options=reader_options,
         )
         virtual_vars = virtual_vars_from_kerchunk_refs(
             vds_refs,
