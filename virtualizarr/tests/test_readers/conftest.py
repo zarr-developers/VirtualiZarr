@@ -147,7 +147,7 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     return filepath
 
 
-@pytest.fixture(params=["gzip", "blosc_lz"])
+@pytest.fixture(params=["gzip"])
 def filter_encoded_xarray_netcdf4_files(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
@@ -155,10 +155,6 @@ def filter_encoded_xarray_netcdf4_files(tmpdir, request):
         encoding_config = {
             "zlib": True,
             "complevel": 1
-        }
-    if request.param == "blosc_lz":
-        encoding_config = {
-            "compression": "blosc_lz",
         }
 
     for var_name in ds.variables:

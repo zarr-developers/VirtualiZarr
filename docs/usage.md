@@ -27,6 +27,7 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.xarray.open_virtual_dataset>` will attempt to automatically infer it.)
 
+
 ```{note}
 In future we would like for it to be possible to just use `xr.open_dataset`, e.g.
 
@@ -60,6 +61,15 @@ Attributes:
 ```
 
 These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+### Opening remote files
+
+To open remote files as virtual datasets pass the `reader_options` options, e.g.
+
+```python
+aws_credentials = {"key": ..., "secret": ...}
+vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
+```
 
 ## Chunk Manifests
 
@@ -140,7 +150,7 @@ concatenated.manifest.dict()
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
 
 ```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatentation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
 ```
 
 Remember that you cannot load values from a `ManifestArray` directly.
@@ -228,10 +238,6 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-```{note}
-Concatenation without indexes like this will only work if you use a [specific branch of xarray](https://github.com/pydata/xarray/pull/8872), as it requires an in-progress PR, see [GH issue #14](https://github.com/TomNicholas/VirtualiZarr/issues/14#issuecomment-2018369470).
-```
-
 We can see that the resulting combined manifest has two chunks, as expected.
 
 ```python
@@ -246,7 +252,7 @@ combined_vds['air'].data.manifest.dict()
 The keyword arguments `coords='minimal', compat='override'` are currently necessary because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 ```
 
-The general multi-dimensional version of this contatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
+The general multi-dimensional version of this concatenation-by-order-supplied can be achieved using `xarray.combine_nested`.
 
 ```python
 combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='minimal', compat='override')
@@ -303,7 +309,7 @@ Attributes:
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects, and loadable variables backed by (lazy) numpy arrays.
 
 Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a muilti-dimensional variable in order to decide what to do next,
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
 
@@ -315,26 +321,37 @@ Once we've combined references to all the chunks of all our legacy files into on
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
 
-To write out all the references in the virtual dataset as a single kerchunk-compliant JSON file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
 
 ```python
 combined_vds.virtualize.to_kerchunk('combined.json', format='json')
 ```
 
-These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (so you need kerchunk to be installed to use `engine='kerchunk'`).
+These references can now be interpreted like they were a Zarr store by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (kerchunk must be installed to use `engine='kerchunk'`).
 
 ```python
-import fsspec
-
-fs = fsspec.filesystem("reference", fo=f"combined.json")
-mapper = fs.get_mapper("")
-
-combined_ds = xr.open_dataset(mapper, engine="kerchunk")
+combined_ds = xr.open_dataset('combined.json', engine="kerchunk")
 ```
+
+In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes. This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
 
 ```{note}
-Currently you can only serialize virtual variables backed by `ManifestArray` objects to kerchunk reference files, not real in-memory numpy-backed variables.
+Currently you can only serialize in-memory variables to kerchunk references if they do not have any encoding.
 ```
+
+When you have many chunks, the reference file can get large enough to be unwieldy as json. In that case the references can be instead stored as parquet. Again this uses kerchunk internally.
+
+```python
+combined_vds.virtualize.to_kerchunk('combined.parq', format='parquet')
+```
+
+And again we can read these references using the "kerchunk" backend as if it were a regular Zarr store
+
+```python
+combined_ds = xr.open_dataset('combined.parq', engine="kerchunk")
+```
+
+By default references are placed in separate parquet file when the total number of references exceeds `record_size`. If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
 
 ### Writing as Zarr
 

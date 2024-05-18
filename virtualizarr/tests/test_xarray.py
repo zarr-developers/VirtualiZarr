@@ -1,6 +1,7 @@
-from typing import Mapping
+from collections.abc import Mapping
 
 import numpy as np
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 from xarray.core.indexes import Index
@@ -268,6 +269,24 @@ class TestCombineUsingIndexes:
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
 
+pytest.importorskip("s3fs")
+
+
+@pytest.mark.parametrize(
+    "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
+)
+@pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
+def test_anon_read_s3(filetype, indexes):
+    """Parameterized tests for empty vs supplied indexes and filetypes."""
+    # TODO: Switch away from this s3 url after minIO is implemented.
+    fpath = "s3://carbonplan-share/virtualizarr/local.nc"
+    vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
+
+    assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+    for var in vds.variables:
+        assert isinstance(vds[var].data, ManifestArray), var
+
+
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ["air", "time"]
@@ -280,6 +299,7 @@ class TestLoadVirtualDataset:
                 assert isinstance(vds[name].data, ManifestArray), name
 
         full_ds = xr.open_dataset(netcdf4_file)
+
         for name in full_ds.variables:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
