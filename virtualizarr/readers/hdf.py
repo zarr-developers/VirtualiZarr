@@ -36,15 +36,11 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
             key_list = [0] * (len(dataset.shape) or 1)
             key = ".".join(map(str, key_list))
             chunk_entry = ChunkEntry(
-                path=path,
-                offset=dsid.get_offset(),
-                length=dsid.get_storage_size()
+                path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
             )
             chunk_key = ChunkKey(key)
             chunk_entries = {chunk_key: chunk_entry}
-            chunk_manifest = ChunkManifest(
-                entries=chunk_entries
-            )
+            chunk_manifest = ChunkManifest(entries=chunk_entries)
             return chunk_manifest
     else:
         num_chunks = dsid.get_num_chunks()
@@ -60,9 +56,7 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
 
         def store_chunk_entry(blob):
             chunk_entries[get_key(blob)] = ChunkEntry(
-                path=path,
-                offset=blob.byte_offset,
-                length=blob.size
+                path=path, offset=blob.byte_offset, length=blob.size
             )
 
         has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
@@ -72,9 +66,7 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
             for index in range(num_chunks):
                 store_chunk_entry(dsid.get_chunk_info(index))
 
-        chunk_manifest = ChunkManifest(
-            entries=chunk_entries
-        )
+        chunk_manifest = ChunkManifest(entries=chunk_entries)
         return chunk_manifest
 
 

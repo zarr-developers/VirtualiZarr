@@ -7,11 +7,9 @@ from virtualizarr.kerchunk import FileType
 
 
 class TestIntegration:
-    def test_filters_end_to_end(self, tmpdir,
-                                    filter_encoded_xarray_netcdf4_files):
+    def test_filters_end_to_end(self, tmpdir, filter_encoded_xarray_netcdf4_files):
         virtual_ds = virtualizarr.open_virtual_dataset(
-            filter_encoded_xarray_netcdf4_files,
-            filetype=FileType("netcdf4")
+            filter_encoded_xarray_netcdf4_files, filetype=FileType("netcdf4")
         )
         kerchunk_file = f"{tmpdir}/kerchunk.json"
         virtual_ds.virtualize.to_kerchunk(kerchunk_file, format="json")

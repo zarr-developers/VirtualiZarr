@@ -138,12 +138,15 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
     if request.param == "gzip":
-        f.create_dataset(name="data", data=np_uncompressed, compression="gzip", compression_opts=1)
+        f.create_dataset(
+            name="data", data=np_uncompressed, compression="gzip", compression_opts=1
+        )
     if request.param == "blosc":
-        f.create_dataset(name="data", data=np_uncompressed,
-                         **hdf5plugin.Blosc(
-                             cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE
-                         ))
+        f.create_dataset(
+            name="data",
+            data=np_uncompressed,
+            **hdf5plugin.Blosc(cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE),
+        )
     return filepath
 
 
@@ -152,10 +155,7 @@ def filter_encoded_xarray_netcdf4_files(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
     if request.param == "gzip":
-        encoding_config = {
-            "zlib": True,
-            "complevel": 1
-        }
+        encoding_config = {"zlib": True, "complevel": 1}
 
     for var_name in ds.variables:
         encoding[var_name] = encoding_config
