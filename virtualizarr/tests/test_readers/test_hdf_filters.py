@@ -36,7 +36,7 @@ class TestCodecsFromDataSet:
         ds = f["data"]
         chunk_info = ds.id.get_chunk_info(0)
         codecs = codecs_from_dataset(ds)
-        with open(filter_encoded_netcdf4_file, 'rb') as file:
+        with open(filter_encoded_netcdf4_file, "rb") as file:
             file.seek(chunk_info.byte_offset)
             bytes_read = file.read(chunk_info.size)
             decoded = codecs[0].decode(bytes_read)

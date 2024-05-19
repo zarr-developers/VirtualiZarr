@@ -20,8 +20,8 @@ from virtualizarr.kerchunk import (
     _automatically_determine_filetype,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.readers.hdf import attrs_from_root_group, virtual_vars_from_hdf
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,
@@ -109,8 +109,7 @@ def open_virtual_dataset(
     if filetype.name.lower() == "netcdf4":
         print("wat")
         virtual_vars = virtual_vars_from_hdf(
-            path=filepath,
-            drop_variables=drop_variables
+            path=filepath, drop_variables=drop_variables
         )
         ds_attrs = attrs_from_root_group(path=filepath)
     if filetype == "zarr_v3":

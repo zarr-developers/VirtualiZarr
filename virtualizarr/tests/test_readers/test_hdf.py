@@ -105,8 +105,5 @@ class TestVirtualVarsFromHDF:
             virtual_vars_from_hdf(group_netcdf4_file)
 
     def test_drop_variables(self, multiple_datasets_netcdf4_file):
-        variables = virtual_vars_from_hdf(
-            multiple_datasets_netcdf4_file,
-            ["data2"]
-        )
+        variables = virtual_vars_from_hdf(multiple_datasets_netcdf4_file, ["data2"])
         assert "data2" not in variables.keys()
