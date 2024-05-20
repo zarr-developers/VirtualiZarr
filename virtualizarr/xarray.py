@@ -1,3 +1,4 @@
+import datetime
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
@@ -32,9 +33,11 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 
 def open_virtual_dataset(
     filepath: str,
+    *,
     filetype: FileType | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
+    cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
     reader_options: Optional[dict] = {
@@ -68,6 +71,11 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
+    cftime_variables : list[str], default is None
+        Interpret the value of specified vars using cftime, returning a datetime.
+        These will be automatically re-encoded with cftime, unless you specify an “M8[*]”
+        dtype for the coordinate, in which case a conversion will be attempted. This list must be a subset
+        of ``loadable_variables``.
     reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
@@ -93,6 +101,18 @@ def open_virtual_dataset(
     common = set(drop_variables).intersection(set(loadable_variables))
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
+
+    if cftime_variables is None:
+        cftime_variables = []
+    elif isinstance(cftime_variables, str):
+        cftime_variables = [cftime_variables]
+    else:
+        cftime_variables = list(cftime_variables)
+
+    if not set(cftime_variables).issubset(set(loadable_variables)):
+        raise ValueError(
+            "All ``cftime_variables`` must be included in ``loadable_variables``"
+        )
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
@@ -140,6 +160,29 @@ def open_virtual_dataset(
                 for name, var in ds.variables.items()
                 if name in loadable_variables
             }
+
+            for name in cftime_variables:
+                import cftime
+
+                calendar = ds[name].attrs.get(
+                    "calendar", ds[name].encoding.get("calendar", "standard")
+                )
+                units = ds[name].attrs.get("units", ds[name].encoding["units"])
+
+                # undoing CF recoding in original input
+                values = []
+                for c in ds[name].values:
+                    value = cftime.num2date(
+                        cftime.date2num(
+                            datetime.datetime.fromisoformat(str(c).split(".")[0]),
+                            calendar=calendar,
+                            units=units,
+                        ),
+                        calendar=calendar,
+                        units=units,
+                    )
+                    values.append(value)
+                loadable_vars[name] = loadable_vars[name].copy(data=values)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:

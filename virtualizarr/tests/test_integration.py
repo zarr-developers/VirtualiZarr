@@ -66,7 +66,10 @@ class TestKerchunkRoundtrip:
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
+        ds = xr.tutorial.open_dataset(
+            "air_temperature", decode_times=True
+        )  # .isel(time=slice(None, 2000))
+        del ds.time.encoding["units"]
 
         # split into two datasets
         ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
@@ -76,8 +79,18 @@ class TestKerchunkRoundtrip:
         ds2.to_netcdf(f"{tmpdir}/air2.nc")
 
         # use open_dataset_via_kerchunk to read it as references
-        vds1 = open_virtual_dataset(f"{tmpdir}/air1.nc", indexes={})
-        vds2 = open_virtual_dataset(f"{tmpdir}/air2.nc", indexes={})
+        vds1 = open_virtual_dataset(
+            f"{tmpdir}/air1.nc",
+            indexes={},
+            loadable_variables=["time"],
+            cftime_variables=["time"],
+        )
+        vds2 = open_virtual_dataset(
+            f"{tmpdir}/air2.nc",
+            indexes={},
+            loadable_variables=["time"],
+            cftime_variables=["time"],
+        )
 
         # concatenate virtually along time
         vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
