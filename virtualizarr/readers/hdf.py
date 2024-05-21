@@ -155,7 +155,7 @@ def _extract_attrs(h5obj: Union[h5py.Dataset, h5py.Group]):
             continue
 
         attrs[n] = v
-        return attrs
+    return attrs
 
 
 def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
