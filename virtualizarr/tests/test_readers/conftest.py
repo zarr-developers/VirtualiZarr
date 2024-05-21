@@ -93,12 +93,13 @@ def chunked_dimensions_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def string_attribute_netcdf4_file(tmpdir):
+def string_attributes_netcdf4_file(tmpdir):
     filepath = f"{tmpdir}/attributes.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
     f["data"].attrs["attribute_name"] = "attribute_name"
+    f["data"].attrs["attribute_name2"] = "attribute_name2"
     return filepath
 
 

@@ -75,16 +75,16 @@ class TestDatasetToVariable:
         var = _dataset_to_variable(single_dimension_scale_netcdf4_file, ds)
         assert var.chunks == (2,)
 
-    def test_dataset_attributes(self, string_attribute_netcdf4_file):
-        f = h5py.File(string_attribute_netcdf4_file)
+    def test_dataset_attributes(self, string_attributes_netcdf4_file):
+        f = h5py.File(string_attributes_netcdf4_file)
         ds = f["data"]
-        var = _dataset_to_variable(string_attribute_netcdf4_file, ds)
+        var = _dataset_to_variable(string_attributes_netcdf4_file, ds)
         assert var.attrs["attribute_name"] == "attribute_name"
 
 
 class TestExtractAttributes:
-    def test_string_attribute(self, string_attribute_netcdf4_file):
-        f = h5py.File(string_attribute_netcdf4_file)
+    def test_string_attribute(self, string_attributes_netcdf4_file):
+        f = h5py.File(string_attributes_netcdf4_file)
         ds = f["data"]
         attrs = _extract_attrs(ds)
         assert attrs["attribute_name"] == "attribute_name"
@@ -93,6 +93,12 @@ class TestExtractAttributes:
         f = h5py.File(root_attributes_netcdf4_file)
         attrs = _extract_attrs(f)
         assert attrs["attribute_name"] == "attribute_name"
+
+    def test_multiple_attributes(self, string_attributes_netcdf4_file):
+        f = h5py.File(string_attributes_netcdf4_file)
+        ds = f["data"]
+        attrs = _extract_attrs(ds)
+        assert len(attrs.keys()) == 2
 
 
 class TestVirtualVarsFromHDF:
