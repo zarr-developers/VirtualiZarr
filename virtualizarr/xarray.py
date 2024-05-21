@@ -107,11 +107,12 @@ def open_virtual_dataset(
     filetype = FileType(filetype)
 
     if filetype.name.lower() == "netcdf4":
-        print("wat")
         virtual_vars = virtual_vars_from_hdf(
-            path=filepath, drop_variables=drop_variables
+            path=filepath,
+            drop_variables=drop_variables,
+            reader_options=reader_options,
         )
-        ds_attrs = attrs_from_root_group(path=filepath)
+        ds_attrs = attrs_from_root_group(path=filepath, reader_options=reader_options)
     if filetype == "zarr_v3":
         # TODO is there a neat way of auto-detecting this?
         return open_virtual_dataset_from_v3_store(

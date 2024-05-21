@@ -1,6 +1,5 @@
 from typing import List, Mapping, Optional, Union
 
-import fsspec
 import h5py
 import numpy as np
 import xarray as xr
@@ -8,6 +7,7 @@ import xarray as xr
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.readers.hdf_filters import codecs_from_dataset
 from virtualizarr.types import ChunkKey
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import ZArray
 
 
@@ -185,11 +185,15 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
 def virtual_vars_from_hdf(
     path: str,
     drop_variables: Optional[List[str]] = None,
+    reader_options: Optional[dict] = {
+        "storage_options": {"key": "", "secret": "", "anon": True}
+    },
 ) -> Mapping[str, xr.Variable]:
     if drop_variables is None:
         drop_variables = []
-    fs, file_path = fsspec.core.url_to_fs(path)
-    open_file = fs.open(path, "rb")
+    open_file = _fsspec_openfile_from_filepath(
+        filepath=path, reader_options=reader_options
+    )
     f = h5py.File(open_file, mode="r")
     variables = {}
     for key in f.keys():
@@ -203,9 +207,15 @@ def virtual_vars_from_hdf(
     return variables
 
 
-def attrs_from_root_group(path: str):
-    fs, file_path = fsspec.core.url_to_fs(path)
-    open_file = fs.open(path, "rb")
+def attrs_from_root_group(
+    path: str,
+    reader_options: Optional[dict] = {
+        "storage_options": {"key": "", "secret": "", "anon": True}
+    },
+):
+    open_file = _fsspec_openfile_from_filepath(
+        filepath=path, reader_options=reader_options
+    )
     f = h5py.File(open_file, mode="r")
     attrs = _extract_attrs(f)
     return attrs
