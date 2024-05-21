@@ -101,82 +101,86 @@ def open_virtual_dataset(
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
-
-    if filetype is None:
-        filetype = _automatically_determine_filetype(filepath=filepath)
-    filetype = FileType(filetype)
-
-    if filetype.name.lower() == "netcdf4":
-        virtual_vars = virtual_vars_from_hdf(
-            path=filepath,
-            drop_variables=drop_variables,
-            reader_options=reader_options,
-        )
-        ds_attrs = attrs_from_root_group(path=filepath, reader_options=reader_options)
     if filetype == "zarr_v3":
         # TODO is there a neat way of auto-detecting this?
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
     else:
-        # this is the only place we actually always need to use kerchunk directly
-        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = kerchunk.read_kerchunk_references_from_file(
-            filepath=filepath,
-            filetype=filetype,
-        )
-        virtual_vars = virtual_vars_from_kerchunk_refs(
-            vds_refs,
-            drop_variables=drop_variables + loadable_variables,
-            virtual_array_class=virtual_array_class,
-        )
-        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+        if filetype is None:
+            filetype = _automatically_determine_filetype(filepath=filepath)
+        filetype = FileType(filetype)
 
-    if indexes is None or len(loadable_variables) > 0:
-        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        fpath = _fsspec_openfile_from_filepath(
-            filepath=filepath, reader_options=reader_options
-        )
-
-        ds = xr.open_dataset(fpath, drop_variables=drop_variables)
-
-        if indexes is None:
-            # add default indexes by reading data from file
-            indexes = {name: index for name, index in ds.xindexes.items()}
-        elif indexes != {}:
-            # TODO allow manual specification of index objects
-            raise NotImplementedError()
+        if filetype.name.lower() == "netcdf4":
+            virtual_vars = virtual_vars_from_hdf(
+                path=filepath,
+                drop_variables=drop_variables,
+                reader_options=reader_options,
+            )
+            ds_attrs = attrs_from_root_group(
+                path=filepath, reader_options=reader_options
+            )
         else:
-            indexes = dict(**indexes)  # for type hinting: to allow mutation
+            # this is the only place we actually always need to use kerchunk directly
+            # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
+            vds_refs = kerchunk.read_kerchunk_references_from_file(
+                filepath=filepath,
+                filetype=filetype,
+            )
+            virtual_vars = virtual_vars_from_kerchunk_refs(
+                vds_refs,
+                drop_variables=drop_variables + loadable_variables,
+                virtual_array_class=virtual_array_class,
+            )
+            ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(
+                ".zattrs", {}
+            )
 
-        loadable_vars = {
-            name: var
-            for name, var in ds.variables.items()
-            if name in loadable_variables
-        }
+        if indexes is None or len(loadable_variables) > 0:
+            # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+            # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+            # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
+            fpath = _fsspec_openfile_from_filepath(
+                filepath=filepath, reader_options=reader_options
+            )
 
-        # if we only read the indexes we can just close the file right away as nothing is lazy
-        if loadable_vars == {}:
-            ds.close()
-    else:
-        loadable_vars = {}
-        indexes = {}
+            ds = xr.open_dataset(fpath, drop_variables=drop_variables)
 
-    vars = {**virtual_vars, **loadable_vars}
+            if indexes is None:
+                # add default indexes by reading data from file
+                indexes = {name: index for name, index in ds.xindexes.items()}
+            elif indexes != {}:
+                # TODO allow manual specification of index objects
+                raise NotImplementedError()
+            else:
+                indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-    data_vars, coords = separate_coords(vars, indexes)
-    vds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+            loadable_vars = {
+                name: var
+                for name, var in ds.variables.items()
+                if name in loadable_variables
+            }
 
-    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+            # if we only read the indexes we can just close the file right away as nothing is lazy
+            if loadable_vars == {}:
+                ds.close()
+        else:
+            loadable_vars = {}
+            indexes = {}
 
-    return vds
+        vars = {**virtual_vars, **loadable_vars}
+
+        data_vars, coords = separate_coords(vars, indexes)
+        vds = xr.Dataset(
+            data_vars,
+            coords=coords,
+            # indexes={},  # TODO should be added in a later version of xarray
+            attrs=ds_attrs,
+        )
+
+        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+        return vds
 
 
 def open_virtual_dataset_from_v3_store(
