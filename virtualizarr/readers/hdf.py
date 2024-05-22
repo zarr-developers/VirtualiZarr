@@ -5,7 +5,7 @@ import numpy as np
 import xarray as xr
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
-from virtualizarr.readers.hdf_filters import codecs_from_dataset
+from virtualizarr.readers.hdf_filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import ZArray
@@ -163,11 +163,20 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
     chunks = dataset.chunks if dataset.chunks else dataset.shape
     codecs = codecs_from_dataset(dataset)
+    cfcodec = cfcodec_from_dataset(dataset)
+    attrs = _extract_attrs(dataset)
+    if cfcodec:
+        codecs.append(cfcodec["codec"])
+        dtype = cfcodec["target_dtype"]
+        attrs.pop("scale_factor", None)
+        attrs.pop("add_offset", None)
+    else:
+        dtype = dataset.dtype
     filters = [codec.get_config() for codec in codecs]
     zarray = ZArray(
         chunks=chunks,
         compressor=None,
-        dtype=dataset.dtype,
+        dtype=dtype,
         fill_value=dataset.fillvalue,
         filters=filters,
         order="C",
@@ -177,7 +186,6 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
     manifest = _dataset_chunk_manifest(path, dataset)
     marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
     dims = _dataset_dims(dataset)
-    attrs = _extract_attrs(dataset)
     variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
     return variable
 

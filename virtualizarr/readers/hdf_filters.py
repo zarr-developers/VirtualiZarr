@@ -1,10 +1,13 @@
-from typing import List, Tuple, Union
+from typing import List, Tuple, TypedDict, Union
 
 import h5py
 import hdf5plugin
 import numcodecs.registry as registry
+import numpy as np
 from numcodecs.abc import Codec
+from numcodecs.fixedscaleoffset import FixedScaleOffset
 from pydantic import BaseModel, validator
+from xarray.coding.variables import _choose_float_dtype
 
 _non_standard_filters = {"gzip": "zlib"}
 
@@ -22,6 +25,11 @@ class BloscProperties(BaseModel):
             for key, value in hdf5plugin._filters.Blosc._Blosc__COMPRESSIONS.items()
         }
         return blosc_compressor_codes[v]
+
+
+class CFCodec(TypedDict):
+    target_dtype: np.dtype
+    codec: Codec
 
 
 def _filter_to_codec(
@@ -59,6 +67,32 @@ def _filter_to_codec(
 
     codec = registry.get_codec(conf)
     return codec
+
+
+def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
+    attributes = {attr: dataset.attrs[attr] for attr in dataset.attrs}
+    mapping = {}
+    if "scale_factor" in attributes:
+        mapping["scale_factor"] = 1 / attributes["scale_factor"][0]
+    else:
+        mapping["scale_factor"] = 1
+    if "add_offset" in attributes:
+        mapping["add_offset"] = attributes["add_offset"]
+    else:
+        mapping["add_offset"] = 0
+    if mapping["scale_factor"] != 1 or mapping["add_offset"] != 0:
+        float_dtype = _choose_float_dtype(dtype=dataset.dtype, mapping=mapping)
+        target_dtype = np.dtype(float_dtype)
+        codec = FixedScaleOffset(
+            offset=mapping["add_offset"],
+            scale=mapping["scale_factor"],
+            dtype=target_dtype,
+            astype=dataset.dtype,
+        )
+        cfcodec = CFCodec(target_dtype=target_dtype, codec=codec)
+        return cfcodec
+    else:
+        return None
 
 
 def codecs_from_dataset(dataset: h5py.Dataset) -> List[Codec]:
