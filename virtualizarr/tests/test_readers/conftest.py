@@ -164,3 +164,13 @@ def filter_encoded_xarray_netcdf4_files(tmpdir, request):
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
     ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
     return filepath
+
+
+@pytest.fixture
+def add_offset_netcdf4_file(tmpdir):
+    filepath = f"{tmpdir}/offset.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.random((10, 10))
+    f.create_dataset(name="data", data=data, chunks=None)
+    f["data"].attrs.create(name="add_offset", data=5)
+    return filepath

@@ -1,9 +1,11 @@
 import h5py
 import numcodecs
+import numpy as np
 import pytest
 
 from virtualizarr.readers.hdf_filters import (
     _filter_to_codec,
+    cfcodec_from_dataset,
     codecs_from_dataset,
 )
 
@@ -41,3 +43,30 @@ class TestCodecsFromDataSet:
             bytes_read = file.read(chunk_info.size)
             decoded = codecs[0].decode(bytes_read)
             assert decoded == np_uncompressed.tobytes()
+
+
+class TestCFCodecFromDataset:
+    def test_no_cf_convention(self, filter_encoded_netcdf4_file):
+        f = h5py.File(filter_encoded_netcdf4_file)
+        ds = f["data"]
+        cf_codec = cfcodec_from_dataset(ds)
+        assert cf_codec is None
+
+    def test_cf_scale_factor(self, netcdf4_file):
+        f = h5py.File(netcdf4_file)
+        ds = f["air"]
+        cf_codec = cfcodec_from_dataset(ds)
+        assert cf_codec["target_dtype"] == np.dtype(np.float64)
+        assert cf_codec["codec"].scale == 100.0
+        assert cf_codec["codec"].offset == 0
+        assert cf_codec["codec"].dtype == "<f8"
+        assert cf_codec["codec"].astype == "<i2"
+
+    def test_cf_add_offset(self, add_offset_netcdf4_file):
+        f = h5py.File(add_offset_netcdf4_file)
+        ds = f["data"]
+        cf_codec = cfcodec_from_dataset(ds)
+        assert cf_codec["target_dtype"] == np.dtype(np.float64)
+        assert cf_codec["codec"].scale == 1
+        assert cf_codec["codec"].offset == 5
+        assert cf_codec["codec"].dtype == "<f8"
