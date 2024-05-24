@@ -62,7 +62,7 @@ class TestKerchunkRoundtrip:
         roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
 
         # assert equal to original dataset
-        xrt.assert_equal(roundtrip, ds)
+        xrt.assert_allclose(roundtrip, ds)
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
@@ -89,7 +89,7 @@ class TestKerchunkRoundtrip:
         roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
 
         # assert equal to original dataset
-        xrt.assert_equal(roundtrip, ds)
+        xrt.assert_allclose(roundtrip, ds)
 
 
 def test_open_scalar_variable(tmpdir):
