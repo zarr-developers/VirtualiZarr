@@ -166,8 +166,7 @@ def filter_encoded_xarray_netcdf4_file(tmpdir, request):
         encoding[var_name] = encoding_config
 
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
-    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
-    #  ds.to_netcdf(filepath, engine="netcdf4", encoding=encoding)
+    ds.to_netcdf(filepath, engine="netcdf4", encoding=encoding)
     return filepath
 
 
