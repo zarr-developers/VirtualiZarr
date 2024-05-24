@@ -134,7 +134,7 @@ def np_uncompressed():
     return np.arange(100)
 
 
-@pytest.fixture(params=["gzip", "blosc"])
+@pytest.fixture(params=["gzip", "blosc_lz4"])
 def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
@@ -142,7 +142,7 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
         f.create_dataset(
             name="data", data=np_uncompressed, compression="gzip", compression_opts=1
         )
-    if request.param == "blosc":
+    if request.param == "blosc_lz4":
         f.create_dataset(
             name="data",
             data=np_uncompressed,
@@ -151,18 +151,23 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     return filepath
 
 
-@pytest.fixture(params=["gzip"])
-def filter_encoded_xarray_netcdf4_files(tmpdir, request):
+@pytest.fixture(params=["gzip", "blosc_zlib"])
+def filter_encoded_xarray_netcdf4_file(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
     if request.param == "gzip":
         encoding_config = {"zlib": True, "complevel": 1}
+    if "blosc" in request.param:
+        encoding_config = {
+            "compression": request.param,
+        }
 
     for var_name in ds.variables:
         encoding[var_name] = encoding_config
 
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
     ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+    #  ds.to_netcdf(filepath, engine="netcdf4", encoding=encoding)
     return filepath
 
 
