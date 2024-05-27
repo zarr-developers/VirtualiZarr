@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from xarray.tests.test_dataset import create_test_data
+from xarray.util.print_versions import netcdf_and_hdf5_versions
 
 
 @pytest.fixture
@@ -181,6 +182,7 @@ def filter_encoded_xarray_netcdf4_file(tmpdir, request):
 
     ds["var2"].encoding.update(encoding_config)
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
+    print(netcdf_and_hdf5_versions())
     ds.to_netcdf(filepath, engine="netcdf4")
     return filepath
 
