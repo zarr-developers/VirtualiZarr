@@ -3,6 +3,7 @@ import hdf5plugin
 import numpy as np
 import pytest
 import xarray as xr
+from packaging.version import Version
 from xarray.tests.test_dataset import create_test_data
 from xarray.util.print_versions import netcdf_and_hdf5_versions
 
@@ -168,8 +169,17 @@ def filter_encoded_xarray_h5netcdf_file(tmpdir, request):
     return filepath
 
 
+@pytest.fixture()
+def skip_test_for_libhdf5_version():
+    versions = netcdf_and_hdf5_versions()
+    libhdf5_version = Version(versions[0][1])
+    return libhdf5_version < Version("1.14")
+
+
 @pytest.fixture(params=["blosc_zlib"])
-def filter_encoded_xarray_netcdf4_file(tmpdir, request):
+def filter_encoded_xarray_netcdf4_file(tmpdir, request, skip_test_for_libhdf5_version):
+    if skip_test_for_libhdf5_version:
+        pytest.skip("Requires libhdf5 >= 1.14")
     ds = create_test_data(dim_sizes=(20, 80, 10))
     if "blosc" in request.param:
         encoding_config = {
@@ -182,9 +192,8 @@ def filter_encoded_xarray_netcdf4_file(tmpdir, request):
 
     ds["var2"].encoding.update(encoding_config)
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
-    print(netcdf_and_hdf5_versions())
     ds.to_netcdf(filepath, engine="netcdf4")
-    return filepath
+    return {"filepath": filepath, "compressor": request.param}
 
 
 @pytest.fixture
