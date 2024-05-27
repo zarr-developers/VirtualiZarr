@@ -3,6 +3,7 @@ import hdf5plugin
 import numpy as np
 import pytest
 import xarray as xr
+from xarray.tests.test_dataset import create_test_data
 
 
 @pytest.fixture
@@ -151,22 +152,36 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     return filepath
 
 
-@pytest.fixture(params=["gzip", "blosc_zlib"])
-def filter_encoded_xarray_netcdf4_file(tmpdir, request):
+@pytest.fixture(params=["gzip"])
+def filter_encoded_xarray_h5netcdf_file(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
     if request.param == "gzip":
         encoding_config = {"zlib": True, "complevel": 1}
-    if "blosc" in request.param:
-        encoding_config = {
-            "compression": request.param,
-        }
 
     for var_name in ds.variables:
         encoding[var_name] = encoding_config
 
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
-    ds.to_netcdf(filepath, engine="netcdf4", encoding=encoding)
+    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+    return filepath
+
+
+@pytest.fixture(params=["blosc_zlib"])
+def filter_encoded_xarray_netcdf4_file(tmpdir, request):
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    if "blosc" in request.param:
+        encoding_config = {
+            "compression": request.param,
+            "chunksizes": (20, 40),
+            "original_shape": ds.var2.shape,
+            "blosc_shuffle": 1,
+            "fletcher32": False,
+        }
+
+    ds["var2"].encoding.update(encoding_config)
+    filepath = f"{tmpdir}/{request.param}_xarray.nc"
+    ds.to_netcdf(filepath, engine="netcdf4")
     return filepath
 
 

@@ -7,7 +7,23 @@ from virtualizarr.kerchunk import FileType
 
 
 class TestIntegration:
-    def test_filters_roundtrip(self, tmpdir, filter_encoded_xarray_netcdf4_file):
+    def test_filters_h5netcdf_roundtrip(
+        self, tmpdir, filter_encoded_xarray_h5netcdf_file
+    ):
+        virtual_ds = virtualizarr.open_virtual_dataset(
+            filter_encoded_xarray_h5netcdf_file, filetype=FileType("netcdf4")
+        )
+        kerchunk_file = f"{tmpdir}/kerchunk.json"
+        virtual_ds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        fs = fsspec.filesystem("reference", fo=kerchunk_file)
+        m = fs.get_mapper("")
+
+        ds = xr.open_dataset(m, engine="kerchunk")
+        assert isinstance(ds.air.values[0][0][0], numpy.float64)
+
+    def test_filters_netcdf4_roundtrip(
+        self, tmpdir, filter_encoded_xarray_netcdf4_file
+    ):
         virtual_ds = virtualizarr.open_virtual_dataset(
             filter_encoded_xarray_netcdf4_file, filetype=FileType("netcdf4")
         )
@@ -17,4 +33,4 @@ class TestIntegration:
         m = fs.get_mapper("")
 
         ds = xr.open_dataset(m, engine="kerchunk")
-        assert isinstance(ds.air.values[0][0][0], numpy.float64)
+        print(ds["var2"].encoding)
