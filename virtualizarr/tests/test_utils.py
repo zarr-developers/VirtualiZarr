@@ -2,6 +2,7 @@ import contextlib
 import pathlib
 
 import fsspec
+import fsspec.implementations.local
 import fsspec.implementations.memory
 import pytest
 import xarray as xr
@@ -21,7 +22,7 @@ def test_fsspec_openfile_from_path(tmp_path: pathlib.Path, dataset: xr.Dataset) 
     dataset.to_netcdf(f)
 
     result = _fsspec_openfile_from_filepath(filepath=f.as_posix())
-    assert result.mode == "rb"
+    assert isinstance(result, fsspec.implementations.local.LocalFile)
 
 
 def test_fsspec_openfile_memory(dataset: xr.Dataset):
