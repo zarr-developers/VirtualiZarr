@@ -22,7 +22,7 @@ def test_fsspec_openfile_from_path(tmp_path: pathlib.Path, dataset: xr.Dataset) 
     dataset.to_netcdf(f)
 
     result = _fsspec_openfile_from_filepath(filepath=f.as_posix())
-    assert isinstance(result, fsspec.implementations.local.LocalFile)
+    assert isinstance(result, fsspec.implementations.local.LocalFileOpener)
 
 
 def test_fsspec_openfile_memory(dataset: xr.Dataset):
