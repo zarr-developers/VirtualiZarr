@@ -15,7 +15,7 @@ def test_zarr_v3_roundtrip(tmpdir):
             chunks=(2, 3),
             compressor=None,
             filters=None,
-            fill_value=None,
+            fill_value=np.NaN,
             order="C",
             zarr_format=3,
         ),

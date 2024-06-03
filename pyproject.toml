@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.5.0",
@@ -28,22 +28,23 @@ dependencies = [
     "numpy",
     "ujson",
     "packaging",
-    "universal-pathlib"
-
+    "universal-pathlib",
 ]
 
 [project.optional-dependencies]
 test = [
     "codecov",
     "pre-commit",
+    "ruff",
     "pytest-mypy",
     "pytest-cov",
     "pytest",
-    "scipy",
     "pooch",
-    "ruff",
-    "s3fs"
-
+    "scipy",
+    "netcdf4",
+    "fsspec",
+    "s3fs",
+    "fastparquet",
 ]
 
 

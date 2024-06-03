@@ -1,9 +1,14 @@
+import base64
+import json
+from enum import Enum, auto
 from pathlib import Path
 from typing import NewType, Optional, cast
 
+import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 
+from virtualizarr.manifests.manifest import join
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import ZArray, ZAttrs
 
@@ -17,9 +22,6 @@ KerchunkArrRefs = NewType(
     "KerchunkArrRefs",
     dict,
 )  # lower-level dict containing just the information for one zarr array
-
-
-from enum import Enum, auto
 
 
 class AutoName(Enum):
@@ -36,6 +38,16 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+
+
+class NumpyEncoder(json.JSONEncoder):
+    # TODO I don't understand how kerchunk gets around this problem of encoding numpy types (in the zattrs) whilst only using ujson
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert NumPy array to Python list
+        elif isinstance(obj, np.generic):
+            return obj.item()  # Convert NumPy scalar to Python scalar
+        return json.JSONEncoder.default(self, obj)
 
 
 def read_kerchunk_references_from_file(
@@ -194,7 +206,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     all_arr_refs = {}
     for var_name, var in ds.variables.items():
-        arr_refs = variable_to_kerchunk_arr_refs(var)
+        arr_refs = variable_to_kerchunk_arr_refs(var, var_name)
 
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
@@ -206,6 +218,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
+            ".zattrs": ujson.dumps(ds.attrs),
             **all_arr_refs,
         },
     }
@@ -213,31 +226,67 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
     return cast(KerchunkStoreRefs, ds_refs)
 
 
-def variable_to_kerchunk_arr_refs(var: xr.Variable) -> KerchunkArrRefs:
+def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkArrRefs:
     """
-    Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps a ManifestArray).
+    Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
 
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
     from virtualizarr.manifests import ManifestArray
 
-    marr = var.data
+    if isinstance(var.data, ManifestArray):
+        marr = var.data
 
-    if not isinstance(marr, ManifestArray):
-        raise TypeError(
-            f"Can only serialize wrapped arrays of type ManifestArray, but got type {type(marr)}"
+        arr_refs: dict[str, str | list[str | int]] = {
+            str(chunk_key): chunk_entry.to_kerchunk()
+            for chunk_key, chunk_entry in marr.manifest.entries.items()
+        }
+
+        zarray = marr.zarray
+
+    else:
+        try:
+            np_arr = var.to_numpy()
+        except AttributeError as e:
+            raise TypeError(
+                f"Can only serialize wrapped arrays of type ManifestArray or numpy.ndarray, but got type {type(var.data)}"
+            ) from e
+
+        if var.encoding:
+            if "scale_factor" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a scale_factor"
+                )
+            if "offset" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset"
+                )
+            if "calendar" in var.encoding:
+                raise NotImplementedError(
+                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar"
+                )
+
+        # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
+        byte_data = np_arr.tobytes()
+        # TODO do I really need to encode then decode like this?
+        inlined_data = (b"base64:" + base64.b64encode(byte_data)).decode("utf-8")
+
+        # TODO can this be generalized to save individual chunks of a dask array?
+        # TODO will this fail for a scalar?
+        arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
+
+        zarray = ZArray(
+            chunks=np_arr.shape,
+            shape=np_arr.shape,
+            dtype=np_arr.dtype,
+            order="C",
         )
 
-    arr_refs: dict[str, str | list[str | int]] = {
-        str(chunk_key): chunk_entry.to_kerchunk()
-        for chunk_key, chunk_entry in marr.manifest.entries.items()
-    }
-
-    zarray_dict = marr.zarray.to_kerchunk_json()
+    zarray_dict = zarray.to_kerchunk_json()
     arr_refs[".zarray"] = zarray_dict
 
     zattrs = var.attrs
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
-    arr_refs[".zattrs"] = ujson.dumps(zattrs)
+    arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 
     return cast(KerchunkArrRefs, arr_refs)

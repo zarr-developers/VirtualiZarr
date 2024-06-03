@@ -119,6 +119,7 @@ def open_virtual_dataset(
         vds_refs = kerchunk.read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
+            reader_options=reader_options,
         )
         virtual_vars = virtual_vars_from_kerchunk_refs(
             vds_refs,
@@ -377,15 +378,23 @@ class VirtualiZarrDatasetAccessor:
     ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...
+    def to_kerchunk(self, filepath: str | Path, format: Literal["json"]) -> None: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None: ...
+    def to_kerchunk(
+        self,
+        filepath: str | Path,
+        format: Literal["parquet"],
+        record_size: int = 100_000,
+        categorical_threshold: int = 10,
+    ) -> None: ...
 
     def to_kerchunk(
         self,
-        filepath: str | None = None,
+        filepath: str | Path | None = None,
         format: Literal["dict", "json", "parquet"] = "dict",
+        record_size: int = 100_000,
+        categorical_threshold: int = 10,
     ) -> KerchunkStoreRefs | None:
         """
         Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
@@ -397,6 +406,13 @@ class VirtualiZarrDatasetAccessor:
         format : 'dict', 'json', or 'parquet'
             Format to serialize the kerchunk references as.
             If 'json' or 'parquet' then the 'filepath' argument is required.
+        record_size (parquet only): int
+            Number of references to store in each reference file (default 100,000). Bigger values
+            mean fewer read requests but larger memory footprint.
+        categorical_threshold (parquet only) : int
+            Encode urls as pandas.Categorical to reduce memory footprint if the ratio
+            of the number of unique urls to total number of refs for each variable
+            is greater than or equal to this number. (default 10)
 
         References
         ----------
@@ -415,6 +431,21 @@ class VirtualiZarrDatasetAccessor:
 
             return None
         elif format == "parquet":
-            raise NotImplementedError()
+            from kerchunk.df import refs_to_dataframe
+
+            if isinstance(filepath, Path):
+                url = str(filepath)
+            elif isinstance(filepath, str):
+                url = filepath
+
+            # refs_to_dataframe is responsible for writing to parquet.
+            # at no point does it create a full in-memory dataframe.
+            refs_to_dataframe(
+                refs,
+                url=url,
+                record_size=record_size,
+                categorical_threshold=categorical_threshold,
+            )
+            return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
