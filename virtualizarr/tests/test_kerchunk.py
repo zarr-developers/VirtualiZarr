@@ -7,7 +7,7 @@ import xarray.testing as xrt
 
 from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
-from virtualizarr.xarray import dataset_from_kerchunk_refs
+from virtualizarr.xarray import dataset_from_kerchunk_refs, open_virtual_dataset
 
 
 def gen_ds_refs(
@@ -232,3 +232,26 @@ def test_FileType():
     assert "zarr" == FileType("zarr").name
     with pytest.raises(ValueError):
         FileType(None)
+
+
+@pytest.mark.parametrize(
+    "format",
+    [
+        "json",
+        pytest.param(
+            "parquet", marks=pytest.mark.xfail(reason="parquet reading not finished")
+        ),
+    ],
+)
+def test_kerchunk_to_virtual_dataset(netcdf4_file, tmpdir, format):
+    vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+    # QUESTION: should these live in a fixture? ex. kerchunk_ref_fpath_json, kerchunk_ref_fpath_parquet
+    vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+    rt_vds = open_virtual_dataset(
+        filepath=f"{tmpdir}/refs.{format}", filetype="kerchunk"
+    )
+
+    # this fails. rt_vds is missing Attributes:_ARRAY_DIMENSIONS:  ['lat'].
+    xrt.assert_equal(vds, rt_vds)

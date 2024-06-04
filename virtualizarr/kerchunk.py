@@ -38,6 +38,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+    kerchunk = auto()
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -117,7 +118,6 @@ def _automatically_determine_filetype(
     fpath = _fsspec_openfile_from_filepath(
         filepath=filepath, reader_options=reader_options
     )
-
     if file_extension == ".nc":
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
         magic = fpath.read()
