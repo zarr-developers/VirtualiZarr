@@ -67,7 +67,8 @@ class TestKerchunkRoundtrip:
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=True)
-        # del ds.time.encoding["calendar"]
+
+        # delete the encoding since this is now incorrect
         del ds.time.encoding["units"]
 
         # split into two datasets
