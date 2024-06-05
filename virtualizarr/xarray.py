@@ -165,14 +165,15 @@ def open_virtual_dataset(
             for name in cftime_variables:
                 import cftime
 
-                calendar = ds[name].attrs.get(
-                    "calendar", ds[name].encoding.get("calendar", "standard")
+                var = ds[name]
+                calendar = var.attrs.get(
+                    "calendar", var.encoding.get("calendar", "standard")
                 )
-                units = ds[name].attrs.get("units", ds[name].encoding["units"])
+                units = var.attrs.get("units", var.encoding["units"])
 
                 # undoing CF recoding in original input
                 values = []
-                for c in ds[name].values:
+                for c in var.values:
                     value = cftime.num2date(
                         cftime.date2num(
                             datetime.datetime.fromisoformat(str(c).split(".")[0]),

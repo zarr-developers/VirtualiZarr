@@ -66,9 +66,8 @@ class TestKerchunkRoundtrip:
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset(
-            "air_temperature", decode_times=True
-        )  # .isel(time=slice(None, 2000))
+        ds = xr.tutorial.open_dataset("air_temperature", decode_times=True)
+        # del ds.time.encoding["calendar"]
         del ds.time.encoding["units"]
 
         # split into two datasets
@@ -99,7 +98,9 @@ class TestKerchunkRoundtrip:
         vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
 
         # use fsspec to read the dataset from disk via the zarr store
-        roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
+        roundtrip = xr.open_dataset(
+            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=True
+        )
 
         # assert equal to original dataset
         xrt.assert_equal(roundtrip, ds)

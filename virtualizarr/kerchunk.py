@@ -47,6 +47,8 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()  # Convert NumPy array to Python list
         elif isinstance(obj, np.generic):
             return obj.item()  # Convert NumPy scalar to Python scalar
+        elif isinstance(obj, np.dtype):
+            return str(obj)
         return json.JSONEncoder.default(self, obj)
 
 
@@ -269,9 +271,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
                 )
                 units = var.attrs.get("units", var.encoding["units"])
 
-                data = cftime.date2num(var, calendar=calendar, units=units).ravel()
-                var = var.copy(data=data)
-                np_arr = var.to_numpy()
+                np_arr = cftime.date2num(var, calendar=calendar, units=units).ravel()
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
@@ -292,7 +292,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
     zarray_dict = zarray.to_kerchunk_json()
     arr_refs[".zarray"] = zarray_dict
 
-    zattrs = var.attrs
+    zattrs = {**var.attrs, **var.encoding}
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 
