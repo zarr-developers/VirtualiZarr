@@ -29,7 +29,7 @@ def test_wrapping():
         "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
         "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
     }
-    manifest = ChunkManifest.from_dict(chunks_dict)
+    manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
     ds = xr.Dataset({"a": (["x", "y"], marr)})
 
@@ -59,7 +59,7 @@ class TestEquals:
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
 
@@ -71,7 +71,7 @@ class TestEquals:
             "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest3 = ChunkManifest.from_dict(chunks_dict3)
+        manifest3 = ChunkManifest(entries=chunks_dict3)
         marr3 = ManifestArray(zarray=zarray, chunkmanifest=manifest3)
         ds3 = xr.Dataset({"a": (["x", "y"], marr3)})
         assert not ds1.equals(ds3)
@@ -96,7 +96,7 @@ class TestConcat:
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
 
@@ -104,7 +104,7 @@ class TestConcat:
             "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
@@ -143,7 +143,7 @@ class TestConcat:
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
 
@@ -151,7 +151,7 @@ class TestConcat:
             "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
         ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
 
@@ -193,7 +193,7 @@ class TestConcat:
             "0": {"path": "foo.nc", "offset": 100, "length": 100},
             "1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         coords = xr.Coordinates({"t": (["t"], marr1)}, indexes={})
         ds1 = xr.Dataset(coords=coords)
@@ -202,7 +202,7 @@ class TestConcat:
             "0": {"path": "foo.nc", "offset": 300, "length": 100},
             "1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
         coords = xr.Coordinates({"t": (["t"], marr2)}, indexes={})
         ds2 = xr.Dataset(coords=coords)

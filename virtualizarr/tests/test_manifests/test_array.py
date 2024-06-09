@@ -14,7 +14,7 @@ class TestManifestArray:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest.from_dict(chunks_dict)
+        manifest = ChunkManifest(entries=chunks_dict)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
         zarray = ZArray(
@@ -69,7 +69,7 @@ class TestEquals:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest.from_dict(chunks_dict)
+        manifest = ChunkManifest(entries=chunks_dict)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
         zarray = ZArray(
@@ -108,14 +108,14 @@ class TestEquals:
             "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
         assert not (marr1 == marr2).all()
 
@@ -183,14 +183,14 @@ class TestConcat:
             "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
 
         result = np.concatenate([marr1, marr2], axis=1)
@@ -228,14 +228,14 @@ class TestStack:
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
         }
-        manifest1 = ChunkManifest.from_dict(chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
-        manifest2 = ChunkManifest.from_dict(chunks_dict2)
+        manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
 
         result = np.stack([marr1, marr2], axis=1)
@@ -271,11 +271,11 @@ def test_refuse_combine():
     chunks_dict1 = {
         "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
     }
-    chunkmanifest1 = ChunkManifest.from_dict(chunks_dict1)
+    chunkmanifest1 = ChunkManifest(entries=chunks_dict1)
     chunks_dict2 = {
         "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
     }
-    chunkmanifest2 = ChunkManifest.from_dict(chunks_dict2)
+    chunkmanifest2 = ChunkManifest(entries=chunks_dict2)
     marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunkmanifest1)
 
     zarray_wrong_compressor = zarray_common.copy()

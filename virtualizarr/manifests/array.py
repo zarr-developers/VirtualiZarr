@@ -50,7 +50,7 @@ class ManifestArray:
             _chunkmanifest = ChunkManifest(entries=chunkmanifest)
         else:
             raise TypeError(
-                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+                f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
         # TODO check that the zarray shape and chunkmanifest shape are consistent with one another

@@ -52,9 +52,9 @@ class ChunkManifest:
     """
     In-memory representation of a single Zarr chunk manifest.
 
-    Stores the manifest internally as numpy arrays.
+    Stores the manifest internally as numpy arrays, so the most efficient way to create this object is via the `.from_arrays` constructor classmethod.
 
-    The manifest can be converted to or from a dictionary from looking like this
+    The manifest can be converted to or from a dictionary which looks like this
 
         {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -63,33 +63,49 @@ class ChunkManifest:
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
 
-    using the .from_dict() and .dict() methods, so users of this class can think of the manifest as if it were a dict.
+    using the .__init__() and .dict() methods, so users of this class can think of the manifest as if it were a dict mapping zarr chunk keys to byte ranges.
 
-    See the chunk manifest SPEC proposal in https://github.com/zarr-developers/zarr-specs/issues/287 .
+    (See the chunk manifest SPEC proposal in https://github.com/zarr-developers/zarr-specs/issues/287.)
 
     Validation is done when this object is instatiated, and this class is immutable,
-    so it's not possible to have a ChunkManifest object that does not represent a complete valid grid of chunks.
+    so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
     """
 
     _paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]]
     _offsets: np.ndarray[Any, np.dtype[np.int32]]
     _lengths: np.ndarray[Any, np.dtype[np.int32]]
 
-    @classmethod
-    def from_dict(cls, chunks: ChunkDict) -> "ChunkManifest":
-        # TODO do some input validation here first?
-        validate_chunk_keys(chunks.keys())
+    def __init__(self, entries: dict) -> None:
+        """
+        Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
 
-        # TODO should we actually pass shape in, in case there are not enough chunks to give correct idea of full shape?
-        shape = get_chunk_grid_shape(chunks.keys())
+        Parameters
+        ----------
+        entries: dict
+            Chunk keys and byte range information, as a dictionary of the form
+
+                {
+                    "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+                    "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+                    "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+                    "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+                }
+        """
+
+        # TODO do some input validation here first?
+        validate_chunk_keys(entries.keys())
+
+        # TODO should we actually optionally pass chunk grid shape in,
+        # in case there are not enough chunks to give correct idea of full shape?
+        shape = get_chunk_grid_shape(entries.keys())
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = np.empty(shape=shape, dtype=np.dtypes.StringDType)
         offsets = np.empty(shape=shape, dtype=np.dtype("int32"))
         lengths = np.empty(shape=shape, dtype=np.dtype("int32"))
 
-        # populate the array
-        for key, entry in chunks.items():
+        # populate the arrays
+        for key, entry in entries.items():
             try:
                 path, offset, length = entry.values()
                 entry = ChunkEntry(path=path, offset=offset, length=length)
@@ -105,12 +121,9 @@ class ChunkManifest:
             offsets[split_key] = entry.offset
             lengths[split_key] = entry.length
 
-        obj = object.__new__(cls)
-        obj._paths = paths
-        obj._offsets = offsets
-        obj._lengths = lengths
-
-        return obj
+        self._paths = paths
+        self._offsets = offsets
+        self._lengths = lengths
 
     @classmethod
     def from_arrays(
@@ -205,14 +218,18 @@ class ChunkManifest:
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:
-        return iter(self._paths.keys())
+        # TODO make this work for numpy arrays
+        raise NotImplementedError()
+        # return iter(self._paths.keys())
 
     def __len__(self) -> int:
         return self._paths.size
 
     def dict(self) -> ChunkDict:
         """
-        Converts the entire manifest to a nested dictionary, of the form
+        Convert the entire manifest to a nested dictionary.
+
+        The returned dict will be of the form
 
         {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -221,7 +238,7 @@ class ChunkManifest:
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
 
-        Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary._
+        Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
 
         coord_vectors = np.mgrid[
@@ -255,17 +272,15 @@ class ChunkManifest:
     def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
         """Create a ChunkManifest from a Zarr manifest.json file."""
         with open(filepath, "r") as manifest_file:
-            entries_dict = json.load(manifest_file)
+            entries = json.load(manifest_file)
 
-        entries = {
-            cast(ChunkKey, k): ChunkEntry(**entry) for k, entry in entries_dict.items()
-        }
         return cls(entries=entries)
 
     def to_zarr_json(self, filepath: str) -> None:
-        """Write a ChunkManifest to a Zarr manifest.json file."""
+        """Write the manifest to a Zarr manifest.json file."""
+        entries = self.dict()
         with open(filepath, "w") as json_file:
-            json.dump(self.dict(), json_file, indent=4, separators=(", ", ": "))
+            json.dump(entries, json_file, indent=4, separators=(", ", ": "))
 
     @classmethod
     def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
@@ -273,7 +288,7 @@ class ChunkManifest:
             cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
             for k, v in kerchunk_chunk_dict.items()
         }
-        return ChunkManifest.from_dict(cast(ChunkDict, chunkentries))
+        return ChunkManifest(entries=cast(ChunkDict, chunkentries))
 
 
 def split(key: ChunkKey) -> Tuple[int, ...]:

@@ -8,7 +8,7 @@ class TestCreateManifest:
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
-        manifest = ChunkManifest.from_dict(chunks)
+        manifest = ChunkManifest(entries=chunks)
         assert manifest.dict() == chunks
 
         chunks = {
@@ -17,7 +17,7 @@ class TestCreateManifest:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest.from_dict(chunks)
+        manifest = ChunkManifest(entries=chunks)
         assert manifest.dict() == chunks
 
     def test_invalid_chunk_entries(self):
@@ -25,7 +25,7 @@ class TestCreateManifest:
             "0.0.0": {"path": "s3://bucket/foo.nc"},
         }
         with pytest.raises(ValueError, match="must be of the form"):
-            ChunkManifest.from_dict(chunks)
+            ChunkManifest(entries=chunks)
 
         chunks = {
             "0.0.0": {
@@ -35,21 +35,21 @@ class TestCreateManifest:
             },
         }
         with pytest.raises(ValueError, match="must be of the form"):
-            ChunkManifest.from_dict(chunks)
+            ChunkManifest(entries=chunks)
 
     def test_invalid_chunk_keys(self):
         chunks = {
             "0.0.": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         with pytest.raises(ValueError, match="Invalid format for chunk key: '0.0.'"):
-            ChunkManifest.from_dict(chunks)
+            ChunkManifest(entries=chunks)
 
         chunks = {
             "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
         }
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
-            ChunkManifest.from_dict(chunks)
+            ChunkManifest(entries=chunks)
 
 
 class TestProperties:
@@ -60,21 +60,21 @@ class TestProperties:
             "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
         }
-        manifest = ChunkManifest.from_dict(chunks)
+        manifest = ChunkManifest(entries=chunks)
         assert manifest.ndim_chunk_grid == 3
         assert manifest.shape_chunk_grid == (1, 2, 2)
 
 
 class TestEquals:
     def test_equals(self):
-        manifest1 = ChunkManifest.from_dict(
-            {
+        manifest1 = ChunkManifest(
+            entries={
                 "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
             }
         )
-        manifest2 = ChunkManifest.from_dict(
-            {
+        manifest2 = ChunkManifest(
+            entries={
                 "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
                 "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
             }

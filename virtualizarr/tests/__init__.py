@@ -42,7 +42,7 @@ def create_manifestarray(
         )
         d = {join(ind): entry_from_chunk_key(ind) for ind in all_possible_combos}
 
-    chunkmanifest = ChunkManifest.from_dict(d)
+    chunkmanifest = ChunkManifest(entries=d)
 
     return ManifestArray(chunkmanifest=chunkmanifest, zarray=zarray)
 
