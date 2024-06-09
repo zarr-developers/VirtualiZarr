@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 
-from virtualizarr.zarr import Codec, ZArray, ceildiv
+from virtualizarr.zarr import Codec, ceildiv
 
 from .manifest import ChunkManifest
 
@@ -144,16 +144,8 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    new_zarray = ZArray(
-        chunks=first_arr.chunks,
-        compressor=first_arr.zarray.compressor,
-        dtype=first_arr.dtype,
-        fill_value=first_arr.zarray.fill_value,
-        filters=first_arr.zarray.filters,
-        shape=new_shape,
-        # TODO presumably these things should be checked for consistency across arrays too?
-        order=first_arr.zarray.order,
-        zarr_format=first_arr.zarray.zarr_format,
+    new_zarray = first_arr.zarray.replace(
+        shape=tuple(new_shape),
     )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
@@ -248,16 +240,9 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = ZArray(
-        chunks=new_chunks,
-        compressor=first_arr.zarray.compressor,
-        dtype=first_arr.dtype,
-        fill_value=first_arr.zarray.fill_value,
-        filters=first_arr.zarray.filters,
-        shape=new_shape,
-        # TODO presumably these things should be checked for consistency across arrays too?
-        order=first_arr.zarray.order,
-        zarr_format=first_arr.zarray.zarr_format,
+    new_zarray = first_arr.zarray.replace(
+        chunks=tuple(new_chunks),
+        shape=tuple(new_shape),
     )
 
     return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
@@ -287,10 +272,16 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
 
     from .array import ManifestArray
 
+    # iterate from last axis to first here so that the fillvalue of 1 is inserted at the start of the shape
+    # i.e. to follow numpy's broadcasting rules
     new_chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
-        for axis_length, chunk_length in itertools.zip_longest(
-            shape, x.chunks, fillvalue=1
+        reversed(
+            [
+                ceildiv(axis_length, chunk_length)
+                for axis_length, chunk_length in itertools.zip_longest(
+                    shape[::-1], x.chunks[::-1], fillvalue=1
+                )
+            ]
         )
     )
 
@@ -316,17 +307,9 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
         for axis_length, chunk_grid_length in zip(new_shape, new_chunk_grid_shape)
     )
 
-    # refactor to use a new ZArray.copy(x, shape=..., chunks=..) constructor method
-    new_zarray = ZArray(
+    new_zarray = x.zarray.replace(
         chunks=new_chunks,
-        compressor=x.zarray.compressor,
-        dtype=x.dtype,
-        fill_value=x.zarray.fill_value,
-        filters=x.zarray.filters,
         shape=new_shape,
-        # TODO presumably these things should be checked for consistency across arrays too?
-        order=x.zarray.order,
-        zarr_format=x.zarray.zarr_format,
     )
 
     return ManifestArray(chunkmanifest=broadcast_manifest, zarray=new_zarray)

@@ -99,6 +99,31 @@ class ZArray(BaseModel):
     def to_kerchunk_json(self) -> str:
         return ujson.dumps(self.dict())
 
+    def replace(
+        self,
+        chunks: Optional[tuple[int, ...]] = None,
+        compressor: Optional[str] = None,
+        dtype: Optional[np.dtype] = None,
+        fill_value: Optional[float] = None,  # float or int?
+        filters: Optional[List[Dict]] = None,
+        order: Optional[Union[Literal["C"], Literal["F"]]] = None,
+        shape: Optional[Tuple[int, ...]] = None,
+        zarr_format: Optional[Union[Literal[2], Literal[3]]] = None,
+    ) -> "ZArray":
+        """
+        Convenience method to create a new ZArray from an existing one by altering only certain attributes.
+        """
+        return ZArray(
+            chunks=chunks if chunks is not None else self.chunks,
+            compressor=compressor if compressor is not None else self.compressor,
+            dtype=dtype if dtype is not None else self.dtype,
+            fill_value=fill_value if fill_value is not None else self.fill_value,
+            filters=filters if filters is not None else self.filters,
+            shape=shape if shape is not None else self.shape,
+            order=order if order is not None else self.order,
+            zarr_format=zarr_format if zarr_format is not None else self.zarr_format,
+        )
+
 
 def encode_dtype(dtype: np.dtype) -> str:
     # TODO not sure if there is a better way to get the '<i4' style representation of the dtype out
