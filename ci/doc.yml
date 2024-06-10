@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python>=3.9
+  - python>=3.10
   - "sphinx"
   - pip
   - pip:
@@ -13,4 +13,4 @@ dependencies:
       - "sphinx_design"
       - "sphinx_togglebutton"
       - "sphinx-autodoc-typehints"
-      - -e ..
+      - -e  "..[test]"

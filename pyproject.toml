@@ -14,12 +14,11 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.5.0",
@@ -29,19 +28,23 @@ dependencies = [
     "numpy>=2.0.0rc1",
     "ujson",
     "packaging",
+    "universal-pathlib",
 ]
 
 [project.optional-dependencies]
 test = [
     "codecov",
     "pre-commit",
+    "ruff",
     "pytest-mypy",
     "pytest-cov",
     "pytest",
-    "scipy",
     "pooch",
-    "ruff",
-
+    "scipy",
+    "netcdf4",
+    "fsspec",
+    "s3fs",
+    "fastparquet",
 ]
 
 

@@ -3,13 +3,9 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Literal,
     NewType,
     Optional,
-    Tuple,
-    Union,
 )
 
 import numpy as np
@@ -29,8 +25,8 @@ ZAttrs = NewType(
 
 
 class Codec(BaseModel):
-    compressor: Optional[str] = None
-    filters: Optional[List[Dict]] = None
+    compressor: str | None = None
+    filters: list[dict] | None = None
 
     def __repr__(self) -> str:
         return f"Codec(compressor={self.compressor}, filters={self.filters})"
@@ -45,14 +41,14 @@ class ZArray(BaseModel):
         arbitrary_types_allowed=True,  # only here so pydantic doesn't complain about the numpy dtype field
     )
 
-    chunks: Tuple[int, ...]
-    compressor: Optional[str] = None
+    chunks: tuple[int, ...]
+    compressor: str | None = None
     dtype: np.dtype
-    fill_value: Optional[float] = None  # float or int?
-    filters: Optional[List[Dict]] = None
-    order: Union[Literal["C"], Literal["F"]]
-    shape: Tuple[int, ...]
-    zarr_format: Union[Literal[2], Literal[3]] = 2
+    fill_value: float | int | None = np.nan  # float or int?
+    filters: list[dict] | None = None
+    order: Literal["C", "F"]
+    shape: tuple[int, ...]
+    zarr_format: Literal[2, 3] = 2
 
     @field_validator("dtype")
     @classmethod
@@ -78,13 +74,16 @@ class ZArray(BaseModel):
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
-        # TODO should we be doing some type coercion on the 'fill_value' here?
+        # coerce type of fill_value as kerchunk can be inconsistent with this
+        fill_value = decoded_arr_refs_zarray["fill_value"]
+        if fill_value is None or fill_value == "NaN" or fill_value == "nan":
+            fill_value = np.nan
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=decoded_arr_refs_zarray["compressor"],
             dtype=np.dtype(decoded_arr_refs_zarray["dtype"]),
-            fill_value=decoded_arr_refs_zarray["fill_value"],
+            fill_value=fill_value,
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
@@ -93,7 +92,12 @@ class ZArray(BaseModel):
 
     def dict(self) -> dict[str, Any]:
         zarray_dict = dict(self)
+
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
+
+        if zarray_dict["fill_value"] is np.nan:
+            zarray_dict["fill_value"] = None
+
         return zarray_dict
 
     def to_kerchunk_json(self) -> str:
@@ -105,10 +109,10 @@ class ZArray(BaseModel):
         compressor: Optional[str] = None,
         dtype: Optional[np.dtype] = None,
         fill_value: Optional[float] = None,  # float or int?
-        filters: Optional[List[Dict]] = None,
-        order: Optional[Union[Literal["C"], Literal["F"]]] = None,
-        shape: Optional[Tuple[int, ...]] = None,
-        zarr_format: Optional[Union[Literal[2], Literal[3]]] = None,
+        filters: Optional[list[dict]] = None,
+        order: Optional[Literal["C"] | Literal["F"]] = None,
+        shape: Optional[tuple[int, ...]] = None,
+        zarr_format: Optional[Literal[2] | Literal[3]] = None,
     ) -> "ZArray":
         """
         Convenience method to create a new ZArray from an existing one by altering only certain attributes.
@@ -206,7 +210,7 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
         metadata_file.write(json_dumps(metadata))
 
 
-def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) -> dict:
+def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) -> dict:
     """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
     # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
 
@@ -244,13 +248,13 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: List[str], attrs: dict) ->
 
 
 def attrs_from_zarr_group_json(filepath: Path) -> dict:
-    with open(filepath, "r") as metadata_file:
+    with open(filepath) as metadata_file:
         attrs = json.load(metadata_file)
     return attrs["attributes"]
 
 
-def metadata_from_zarr_json(filepath: Path) -> Tuple[ZArray, List[str], dict]:
-    with open(filepath, "r") as metadata_file:
+def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
+    with open(filepath) as metadata_file:
         metadata = json.load(metadata_file)
 
     if {
@@ -268,11 +272,16 @@ def metadata_from_zarr_json(filepath: Path) -> Tuple[ZArray, List[str], dict]:
 
     chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
 
+    if metadata["fill_value"] is None:
+        fill_value = np.nan
+    else:
+        fill_value = metadata["fill_value"]
+
     zarray = ZArray(
         chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
         compressor=metadata["codecs"],
         dtype=np.dtype(metadata["data_type"]),
-        fill_value=metadata["fill_value"],
+        fill_value=fill_value,
         filters=metadata.get("filters", None),
         order="C",
         shape=chunk_shape,

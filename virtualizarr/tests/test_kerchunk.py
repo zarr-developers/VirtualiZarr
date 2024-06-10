@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 import ujson  # type: ignore
 import xarray as xr
@@ -39,7 +40,7 @@ def test_dataset_from_df_refs():
 
     assert da.data.zarray.compressor is None
     assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is None
+    assert da.data.zarray.fill_value is np.nan
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {
@@ -78,7 +79,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=None,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -88,6 +89,7 @@ class TestAccessor:
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
@@ -109,7 +111,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=None,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -119,19 +121,61 @@ class TestAccessor:
 
         ds.virtualize.to_kerchunk(filepath, format="json")
 
-        with open(filepath, "r") as json_file:
+        with open(filepath) as json_file:
             loaded_refs = ujson.load(json_file)
 
         expected_ds_refs = {
             "version": 1,
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
                 "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
             },
         }
         assert loaded_refs == expected_ds_refs
+
+    def test_accessor_to_kerchunk_parquet(self, tmp_path):
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=dict(
+                shape=(2, 4),
+                dtype=np.dtype("<i8"),
+                chunks=(2, 2),
+                compressor=None,
+                filters=None,
+                fill_value=None,
+                order="C",
+            ),
+        )
+        ds = xr.Dataset({"a": (["x", "y"], arr)})
+
+        filepath = tmp_path / "refs"
+
+        ds.virtualize.to_kerchunk(filepath, format="parquet", record_size=2)
+
+        with open(tmp_path / "refs" / ".zmetadata") as f:
+            meta = ujson.load(f)
+            assert list(meta) == ["metadata", "record_size"]
+            assert meta["record_size"] == 2
+
+        df0 = pd.read_parquet(filepath / "a" / "refs.0.parq")
+
+        assert df0.to_dict() == {
+            "offset": {0: 100, 1: 200},
+            "path": {
+                0: "foo.nc",
+                1: "foo.nc",
+            },
+            "size": {0: 100, 1: 100},
+            "raw": {0: None, 1: None},
+        }
 
 
 def test_kerchunk_roundtrip_in_memory_no_concat():
@@ -148,7 +192,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=None,
+            fill_value=np.nan,
             order="C",
         ),
         chunkmanifest=manifest,
@@ -176,8 +220,12 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
     ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
     ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
 
-    assert FileType("netcdf3") == _automatically_determine_filetype(netcdf3_file_path)
-    assert FileType("netcdf4") == _automatically_determine_filetype(netcdf4_file_path)
+    assert FileType("netcdf3") == _automatically_determine_filetype(
+        filepath=netcdf3_file_path
+    )
+    assert FileType("netcdf4") == _automatically_determine_filetype(
+        filepath=netcdf4_file_path
+    )
 
 
 def test_FileType():

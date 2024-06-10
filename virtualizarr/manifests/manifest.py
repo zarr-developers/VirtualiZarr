@@ -1,6 +1,7 @@
 import json
 import re
-from typing import Any, Iterable, Iterator, List, NewType, Tuple, Union, cast
+from collections.abc import Iterable, Iterator
+from typing import Any, NewType, Tuple, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -34,13 +35,11 @@ class ChunkEntry(BaseModel):
         return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
 
     @classmethod
-    def from_kerchunk(
-        cls, path_and_byte_range_info: List[Union[str, int]]
-    ) -> "ChunkEntry":
+    def from_kerchunk(cls, path_and_byte_range_info: list[str | int]) -> "ChunkEntry":
         path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
-    def to_kerchunk(self) -> List[Union[str, int]]:
+    def to_kerchunk(self) -> list[str | int]:
         """Write out in the format that kerchunk uses for chunk entries."""
         return [self.path, self.offset, self.length]
 
@@ -199,7 +198,7 @@ class ChunkManifest:
         return self._paths.ndim
 
     @property
-    def shape_chunk_grid(self) -> Tuple[int, ...]:
+    def shape_chunk_grid(self) -> tuple[int, ...]:
         """
         Number of separate chunks along each dimension.
 
@@ -271,6 +270,7 @@ class ChunkManifest:
     @classmethod
     def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
         """Create a ChunkManifest from a Zarr manifest.json file."""
+
         with open(filepath, "r") as manifest_file:
             entries = json.load(manifest_file)
 
@@ -321,7 +321,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
             )
 
 
-def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> Tuple[int, ...]:
+def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
     # find max chunk index along each dimension
     zipped_indices = zip(*[split(key) for key in chunk_keys])
     chunk_grid_shape = tuple(

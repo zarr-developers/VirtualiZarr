@@ -1,12 +1,8 @@
+from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
-    Iterable,
-    List,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Union,
     overload,
 )
 
@@ -20,6 +16,7 @@ from xarray.core.variable import IndexVariable
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,
@@ -35,11 +32,14 @@ class ManifestBackendArray(ManifestArray, BackendArray):
 
 def open_virtual_dataset(
     filepath: str,
-    filetype: Optional[FileType] = None,
-    drop_variables: Optional[Iterable[str]] = None,
-    loadable_variables: Optional[Iterable[str]] = None,
-    indexes: Optional[Mapping[str, Index]] = None,
+    filetype: FileType | None = None,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
+    reader_options: Optional[dict] = {
+        "storage_options": {"key": "", "secret": "", "anon": True}
+    },
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -68,6 +68,9 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
+    reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
+        so ensure reader_options match selected Kerchunk reader arguments.
 
     Returns
     -------
@@ -105,6 +108,7 @@ def open_virtual_dataset(
         vds_refs = kerchunk.read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
+            reader_options=reader_options,
         )
         virtual_vars = virtual_vars_from_kerchunk_refs(
             vds_refs,
@@ -117,7 +121,11 @@ def open_virtual_dataset(
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
             # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
             # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            ds = xr.open_dataset(filepath, drop_variables=drop_variables)
+            fpath = _fsspec_openfile_from_filepath(
+                filepath=filepath, reader_options=reader_options
+            )
+
+            ds = xr.open_dataset(fpath, drop_variables=drop_variables)
 
             if indexes is None:
                 # add default indexes by reading data from file
@@ -159,8 +167,8 @@ def open_virtual_dataset(
 
 def open_virtual_dataset_from_v3_store(
     storepath: str,
-    drop_variables: List[str],
-    indexes: Optional[Mapping[str, Index]],
+    drop_variables: list[str],
+    indexes: Mapping[str, Index] | None,
 ) -> xr.Dataset:
     """
     Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
@@ -210,7 +218,7 @@ def open_virtual_dataset_from_v3_store(
 
 def virtual_vars_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
-    drop_variables: Optional[List[str]] = None,
+    drop_variables: list[str] | None = None,
     virtual_array_class=ManifestArray,
 ) -> Mapping[str, xr.Variable]:
     """
@@ -240,9 +248,9 @@ def virtual_vars_from_kerchunk_refs(
 
 def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
-    drop_variables: List[str] = [],
+    drop_variables: list[str] = [],
     virtual_array_class: type = ManifestArray,
-    indexes: Optional[MutableMapping[str, Index]] = None,
+    indexes: MutableMapping[str, Index] | None = None,
 ) -> xr.Dataset:
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
@@ -299,7 +307,7 @@ def separate_coords(
     """
 
     # this would normally come from CF decoding, let's hope the fact we're skipping that doesn't cause any problems...
-    coord_names: List[str] = []
+    coord_names: list[str] = []
 
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
@@ -359,16 +367,24 @@ class VirtualiZarrDatasetAccessor:
     ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["json"]) -> None: ...
+    def to_kerchunk(self, filepath: str | Path, format: Literal["json"]) -> None: ...
 
     @overload
-    def to_kerchunk(self, filepath: str, format: Literal["parquet"]) -> None: ...
+    def to_kerchunk(
+        self,
+        filepath: str | Path,
+        format: Literal["parquet"],
+        record_size: int = 100_000,
+        categorical_threshold: int = 10,
+    ) -> None: ...
 
     def to_kerchunk(
         self,
-        filepath: Optional[str] = None,
-        format: Union[Literal["dict"], Literal["json"], Literal["parquet"]] = "dict",
-    ) -> Union[KerchunkStoreRefs, None]:
+        filepath: str | Path | None = None,
+        format: Literal["dict", "json", "parquet"] = "dict",
+        record_size: int = 100_000,
+        categorical_threshold: int = 10,
+    ) -> KerchunkStoreRefs | None:
         """
         Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
 
@@ -379,6 +395,13 @@ class VirtualiZarrDatasetAccessor:
         format : 'dict', 'json', or 'parquet'
             Format to serialize the kerchunk references as.
             If 'json' or 'parquet' then the 'filepath' argument is required.
+        record_size (parquet only): int
+            Number of references to store in each reference file (default 100,000). Bigger values
+            mean fewer read requests but larger memory footprint.
+        categorical_threshold (parquet only) : int
+            Encode urls as pandas.Categorical to reduce memory footprint if the ratio
+            of the number of unique urls to total number of refs for each variable
+            is greater than or equal to this number. (default 10)
 
         References
         ----------
@@ -397,6 +420,21 @@ class VirtualiZarrDatasetAccessor:
 
             return None
         elif format == "parquet":
-            raise NotImplementedError()
+            from kerchunk.df import refs_to_dataframe
+
+            if isinstance(filepath, Path):
+                url = str(filepath)
+            elif isinstance(filepath, str):
+                url = filepath
+
+            # refs_to_dataframe is responsible for writing to parquet.
+            # at no point does it create a full in-memory dataframe.
+            refs_to_dataframe(
+                refs,
+                url=url,
+                record_size=record_size,
+                categorical_threshold=categorical_threshold,
+            )
+            return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")

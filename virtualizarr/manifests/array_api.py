@@ -1,5 +1,5 @@
 import itertools
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Iterable
 
 import numpy as np
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from .array import ManifestArray
 
 
-MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS: Dict[
+MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS: dict[
     str, Callable
 ] = {}  # populated by the @implements decorators below
 
@@ -52,7 +52,7 @@ def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
             )
 
 
-def _check_same_codecs(codecs: List[Codec]) -> None:
+def _check_same_codecs(codecs: list[Codec]) -> None:
     first_codec, *other_codecs = codecs
     for codec in other_codecs:
         if codec != first_codec:
@@ -63,7 +63,7 @@ def _check_same_codecs(codecs: List[Codec]) -> None:
             )
 
 
-def _check_same_chunk_shapes(chunks_list: List[Tuple[int, ...]]) -> None:
+def _check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
     """Check all the chunk shapes are the same"""
 
     first_chunks, *other_chunks_list = chunks_list
@@ -78,7 +78,7 @@ def _check_same_chunk_shapes(chunks_list: List[Tuple[int, ...]]) -> None:
 @implements(np.result_type)
 def result_type(*arrays_and_dtypes) -> np.dtype:
     """Called by xarray to ensure all arguments to concat have the same dtype."""
-    first_dtype, *other_dtypes = [np.dtype(obj) for obj in arrays_and_dtypes]
+    first_dtype, *other_dtypes = (np.dtype(obj) for obj in arrays_and_dtypes)
     for other_dtype in other_dtypes:
         if other_dtype != first_dtype:
             raise ValueError("dtypes not all consistent")
@@ -87,10 +87,10 @@ def result_type(*arrays_and_dtypes) -> np.dtype:
 
 @implements(np.concatenate)
 def concatenate(
-    arrays: Union[tuple["ManifestArray", ...], list["ManifestArray"]],
+    arrays: tuple["ManifestArray", ...] | list["ManifestArray"],
     /,
     *,
-    axis: Union[int, None] = 0,
+    axis: int | None = 0,
 ) -> "ManifestArray":
     """
     Concatenate ManifestArrays by merging their chunk manifests.
@@ -183,7 +183,7 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
 
 @implements(np.stack)
 def stack(
-    arrays: Union[tuple["ManifestArray", ...], list["ManifestArray"]],
+    arrays: tuple["ManifestArray", ...] | list["ManifestArray"],
     /,
     *,
     axis: int = 0,
@@ -248,7 +248,7 @@ def stack(
     return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
 
 
-def _check_same_shapes(shapes: List[Tuple[int, ...]]) -> None:
+def _check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
     first_shape, *other_shapes = shapes
     for other_shape in other_shapes:
         if other_shape != first_shape:
@@ -265,7 +265,7 @@ def expand_dims(x: "ManifestArray", /, *, axis: int = 0) -> "ManifestArray":
 
 
 @implements(np.broadcast_to)
-def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArray":
+def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArray":
     """
     Broadcasts a ManifestArray to a specified shape, by either adjusting chunk keys or copying chunk manifest entries.
     """
@@ -320,7 +320,7 @@ def broadcast_to(x: "ManifestArray", /, shape: Tuple[int, ...]) -> "ManifestArra
 
 @implements(np.full_like)
 def full_like(
-    x: "ManifestArray", /, fill_value: bool, *, dtype: Union[np.dtype, None]
+    x: "ManifestArray", /, fill_value: bool, *, dtype: np.dtype | None
 ) -> np.ndarray:
     """
     Returns a new array filled with fill_value and having the same shape as an input array x.

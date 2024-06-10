@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Tuple, Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -26,8 +26,8 @@ class ManifestArray:
 
     def __init__(
         self,
-        zarray: Union[ZArray, dict],
-        chunkmanifest: Union[dict, ChunkManifest],
+        zarray: ZArray | dict,
+        chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
         Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
@@ -83,7 +83,7 @@ class ManifestArray:
         return self._zarray
 
     @property
-    def chunks(self) -> Tuple[int, ...]:
+    def chunks(self) -> tuple[int, ...]:
         return tuple(self.zarray.chunks)
 
     @property
