@@ -46,6 +46,7 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
+    "imagecodecs-numcodecs",
 ]
 
 

@@ -9,7 +9,7 @@ from numcodecs.fixedscaleoffset import FixedScaleOffset
 from pydantic import BaseModel, validator
 from xarray.coding.variables import _choose_float_dtype
 
-_non_standard_filters = {"gzip": "zlib"}
+_non_standard_filters = {"gzip": "zlib", "lzf": "imagecodecs_lzf"}
 
 
 class BloscProperties(BaseModel):

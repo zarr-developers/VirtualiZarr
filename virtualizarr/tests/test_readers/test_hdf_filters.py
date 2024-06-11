@@ -1,7 +1,7 @@
 import h5py
+import imagecodecs
 import numcodecs
 import numpy as np
-import pytest
 
 from virtualizarr.readers.hdf_filters import (
     _filter_to_codec,
@@ -15,9 +15,9 @@ class TestFilterToCodec:
         codec = _filter_to_codec("gzip", 1)
         assert isinstance(codec, numcodecs.zlib.Zlib)
 
-    def test_lzf_not_available(self):
-        with pytest.raises(ValueError, match="codec not available"):
-            _filter_to_codec("lzf")
+    def test_lzf(self):
+        codec = _filter_to_codec("lzf")
+        assert isinstance(codec, imagecodecs.numcodecs.Lzf)
 
     def test_blosc(self):
         codec = _filter_to_codec("32001", (2, 2, 8, 800, 9, 2, 1))
