@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.5.0",
@@ -63,11 +63,7 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-write_to = "virtualizarr/_version.py"
-write_to_template = '''
-# Do not change! Do not track in version control!
-__version__ = "{version}"
-'''
+fallback_version = "9999"
 
 [tool.setuptools.packages.find]
 exclude = ["docs", "tests", "tests.*", "docs.*"]

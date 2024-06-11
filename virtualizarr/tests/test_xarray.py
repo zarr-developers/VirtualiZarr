@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -303,3 +304,16 @@ class TestLoadVirtualDataset:
         for name in full_ds.variables:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+
+    @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
+    def test_open_virtual_dataset_passes_expected_args(
+        self, mock_read_kerchunk, netcdf4_file
+    ):
+        reader_options = {"option1": "value1", "option2": "value2"}
+        open_virtual_dataset(netcdf4_file, indexes={}, reader_options=reader_options)
+        args = {
+            "filepath": netcdf4_file,
+            "filetype": None,
+            "reader_options": reader_options,
+        }
+        mock_read_kerchunk.assert_called_once_with(**args)
