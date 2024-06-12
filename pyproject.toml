@@ -45,6 +45,7 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
+    "hypothesis",
 ]
 
 
@@ -61,11 +62,8 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-write_to = "virtualizarr/_version.py"
-write_to_template = '''
-# Do not change! Do not track in version control!
-__version__ = "{version}"
-'''
+local_scheme = "guess-next-dev"
+fallback_version = "9999"
 
 [tool.setuptools.packages.find]
 exclude = ["docs", "tests", "tests.*", "docs.*"]

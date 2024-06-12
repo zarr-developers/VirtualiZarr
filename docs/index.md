@@ -83,4 +83,5 @@ usage
 faq
 api
 releases
+contributing
 ```
