@@ -27,10 +27,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install setuptools setuptools-scm wheel twine check-manifest
-      - name: Build tarball and wheels
-        run: |
           git clean -xdf
           git restore -SW .
+      # This step is only necessary for testing purposes and for TestPyPI
+      - name: Fix up version string for TestPyPI
+        if: ${{ !startsWith(github.ref, 'refs/tags') }}
+        run: |
+          # Change setuptools-scm local_scheme to "no-local-version" so the
+          # local part of the version isn't included, making the version string
+          # compatible with PyPI.
+          sed --in-place "s/guess-next-dev/no-local-version/g" pyproject.toml
+      - name: Build tarball and wheels
+        run: |
           python -m build --sdist --wheel .
       - name: Check built artifacts
         run: |
