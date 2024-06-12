@@ -51,9 +51,9 @@ jobs:
   test-built-dist:
     needs: build-artifacts
     runs-on: ubuntu-latest
-    # environment: # TODO: Have a VirtualiZarr maintainer create a test-release environment
-    #   name: test-release
-    #   url: https://test.pypi.org/p/virtualizarr
+    environment:
+      name: test-release
+      url: https://test.pypi.org/p/virtualizarr
     permissions:
       id-token: write # this permission is mandatory for trusted publishing
     steps:
@@ -87,9 +87,9 @@ jobs:
     needs: test-built-dist
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
-    # environment: # TODO: Have a VirtualiZarr maintainer create a release environment
-    #   name: release
-    #   url: https://pypi.org/p/virtualizarr
+    environment:
+      name: release
+      url: https://pypi.org/p/virtualizarr
     permissions:
       id-token: write # this permission is mandatory for trusted publishing
     steps:
