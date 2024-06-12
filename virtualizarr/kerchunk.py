@@ -112,7 +112,9 @@ def read_kerchunk_references_from_file(
 
 
 def _automatically_determine_filetype(
-    *, filepath: str, reader_options: Optional[dict[str, Any]] = None,
+    *,
+    filepath: str,
+    reader_options: Optional[dict[str, Any]] = None,
 ) -> FileType:
     file_extension = Path(filepath).suffix
     fpath = _fsspec_openfile_from_filepath(
