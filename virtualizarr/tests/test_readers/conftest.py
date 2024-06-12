@@ -137,7 +137,7 @@ def np_uncompressed():
     return np.arange(100)
 
 
-@pytest.fixture(params=["gzip", "blosc_lz4"])
+@pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd"])
 def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
     filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
@@ -151,6 +151,13 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
             data=np_uncompressed,
             **hdf5plugin.Blosc(cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE),
         )
+    if request.param == "lz4":
+        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.LZ4(nbytes=0))
+    if request.param == "bzip2":
+        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.BZip2())
+    if request.param == "zstd":
+        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.Zstd(clevel=2))
+
     return filepath
 
 

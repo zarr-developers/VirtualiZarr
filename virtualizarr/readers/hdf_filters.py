@@ -9,7 +9,12 @@ from numcodecs.fixedscaleoffset import FixedScaleOffset
 from pydantic import BaseModel, validator
 from xarray.coding.variables import _choose_float_dtype
 
-_non_standard_filters = {"gzip": "zlib", "lzf": "imagecodecs_lzf"}
+_non_standard_filters = {
+    "gzip": "zlib",
+    "lzf": "imagecodecs_lzf",
+}
+
+_hdf5plugin_imagecodecs = {"lz4": "imagecodecs_lz4h5", "bzip2": "imagecodecs_bz2"}
 
 
 class BloscProperties(BaseModel):
@@ -27,6 +32,10 @@ class BloscProperties(BaseModel):
         return blosc_compressor_codes[v]
 
 
+class ZstdProperties(BaseModel):
+    level: int
+
+
 class CFCodec(TypedDict):
     target_dtype: np.dtype
     codec: Codec
@@ -41,18 +50,20 @@ def _filter_to_codec(
         id_int = int(filter_id)
     except ValueError:
         id_str = filter_id
-
+    conf = {}
     if id_str:
         if id_str in _non_standard_filters.keys():
             id = _non_standard_filters[id_str]
         else:
             id = id_str
-        conf = {"id": id}
+        conf["id"] = id  # type: ignore[assignment]
         if id == "zlib":
             conf["level"] = filter_properties  # type: ignore[assignment]
     if id_int:
         filter = hdf5plugin.get_filters(id_int)[0]
         id = filter.filter_name
+        if id in _hdf5plugin_imagecodecs.keys():
+            id = _hdf5plugin_imagecodecs[id]
         if id == "blosc" and isinstance(filter_properties, tuple):
             blosc_props = BloscProperties(
                 **{
@@ -63,7 +74,11 @@ def _filter_to_codec(
                 }
             )
             conf = blosc_props.model_dump()  # type: ignore[assignment]
-            conf["id"] = id
+        if id == "zstd" and isinstance(filter_properties, tuple):
+            zstd_props = ZstdProperties(level=filter_properties[0])
+            conf = zstd_props.model_dump()  # type: ignore[assignment]
+
+        conf["id"] = id
 
     codec = registry.get_codec(conf)
     return codec
