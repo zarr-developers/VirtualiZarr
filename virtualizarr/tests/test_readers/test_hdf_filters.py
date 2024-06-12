@@ -31,6 +31,12 @@ class TestFilterToCodec:
         }
         assert codec.get_config() == expected_config
 
+    def test_zstd(self):
+        codec = _filter_to_codec("32015", (5,))
+        assert isinstance(codec, numcodecs.zstd.Zstd)
+        expected_config = {"id": "zstd", "level": 5}
+        assert codec.get_config() == expected_config
+
 
 class TestCodecsFromDataSet:
     def test_numcodec_decoding(self, np_uncompressed, filter_encoded_netcdf4_file):
