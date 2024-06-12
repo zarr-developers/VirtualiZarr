@@ -1,5 +1,4 @@
 import itertools
-from typing import Union
 
 import numpy as np
 
@@ -47,7 +46,7 @@ def create_manifestarray(
     return ManifestArray(chunkmanifest=chunkmanifest, zarray=zarray)
 
 
-def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, Union[str, int]]:
+def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
     """Generate a (somewhat) unique manifest entry from a given chunk key"""
     entry = {
         "path": f"file.{str(join(ind))}.nc",
