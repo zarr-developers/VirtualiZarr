@@ -1,6 +1,7 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
+from importlib.metadata import version
 from typing import Any, NewType, Tuple, Union, cast
 
 import numpy as np
@@ -16,6 +17,17 @@ _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, op
 
 
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]])
+
+# This is a hard-coded length as its the only option for backwards-compatibility
+# The actual choice of 32-bit length is arbitrary
+# TODO remove once all dependencies support numpy 2.0
+ValidStringDTypes = [np.dtype("<U32")]
+if version("numpy") >= "2.0.0":
+    from numpy.dtypes import StringDType  # type: ignore[attr-defined]
+
+    ValidStringDTypes.append(StringDType())
+# TODO get type hinting to work here
+T_ValidStringDTypes = Any
 
 
 class ChunkEntry(BaseModel):
@@ -70,7 +82,7 @@ class ChunkManifest:
     so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
     """
 
-    _paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]]
+    _paths: np.ndarray[Any, T_ValidStringDTypes]
     _offsets: np.ndarray[Any, np.dtype[np.int32]]
     _lengths: np.ndarray[Any, np.dtype[np.int32]]
 
@@ -98,8 +110,14 @@ class ChunkManifest:
         # in case there are not enough chunks to give correct idea of full shape?
         shape = get_chunk_grid_shape(entries.keys())
 
+        if version("numpy") < "2.0.0":
+            # TODO remove this backwards-compatibility branch once all dependencies support numpy 2.0
+            string_dtype = np.dtype("<U32")
+        else:
+            string_dtype = np.dtypes.StringDType()  # type: ignore[attr-defined]
+
         # Initializing to empty implies that entries with path='' are treated as missing chunks
-        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType)
+        paths = np.empty(shape=shape, dtype=string_dtype)
         offsets = np.empty(shape=shape, dtype=np.dtype("int32"))
         lengths = np.empty(shape=shape, dtype=np.dtype("int32"))
 
@@ -127,7 +145,7 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
-        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],
+        paths: np.ndarray[Any, np.dtype[T_ValidStringDTypes]],
         offsets: np.ndarray[Any, np.dtype[np.int32]],
         lengths: np.ndarray[Any, np.dtype[np.int32]],
     ) -> "ChunkManifest":
@@ -157,9 +175,9 @@ class ChunkManifest:
             )
 
         # check dtypes
-        if paths.dtype != np.dtypes.StringDType():
+        if paths.dtype not in ValidStringDTypes:
             raise ValueError(
-                f"paths array must have numpy dtype StringDType, but got dtype {paths.dtype}"
+                f"paths array must have a numpy string dtype (i.e. one of {ValidStringDTypes}), but got dtype {paths.dtype}"
             )
         if offsets.dtype != np.dtype("int32"):
             raise ValueError(

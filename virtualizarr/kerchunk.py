@@ -232,13 +232,13 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
 
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
-    from virtualizarr.manifests import ChunkEntry, ManifestArray
+    from virtualizarr.manifests import ManifestArray
 
     if isinstance(var.data, ManifestArray):
         marr = var.data
 
         arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): [entry['path'], entry['offset'], entry['length']]
+            str(chunk_key): [entry["path"], entry["offset"], entry["length"]]
             for chunk_key, entry in marr.manifest.dict().items()
         }
 
