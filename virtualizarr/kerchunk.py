@@ -2,7 +2,7 @@ import base64
 import json
 from enum import Enum, auto
 from pathlib import Path
-from typing import NewType, Optional, cast
+from typing import Any, NewType, Optional, cast
 
 import numpy as np
 import ujson  # type: ignore
@@ -53,9 +53,7 @@ class NumpyEncoder(json.JSONEncoder):
 def read_kerchunk_references_from_file(
     filepath: str,
     filetype: FileType | None,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
+    reader_options: Optional[dict[str, Any]] = None,
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -76,6 +74,9 @@ def read_kerchunk_references_from_file(
         filetype = _automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
+
+    if reader_options is None:
+        reader_options = {}
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -111,7 +112,9 @@ def read_kerchunk_references_from_file(
 
 
 def _automatically_determine_filetype(
-    *, filepath: str, reader_options: Optional[dict] = {}
+    *,
+    filepath: str,
+    reader_options: Optional[dict[str, Any]] = None,
 ) -> FileType:
     file_extension = Path(filepath).suffix
     fpath = _fsspec_openfile_from_filepath(
