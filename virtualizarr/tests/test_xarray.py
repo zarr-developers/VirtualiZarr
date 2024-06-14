@@ -274,7 +274,7 @@ pytest.importorskip("s3fs")
 
 
 @pytest.mark.parametrize(
-    "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
+    "filetype", ["hdf5", None], ids=["netcdf4 filetype", "None filetype"]
 )
 @pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
 def test_anon_read_s3(filetype, indexes):

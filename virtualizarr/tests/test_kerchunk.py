@@ -217,7 +217,7 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
     assert FileType("netcdf3") == _automatically_determine_filetype(
         filepath=netcdf3_file_path
     )
-    assert FileType("netcdf4") == _automatically_determine_filetype(
+    assert FileType("hdf5") == _automatically_determine_filetype(
         filepath=netcdf4_file_path
     )
 
@@ -225,7 +225,7 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
 def test_FileType():
     # tests if FileType converts user supplied strings to correct filetype
     assert "netcdf3" == FileType("netcdf3").name
-    assert "netcdf4" == FileType("netcdf4").name
+    assert "hdf5" == FileType("hdf5").name
     assert "grib" == FileType("grib").name
     assert "tiff" == FileType("tiff").name
     assert "fits" == FileType("fits").name
