@@ -121,7 +121,7 @@ def _automatically_determine_filetype(
         filepath=filepath, reader_options=reader_options
     )
 
-    if file_extension == ".nc":
+    if file_extension in [".nc",".nc4",".hdf",".h5"]:
         # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
         magic = fpath.read()
 
@@ -136,7 +136,7 @@ def _automatically_determine_filetype(
         raise NotImplementedError()
     elif file_extension == ".grib":
         filetype = FileType.grib
-    elif file_extension == ".tiff":
+    elif file_extension in [".tif",".tiff"]:
         filetype = FileType.tiff
     elif file_extension == ".fits":
         filetype = FileType.fits
