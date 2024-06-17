@@ -1,10 +1,13 @@
 import itertools
 
 import numpy as np
+import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray, ceildiv
+
+network = pytest.mark.network
 
 
 def create_manifestarray(
