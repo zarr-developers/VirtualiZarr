@@ -1,5 +1,8 @@
+import hypothesis.extra.numpy as npst
+import hypothesis.strategies as st
 import numpy as np
 import pytest
+from hypothesis import given
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import create_manifestarray
@@ -131,6 +134,33 @@ class TestBroadcast:
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
         assert expanded.manifest == marr.manifest
+
+    @given(st.data())
+    def test_broadcast_any_shape(self, data):
+        # Generate arbitary ManifestArray with arbitrary chunk shape
+        original_shape = data.draw(npst.array_shapes())
+        arr_ndim = len(original_shape)
+        chunk_shape = data.draw(
+            npst.array_shapes(
+                min_dims=arr_ndim, max_dims=arr_ndim, max_side=max(original_shape)
+            )
+        )
+        marr = create_manifestarray(shape=original_shape, chunks=chunk_shape)
+
+        # generate arbitrary broadcastable shape to broadcast to
+        target_broadcast_shape = data.draw(npst.broadcastable_shapes(marr.shape))
+
+        # do the broadcasting
+        broadcasted_marr = np.broadcast_to(marr, shape=target_broadcast_shape)
+        broadcasted_chunk_shape = broadcasted_marr.chunks
+
+        # check that the resultant shape is correct
+        assert broadcasted_marr.shape == target_broadcast_shape
+
+        # check that chunk shape has plausible ndims and lengths
+        assert broadcasted_chunk_shape.ndim == broadcasted_marr.ndim
+        for len_arr, len_chunk in zip(broadcasted_chunk_shape, broadcasted_marr):
+            assert len_chunk <= len_arr
 
 
 # TODO we really need some kind of fixtures to generate useful example data
