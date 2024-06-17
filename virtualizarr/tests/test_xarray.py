@@ -271,9 +271,6 @@ class TestCombineUsingIndexes:
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
 
-pytest.importorskip("s3fs")
-
-
 @network
 @requires_s3fs
 class TestReadFromS3:
