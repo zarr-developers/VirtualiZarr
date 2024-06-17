@@ -1,10 +1,38 @@
+import importlib
 import itertools
 
 import numpy as np
+import pytest
+from packaging.version import Version
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray, ceildiv
+
+network = pytest.mark.network
+
+
+def _importorskip(
+    modname: str, minversion: str | None = None
+) -> tuple[bool, pytest.MarkDecorator]:
+    try:
+        mod = importlib.import_module(modname)
+        has = True
+        if minversion is not None:
+            v = getattr(mod, "__version__", "999")
+            if Version(v) < Version(minversion):
+                raise ImportError("Minimum version not satisfied")
+    except ImportError:
+        has = False
+
+    reason = f"requires {modname}"
+    if minversion is not None:
+        reason += f">={minversion}"
+    func = pytest.mark.skipif(not has, reason=reason)
+    return has, func
+
+
+has_s3fs, requires_s3fs = _importorskip("s3fs")
 
 
 def create_manifestarray(

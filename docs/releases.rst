@@ -29,6 +29,9 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Mark tests which require network access so that they are only run when `--run-network-tests` is passed a command-line argument to pytest.
+  (:pull:`144`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 .. _v0.1:
 
 v0.1 (17th June 2024)
