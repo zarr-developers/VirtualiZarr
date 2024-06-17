@@ -9,6 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import network
 from virtualizarr.zarr import ZArray
 
 
@@ -273,19 +274,23 @@ class TestCombineUsingIndexes:
 pytest.importorskip("s3fs")
 
 
-@pytest.mark.parametrize(
-    "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
-)
-@pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
-def test_anon_read_s3(filetype, indexes):
-    """Parameterized tests for empty vs supplied indexes and filetypes."""
-    # TODO: Switch away from this s3 url after minIO is implemented.
-    fpath = "s3://carbonplan-share/virtualizarr/local.nc"
-    vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
+@network
+class TestReadFromS3:
+    @pytest.mark.parametrize(
+        "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
+    )
+    @pytest.mark.parametrize(
+        "indexes", [None, {}], ids=["None index", "empty dict index"]
+    )
+    def test_anon_read_s3(self, filetype, indexes):
+        """Parameterized tests for empty vs supplied indexes and filetypes."""
+        # TODO: Switch away from this s3 url after minIO is implemented.
+        fpath = "s3://carbonplan-share/virtualizarr/local.nc"
+        vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
 
-    assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
-    for var in vds.variables:
-        assert isinstance(vds[var].data, ManifestArray), var
+        assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+        for var in vds.variables:
+            assert isinstance(vds[var].data, ManifestArray), var
 
 
 class TestLoadVirtualDataset:
