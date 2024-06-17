@@ -9,7 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import network
+from virtualizarr.tests import network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -275,6 +275,7 @@ pytest.importorskip("s3fs")
 
 
 @network
+@requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
         "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]

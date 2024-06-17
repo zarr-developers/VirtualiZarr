@@ -16,7 +16,7 @@ def pytest_runtest_setup(item):
     # based on https://stackoverflow.com/questions/47559524
     if "network" in item.keywords and not item.config.getoption("--run-network-tests"):
         pytest.skip(
-            "set --run-network-tests to run test requiring an internet connection"
+            "set --run-network-tests to run tests requiring an internet connection"
         )
 
 
