@@ -61,7 +61,6 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-local_scheme = "guess-next-dev"
 fallback_version = "9999"
 
 [tool.setuptools.packages.find]
