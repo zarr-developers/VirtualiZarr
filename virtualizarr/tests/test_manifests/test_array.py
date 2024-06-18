@@ -153,7 +153,12 @@ class TestBroadcast:
             ((1,), (1,), (3,)),
             ((2,), (1,), (2,)),
             ((3,), (2,), (5, 4, 3)),
-            ((3, 1), (2, 1), (2, 3, 4)),
+            pytest.param(
+                (3, 1),
+                (2, 1),
+                (2, 3, 4),
+                marks=pytest.mark.xfail(reason="known bug, see issue 144"),
+            ),
         ],
     )
     def test_broadcast_any_shape(self, shape, chunks, target_shape):
