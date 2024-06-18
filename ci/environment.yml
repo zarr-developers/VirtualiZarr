@@ -1,0 +1,28 @@
+name: virtualizarr-tests
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - xarray>=2024.5.0
+  - kerchunk>=0.2.5
+  - pydantic
+  - numpy
+  - ujson
+  - packaging
+  - universal_pathlib
+  # Testing
+  - codecov
+  - pre-commit
+  - ruff
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - scipy
+  - fsspec
+  - s3fs
+  - fastparquet
