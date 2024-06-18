@@ -70,7 +70,7 @@ class ChunkManifest:
     so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
     """
 
-    _paths: np.ndarray[Any, np.dtypes.StringDType]
+    _paths: np.ndarray[Any, np.dtypes.StringDType]  # type: ignore[name-defined]
     _offsets: np.ndarray[Any, np.dtype[np.int32]]
     _lengths: np.ndarray[Any, np.dtype[np.int32]]
 
@@ -99,7 +99,7 @@ class ChunkManifest:
         shape = get_chunk_grid_shape(entries.keys())
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
-        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())
+        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())  # type: ignore[attr-defined]
         offsets = np.empty(shape=shape, dtype=np.dtype("int32"))
         lengths = np.empty(shape=shape, dtype=np.dtype("int32"))
 
@@ -127,7 +127,7 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
-        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],
+        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],  # type: ignore[name-defined]
         offsets: np.ndarray[Any, np.dtype[np.int32]],
         lengths: np.ndarray[Any, np.dtype[np.int32]],
     ) -> "ChunkManifest":
@@ -157,7 +157,7 @@ class ChunkManifest:
             )
 
         # check dtypes
-        if paths.dtype != np.dtypes.StringDType():
+        if paths.dtype != np.dtypes.StringDType():  # type: ignore[attr-defined]
             raise ValueError(
                 f"paths array must have a numpy variable-length string dtype, but got dtype {paths.dtype}"
             )

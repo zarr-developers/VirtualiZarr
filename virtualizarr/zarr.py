@@ -109,7 +109,7 @@ class ZArray(BaseModel):
         compressor: Optional[str] = None,
         dtype: Optional[np.dtype] = None,
         fill_value: Optional[float] = None,  # float or int?
-        filters: Optional[list[dict]] = None,
+        filters: Optional[list[dict]] = None,  # type: ignore[valid-type]
         order: Optional[Literal["C"] | Literal["F"]] = None,
         shape: Optional[tuple[int, ...]] = None,
         zarr_format: Optional[Literal[2] | Literal[3]] = None,
