@@ -1,8 +1,5 @@
-import hypothesis.extra.numpy as npst
-import hypothesis.strategies as st
 import numpy as np
 import pytest
-from hypothesis import given
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import create_manifestarray
@@ -165,31 +162,43 @@ class TestBroadcast:
             "0": {"path": "file.0.nc", "offset": 0, "length": 5},
         }
 
-    @given(st.data())
-    def test_broadcast_any_shape(self, data):
-        # Generate arbitary ManifestArray with arbitrary chunk shape
-        original_shape = data.draw(npst.array_shapes())
-        arr_ndim = len(original_shape)
-        chunk_shape = data.draw(
-            npst.array_shapes(
-                min_dims=arr_ndim, max_dims=arr_ndim, max_side=max(original_shape)
-            )
-        )
-        marr = create_manifestarray(shape=original_shape, chunks=chunk_shape)
+    @pytest.mark.parametrize(
+        "shape, chunks, target_shape",
+        [
+            ((1,), (1,), ()),
+            ((2,), (1,), (1,)),
+            ((3,), (2,), (5, 4, 4)),
+            ((3, 2), (2, 2), (2, 3, 4)),
+        ],
+    )
+    def test_raise_on_invalid_broadcast_shapes(self, shape, chunks, target_shape):
+        marr = create_manifestarray(shape=shape, chunks=chunks)
+        with pytest.raises(ValueError):
+            np.broadcast_to(marr, shape=target_shape)
 
-        # generate arbitrary broadcastable shape to broadcast to
-        target_broadcast_shape = data.draw(npst.broadcastable_shapes(marr.shape))
+    # TODO replace this parametrization with hypothesis strategies
+    @pytest.mark.parametrize(
+        "shape, chunks, target_shape",
+        [
+            ((1,), (1,), (3,)),
+            ((2,), (1,), (2,)),
+            ((3,), (2,), (5, 4, 3)),
+            ((3, 1), (2, 1), (2, 3, 4)),
+        ],
+    )
+    def test_broadcast_any_shape(self, shape, chunks, target_shape):
+        marr = create_manifestarray(shape=shape, chunks=chunks)
 
         # do the broadcasting
-        broadcasted_marr = np.broadcast_to(marr, shape=target_broadcast_shape)
-        broadcasted_chunk_shape = broadcasted_marr.chunks
+        broadcasted_marr = np.broadcast_to(marr, shape=target_shape)
 
         # check that the resultant shape is correct
-        assert broadcasted_marr.shape == target_broadcast_shape
+        assert broadcasted_marr.shape == target_shape
 
         # check that chunk shape has plausible ndims and lengths
-        assert broadcasted_chunk_shape.ndim == broadcasted_marr.ndim
-        for len_arr, len_chunk in zip(broadcasted_chunk_shape, broadcasted_marr):
+        broadcasted_chunk_shape = broadcasted_marr.chunks
+        assert len(broadcasted_chunk_shape) == broadcasted_marr.ndim
+        for len_arr, len_chunk in zip(broadcasted_marr.shape, broadcasted_chunk_shape):
             assert len_chunk <= len_arr
 
 
