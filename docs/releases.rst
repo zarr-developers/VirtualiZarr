@@ -13,6 +13,8 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- Requires numpy 2.0 (for :pull:`107`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -29,6 +31,8 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Refactor `ChunkManifest` class to store chunk references internally using numpy arrays.
+  (:pull:`107`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Mark tests which require network access so that they are only run when `--run-network-tests` is passed a command-line argument to pytest.
   (:pull:`144`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 

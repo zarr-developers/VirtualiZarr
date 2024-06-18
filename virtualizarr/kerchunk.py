@@ -241,8 +241,8 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
         marr = var.data
 
         arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): chunk_entry.to_kerchunk()
-            for chunk_key, chunk_entry in marr.manifest.entries.items()
+            str(chunk_key): [entry["path"], entry["offset"], entry["length"]]
+            for chunk_key, entry in marr.manifest.dict().items()
         }
 
         zarray = marr.zarray

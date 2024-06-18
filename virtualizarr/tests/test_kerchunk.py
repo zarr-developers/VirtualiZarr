@@ -6,7 +6,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
 
@@ -68,8 +68,11 @@ def test_dataset_from_df_refs_with_filters():
 
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),
@@ -97,8 +100,11 @@ class TestAccessor:
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_json(self, tmp_path):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),

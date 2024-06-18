@@ -124,13 +124,43 @@ class TestEquals:
 
 
 class TestBroadcast:
+    def test_broadcast_existing_axis(self):
+        marr = create_manifestarray(shape=(1, 2), chunks=(1, 2))
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.chunks == (1, 2)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "1.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "2.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+        }
+
+    def test_broadcast_new_axis(self):
+        marr = create_manifestarray(shape=(3,), chunks=(1,))
+        expanded = np.broadcast_to(marr, shape=(1, 3))
+        assert expanded.shape == (1, 3)
+        assert expanded.chunks == (1, 1)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.nc", "offset": 0, "length": 5},
+            "0.1": {"path": "file.1.nc", "offset": 10, "length": 6},
+            "0.2": {"path": "file.2.nc", "offset": 20, "length": 7},
+        }
+
     def test_broadcast_scalar(self):
         # regression test
         marr = create_manifestarray(shape=(), chunks=())
+        assert marr.shape == ()
+        assert marr.chunks == ()
+        assert marr.manifest.dict() == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
+
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
-        assert expanded.manifest == marr.manifest
+        assert expanded.manifest.dict() == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
 
     @pytest.mark.parametrize(
         "shape, chunks, target_shape",
@@ -153,12 +183,7 @@ class TestBroadcast:
             ((1,), (1,), (3,)),
             ((2,), (1,), (2,)),
             ((3,), (2,), (5, 4, 3)),
-            pytest.param(
-                (3, 1),
-                (2, 1),
-                (2, 3, 4),
-                marks=pytest.mark.xfail(reason="known bug, see issue 144"),
-            ),
+            ((3, 1), (2, 1), (2, 3, 4)),
         ],
     )
     def test_broadcast_any_shape(self, shape, chunks, target_shape):
@@ -285,28 +310,30 @@ def test_refuse_combine():
     chunks_dict1 = {
         "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
     }
+    chunkmanifest1 = ChunkManifest(entries=chunks_dict1)
     chunks_dict2 = {
         "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
     }
-    marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunks_dict1)
+    chunkmanifest2 = ChunkManifest(entries=chunks_dict2)
+    marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunkmanifest1)
 
     zarray_wrong_compressor = zarray_common.copy()
     zarray_wrong_compressor["compressor"] = None
-    marr2 = ManifestArray(zarray=zarray_wrong_compressor, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_compressor, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
     zarray_wrong_dtype = zarray_common.copy()
     zarray_wrong_dtype["dtype"] = np.dtype("int64")
-    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
 
     zarray_wrong_dtype = zarray_common.copy()
     zarray_wrong_dtype["dtype"] = np.dtype("int64")
-    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
