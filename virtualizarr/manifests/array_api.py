@@ -1,4 +1,3 @@
-import itertools
 from typing import TYPE_CHECKING, Callable, Iterable
 
 import numpy as np
@@ -144,6 +143,7 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
+    # chunk shape has not changed, there are just now more chunks along the concatenation axis
     new_zarray = first_arr.zarray.replace(
         shape=tuple(new_shape),
     )
@@ -235,7 +235,7 @@ def stack(
         lengths=stacked_lengths,
     )
 
-    # chunk size has changed because a length-1 axis has been inserted
+    # chunk shape has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
@@ -272,47 +272,60 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     from .array import ManifestArray
 
-    # iterate from last axis to first here so that the fillvalue of 1 is inserted at the start of the shape
-    # i.e. to follow numpy's broadcasting rules
-    new_chunk_grid_shape = tuple(
-        reversed(
-            [
-                ceildiv(axis_length, chunk_length)
-                for axis_length, chunk_length in itertools.zip_longest(
-                    shape[::-1], x.chunks[::-1], fillvalue=1
-                )
-            ]
+    new_shape = shape
+
+    # check its actually possible to broadcast to this new shape
+    mutually_broadcastable_shape = np.broadcast_shapes(x.shape, new_shape)
+    if mutually_broadcastable_shape != new_shape:
+        # we're not trying to broadcast both shapes to a third shape
+        raise ValueError(
+            f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
         )
+
+    # new chunk_shape is old chunk_shape with singleton dimensions pre-pended
+    # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
+    old_chunk_shape = x.chunks
+    new_chunk_shape = _prepend_singleton_dimensions(
+        old_chunk_shape, ndim=len(new_shape)
+    )
+
+    # find new chunk grid shape by dividing new array shape by new chunk shape
+    new_chunk_grid_shape = tuple(
+        ceildiv(axis_length, chunk_length)
+        for axis_length, chunk_length in zip(new_shape, new_chunk_shape)
     )
 
     # do broadcasting of entries in manifest
-    broadcast_paths = np.broadcast_to(x.manifest._paths, shape=new_chunk_grid_shape)
-    broadcast_offsets = np.broadcast_to(
+    broadcasted_paths = np.broadcast_to(
+        x.manifest._paths,
+        shape=new_chunk_grid_shape,
+    )
+    broadcasted_offsets = np.broadcast_to(
         x.manifest._offsets,
         shape=new_chunk_grid_shape,
     )
-    broadcast_lengths = np.broadcast_to(
+    broadcasted_lengths = np.broadcast_to(
         x.manifest._lengths,
         shape=new_chunk_grid_shape,
     )
-    broadcast_manifest = ChunkManifest.from_arrays(
-        paths=broadcast_paths,
-        offsets=broadcast_offsets,
-        lengths=broadcast_lengths,
-    )
-
-    new_shape = np.broadcast_shapes(x.shape, shape)
-    new_chunks = tuple(
-        ceildiv(axis_length, chunk_grid_length)
-        for axis_length, chunk_grid_length in zip(new_shape, new_chunk_grid_shape)
+    broadcasted_manifest = ChunkManifest.from_arrays(
+        paths=broadcasted_paths,
+        offsets=broadcasted_offsets,
+        lengths=broadcasted_lengths,
     )
 
     new_zarray = x.zarray.replace(
-        chunks=new_chunks,
+        chunks=new_chunk_shape,
         shape=new_shape,
     )
 
-    return ManifestArray(chunkmanifest=broadcast_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+
+
+def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:
+    """Prepend as many new length-1 axes to shape as necessary such that the result has ndim number of axes."""
+    n_prepended_dims = ndim - len(shape)
+    return tuple([1] * n_prepended_dims + list(shape))
 
 
 # TODO broadcast_arrays, squeeze, permute_dims
