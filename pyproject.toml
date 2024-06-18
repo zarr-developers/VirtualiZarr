@@ -45,7 +45,6 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
-    "hypothesis",
 ]
 
 
