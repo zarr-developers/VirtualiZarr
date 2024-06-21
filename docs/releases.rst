@@ -9,6 +9,8 @@ v0.2 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- New ``cftime_variables`` option on ``open_virtual_dataset`` enables encoding/decoding time.
+  (:pull:`122`) By `Julia Signell <https://github.com/jsignell>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
