@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import io
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -59,3 +60,34 @@ def _fsspec_openfile_from_filepath(
     fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
 
     return fpath
+
+
+def encode_cftime(var):
+    import cftime
+
+    calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
+    units = var.attrs.get("units", var.encoding["units"])
+
+    return cftime.date2num(var.data, calendar=calendar, units=units).ravel()
+
+
+def decode_cftime(var):
+    import cftime
+
+    calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
+    units = var.attrs.get("units", var.encoding["units"])
+
+    # undoing CF recoding in original input
+    values = []
+    for c in var.values:
+        value = cftime.num2date(
+            cftime.date2num(
+                datetime.datetime.fromisoformat(str(c)),
+                calendar=calendar,
+                units=units,
+            ),
+            calendar=calendar,
+            units=units,
+        )
+        values.append(value)
+    return values

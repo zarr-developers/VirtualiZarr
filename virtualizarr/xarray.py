@@ -1,4 +1,3 @@
-import datetime
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
@@ -17,7 +16,7 @@ from xarray.core.variable import IndexVariable
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.utils import _fsspec_openfile_from_filepath, decode_cftime
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,
@@ -163,27 +162,8 @@ def open_virtual_dataset(
             }
 
             for name in cftime_variables:
-                import cftime
-
                 var = ds[name]
-                calendar = var.attrs.get(
-                    "calendar", var.encoding.get("calendar", "standard")
-                )
-                units = var.attrs.get("units", var.encoding["units"])
-
-                # undoing CF recoding in original input
-                values = []
-                for c in var.values:
-                    value = cftime.num2date(
-                        cftime.date2num(
-                            datetime.datetime.fromisoformat(str(c).split(".")[0]),
-                            calendar=calendar,
-                            units=units,
-                        ),
-                        calendar=calendar,
-                        units=units,
-                    )
-                    values.append(value)
+                values = decode_cftime(var)
                 loadable_vars[name] = loadable_vars[name].copy(data=values)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy

@@ -64,12 +64,10 @@ class TestKerchunkRoundtrip:
         # assert equal to original dataset
         xrt.assert_equal(roundtrip, ds)
 
-    def test_kerchunk_roundtrip_concat(self, tmpdir, format):
+    @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
+    def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=True)
-
-        # delete the encoding since this is now incorrect
-        del ds.time.encoding["units"]
+        ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
 
         # split into two datasets
         ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
@@ -82,14 +80,14 @@ class TestKerchunkRoundtrip:
         vds1 = open_virtual_dataset(
             f"{tmpdir}/air1.nc",
             indexes={},
-            loadable_variables=["time"],
-            cftime_variables=["time"],
+            loadable_variables=time_vars,
+            cftime_variables=time_vars,
         )
         vds2 = open_virtual_dataset(
             f"{tmpdir}/air2.nc",
             indexes={},
-            loadable_variables=["time"],
-            cftime_variables=["time"],
+            loadable_variables=time_vars,
+            cftime_variables=time_vars,
         )
 
         # concatenate virtually along time
@@ -100,7 +98,7 @@ class TestKerchunkRoundtrip:
 
         # use fsspec to read the dataset from disk via the zarr store
         roundtrip = xr.open_dataset(
-            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=True
+            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=decode_times
         )
 
         # assert equal to original dataset
