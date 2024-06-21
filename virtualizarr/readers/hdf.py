@@ -39,34 +39,33 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
                 path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
             )
             chunk_key = ChunkKey(key)
-            chunk_entries = {chunk_key: chunk_entry}
+            chunk_entries = {chunk_key: chunk_entry.dict()}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
             return chunk_manifest
     else:
         num_chunks = dsid.get_num_chunks()
         if num_chunks == 0:
             raise ValueError("The dataset is chunked but contains no chunks")
+        paths = np.full(num_chunks, path, dtype=np.dtypes.StringDType)  # type: ignore
+        offsets = np.empty((num_chunks), dtype=np.int32)
+        lengths = np.empty((num_chunks), dtype=np.int32)
 
-        chunk_entries = dict()
-
-        def get_key(blob):
-            key_list = [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
-            key = ".".join(map(str, key_list))
-            return key
-
-        def store_chunk_entry(blob):
-            chunk_entries[get_key(blob)] = ChunkEntry(
-                path=path, offset=blob.byte_offset, length=blob.size
-            )
+        def add_chunk_info(blob, chunk_index):
+            offsets[chunk_index] = blob.byte_offset
+            lengths[chunk_index] = blob.size
+            chunk_index += 1
 
         has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
         if has_chunk_iter:
-            dsid.chunk_iter(store_chunk_entry)
+            chunk_index = 0
+            dsid.chunk_iter(add_chunk_info, chunk_index)
         else:
             for index in range(num_chunks):
-                store_chunk_entry(dsid.get_chunk_info(index))
+                add_chunk_info(dsid.get_chunk_info(index), index)
 
-        chunk_manifest = ChunkManifest(entries=chunk_entries)
+        chunk_manifest = ChunkManifest.from_arrays(
+            paths=paths, offsets=offsets, lengths=lengths
+        )
         return chunk_manifest
 
 
