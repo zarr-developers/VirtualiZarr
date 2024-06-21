@@ -4,9 +4,14 @@ import datetime
 import io
 from typing import TYPE_CHECKING, Optional, Union
 
+import numpy as np
+
 if TYPE_CHECKING:
+    import cftime
     import fsspec.core
     import fsspec.spec
+    import xarray as xr
+    from numpy.typing import NDArray
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[
@@ -62,7 +67,21 @@ def _fsspec_openfile_from_filepath(
     return fpath
 
 
-def encode_cftime(var):
+def encode_cftime(var: xr.Variable) -> NDArray[np.int64 | np.float64]:
+    """Encode time variable
+
+    Parameters
+    ----------
+    var : xr.Variable
+        Variable containing cftime.datetime values and encoding information in
+        ``var.encoding`` or ``var.attributes,
+
+    Returns
+    -------
+    NDArray[np.int64 | np.float64]
+        Numpy array of values encoded according to the units and calendar specified
+        by encoding on ``var``
+    """
     import cftime
 
     calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
@@ -71,13 +90,25 @@ def encode_cftime(var):
     return cftime.date2num(var.data, calendar=calendar, units=units).ravel()
 
 
-def decode_cftime(var):
+def recode_cftime(var: xr.Variable) -> NDArray[cftime.datetime]:
+    """Recode time variable from np.datetime to cf.datetime
+
+    Parameters
+    ----------
+    var : xr.Variable
+        Variable containing np.datetime64 values and encoding information in
+        `var.encoding`` or ``var.attributes``
+
+    Returns
+    -------
+    NDArray[cftime.datetime]
+        Numpy array of cftime.datetime values
+    """
     import cftime
 
     calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
     units = var.attrs.get("units", var.encoding["units"])
 
-    # undoing CF recoding in original input
     values = []
     for c in var.values:
         value = cftime.num2date(
@@ -90,4 +121,4 @@ def decode_cftime(var):
             units=units,
         )
         values.append(value)
-    return values
+    return np.array(values)

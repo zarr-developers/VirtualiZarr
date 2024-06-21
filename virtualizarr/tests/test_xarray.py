@@ -320,3 +320,10 @@ class TestLoadVirtualDataset:
             "reader_options": reader_options,
         }
         mock_read_kerchunk.assert_called_once_with(**args)
+
+
+def test_cftime_variables_must_be_in_loadable_variables(tmpdir):
+    ds = xr.Dataset(data_vars={"time": ["2024-06-21"]})
+    ds.to_netcdf(f"{tmpdir}/scalar.nc")
+    with pytest.raises(ValueError, match="'time' not in"):
+        open_virtual_dataset(f"{tmpdir}/scalar.nc", cftime_variables=["time"])

@@ -16,7 +16,7 @@ from xarray.core.variable import IndexVariable
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath, decode_cftime
+from virtualizarr.utils import _fsspec_openfile_from_filepath, recode_cftime
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,
@@ -72,8 +72,7 @@ def open_virtual_dataset(
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     cftime_variables : list[str], default is None
         Interpret the value of specified vars using cftime, returning a datetime.
-        These will be automatically re-encoded with cftime, unless you specify an “M8[*]”
-        dtype for the coordinate, in which case a conversion will be attempted. This list must be a subset
+        These will be automatically re-encoded with cftime. This list must be a subset
         of ``loadable_variables``.
     reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
@@ -108,9 +107,11 @@ def open_virtual_dataset(
     else:
         cftime_variables = list(cftime_variables)
 
-    if not set(cftime_variables).issubset(set(loadable_variables)):
+    if diff := (set(cftime_variables) - set(loadable_variables)):
+        missing_str = ", ".join([f"'{v}'" for v in diff])
         raise ValueError(
-            "All ``cftime_variables`` must be included in ``loadable_variables``"
+            "All ``cftime_variables`` must be included in ``loadable_variables`` "
+            f"({missing_str} not in ``loadable_variables``)"
         )
 
     if virtual_array_class is not ManifestArray:
@@ -163,7 +164,7 @@ def open_virtual_dataset(
 
             for name in cftime_variables:
                 var = ds[name]
-                values = decode_cftime(var)
+                values = recode_cftime(var)
                 loadable_vars[name] = loadable_vars[name].copy(data=values)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
