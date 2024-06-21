@@ -320,3 +320,32 @@ class TestLoadVirtualDataset:
             "reader_options": reader_options,
         }
         mock_read_kerchunk.assert_called_once_with(**args)
+
+
+class TestRenamePaths:
+    def test_rename_to_str(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert renamed_vds["air"].data.dict()["path"] == "s3://bucket/air.nc"
+
+    def test_rename_using_function(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        def local_to_s3_url(old_local_path: str) -> str:
+            from pathlib import Path
+
+            new_s3_bucket_url = "s3://bucket/"
+
+            filename = Path(old_local_path).name
+            return str(new_s3_bucket_url + filename)
+
+        renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+        assert renamed_vds["air"].data.dict()["path"] == "s3://bucket/air.nc"
+
+    def test_invalid_type(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        with pytest.raises(TypeError):
+            vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+
+    # TODO test mixture of ManifestArrays and numpy arrays
