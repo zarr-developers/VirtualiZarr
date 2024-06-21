@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+import io
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
-    from fsspec.implementations.local import LocalFileOpener
-    from s3fs.core import S3File
+    import fsspec.core
+    import fsspec.spec
+
+    # See pangeo_forge_recipes.storage
+    OpenFileType = Union[
+        fsspec.core.OpenFile, fsspec.spec.AbstractBufferedFile, io.IOBase
+    ]
 
 
 def _fsspec_openfile_from_filepath(
     *,
     filepath: str,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
-) -> S3File | LocalFileOpener:
+    reader_options: Optional[dict] = {},
+) -> OpenFileType:
     """Converts input filepath to fsspec openfile object.
 
     Parameters
@@ -25,8 +29,8 @@ def _fsspec_openfile_from_filepath(
 
     Returns
     -------
-    S3File | LocalFileOpener
-        Either S3File or LocalFileOpener, depending on which protocol was supplied.
+    OpenFileType
+        An open file-like object, specific to the protocol supplied in filepath.
 
     Raises
     ------
@@ -40,25 +44,18 @@ def _fsspec_openfile_from_filepath(
     universal_filepath = UPath(filepath)
     protocol = universal_filepath.protocol
 
-    if protocol == "":
-        fpath = fsspec.open(filepath, "rb").open()
-
-    elif protocol in ["s3"]:
-        s3_anon_defaults = {"key": "", "secret": "", "anon": True}
-        if not bool(reader_options):
-            storage_options = s3_anon_defaults
-
-        else:
-            storage_options = reader_options.get("storage_options")  # type: ignore
-
-            # using dict merge operator to add in defaults if keys are not specified
-            storage_options = s3_anon_defaults | storage_options
-
-        fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
-
+    if protocol == "s3":
+        protocol_defaults = {"key": "", "secret": "", "anon": True}
     else:
-        raise NotImplementedError(
-            "Only local and s3 file protocols are currently supported"
-        )
+        protocol_defaults = {}
+
+    if reader_options is None:
+        reader_options = {}
+
+    storage_options = reader_options.get("storage_options", {})  # type: ignore
+
+    # using dict merge operator to add in defaults if keys are not specified
+    storage_options = protocol_defaults | storage_options
+    fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
 
     return fpath

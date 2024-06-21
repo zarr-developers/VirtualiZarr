@@ -3,7 +3,7 @@
 Currently you need to clone VirtualiZarr and install it locally:
 
 ```shell
-git clone https://github.com/TomNicholas/VirtualiZarr
+git clone https://github.com/zarr-developers/VirtualiZarr
 cd VirtualiZarr
 pip install -e .
 ```
