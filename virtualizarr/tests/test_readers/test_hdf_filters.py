@@ -76,3 +76,31 @@ class TestCFCodecFromDataset:
         assert cf_codec["codec"].scale == 1
         assert cf_codec["codec"].offset == 5
         assert cf_codec["codec"].dtype == "<f8"
+
+    def test_cf_codec_decoding_offset(
+        self, add_offset_netcdf4_file, np_uncompressed_int16
+    ):
+        f = h5py.File(add_offset_netcdf4_file)
+        ds = f["data"]
+        chunk_info = ds.id.get_chunk_info(0)
+        cfcodec = cfcodec_from_dataset(ds)
+        with open(add_offset_netcdf4_file, "rb") as file:
+            file.seek(chunk_info.byte_offset)
+            bytes_read = file.read(chunk_info.size)
+            decoded = cfcodec["codec"].decode(bytes_read)
+            assert np.array_equal(decoded, np_uncompressed_int16)
+            assert decoded.dtype == np.float64
+
+    def test_cf_codec_decoding_scale_offset(
+        self, scale_add_offset_netcdf4_file, np_uncompressed_int16
+    ):
+        f = h5py.File(scale_add_offset_netcdf4_file)
+        ds = f["data"]
+        chunk_info = ds.id.get_chunk_info(0)
+        cfcodec = cfcodec_from_dataset(ds)
+        with open(scale_add_offset_netcdf4_file, "rb") as file:
+            file.seek(chunk_info.byte_offset)
+            bytes_read = file.read(chunk_info.size)
+            decoded = cfcodec["codec"].decode(bytes_read)
+            assert np.allclose(decoded, np_uncompressed_int16)
+            assert decoded.dtype == np.float64

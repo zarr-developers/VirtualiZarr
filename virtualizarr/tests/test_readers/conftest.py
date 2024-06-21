@@ -204,10 +204,36 @@ def filter_encoded_xarray_netcdf4_file(tmpdir, request, skip_test_for_libhdf5_ve
 
 
 @pytest.fixture
-def add_offset_netcdf4_file(tmpdir):
+def np_uncompressed_int16():
+    return np.arange(100, dtype=np.int16)
+
+
+@pytest.fixture
+def offset():
+    return np.float32(5.0)
+
+
+@pytest.fixture
+def add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset):
     filepath = f"{tmpdir}/offset.nc"
     f = h5py.File(filepath, "w")
-    data = np.random.random((10, 10))
-    f.create_dataset(name="data", data=data, chunks=None)
-    f["data"].attrs.create(name="add_offset", data=5)
+    data = np_uncompressed_int16 - offset
+    f.create_dataset(name="data", data=data, chunks=True)
+    f["data"].attrs.create(name="add_offset", data=offset)
+    return filepath
+
+
+@pytest.fixture
+def scale_factor():
+    return 0.01
+
+
+@pytest.fixture
+def scale_add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset, scale_factor):
+    filepath = f"{tmpdir}/scale_offset.nc"
+    f = h5py.File(filepath, "w")
+    data = (np_uncompressed_int16 - offset) / scale_factor
+    f.create_dataset(name="data", data=data, chunks=True)
+    f["data"].attrs.create(name="add_offset", data=offset)
+    f["data"].attrs.create(name="scale_factor", data=np.array([scale_factor]))
     return filepath
