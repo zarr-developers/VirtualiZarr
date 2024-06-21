@@ -113,7 +113,7 @@ def recode_cftime(var: xr.Variable) -> NDArray[cftime.datetime]:
     for c in var.values:
         value = cftime.num2date(
             cftime.date2num(
-                datetime.datetime.fromisoformat(str(c)),
+                datetime.datetime.fromisoformat(str(c.astype("M8[us]"))),
                 calendar=calendar,
                 units=units,
             ),
