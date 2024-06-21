@@ -49,6 +49,9 @@ def _fsspec_openfile_from_filepath(
     else:
         protocol_defaults = {}
 
+    if reader_options is None:
+        reader_options = {}
+
     storage_options = reader_options.get("storage_options", {})  # type: ignore
 
     # using dict merge operator to add in defaults if keys are not specified

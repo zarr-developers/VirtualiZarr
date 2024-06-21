@@ -6,7 +6,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
 
@@ -40,7 +40,7 @@ def test_dataset_from_df_refs():
 
     assert da.data.zarray.compressor is None
     assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is np.NaN
+    assert da.data.zarray.fill_value is np.nan
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {
@@ -68,15 +68,18 @@ def test_dataset_from_df_refs_with_filters():
 
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.NaN,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -97,15 +100,18 @@ class TestAccessor:
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_json(self, tmp_path):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.NaN,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -186,7 +192,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=np.NaN,
+            fill_value=np.nan,
             order="C",
         ),
         chunkmanifest=manifest,
