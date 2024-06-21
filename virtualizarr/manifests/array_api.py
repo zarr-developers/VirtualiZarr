@@ -1,11 +1,10 @@
-import itertools
-from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, Iterable
 
 import numpy as np
 
-from ..zarr import Codec, ZArray
-from .manifest import concat_manifests, stack_manifests
+from virtualizarr.zarr import Codec, ceildiv
+
+from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
     from .array import ManifestArray
@@ -125,21 +124,28 @@ def concatenate(
     new_shape = list(first_shape)
     new_shape[axis] = new_length_along_concat_axis
 
-    concatenated_manifest = concat_manifests(
-        [arr.manifest for arr in arrays],
+    # do concatenation of entries in manifest
+    concatenated_paths = np.concatenate(
+        [arr.manifest._paths for arr in arrays],
         axis=axis,
     )
+    concatenated_offsets = np.concatenate(
+        [arr.manifest._offsets for arr in arrays],
+        axis=axis,
+    )
+    concatenated_lengths = np.concatenate(
+        [arr.manifest._lengths for arr in arrays],
+        axis=axis,
+    )
+    concatenated_manifest = ChunkManifest.from_arrays(
+        paths=concatenated_paths,
+        offsets=concatenated_offsets,
+        lengths=concatenated_lengths,
+    )
 
-    new_zarray = ZArray(
-        chunks=first_arr.chunks,
-        compressor=first_arr.zarray.compressor,
-        dtype=first_arr.dtype,
-        fill_value=first_arr.zarray.fill_value,
-        filters=first_arr.zarray.filters,
-        shape=new_shape,
-        # TODO presumably these things should be checked for consistency across arrays too?
-        order=first_arr.zarray.order,
-        zarr_format=first_arr.zarray.zarr_format,
+    # chunk shape has not changed, there are just now more chunks along the concatenation axis
+    new_zarray = first_arr.zarray.replace(
+        shape=tuple(new_shape),
     )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
@@ -210,26 +216,33 @@ def stack(
     new_shape = list(first_shape)
     new_shape.insert(axis, length_along_new_stacked_axis)
 
-    stacked_manifest = stack_manifests(
-        [arr.manifest for arr in arrays],
+    # do stacking of entries in manifest
+    stacked_paths = np.stack(
+        [arr.manifest._paths for arr in arrays],
         axis=axis,
     )
+    stacked_offsets = np.stack(
+        [arr.manifest._offsets for arr in arrays],
+        axis=axis,
+    )
+    stacked_lengths = np.stack(
+        [arr.manifest._lengths for arr in arrays],
+        axis=axis,
+    )
+    stacked_manifest = ChunkManifest.from_arrays(
+        paths=stacked_paths,
+        offsets=stacked_offsets,
+        lengths=stacked_lengths,
+    )
 
-    # chunk size has changed because a length-1 axis has been inserted
+    # chunk shape has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = ZArray(
-        chunks=new_chunks,
-        compressor=first_arr.zarray.compressor,
-        dtype=first_arr.dtype,
-        fill_value=first_arr.zarray.fill_value,
-        filters=first_arr.zarray.filters,
-        shape=new_shape,
-        # TODO presumably these things should be checked for consistency across arrays too?
-        order=first_arr.zarray.order,
-        zarr_format=first_arr.zarray.zarr_format,
+    new_zarray = first_arr.zarray.replace(
+        chunks=tuple(new_chunks),
+        shape=tuple(new_shape),
     )
 
     return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
@@ -254,74 +267,65 @@ def expand_dims(x: "ManifestArray", /, *, axis: int = 0) -> "ManifestArray":
 @implements(np.broadcast_to)
 def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArray":
     """
-    Broadcasts an array to a specified shape, by either manipulating chunk keys or copying chunk manifest entries.
-    """
-
-    if len(x.shape) > len(shape):
-        raise ValueError("input operand has more dimensions than allowed")
-
-    # numpy broadcasting algorithm requires us to start by comparing the length of the final axes and work backwards
-    result = x
-    for axis, d, d_requested in itertools.zip_longest(
-        reversed(range(len(shape))), reversed(x.shape), reversed(shape), fillvalue=None
-    ):
-        # len(shape) check above ensures this can't be type None
-        d_requested = cast(int, d_requested)
-
-        if d == d_requested:
-            pass
-        elif d is None:
-            if result.shape == ():
-                # scalars are a special case because their manifests already have a chunk key with one dimension
-                # see https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
-                result = _broadcast_scalar(result, new_axis_length=d_requested)
-            else:
-                # stack same array upon itself d_requested number of times, which inserts a new axis at axis=0
-                result = stack([result] * d_requested, axis=0)
-        elif d == 1:
-            # concatenate same array upon itself d_requested number of times along existing axis
-            result = concatenate([result] * d_requested, axis=axis)
-        else:
-            raise ValueError(
-                f"Array with shape {x.shape} cannot be broadcast to shape {shape}"
-            )
-
-    return result
-
-
-def _broadcast_scalar(x: "ManifestArray", new_axis_length: int) -> "ManifestArray":
-    """
-    Add an axis to a scalar ManifestArray, but without adding a new axis to the keys of the chunk manifest.
-
-    This is not the same as concatenation, because there is no existing axis along which to concatenate.
-    It's also not the same as stacking, because we don't want to insert a new axis into the chunk keys.
-
-    Scalars are a special case because their manifests still have a chunk key with one dimension.
-    See https://github.com/TomNicholas/VirtualiZarr/issues/100#issuecomment-2097058282
+    Broadcasts a ManifestArray to a specified shape, by either adjusting chunk keys or copying chunk manifest entries.
     """
 
     from .array import ManifestArray
 
-    new_shape = (new_axis_length,)
-    new_chunks = (new_axis_length,)
+    new_shape = shape
 
-    concatenated_manifest = concat_manifests(
-        [x.manifest] * new_axis_length,
-        axis=0,
+    # check its actually possible to broadcast to this new shape
+    mutually_broadcastable_shape = np.broadcast_shapes(x.shape, new_shape)
+    if mutually_broadcastable_shape != new_shape:
+        # we're not trying to broadcast both shapes to a third shape
+        raise ValueError(
+            f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
+        )
+
+    # new chunk_shape is old chunk_shape with singleton dimensions pre-pended
+    # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
+    old_chunk_shape = x.chunks
+    new_chunk_shape = _prepend_singleton_dimensions(
+        old_chunk_shape, ndim=len(new_shape)
     )
 
-    new_zarray = ZArray(
-        chunks=new_chunks,
-        compressor=x.zarray.compressor,
-        dtype=x.dtype,
-        fill_value=x.zarray.fill_value,
-        filters=x.zarray.filters,
+    # find new chunk grid shape by dividing new array shape by new chunk shape
+    new_chunk_grid_shape = tuple(
+        ceildiv(axis_length, chunk_length)
+        for axis_length, chunk_length in zip(new_shape, new_chunk_shape)
+    )
+
+    # do broadcasting of entries in manifest
+    broadcasted_paths = np.broadcast_to(
+        x.manifest._paths,
+        shape=new_chunk_grid_shape,
+    )
+    broadcasted_offsets = np.broadcast_to(
+        x.manifest._offsets,
+        shape=new_chunk_grid_shape,
+    )
+    broadcasted_lengths = np.broadcast_to(
+        x.manifest._lengths,
+        shape=new_chunk_grid_shape,
+    )
+    broadcasted_manifest = ChunkManifest.from_arrays(
+        paths=broadcasted_paths,
+        offsets=broadcasted_offsets,
+        lengths=broadcasted_lengths,
+    )
+
+    new_zarray = x.zarray.replace(
+        chunks=new_chunk_shape,
         shape=new_shape,
-        order=x.zarray.order,
-        zarr_format=x.zarray.zarr_format,
     )
 
-    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+
+
+def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:
+    """Prepend as many new length-1 axes to shape as necessary such that the result has ndim number of axes."""
+    n_prepended_dims = ndim - len(shape)
+    return tuple([1] * n_prepended_dims + list(shape))
 
 
 # TODO broadcast_arrays, squeeze, permute_dims

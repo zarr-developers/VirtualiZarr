@@ -50,8 +50,11 @@ class ManifestArray:
             _chunkmanifest = ChunkManifest(entries=chunkmanifest)
         else:
             raise TypeError(
-                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+                f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
+
+        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
+        # TODO also cover the special case of scalar arrays
 
         self._zarray = _zarray
         self._manifest = _chunkmanifest
@@ -140,7 +143,7 @@ class ManifestArray:
 
         Returns a numpy array of booleans.
         """
-        if isinstance(other, (int, float, bool)):
+        if isinstance(other, (int, float, bool, np.ndarray)):
             # TODO what should this do when comparing against numpy arrays?
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         elif not isinstance(other, ManifestArray):
@@ -164,9 +167,22 @@ class ManifestArray:
                     UserWarning,
                 )
 
-                # TODO do chunk-wise comparison
-                # TODO expand it into an element-wise result
-                return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
+                # do chunk-wise comparison
+                equal_chunk_paths = self.manifest._paths == other.manifest._paths
+                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
+                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
+
+                equal_chunks = (
+                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
+                )
+
+                if not equal_chunks.all():
+                    # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
+                    return np.full(
+                        shape=self.shape, fill_value=False, dtype=np.dtype(bool)
+                    )
+                else:
+                    raise RuntimeWarning("Should not be possible to get here")
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
