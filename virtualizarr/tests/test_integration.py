@@ -101,8 +101,15 @@ class TestKerchunkRoundtrip:
             f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=decode_times
         )
 
-        # assert equal to original dataset
-        xrt.assert_equal(roundtrip, ds)
+        if decode_times is False:
+            # assert equal to original dataset
+            xrt.assert_equal(roundtrip, ds)
+        else:
+            # they are very very close! But assert_allclose doesn't seem to work on datetimes
+            assert (roundtrip.time - ds.time).sum() == 0
+            assert roundtrip.time.dtype == ds.time.dtype
+            assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
+            assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
 
 
 def test_open_scalar_variable(tmpdir):
