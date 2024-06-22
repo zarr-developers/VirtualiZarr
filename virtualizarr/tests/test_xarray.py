@@ -354,4 +354,13 @@ class TestRenamePaths:
         with pytest.raises(TypeError):
             vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
-    # TODO test mixture of ManifestArrays and numpy arrays
+    def test_mixture_of_manifestarrays_and_numpy_arrays(self, netcdf4_file):
+        vds = open_virtual_dataset(
+            netcdf4_file, indexes={}, loadable_variables=["lat", "lon"]
+        )
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+        assert isinstance(renamed_vds["lat"].data, np.ndarray)
