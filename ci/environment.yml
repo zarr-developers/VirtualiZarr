@@ -27,4 +27,4 @@ dependencies:
   - fsspec
   - s3fs
   - fastparquet
-  - imagecodecs-numcodecs
+  - imagecodecs
