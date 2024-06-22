@@ -1,5 +1,6 @@
 import fsspec
 import numpy
+import pytest
 import xarray as xr
 
 import virtualizarr
@@ -21,6 +22,9 @@ class TestIntegration:
         ds = xr.open_dataset(m, engine="kerchunk")
         assert isinstance(ds.air.values[0][0][0], numpy.float64)
 
+    @pytest.mark.skip(
+        reason="Issue with xr 'dim1' serialization and blosc availability"
+    )
     def test_filters_netcdf4_roundtrip(
         self, tmpdir, filter_encoded_xarray_netcdf4_file
     ):
