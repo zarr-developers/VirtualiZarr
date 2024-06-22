@@ -326,7 +326,10 @@ class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
         renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
-        assert renamed_vds["air"].data.dict()["path"] == "s3://bucket/air.nc"
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
 
     def test_rename_using_function(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -340,7 +343,10 @@ class TestRenamePaths:
             return str(new_s3_bucket_url + filename)
 
         renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
-        assert renamed_vds["air"].data.dict()["path"] == "s3://bucket/air.nc"
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
 
     def test_invalid_type(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
