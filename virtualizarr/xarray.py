@@ -479,13 +479,10 @@ class VirtualiZarrDatasetAccessor:
         ChunkManifest.rename_paths
         """
 
-        def _rename_manifestarray(marr: ManifestArray) -> ManifestArray:
-            return marr.rename_paths(new=new)
+        new_ds = self.ds.copy()
+        for var_name in new_ds.variables:
+            data = new_ds[var_name].data
+            if isinstance(data, ManifestArray):
+                new_ds[var_name].data = data.rename_paths(new=new)
 
-        def _rename_dataarray(da: xr.DataArray) -> xr.DataArray:
-            if isinstance(da.data, ManifestArray):
-                return xr.apply_ufunc(_rename_manifestarray, da)
-            else:
-                return da
-
-        return self.ds.map(_rename_dataarray)
+        return new_ds
