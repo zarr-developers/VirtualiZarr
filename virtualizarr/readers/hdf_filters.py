@@ -6,7 +6,7 @@ import numcodecs.registry as registry
 import numpy as np
 from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from xarray.coding.variables import _choose_float_dtype
 
 _non_standard_filters = {
@@ -23,7 +23,7 @@ class BloscProperties(BaseModel):
     shuffle: int
     cname: str
 
-    @validator("cname", pre=True)
+    @field_validator("cname", mode="before")
     def get_cname_from_code(cls, v):
         blosc_compressor_codes = {
             value: key
@@ -69,7 +69,7 @@ def _filter_to_codec(
                 **{
                     k: v
                     for k, v in zip(
-                        BloscProperties.__fields__.keys(), filter_properties[-4:]
+                        BloscProperties.model_fields.keys(), filter_properties[-4:]
                     )
                 }
             )
