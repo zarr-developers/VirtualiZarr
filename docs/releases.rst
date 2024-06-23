@@ -25,6 +25,8 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Ensure that `_ARRAY_DIMENSIONS` are dropped from variable `.attrs`. (:issue:`150`, :pull:`152`) 
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
