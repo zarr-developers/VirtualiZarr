@@ -396,7 +396,8 @@ def local_to_s3_url(old_local_path: str) -> str:
 
     filename = Path(old_local_path).name
     return str(new_s3_bucket_url / filename)
-
+```
+```python
 renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
 renamed_vds['air'].data.manifest.dict()
 ```
