@@ -9,6 +9,8 @@ v0.2 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added a `.rename_paths` convenience method to rename paths in a manifest according to a function.
+  (:pull:`152`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~

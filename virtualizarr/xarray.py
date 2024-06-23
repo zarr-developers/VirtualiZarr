@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
+    Callable,
     Literal,
     Optional,
     overload,
@@ -343,8 +344,8 @@ class VirtualiZarrDatasetAccessor:
     Methods on this object are called via `ds.virtualize.{method}`.
     """
 
-    def __init__(self, ds):
-        self.ds = ds
+    def __init__(self, ds: xr.Dataset):
+        self.ds: xr.Dataset = ds
 
     def to_zarr(self, storepath: str) -> None:
         """
@@ -438,3 +439,50 @@ class VirtualiZarrDatasetAccessor:
             return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> xr.Dataset:
+        """
+        Rename paths to chunks in every ManifestArray in this dataset.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        Dataset
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> ds.virtualize.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ManifestArray.rename_paths
+        ChunkManifest.rename_paths
+        """
+
+        new_ds = self.ds.copy()
+        for var_name in new_ds.variables:
+            data = new_ds[var_name].data
+            if isinstance(data, ManifestArray):
+                new_ds[var_name].data = data.rename_paths(new=new)
+
+        return new_ds
