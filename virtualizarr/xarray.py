@@ -288,8 +288,12 @@ def variable_from_kerchunk_refs(
 
     arr_refs = kerchunk.extract_array_refs(refs, var_name)
     chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
+
     manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-    dims = zattrs["_ARRAY_DIMENSIONS"]
+
+    # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
+    dims = zattrs.pop("_ARRAY_DIMENSIONS")
+
     varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
 
     return xr.Variable(data=varr, dims=dims, attrs=zattrs)
