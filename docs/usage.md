@@ -38,7 +38,7 @@ In future we would like for it to be possible to just use `xr.open_dataset`, e.g
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
 ```
 
-Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects. (We will use the term "virtual dataset" to refer to any `xarray.Dataset` which contains one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.)
 
 ```python
 vds
@@ -170,7 +170,7 @@ You also cannot currently index into a `ManifestArray`, as arbitrary indexing wo
 
 ## Virtual Datasets as Zarr Groups
 
-The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
+The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
 
 The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
@@ -317,7 +317,7 @@ Loading variables can be useful in a few scenarios:
 
 Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
-### Writing to Kerchunk's format and reading via fsspec
+### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
 
@@ -376,4 +376,30 @@ The advantage of this format is that any zarr v3 reader that understands the chu
 Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
 
 This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+```
+
+## Rewriting existing manifests
+
+Sometimes it can be useful to rewrite the contents of an already-generated manifest or virtual dataset.
+
+### Rewriting file paths
+
+You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`ds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
+
+For example, you may want to rename file paths according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
+
+```python
+def local_to_s3_url(old_local_path: str) -> str:
+    from pathlib import Path
+
+    new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+
+    filename = Path(old_local_path).name
+    return str(new_s3_bucket_url / filename)
+
+renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+renamed_vds['air'].data.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'http://s3.amazonaws.com/my_bucket/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
