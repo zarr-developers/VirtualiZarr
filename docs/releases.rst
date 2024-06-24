@@ -25,7 +25,9 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
-- Ensure that `_ARRAY_DIMENSIONS` are dropped from variable `.attrs`. (:issue:`150`, :pull:`152`) 
+- Ensure that `_ARRAY_DIMENSIONS` are dropped from variable `.attrs`. (:issue:`150`, :pull:`152`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that `.attrs` on coordinate variables are preserved during round-tripping. (:issue:`155`, :pull:`154`)
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
