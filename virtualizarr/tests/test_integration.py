@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
@@ -93,6 +94,31 @@ class TestKerchunkRoundtrip:
         )
 
         # assert identical to original dataset
+        xrt.assert_identical(roundtrip, ds)
+
+    def test_non_dimension_coordinates(self, tmpdir, format):
+        # regression test for GH issue #105
+
+        # set up example xarray dataset containing non-dimension coordinate variables
+        ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6).reshape(2, 3))})
+
+        # save it to disk as netCDF (in temporary directory)
+        ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")
+
+        vds = open_virtual_dataset(f"{tmpdir}/non_dim_coords.nc", indexes={})
+
+        assert "lat" in vds.coords
+        assert "coordinates" not in vds.attrs
+
+        # write those references to disk as kerchunk references format
+        vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+        # use fsspec to read the dataset from disk via the kerchunk references
+        roundtrip = xr.open_dataset(
+            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+        )
+
+        # assert equal to original dataset
         xrt.assert_identical(roundtrip, ds)
 
 

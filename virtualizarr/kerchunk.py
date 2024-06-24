@@ -217,11 +217,18 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
         all_arr_refs.update(prepended_with_var_name)
 
+    zattrs = ds.attrs
+    if ds.coords:
+        coord_names = list(ds.coords)
+        # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
+        zattrs["coordinates"] = " ".join(coord_names)
+
     ds_refs = {
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(ds.attrs),
+            ".zattrs": ujson.dumps(zattrs),
             **all_arr_refs,
         },
     }

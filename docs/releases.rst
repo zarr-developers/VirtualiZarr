@@ -29,6 +29,8 @@ Bug fixes
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Ensure that `.attrs` on coordinate variables are preserved during round-tripping. (:issue:`155`, :pull:`154`)
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that non-dimension coordinate variables described via the CF conventions are preserved during round-tripping. (:issue:`105`, :pull:`156`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
