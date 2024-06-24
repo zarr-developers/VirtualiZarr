@@ -55,14 +55,16 @@ class TestKerchunkRoundtrip:
         # use open_dataset_via_kerchunk to read it as references
         vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
 
-        # write those references to disk as kerchunk json
+        # write those references to disk as kerchunk references format
         vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
 
-        # use fsspec to read the dataset from disk via the zarr store
-        roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
+        # use fsspec to read the dataset from disk via the kerchunk references
+        roundtrip = xr.open_dataset(
+            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+        )
 
-        # assert equal to original dataset
-        xrt.assert_equal(roundtrip, ds)
+        # assert identical to original dataset
+        xrt.assert_identical(roundtrip, ds)
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
@@ -82,14 +84,16 @@ class TestKerchunkRoundtrip:
         # concatenate virtually along time
         vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
 
-        # write those references to disk as kerchunk json
+        # write those references to disk as kerchunk references format
         vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
 
-        # use fsspec to read the dataset from disk via the zarr store
-        roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
+        # use fsspec to read the dataset from disk via the kerchunk references
+        roundtrip = xr.open_dataset(
+            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+        )
 
-        # assert equal to original dataset
-        xrt.assert_equal(roundtrip, ds)
+        # assert identical to original dataset
+        xrt.assert_identical(roundtrip, ds)
 
 
 def test_open_scalar_variable(tmpdir):

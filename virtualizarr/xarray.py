@@ -243,7 +243,6 @@ def virtual_vars_from_kerchunk_refs(
         var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
         for var_name in var_names_to_keep
     }
-
     return vars
 
 
@@ -306,7 +305,7 @@ def separate_coords(
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
-    Currently requires a workaround unless xarray 8107 is merged.
+    Currently requires this function as a workaround unless xarray PR #8124 is merged.
 
     Will also preserve any loaded variables and indexes it is passed.
     """
@@ -322,7 +321,7 @@ def separate_coords(
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
-                coord_vars[name] = (dim1d, var.data)
+                coord_vars[name] = (dim1d, var.data, var.attrs)
 
                 if isinstance(var, IndexVariable):
                     # unless variable actually already is a loaded IndexVariable,
