@@ -44,7 +44,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
-@pytest.mark.parametrize("format", ["json", "parquet"])
+@pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
     def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
         # set up example xarray dataset
@@ -56,13 +56,20 @@ class TestKerchunkRoundtrip:
         # use open_dataset_via_kerchunk to read it as references
         vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
 
-        # write those references to disk as kerchunk references format
-        vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+        if format == "dict":
+            # write those references to an in-memory kerchunk-formatted references dictionary
+            ds_refs = vds.virtualize.to_kerchunk(format=format)
 
-        # use fsspec to read the dataset from disk via the kerchunk references
-        roundtrip = xr.open_dataset(
-            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
-        )
+            # use fsspec to read the dataset from the kerchunk references dict
+            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+        else:
+            # write those references to disk as kerchunk references format
+            vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+            # use fsspec to read the dataset from disk via the kerchunk references
+            roundtrip = xr.open_dataset(
+                f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+            )
 
         # assert identical to original dataset
         xrt.assert_identical(roundtrip, ds)
@@ -85,13 +92,20 @@ class TestKerchunkRoundtrip:
         # concatenate virtually along time
         vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
 
-        # write those references to disk as kerchunk references format
-        vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+        if format == "dict":
+            # write those references to an in-memory kerchunk-formatted references dictionary
+            ds_refs = vds.virtualize.to_kerchunk(format=format)
 
-        # use fsspec to read the dataset from disk via the kerchunk references
-        roundtrip = xr.open_dataset(
-            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
-        )
+            # use fsspec to read the dataset from the kerchunk references dict
+            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+        else:
+            # write those references to disk as kerchunk references format
+            vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+            # use fsspec to read the dataset from disk via the kerchunk references
+            roundtrip = xr.open_dataset(
+                f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+            )
 
         # assert identical to original dataset
         xrt.assert_identical(roundtrip, ds)
@@ -110,13 +124,20 @@ class TestKerchunkRoundtrip:
         assert "lat" in vds.coords
         assert "coordinates" not in vds.attrs
 
-        # write those references to disk as kerchunk references format
-        vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+        if format == "dict":
+            # write those references to an in-memory kerchunk-formatted references dictionary
+            ds_refs = vds.virtualize.to_kerchunk(format=format)
 
-        # use fsspec to read the dataset from disk via the kerchunk references
-        roundtrip = xr.open_dataset(
-            f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
-        )
+            # use fsspec to read the dataset from the kerchunk references dict
+            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+        else:
+            # write those references to disk as kerchunk references format
+            vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+            # use fsspec to read the dataset from disk via the kerchunk references
+            roundtrip = xr.open_dataset(
+                f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+            )
 
         # assert equal to original dataset
         xrt.assert_identical(roundtrip, ds)
