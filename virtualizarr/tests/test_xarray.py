@@ -308,6 +308,40 @@ class TestReadFromS3:
             assert isinstance(vds[var].data, ManifestArray), var
 
 
+@network
+class TestReadFromURL:
+    def test_read_from_url(self):
+        examples = {
+            'grib':'https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib',
+            
+            'netcdf3':'https://github.com/pydata/xarray-data/raw/master/air_temperature.nc', 
+            'netcdf4':'https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc',
+            
+            'hdf4':'https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf',
+            
+            # https://github.com/zarr-developers/VirtualiZarr/issues/159
+            # https://nisar.jpl.nasa.gov/data/sample-data/
+            #'hdf5':'https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/Soil_Moisture/ALOS-2/NISAR_L3_PR_SME2_001_008_D_070_4000_QPNA_A_20190829T180759_20190829T180809_P01101_M_P_J_001.h5',
+            #'hdf5':'https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5',
+             
+            # https://github.com/zarr-developers/VirtualiZarr/issues/160
+            #'tiff':'https://github.com/corteva/rioxarray/raw/master/test/test_data/input/cog.tif',
+            #'tiff':'https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif',
+            # https://github.com/astropy/astropy/blob/4d034aa7e27e31cb0241cc01bbe76eab47406a91/astropy/io/fits/tests/test_fsspec.py#L73
+            #'fits':'https://mast.stsci.edu/api/v0.1/Download/file/?uri=mast:HST/product/ibxl50020_jif.fits',
+            # https://github.com/fsspec/kerchunk/blob/ae692fead51a216691e4db9a67c99194c5ba8e14/kerchunk/tests/test_fits.py#L18
+            #'fits':'https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits',
+            
+            'jpg': 'https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg',
+        }
+        
+        for filetype, url in examples.items():
+            if filetype in ['grib','jpg','hdf4']:
+                with pytest.raises(NotImplementedError):
+                    vds = open_virtual_dataset(url, reader_options={})
+            else:
+                vds = open_virtual_dataset(url, reader_options={})
+
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ["air", "time"]
@@ -324,6 +358,18 @@ class TestLoadVirtualDataset:
         for name in full_ds.variables:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+
+    def test_explicit_filetype(self, netcdf4_file):
+        # NOTE: not sure of best way to check these VDS are identical
+        #vds1 = open_virtual_dataset(netcdf4_file) 
+        #vds2 = open_virtual_dataset(netcdf4_file, filetype="netcdf4") 
+        #vds2 = open_virtual_dataset(netcdf4_file, filetype="hdf5") 
+
+        with pytest.raises(ValueError):
+            vds = open_virtual_dataset(netcdf4_file, filetype="unknown")  
+
+        with pytest.raises(NotImplementedError):
+            vds = open_virtual_dataset(netcdf4_file, filetype="grib")  
 
     @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
     def test_open_virtual_dataset_passes_expected_args(

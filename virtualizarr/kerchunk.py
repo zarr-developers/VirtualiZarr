@@ -34,6 +34,7 @@ class AutoName(Enum):
 class FileType(AutoName):
     netcdf3 = auto()
     netcdf4 = auto() # NOTE: netCDF4 is a subset of hdf5
+    hdf4 = auto()
     hdf5 = auto()
     grib = auto()
     tiff = auto()
@@ -100,11 +101,11 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, inline_threshold=0, **reader_options)
+        refs = tiff_to_zarr(filepath, **reader_options)
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, inline_threshold=0, **reader_options)
+        refs = process_file(filepath, **reader_options)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
