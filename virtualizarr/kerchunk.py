@@ -33,7 +33,7 @@ class AutoName(Enum):
 
 class FileType(AutoName):
     netcdf3 = auto()
-    netcdf4 = auto() # NOTE: netCDF4 is a subset of hdf5
+    netcdf4 = auto()  # NOTE: netCDF4 is a subset of hdf5
     hdf4 = auto()
     hdf5 = auto()
     grib = auto()
@@ -118,11 +118,10 @@ def _automatically_determine_filetype(
     filepath: str,
     reader_options: Optional[dict[str, Any]] = None,
 ) -> FileType:
-    
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
-    
+
     # Read magic bytes from local or remote file
     fpath = _fsspec_openfile_from_filepath(
         filepath=filepath, reader_options=reader_options
@@ -133,17 +132,19 @@ def _automatically_determine_filetype(
     if magic_bytes.startswith(b"CDF"):
         filetype = FileType.netcdf3
     elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
-        raise NotImplementedError(f"HDF4 formatted files not supported")
+        raise NotImplementedError("HDF4 formatted files not supported")
     elif magic_bytes.startswith(b"\x89HDF"):
         filetype = FileType.hdf5
-    elif magic_bytes.startswith(b'GRIB'):
+    elif magic_bytes.startswith(b"GRIB"):
         filetype = FileType.grib
-    elif magic_bytes.startswith(b'II*'):
+    elif magic_bytes.startswith(b"II*"):
         filetype = FileType.tiff
-    elif magic_bytes.startswith(b'SIMPLE'):
+    elif magic_bytes.startswith(b"SIMPLE"):
         filetype = FileType.fits
     else:
-        raise NotImplementedError(f"Unrecognised file based on header bytes: {magic_bytes}")
+        raise NotImplementedError(
+            f"Unrecognised file based on header bytes: {magic_bytes}"
+        )
 
     return filetype
 

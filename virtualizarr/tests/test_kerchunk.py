@@ -227,26 +227,32 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
         filepath=netcdf4_file_path
     )
 
-@pytest.mark.parametrize("filetype,headerbytes", [("netcdf3", b"CDF"),  
-                                                  ("hdf5", b"\x89HDF"), 
-                                                  ("grib", b"GRIB"),
-                                                  ("tiff", b"II*"),
-                                                  ("fits", b"SIMPLE")])
+
+@pytest.mark.parametrize(
+    "filetype,headerbytes",
+    [
+        ("netcdf3", b"CDF"),
+        ("hdf5", b"\x89HDF"),
+        ("grib", b"GRIB"),
+        ("tiff", b"II*"),
+        ("fits", b"SIMPLE"),
+    ],
+)
 def test_valid_filetype_bytes(tmp_path, filetype, headerbytes):
     filepath = tmp_path / "file.abc"
-    with open(filepath, 'wb') as f:
+    with open(filepath, "wb") as f:
         f.write(headerbytes)
-    assert FileType(filetype) == _automatically_determine_filetype(
-        filepath=filepath
-    )
+    assert FileType(filetype) == _automatically_determine_filetype(filepath=filepath)
+
 
 def test_notimplemented_filetype(tmp_path):
     for headerbytes in [b"JUNK", b"\x0e\x03\x13\x01"]:
         filepath = tmp_path / "file.abc"
-        with open(filepath, 'wb') as f:
+        with open(filepath, "wb") as f:
             f.write(headerbytes)
         with pytest.raises(NotImplementedError):
             _automatically_determine_filetype(filepath=filepath)
+
 
 def test_FileType():
     # tests if FileType converts user supplied strings to correct filetype

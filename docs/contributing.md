@@ -5,6 +5,7 @@
 ```bash
 mamba env create -f ci/environment.yml
 mamba activate virtualizarr-tests
+pre-commit install
 # git checkout -b new-feature
 python -m pip install -e . --no-deps
 python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
