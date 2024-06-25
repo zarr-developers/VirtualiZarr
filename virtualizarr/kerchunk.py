@@ -100,7 +100,6 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        # leaving these in causes some fsspec error
         reader_options.pop("storage_options")
         warnings.warn(
             "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
