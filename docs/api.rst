@@ -41,6 +41,17 @@ Serialization
     VirtualiZarrDatasetAccessor.to_zarr
 
 
+Rewriting
+=============
+
+.. currentmodule:: virtualizarr.xarray
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    VirtualiZarrDatasetAccessor.rename_paths
+
+
 Array API
 =========
 

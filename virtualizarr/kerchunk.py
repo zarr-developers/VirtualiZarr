@@ -216,11 +216,18 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
         all_arr_refs.update(prepended_with_var_name)
 
+    zattrs = ds.attrs
+    if ds.coords:
+        coord_names = list(ds.coords)
+        # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
+        zattrs["coordinates"] = " ".join(coord_names)
+
     ds_refs = {
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(ds.attrs),
+            ".zattrs": ujson.dumps(zattrs),
             **all_arr_refs,
         },
     }
@@ -240,8 +247,8 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
         marr = var.data
 
         arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): chunk_entry.to_kerchunk()
-            for chunk_key, chunk_entry in marr.manifest.entries.items()
+            str(chunk_key): [entry["path"], entry["offset"], entry["length"]]
+            for chunk_key, entry in marr.manifest.dict().items()
         }
 
         zarray = marr.zarray

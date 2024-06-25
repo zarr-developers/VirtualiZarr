@@ -21,11 +21,11 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.5.0",
+    "xarray>=2024.06.0",
     "kerchunk>=0.2.5",
     "h5netcdf",
     "pydantic",
-    "numpy",
+    "numpy>=2.0.0",
     "ujson",
     "packaging",
     "universal-pathlib",
@@ -61,7 +61,6 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-local_scheme = "guess-next-dev"
 fallback_version = "9999"
 
 [tool.setuptools.packages.find]

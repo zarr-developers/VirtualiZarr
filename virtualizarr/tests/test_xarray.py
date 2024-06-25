@@ -9,6 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -227,6 +228,23 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
+class TestOpenVirtualDatasetAttrs:
+    def test_drop_array_dimensions(self, netcdf4_file):
+        # regression test for GH issue #150
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
+
+    def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
+        # regression test for GH issue #155
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert vds["lat"].attrs == {
+            "standard_name": "latitude",
+            "long_name": "Latitude",
+            "units": "degrees_north",
+            "axis": "Y",
+        }
+
+
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -270,22 +288,24 @@ class TestCombineUsingIndexes:
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
 
-pytest.importorskip("s3fs")
+@network
+@requires_s3fs
+class TestReadFromS3:
+    @pytest.mark.parametrize(
+        "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
+    )
+    @pytest.mark.parametrize(
+        "indexes", [None, {}], ids=["None index", "empty dict index"]
+    )
+    def test_anon_read_s3(self, filetype, indexes):
+        """Parameterized tests for empty vs supplied indexes and filetypes."""
+        # TODO: Switch away from this s3 url after minIO is implemented.
+        fpath = "s3://carbonplan-share/virtualizarr/local.nc"
+        vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
 
-
-@pytest.mark.parametrize(
-    "filetype", ["hdf5", None], ids=["netcdf4 filetype", "None filetype"]
-)
-@pytest.mark.parametrize("indexes", [None, {}], ids=["None index", "empty dict index"])
-def test_anon_read_s3(filetype, indexes):
-    """Parameterized tests for empty vs supplied indexes and filetypes."""
-    # TODO: Switch away from this s3 url after minIO is implemented.
-    fpath = "s3://carbonplan-share/virtualizarr/local.nc"
-    vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
-
-    assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
-    for var in vds.variables:
-        assert isinstance(vds[var].data, ManifestArray), var
+        assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+        for var in vds.variables:
+            assert isinstance(vds[var].data, ManifestArray), var
 
 
 class TestLoadVirtualDataset:
@@ -317,3 +337,47 @@ class TestLoadVirtualDataset:
             "reader_options": reader_options,
         }
         mock_read_kerchunk.assert_called_once_with(**args)
+
+
+class TestRenamePaths:
+    def test_rename_to_str(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+
+    def test_rename_using_function(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        def local_to_s3_url(old_local_path: str) -> str:
+            from pathlib import Path
+
+            new_s3_bucket_url = "s3://bucket/"
+
+            filename = Path(old_local_path).name
+            return str(new_s3_bucket_url + filename)
+
+        renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+
+    def test_invalid_type(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        with pytest.raises(TypeError):
+            vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+
+    def test_mixture_of_manifestarrays_and_numpy_arrays(self, netcdf4_file):
+        vds = open_virtual_dataset(
+            netcdf4_file, indexes={}, loadable_variables=["lat", "lon"]
+        )
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+        assert isinstance(renamed_vds["lat"].data, np.ndarray)
