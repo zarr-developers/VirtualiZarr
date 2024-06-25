@@ -111,7 +111,8 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, inline_threshold=0, **reader_options)
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": process_file(filepath, inline_threshold=0, **reader_options)}
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
