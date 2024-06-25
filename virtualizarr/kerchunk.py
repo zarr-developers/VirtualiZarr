@@ -33,6 +33,7 @@ class AutoName(Enum):
 
 class FileType(AutoName):
     netcdf3 = auto()
+    netcdf4 = auto() # NOTE: netCDF4 is a subset of hdf5
     hdf5 = auto()
     grib = auto()
     tiff = auto()
@@ -86,7 +87,7 @@ def read_kerchunk_references_from_file(
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
-    elif filetype.name.lower() == "hdf5":
+    elif filetype.name.lower() == "hdf5" or filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
         refs = SingleHdf5ToZarr(
