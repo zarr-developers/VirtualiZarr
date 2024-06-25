@@ -38,9 +38,7 @@ def open_virtual_dataset(
     loadable_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
+    reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -104,6 +102,11 @@ def open_virtual_dataset(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
     else:
+        if reader_options is None:
+            reader_options = {
+                "storage_options": {"key": "", "secret": "", "anon": True}
+            }
+
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
         vds_refs = kerchunk.read_kerchunk_references_from_file(
