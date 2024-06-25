@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - astropy # for FITS
   - h5netcdf
   - h5py
   - hdf5
@@ -14,6 +15,7 @@ dependencies:
   - ujson
   - packaging
   - universal_pathlib
+  - tiffile # for TIFF
   # Testing
   - codecov
   - pre-commit

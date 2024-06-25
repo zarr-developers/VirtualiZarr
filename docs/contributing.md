@@ -1,5 +1,15 @@
 # Contributing
 
+## Contributing code
+
+```bash
+mamba env create -f ci/environment.yml
+mamba activate virtualizarr-tests
+# git checkout -b new-feature
+python -m pip install -e . --no-deps
+python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+```
+
 ## Contributing documentation
 
 ### Build the documentation locally
