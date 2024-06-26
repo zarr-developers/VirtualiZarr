@@ -252,7 +252,7 @@ class TestOpenVirtualDatasetIndexes:
 
     def test_create_default_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes=None)
-        ds = xr.open_dataset(netcdf4_file)
+        ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -344,7 +344,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file)
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         for name in full_ds.variables:
             if name in vars_to_load:
