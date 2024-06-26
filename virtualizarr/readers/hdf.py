@@ -53,12 +53,22 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
         def add_chunk_info(blob, chunk_index):
             offsets[chunk_index] = blob.byte_offset
             lengths[chunk_index] = blob.size
-            chunk_index += 1
 
         has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
         if has_chunk_iter:
-            chunk_index = 0
-            dsid.chunk_iter(add_chunk_info, chunk_index)
+
+            def create_callback(initial=0):
+                value = initial
+
+                def callback(blob):
+                    nonlocal value
+                    add_chunk_info(blob, chunk_index=value)
+                    value += 1
+
+                return callback
+
+            callback = create_callback()
+            dsid.chunk_iter(callback)
         else:
             for index in range(num_chunks):
                 add_chunk_info(dsid.get_chunk_info(index), index)
