@@ -34,7 +34,9 @@ class AutoName(Enum):
 
 class FileType(AutoName):
     netcdf3 = auto()
-    netcdf4 = auto()
+    netcdf4 = auto()  # NOTE: netCDF4 is a subset of hdf5
+    hdf4 = auto()
+    hdf5 = auto()
     grib = auto()
     tiff = auto()
     fits = auto()
@@ -89,7 +91,7 @@ def read_kerchunk_references_from_file(
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
-    elif filetype.name.lower() == "netcdf4":
+    elif filetype.name.lower() == "hdf5" or filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
         refs = SingleHdf5ToZarr(
@@ -102,11 +104,11 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, inline_threshold=0, **reader_options)
+        refs = tiff_to_zarr(filepath, **reader_options)
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, inline_threshold=0, **reader_options)
+        refs = process_file(filepath, **reader_options)
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
@@ -119,34 +121,34 @@ def _automatically_determine_filetype(
     filepath: str,
     reader_options: Optional[dict[str, Any]] = None,
 ) -> FileType:
-    file_extension = Path(filepath).suffix
+    if Path(filepath).suffix == ".zarr":
+        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
+        raise NotImplementedError()
+
+    # Read magic bytes from local or remote file
     fpath = _fsspec_openfile_from_filepath(
         filepath=filepath, reader_options=reader_options
     )
+    magic_bytes = fpath.read(8)
+    fpath.close()
 
-    if file_extension == ".nc":
-        # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        magic = fpath.read()
-
-        if magic[0:3] == b"CDF":
-            filetype = FileType.netcdf3
-        elif magic[1:4] == b"HDF":
-            filetype = FileType.netcdf4
-        else:
-            raise ValueError(".nc file does not appear to be NETCDF3 OR NETCDF4")
-    elif file_extension == ".zarr":
-        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
-        raise NotImplementedError()
-    elif file_extension == ".grib":
+    if magic_bytes.startswith(b"CDF"):
+        filetype = FileType.netcdf3
+    elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
+        raise NotImplementedError("HDF4 formatted files not supported")
+    elif magic_bytes.startswith(b"\x89HDF"):
+        filetype = FileType.hdf5
+    elif magic_bytes.startswith(b"GRIB"):
         filetype = FileType.grib
-    elif file_extension == ".tiff":
+    elif magic_bytes.startswith(b"II*"):
         filetype = FileType.tiff
-    elif file_extension == ".fits":
+    elif magic_bytes.startswith(b"SIMPLE"):
         filetype = FileType.fits
     else:
-        raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
+        raise NotImplementedError(
+            f"Unrecognised file based on header bytes: {magic_bytes}"
+        )
 
-    fpath.close()
     return filetype
 
 
