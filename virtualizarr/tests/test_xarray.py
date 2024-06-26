@@ -327,9 +327,9 @@ class TestReadFromURL:
         for filetype, url in examples.items():
             if filetype in ["grib", "jpg", "hdf4"]:
                 with pytest.raises(NotImplementedError):
-                    vds = open_virtual_dataset(url, reader_options={})
+                    vds = open_virtual_dataset(url, reader_options={}, indexes={})
             else:
-                vds = open_virtual_dataset(url, reader_options={})
+                vds = open_virtual_dataset(url, reader_options={}, indexes={})
                 assert isinstance(vds, xr.Dataset)
 
 
