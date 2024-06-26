@@ -11,13 +11,14 @@ import ujson  # type: ignore
 import xarray as xr
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
+from xarray.coding.times import CFDatetimeCoder
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath, recode_cftime
+from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
     dataset_to_zarr,
@@ -147,7 +148,9 @@ def open_virtual_dataset(
                 filepath=filepath, reader_options=reader_options
             )
 
-            ds = xr.open_dataset(fpath, drop_variables=drop_variables)
+            ds = xr.open_dataset(
+                fpath, drop_variables=drop_variables, decode_times=False
+            )
 
             if indexes is None:
                 # add default indexes by reading data from file
@@ -165,9 +168,9 @@ def open_virtual_dataset(
             }
 
             for name in cftime_variables:
-                var = ds[name]
-                values = recode_cftime(var)
-                loadable_vars[name] = loadable_vars[name].copy(data=values)
+                var = loadable_vars[name]
+                loadable_vars[name] = CFDatetimeCoder().decode(var, name=name)
+                print(loadable_vars[name].encoding, loadable_vars[name].attrs)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:
@@ -351,7 +354,7 @@ def separate_coords(
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
-                coord_vars[name] = (dim1d, var.data, var.attrs)
+                coord_vars[name] = (dim1d, var.data, var.attrs, var.encoding)
 
                 if isinstance(var, IndexVariable):
                     # unless variable actually already is a loaded IndexVariable,

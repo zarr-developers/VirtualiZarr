@@ -100,6 +100,13 @@ class TestKerchunkRoundtrip:
             cftime_variables=time_vars,
         )
 
+        if decode_times is False:
+            assert vds1.time.dtype == np.dtype("float32")
+        else:
+            assert vds1.time.dtype == np.dtype("<M8[ns]")
+            assert "units" in vds1.time.encoding
+            assert "calendar" in vds1.time.encoding
+
         # concatenate virtually along time
         vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
 

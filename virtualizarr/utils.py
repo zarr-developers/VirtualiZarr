@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-import datetime
 import io
 from typing import TYPE_CHECKING, Optional, Union
 
-import numpy as np
-
 if TYPE_CHECKING:
-    import cftime
     import fsspec.core
     import fsspec.spec
-    import xarray as xr
-    from numpy.typing import NDArray
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[
@@ -65,60 +59,3 @@ def _fsspec_openfile_from_filepath(
     fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
 
     return fpath
-
-
-def encode_cftime(var: xr.Variable) -> NDArray[np.int64 | np.float64]:
-    """Encode time variable
-
-    Parameters
-    ----------
-    var : xr.Variable
-        Variable containing cftime.datetime values and encoding information in
-        ``var.encoding`` or ``var.attributes,
-
-    Returns
-    -------
-    NDArray[np.int64 | np.float64]
-        Numpy array of values encoded according to the units and calendar specified
-        by encoding on ``var``
-    """
-    import cftime
-
-    calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
-    units = var.attrs.get("units", var.encoding["units"])
-
-    return cftime.date2num(var.data, calendar=calendar, units=units).ravel()
-
-
-def recode_cftime(var: xr.Variable) -> NDArray[cftime.datetime]:
-    """Recode time variable from np.datetime to cf.datetime
-
-    Parameters
-    ----------
-    var : xr.Variable
-        Variable containing np.datetime64 values and encoding information in
-        `var.encoding`` or ``var.attributes``
-
-    Returns
-    -------
-    NDArray[cftime.datetime]
-        Numpy array of cftime.datetime values
-    """
-    import cftime
-
-    calendar = var.attrs.get("calendar", var.encoding.get("calendar", "standard"))
-    units = var.attrs.get("units", var.encoding["units"])
-
-    values = []
-    for c in var.values:
-        value = cftime.num2date(
-            cftime.date2num(
-                datetime.datetime.fromisoformat(str(c.astype("M8[us]"))),
-                calendar=calendar,
-                units=units,
-            ),
-            calendar=calendar,
-            units=units,
-        )
-        values.append(value)
-    return np.array(values)
