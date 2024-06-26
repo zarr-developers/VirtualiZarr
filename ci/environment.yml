@@ -28,3 +28,5 @@ dependencies:
   - s3fs
   - fastparquet
   - imagecodecs>=2024.6.1
+  - pip:
+    - imagecodecs-numcodecs
