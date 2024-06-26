@@ -43,6 +43,8 @@ Internal Changes
   (:pull:`107`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Mark tests which require network access so that they are only run when `--run-network-tests` is passed a command-line argument to pytest.
   (:pull:`144`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  - Determine file format from magic bytes rather than name suffix
+  (:pull:`143`) By `Scott Henderson <https://github.com/scottyhq>`_.
 
 .. _v0.1:
 
