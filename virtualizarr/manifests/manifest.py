@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
-from typing import Any, NewType, Tuple, Union, cast
+from typing import Any, Callable, NewType, Tuple, Union, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -289,6 +289,59 @@ class ChunkManifest:
             for k, v in kerchunk_chunk_dict.items()
         }
         return ChunkManifest(entries=cast(ChunkDict, chunkentries))
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> "ChunkManifest":
+        """
+        Rename paths to chunks in this manifest.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        manifest
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> manifest.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ManifestArray.rename_paths
+        """
+        if isinstance(new, str):
+            renamed_paths = np.full_like(self._paths, fill_value=new)
+        elif callable(new):
+            vectorized_rename_fn = np.vectorize(new, otypes=[np.dtypes.StringDType()])  # type: ignore[attr-defined]
+            renamed_paths = vectorized_rename_fn(self._paths)
+        else:
+            raise TypeError(
+                f"Argument 'new' must be either a string or a callable that accepts and returns strings, but got type {type(new)}"
+            )
+
+        return self.from_arrays(
+            paths=renamed_paths,
+            offsets=self._offsets,
+            lengths=self._lengths,
+        )
 
 
 def split(key: ChunkKey) -> Tuple[int, ...]:

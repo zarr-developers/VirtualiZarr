@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
+    Callable,
     Literal,
     Optional,
     overload,
@@ -136,6 +137,7 @@ def open_virtual_dataset(
             virtual_array_class=virtual_array_class,
         )
         ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+        coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
@@ -176,7 +178,7 @@ def open_virtual_dataset(
 
         vars = {**virtual_vars, **loadable_vars}
 
-        data_vars, coords = separate_coords(vars, indexes)
+        data_vars, coords = separate_coords(vars, indexes, coord_names)
 
         vds = xr.Dataset(
             data_vars,
@@ -201,6 +203,7 @@ def open_virtual_dataset_from_v3_store(
     _storepath = Path(storepath)
 
     ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
+    coord_names = ds_attrs.pop("coordinates", [])
 
     # TODO recursive glob to create a datatree
     # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
@@ -229,7 +232,7 @@ def open_virtual_dataset_from_v3_store(
     else:
         indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-    data_vars, coords = separate_coords(vars, indexes)
+    data_vars, coords = separate_coords(vars, indexes, coord_names)
 
     ds = xr.Dataset(
         data_vars,
@@ -247,8 +250,10 @@ def virtual_vars_from_kerchunk_refs(
     virtual_array_class=ManifestArray,
 ) -> Mapping[str, xr.Variable]:
     """
-    Translate a store-level kerchunk reference dict into aa set of xarray Variables containing virtualized arrays.
+    Translate a store-level kerchunk reference dict into aaset of xarray Variables containing virtualized arrays.
 
+    Parameters
+    ----------
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     virtual_array_class
@@ -267,7 +272,6 @@ def virtual_vars_from_kerchunk_refs(
         var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
         for var_name in var_names_to_keep
     }
-
     return vars
 
 
@@ -288,12 +292,12 @@ def dataset_from_kerchunk_refs(
     """
 
     vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
+    ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
+    coord_names = ds_attrs.pop("coordinates", [])
 
     if indexes is None:
         indexes = {}
-    data_vars, coords = separate_coords(vars, indexes)
-
-    ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
+    data_vars, coords = separate_coords(vars, indexes, coord_names)
 
     vds = xr.Dataset(
         data_vars,
@@ -312,8 +316,12 @@ def variable_from_kerchunk_refs(
 
     arr_refs = kerchunk.extract_array_refs(refs, var_name)
     chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
+
     manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-    dims = zattrs["_ARRAY_DIMENSIONS"]
+
+    # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
+    dims = zattrs.pop("_ARRAY_DIMENSIONS")
+
     varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
 
     return xr.Variable(data=varr, dims=dims, attrs=zattrs)
@@ -322,17 +330,18 @@ def variable_from_kerchunk_refs(
 def separate_coords(
     vars: Mapping[str, xr.Variable],
     indexes: MutableMapping[str, Index],
+    coord_names: Iterable[str] | None = None,
 ) -> tuple[Mapping[str, xr.Variable], xr.Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
-    Currently requires a workaround unless xarray 8107 is merged.
+    Currently requires this function as a workaround unless xarray PR #8124 is merged.
 
     Will also preserve any loaded variables and indexes it is passed.
     """
 
-    # this would normally come from CF decoding, let's hope the fact we're skipping that doesn't cause any problems...
-    coord_names: list[str] = []
+    if coord_names is None:
+        coord_names = []
 
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
@@ -342,7 +351,7 @@ def separate_coords(
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
-                coord_vars[name] = (dim1d, var.data)
+                coord_vars[name] = (dim1d, var.data, var.attrs)
 
                 if isinstance(var, IndexVariable):
                     # unless variable actually already is a loaded IndexVariable,
@@ -368,8 +377,8 @@ class VirtualiZarrDatasetAccessor:
     Methods on this object are called via `ds.virtualize.{method}`.
     """
 
-    def __init__(self, ds):
-        self.ds = ds
+    def __init__(self, ds: xr.Dataset):
+        self.ds: xr.Dataset = ds
 
     def to_zarr(self, storepath: str) -> None:
         """
@@ -463,3 +472,50 @@ class VirtualiZarrDatasetAccessor:
             return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> xr.Dataset:
+        """
+        Rename paths to chunks in every ManifestArray in this dataset.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        Dataset
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> ds.virtualize.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ManifestArray.rename_paths
+        ChunkManifest.rename_paths
+        """
+
+        new_ds = self.ds.copy()
+        for var_name in new_ds.variables:
+            data = new_ds[var_name].data
+            if isinstance(data, ManifestArray):
+                new_ds[var_name].data = data.rename_paths(new=new)
+
+        return new_ds
