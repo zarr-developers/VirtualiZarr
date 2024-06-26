@@ -277,11 +277,8 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
                     f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset"
                 )
             if "calendar" in var.encoding:
-                print("JULIA 0 ", var)
                 np_arr = CFDatetimeCoder().encode(var.copy(), name=var_name).values
-                print("JULIA 1 ", var, np_arr)
 
-        print("JULIA 2", var.encoding, var.attrs, np_arr)
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
         # TODO do I really need to encode then decode like this?

@@ -170,7 +170,6 @@ def open_virtual_dataset(
             for name in cftime_variables:
                 var = loadable_vars[name]
                 loadable_vars[name] = CFDatetimeCoder().decode(var, name=name)
-                print(loadable_vars[name].encoding, loadable_vars[name].attrs)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:
