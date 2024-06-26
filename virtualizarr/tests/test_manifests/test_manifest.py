@@ -87,3 +87,44 @@ class TestSerializeManifest:
     def test_serialize_manifest_to_zarr(self): ...
 
     def test_deserialize_manifest_from_zarr(self): ...
+
+
+class TestRenamePaths:
+    def test_rename_to_str(self):
+        chunks = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+
+        renamed = manifest.rename_paths("s3://bucket/bar.nc")
+        assert renamed.dict() == {
+            "0.0.0": {"path": "s3://bucket/bar.nc", "offset": 100, "length": 100},
+        }
+
+    def test_rename_using_function(self):
+        chunks = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+
+        def local_to_s3_url(old_local_path: str) -> str:
+            from pathlib import Path
+
+            new_s3_bucket_url = "s3://bucket/"
+
+            filename = Path(old_local_path).name
+            return str(new_s3_bucket_url + filename)
+
+        renamed = manifest.rename_paths(local_to_s3_url)
+        assert renamed.dict() == {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+
+    def test_invalid_type(self):
+        chunks = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+
+        with pytest.raises(TypeError):
+            manifest.rename_paths(["file1.nc", "file2.nc"])

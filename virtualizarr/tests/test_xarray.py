@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -227,6 +228,23 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
+class TestOpenVirtualDatasetAttrs:
+    def test_drop_array_dimensions(self, netcdf4_file):
+        # regression test for GH issue #150
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
+
+    def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
+        # regression test for GH issue #155
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert vds["lat"].attrs == {
+            "standard_name": "latitude",
+            "long_name": "Latitude",
+            "units": "degrees_north",
+            "axis": "Y",
+        }
+
+
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -306,3 +324,60 @@ class TestLoadVirtualDataset:
         for name in full_ds.variables:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+
+    @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
+    def test_open_virtual_dataset_passes_expected_args(
+        self, mock_read_kerchunk, netcdf4_file
+    ):
+        reader_options = {"option1": "value1", "option2": "value2"}
+        open_virtual_dataset(netcdf4_file, indexes={}, reader_options=reader_options)
+        args = {
+            "filepath": netcdf4_file,
+            "filetype": None,
+            "reader_options": reader_options,
+        }
+        mock_read_kerchunk.assert_called_once_with(**args)
+
+
+class TestRenamePaths:
+    def test_rename_to_str(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+
+    def test_rename_using_function(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        def local_to_s3_url(old_local_path: str) -> str:
+            from pathlib import Path
+
+            new_s3_bucket_url = "s3://bucket/"
+
+            filename = Path(old_local_path).name
+            return str(new_s3_bucket_url + filename)
+
+        renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+
+    def test_invalid_type(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        with pytest.raises(TypeError):
+            vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+
+    def test_mixture_of_manifestarrays_and_numpy_arrays(self, netcdf4_file):
+        vds = open_virtual_dataset(
+            netcdf4_file, indexes={}, loadable_variables=["lat", "lon"]
+        )
+        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+        assert (
+            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+            == "s3://bucket/air.nc"
+        )
+        assert isinstance(renamed_vds["lat"].data, np.ndarray)

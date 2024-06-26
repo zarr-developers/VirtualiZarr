@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Union
+from typing import Any, Callable, Union
 
 import numpy as np
 
@@ -223,6 +223,46 @@ class ManifestArray:
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> "ManifestArray":
+        """
+        Rename paths to chunks in this array's manifest.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        ManifestArray
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> marr.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ChunkManifest.rename_paths
+        """
+        renamed_manifest = self.manifest.rename_paths(new)
+        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):

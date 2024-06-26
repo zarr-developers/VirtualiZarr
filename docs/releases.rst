@@ -9,6 +9,8 @@ v0.2 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added a `.rename_paths` convenience method to rename paths in a manifest according to a function.
+  (:pull:`152`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -23,6 +25,12 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Ensure that `_ARRAY_DIMENSIONS` are dropped from variable `.attrs`. (:issue:`150`, :pull:`152`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that `.attrs` on coordinate variables are preserved during round-tripping. (:issue:`155`, :pull:`154`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that non-dimension coordinate variables described via the CF conventions are preserved during round-tripping. (:issue:`105`, :pull:`156`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
