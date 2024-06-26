@@ -319,7 +319,7 @@ class TestReadFromURL:
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
             # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
             # https://github.com/zarr-developers/VirtualiZarr/issues/160
-            # "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
+            "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
             # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
             "jpg": "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
         }
