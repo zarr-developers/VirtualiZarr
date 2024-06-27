@@ -8,6 +8,7 @@ import xarray.testing as xrt
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.kerchunk import FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import network, requires_s3fs
 from virtualizarr.zarr import ZArray
@@ -325,18 +326,25 @@ class TestLoadVirtualDataset:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
-    @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
+    @patch("virtualizarr.xarray._automatically_determine_filetype")
+    @patch("virtualizarr.xarray.virtual_vars_from_hdf")
     def test_open_virtual_dataset_passes_expected_args(
-        self, mock_read_kerchunk, netcdf4_file
+        self, mock_reader, mock_determine_filetype, netcdf4_file
     ):
         reader_options = {"option1": "value1", "option2": "value2"}
+        mock_determine_filetype.return_value = FileType.netcdf4
         open_virtual_dataset(netcdf4_file, indexes={}, reader_options=reader_options)
-        args = {
-            "filepath": netcdf4_file,
-            "filetype": None,
+        reader_args = {
+            "path": netcdf4_file,
+            "drop_variables": [],
             "reader_options": reader_options,
         }
-        mock_read_kerchunk.assert_called_once_with(**args)
+        mock_reader.assert_called_once_with(**reader_args)
+        filetype_args = {
+            "filepath": netcdf4_file,
+            "reader_options": reader_options,
+        }
+        mock_determine_filetype.assert_called_once_with(**filetype_args)
 
 
 class TestRenamePaths:

@@ -109,7 +109,9 @@ def open_virtual_dataset(
         )
     else:
         if filetype is None:
-            filetype = _automatically_determine_filetype(filepath=filepath)
+            filetype = _automatically_determine_filetype(
+                filepath=filepath, reader_options=reader_options
+            )
         filetype = FileType(filetype)
 
         if filetype.name.lower() == "netcdf4":
