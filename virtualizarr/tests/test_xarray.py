@@ -9,7 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import has_tifffile, network, requires_s3fs
+from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -338,7 +338,13 @@ class TestReadFromURL:
                     not has_tifffile, reason="package tifffile is not available"
                 ),
             ),
-            # ("fits", "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits"),
+            pytest.param(
+                "fits",
+                "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
+                marks=pytest.mark.skipif(
+                    not has_astropy, reason="package astropy is not available"
+                ),
+            ),
             (
                 "jpg",
                 "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",

@@ -26,4 +26,7 @@ dependencies:
   - fsspec
   - s3fs
   - fastparquet
+  # for opening tiff files
   - tifffile
+  # for opening FITS files
+  - astropy

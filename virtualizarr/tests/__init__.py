@@ -32,6 +32,7 @@ def _importorskip(
     return has, func
 
 
+has_astropy, requires_astropy = _importorskip("astropy")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
 
