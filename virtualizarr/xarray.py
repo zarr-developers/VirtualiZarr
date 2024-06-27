@@ -121,7 +121,7 @@ def open_virtual_dataset(
             ds_attrs = attrs_from_root_group(
                 path=filepath, reader_options=reader_options
             )
-            coord_names = None
+            coord_names = ds_attrs.pop("coordinates", [])
         else:
             # this is the only place we actually always need to use kerchunk directly
             # TODO avoid even reading byte ranges for variables that will be dropped later anyway?

@@ -11,7 +11,9 @@ from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import ZArray
 
 
-def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
+def _dataset_chunk_manifest(
+    path: str, dataset: h5py.Dataset
+) -> Optional[ChunkManifest]:
     """
     Generate ChunkManifest for HDF5 dataset.
 
@@ -31,7 +33,7 @@ def _dataset_chunk_manifest(path: str, dataset: h5py.Dataset) -> ChunkManifest:
 
     if dataset.chunks is None:
         if dsid.get_offset() is None:
-            raise ValueError("Dataset has no space allocated in the file")
+            return None
         else:
             key_list = [0] * (len(dataset.shape) or 1)
             key = ".".join(map(str, key_list))
@@ -167,35 +169,39 @@ def _extract_attrs(h5obj: Union[h5py.Dataset, h5py.Group]):
     return attrs
 
 
-def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> xr.Variable:
+def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variable]:
     # This chunk determination logic mirrors zarr-python's create
     # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
-    chunks = dataset.chunks if dataset.chunks else dataset.shape
-    codecs = codecs_from_dataset(dataset)
-    cfcodec = cfcodec_from_dataset(dataset)
-    attrs = _extract_attrs(dataset)
-    if cfcodec:
-        codecs.append(cfcodec["codec"])
-        dtype = cfcodec["target_dtype"]
-        attrs.pop("scale_factor", None)
-        attrs.pop("add_offset", None)
-    else:
-        dtype = dataset.dtype
-    filters = [codec.get_config() for codec in codecs]
-    zarray = ZArray(
-        chunks=chunks,
-        compressor=None,
-        dtype=dtype,
-        fill_value=dataset.fillvalue,
-        filters=filters,
-        order="C",
-        shape=dataset.shape,
-        zarr_format=2,
-    )
+
     manifest = _dataset_chunk_manifest(path, dataset)
-    marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-    dims = _dataset_dims(dataset)
-    variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
+    if manifest:
+        chunks = dataset.chunks if dataset.chunks else dataset.shape
+        codecs = codecs_from_dataset(dataset)
+        cfcodec = cfcodec_from_dataset(dataset)
+        attrs = _extract_attrs(dataset)
+        if cfcodec:
+            codecs.append(cfcodec["codec"])
+            dtype = cfcodec["target_dtype"]
+            attrs.pop("scale_factor", None)
+            attrs.pop("add_offset", None)
+        else:
+            dtype = dataset.dtype
+        filters = [codec.get_config() for codec in codecs]
+        zarray = ZArray(
+            chunks=chunks,
+            compressor=None,
+            dtype=dtype,
+            fill_value=dataset.fillvalue,
+            filters=filters,
+            order="C",
+            shape=dataset.shape,
+            zarr_format=2,
+        )
+        marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        dims = _dataset_dims(dataset)
+        variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
+    else:
+        variable = None
     return variable
 
 
@@ -217,7 +223,8 @@ def virtual_vars_from_hdf(
         if key not in drop_variables:
             if isinstance(f[key], h5py.Dataset):
                 variable = _dataset_to_variable(path, f[key])
-                variables[key] = variable
+                if variable is not None:
+                    variables[key] = variable
             else:
                 raise NotImplementedError("Nested groups are not yet supported")
 

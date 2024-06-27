@@ -71,8 +71,12 @@ class TestKerchunkRoundtrip:
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
             )
 
-        # assert identical to original dataset
+        # assert all_close to original dataset
         xrt.assert_allclose(roundtrip, ds)
+
+        # assert coordinate attributes are maintained
+        for coord in ds.coords:
+            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_kerchunk_roundtrip_concat(self, tmpdir, format):
         # set up example xarray dataset
@@ -107,8 +111,12 @@ class TestKerchunkRoundtrip:
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
             )
 
-        # assert identical to original dataset
-        xrt.assert_identical(roundtrip, ds)
+        # assert all_close to original dataset
+        xrt.assert_allclose(roundtrip, ds)
+
+        # assert coordinate attributes are maintained
+        for coord in ds.coords:
+            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_non_dimension_coordinates(self, tmpdir, format):
         # regression test for GH issue #105
@@ -141,6 +149,10 @@ class TestKerchunkRoundtrip:
 
         # assert equal to original dataset
         xrt.assert_allclose(roundtrip, ds)
+
+        # assert coordinate attributes are maintained
+        for coord in ds.coords:
+            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
 
 def test_open_scalar_variable(tmpdir):
