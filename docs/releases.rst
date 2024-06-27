@@ -9,6 +9,8 @@ v0.2 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Now successfully opens both tiff and FITS files. (:issue:`160`, :pull:`162`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added a `.rename_paths` convenience method to rename paths in a manifest according to a function.
   (:pull:`152`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
@@ -43,7 +45,7 @@ Internal Changes
   (:pull:`107`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Mark tests which require network access so that they are only run when `--run-network-tests` is passed a command-line argument to pytest.
   (:pull:`144`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
-  - Determine file format from magic bytes rather than name suffix
+- Determine file format from magic bytes rather than name suffix
   (:pull:`143`) By `Scott Henderson <https://github.com/scottyhq>`_.
 
 .. _v0.1:
