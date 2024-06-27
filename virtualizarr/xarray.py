@@ -112,7 +112,7 @@ def open_virtual_dataset(
             filepath=filepath, reader_options=reader_options
         )
         parser = DMRParser(fpath.read())
-        return parser.parse(group=group)
+        return parser.parse_dataset(group=group)
     else:
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
