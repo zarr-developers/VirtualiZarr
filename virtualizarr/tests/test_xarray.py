@@ -9,7 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import network, requires_s3fs
+from virtualizarr.tests import has_tifffile, network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -308,22 +308,43 @@ class TestReadFromS3:
             assert isinstance(vds[var].data, ManifestArray), var
 
 
-EXAMPLE_URLS = {
-    "grib": "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
-    "netcdf3": "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
-    "netcdf4": "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
-    "hdf4": "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
-    # https://github.com/zarr-developers/VirtualiZarr/issues/159
-    # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
-    "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-    # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-    "jpg": "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
-}
-
-
 @network
 class TestReadFromURL:
-    @pytest.mark.parametrize("filetype, url", [(k, v) for k, v in EXAMPLE_URLS.items()])
+    @pytest.mark.parametrize(
+        "filetype, url",
+        [
+            (
+                "grib",
+                "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
+            ),
+            (
+                "netcdf3",
+                "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+            ),
+            (
+                "netcdf4",
+                "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
+            ),
+            (
+                "hdf4",
+                "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+            ),
+            # https://github.com/zarr-developers/VirtualiZarr/issues/159
+            # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
+            pytest.param(
+                "tiff",
+                "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
+                marks=pytest.mark.skipif(
+                    not has_tifffile, reason="package tifffile is not available"
+                ),
+            ),
+            # ("fits", "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits"),
+            (
+                "jpg",
+                "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
+            ),
+        ],
+    )
     def test_read_from_url(self, filetype, url):
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
