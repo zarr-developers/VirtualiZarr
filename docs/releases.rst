@@ -39,6 +39,8 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Updated the development roadmap in preparation for v1.0. (:pull:`164`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
