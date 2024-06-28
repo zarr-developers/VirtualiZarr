@@ -41,16 +41,14 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
+    reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
 
-    No data variables will be loaded.
+    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
 
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass indexes={}.
+    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -65,6 +63,10 @@ def open_virtual_dataset(
     loadable_variables: list[str], default is None
         Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
+    cftime_variables : list[str], default is None
+        Interpret the value of specified vars using cftime, returning a datetime.
+        These will be automatically re-encoded with cftime. This list must be a subset
+        of ``loadable_variables``.
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
@@ -72,13 +74,9 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    cftime_variables : list[str], default is None
-        Interpret the value of specified vars using cftime, returning a datetime.
-        These will be automatically re-encoded with cftime. This list must be a subset
-        of ``loadable_variables``.
-    reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
-        Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
-        so ensure reader_options match selected Kerchunk reader arguments.
+    reader_options: dict, default {'storage_options': {'key': '', 'secret': '', 'anon': True}}
+        Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
+        Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
 
     Returns
     -------
@@ -125,6 +123,11 @@ def open_virtual_dataset(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
     else:
+        if reader_options is None:
+            reader_options = {
+                "storage_options": {"key": "", "secret": "", "anon": True}
+            }
+
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
         vds_refs = kerchunk.read_kerchunk_references_from_file(

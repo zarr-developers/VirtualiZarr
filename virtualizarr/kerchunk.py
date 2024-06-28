@@ -1,5 +1,6 @@
 import base64
 import json
+import warnings
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, NewType, Optional, cast
@@ -104,11 +105,19 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, **reader_options)
+        reader_options.pop("storage_options", {})
+        warnings.warn(
+            "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
+            UserWarning,
+        )
+
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": tiff_to_zarr(filepath, **reader_options)}
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, **reader_options)
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": process_file(filepath, **reader_options)}
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
