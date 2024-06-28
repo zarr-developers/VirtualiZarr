@@ -18,13 +18,13 @@ VirtualiZarr aims to build on the excellent ideas of kerchunk whilst solving the
 
 ## Aim
 
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
+Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along a dimension to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 
 ```python
 ds = xr.open_mfdataset(
     '/my/files*.nc',
     engine='h5netcdf',
-    combine='by_coords',  # 'by_coords' requires reading coord data to determine concatenation order
+    combine='nested',
 )
 ds  # the complete lazy xarray dataset
 ```
@@ -48,7 +48,7 @@ virtual_datasets = [
 ]
 
 # this Dataset wraps a bunch of virtual ManifestArray objects directly
-virtual_ds = xr.combine_by_coords(virtual_datasets)
+virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
 
 # cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
 virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
