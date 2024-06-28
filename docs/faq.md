@@ -55,7 +55,7 @@ The reasons why VirtualiZarr has been developed as separate project rather than 
 
 VirtualiZarr version 1 focused on (mostly) achieving feature parity with kerchunk, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
-There is still work to do there, but with an MVP mostly established, future VirtualiZarr versions will move beyond that to focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
+There is still work to do there, but with an MVP mostly established, future VirtualiZarr development will move beyond that to focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
 We have a lot of ideas, including:
 - [Zarr v3 support](https://github.com/zarr-developers/VirtualiZarr/issues/17)
