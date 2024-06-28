@@ -11,6 +11,8 @@ New Features
 
 - Added a `.rename_paths` convenience method to rename paths in a manifest according to a function.
   (:pull:`152`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- New ``cftime_variables`` option on ``open_virtual_dataset`` enables encoding/decoding time.
+  (:pull:`122`) By `Julia Signell <https://github.com/jsignell>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
