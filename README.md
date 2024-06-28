@@ -8,11 +8,19 @@ _Please see the [documentation](https://virtualizarr.readthedocs.io/en/latest/)_
 
 ### Development Status and Roadmap
 
-VirtualiZarr is ready to use for many of the tasks that we are used to using kerchunk for, but the most general and powerful vision of this library can only be implemented once certain changes upstream in Zarr have occurred.
+VirtualiZarr version 1 focused on (mostly) achieving feature parity with kerchunk, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
-VirtualiZarr is therefore evolving in tandem with developments in the Zarr Specification, which then need to be implemented in specific Zarr reader implementations (especially the Zarr-Python V3 implementation). There is an [overall roadmap for this integration with Zarr](https://hackmd.io/t9Myqt0HR7O0nq6wiHWCDA), whose final completion requires acceptance of at least two new Zarr Enhancement Proposals (the ["Chunk Manifest"](https://github.com/zarr-developers/zarr-specs/issues/287) and ["Virtual Concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) ZEPs).
+There is still work to do there, but with an MVP mostly established, future VirtualiZarr versions will move beyond that to focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
-Whilst we wait for these upstream changes, in the meantime VirtualiZarr aims to provide utility in a significant subset of cases, for example by enabling writing virtualized zarr stores out to the existing kerchunk references format, so that they can be read by fsspec today.
+We have a lot of ideas, including:
+- [Zarr v3 support](https://github.com/zarr-developers/VirtualiZarr/issues/17)
+- [Zarr-native on-disk chunk manifest format](https://github.com/zarr-developers/zarr-specs/issues/287)
+- ["Virtual concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) of separate Zarr arrays
+- ManifestArrays as an [intermediate layer in-memory](https://github.com/zarr-developers/VirtualiZarr/issues/71) in Zarr-Python
+- [Separating CF-related Codecs from xarray](https://github.com/zarr-developers/VirtualiZarr/issues/68#issuecomment-2197682388)
+- [Generating references without kerchunk](https://github.com/zarr-developers/VirtualiZarr/issues/78)
+
+If you see other opportunities then we would love to hear your ideas!
 
 ### Credits
 
