@@ -36,6 +36,7 @@ def open_virtual_dataset(
     filepath: str,
     *,
     filetype: FileType | None = None,
+    group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     cftime_variables: Iterable[str] | None = None,
@@ -60,6 +61,8 @@ def open_virtual_dataset(
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
+    group : str, default is None
+        Specific HDF Group in file to open (others ignored).
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
@@ -125,6 +128,11 @@ def open_virtual_dataset(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
     else:
+        if filetype is None:
+            filetype = kerchunk._automatically_determine_filetype(
+                filepath=filepath, reader_options=reader_options
+            )
+        filetype = FileType(filetype)
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
         vds_refs = kerchunk.read_kerchunk_references_from_file(
@@ -132,6 +140,42 @@ def open_virtual_dataset(
             filetype=filetype,
             reader_options=reader_options,
         )
+
+        if filetype.name.lower() == "hdf5" or filetype.name.lower() == "netcdf4":
+            hdf_groups = [
+                k.removesuffix(".zgroup")
+                for k in vds_refs["refs"].keys()
+                if ".zgroup" in k
+            ]
+            if len(hdf_groups) > 1:
+                if group is None:
+                    raise ValueError(
+                        f"Multiple HDF Groups found. Must specify group= keyword to select one of {hdf_groups}"
+                    )
+                else:
+                    # Ensure formatting consistent with kerchunk keys
+                    if not group.endswith("/"):
+                        group += "/"
+                    if group.startswith("/"):
+                        group = group.removeprefix("/")
+
+                if group not in hdf_groups:
+                    raise ValueError(
+                        f"Group {group} not found. Available groups are: {hdf_groups}"
+                    )
+
+                # Filter by group prefix and remove prefix from all keys
+                groupdict = {
+                    k.removeprefix(group): v
+                    for k, v in vds_refs["refs"].items()
+                    if k.startswith(group)
+                }
+                # Also remove group prefix from _ARRAY_DIMENSIONS
+                for k, v in groupdict.items():
+                    if isinstance(v, str):
+                        groupdict[k] = v.replace("\\/", "/").replace(group, "")
+                vds_refs["refs"] = groupdict
+
         virtual_vars = virtual_vars_from_kerchunk_refs(
             vds_refs,
             drop_variables=drop_variables + loadable_variables,
@@ -147,9 +191,11 @@ def open_virtual_dataset(
             fpath = _fsspec_openfile_from_filepath(
                 filepath=filepath, reader_options=reader_options
             )
-
             ds = xr.open_dataset(
-                fpath, drop_variables=drop_variables, decode_times=False
+                fpath,
+                drop_variables=drop_variables,
+                decode_times=False,
+                group=group,
             )
 
             if indexes is None:
@@ -264,12 +310,12 @@ def virtual_vars_from_kerchunk_refs(
     """
 
     var_names = kerchunk.find_var_names(refs)
+
     if drop_variables is None:
         drop_variables = []
     var_names_to_keep = [
         var_name for var_name in var_names if var_name not in drop_variables
     ]
-
     vars = {
         var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
         for var_name in var_names_to_keep

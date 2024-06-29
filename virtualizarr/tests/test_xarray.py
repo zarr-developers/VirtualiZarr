@@ -318,6 +318,8 @@ class TestReadFromURL:
             "hdf4": "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
             # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
+            "hdf5": "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
+            # "hdf5": "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/Soil_Moisture/ALOS-2/NISAR_L3_PR_SME2_001_008_D_070_4000_QPNA_A_20190829T180759_20190829T180809_P01101_M_P_J_001.h5",
             # https://github.com/zarr-developers/VirtualiZarr/issues/160
             # "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
             # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
@@ -328,6 +330,16 @@ class TestReadFromURL:
             if filetype in ["grib", "jpg", "hdf4"]:
                 with pytest.raises(NotImplementedError):
                     vds = open_virtual_dataset(url, reader_options={})
+            elif filetype == "hdf5":
+                vds = open_virtual_dataset(
+                    url,
+                    # group="science/LSAR/GCOV/grids/frequencyA",
+                    drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+                    indexes={},
+                    reader_options={},
+                )
+                assert isinstance(vds, xr.Dataset)
+
             else:
                 vds = open_virtual_dataset(url, reader_options={})
                 assert isinstance(vds, xr.Dataset)
@@ -356,6 +368,23 @@ class TestLoadVirtualDataset:
 
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
+
+    def test_group_kwarg(self, hdf5_groups_file):
+        with pytest.raises(ValueError):
+            open_virtual_dataset(
+                hdf5_groups_file
+            )  # ValueError: Multiple HDF Groups found
+        with pytest.raises(ValueError):  # group not found
+            open_virtual_dataset(hdf5_groups_file, group="group")
+
+        vars_to_load = ["air", "time"]
+        vds = open_virtual_dataset(
+            hdf5_groups_file, group="test/group", loadable_variables=vars_to_load
+        )
+        full_ds = xr.open_dataset(hdf5_groups_file, group="test/group")
+        for name in full_ds.variables:
+            if name in vars_to_load:
+                xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
     @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
     def test_open_virtual_dataset_passes_expected_args(

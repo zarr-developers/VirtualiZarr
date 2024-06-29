@@ -74,17 +74,10 @@ def read_kerchunk_references_from_file(
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
     """
-
-    if filetype is None:
-        filetype = _automatically_determine_filetype(
-            filepath=filepath, reader_options=reader_options
-        )
+    filetype = FileType(filetype)
 
     if reader_options is None:
         reader_options = {}
-
-    # if filetype is user defined, convert to FileType
-    filetype = FileType(filetype)
 
     if filetype.name.lower() == "netcdf3":
         from kerchunk.netCDF3 import NetCDF3ToZarr
@@ -156,7 +149,10 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     """Find the names of zarr variables in this store/group."""
 
     refs = ds_reference_dict["refs"]
-    found_var_names = [key.split("/")[0] for key in refs.keys() if "/" in key]
+    found_var_names = list(
+        set([key.split("/")[0] for key in refs.keys() if "/" in key])
+    )
+
     return found_var_names
 
 
