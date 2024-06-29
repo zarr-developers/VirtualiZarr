@@ -9,7 +9,7 @@ from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import network, requires_s3fs
+from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -310,39 +310,65 @@ class TestReadFromS3:
 
 @network
 class TestReadFromURL:
-    def test_read_from_url(self):
-        examples = {
-            "grib": "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
-            "netcdf3": "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
-            "netcdf4": "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
-            "hdf4": "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
-            # https://github.com/zarr-developers/VirtualiZarr/issues/159
-            # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
-            "hdf5": "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
-            # "hdf5": "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/Soil_Moisture/ALOS-2/NISAR_L3_PR_SME2_001_008_D_070_4000_QPNA_A_20190829T180759_20190829T180809_P01101_M_P_J_001.h5",
-            # https://github.com/zarr-developers/VirtualiZarr/issues/160
-            # "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-            # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-            "jpg": "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
-        }
-
-        for filetype, url in examples.items():
-            if filetype in ["grib", "jpg", "hdf4"]:
-                with pytest.raises(NotImplementedError):
-                    vds = open_virtual_dataset(url, reader_options={})
-            elif filetype == "hdf5":
-                vds = open_virtual_dataset(
-                    url,
-                    # group="science/LSAR/GCOV/grids/frequencyA",
-                    drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
-                    indexes={},
-                    reader_options={},
-                )
-                assert isinstance(vds, xr.Dataset)
-
-            else:
-                vds = open_virtual_dataset(url, reader_options={})
-                assert isinstance(vds, xr.Dataset)
+    @pytest.mark.parametrize(
+        "filetype, url",
+        [
+            (
+                "grib",
+                "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
+            ),
+            (
+                "netcdf3",
+                "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+            ),
+            (
+                "netcdf4",
+                "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
+            ),
+            (
+                "hdf4",
+                "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+            ),
+            (
+                "hdf5",
+                "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
+            ),
+            pytest.param(
+                "tiff",
+                "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
+                marks=pytest.mark.skipif(
+                    not has_tifffile, reason="package tifffile is not available"
+                ),
+            ),
+            pytest.param(
+                "fits",
+                "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
+                marks=pytest.mark.skipif(
+                    not has_astropy, reason="package astropy is not available"
+                ),
+            ),
+            (
+                "jpg",
+                "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
+            ),
+        ],
+    )
+    def test_read_from_url(self, filetype, url):
+        if filetype in ["grib", "jpg", "hdf4"]:
+            with pytest.raises(NotImplementedError):
+                vds = open_virtual_dataset(url, reader_options={}, indexes={})
+        elif filetype == "hdf5":
+            vds = open_virtual_dataset(
+                url,
+                group="science/LSAR/GCOV/grids/frequencyA",
+                drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+                indexes={},
+                reader_options={},
+            )
+            assert isinstance(vds, xr.Dataset)
+        else:
+            vds = open_virtual_dataset(url, reader_options={}, indexes={})
+            assert isinstance(vds, xr.Dataset)
 
 
 class TestLoadVirtualDataset:
