@@ -136,8 +136,7 @@ def open_virtual_dataset(
                 filepath=filepath, reader_options=reader_options
             )
         filetype = FileType(filetype)
-
-        if filetype.name.lower() == "netcdf4":
+        if filetype.name.lower() == "netcdf4" or filetype.name.lower() == "hdf5":
             virtual_vars = virtual_vars_from_hdf(
                 path=filepath,
                 drop_variables=drop_variables,
