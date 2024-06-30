@@ -309,6 +309,31 @@ class TestReadFromS3:
             assert isinstance(vds[var].data, ManifestArray), var
 
 
+@network
+class TestReadFromURL:
+    def test_read_from_url(self):
+        examples = {
+            "grib": "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
+            "netcdf3": "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+            "netcdf4": "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
+            "hdf4": "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+            # https://github.com/zarr-developers/VirtualiZarr/issues/159
+            # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
+            # https://github.com/zarr-developers/VirtualiZarr/issues/160
+            # "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
+            # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
+            "jpg": "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
+        }
+
+        for filetype, url in examples.items():
+            if filetype in ["grib", "jpg", "hdf4"]:
+                with pytest.raises(NotImplementedError):
+                    vds = open_virtual_dataset(url, reader_options={})
+            else:
+                vds = open_virtual_dataset(url, reader_options={})
+                assert isinstance(vds, xr.Dataset)
+
+
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ["air", "time"]
@@ -326,6 +351,13 @@ class TestLoadVirtualDataset:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
+    def test_explicit_filetype(self, netcdf4_file):
+        with pytest.raises(ValueError):
+            open_virtual_dataset(netcdf4_file, filetype="unknown")
+
+        with pytest.raises(NotImplementedError):
+            open_virtual_dataset(netcdf4_file, filetype="grib")
+            
     @patch("virtualizarr.xarray._automatically_determine_filetype")
     @patch("virtualizarr.xarray.virtual_vars_from_hdf")
     def test_open_virtual_dataset_passes_expected_args(
