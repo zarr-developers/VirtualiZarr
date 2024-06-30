@@ -78,9 +78,10 @@ class TestKerchunkRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    def test_kerchunk_roundtrip_concat(self, tmpdir, format):
+    @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
+    def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
+        ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
 
         # split into two datasets
         ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
@@ -90,8 +91,25 @@ class TestKerchunkRoundtrip:
         ds2.to_netcdf(f"{tmpdir}/air2.nc")
 
         # use open_dataset_via_kerchunk to read it as references
-        vds1 = open_virtual_dataset(f"{tmpdir}/air1.nc", indexes={})
-        vds2 = open_virtual_dataset(f"{tmpdir}/air2.nc", indexes={})
+        vds1 = open_virtual_dataset(
+            f"{tmpdir}/air1.nc",
+            indexes={},
+            loadable_variables=time_vars,
+            cftime_variables=time_vars,
+        )
+        vds2 = open_virtual_dataset(
+            f"{tmpdir}/air2.nc",
+            indexes={},
+            loadable_variables=time_vars,
+            cftime_variables=time_vars,
+        )
+
+        if decode_times is False:
+            assert vds1.time.dtype == np.dtype("float32")
+        else:
+            assert vds1.time.dtype == np.dtype("<M8[ns]")
+            assert "units" in vds1.time.encoding
+            assert "calendar" in vds1.time.encoding
 
         # concatenate virtually along time
         vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
@@ -101,22 +119,31 @@ class TestKerchunkRoundtrip:
             ds_refs = vds.virtualize.to_kerchunk(format=format)
 
             # use fsspec to read the dataset from the kerchunk references dict
-            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+            roundtrip = xr.open_dataset(
+                ds_refs, engine="kerchunk", decode_times=decode_times
+            )
         else:
             # write those references to disk as kerchunk references format
             vds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
 
             # use fsspec to read the dataset from disk via the kerchunk references
             roundtrip = xr.open_dataset(
-                f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
+                f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=decode_times
             )
 
-        # assert all_close to original dataset
-        xrt.assert_allclose(roundtrip, ds)
+        if decode_times is False:
+            # assert all_close to original dataset
+            xrt.assert_allclose(roundtrip, ds)
 
-        # assert coordinate attributes are maintained
-        for coord in ds.coords:
-            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+            # assert coordinate attributes are maintained
+            for coord in ds.coords:
+                assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+        else:
+            # they are very very close! But assert_allclose doesn't seem to work on datetimes
+            assert (roundtrip.time - ds.time).sum() == 0
+            assert roundtrip.time.dtype == ds.time.dtype
+            assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
+            assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
 
     def test_non_dimension_coordinates(self, tmpdir, format):
         # regression test for GH issue #105

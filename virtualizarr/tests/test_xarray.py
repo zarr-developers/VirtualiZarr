@@ -10,7 +10,7 @@ from xarray.core.indexes import Index
 from virtualizarr import open_virtual_dataset
 from virtualizarr.kerchunk import FileType
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import network, requires_s3fs
+from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
@@ -253,7 +253,7 @@ class TestOpenVirtualDatasetIndexes:
 
     def test_create_default_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes=None)
-        ds = xr.open_dataset(netcdf4_file)
+        ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -311,27 +311,54 @@ class TestReadFromS3:
 
 @network
 class TestReadFromURL:
-    def test_read_from_url(self):
-        examples = {
-            "grib": "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
-            "netcdf3": "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
-            "netcdf4": "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
-            "hdf4": "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+    @pytest.mark.parametrize(
+        "filetype, url",
+        [
+            (
+                "grib",
+                "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
+            ),
+            (
+                "netcdf3",
+                "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+            ),
+            (
+                "netcdf4",
+                "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
+            ),
+            (
+                "hdf4",
+                "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+            ),
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
-            # "hdf5": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5",
-            # https://github.com/zarr-developers/VirtualiZarr/issues/160
-            # "tiff": "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-            # "fits": "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-            "jpg": "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
-        }
-
-        for filetype, url in examples.items():
-            if filetype in ["grib", "jpg", "hdf4"]:
-                with pytest.raises(NotImplementedError):
-                    vds = open_virtual_dataset(url, reader_options={})
-            else:
-                vds = open_virtual_dataset(url, reader_options={})
-                assert isinstance(vds, xr.Dataset)
+            # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
+            pytest.param(
+                "tiff",
+                "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
+                marks=pytest.mark.skipif(
+                    not has_tifffile, reason="package tifffile is not available"
+                ),
+            ),
+            pytest.param(
+                "fits",
+                "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
+                marks=pytest.mark.skipif(
+                    not has_astropy, reason="package astropy is not available"
+                ),
+            ),
+            (
+                "jpg",
+                "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
+            ),
+        ],
+    )
+    def test_read_from_url(self, filetype, url):
+        if filetype in ["grib", "jpg", "hdf4"]:
+            with pytest.raises(NotImplementedError):
+                vds = open_virtual_dataset(url, reader_options={}, indexes={})
+        else:
+            vds = open_virtual_dataset(url, reader_options={}, indexes={})
+            assert isinstance(vds, xr.Dataset)
 
 
 class TestLoadVirtualDataset:
@@ -345,7 +372,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file)
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         for name in full_ds.variables:
             if name in vars_to_load:
@@ -357,7 +384,7 @@ class TestLoadVirtualDataset:
 
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
-            
+
     @patch("virtualizarr.xarray._automatically_determine_filetype")
     @patch("virtualizarr.xarray.virtual_vars_from_hdf")
     def test_open_virtual_dataset_passes_expected_args(
@@ -421,3 +448,10 @@ class TestRenamePaths:
             == "s3://bucket/air.nc"
         )
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
+
+
+def test_cftime_variables_must_be_in_loadable_variables(tmpdir):
+    ds = xr.Dataset(data_vars={"time": ["2024-06-21"]})
+    ds.to_netcdf(f"{tmpdir}/scalar.nc")
+    with pytest.raises(ValueError, match="'time' not in"):
+        open_virtual_dataset(f"{tmpdir}/scalar.nc", cftime_variables=["time"])

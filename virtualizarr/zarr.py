@@ -79,9 +79,15 @@ class ZArray(BaseModel):
         if fill_value is None or fill_value == "NaN" or fill_value == "nan":
             fill_value = np.nan
 
+        compressor = decoded_arr_refs_zarray["compressor"]
+        # deal with an inconsistency in kerchunk's tiff_to_zarr function
+        # TODO should this be moved to the point where we actually call tiff_to_zarr? Or ideally made consistent upstream.
+        if compressor is not None and "id" in compressor:
+            compressor = compressor["id"]
+
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
-            compressor=decoded_arr_refs_zarray["compressor"],
+            compressor=compressor,
             dtype=np.dtype(decoded_arr_refs_zarray["dtype"]),
             fill_value=fill_value,
             filters=decoded_arr_refs_zarray["filters"],

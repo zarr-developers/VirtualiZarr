@@ -28,5 +28,9 @@ dependencies:
   - s3fs
   - fastparquet
   - imagecodecs>=2024.6.1
+  # for opening tiff files
+  - tifffile
+  # for opening FITS files
+  - astropy
   - pip:
     - imagecodecs-numcodecs

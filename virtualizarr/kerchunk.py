@@ -1,5 +1,6 @@
 import base64
 import json
+import warnings
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, NewType, Optional, cast
@@ -7,6 +8,7 @@ from typing import Any, NewType, Optional, cast
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
+from xarray.coding.times import CFDatetimeCoder
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.utils import _fsspec_openfile_from_filepath
@@ -49,6 +51,8 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()  # Convert NumPy array to Python list
         elif isinstance(obj, np.generic):
             return obj.item()  # Convert NumPy scalar to Python scalar
+        elif isinstance(obj, np.dtype):
+            return str(obj)
         return json.JSONEncoder.default(self, obj)
 
 
@@ -101,11 +105,19 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, **reader_options)
+        reader_options.pop("storage_options", {})
+        warnings.warn(
+            "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
+            UserWarning,
+        )
+
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": tiff_to_zarr(filepath, **reader_options)}
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, **reader_options)
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": process_file(filepath, **reader_options)}
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
@@ -274,9 +286,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
                     f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset"
                 )
             if "calendar" in var.encoding:
-                raise NotImplementedError(
-                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar"
-                )
+                np_arr = CFDatetimeCoder().encode(var.copy(), name=var_name).values
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
@@ -297,7 +307,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
     zarray_dict = zarray.to_kerchunk_json()
     arr_refs[".zarray"] = zarray_dict
 
-    zattrs = var.attrs
+    zattrs = {**var.attrs, **var.encoding}
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 
