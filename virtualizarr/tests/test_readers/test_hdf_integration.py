@@ -1,53 +1,34 @@
-import fsspec
-import numpy
 import pytest
 import xarray as xr
+import xarray.testing as xrt
 
 import virtualizarr
 from virtualizarr.kerchunk import FileType
 
 
 class TestIntegration:
+    @pytest.mark.xfail(reason="Investigate initial time value decoding issue")
     def test_filters_h5netcdf_roundtrip(
         self, tmpdir, filter_encoded_xarray_h5netcdf_file
     ):
-        virtual_ds = virtualizarr.open_virtual_dataset(
+        ds = xr.open_dataset(filter_encoded_xarray_h5netcdf_file, decode_times=False)
+        vds = virtualizarr.open_virtual_dataset(
             filter_encoded_xarray_h5netcdf_file, filetype=FileType("netcdf4")
         )
         kerchunk_file = f"{tmpdir}/kerchunk.json"
-        virtual_ds.virtualize.to_kerchunk(kerchunk_file, format="json")
-        fs = fsspec.filesystem("reference", fo=kerchunk_file)
-        m = fs.get_mapper("")
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(
+            kerchunk_file, engine="kerchunk", decode_times=False
+        )
+        xrt.assert_allclose(ds, roundtrip)
 
-        ds = xr.open_dataset(m, engine="kerchunk")
-        assert isinstance(ds.air.values[0][0][0], numpy.float64)
-
-    @pytest.mark.skip(
-        reason="Issue with xr 'dim1' serialization and blosc availability"
-    )
     def test_filters_netcdf4_roundtrip(
         self, tmpdir, filter_encoded_xarray_netcdf4_file
     ):
         filepath = filter_encoded_xarray_netcdf4_file["filepath"]
-        compressor = filter_encoded_xarray_netcdf4_file["compressor"]
-        virtual_ds = virtualizarr.open_virtual_dataset(
-            filepath, filetype=FileType("netcdf4")
-        )
+        ds = xr.open_dataset(filepath)
+        vds = virtualizarr.open_virtual_dataset(filepath, filetype=FileType("netcdf4"))
         kerchunk_file = f"{tmpdir}/kerchunk.json"
-        virtual_ds.virtualize.to_kerchunk(kerchunk_file, format="json")
-        fs = fsspec.filesystem("reference", fo=kerchunk_file)
-        m = fs.get_mapper("")
-        ds = xr.open_dataset(m, engine="kerchunk")
-
-        expected_encoding = ds["var2"].encoding.copy()
-        compression = expected_encoding.pop("compression")
-        blosc_shuffle = expected_encoding.pop("blosc_shuffle")
-        if compression is not None:
-            if "blosc" in compression and blosc_shuffle:
-                expected_encoding["blosc"] = {
-                    "compressor": compressor,
-                    "shuffle": blosc_shuffle,
-                }
-                expected_encoding["shuffle"] = False
-        actual_encoding = ds["var2"].encoding
-        assert expected_encoding.items() <= actual_encoding.items()
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_equal(ds, roundtrip)
