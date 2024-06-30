@@ -9,7 +9,7 @@ from xarray.util.print_versions import netcdf_and_hdf5_versions
 
 
 @pytest.fixture
-def empty_chunks_netcdf4_file(tmpdir):
+def empty_chunks_hdf5_file(tmpdir):
     ds = xr.Dataset({"data": []})
     filepath = f"{tmpdir}/empty_chunks.nc"
     ds.to_netcdf(filepath, engine="h5netcdf")
@@ -17,7 +17,7 @@ def empty_chunks_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def empty_dataset_netcdf4_file(tmpdir):
+def empty_dataset_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/empty_dataset.nc"
     f = h5py.File(filepath, "w")
     f.create_dataset("data", shape=(0,), dtype="f")
@@ -25,7 +25,7 @@ def empty_dataset_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def no_chunks_netcdf4_file(tmpdir):
+def no_chunks_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/no_chunks.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
@@ -34,7 +34,7 @@ def no_chunks_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def chunked_netcdf4_file(tmpdir):
+def chunked_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/chunks.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((100, 100))
@@ -43,7 +43,7 @@ def chunked_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def single_dimension_scale_netcdf4_file(tmpdir):
+def single_dimension_scale_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/single_dimension_scale.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
@@ -56,7 +56,7 @@ def single_dimension_scale_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def is_scale_netcdf4_file(tmpdir):
+def is_scale_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/is_scale.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
@@ -66,7 +66,7 @@ def is_scale_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def multiple_dimension_scales_netcdf4_file(tmpdir):
+def multiple_dimension_scales_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/multiple_dimension_scales.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
@@ -96,7 +96,7 @@ def chunked_dimensions_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def string_attributes_netcdf4_file(tmpdir):
+def string_attributes_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/attributes.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
@@ -107,7 +107,7 @@ def string_attributes_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def root_attributes_netcdf4_file(tmpdir):
+def root_attributes_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/root_attributes.nc"
     f = h5py.File(filepath, "w")
     f.attrs["attribute_name"] = "attribute_name"
@@ -115,7 +115,7 @@ def root_attributes_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def group_netcdf4_file(tmpdir):
+def group_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/group.nc"
     f = h5py.File(filepath, "w")
     f.create_group("group")
@@ -123,7 +123,7 @@ def group_netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def multiple_datasets_netcdf4_file(tmpdir):
+def multiple_datasets_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/multiple_datasets.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
@@ -138,7 +138,7 @@ def np_uncompressed():
 
 
 @pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd"])
-def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
+def filter_encoded_hdf5_file(tmpdir, np_uncompressed, request):
     filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
     if request.param == "gzip":
@@ -162,7 +162,7 @@ def filter_encoded_netcdf4_file(tmpdir, np_uncompressed, request):
 
 
 @pytest.fixture(params=["gzip"])
-def filter_encoded_xarray_h5netcdf_file(tmpdir, request):
+def filter_encoded_roundtrip_hdf5_file(tmpdir, request):
     ds = xr.tutorial.open_dataset("air_temperature")
     encoding = {}
     if request.param == "gzip":
@@ -184,7 +184,9 @@ def skip_test_for_libhdf5_version():
 
 
 @pytest.fixture(params=["blosc_zlib"])
-def filter_encoded_xarray_netcdf4_file(tmpdir, request, skip_test_for_libhdf5_version):
+def filter_encoded_roundtrip_netcdf4_file(
+    tmpdir, request, skip_test_for_libhdf5_version
+):
     if skip_test_for_libhdf5_version:
         pytest.skip("Requires libhdf5 >= 1.14")
     ds = create_test_data(dim_sizes=(20, 80, 10))
@@ -215,7 +217,7 @@ def offset():
 
 
 @pytest.fixture
-def add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset):
+def add_offset_hdf5_file(tmpdir, np_uncompressed_int16, offset):
     filepath = f"{tmpdir}/offset.nc"
     f = h5py.File(filepath, "w")
     data = np_uncompressed_int16 - offset
@@ -230,7 +232,7 @@ def scale_factor():
 
 
 @pytest.fixture
-def scale_add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset, scale_factor):
+def scale_add_offset_hdf5_file(tmpdir, np_uncompressed_int16, offset, scale_factor):
     filepath = f"{tmpdir}/scale_offset.nc"
     f = h5py.File(filepath, "w")
     data = (np_uncompressed_int16 - offset) / scale_factor
@@ -241,7 +243,7 @@ def scale_add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset, scale_f
 
 
 @pytest.fixture()
-def chunked_roundtrip(tmpdir):
+def chunked_roundtrip_hdf5_file(tmpdir):
     ds = create_test_data(dim_sizes=(20, 80, 10))
     ds = ds.drop_dims("dim3")
     filepath = f"{tmpdir}/chunked_xarray.nc"

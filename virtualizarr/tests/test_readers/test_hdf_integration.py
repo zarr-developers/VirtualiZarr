@@ -7,11 +7,11 @@ from virtualizarr.kerchunk import FileType
 
 class TestIntegration:
     def test_filters_h5netcdf_roundtrip(
-        self, tmpdir, filter_encoded_xarray_h5netcdf_file
+        self, tmpdir, filter_encoded_roundtrip_hdf5_file
     ):
-        ds = xr.open_dataset(filter_encoded_xarray_h5netcdf_file, decode_times=True)
+        ds = xr.open_dataset(filter_encoded_roundtrip_hdf5_file, decode_times=True)
         vds = virtualizarr.open_virtual_dataset(
-            filter_encoded_xarray_h5netcdf_file,
+            filter_encoded_roundtrip_hdf5_file,
             loadable_variables=["time"],
             cftime_variables=["time"],
         )
@@ -21,9 +21,9 @@ class TestIntegration:
         xrt.assert_allclose(ds, roundtrip)
 
     def test_filters_netcdf4_roundtrip(
-        self, tmpdir, filter_encoded_xarray_netcdf4_file
+        self, tmpdir, filter_encoded_roundtrip_netcdf4_file
     ):
-        filepath = filter_encoded_xarray_netcdf4_file["filepath"]
+        filepath = filter_encoded_roundtrip_netcdf4_file["filepath"]
         ds = xr.open_dataset(filepath)
         vds = virtualizarr.open_virtual_dataset(filepath, filetype=FileType("netcdf4"))
         kerchunk_file = f"{tmpdir}/kerchunk.json"
