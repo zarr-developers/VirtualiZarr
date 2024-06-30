@@ -28,13 +28,19 @@ class TestDatasetChunkManifest:
         f = h5py.File(no_chunks_netcdf4_file)
         ds = f["data"]
         manifest = _dataset_chunk_manifest(path=no_chunks_netcdf4_file, dataset=ds)
-        assert len(manifest) == 1
+        assert manifest.shape_chunk_grid == (1, 1)
 
     def test_chunked(self, chunked_netcdf4_file):
         f = h5py.File(chunked_netcdf4_file)
         ds = f["data"]
         manifest = _dataset_chunk_manifest(path=chunked_netcdf4_file, dataset=ds)
-        assert len(manifest) == 4
+        assert manifest.shape_chunk_grid == (2, 2)
+
+    def test_chunked_roundtrip(self, chunked_roundtrip):
+        f = h5py.File(chunked_roundtrip)
+        ds = f["var2"]
+        manifest = _dataset_chunk_manifest(path=chunked_roundtrip, dataset=ds)
+        assert manifest.shape_chunk_grid == (2, 8)
 
 
 class TestDatasetDims:

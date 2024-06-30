@@ -1,3 +1,4 @@
+import math
 from typing import List, Mapping, Optional, Union
 
 import h5py
@@ -48,32 +49,27 @@ def _dataset_chunk_manifest(
         num_chunks = dsid.get_num_chunks()
         if num_chunks == 0:
             raise ValueError("The dataset is chunked but contains no chunks")
-        paths = np.full(num_chunks, path, dtype=np.dtypes.StringDType)  # type: ignore
-        offsets = np.empty((num_chunks), dtype=np.int32)
-        lengths = np.empty((num_chunks), dtype=np.int32)
 
-        def add_chunk_info(blob, chunk_index):
-            offsets[chunk_index] = blob.byte_offset
-            lengths[chunk_index] = blob.size
+        shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks))
+        paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
+        offsets = np.empty(shape, dtype=np.int32)
+        lengths = np.empty(shape, dtype=np.int32)
+
+        def get_key(blob):
+            return tuple([a // b for a, b in zip(blob.chunk_offset, dataset.chunks)])
+
+        def add_chunk_info(blob):
+            key = get_key(blob)
+            paths[key] = path
+            offsets[key] = blob.byte_offset
+            lengths[key] = blob.size
 
         has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
         if has_chunk_iter:
-
-            def create_callback(initial=0):
-                value = initial
-
-                def callback(blob):
-                    nonlocal value
-                    add_chunk_info(blob, chunk_index=value)
-                    value += 1
-
-                return callback
-
-            callback = create_callback()
-            dsid.chunk_iter(callback)
+            dsid.chunk_iter(add_chunk_info)
         else:
             for index in range(num_chunks):
-                add_chunk_info(dsid.get_chunk_info(index), index)
+                add_chunk_info(dsid.get_chunk_info(index))
 
         chunk_manifest = ChunkManifest.from_arrays(
             paths=paths, offsets=offsets, lengths=lengths
