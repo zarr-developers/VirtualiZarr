@@ -196,7 +196,8 @@ def filter_encoded_xarray_netcdf4_file(tmpdir, request, skip_test_for_libhdf5_ve
             "blosc_shuffle": 1,
             "fletcher32": False,
         }
-
+    #  Check on how handle scalar dim.
+    ds = ds.drop_dims("dim3")
     ds["var2"].encoding.update(encoding_config)
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
     ds.to_netcdf(filepath, engine="netcdf4")
@@ -236,4 +237,15 @@ def scale_add_offset_netcdf4_file(tmpdir, np_uncompressed_int16, offset, scale_f
     f.create_dataset(name="data", data=data, chunks=True)
     f["data"].attrs.create(name="add_offset", data=offset)
     f["data"].attrs.create(name="scale_factor", data=np.array([scale_factor]))
+    return filepath
+
+
+@pytest.fixture()
+def chunked_roundtrip(tmpdir):
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    ds = ds.drop_dims("dim3")
+    filepath = f"{tmpdir}/chunked_xarray.nc"
+    ds.to_netcdf(
+        filepath, engine="netcdf4", encoding={"var2": {"chunksizes": (10, 10)}}
+    )
     return filepath
