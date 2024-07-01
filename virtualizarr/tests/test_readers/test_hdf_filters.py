@@ -37,6 +37,12 @@ class TestFilterToCodec:
         expected_config = {"id": "zstd", "level": 5}
         assert codec.get_config() == expected_config
 
+    def test_shuffle(self):
+        codec = _filter_to_codec("shuffle", (7,))
+        assert isinstance(codec, numcodecs.shuffle.Shuffle)
+        expected_config = {"id": "shuffle", "elementsize": 7}
+        assert codec.get_config() == expected_config
+
 
 class TestCodecsFromDataSet:
     def test_numcodec_decoding(self, np_uncompressed, filter_encoded_hdf5_file):
@@ -48,7 +54,10 @@ class TestCodecsFromDataSet:
             file.seek(chunk_info.byte_offset)
             bytes_read = file.read(chunk_info.size)
             decoded = codecs[0].decode(bytes_read)
-            assert decoded == np_uncompressed.tobytes()
+            if isinstance(decoded, np.ndarray):
+                assert decoded.tobytes() == np_uncompressed.tobytes()
+            else:
+                assert decoded == np_uncompressed.tobytes()
 
 
 class TestCFCodecFromDataset:

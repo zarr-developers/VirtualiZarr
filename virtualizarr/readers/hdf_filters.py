@@ -36,6 +36,14 @@ class ZstdProperties(BaseModel):
     level: int
 
 
+class ShuffleProperties(BaseModel):
+    elementsize: int
+
+
+class ZlibProperties(BaseModel):
+    level: int
+
+
 class CFCodec(TypedDict):
     target_dtype: np.dtype
     codec: Codec
@@ -56,9 +64,13 @@ def _filter_to_codec(
             id = _non_standard_filters[id_str]
         else:
             id = id_str
-        conf["id"] = id  # type: ignore[assignment]
         if id == "zlib":
-            conf["level"] = filter_properties  # type: ignore[assignment]
+            zlib_props = ZlibProperties(level=filter_properties)
+            conf = zlib_props.model_dump()  # type: ignore[assignment]
+        if id == "shuffle" and isinstance(filter_properties, tuple):
+            shuffle_props = ShuffleProperties(elementsize=filter_properties[0])
+            conf = shuffle_props.model_dump()  # type: ignore[assignment]
+        conf["id"] = id  # type: ignore[assignment]
     if id_int:
         filter = hdf5plugin.get_filters(id_int)[0]
         id = filter.filter_name
@@ -77,9 +89,7 @@ def _filter_to_codec(
         if id == "zstd" and isinstance(filter_properties, tuple):
             zstd_props = ZstdProperties(level=filter_properties[0])
             conf = zstd_props.model_dump()  # type: ignore[assignment]
-
         conf["id"] = id
-
     codec = registry.get_codec(conf)
     return codec
 
