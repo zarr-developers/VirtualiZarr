@@ -38,7 +38,7 @@ In future we would like for it to be possible to just use `xr.open_dataset`, e.g
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
 ```
 
-Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects. (We will use the term "virtual dataset" to refer to any `xarray.Dataset` which contains one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.)
+Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 ```python
 vds
@@ -60,7 +60,17 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+Generally a "virtual dataset" is any `xarray.Dataset` which wraps one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+
+These particular {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+```{important} Virtual datasets are not normal xarray datasets!
+
+Although the top-level type is still `xarray.Dataset`, they are intended only as an abstract representation of a set of data files, not as something you can do analysis with. If you try to load, view, or plot any data you will get a `NotImplementedError`. Virtual datasets only support a very limited subset of normal xarray operations, particularly functions and methods for concatenating, merging and extracting variables, as well as operations for renaming dimensions and variables.
+
+_The only use case for a virtual dataset is [combining references](#combining-virtual-datasets) to files before [writing out those references to disk](#writing-virtual-stores-to-disk)._
+```
 
 ### Opening remote files
 

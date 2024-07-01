@@ -39,6 +39,9 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Clarify that virtual datasets cannot be treated like normal xarray datasets. (:issue:`173`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
