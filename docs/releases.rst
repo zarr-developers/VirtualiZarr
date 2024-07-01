@@ -39,6 +39,8 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Warn if user passes `indexes=None` to `open_virtual_dataset` to indicate that this is not yet fully supported.
+  (:pull:`170`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
