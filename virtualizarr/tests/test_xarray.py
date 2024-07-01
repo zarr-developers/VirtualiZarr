@@ -289,7 +289,7 @@ class TestCombineUsingIndexes:
         )
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
-    
+
     @pytest.mark.xfail(reason="Not yet implemented, see issue #18")
     def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files):
         filepath1, filepath2 = netcdf4_files
@@ -306,6 +306,7 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["time"].data, ManifestArray)
         assert isinstance(combined_vds["lat"].data, ManifestArray)
         assert isinstance(combined_vds["lon"].data, ManifestArray)
+
 
 @network
 @requires_s3fs
