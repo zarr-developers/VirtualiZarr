@@ -10,9 +10,7 @@ from virtualizarr import open_virtual_dataset
     "inline_threshold, vars_to_inline",
     [
         (5e2, ["lat", "lon"]),
-        pytest.param(
-            5e4, ["lat", "lon", "time"], marks=pytest.mark.xfail(reason="time encoding")
-        ),
+        (5e4, ["lat", "lon", "time"]),
         pytest.param(
             5e7,
             ["lat", "lon", "time", "air"],
