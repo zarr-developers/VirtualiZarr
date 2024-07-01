@@ -29,6 +29,7 @@ dependencies = [
     "ujson",
     "packaging",
     "universal-pathlib",
+    "hdf5plugin",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,7 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
+    "imagecodecs-numcodecs",
 ]
 
 
