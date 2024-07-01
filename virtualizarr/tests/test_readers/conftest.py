@@ -137,7 +137,7 @@ def np_uncompressed():
     return np.arange(100)
 
 
-@pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd"])
+@pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd", "shuffle"])
 def filter_encoded_hdf5_file(tmpdir, np_uncompressed, request):
     filepath = f"{tmpdir}/{request.param}.nc"
     f = h5py.File(filepath, "w")
@@ -157,6 +157,8 @@ def filter_encoded_hdf5_file(tmpdir, np_uncompressed, request):
         f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.BZip2())
     if request.param == "zstd":
         f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.Zstd(clevel=2))
+    if request.param == "shuffle":
+        f.create_dataset(name="data", data=np_uncompressed, shuffle=True)
 
     return filepath
 
@@ -250,4 +252,36 @@ def chunked_roundtrip_hdf5_file(tmpdir):
     ds.to_netcdf(
         filepath, engine="netcdf4", encoding={"var2": {"chunksizes": (10, 10)}}
     )
+    return filepath
+
+
+@pytest.fixture(params=["gzip", "zlib"])
+def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
+    x = np.arange(100)
+    y = np.arange(100)
+    temperature = 0.1 * x[:, None] + 0.1 * y[None, :]
+    ds = xr.Dataset(
+        {"temperature": (["x", "y"], temperature)},
+        coords={"x": np.arange(100), "y": np.arange(100)},
+    )
+    encoding = {
+        "temperature": {
+            "dtype": "int16",
+            "scale_factor": 0.1,
+            "add_offset": 273.15,
+        }
+    }
+    if request.param == "gzip":
+        encoding["temperature"]["compression"] = "gzip"
+        encoding["temperature"]["compression_opts"] = 7
+
+    if request.param == "zlib":
+        encoding["temperature"]["zlib"] = True
+        encoding["temperature"]["complevel"] = 9
+
+    from random import randint
+
+    filepath = f"{tmpdir}/{request.param}_{randint(0,100)}_cf_roundtrip.nc"
+    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+
     return filepath

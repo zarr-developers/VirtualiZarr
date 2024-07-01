@@ -1,3 +1,4 @@
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 
@@ -30,3 +31,12 @@ class TestIntegration:
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_equal(ds, roundtrip)
+
+    @pytest.mark.xfail(reason="Investigate kerchunk _FillValue logic")
+    def test_filter_and_cf_roundtrip(self, tmpdir, filter_and_cf_roundtrip_hdf5_file):
+        ds = xr.open_dataset(filter_and_cf_roundtrip_hdf5_file)
+        vds = virtualizarr.open_virtual_dataset(filter_and_cf_roundtrip_hdf5_file)
+        kerchunk_file = f"{tmpdir}/filter_cf_kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_allclose(ds, roundtrip)

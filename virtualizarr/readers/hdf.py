@@ -176,7 +176,7 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
         cfcodec = cfcodec_from_dataset(dataset)
         attrs = _extract_attrs(dataset)
         if cfcodec:
-            codecs.append(cfcodec["codec"])
+            codecs.insert(0, cfcodec["codec"])
             dtype = cfcodec["target_dtype"]
             attrs.pop("scale_factor", None)
             attrs.pop("add_offset", None)
