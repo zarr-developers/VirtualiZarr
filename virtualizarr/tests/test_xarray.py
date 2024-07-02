@@ -6,6 +6,8 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 from xarray.core.indexes import Index
+from zarr.array import Array
+from zarr.codecs import BytesCodec, ZstdCodec
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -17,15 +19,16 @@ def test_wrapping():
     chunks = (5, 10)
     shape = (5, 20)
     dtype = np.dtype("int32")
-    zarray = ZArray(
-        chunks=chunks,
-        compressor="zlib",
+    # This passes for V3
+    zarray = Array.create(
+        store=None,
+        shape=shape,
         dtype=dtype,
+        chunk_shape=chunks,
+        codecs=[BytesCodec(), ZstdCodec()],
         fill_value=0.0,
         filters=None,
-        order="C",
-        shape=shape,
-        zarr_format=2,
+        zarr_format=3,
     )
 
     chunks_dict = {
@@ -47,9 +50,11 @@ class TestEquals:
     def test_equals(self):
         chunks = (5, 10)
         shape = (5, 20)
-        zarray = ZArray(
-            chunks=chunks,
-            compressor="zlib",
+        # This passes for v2
+        zarray = Array.create(
+            store=None,
+            chunk_shape=chunks,
+            compressor=dict(id="zlib", level=1),
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -84,9 +89,13 @@ class TestEquals:
 class TestConcat:
     def test_concat_along_existing_dim(self):
         # both manifest arrays in this example have the same zarray properties
-        zarray = ZArray(
-            chunks=(1, 10),
-            compressor="zlib",
+        # Does this need to work for both Zarr v2 and v3?
+        # Because eventually the zarray.metadata object is different and the
+        # concatenation check has to branch based on v2 and v3
+        zarray = Array.create(
+            store=None,
+            chunk_shape=(1, 10),
+            compressor=dict(id="zlib", level=1),
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,

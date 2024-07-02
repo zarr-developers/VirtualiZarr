@@ -5,13 +5,13 @@ from typing import (
     Any,
     Literal,
     NewType,
-    Optional,
 )
 
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 from pydantic import BaseModel, ConfigDict, field_validator
+from zarr.array import Array
 
 from virtualizarr.vendor.zarr.utils import json_dumps
 
@@ -106,33 +106,9 @@ class ZArray(BaseModel):
 
         return zarray_dict
 
-    def to_kerchunk_json(self) -> str:
-        return ujson.dumps(self.dict())
 
-    def replace(
-        self,
-        chunks: Optional[tuple[int, ...]] = None,
-        compressor: Optional[str] = None,
-        dtype: Optional[np.dtype] = None,
-        fill_value: Optional[float] = None,  # float or int?
-        filters: Optional[list[dict]] = None,  # type: ignore[valid-type]
-        order: Optional[Literal["C"] | Literal["F"]] = None,
-        shape: Optional[tuple[int, ...]] = None,
-        zarr_format: Optional[Literal[2] | Literal[3]] = None,
-    ) -> "ZArray":
-        """
-        Convenience method to create a new ZArray from an existing one by altering only certain attributes.
-        """
-        return ZArray(
-            chunks=chunks if chunks is not None else self.chunks,
-            compressor=compressor if compressor is not None else self.compressor,
-            dtype=dtype if dtype is not None else self.dtype,
-            fill_value=fill_value if fill_value is not None else self.fill_value,
-            filters=filters if filters is not None else self.filters,
-            shape=shape if shape is not None else self.shape,
-            order=order if order is not None else self.order,
-            zarr_format=zarr_format if zarr_format is not None else self.zarr_format,
-        )
+def to_kerchunk_json(zarray: Array) -> str:
+    return ujson.dumps(zarray)
 
 
 def encode_dtype(dtype: np.dtype) -> str:
@@ -216,11 +192,10 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
         metadata_file.write(json_dumps(metadata))
 
 
-def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) -> dict:
+def zarr_v3_array_metadata(zarray: Array, dim_names: list[str], attrs: dict) -> dict:
     """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
     # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
-
-    metadata = zarray.dict()
+    metadata = zarray.metadata.to_dict()
 
     # adjust to match v3 spec
     metadata["zarr_format"] = 3

@@ -29,6 +29,7 @@ dependencies = [
     "ujson",
     "packaging",
     "universal-pathlib",
+    "zarr>=3.0.0a0"
 ]
 
 [project.optional-dependencies]

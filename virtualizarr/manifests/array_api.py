@@ -1,6 +1,8 @@
+from dataclasses import replace
 from typing import TYPE_CHECKING, Callable, Iterable
 
 import numpy as np
+from zarr.metadata import ArrayV3Metadata
 
 from virtualizarr.zarr import Codec, ceildiv
 
@@ -34,7 +36,15 @@ def _check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([arr.zarray.codec for arr in arrays])
+    # If we want to support Zarr's v2 and v3 metadata, we have to branch here
+    # based on the type of arr.zarray.metadata
+    _check_same_codecs(
+        [
+            arr.zarray.metadata.codecs  # type: ignore
+            for arr in arrays
+            if isinstance(arr.zarray.metadata, ArrayV3Metadata)
+        ]
+    )
 
     # Would require variable-length chunks ZEP
     _check_same_chunk_shapes([arr.chunks for arr in arrays])
@@ -144,9 +154,7 @@ def concatenate(
     )
 
     # chunk shape has not changed, there are just now more chunks along the concatenation axis
-    new_zarray = first_arr.zarray.replace(
-        shape=tuple(new_shape),
-    )
+    new_zarray = replace(first_arr.zarray, shape=tuple(new_shape))
 
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
@@ -240,8 +248,9 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
+    new_zarray = replace(
+        first_arr.zarray,
+        chunk_shape=tuple(new_chunks),
         shape=tuple(new_shape),
     )
 
@@ -314,8 +323,9 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
-        chunks=new_chunk_shape,
+    new_zarray = replace(
+        x.zarray,
+        chunk_shape=new_chunk_shape,
         shape=new_shape,
     )
 
