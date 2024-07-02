@@ -40,6 +40,9 @@ Documentation
 ~~~~~~~~~~~~~
 
 - Updated the development roadmap in preparation for v1.0. (:pull:`164`)
+- Warn if user passes `indexes=None` to `open_virtual_dataset` to indicate that this is not yet fully supported.
+  (:pull:`170`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify that virtual datasets cannot be treated like normal xarray datasets. (:issue:`173`)
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
