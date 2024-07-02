@@ -18,16 +18,13 @@ VirtualiZarr aims to build on the excellent ideas of kerchunk whilst solving the
 
 ## Aim
 
-**NOTE: This package is in development. The usage examples in this section are currently aspirational.
-See the [Usage docs page](#usage) to see what API works today. Progress towards making all of these examples work is tracked in [issue #2](https://github.com/TomNicholas/VirtualiZarr/issues/2).**
-
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
+Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along a dimension to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 
 ```python
 ds = xr.open_mfdataset(
     '/my/files*.nc',
     engine='h5netcdf',
-    combine='by_coords',  # 'by_coords' requires reading coord data to determine concatenation order
+    combine='nested',
 )
 ds  # the complete lazy xarray dataset
 ```
@@ -38,18 +35,20 @@ However, you don't want to run this set of xarray operations every time you open
 
 What's being cached here, you ask? We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
+### Usage
+
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
 ```python
-import virtualizarr  # required for the xarray backend and accessor to be present
+from virtualizarr import open_virtual_dataset
 
-virtual_ds = xr.open_mfdataset(
-    '/my/files*.nc',
-    engine='virtualizarr',  # virtualizarr registers an xarray IO backend that returns ManifestArray objects
-    combine='by_coords',  # 'by_coords' stills requires actually reading coordinate data
-)
+virtual_datasets = [
+    open_virtual_dataset(filepath)
+    for filepath in glob.glob('/my/files*.nc')
+]
 
-virtual_ds  # now wraps a bunch of virtual ManifestArray objects directly
+# this Dataset wraps a bunch of virtual ManifestArray objects directly
+virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
 
 # cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
 virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
@@ -67,6 +66,8 @@ ds = xr.open_dataset(m, engine='kerchunk', chunks={})  # normal xarray.Dataset o
 (Since we serialized the cached results using the kerchunk specification then opening this zarr store still requires using fsspec via the kerchunk xarray backend.)
 
 No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
+
+See the [Usage docs page](#usage) for more details.
 
 ## Licence
 
