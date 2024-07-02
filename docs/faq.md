@@ -53,7 +53,7 @@ The reasons why VirtualiZarr has been developed as separate project rather than 
 
 ## What is the Development Status and Roadmap?
 
-VirtualiZarr version 1 focused on (mostly) achieving feature parity with kerchunk, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
+VirtualiZarr version 1 (mostly) achieves feature parity with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
 Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
