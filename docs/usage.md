@@ -298,7 +298,7 @@ TODO: Use preprocess to create a new index from the metadata
 Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
 
 ```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
 ```
 ```python
 <xarray.Dataset> Size: 31MB
