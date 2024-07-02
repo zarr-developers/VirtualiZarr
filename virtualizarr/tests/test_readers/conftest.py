@@ -259,7 +259,9 @@ def chunked_roundtrip_hdf5_file(tmpdir):
 def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
     x = np.arange(100)
     y = np.arange(100)
+    fill_value = np.int16(-9999)
     temperature = 0.1 * x[:, None] + 0.1 * y[None, :]
+    temperature[0][0] = fill_value
     ds = xr.Dataset(
         {"temperature": (["x", "y"], temperature)},
         coords={"x": np.arange(100), "y": np.arange(100)},
@@ -269,7 +271,10 @@ def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
             "dtype": "int16",
             "scale_factor": 0.1,
             "add_offset": 273.15,
-        }
+            "_FillValue": fill_value,
+        },
+        "x": {"_FillValue": fill_value},
+        "y": {"_FillValue": fill_value},
     }
     if request.param == "gzip":
         encoding["temperature"]["compression"] = "gzip"

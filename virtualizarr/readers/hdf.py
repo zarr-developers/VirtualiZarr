@@ -180,14 +180,16 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
             dtype = cfcodec["target_dtype"]
             attrs.pop("scale_factor", None)
             attrs.pop("add_offset", None)
+            fill_value = cfcodec["codec"].decode(dataset.fillvalue)
         else:
             dtype = dataset.dtype
+            fill_value = dataset.fillvalue
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,
             compressor=None,
             dtype=dtype,
-            fill_value=dataset.fillvalue,
+            fill_value=fill_value,
             filters=filters,
             order="C",
             shape=dataset.shape,
