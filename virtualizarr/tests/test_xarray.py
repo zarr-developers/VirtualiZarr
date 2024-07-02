@@ -251,7 +251,8 @@ class TestOpenVirtualDatasetIndexes:
         assert vds.indexes == {}
 
     def test_create_default_indexes(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes=None)
+        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
+            vds = open_virtual_dataset(netcdf4_file, indexes=None)
         ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
@@ -278,14 +279,33 @@ class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files):
         filepath1, filepath2 = netcdf4_files
 
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
+        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
+            vds1 = open_virtual_dataset(filepath1)
+        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
+            vds2 = open_virtual_dataset(filepath2)
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
         )
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+
+    @pytest.mark.xfail(reason="Not yet implemented, see issue #18")
+    def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files):
+        filepath1, filepath2 = netcdf4_files
+
+        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
+            vds1 = open_virtual_dataset(filepath1)
+        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
+            vds2 = open_virtual_dataset(filepath2)
+
+        combined_vds = xr.combine_by_coords(
+            [vds2, vds1],
+        )
+
+        assert isinstance(combined_vds["time"].data, ManifestArray)
+        assert isinstance(combined_vds["lat"].data, ManifestArray)
+        assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
 @network
@@ -363,7 +383,9 @@ class TestReadFromURL:
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ["air", "time"]
-        vds = open_virtual_dataset(netcdf4_file, loadable_variables=vars_to_load)
+        vds = open_virtual_dataset(
+            netcdf4_file, loadable_variables=vars_to_load, indexes={}
+        )
 
         for name in vds.variables:
             if name in vars_to_load:

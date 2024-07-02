@@ -173,5 +173,5 @@ def test_open_scalar_variable(tmpdir):
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(f"{tmpdir}/scalar.nc")
 
-    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc")
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
     assert vds["a"].shape == ()
