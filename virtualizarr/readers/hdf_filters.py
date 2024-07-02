@@ -102,7 +102,7 @@ def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
             scale_factor = attributes["scale_factor"][0]
         except IndexError:
             scale_factor = attributes["scale_factor"]
-        mapping["scale_factor"] = 1 / scale_factor
+        mapping["scale_factor"] = float(1 / scale_factor)
     else:
         mapping["scale_factor"] = 1
     if "add_offset" in attributes:
@@ -110,7 +110,7 @@ def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
             offset = attributes["add_offset"][0]
         except IndexError:
             offset = attributes["add_offset"]
-        mapping["add_offset"] = offset
+        mapping["add_offset"] = float(offset)
     else:
         mapping["add_offset"] = 0
     if mapping["scale_factor"] != 1 or mapping["add_offset"] != 0:
