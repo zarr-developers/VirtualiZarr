@@ -353,13 +353,6 @@ Now the loaded time variable has a `datetime64[ns]` dtype. Any variables listed 
 
 Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
-```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], cftime_variables=['time'], indexes={})
-```
-```python
-
-```
-
 ### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
