@@ -9,6 +9,12 @@ v0.2 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Now successfully opens both tiff and FITS files. (:issue:`160`, :pull:`162`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added a `.rename_paths` convenience method to rename paths in a manifest according to a function.
+  (:pull:`152`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- New ``cftime_variables`` option on ``open_virtual_dataset`` enables encoding/decoding time.
+  (:pull:`122`) By `Julia Signell <https://github.com/jsignell>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -23,10 +29,21 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Ensure that `_ARRAY_DIMENSIONS` are dropped from variable `.attrs`. (:issue:`150`, :pull:`152`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that `.attrs` on coordinate variables are preserved during round-tripping. (:issue:`155`, :pull:`154`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Ensure that non-dimension coordinate variables described via the CF conventions are preserved during round-tripping. (:issue:`105`, :pull:`156`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
 
+- Updated the development roadmap in preparation for v1.0. (:pull:`164`)
+- Warn if user passes `indexes=None` to `open_virtual_dataset` to indicate that this is not yet fully supported.
+  (:pull:`170`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify that virtual datasets cannot be treated like normal xarray datasets. (:issue:`173`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -35,6 +52,8 @@ Internal Changes
   (:pull:`107`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Mark tests which require network access so that they are only run when `--run-network-tests` is passed a command-line argument to pytest.
   (:pull:`144`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Determine file format from magic bytes rather than name suffix
+  (:pull:`143`) By `Scott Henderson <https://github.com/scottyhq>`_.
 
 .. _v0.1:
 

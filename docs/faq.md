@@ -25,7 +25,7 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset`, via `kerchunk.tiff.tiff_to_zarr` or potentially `cog3pio`                                                                |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset`, via `kerchunk.zarr.ZarrToZarr` ?                                                                                        |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree`, via `kerchunk.grib2.scan_grib` ?                                                                                        |
-| From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset`, via `kerchunk.fits.process_file` ?                                                                                       |
+| From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset`, via `kerchunk.fits.process_file`                                                                                      |
 | **In-memory representation (2)**                                         |                                                                                                                                     |                                                                                                                                                  |
 | In-memory representation of byte ranges for single array                 | Part of a "reference `dict`" with keys for each chunk in array                                                                      | `ManifestArray` instance (wrapping a `ChunkManifest` instance)                                                                                   |
 | In-memory representation of actual data values                           | Encoded bytes directly serialized into the "reference `dict`", created on a per-chunk basis using the `inline_threshold` kwarg      | `numpy.ndarray` instances, created on a per-variable basis using the `loadable_variables` kwarg                                                  |
@@ -53,8 +53,16 @@ The reasons why VirtualiZarr has been developed as separate project rather than 
 
 ## What is the Development Status and Roadmap?
 
-VirtualiZarr is ready to use for many of the tasks that we are used to using kerchunk for, but the most general and powerful vision of this library can only be implemented once certain changes upstream in Zarr have occurred.
+VirtualiZarr version 1 (mostly) achieves [feature parity](#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
-VirtualiZarr is therefore evolving in tandem with developments in the Zarr Specification, which then need to be implemented in specific Zarr reader implementations (especially the Zarr-Python V3 implementation). There is an [overall roadmap for this integration with Zarr](https://hackmd.io/t9Myqt0HR7O0nq6wiHWCDA), whose final completion requires acceptance of at least two new Zarr Enhancement Proposals (the ["Chunk Manifest"](https://github.com/zarr-developers/zarr-specs/issues/287) and ["Virtual Concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) ZEPs).
+Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
-Whilst we wait for these upstream changes, in the meantime VirtualiZarr aims to provide utility in a significant subset of cases, for example by enabling writing virtualized zarr stores out to the existing kerchunk references format, so that they can be read by fsspec today.
+We have a lot of ideas, including:
+- [Zarr v3 support](https://github.com/zarr-developers/VirtualiZarr/issues/17)
+- [Zarr-native on-disk chunk manifest format](https://github.com/zarr-developers/zarr-specs/issues/287)
+- ["Virtual concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) of separate Zarr arrays
+- ManifestArrays as an [intermediate layer in-memory](https://github.com/zarr-developers/VirtualiZarr/issues/71) in Zarr-Python
+- [Separating CF-related Codecs from xarray](https://github.com/zarr-developers/VirtualiZarr/issues/68#issuecomment-2197682388)
+- [Generating references without kerchunk](https://github.com/zarr-developers/VirtualiZarr/issues/78)
+
+If you see other opportunities then we would love to hear your ideas!
