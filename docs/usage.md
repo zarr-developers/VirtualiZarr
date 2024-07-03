@@ -328,7 +328,12 @@ Loading variables can be useful in a few scenarios:
 Notice that the `time` variable that was loaded above does not have the expected dtype. To correctly decode time variables according to the CF conventions (like `xr.open_dataset` does by default), you need to include them in an additional keyword argument `cftime_variables`:
 
 ```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], cftime_variables=['time'], indexes={})
+vds = open_virtual_dataset(
+    'air.nc', 
+    loadable_variables=['air', 'time'], 
+    cftime_variables=['time'], 
+    indexes={},
+)
 ```
 ```python
 <xarray.Dataset> Size: 31MB
