@@ -2,9 +2,9 @@ import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
-from zarr.array import Array as ZArray
 
 from ..kerchunk import KerchunkArrRefs
+from ..zarr import ZArray
 from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS
 from .manifest import ChunkManifest
 

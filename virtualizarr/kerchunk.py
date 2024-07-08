@@ -9,11 +9,10 @@ import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 from xarray.coding.times import CFDatetimeCoder
-from zarr.array import Array
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.utils import _fsspec_openfile_from_filepath
-from virtualizarr.zarr import ZAttrs
+from virtualizarr.zarr import ZArray, ZAttrs
 
 # Distinguishing these via type hints makes it a lot easier to mentally keep track of what the opaque kerchunk "reference dicts" actually mean
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
@@ -196,8 +195,8 @@ def extract_array_refs(
 
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> tuple[dict, Array, ZAttrs]:
-    zarray = Array.from_kerchunk_refs(arr_refs.pop(".zarray"))
+) -> tuple[dict, ZArray, ZAttrs]:
+    zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
@@ -298,14 +297,14 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
         # TODO will this fail for a scalar?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
 
-        zarray = Array.create(
-            store=None,  # type: ignore
+        zarray = ZArray(
+            chunks=np_arr.shape,
             shape=np_arr.shape,
             dtype=np_arr.dtype,
-            chunk_shape=np_arr.shape,
+            order="C",
         )
 
-    zarray_dict = ujson.dumps(zarray)
+    zarray_dict = zarray.to_kerchunk_json()
     arr_refs[".zarray"] = zarray_dict
 
     zattrs = {**var.attrs, **var.encoding}
