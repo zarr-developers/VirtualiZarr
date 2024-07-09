@@ -396,11 +396,11 @@ class TestLoadVirtualDataset:
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
     def test_group_kwarg(self, hdf5_groups_file):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Multiple HDF Groups found"):
             open_virtual_dataset(
                 hdf5_groups_file
-            )  # ValueError: Multiple HDF Groups found
-        with pytest.raises(ValueError):  # group not found
+            )
+        with pytest.raises(ValueError, match="group not found"):
             open_virtual_dataset(hdf5_groups_file, group="group")
 
         vars_to_load = ["air", "time"]
