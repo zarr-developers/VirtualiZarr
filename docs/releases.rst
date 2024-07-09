@@ -1,10 +1,37 @@
 Release notes
 =============
 
-.. _v0.2:
+.. _v1.1:
 
-v0.2 (unreleased)
+v1.1 (unreleased)
 -----------------
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.0:
+
+v1.0 (9th July 2024)
+--------------------
+
+This release marks VirtualiZarr as mostly feature-complete, in the sense of achieving feature parity with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
+
+Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages. See the roadmap in the documentation for details.
 
 New Features
 ~~~~~~~~~~~~
@@ -39,6 +66,14 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Added example of using cftime_variables to usage docs. (:issue:`169`, :pull:`174`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Updated the development roadmap in preparation for v1.0. (:pull:`164`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Warn if user passes `indexes=None` to `open_virtual_dataset` to indicate that this is not yet fully supported.
+  (:pull:`170`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify that virtual datasets cannot be treated like normal xarray datasets. (:issue:`173`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
