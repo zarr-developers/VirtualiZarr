@@ -329,9 +329,9 @@ Notice that the `time` variable that was loaded above does not have the expected
 
 ```python
 vds = open_virtual_dataset(
-    'air.nc', 
-    loadable_variables=['air', 'time'], 
-    cftime_variables=['time'], 
+    'air.nc',
+    loadable_variables=['air', 'time'],
+    cftime_variables=['time'],
     indexes={},
 )
 ```
