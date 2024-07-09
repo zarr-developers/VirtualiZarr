@@ -165,8 +165,8 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     """Find the names of zarr variables in this store/group."""
 
     refs = ds_reference_dict["refs"]
-    found_var_names = [key.split("/")[0] for key in refs.keys() if "/" in key]
-    return found_var_names
+    found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
+    return list(found_var_names)
 
 
 def extract_array_refs(

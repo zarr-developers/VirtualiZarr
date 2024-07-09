@@ -5,7 +5,7 @@ import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
+from virtualizarr.kerchunk import FileType, find_var_names, _automatically_determine_filetype, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs
 
@@ -266,3 +266,14 @@ def test_FileType():
     assert "zarr" == FileType("zarr").name
     with pytest.raises(ValueError):
         FileType(None)
+
+
+def test_no_duplicates_find_var_names():
+    """Verify that we get a deduplicated list of var names"""
+    ref_dict = {
+        "refs": {
+            "x/something": {},
+            "x/otherthing": {}
+        }
+    }
+    assert len(find_var_names(ref_dict)) == 1
