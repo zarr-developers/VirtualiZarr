@@ -60,7 +60,7 @@ def open_virtual_dataset(
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
-        Specific HDF Group in file to open (others ignored).
+        Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
