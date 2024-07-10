@@ -13,12 +13,13 @@ def test_zarr_v3_roundtrip(tmpdir):
         ),
         zarray=dict(
             shape=(2, 3),
-            dtype=np.dtype("<i8"),
-            chunks=(2, 3),
-            compressor=None,
-            filters=None,
+            data_type=np.dtype("<i8"),
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": [2, 3]}},
+            chunk_key_encoding={"name": "default", "configuration": {"separator": "."}},
+            codecs=(),
+            attributes={},
+            dimension_names=None,
             fill_value=np.nan,
-            order="C",
             zarr_format=3,
         ),
     )

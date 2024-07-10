@@ -1,6 +1,9 @@
-from typing import TYPE_CHECKING, Callable, Iterable
+from dataclasses import replace
+from typing import TYPE_CHECKING, Callable, Iterable, Union
 
 import numpy as np
+from zarr.abc.codec import Codec as ZCodec
+from zarr.array import ArrayMetadata, ArrayV2Metadata, ArrayV3Metadata, RegularChunkGrid
 
 from virtualizarr.zarr import Codec, ceildiv
 
@@ -34,7 +37,7 @@ def _check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([arr.zarray.codec for arr in arrays])
+    _check_same_codecs([arr.zarray for arr in arrays])
 
     # Would require variable-length chunks ZEP
     _check_same_chunk_shapes([arr.chunks for arr in arrays])
@@ -51,7 +54,20 @@ def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
             )
 
 
-def _check_same_codecs(codecs: list[Codec]) -> None:
+def _check_same_codecs(zarrays: list[ArrayMetadata]) -> None:
+    if len({zarry.zarr_format for zarry in zarrays}) > 1:
+        raise ValueError("Cannot concatenate arrays with different zarr formats.")
+
+    def to_codec(zarray: ArrayMetadata) -> Union[Codec | tuple[ZCodec, ...]]:
+        match zarray:
+            case ArrayV2Metadata(compressor=compressor, filters=filters):
+                return Codec(compressor=compressor, filters=filters)
+            case ArrayV3Metadata(codecs=codecs):
+                return codecs
+            case _:
+                raise ValueError("Unknown ArrayMetadata type")
+
+    codecs = [to_codec(zarray) for zarray in zarrays]
     first_codec, *other_codecs = codecs
     for codec in other_codecs:
         if codec != first_codec:
@@ -144,10 +160,7 @@ def concatenate(
     )
 
     # chunk shape has not changed, there are just now more chunks along the concatenation axis
-    new_zarray = first_arr.zarray.replace(
-        shape=tuple(new_shape),
-    )
-
+    new_zarray = replace(first_arr.zarray, shape=tuple(new_shape))
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
@@ -239,10 +252,10 @@ def stack(
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
-
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
+    new_zarray = replace(
+        first_arr.zarray,
         shape=tuple(new_shape),
+        chunk_grid=RegularChunkGrid(chunk_shape=tuple(new_chunks)),
     )
 
     return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
@@ -314,9 +327,10 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
-        chunks=new_chunk_shape,
-        shape=new_shape,
+    new_zarray = replace(
+        x.zarray,
+        shape=tuple(new_shape),
+        chunk_grid=RegularChunkGrid(chunk_shape=tuple(new_chunk_shape)),
     )
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
