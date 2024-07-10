@@ -13,7 +13,7 @@ Breaking changes
 ~~~~~~~~~~~~~~~~
 
 - Requires Zarr 3.0 (for :pull:`182`).
-  By `Tom Nicholas <https://github.com/ghidalgo3>`_.
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 
 Deprecations
 ~~~~~~~~~~~~
