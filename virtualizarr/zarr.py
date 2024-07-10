@@ -12,8 +12,7 @@ import numpy as np
 import ujson  # type: ignore
 import xarray as xr
 from pydantic import BaseModel, ConfigDict, field_validator
-
-from virtualizarr.vendor.zarr.utils import json_dumps
+from zarr.v2.util import json_dumps
 
 if TYPE_CHECKING:
     pass
