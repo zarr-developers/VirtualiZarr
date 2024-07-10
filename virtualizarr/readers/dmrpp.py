@@ -35,10 +35,10 @@ class DMRParser:
         "UInt32": "uint32",
         "Int64": "int64",
         "UInt64": "uint64",
-        "Url": "object",
+        "Url": "str",
         "Float32": "float32",
         "Float64": "float64",
-        "String": "object",
+        "String": "str",
     }
     # Default zlib compression value (-1 means default, currently level 6 is default)
     _default_zlib_value = -1
@@ -341,7 +341,7 @@ class DMRParser:
         fill_value = (
             attrs["_FillValue"]
             if "_FillValue" in attrs and attrs["_FillValue"] != "*"
-            else None
+            else np.nan
         )
         # create ManifestArray and ZArray
         zarray = ZArray(
@@ -374,11 +374,9 @@ class DMRParser:
         dtype = np.dtype(self._dap_np_dtype[attr_tag.attrib["type"]])
         # if multiple Value tags are present, store as "key": "[v1, v2, ...]"
         for value_tag in attr_tag:
-            # cast attribute to dmr provided dtype
-            values.append(dtype.type(value_tag.text))
-        attr[attr_tag.attrib["name"]] = (
-            values[0] if len(values) == 1 else str(np.asarray(values))
-        )
+            # cast attribute to native python type using dmr provided dtype
+            values.append(dtype.type(value_tag.text).item())
+        attr[attr_tag.attrib["name"]] = values[0] if len(values) == 1 else values
         return attr
 
     def _parse_chunks(
