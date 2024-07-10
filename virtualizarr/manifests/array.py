@@ -49,6 +49,9 @@ class ManifestArray:
                 else:
                     _zarray = ArrayV2Metadata(**zarray)
 
+        if not isinstance(_zarray.chunk_grid, RegularChunkGrid):
+            raise ValueError("Chunk grid must be RegularChunkGrid.")
+
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
@@ -60,7 +63,6 @@ class ManifestArray:
 
         # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
         # TODO also cover the special case of scalar arrays
-
         self._zarray = _zarray
         self._manifest = _chunkmanifest
 
@@ -92,12 +94,7 @@ class ManifestArray:
         """
         Individual chunk size by number of elements.
         """
-        if isinstance(self._zarray.chunk_grid, RegularChunkGrid):
-            return self._zarray.chunk_grid.chunk_shape
-        else:
-            raise NotImplementedError(
-                "Only RegularChunkGrid is currently supported for chunk size"
-            )
+        return self._zarray.chunk_grid.chunk_shape
 
     @property
     def dtype(self) -> np.dtype:
