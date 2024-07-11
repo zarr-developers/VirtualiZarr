@@ -366,3 +366,26 @@ def test_refuse_combine(array_v3_metadata):
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
+
+
+class TestIndexing:
+    def test_slice_aligned_with_chunks(self):
+        marr = create_manifestarray(shape=(4,), chunks=(2,))
+        marr[0:2]
+        marr[2:4]
+        marr[0:4]
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0]
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0:1]
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0:3]
