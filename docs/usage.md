@@ -419,6 +419,14 @@ Currently there are not yet any zarr v3 readers which understand the chunk manif
 This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
 ```
 
+## Opening kerchunk files from disk as virtual datasets
+
+You can open kerchunk files from disk as virtual datasets if they are json (not yet parquet). This is helpful, for example, to allow for the workflow necessary if you have existing model output you want to create a kerchunk file for, but also want to be able to add to later. One way to do this is to create derivative json kerchunk files to represent the available model output and combine those into a single kerchunk file for all available model output. Then as more model output is available, create more derivative kerchunk files to represent the new model output and as needed, recreate the single combined kerchunk file that represents the full model dataset.
+
+```python
+open_virtual_dataset('combined.json', format='json')
+```
+
 ## Rewriting existing manifests
 
 Sometimes it can be useful to rewrite the contents of an already-generated manifest or virtual dataset.

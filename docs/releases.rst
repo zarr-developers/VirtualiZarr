@@ -9,6 +9,9 @@ v1.0.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Can open `kerchunk` reference files with ``open_virtual_dataset`` if they are json
+  (:pull:`119`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_, `Kristen Thyng <https://github.com/kthyng>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
