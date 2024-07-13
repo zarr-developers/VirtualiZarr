@@ -2,5 +2,8 @@
 
 - [ ] Closes #xxxx
 - [ ] Tests added
-- [ ] User visible changes (including notable bug fixes) are documented in `changelog.md`
+- [ ] Tests passing
+- [ ] Full type hint coverage
+- [ ] Changes are documented in `docs/releases.rst`
 - [ ] New functions/methods are listed in `api.rst`
+- [ ] New functionality has documentation

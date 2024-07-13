@@ -5,8 +5,12 @@ import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.kerchunk import FileType, _automatically_determine_filetype
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.kerchunk import (
+    FileType,
+    _automatically_determine_filetype,
+    find_var_names,
+)
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import dataset_from_kerchunk_refs, open_virtual_dataset
 
 
@@ -40,7 +44,7 @@ def test_dataset_from_df_refs():
 
     assert da.data.zarray.compressor is None
     assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is np.NaN
+    assert da.data.zarray.fill_value is np.nan
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {
@@ -68,15 +72,18 @@ def test_dataset_from_df_refs_with_filters():
 
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.NaN,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -97,15 +104,18 @@ class TestAccessor:
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_json(self, tmp_path):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+        )
         arr = ManifestArray(
-            chunkmanifest={"0.0": ChunkEntry(path="test.nc", offset=6144, length=48)},
+            chunkmanifest=manifest,
             zarray=dict(
                 shape=(2, 3),
                 dtype=np.dtype("<i8"),
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.NaN,
+                fill_value=np.nan,
                 order="C",
             ),
         )
@@ -186,7 +196,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=np.NaN,
+            fill_value=np.nan,
             order="C",
         ),
         chunkmanifest=manifest,
@@ -217,15 +227,43 @@ def test_automatically_determine_filetype_netcdf3_netcdf4():
     assert FileType("netcdf3") == _automatically_determine_filetype(
         filepath=netcdf3_file_path
     )
-    assert FileType("netcdf4") == _automatically_determine_filetype(
+    assert FileType("hdf5") == _automatically_determine_filetype(
         filepath=netcdf4_file_path
     )
+
+
+@pytest.mark.parametrize(
+    "filetype,headerbytes",
+    [
+        ("netcdf3", b"CDF"),
+        ("hdf5", b"\x89HDF"),
+        ("grib", b"GRIB"),
+        ("tiff", b"II*"),
+        ("fits", b"SIMPLE"),
+    ],
+)
+def test_valid_filetype_bytes(tmp_path, filetype, headerbytes):
+    filepath = tmp_path / "file.abc"
+    with open(filepath, "wb") as f:
+        f.write(headerbytes)
+    assert FileType(filetype) == _automatically_determine_filetype(filepath=filepath)
+
+
+def test_notimplemented_filetype(tmp_path):
+    for headerbytes in [b"JUNK", b"\x0e\x03\x13\x01"]:
+        filepath = tmp_path / "file.abc"
+        with open(filepath, "wb") as f:
+            f.write(headerbytes)
+        with pytest.raises(NotImplementedError):
+            _automatically_determine_filetype(filepath=filepath)
 
 
 def test_FileType():
     # tests if FileType converts user supplied strings to correct filetype
     assert "netcdf3" == FileType("netcdf3").name
     assert "netcdf4" == FileType("netcdf4").name
+    assert "hdf4" == FileType("hdf4").name
+    assert "hdf5" == FileType("hdf5").name
     assert "grib" == FileType("grib").name
     assert "tiff" == FileType("tiff").name
     assert "fits" == FileType("fits").name
@@ -255,3 +293,9 @@ def test_kerchunk_to_virtual_dataset(netcdf4_file, tmpdir, format):
 
     # this fails. rt_vds is missing Attributes:_ARRAY_DIMENSIONS:  ['lat'].
     xrt.assert_equal(vds, rt_vds)
+    
+
+def test_no_duplicates_find_var_names():
+    """Verify that we get a deduplicated list of var names"""
+    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
+    assert len(find_var_names(ref_dict)) == 1

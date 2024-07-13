@@ -18,14 +18,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.5.0",
+    "xarray>=2024.06.0",
     "kerchunk>=0.2.5",
     "h5netcdf",
     "pydantic",
-    "numpy",
+    "numpy>=2.0.0",
     "ujson",
     "packaging",
     "universal-pathlib",
@@ -61,11 +61,7 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-write_to = "virtualizarr/_version.py"
-write_to_template = '''
-# Do not change! Do not track in version control!
-__version__ = "{version}"
-'''
+fallback_version = "9999"
 
 [tool.setuptools.packages.find]
 exclude = ["docs", "tests", "tests.*", "docs.*"]
@@ -118,3 +114,8 @@ line-ending = "auto"
 
 [tool.ruff.lint.isort]
 known-first-party = ["virtualizarr"]
+
+[tool.pytest.ini_options]
+markers = [
+    "network: marks test requiring internet (select with '--run-network-tests')",
+]

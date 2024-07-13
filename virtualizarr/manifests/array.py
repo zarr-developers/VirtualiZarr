@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Union
+from typing import Any, Callable, Union
 
 import numpy as np
 
@@ -50,8 +50,11 @@ class ManifestArray:
             _chunkmanifest = ChunkManifest(entries=chunkmanifest)
         else:
             raise TypeError(
-                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+                f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
+
+        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
+        # TODO also cover the special case of scalar arrays
 
         self._zarray = _zarray
         self._manifest = _chunkmanifest
@@ -140,7 +143,7 @@ class ManifestArray:
 
         Returns a numpy array of booleans.
         """
-        if isinstance(other, (int, float, bool)):
+        if isinstance(other, (int, float, bool, np.ndarray)):
             # TODO what should this do when comparing against numpy arrays?
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         elif not isinstance(other, ManifestArray):
@@ -164,9 +167,22 @@ class ManifestArray:
                     UserWarning,
                 )
 
-                # TODO do chunk-wise comparison
-                # TODO expand it into an element-wise result
-                return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
+                # do chunk-wise comparison
+                equal_chunk_paths = self.manifest._paths == other.manifest._paths
+                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
+                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
+
+                equal_chunks = (
+                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
+                )
+
+                if not equal_chunks.all():
+                    # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
+                    return np.full(
+                        shape=self.shape, fill_value=False, dtype=np.dtype(bool)
+                    )
+                else:
+                    raise RuntimeWarning("Should not be possible to get here")
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
@@ -207,6 +223,46 @@ class ManifestArray:
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> "ManifestArray":
+        """
+        Rename paths to chunks in this array's manifest.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        ManifestArray
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> marr.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ChunkManifest.rename_paths
+        """
+        renamed_manifest = self.manifest.rename_paths(new)
+        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):

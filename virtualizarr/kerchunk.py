@@ -1,12 +1,14 @@
 import base64
 import json
+import warnings
 from enum import Enum, auto
 from pathlib import Path
-from typing import NewType, Optional, cast
+from typing import Any, NewType, Optional, cast
 
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
+from xarray.coding.times import CFDatetimeCoder
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.utils import _fsspec_openfile_from_filepath
@@ -33,7 +35,9 @@ class AutoName(Enum):
 
 class FileType(AutoName):
     netcdf3 = auto()
-    netcdf4 = auto()
+    netcdf4 = auto()  # NOTE: netCDF4 is a subset of hdf5
+    hdf4 = auto()
+    hdf5 = auto()
     grib = auto()
     tiff = auto()
     fits = auto()
@@ -48,15 +52,15 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()  # Convert NumPy array to Python list
         elif isinstance(obj, np.generic):
             return obj.item()  # Convert NumPy scalar to Python scalar
+        elif isinstance(obj, np.dtype):
+            return str(obj)
         return json.JSONEncoder.default(self, obj)
 
 
 def read_kerchunk_references_from_file(
     filepath: str,
     filetype: FileType | None,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
+    reader_options: Optional[dict[str, Any]] = None,
 ) -> KerchunkStoreRefs:
     """
     Read a single legacy file and return kerchunk references to its contents.
@@ -78,6 +82,9 @@ def read_kerchunk_references_from_file(
             filepath=filepath, reader_options=reader_options
         )
 
+    if reader_options is None:
+        reader_options = {}
+
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
 
@@ -86,7 +93,7 @@ def read_kerchunk_references_from_file(
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
-    elif filetype.name.lower() == "netcdf4":
+    elif filetype.name.lower() == "hdf5" or filetype.name.lower() == "netcdf4":
         from kerchunk.hdf import SingleHdf5ToZarr
 
         refs = SingleHdf5ToZarr(
@@ -99,11 +106,19 @@ def read_kerchunk_references_from_file(
     elif filetype.name.lower() == "tiff":
         from kerchunk.tiff import tiff_to_zarr
 
-        refs = tiff_to_zarr(filepath, inline_threshold=0, **reader_options)
+        reader_options.pop("storage_options", {})
+        warnings.warn(
+            "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
+            UserWarning,
+        )
+
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": tiff_to_zarr(filepath, **reader_options)}
     elif filetype.name.lower() == "fits":
         from kerchunk.fits import process_file
 
-        refs = process_file(filepath, inline_threshold=0, **reader_options)
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = {"refs": process_file(filepath, **reader_options)}
     else:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
@@ -112,35 +127,35 @@ def read_kerchunk_references_from_file(
 
 
 def _automatically_determine_filetype(
-    *, filepath: str, reader_options: Optional[dict] = {}
+    *,
+    filepath: str,
+    reader_options: Optional[dict[str, Any]] = None,
 ) -> FileType:
-    file_extension = Path(filepath).suffix
+    if Path(filepath).suffix == ".zarr":
+        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
+        raise NotImplementedError()
+
+    # Read magic bytes from local or remote file
     fpath = _fsspec_openfile_from_filepath(
         filepath=filepath, reader_options=reader_options
     )
-    if file_extension == ".nc":
-        # based off of: https://github.com/TomNicholas/VirtualiZarr/pull/43#discussion_r1543415167
-        magic = fpath.read()
-
-        if magic[0:3] == b"CDF":
-            filetype = FileType.netcdf3
-        elif magic[1:4] == b"HDF":
-            filetype = FileType.netcdf4
-        else:
-            raise ValueError(".nc file does not appear to be NETCDF3 OR NETCDF4")
-    elif file_extension == ".zarr":
-        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
-        raise NotImplementedError()
-    elif file_extension == ".grib":
+    if magic_bytes.startswith(b"CDF"):
+        filetype = FileType.netcdf3
+    elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
+        raise NotImplementedError("HDF4 formatted files not supported")
+    elif magic_bytes.startswith(b"\x89HDF"):
+        filetype = FileType.hdf5
+    elif magic_bytes.startswith(b"GRIB"):
         filetype = FileType.grib
-    elif file_extension == ".tiff":
+    elif magic_bytes.startswith(b"II*"):
         filetype = FileType.tiff
-    elif file_extension == ".fits":
+    elif magic_bytes.startswith(b"SIMPLE"):
         filetype = FileType.fits
     else:
-        raise NotImplementedError(f"Unrecognised file extension: {file_extension}")
+        raise NotImplementedError(
+            f"Unrecognised file based on header bytes: {magic_bytes}"
+        )
 
-    fpath.close()
     return filetype
 
 
@@ -148,8 +163,8 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     """Find the names of zarr variables in this store/group."""
 
     refs = ds_reference_dict["refs"]
-    found_var_names = [key.split("/")[0] for key in refs.keys() if "/" in key]
-    return found_var_names
+    found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
+    return list(found_var_names)
 
 
 def extract_array_refs(
@@ -214,11 +229,18 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
         all_arr_refs.update(prepended_with_var_name)
 
+    zattrs = ds.attrs
+    if ds.coords:
+        coord_names = list(ds.coords)
+        # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
+        zattrs["coordinates"] = " ".join(coord_names)
+
     ds_refs = {
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(ds.attrs),
+            ".zattrs": ujson.dumps(zattrs),
             **all_arr_refs,
         },
     }
@@ -238,8 +260,8 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
         marr = var.data
 
         arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): chunk_entry.to_kerchunk()
-            for chunk_key, chunk_entry in marr.manifest.entries.items()
+            str(chunk_key): [entry["path"], entry["offset"], entry["length"]]
+            for chunk_key, entry in marr.manifest.dict().items()
         }
 
         zarray = marr.zarray
@@ -262,9 +284,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
                     f"Cannot serialize loaded variable {var_name}, as it is encoded with an offset"
                 )
             if "calendar" in var.encoding:
-                raise NotImplementedError(
-                    f"Cannot serialize loaded variable {var_name}, as it is encoded with a calendar"
-                )
+                np_arr = CFDatetimeCoder().encode(var.copy(), name=var_name).values
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
@@ -285,7 +305,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
     zarray_dict = zarray.to_kerchunk_json()
     arr_refs[".zarray"] = zarray_dict
 
-    zattrs = var.attrs
+    zattrs = {**var.attrs, **var.encoding}
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 

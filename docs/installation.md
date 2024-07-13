@@ -1,11 +1,15 @@
 # Installation
 
-Currently you need to clone VirtualiZarr and install it locally:
+VirtualiZarr is available on PyPI via pip:
 
 ```shell
-git clone https://github.com/TomNicholas/VirtualiZarr
-cd VirtualiZarr
-pip install -e .
+pip install virtualizarr
+```
+
+and on conda-forge:
+
+```shell
+conda install -c conda-forge virtualizarr
 ```
 
 

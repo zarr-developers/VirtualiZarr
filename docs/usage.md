@@ -60,7 +60,17 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-These {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+Generally a "virtual dataset" is any `xarray.Dataset` which wraps one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+
+These particular {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+```{important} Virtual datasets are not normal xarray datasets!
+
+Although the top-level type is still `xarray.Dataset`, they are intended only as an abstract representation of a set of data files, not as something you can do analysis with. If you try to load, view, or plot any data you will get a `NotImplementedError`. Virtual datasets only support a very limited subset of normal xarray operations, particularly functions and methods for concatenating, merging and extracting variables, as well as operations for renaming dimensions and variables.
+
+_The only use case for a virtual dataset is [combining references](#combining-virtual-datasets) to files before [writing out those references to disk](#writing-virtual-stores-to-disk)._
+```
 
 ### Opening remote files
 
@@ -170,7 +180,7 @@ You also cannot currently index into a `ManifestArray`, as arbitrary indexing wo
 
 ## Virtual Datasets as Zarr Groups
 
-The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps really nicely to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of in-memory arrays.
+The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
 
 The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
@@ -288,7 +298,7 @@ TODO: Use preprocess to create a new index from the metadata
 Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
 
 ```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
 ```
 ```python
 <xarray.Dataset> Size: 31MB
@@ -296,7 +306,7 @@ Dimensions:  (time: 2920, lat: 25, lon: 53)
 Coordinates:
     lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
     lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+  * time     (time) float32 12kB 1.867e+06 1.867e+06 ... 1.885e+06 1.885e+06
 Data variables:
     air      (time, lat, lon) float64 31MB ...
 Attributes:
@@ -306,18 +316,49 @@ Attributes:
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
 ```
-You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects, and loadable variables backed by (lazy) numpy arrays.
+You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
 
 Loading variables can be useful in a few scenarios:
 1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
 
+### CF-encoded time variables
+
+Notice that the `time` variable that was loaded above does not have the expected dtype. To correctly decode time variables according to the CF conventions (like `xr.open_dataset` does by default), you need to include them in an additional keyword argument `cftime_variables`:
+
+```python
+vds = open_virtual_dataset(
+    'air.nc',
+    loadable_variables=['air', 'time'],
+    cftime_variables=['time'],
+    indexes={},
+)
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
+Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+
+Now the loaded time variable has a `datetime64[ns]` dtype. Any variables listed as `cftime_variables` must also be listed as `loadable_variables`.
+
 ## Writing virtual stores to disk
 
 Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
-### Writing to Kerchunk's format and reading via fsspec
+### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
 
@@ -376,4 +417,31 @@ The advantage of this format is that any zarr v3 reader that understands the chu
 Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
 
 This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+```
+
+## Rewriting existing manifests
+
+Sometimes it can be useful to rewrite the contents of an already-generated manifest or virtual dataset.
+
+### Rewriting file paths
+
+You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`ds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
+
+For example, you may want to rename file paths according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
+
+```python
+def local_to_s3_url(old_local_path: str) -> str:
+    from pathlib import Path
+
+    new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+
+    filename = Path(old_local_path).name
+    return str(new_s3_bucket_url / filename)
+```
+```python
+renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+renamed_vds['air'].data.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'http://s3.amazonaws.com/my_bucket/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
