@@ -44,24 +44,8 @@ def _fsspec_openfile_from_filepath(
     universal_filepath = UPath(filepath)
     protocol = universal_filepath.protocol
 
-    if protocol == "":
-        fpath = fsspec.open(universal_filepath, "rb")
-        if universal_filepath.is_file():
-            fpath = fpath.open()
-
-    elif protocol in ["s3"]:
-        s3_anon_defaults = {"key": "", "secret": "", "anon": True}
-        if not bool(reader_options):
-            storage_options = s3_anon_defaults
-
-        else:
-            storage_options = reader_options.get("storage_options")  # type: ignore
-
-            # using dict merge operator to add in defaults if keys are not specified
-            storage_options = s3_anon_defaults | storage_options
-        fpath = fsspec.filesystem(protocol, **storage_options)
-        if universal_filepath.is_file():
-            fpath = fpath.open(filepath)
+    if protocol == "s3":
+        protocol_defaults = {"key": "", "secret": "", "anon": True}
     else:
         protocol_defaults = {}
 
