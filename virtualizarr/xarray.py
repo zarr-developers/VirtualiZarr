@@ -57,8 +57,10 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
+        For type of 'kerchunk' the file must be a JSON containing kerchunk references
+        and the filetype string must be input.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
@@ -125,9 +127,16 @@ def open_virtual_dataset(
         )
 
     if filetype == "kerchunk":
-        fpath = _fsspec_openfile_from_filepath(
-            filepath=filepath, reader_options=reader_options
-        )
+
+        try:
+            fpath = _fsspec_openfile_from_filepath(
+                filepath=filepath, reader_options=reader_options
+            )
+        except IsADirectoryError:
+            # moved this here because fsspec wasn't finding the
+            # suffix of the parquet file due to thinking it was a directory
+            # but left the other code since it should ultimately be back down there
+            raise NotImplementedError()
 
         from upath import UPath
 
@@ -140,8 +149,8 @@ def open_virtual_dataset(
 
             vds = dataset_from_kerchunk_refs(refs_dict)
             return vds
-        elif kerchunk_storage_ftype == ".parquet":
-            raise NotImplementedError
+        elif kerchunk_storage_ftype in [".parquet", ".parq"]:
+            raise NotImplementedError()
 
             # Question: How should we read the parquet files
             # into a dict to pass into dataset_from_kerchunk_refs?
