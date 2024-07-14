@@ -1,7 +1,7 @@
 import os
 import warnings
 from collections import defaultdict
-from typing import Optional
+from typing import Any, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -312,6 +312,7 @@ class DMRParser:
         )
         # Chunks and Filters
         filters = None
+        fill_value = np.nan
         shape = tuple([dataset_dims[d] for d in dim_names])
         chunks_shape = shape
         chunks_tag = var_tag.find("dmr:chunks", self._ns)
@@ -335,14 +336,12 @@ class DMRParser:
                             {"id": "zlib", "level": self._default_zlib_value}
                         )
         # Attributes
-        attrs: dict[str, str] = {}
+        attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._ns):
             attrs.update(self._parse_attribute(attr_tag))
-        fill_value = (
-            attrs["_FillValue"]
-            if "_FillValue" in attrs and attrs["_FillValue"] != "*"
-            else np.nan
-        )
+        if "_FillValue" in attrs and attrs["_FillValue"] != "*":
+            fill_value = attrs["_FillValue"]
+        attrs.pop("_FillValue", None)
         # create ManifestArray and ZArray
         zarray = ZArray(
             chunks=chunks_shape,

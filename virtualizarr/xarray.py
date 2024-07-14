@@ -59,7 +59,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'dmrpp'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
@@ -125,13 +125,13 @@ def open_virtual_dataset(
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
-    if filetype == "dmr++":
+    if filetype == "dmrpp":
         from virtualizarr.readers.dmrpp import DMRParser
 
         fpath = _fsspec_openfile_from_filepath(
             filepath=filepath, reader_options=reader_options
         )
-        parser = DMRParser(fpath.read())
+        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
         return parser.parse_dataset()
     else:
         if reader_options is None:
