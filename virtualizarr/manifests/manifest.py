@@ -71,8 +71,8 @@ class ChunkManifest:
     """
 
     _paths: np.ndarray[Any, np.dtypes.StringDType]  # type: ignore[name-defined]
-    _offsets: np.ndarray[Any, np.dtype[np.int64]]
-    _lengths: np.ndarray[Any, np.dtype[np.int64]]
+    _offsets: np.ndarray[Any, np.dtype[np.uint64]]
+    _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
     def __init__(self, entries: dict) -> None:
         """
@@ -100,8 +100,8 @@ class ChunkManifest:
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())  # type: ignore[attr-defined]
-        offsets = np.empty(shape=shape, dtype=np.dtype("int64"))
-        lengths = np.empty(shape=shape, dtype=np.dtype("int64"))
+        offsets = np.empty(shape=shape, dtype=np.dtype("uint64"))
+        lengths = np.empty(shape=shape, dtype=np.dtype("uint64"))
 
         # populate the arrays
         for key, entry in entries.items():
@@ -128,8 +128,8 @@ class ChunkManifest:
     def from_arrays(
         cls,
         paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],  # type: ignore[name-defined]
-        offsets: np.ndarray[Any, np.dtype[np.int64]],
-        lengths: np.ndarray[Any, np.dtype[np.int64]],
+        offsets: np.ndarray[Any, np.dtype[np.uint64]],
+        lengths: np.ndarray[Any, np.dtype[np.uint64]],
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -161,11 +161,11 @@ class ChunkManifest:
             raise ValueError(
                 f"paths array must have a numpy variable-length string dtype, but got dtype {paths.dtype}"
             )
-        if offsets.dtype != np.dtype("int64"):
+        if offsets.dtype != np.dtype("uint64"):
             raise ValueError(
                 f"offsets array must have 32-bit integer dtype, but got dtype {offsets.dtype}"
             )
-        if lengths.dtype != np.dtype("int64"):
+        if lengths.dtype != np.dtype("uint64"):
             raise ValueError(
                 f"lengths array must have 32-bit integer dtype, but got dtype {lengths.dtype}"
             )
