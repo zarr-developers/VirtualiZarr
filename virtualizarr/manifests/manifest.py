@@ -163,11 +163,11 @@ class ChunkManifest:
             )
         if offsets.dtype != np.dtype("uint64"):
             raise ValueError(
-                f"offsets array must have 32-bit integer dtype, but got dtype {offsets.dtype}"
+                f"offsets array must have 64-bit unsigned integer dtype, but got dtype {offsets.dtype}"
             )
         if lengths.dtype != np.dtype("uint64"):
             raise ValueError(
-                f"lengths array must have 32-bit integer dtype, but got dtype {lengths.dtype}"
+                f"lengths array must have 64-bit unsigned integer dtype, but got dtype {lengths.dtype}"
             )
 
         # check shapes
