@@ -357,8 +357,13 @@ def separate_coords(
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
     coord_vars = {}
+    found_coord_names: set[str] = set()
+    # Search through variable attributes for coordinate names
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if "coordinates" in var.attrs:
+            found_coord_names.update(var.attrs["coordinates"].split(" "))
+    for name, var in vars.items():
+        if name in coord_names or var.dims == (name,) or name in found_coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
