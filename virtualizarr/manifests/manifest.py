@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
-from typing import Any, Callable, NewType, Tuple, Union, cast
+from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -15,7 +15,13 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]])
+class ChunkDictEntry(TypedDict):
+    path: str
+    offset: int
+    length: int
+
+
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
 class ChunkEntry(BaseModel):
@@ -35,16 +41,18 @@ class ChunkEntry(BaseModel):
         return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
 
     @classmethod
-    def from_kerchunk(cls, path_and_byte_range_info: list[str | int]) -> "ChunkEntry":
+    def from_kerchunk(
+        cls, path_and_byte_range_info: tuple[str, int, int]
+    ) -> "ChunkEntry":
         path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
-    def to_kerchunk(self) -> list[str | int]:
+    def to_kerchunk(self) -> tuple[str, int, int]:
         """Write out in the format that kerchunk uses for chunk entries."""
-        return [self.path, self.offset, self.length]
+        return (self.path, self.offset, self.length)
 
-    def dict(self) -> dict[str, Union[str, int]]:
-        return dict(path=self.path, offset=self.offset, length=self.length)
+    def dict(self) -> ChunkDictEntry:
+        return ChunkDictEntry(path=self.path, offset=self.offset, length=self.length)
 
 
 class ChunkManifest:
@@ -285,7 +293,7 @@ class ChunkManifest:
     @classmethod
     def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
         chunkentries = {
-            cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
+            cast(ChunkKey, k): ChunkEntry.from_kerchunk(tuple(v)).dict()
             for k, v in kerchunk_chunk_dict.items()
         }
         return ChunkManifest(entries=cast(ChunkDict, chunkentries))
