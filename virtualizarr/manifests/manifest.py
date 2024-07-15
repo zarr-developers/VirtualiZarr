@@ -5,6 +5,7 @@ from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
+from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
@@ -42,9 +43,14 @@ class ChunkEntry(BaseModel):
 
     @classmethod
     def from_kerchunk(
-        cls, path_and_byte_range_info: tuple[str, int, int]
+        cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
     ) -> "ChunkEntry":
-        path, offset, length = path_and_byte_range_info
+        if len(path_and_byte_range_info) == 1:
+            path = path_and_byte_range_info[0]
+            offset = 0
+            length = UPath(path).stat().st_size
+        else:
+            path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def to_kerchunk(self) -> tuple[str, int, int]:
