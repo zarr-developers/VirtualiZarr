@@ -356,8 +356,8 @@ def isnan(x: "ManifestArray", /) -> np.ndarray:
 
     Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
     """
-    return np.full(
-        shape=x.shape,
-        fill_value=False,
-        dtype=np.dtype(bool),
-    )
+    return _isnan(x.shape)
+
+
+def _isnan(shape: tuple):
+    return np.full(shape=shape, fill_value=False, dtype=np.dtype(bool))
