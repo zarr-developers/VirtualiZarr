@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
-from typing import Any, Callable, NewType, Tuple, TypedDict, cast
+from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -297,12 +297,18 @@ class ChunkManifest:
             json.dump(entries, json_file, indent=4, separators=(", ", ": "))
 
     @classmethod
-    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
-        chunkentries = {
-            cast(ChunkKey, k): ChunkEntry.from_kerchunk(tuple(v)).dict()
-            for k, v in kerchunk_chunk_dict.items()
-        }
-        return ChunkManifest(entries=cast(ChunkDict, chunkentries))
+    def _from_kerchunk_chunk_dict(
+        cls,
+        kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+    ) -> "ChunkManifest":
+        chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
+        for k, v in kerchunk_chunk_dict.items():
+            if isinstance(v, (str, bytes)):
+                raise NotImplementedError("TODO: handle inlined data")
+            elif not isinstance(v, (tuple, list)):
+                raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+            chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
+        return ChunkManifest(entries=chunk_entries)
 
     def rename_paths(
         self,
