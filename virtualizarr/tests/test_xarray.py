@@ -420,14 +420,19 @@ class TestLoadVirtualDataset:
     def test_group_kwarg(self, hdf5_groups_file):
         with pytest.raises(ValueError, match="Multiple HDF Groups found"):
             open_virtual_dataset(hdf5_groups_file)
-        with pytest.raises(ValueError, match="group not found"):
-            open_virtual_dataset(hdf5_groups_file, group="group")
+        with pytest.raises(ValueError, match="not found in"):
+            open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
 
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
-            hdf5_groups_file, group="test/group", loadable_variables=vars_to_load
+            hdf5_groups_file,
+            group="test/group",
+            loadable_variables=vars_to_load,
+            indexes={},
         )
-        full_ds = xr.open_dataset(hdf5_groups_file, group="test/group")
+        full_ds = xr.open_dataset(
+            hdf5_groups_file, group="test/group", decode_times=False
+        )
         for name in full_ds.variables:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
