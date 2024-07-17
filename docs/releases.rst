@@ -1,10 +1,10 @@
 Release notes
 =============
 
-.. _v1.1:
+.. _v1.0.1:
 
-v1.1 (unreleased)
------------------
+v1.0.1 (unreleased)
+-------------------
 
 New Features
 ~~~~~~~~~~~~
@@ -24,10 +24,10 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
-.. _v1.0:
+.. _v1.0.0:
 
-v1.0 (9th July 2024)
---------------------
+v1.0.0 (9th July 2024)
+----------------------
 
 This release marks VirtualiZarr as mostly feature-complete, in the sense of achieving feature parity with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 

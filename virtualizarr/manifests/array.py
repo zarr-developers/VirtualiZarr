@@ -5,7 +5,7 @@ import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
-from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS
+from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS, _isnan
 from .manifest import ChunkManifest
 
 
@@ -127,6 +127,8 @@ class ManifestArray:
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
+        if ufunc == np.isnan:
+            return _isnan(self.shape)
         return NotImplemented
 
     def __array__(self) -> np.ndarray:
