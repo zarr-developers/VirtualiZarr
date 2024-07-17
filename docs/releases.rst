@@ -12,6 +12,9 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- Serialize valid ZarrV3 metadata (for :pull:`193`).
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Deprecations
 ~~~~~~~~~~~~
 
