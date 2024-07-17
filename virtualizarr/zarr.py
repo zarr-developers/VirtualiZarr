@@ -6,8 +6,10 @@ from typing import (
     Literal,
     NewType,
     Optional,
+    Union,
 )
 
+import numcodecs
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
@@ -103,6 +105,8 @@ class ZArray(BaseModel):
 
         if zarray_dict["fill_value"] is np.nan:
             zarray_dict["fill_value"] = None
+        else:
+            zarray_dict["fill_value"] = self._default_fill_value()
 
         return zarray_dict
 
@@ -133,6 +137,80 @@ class ZArray(BaseModel):
             order=order if order is not None else self.order,
             zarr_format=zarr_format if zarr_format is not None else self.zarr_format,
         )
+
+    def _default_fill_value(self) -> Union[bool, int, float, str, list]:
+        """
+        The value and format of the fill_value depend on the data_type of the array.
+        See here for spec:
+        https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
+        """
+        # numpy dtypes's hierarchy lets us avoid checking for all the widths
+        # https://numpy.org/doc/stable/reference/arrays.scalars.html
+        if self.dtype is np.dtype("bool"):
+            return False
+        elif self.dtype is np.dtype("int"):
+            return 0
+        elif self.dtype is np.dtype("float"):
+            return "NaN"
+        elif self.dtype is np.dtype("complex"):
+            return ["NaN", "NaN"]
+        else:
+            return "NaN"
+
+    def _v3_codec_pipeline(self) -> list:
+        """
+        VirtualiZarr internally uses the `filters`, `compressor`, and `order` attributes
+        from zarr v2, but to create conformant zarr v3 metadata those 3 must be turned into `codecs` objects.
+        Not all codecs are created equal though: https://github.com/zarr-developers/zarr-python/issues/1943
+        An array _must_ declare a single ArrayBytes codec, and 0 or more ArrayArray, BytesBytes codecs.
+        Roughly, this is the mapping:
+        ```
+            filters: Iterable[ArrayArrayCodec] #optional
+            compressor: ArrayBytesCodec #mandatory
+            post_compressor: Iterable[BytesBytesCodec] #optional
+        ```
+        """
+        if self.filters:
+            filter_codecs_configs = [
+                numcodecs.get_codec(filter).get_config() for filter in self.filters
+            ]
+            filters = [
+                dict(name=codec.pop("id"), configuration=codec)
+                for codec in filter_codecs_configs
+            ]
+        else:
+            filters = []
+
+        # Noting here that zarr v3 has very few codecs specificed in the official spec,
+        # and that there are far more codecs in `numcodecs`. We take a gamble and assume
+        # that the codec names and configuration are simply mapped into zarrv3 "configurables".
+        compressor_codec = numcodecs.get_codec(
+            # default to gzip because it is officially specified in the zarr v3 spec
+            dict(id=self.compressor or "gzip")
+        ).get_config()
+        compressor_id = compressor_codec.pop("id")
+        compressor = dict(name=compressor_id, configuration=compressor_codec)
+
+        # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
+        # Either "C" or "F", defining the layout of bytes within each chunk of the array.
+        # "C" means row-major order, i.e., the last dimension varies fastest;
+        # "F" means column-major order, i.e., the first dimension varies fastest.
+        if self.order == "C":
+            order = tuple(range(len(self.shape)))
+        elif self.order == "F":
+            order = tuple(reversed(range(len(self.shape))))
+
+        transpose = dict(name="transpose", configuration=dict(order=order))
+        # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
+        # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
+        bytes = dict(
+            name="bytes", configuration={}
+        )  # TODO need to handle endianess configuration
+
+        # The order here is significant!
+        # [ArrayArray] -> ArrayBytes -> [BytesBytes]
+        codec_pipeline = [transpose, bytes] + [compressor] + filters
+        return codec_pipeline
 
 
 def encode_dtype(dtype: np.dtype) -> str:
@@ -234,9 +312,10 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
         "name": "default",
         "configuration": {"separator": "/"},
     }
-    metadata["codecs"] = metadata.pop("filters")
-    metadata.pop("compressor")  # TODO this should be entered in codecs somehow
-    metadata.pop("order")  # TODO this should be replaced by a transpose codec
+    metadata["codecs"] = zarray._v3_codec_pipeline()
+    metadata.pop("filters")
+    metadata.pop("compressor")
+    metadata.pop("order")
 
     # indicate that we're using the manifest storage transformer ZEP
     metadata["storage_transformers"] = [
@@ -282,13 +361,19 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
         fill_value = np.nan
     else:
         fill_value = metadata["fill_value"]
-
+    all_codecs = [
+        codec
+        for codec in metadata["codecs"]
+        if codec["name"] not in ("transpose", "bytes")
+    ]
+    compressor = all_codecs[0]
+    filters = [dict(id=f.pop("name"), **f) for f in all_codecs[1:]] or None
     zarray = ZArray(
         chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
-        compressor=metadata["codecs"],
+        compressor=compressor["name"],
         dtype=np.dtype(metadata["data_type"]),
         fill_value=fill_value,
-        filters=metadata.get("filters", None),
+        filters=filters,
         order="C",
         shape=chunk_shape,
         zarr_format=3,
