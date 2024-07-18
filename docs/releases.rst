@@ -8,6 +8,8 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+- New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
+  (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~

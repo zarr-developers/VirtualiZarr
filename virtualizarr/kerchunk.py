@@ -18,12 +18,13 @@ from virtualizarr.zarr import ZArray, ZAttrs
 # (idea from https://kobzol.github.io/rust/python/2023/05/20/writing-python-like-its-rust.html)
 # TODO I would prefer to be more specific about these types
 KerchunkStoreRefs = NewType(
-    "KerchunkStoreRefs", dict
-)  # top-level dict with keys for 'version', 'refs'
+    "KerchunkStoreRefs",
+    dict,  # dict_keys(['version', 'refs'])
+)  # top-level dict containing kerchunk version and 'refs' dictionary which assumes single '.zgroup' key and multiple KerchunkArrRefs
 KerchunkArrRefs = NewType(
     "KerchunkArrRefs",
-    dict,
-)  # lower-level dict containing just the information for one zarr array
+    dict,  # dict_keys(['.zarray', '.zattrs', '0.0', '0.1', ...)
+)  # lower-level dict defining a single Zarr Array, with keys for '.zarray', '.zattrs', and every chunk
 
 
 class AutoName(Enum):
@@ -129,7 +130,7 @@ def read_kerchunk_references_from_file(
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
-    """Extract only the part of the kerchunk reference dict that is relevant to this one HDF group"""
+    """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
     ]
@@ -229,6 +230,7 @@ def extract_array_refs(
         }
 
         return fully_decode_arr_refs(arr_refs)
+
     else:
         raise KeyError(
             f"Could not find zarr array variable name {var_name}, only {found_var_names}"
