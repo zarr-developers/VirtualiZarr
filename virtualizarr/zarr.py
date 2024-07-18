@@ -151,11 +151,11 @@ class ZArray(BaseModel):
         elif self.dtype is np.dtype("int"):
             return 0
         elif self.dtype is np.dtype("float"):
-            return "NaN"
+            return 0.0
         elif self.dtype is np.dtype("complex"):
-            return ["NaN", "NaN"]
+            return [0.0, 0.0]
         else:
-            return "NaN"
+            return 0.0
 
     def _v3_codec_pipeline(self) -> list:
         """
