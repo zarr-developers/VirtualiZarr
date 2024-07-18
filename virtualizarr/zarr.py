@@ -196,9 +196,9 @@ class ZArray(BaseModel):
         # "C" means row-major order, i.e., the last dimension varies fastest;
         # "F" means column-major order, i.e., the first dimension varies fastest.
         if self.order == "C":
-            order = tuple(range(len(self.shape)))
+            order = tuple(enumerate(self.shape))
         elif self.order == "F":
-            order = tuple(reversed(range(len(self.shape))))
+            order = tuple(reversed(enumerate(self.shape)))
 
         transpose = dict(name="transpose", configuration=dict(order=order))
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
