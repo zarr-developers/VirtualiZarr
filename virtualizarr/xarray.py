@@ -37,7 +37,7 @@ def open_virtual_dataset(
     filepath: str,
     *,
     filetype: FileType | None = None,
-    group: str,
+    group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     cftime_variables: Iterable[str] | None = None,

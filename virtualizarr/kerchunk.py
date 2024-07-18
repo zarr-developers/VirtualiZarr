@@ -59,7 +59,7 @@ class NumpyEncoder(json.JSONEncoder):
 def read_kerchunk_references_from_file(
     filepath: str,
     filetype: FileType | None,
-    group: str,
+    group: str | None,
     reader_options: Optional[dict[str, Any]] = None,
 ) -> KerchunkStoreRefs:
     """
@@ -128,7 +128,7 @@ def read_kerchunk_references_from_file(
     return refs
 
 
-def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
+def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
     """Extract only the part of the kerchunk reference dict that is relevant to this one HDF group"""
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k

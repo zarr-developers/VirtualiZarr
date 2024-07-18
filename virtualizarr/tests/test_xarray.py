@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from unittest.mock import patch
 
+import fsspec
 import numpy as np
 import pytest
 import xarray as xr
@@ -390,6 +391,50 @@ class TestReadFromURL:
             vds = open_virtual_dataset(url, reader_options={}, indexes={})
             assert isinstance(vds, xr.Dataset)
 
+    def test_virtualizarr_vs_local_nisar(self, tmp_path):
+        # Open group directly from locally cached file with xarray
+        url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
+        tmpfile = fsspec.open_local(
+            f"filecache::{url}", filecache=dict(cache_storage=tmp_path, same_names=True)
+        )
+        hdf_group = "science/LSAR/GCOV/grids/frequencyA"
+        dsXR = xr.open_dataset(
+            tmpfile,
+            engine="h5netcdf",
+            group=hdf_group,
+            drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+            phony_dims="access",
+        )
+
+        # save group reference file via virtualizarr, then open with engine="kerchunk"
+        vds = open_virtual_dataset(
+            tmpfile,
+            group=hdf_group,
+            indexes={},
+            drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+        )
+        tmpref = f"{tmp_path}/cmip6.json"
+        vds.virtualize.to_kerchunk(tmpref, format="json")
+        dsV = xr.open_dataset(tmpref, engine="kerchunk")
+
+        # xrt.assert_identical(dsXR, dsV) #Attribute order changes
+        xrt.assert_equal(dsXR, dsV)
+
+    def test_virtualizarr_vs_local_cmip6(self, tmp_path):
+        url = "https://raw.githubusercontent.com/pydata/xarray-data/master/cmip6.nc"
+        tmpfile = fsspec.open_local(
+            f"filecache::{url}", filecache=dict(cache_storage=tmp_path, same_names=True)
+        )
+        hdf_group = "CMIP/NCAR/CESM2-WACCM/historical/Amon/gn"
+        dsXR = xr.open_dataset(tmpfile, group=hdf_group)
+
+        vds = open_virtual_dataset(tmpfile, group=hdf_group, indexes={})
+        tmpref = f"{tmp_path}/cmip6.json"
+        vds.virtualize.to_kerchunk(tmpref, format="json")
+        dsV = xr.open_dataset(tmpref, engine="kerchunk")
+
+        xrt.assert_equal(dsXR, dsV)
+
 
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
@@ -446,6 +491,7 @@ class TestLoadVirtualDataset:
         args = {
             "filepath": netcdf4_file,
             "filetype": None,
+            "group": None,
             "reader_options": reader_options,
         }
         mock_read_kerchunk.assert_called_once_with(**args)
