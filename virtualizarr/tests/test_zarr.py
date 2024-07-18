@@ -30,7 +30,7 @@ def vds_with_manifest_arrays() -> xr.Dataset:
     return xr.Dataset({"a": (["x", "y"], arr)}, attrs={"something": 0})
 
 
-def isconfigurable(value: dict):
+def isconfigurable(value: dict) -> bool:
     """
     Several metadata attributes in ZarrV3 use a dictionary with keys "name" : str and "configuration" : dict
     """
