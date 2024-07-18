@@ -72,9 +72,7 @@ def test_zarr_v3_metadata_conformance(tmpdir, vds_with_manifest_arrays: xr.Datas
     )
     assert isconfigurable(metadata["chunk_grid"])
     assert isconfigurable(metadata["chunk_key_encoding"])
-    assert any(
-        isinstance(metadata["fill_value"], t) for t in (bool, int, float, str, list)
-    )
+    assert isinstance(metadata["fill_value"], (bool, int, float, str, list))
     assert (
         isinstance(metadata["codecs"], list)
         and len(metadata["codecs"]) > 1
