@@ -13,7 +13,14 @@ import numcodecs
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
+from typing_extensions import Self
 
 from virtualizarr.vendor.zarr.utils import json_dumps
 
@@ -24,6 +31,7 @@ if TYPE_CHECKING:
 ZAttrs = NewType(
     "ZAttrs", dict[str, Any]
 )  # just the .zattrs (for one array or for the whole store/group)
+FillValueT = bool | str | float | int | list | None
 
 
 class Codec(BaseModel):
@@ -46,7 +54,7 @@ class ZArray(BaseModel):
     chunks: tuple[int, ...]
     compressor: str | None = None
     dtype: np.dtype
-    fill_value: float | int | None = np.nan  # float or int?
+    fill_value: FillValueT = Field(default=0.0, validate_default=True)
     filters: list[dict] | None = None
     order: Literal["C", "F"]
     shape: tuple[int, ...]
@@ -65,6 +73,12 @@ class ZArray(BaseModel):
                 "Dimension mismatch between array shape and chunk shape. "
                 f"Array shape {self.shape} has ndim={self.shape} but chunk shape {self.chunks} has ndim={len(self.chunks)}"
             )
+
+    @model_validator(mode="after")
+    def _check_fill_value(self) -> Self:
+        if self.fill_value is None:
+            self.fill_value = _default_fill_value(self.dtype)
+        return self
 
     @property
     def codec(self) -> Codec:
@@ -100,18 +114,14 @@ class ZArray(BaseModel):
 
     def dict(self) -> dict[str, Any]:
         zarray_dict = dict(self)
-
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
-
-        if zarray_dict["fill_value"] is np.nan:
-            zarray_dict["fill_value"] = None
-        else:
-            zarray_dict["fill_value"] = self._default_fill_value()
-
         return zarray_dict
 
     def to_kerchunk_json(self) -> str:
-        return ujson.dumps(self.dict())
+        zarray_dict = self.dict()
+        if zarray_dict["fill_value"] is np.nan:
+            zarray_dict["fill_value"] = None
+        return ujson.dumps(zarray_dict)
 
     def replace(
         self,
@@ -137,25 +147,6 @@ class ZArray(BaseModel):
             order=order if order is not None else self.order,
             zarr_format=zarr_format if zarr_format is not None else self.zarr_format,
         )
-
-    def _default_fill_value(self) -> Union[bool, int, float, str, list]:
-        """
-        The value and format of the fill_value depend on the data_type of the array.
-        See here for spec:
-        https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
-        """
-        # numpy dtypes's hierarchy lets us avoid checking for all the widths
-        # https://numpy.org/doc/stable/reference/arrays.scalars.html
-        if self.dtype is np.dtype("bool"):
-            return False
-        elif self.dtype is np.dtype("int"):
-            return 0
-        elif self.dtype is np.dtype("float"):
-            return 0.0
-        elif self.dtype is np.dtype("complex"):
-            return [0.0, 0.0]
-        else:
-            return 0.0
 
     def _v3_codec_pipeline(self) -> list:
         """
@@ -196,9 +187,9 @@ class ZArray(BaseModel):
         # "C" means row-major order, i.e., the last dimension varies fastest;
         # "F" means column-major order, i.e., the first dimension varies fastest.
         if self.order == "C":
-            order = tuple(enumerate(self.shape))
+            order = tuple(range(len(self.shape)))
         elif self.order == "F":
-            order = tuple(reversed(enumerate(self.shape)))
+            order = tuple(reversed(range(len(self.shape))))
 
         transpose = dict(name="transpose", configuration=dict(order=order))
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
@@ -358,7 +349,9 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
     chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
 
     if metadata["fill_value"] is None:
-        fill_value = np.nan
+        raise ValueError(
+            "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
+        )
     else:
         fill_value = metadata["fill_value"]
     all_codecs = [
@@ -380,3 +373,23 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
     )
 
     return zarray, dim_names, attrs
+
+
+def _default_fill_value(dtype: np.dtype) -> Union[bool, int, float, str, list]:
+    """
+    The value and format of the fill_value depend on the data_type of the array.
+    See here for spec:
+    https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
+    """
+    # numpy dtypes's hierarchy lets us avoid checking for all the widths
+    # https://numpy.org/doc/stable/reference/arrays.scalars.html
+    if dtype is np.dtype("bool"):
+        return False
+    elif dtype is np.dtype("int"):
+        return 0
+    elif dtype is np.dtype("float"):
+        return 0.0
+    elif dtype is np.dtype("complex"):
+        return [0.0, 0.0]
+    else:
+        return 0.0
