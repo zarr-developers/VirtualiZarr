@@ -35,7 +35,7 @@ FillValueT = bool | str | float | int | list | None
 
 
 class Codec(BaseModel):
-    compressor: str | None = None
+    compressor: dict | None = None
     filters: list[dict] | None = None
 
     def __repr__(self) -> str:
@@ -52,7 +52,7 @@ class ZArray(BaseModel):
     )
 
     chunks: tuple[int, ...]
-    compressor: str | None = None
+    compressor: dict | None = None
     dtype: np.dtype
     fill_value: FillValueT = Field(default=0.0, validate_default=True)
     filters: list[dict] | None = None
@@ -98,8 +98,8 @@ class ZArray(BaseModel):
         compressor = decoded_arr_refs_zarray["compressor"]
         # deal with an inconsistency in kerchunk's tiff_to_zarr function
         # TODO should this be moved to the point where we actually call tiff_to_zarr? Or ideally made consistent upstream.
-        if compressor is not None and "id" in compressor:
-            compressor = compressor["id"]
+        # if compressor is not None and "id" in compressor:
+        #     compressor = compressor["id"]
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
@@ -126,7 +126,7 @@ class ZArray(BaseModel):
     def replace(
         self,
         chunks: Optional[tuple[int, ...]] = None,
-        compressor: Optional[str] = None,
+        compressor: Optional[dict] = None,
         dtype: Optional[np.dtype] = None,
         fill_value: Optional[float] = None,  # float or int?
         filters: Optional[list[dict]] = None,  # type: ignore[valid-type]
@@ -175,12 +175,10 @@ class ZArray(BaseModel):
         # Noting here that zarr v3 has very few codecs specificed in the official spec,
         # and that there are far more codecs in `numcodecs`. We take a gamble and assume
         # that the codec names and configuration are simply mapped into zarrv3 "configurables".
-        compressor_codec = numcodecs.get_codec(
-            # default to gzip because it is officially specified in the zarr v3 spec
-            dict(id=self.compressor or "gzip")
-        ).get_config()
-        compressor_id = compressor_codec.pop("id")
-        compressor = dict(name=compressor_id, configuration=compressor_codec)
+        if self.compressor:
+            compressor = [_num_codec_config_to_configurable(self.compressor)]
+        else:
+            compressor = []
 
         # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
         # Either "C" or "F", defining the layout of bytes within each chunk of the array.
@@ -200,7 +198,7 @@ class ZArray(BaseModel):
 
         # The order here is significant!
         # [ArrayArray] -> ArrayBytes -> [BytesBytes]
-        codec_pipeline = [transpose, bytes] + [compressor] + filters
+        codec_pipeline = [transpose, bytes] + compressor + filters
         return codec_pipeline
 
 
@@ -347,6 +345,8 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
     dim_names = metadata.pop("dimension_names")
 
     chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
+    shape = metadata["shape"]
+    zarr_format = metadata["zarr_format"]
 
     if metadata["fill_value"] is None:
         raise ValueError(
@@ -359,21 +359,37 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
         for codec in metadata["codecs"]
         if codec["name"] not in ("transpose", "bytes")
     ]
-    compressor = all_codecs[0]
-    filters = [dict(id=f.pop("name"), **f) for f in all_codecs[1:]] or None
+    # TODO: hdf.py treats all codecs as filter, but maybe one needs to be the compressor?
+    compressor = None #all_codecs[0] if all_codecs else None
+    filters = [_configurable_to_num_codec_config(_filter) for _filter in all_codecs] or None
     zarray = ZArray(
         chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
-        compressor=compressor["name"],
+        compressor=_configurable_to_num_codec_config(compressor) if compressor else None,
         dtype=np.dtype(metadata["data_type"]),
         fill_value=fill_value,
         filters=filters,
         order="C",
-        shape=chunk_shape,
-        zarr_format=3,
+        shape=shape,
+        zarr_format=zarr_format,
     )
 
     return zarray, dim_names, attrs
 
+def _configurable_to_num_codec_config(configurable: dict) -> dict:
+    """
+    Convert a zarr v3 configurable into a numcodecs codec.
+    """
+    configurable_copy = configurable.copy()
+    codec_id = configurable_copy.pop("name")
+    configuration = configurable_copy.pop("configuration")
+    return numcodecs.get_codec({"id": codec_id, **configuration}).get_config()
+
+def _num_codec_config_to_configurable(num_codec: dict) -> dict:
+    """
+    Convert a numcodecs codec into a zarr v3 configurable.
+    """
+    num_codec_copy = num_codec.copy()
+    return {"name": num_codec_copy.pop("id"), "configuration": num_codec_copy}
 
 def _default_fill_value(dtype: np.dtype) -> Union[bool, int, float, str, list]:
     """
