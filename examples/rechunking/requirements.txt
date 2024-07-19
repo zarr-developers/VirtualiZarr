@@ -1,0 +1,9 @@
+boto
+cftime
+lithops
+cubed
+h5py
+kerchunk
+s3fs
+virtualizarr
+xarray
