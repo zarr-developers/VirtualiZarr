@@ -18,6 +18,9 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Exclude empty chunks during `ChunkDict` construction. (:pull:`198`)
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Documentation
 ~~~~~~~~~~~~~
 
