@@ -364,16 +364,14 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
-    keys = list(chunk_keys)
-    if len(keys) > 1:
-        first_key, *other_keys = keys
-        ndim = get_ndim_from_key(first_key)
-        for key in other_keys:
-            other_ndim = get_ndim_from_key(key)
-            if other_ndim != ndim:
-                raise ValueError(
-                    f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
-                )
+    first_key, *other_keys = list(chunk_keys)
+    ndim = get_ndim_from_key(first_key)
+    for key in other_keys:
+        other_ndim = get_ndim_from_key(key)
+        if other_ndim != ndim:
+            raise ValueError(
+                f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
+            )
 
 
 def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
