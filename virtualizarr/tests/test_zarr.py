@@ -20,7 +20,7 @@ def vds_with_manifest_arrays() -> xr.Dataset:
             shape=(2, 3),
             dtype=np.dtype("<i8"),
             chunks=(2, 3),
-            compressor="gzip",
+            compressor={"id": "zlib", "level": 1},
             filters=None,
             fill_value=0,
             order="C",

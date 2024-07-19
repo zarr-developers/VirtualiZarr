@@ -354,26 +354,28 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
         )
     else:
         fill_value = metadata["fill_value"]
+
     all_codecs = [
         codec
         for codec in metadata["codecs"]
         if codec["name"] not in ("transpose", "bytes")
     ]
-    # TODO: hdf.py treats all codecs as filter, but maybe one needs to be the compressor?
-    compressor = None #all_codecs[0] if all_codecs else None
-    filters = [_configurable_to_num_codec_config(_filter) for _filter in all_codecs] or None
+    compressor, *filters = [
+        _configurable_to_num_codec_config(_filter) for _filter in all_codecs
+    ]
     zarray = ZArray(
-        chunks=metadata["chunk_grid"]["configuration"]["chunk_shape"],
-        compressor=_configurable_to_num_codec_config(compressor) if compressor else None,
+        chunks=chunk_shape,
+        compressor=compressor,
         dtype=np.dtype(metadata["data_type"]),
         fill_value=fill_value,
-        filters=filters,
+        filters=filters or None,
         order="C",
         shape=shape,
         zarr_format=zarr_format,
     )
 
     return zarray, dim_names, attrs
+
 
 def _configurable_to_num_codec_config(configurable: dict) -> dict:
     """
@@ -384,12 +386,14 @@ def _configurable_to_num_codec_config(configurable: dict) -> dict:
     configuration = configurable_copy.pop("configuration")
     return numcodecs.get_codec({"id": codec_id, **configuration}).get_config()
 
+
 def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
     """
     num_codec_copy = num_codec.copy()
     return {"name": num_codec_copy.pop("id"), "configuration": num_codec_copy}
+
 
 def _default_fill_value(dtype: np.dtype) -> Union[bool, int, float, str, list]:
     """
