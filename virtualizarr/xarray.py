@@ -17,13 +17,8 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import (
-    FileType,
-    KerchunkStoreRefs,
-    _automatically_determine_filetype,
-)
+from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.hdf import attrs_from_root_group, virtual_vars_from_hdf
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 from virtualizarr.zarr import (
     attrs_from_zarr_group_json,
@@ -122,6 +117,7 @@ def open_virtual_dataset(
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
+
     if filetype == "zarr_v3":
         # TODO is there a neat way of auto-detecting this?
         return open_virtual_dataset_from_v3_store(
@@ -132,38 +128,21 @@ def open_virtual_dataset(
             reader_options = {
                 "storage_options": {"key": "", "secret": "", "anon": True}
             }
-        if filetype is None:
-            filetype = _automatically_determine_filetype(
-                filepath=filepath, reader_options=reader_options
-            )
-        filetype = FileType(filetype)
-        if filetype.name.lower() == "netcdf4" or filetype.name.lower() == "hdf5":
-            virtual_vars = virtual_vars_from_hdf(
-                path=filepath,
-                drop_variables=drop_variables,
-                reader_options=reader_options,
-            )
-            ds_attrs = attrs_from_root_group(
-                path=filepath, reader_options=reader_options
-            )
-            coord_names = ds_attrs.pop("coordinates", [])
-        else:
-            # this is the only place we actually always need to use kerchunk directly
-            # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-            vds_refs = kerchunk.read_kerchunk_references_from_file(
-                filepath=filepath,
-                filetype=filetype,
-                reader_options=reader_options,
-            )
-            virtual_vars = virtual_vars_from_kerchunk_refs(
-                vds_refs,
-                drop_variables=drop_variables + loadable_variables,
-                virtual_array_class=virtual_array_class,
-            )
-            ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(
-                ".zattrs", {}
-            )
-            coord_names = ds_attrs.pop("coordinates", [])
+
+        # this is the only place we actually always need to use kerchunk directly
+        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
+        vds_refs = kerchunk.read_kerchunk_references_from_file(
+            filepath=filepath,
+            filetype=filetype,
+            reader_options=reader_options,
+        )
+        virtual_vars = virtual_vars_from_kerchunk_refs(
+            vds_refs,
+            drop_variables=drop_variables + loadable_variables,
+            virtual_array_class=virtual_array_class,
+        )
+        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+        coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
@@ -211,6 +190,7 @@ def open_virtual_dataset(
         vars = {**virtual_vars, **loadable_vars}
 
         data_vars, coords = separate_coords(vars, indexes, coord_names)
+
         vds = xr.Dataset(
             data_vars,
             coords=coords,

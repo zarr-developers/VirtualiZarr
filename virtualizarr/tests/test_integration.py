@@ -69,12 +69,8 @@ class TestKerchunkRoundtrip:
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
             )
 
-        # assert all_close to original dataset
-        xrt.assert_allclose(roundtrip, ds)
-
-        # assert coordinate attributes are maintained
-        for coord in ds.coords:
-            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+        # assert identical to original dataset
+        xrt.assert_identical(roundtrip, ds)
 
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
     def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
@@ -128,14 +124,9 @@ class TestKerchunkRoundtrip:
             roundtrip = xr.open_dataset(
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=decode_times
             )
-
         if decode_times is False:
-            # assert all_close to original dataset
-            xrt.assert_allclose(roundtrip, ds)
-
-            # assert coordinate attributes are maintained
-            for coord in ds.coords:
-                assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+            # assert identical to original dataset
+            xrt.assert_identical(roundtrip, ds)
         else:
             # they are very very close! But assert_allclose doesn't seem to work on datetimes
             assert (roundtrip.time - ds.time).sum() == 0
@@ -173,11 +164,7 @@ class TestKerchunkRoundtrip:
             )
 
         # assert equal to original dataset
-        xrt.assert_allclose(roundtrip, ds)
-
-        # assert coordinate attributes are maintained
-        for coord in ds.coords:
-            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+        xrt.assert_identical(roundtrip, ds)
 
 
 def test_open_scalar_variable(tmpdir):
