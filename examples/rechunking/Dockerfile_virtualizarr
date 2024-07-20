@@ -1,7 +1,6 @@
 # Python 3.11
 FROM python:3.11-slim-buster
 
-COPY requirements.txt requirements.txt
 
 RUN apt-get update \
     # Install aws-lambda-cpp build dependencies
@@ -53,6 +52,7 @@ RUN unzip lithops_lambda.zip \
 
 # Put your dependencies here, using RUN pip install... or RUN apt install...
 
+COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]

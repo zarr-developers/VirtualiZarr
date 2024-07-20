@@ -1,9 +1,10 @@
 boto
 cftime
-lithops
 cubed
+cubed-xarray
 h5py
 kerchunk
+lithops
 s3fs
 virtualizarr
 xarray

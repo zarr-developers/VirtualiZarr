@@ -11,5 +11,12 @@ pip install -r requirements.txt
 
 1. Build a runtime image for Cubed
 ```bash
+export LITHOPS_CONFIG_FILE=$(pwd)/config.aws
 lithops runtime build -b aws_lambda -f Dockerfile_aws_lambda virtualizarr-runtime
+```
+
+## Cleaning up
+To rebuild the Litops image, delete the existing one by running
+```bash
+lithops runtime delete -b aws_lambda -d virtualizarr-runtime
 ```
