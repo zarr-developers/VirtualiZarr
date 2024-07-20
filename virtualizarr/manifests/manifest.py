@@ -252,7 +252,7 @@ class ChunkManifest:
                 [*coord_vectors, self._paths, self._offsets, self._lengths],
                 flags=("refs_ok",),
             )
-            if path.item()[0] != ""  # don't include entry if path='' (i.e. empty chunk)
+            if path.item() != ""  # don't include entry if path='' (i.e. empty chunk)
         }
 
         return cast(
