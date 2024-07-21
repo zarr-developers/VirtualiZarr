@@ -299,6 +299,8 @@ class ChunkManifest:
     @classmethod
     def _from_kerchunk_chunk_dict(
         cls,
+        # The type hint requires `Dict` instead of `dict` due to
+        # the conflicting ChunkManifest.dict method.
         kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
     ) -> "ChunkManifest":
         chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
