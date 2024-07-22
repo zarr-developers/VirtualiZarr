@@ -6,7 +6,6 @@ from typing import (
     Literal,
     NewType,
     Optional,
-    Union,
 )
 
 import numcodecs
@@ -32,6 +31,20 @@ ZAttrs = NewType(
     "ZAttrs", dict[str, Any]
 )  # just the .zattrs (for one array or for the whole store/group)
 FillValueT = bool | str | float | int | list | None
+
+ZARR_DEFAULT_FILL_VALUE: dict[np.dtype, FillValueT] = {
+    # numpy dtypes's hierarchy lets us avoid checking for all the widths
+    # https://numpy.org/doc/stable/reference/arrays.scalars.html
+    np.dtype("bool"): False,
+    np.dtype("int"): 0,
+    np.dtype("float"): 0.0,
+    np.dtype("complex"): [0.0, 0.0],
+}
+"""
+The value and format of the fill_value depend on the `data_type` of the array.
+See here for spec:
+https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
+"""
 
 
 class Codec(BaseModel):
@@ -77,7 +90,7 @@ class ZArray(BaseModel):
     @model_validator(mode="after")
     def _check_fill_value(self) -> Self:
         if self.fill_value is None:
-            self.fill_value = _default_fill_value(self.dtype)
+            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype, default=0.0)
         return self
 
     @property
@@ -96,11 +109,6 @@ class ZArray(BaseModel):
             fill_value = np.nan
 
         compressor = decoded_arr_refs_zarray["compressor"]
-        # deal with an inconsistency in kerchunk's tiff_to_zarr function
-        # TODO should this be moved to the point where we actually call tiff_to_zarr? Or ideally made consistent upstream.
-        # if compressor is not None and "id" in compressor:
-        #     compressor = compressor["id"]
-
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=compressor,
@@ -393,23 +401,3 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
     num_codec_copy = num_codec.copy()
     return {"name": num_codec_copy.pop("id"), "configuration": num_codec_copy}
-
-
-def _default_fill_value(dtype: np.dtype) -> Union[bool, int, float, str, list]:
-    """
-    The value and format of the fill_value depend on the data_type of the array.
-    See here for spec:
-    https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
-    """
-    # numpy dtypes's hierarchy lets us avoid checking for all the widths
-    # https://numpy.org/doc/stable/reference/arrays.scalars.html
-    if dtype is np.dtype("bool"):
-        return False
-    elif dtype is np.dtype("int"):
-        return 0
-    elif dtype is np.dtype("float"):
-        return 0.0
-    elif dtype is np.dtype("complex"):
-        return [0.0, 0.0]
-    else:
-        return 0.0
