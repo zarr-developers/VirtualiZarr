@@ -6,7 +6,7 @@ import numpy as np
 from ..kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
 from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS, _isnan
-from .manifest import ChunkManifest
+from .manifest import ChunkManifest, subchunk
 
 
 class ManifestArray:
@@ -225,6 +225,58 @@ class ManifestArray:
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+    def rechunk(self: "ManifestArray", chunks: tuple[int, ...]) -> "ManifestArray":
+        """
+        Split the chunks in the manifest into smaller chunks.
+
+        Only valid for manifestarrays pointing to uncompressed data files.
+
+        Parameters
+        ----------
+        chunks: tuple[int, ...]
+            New chunks to split the current chunks in the manifest into.
+            Will set the `.chunks` attribute of the returned ManifestArray.
+            Each element must be an integer divisor of the corresponding existing chunk length.
+            Each element must be an integer divisor of the corresponding array length (i.e. regular-length chunks).
+
+        Returns
+        -------
+        manifestarray: ManifestArray
+            New ManifestArray but with the chunks attribute replaced.
+
+        See Also
+        --------
+        kerchunk.utils.subchunk
+        """
+        if self.zarray.compressor is not None:
+            raise ValueError(
+                f"Cannot rechunk a ManifestArray which points to compressed data on disk, but compressor={self.zarray.compressor}"
+            )
+
+        if any(new_len > old_len for new_len, old_len in zip(chunks, self.chunks)):
+            # TODO we could theoretically handle this case if we checked that adjacent entries in the manifest had the same filepath and contiguous byte ranges
+            # but it's a lot of effort to implement something that doesn't have a clear use case.
+            raise NotImplementedError(
+                f"Can only rechunk into smaller chunks, but existing chunk shape = {self.chunks} and requested new chunk shape = {chunks}"
+            )
+
+        # Check if integer divisor of array shape & chunk shape
+        # (If its an integer divisor of old chunk shape it must be divisor of old array shape)
+        if any(old_len % new_len != 0 for new_len, old_len in zip(chunks, self.chunks)):
+            raise ValueError(
+                f"New chunk lengths must be integer divisor of old chunk lengths, but existing chunk shape = {self.chunks} and requested new chunk shape = {chunks}"
+            )
+
+        # TODO find subchunks, i.e. pattern of how many new chunks fit into one old chunk
+        subchunks: tuple[int, ...] = ...
+
+        rechunked_manifest = subchunk(self.manifest, subchunks=subchunks)
+
+        return ManifestArray(
+            chunkmanifest=rechunked_manifest,
+            zarray=self.zarray.replace(chunks=chunks),
+        )
 
     def rename_paths(
         self,

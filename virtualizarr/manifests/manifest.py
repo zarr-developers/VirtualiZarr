@@ -381,3 +381,49 @@ def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )
     return chunk_grid_shape
+
+
+def subchunk(manifest: ChunkManifest, subchunks: tuple[int, ...]) -> ChunkManifest:
+    """
+    Split every chunk in the manifest into an array of smaller subchunks.
+
+    Only valid for manifests pointing to uncompressed data files.
+    """
+
+    # Split each chunk's byte range up according to new chunking scheme
+    def generate_subchunk_offsets(
+        offset_element: int, length_element: int, subchunks: tuple[int, ...]
+    ) -> np.ndarray[Any, np.dtype[np.uint64]]:
+        new_length = length_element / np.prod(subchunks)
+
+        # TODO check if new_length is not an integer?
+
+        return np.linspace(
+            start=offset_element,
+            stop=offset_element + new_length,
+            num=np.prod(subchunks),
+            dtype=np.dtype("uint64"),
+        ).reshape(subchunks)
+
+    def generate_subchunk_lengths(
+        length_element: int, subchunks: tuple[int, ...]
+    ) -> np.ndarray[Any, np.dtype[np.uint64]]:
+        # TODO - think: are the new lengths actually all the same size??
+        new_length = length_element / np.prod(subchunks)
+
+        return np.repeat(new_length, repeats=np.prod(subchunks)).reshape(subchunks)
+
+    def generate_subchunk_paths(
+        path_element: str, subchunks: tuple[int, ...]
+    ) -> np.ndarray[Any, np.dtypes.StringDType]:  # type: ignore[name-defined]
+        """Paths are just repeated as each subchunk is pointing to the same file"""
+        return np.repeat(path_element, repeats=np.prod(subchunks)).reshape(subchunks)
+
+    # TODO replace every chunk in the manifest with the new sub-array of chunks
+    # (this is a similar block-like problem to the one in __eq__ above https://github.com/zarr-developers/VirtualiZarr/pull/31)
+    # Suprised there is not a numpy function that already exists to do this...
+    # Seems doable using np.block to combine nested lists
+    # (see https://chatgpt.com/share/df353876-68fd-4f2d-9a94-f419c6c3028b for inspiration)
+    rechunked_manifest = ...
+
+    return rechunked_manifest
