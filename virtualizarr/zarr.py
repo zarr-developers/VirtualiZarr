@@ -90,7 +90,7 @@ class ZArray(BaseModel):
     @model_validator(mode="after")
     def _check_fill_value(self) -> Self:
         if self.fill_value is None:
-            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype, default=0.0)
+            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype, 0.0)
         return self
 
     @property
