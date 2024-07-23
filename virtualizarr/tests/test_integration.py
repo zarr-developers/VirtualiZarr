@@ -5,6 +5,7 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.tests import requires_dask
 
 
 @pytest.mark.parametrize(
@@ -178,6 +179,7 @@ def test_open_scalar_variable(tmpdir):
     assert vds["a"].shape == ()
 
 
+@requires_dask
 def test_rechunk_via_manifest_vs_xarray(netcdf3_file, tmpdir):
     # start with uncompressed netCDF3 file on disk
 
