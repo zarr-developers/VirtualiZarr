@@ -376,7 +376,7 @@ class TestReadFromURL:
             with pytest.raises(NotImplementedError):
                 vds = open_virtual_dataset(url, reader_options={}, indexes={})
         else:
-            vds = open_virtual_dataset(url, reader_options={}, indexes={})
+            vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
 
