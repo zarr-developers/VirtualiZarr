@@ -20,7 +20,7 @@ def test_wrapping():
     dtype = np.dtype("int32")
     zarray = ZArray(
         chunks=chunks,
-        compressor="zlib",
+        compressor={"id": "zlib", "level": 1},
         dtype=dtype,
         fill_value=0.0,
         filters=None,
@@ -50,7 +50,7 @@ class TestEquals:
         shape = (5, 20)
         zarray = ZArray(
             chunks=chunks,
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -87,7 +87,7 @@ class TestConcat:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(1, 10),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -134,7 +134,7 @@ class TestConcat:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(5, 10),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -184,7 +184,7 @@ class TestConcat:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(10,),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -388,7 +388,7 @@ class TestReadFromURL:
             )
             assert isinstance(vds, xr.Dataset)
         else:
-            vds = open_virtual_dataset(url, reader_options={}, indexes={})
+            vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
     def test_virtualizarr_vs_local_nisar(self):
