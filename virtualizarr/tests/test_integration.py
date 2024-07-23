@@ -4,6 +4,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests import ManifestArray
 
 
 @pytest.mark.parametrize(
@@ -175,3 +176,31 @@ def test_open_scalar_variable(tmpdir):
 
     vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
     assert vds["a"].shape == ()
+
+
+def test_rechunk_via_manifest_vs_xarray(netcdf3_file, tmpdir):
+    # start with uncompressed netCDF3 file on disk
+
+    new_chunks = {"time": 1460}
+
+    # open and split into two time chunks using virtualizarr
+    vds = open_virtual_dataset(netcdf3_file, indexes={}).chunk(**new_chunks)
+
+    # check we have not accidentally created a dask array
+    assert isinstance(vds["air"].data, ManifestArray)
+
+    refs_path = f"{tmpdir}/refs.json"
+    vds.virtualize.to_kerchunk(refs_path, format="json")
+
+    # open chunked references
+    roundtrip_ds = xr.open_dataset(
+        refs_path,
+        engine="kerchunk",
+        chunks={},
+    )
+
+    # open original file using xarray and dask, and rechunk
+    expected_ds = xr.open_dataset(netcdf3_file, chunks={}).chunk(**new_chunks)
+
+    # assert both approaches equivalent
+    xrt.assert_identical(roundtrip_ds, expected_ds)

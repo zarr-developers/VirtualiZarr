@@ -50,3 +50,16 @@ def netcdf4_files(tmpdir):
     ds2.close()
 
     return filepath1, filepath2
+
+
+@pytest.fixture
+def netcdf3_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+    ds.close()
+
+    return filepath
