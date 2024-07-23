@@ -398,3 +398,67 @@ class TestRechunk:
 
         assert rechunked.manifest.dict() == expected_chunks_dict
         assert rechunked.zarray == expected_zarray
+
+    def test_rechunk_compressed(self):
+        zarray = ZArray(
+            chunks=(2, 3),
+            compressor="zlib",
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(2, 3),
+            zarr_format=2,
+        )
+
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+
+        with pytest.raises(ValueError, match="compressed"):
+            marr.rechunk(chunks=(1, 3))
+
+    def test_rechunk_non_integer_subchunks(self):
+        zarray = ZArray(
+            chunks=(2, 3),
+            compressor=None,
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(2, 3),
+            zarr_format=2,
+        )
+
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+
+        with pytest.raises(ValueError, match="integer divisor"):
+            marr.rechunk(chunks=(1, 2))
+
+    def test_rechunk_larger_chunks(self):
+        zarray = ZArray(
+            chunks=(1, 3),
+            compressor=None,
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(2, 3),
+            zarr_format=2,
+        )
+
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
+            "1.0": {"path": "foo.nc", "offset": 160, "length": 60},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+
+        with pytest.raises(NotImplementedError, match="smaller chunks"):
+            marr.rechunk(chunks=(2, 3))
