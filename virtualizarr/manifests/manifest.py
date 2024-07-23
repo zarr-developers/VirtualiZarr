@@ -390,40 +390,68 @@ def subchunk(manifest: ChunkManifest, subchunks: tuple[int, ...]) -> ChunkManife
     Only valid for manifests pointing to uncompressed data files.
     """
 
+    original_paths = manifest._paths
+    original_offsets = manifest._offsets
+    original_lengths = manifest._lengths
+    original_shape = original_paths.shape
+
     # Split each chunk's byte range up according to new chunking scheme
     def generate_subchunk_offsets(
         offset_element: int, length_element: int, subchunks: tuple[int, ...]
     ) -> np.ndarray[Any, np.dtype[np.uint64]]:
-        new_length = length_element / np.prod(subchunks)
-
-        # TODO check if new_length is not an integer?
-
         return np.linspace(
             start=offset_element,
-            stop=offset_element + new_length,
+            stop=offset_element + length_element,
             num=np.prod(subchunks),
+            endpoint=False,
             dtype=np.dtype("uint64"),
         ).reshape(subchunks)
 
     def generate_subchunk_lengths(
         length_element: int, subchunks: tuple[int, ...]
     ) -> np.ndarray[Any, np.dtype[np.uint64]]:
-        # TODO - think: are the new lengths actually all the same size??
+        # Note: Once Zarr supports non-variable-length chunking we can no longer assume all chunk byte ranges are same length
         new_length = length_element / np.prod(subchunks)
-
-        return np.repeat(new_length, repeats=np.prod(subchunks)).reshape(subchunks)
+        return (
+            np.repeat(
+                new_length,
+                repeats=np.prod(subchunks),
+            )
+            .reshape(subchunks)
+            .astype(np.dtype("uint64"))
+        )
 
     def generate_subchunk_paths(
         path_element: str, subchunks: tuple[int, ...]
     ) -> np.ndarray[Any, np.dtypes.StringDType]:  # type: ignore[name-defined]
         """Paths are just repeated as each subchunk is pointing to the same file"""
-        return np.repeat(path_element, repeats=np.prod(subchunks)).reshape(subchunks)
+        return (
+            np.repeat(path_element, repeats=np.prod(subchunks))
+            .reshape(subchunks)
+            .astype(np.dtypes.StringDType)  # type: ignore[attr-defined]
+        )
 
-    # TODO replace every chunk in the manifest with the new sub-array of chunks
-    # (this is a similar block-like problem to the one in __eq__ above https://github.com/zarr-developers/VirtualiZarr/pull/31)
-    # Suprised there is not a numpy function that already exists to do this...
-    # Seems doable using np.block to combine nested lists
-    # (see https://chatgpt.com/share/df353876-68fd-4f2d-9a94-f419c6c3028b for inspiration)
-    rechunked_manifest = ...
+    # Replace every chunk in the manifest with the new sub-array of chunks
+    # Create a nested list of subarrays using np.ndindex for general N-dimensional support
+    paths_subarrays = np.empty(original_shape, dtype=object)
+    offsets_subarrays = np.empty(original_shape, dtype=object)
+    lengths_subarrays = np.empty(original_shape, dtype=object)
+    for idx in np.ndindex(original_shape):
+        paths_subarrays[idx] = generate_subchunk_paths(original_paths[idx], subchunks)
+        offsets_subarrays[idx] = generate_subchunk_offsets(
+            original_offsets[idx], original_lengths[idx], subchunks
+        )
+        lengths_subarrays[idx] = generate_subchunk_lengths(
+            original_lengths[idx], subchunks
+        )
 
-    return rechunked_manifest
+    # Use np.block to assemble the final rechunked arrays
+    new_paths_array = np.block(paths_subarrays.tolist())
+    new_offsets_array = np.block(offsets_subarrays.tolist())
+    new_lengths_array = np.block(lengths_subarrays.tolist())
+
+    return ChunkManifest.from_arrays(
+        paths=new_paths_array,
+        offsets=new_offsets_array,
+        lengths=new_lengths_array,
+    )

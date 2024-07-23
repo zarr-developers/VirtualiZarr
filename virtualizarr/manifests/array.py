@@ -268,8 +268,10 @@ class ManifestArray:
                 f"New chunk lengths must be integer divisor of old chunk lengths, but existing chunk shape = {self.chunks} and requested new chunk shape = {chunks}"
             )
 
-        # TODO find subchunks, i.e. pattern of how many new chunks fit into one old chunk
-        subchunks: tuple[int, ...] = ...
+        # Find subchunks, i.e. pattern of how many new chunks fit into one old chunk
+        subchunks: tuple[int, ...] = tuple(
+            old_len // new_len for new_len, old_len in zip(chunks, self.chunks)
+        )
 
         rechunked_manifest = subchunk(self.manifest, subchunks=subchunks)
 
