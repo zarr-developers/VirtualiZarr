@@ -340,7 +340,38 @@ def test_refuse_combine():
 
 
 class TestRechunk:
-    def test_rechunk(self):
+    @pytest.mark.parametrize(
+        "new_chunks, expected_chunks_dict",
+        [
+            (
+                (1, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
+                    "1.0": {"path": "foo.nc", "offset": 160, "length": 60},
+                },
+            ),
+            (
+                (2, 1),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 40},
+                    "0.1": {"path": "foo.nc", "offset": 140, "length": 40},
+                    "0.2": {"path": "foo.nc", "offset": 180, "length": 40},
+                },
+            ),
+            (
+                (1, 1),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 20},
+                    "0.1": {"path": "foo.nc", "offset": 120, "length": 20},
+                    "0.2": {"path": "foo.nc", "offset": 140, "length": 20},
+                    "1.0": {"path": "foo.nc", "offset": 160, "length": 20},
+                    "1.1": {"path": "foo.nc", "offset": 180, "length": 20},
+                    "1.2": {"path": "foo.nc", "offset": 200, "length": 20},
+                },
+            ),
+        ],
+    )
+    def test_rechunk(self, new_chunks, expected_chunks_dict):
         zarray = ZArray(
             chunks=(2, 3),
             compressor=None,
@@ -358,42 +389,8 @@ class TestRechunk:
         manifest = ChunkManifest(entries=chunks_dict)
         marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
 
-        new_chunks = (1, 3)
         rechunked = marr.rechunk(chunks=new_chunks)
 
-        expected_chunks_dict = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
-            "1.0": {"path": "foo.nc", "offset": 160, "length": 60},
-        }
-        expected_zarray = zarray.replace(chunks=new_chunks)
-
-        assert rechunked.manifest.dict() == expected_chunks_dict
-        assert rechunked.zarray == expected_zarray
-
-        new_chunks = (2, 1)
-        rechunked = marr.rechunk(chunks=new_chunks)
-
-        expected_chunks_dict = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 40},
-            "0.1": {"path": "foo.nc", "offset": 140, "length": 40},
-            "0.2": {"path": "foo.nc", "offset": 180, "length": 40},
-        }
-        expected_zarray = zarray.replace(chunks=new_chunks)
-
-        assert rechunked.manifest.dict() == expected_chunks_dict
-        assert rechunked.zarray == expected_zarray
-
-        new_chunks = (1, 1)
-        rechunked = marr.rechunk(chunks=new_chunks)
-
-        expected_chunks_dict = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 20},
-            "0.1": {"path": "foo.nc", "offset": 120, "length": 20},
-            "0.2": {"path": "foo.nc", "offset": 140, "length": 20},
-            "1.0": {"path": "foo.nc", "offset": 160, "length": 20},
-            "1.1": {"path": "foo.nc", "offset": 180, "length": 20},
-            "1.2": {"path": "foo.nc", "offset": 200, "length": 20},
-        }
         expected_zarray = zarray.replace(chunks=new_chunks)
 
         assert rechunked.manifest.dict() == expected_chunks_dict
