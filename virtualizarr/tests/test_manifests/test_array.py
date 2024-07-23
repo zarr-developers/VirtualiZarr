@@ -337,3 +337,64 @@ def test_refuse_combine():
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
+
+
+class TestRechunk:
+    def test_rechunk(self):
+        zarray = ZArray(
+            chunks=(2, 3),
+            compressor=None,
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(2, 3),
+            zarr_format=2,
+        )
+
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+
+        new_chunks = (1, 3)
+        rechunked = marr.rechunk(chunks=new_chunks)
+
+        expected_chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
+            "1.0": {"path": "foo.nc", "offset": 160, "length": 60},
+        }
+        expected_zarray = zarray.replace(chunks=new_chunks)
+
+        assert rechunked.manifest.dict() == expected_chunks_dict
+        assert rechunked.zarray == expected_zarray
+
+        new_chunks = (2, 1)
+        rechunked = marr.rechunk(chunks=new_chunks)
+
+        expected_chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 40},
+            "0.1": {"path": "foo.nc", "offset": 140, "length": 40},
+            "0.2": {"path": "foo.nc", "offset": 180, "length": 40},
+        }
+        expected_zarray = zarray.replace(chunks=new_chunks)
+
+        assert rechunked.manifest.dict() == expected_chunks_dict
+        assert rechunked.zarray == expected_zarray
+
+        new_chunks = (1, 1)
+        rechunked = marr.rechunk(chunks=new_chunks)
+
+        expected_chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 20},
+            "0.1": {"path": "foo.nc", "offset": 120, "length": 20},
+            "0.2": {"path": "foo.nc", "offset": 140, "length": 20},
+            "1.0": {"path": "foo.nc", "offset": 160, "length": 20},
+            "1.1": {"path": "foo.nc", "offset": 180, "length": 20},
+            "1.2": {"path": "foo.nc", "offset": 200, "length": 20},
+        }
+        expected_zarray = zarray.replace(chunks=new_chunks)
+
+        assert rechunked.manifest.dict() == expected_chunks_dict
+        assert rechunked.zarray == expected_zarray
