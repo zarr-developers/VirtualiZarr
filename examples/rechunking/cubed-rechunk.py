@@ -1,7 +1,7 @@
-# Example rechunking flow using VirtualiZarr and cubed based on Pythia's
-# kerchunk cookbook: https://projectpythia.org/kerchunk-cookbook
-# The example proves concept, but should be optimized before production use.
-# Please, suggest improvements.
+# Example rechunking flow using VirtualiZarr, cubed, and xarray-cubed.
+# Inspired by Pythia's cookbook: https://projectpythia.org/kerchunk-cookbook
+# This script proves the concept but requires further optimization for
+# production. Please, suggest improvements.
 
 import fsspec
 import lithops
