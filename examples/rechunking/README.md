@@ -8,11 +8,18 @@ pip install -r requirements.txt
 ```
 
 1. Set up cubed executor by following https://github.com/cubed-dev/cubed/blob/main/examples/lithops/aws/README.md
+```bash
+export CUBED_CONFIG=$(pwd)
 
 1. Build a runtime image for Cubed
 ```bash
 export LITHOPS_CONFIG_FILE=$(pwd)/config.aws
-lithops runtime build -b aws_lambda -f Dockerfile_aws_lambda virtualizarr-runtime
+lithops runtime build -b aws_lambda -f Dockerfile_virtualizarr virtualizarr-runtime
+```
+
+1. Run the script
+```bash
+python cubed-rechunk.py
 ```
 
 ## Cleaning up

@@ -1,0 +1,7 @@
+spec:
+  work_dir: "s3://cubed-$USER-temp"
+  allowed_mem: "2GB"
+  executor_name: "lithops"
+  executor_options:
+    runtime: "virtualizarr-runtime"
+    runtime_memory: 2000
