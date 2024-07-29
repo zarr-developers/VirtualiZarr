@@ -33,12 +33,19 @@ class Codec(BaseModel):
 
 
 class ZArray(BaseModel):
-    """Just the .zarray information"""
+    """
+    Stores the attributes of a Zarr Array.
+
+    Read-only.
+
+    Named ZArray because in zarr v2 these attributes were stored in the .zarray file.
+    """
 
     # TODO will this work for V3?
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,  # only here so pydantic doesn't complain about the numpy dtype field
+        frozen=True,
     )
 
     chunks: tuple[int, ...]
@@ -50,10 +57,29 @@ class ZArray(BaseModel):
     shape: tuple[int, ...]
     zarr_format: Literal[2, 3] = 2
 
+    @field_validator("shape")
+    @classmethod
+    def validate_shape(cls, shape) -> tuple[int, ...]:
+        for length in shape:
+            if length < 1:
+                raise ValueError(
+                    "Each axis of shape must be of length 1 or greater, but got shape={shape}"
+                )
+        return shape
+
+    @field_validator("chunks")
+    @classmethod
+    def validate_chunks(cls, chunks) -> tuple[int, ...]:
+        for length in chunks:
+            if length < 1:
+                raise ValueError(
+                    "Chunks must be of length 1 or greater, but got chunks={chunks}"
+                )
+        return chunks
+
     @field_validator("dtype")
     @classmethod
     def validate_dtype(cls, dtype) -> np.dtype:
-        # Your custom validation logic here
         # Convert numpy.dtype to a format suitable for Pydantic
         return np.dtype(dtype)
 
@@ -63,6 +89,12 @@ class ZArray(BaseModel):
                 "Dimension mismatch between array shape and chunk shape. "
                 f"Array shape {self.shape} has ndim={self.shape} but chunk shape {self.chunks} has ndim={len(self.chunks)}"
             )
+
+        for chunk_length, axis_length in zip(self.chunks, self.shape):
+            if not chunk_length <= axis_length:
+                raise ValueError(
+                    f"Chunks must be smaller than axis length for all axes, but got chunks={self.chunks} and shape={self.shape}"
+                )
 
     @property
     def codec(self) -> Codec:

@@ -243,7 +243,7 @@ class ManifestArray:
         Returns
         -------
         manifestarray: ManifestArray
-            New ManifestArray but with the chunks attribute replaced.
+            New ManifestArray but with the chunks replaced by the requested smaller chunks.
 
         See Also
         --------
@@ -253,6 +253,9 @@ class ManifestArray:
             raise ValueError(
                 f"Cannot rechunk a ManifestArray which points to compressed data on disk, but compressor={self.zarray.compressor}"
             )
+
+        # perform basic validation checks at the start
+        new_zarray = self.zarray.replace(chunks=chunks)
 
         if any(new_len > old_len for new_len, old_len in zip(chunks, self.chunks)):
             # TODO we could theoretically handle this case if we checked that adjacent entries in the manifest had the same filepath and contiguous byte ranges
@@ -277,7 +280,7 @@ class ManifestArray:
 
         return ManifestArray(
             chunkmanifest=rechunked_manifest,
-            zarray=self.zarray.replace(chunks=chunks),
+            zarray=new_zarray,
         )
 
     def rename_paths(
