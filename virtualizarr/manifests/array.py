@@ -1,4 +1,3 @@
-import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -143,7 +142,7 @@ class ManifestArray:
         """
         Element-wise equality checking.
 
-        Returns a numpy array of booleans, with elements that are True iff the manifests' ChunkEntry that this element would reside in is identical between the two arrays.
+        Returns a numpy array of booleans, with elements that are True iff the manifests' chunk that this element would reside in is identical between the two arrays.
         """
         if isinstance(other, (int, float, bool, np.ndarray)):
             # TODO what should this do when comparing against numpy arrays?
@@ -164,17 +163,28 @@ class ManifestArray:
             equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
             equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
 
-            equal_chunks = (
-                equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
-            )
+            equal_chunks = equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
 
-            if not equal_chunks.all():
-                # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
-                return np.full(
-                    shape=self.shape, fill_value=False, dtype=np.dtype(bool)
+            def generate_boolean_subarrays(
+                boolean_element: bool, chunks: tuple[int, ...]
+            ) -> np.ndarray[Any, np.dtype[np.bool]]:  # type: ignore[name-defined]
+                """If a chunk is not equivalent then all elements in it are considered not equal, so repeat the boolean result."""
+                return (
+                    np.repeat(boolean_element, repeats=np.prod(chunks))
+                    .reshape(chunks)
+                    .astype(bool)  # type: ignore[attr-defined]  # TODO do we need this?
                 )
-            else:
-                raise RuntimeWarning("Should not be possible to get here")
+
+            # Replace every chunk in the manifest with the new sub-array of booleans
+            # Create a nested list of subarrays using np.ndindex for general N-dimensional support
+            boolean_subarrays = np.empty(self.manifest.shape_chunk_grid, dtype=object)
+            for idx in np.ndindex(self.manifest.shape_chunk_grid):
+                boolean_subarrays[idx] = generate_boolean_subarrays(
+                    equal_chunks[idx], self.chunks
+                )
+
+            # Use np.block to assemble the subarrays into boolean array of same shape as original ManifestArray
+            return np.block(boolean_subarrays.tolist())
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
@@ -255,29 +265,6 @@ class ManifestArray:
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
-
-
-# Define type for arbitrarily-nested list of lists recursively:
-OBJECT_LIST_HYPERCUBE = Union[Any, List["OBJECT_LIST_HYPERCUBE"]]
-
-
-def _nested_list_from_chunk_keys(chunk_dict: dict[str, Any]) -> OBJECT_LIST_HYPERCUBE:
-    """Takes a mapping of chunk keys to values and returns an n-dimensional nested list containing those values in order."""
-
-    first_key, *other_keys = chunk_dict.keys()
-    ndim = get_ndim_from_key(first_key)
-
-    _chunk_dict = chunk_dict
-    for _ in range(ndim):
-        _chunk_dict = _stack_along_final_dim(_chunk_dict)
-
-    nested_list = _chunk_dict[""]
-    return nested_list
-
-
-def _stack_along_final_dim(d: dict[str, Any]) -> OBJECT_LIST_HYPERCUBE:
-    *other_key_indices, order = split(key)
-    order =  
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):
