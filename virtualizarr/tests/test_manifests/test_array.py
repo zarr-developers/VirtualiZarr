@@ -341,9 +341,13 @@ def test_refuse_combine():
 
 class TestRechunk:
     @pytest.mark.parametrize(
-        "new_chunks, expected_chunks_dict",
+        "shape, chunks_dict, new_chunks, expected_chunks_dict",
         [
             (
+                (2, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+                },
                 (1, 3),
                 {
                     "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
@@ -351,6 +355,10 @@ class TestRechunk:
                 },
             ),
             (
+                (2, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+                },
                 (2, 1),
                 {
                     "0.0": {"path": "foo.nc", "offset": 100, "length": 40},
@@ -359,6 +367,10 @@ class TestRechunk:
                 },
             ),
             (
+                (2, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
+                },
                 (1, 1),
                 {
                     "0.0": {"path": "foo.nc", "offset": 100, "length": 20},
@@ -369,9 +381,23 @@ class TestRechunk:
                     "1.2": {"path": "foo.nc", "offset": 200, "length": 20},
                 },
             ),
+            (
+                (4, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 60},
+                    "1.0": {"path": "foo.nc", "offset": 160, "length": 60},
+                },
+                (1, 3),
+                {
+                    "0.0": {"path": "foo.nc", "offset": 100, "length": 30},
+                    "1.0": {"path": "foo.nc", "offset": 130, "length": 30},
+                    "2.0": {"path": "foo.nc", "offset": 160, "length": 30},
+                    "3.0": {"path": "foo.nc", "offset": 190, "length": 30},
+                },
+            ),
         ],
     )
-    def test_rechunk(self, new_chunks, expected_chunks_dict):
+    def test_rechunk(self, shape, chunks_dict, new_chunks, expected_chunks_dict):
         zarray = ZArray(
             chunks=(2, 3),
             compressor=None,
@@ -379,13 +405,10 @@ class TestRechunk:
             fill_value=0.0,
             filters=None,
             order="C",
-            shape=(2, 3),
+            shape=shape,
             zarr_format=2,
         )
 
-        chunks_dict = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 120},
-        }
         manifest = ChunkManifest(entries=chunks_dict)
         marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
 
