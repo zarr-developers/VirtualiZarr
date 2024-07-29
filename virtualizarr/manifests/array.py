@@ -1,13 +1,12 @@
-import re
 import warnings
-from typing import Any, Tuple, Union
+from typing import Any, Callable, Union
 
 import numpy as np
 
 from ..kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
-from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS
-from .manifest import _CHUNK_KEY, ChunkManifest
+from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS, _isnan
+from .manifest import ChunkManifest
 
 
 class ManifestArray:
@@ -27,8 +26,8 @@ class ManifestArray:
 
     def __init__(
         self,
-        zarray: Union[ZArray, dict],
-        chunkmanifest: Union[dict, ChunkManifest],
+        zarray: ZArray | dict,
+        chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
         Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
@@ -51,33 +50,26 @@ class ManifestArray:
             _chunkmanifest = ChunkManifest(entries=chunkmanifest)
         else:
             raise TypeError(
-                f"chunkmanifest arg must be of type ChunkManifest, but got type {type(chunkmanifest)}"
+                f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
-        # Check that the chunk grid implied by zarray info is consistent with shape implied by chunk keys in manifest
-        if _zarray.shape_chunk_grid != _chunkmanifest.shape_chunk_grid:
-            raise ValueError(
-                f"Inconsistent chunk grid shape between zarray info and manifest: {_zarray.shape_chunk_grid} vs {_chunkmanifest.shape_chunk_grid}"
-            )
+        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
+        # TODO also cover the special case of scalar arrays
 
         self._zarray = _zarray
         self._manifest = _chunkmanifest
 
     @classmethod
-    def from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
-        from virtualizarr.kerchunk import fully_decode_arr_refs
+    def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
+        from virtualizarr.kerchunk import fully_decode_arr_refs, parse_array_refs
 
         decoded_arr_refs = fully_decode_arr_refs(arr_refs)
 
-        zarray = ZArray.from_kerchunk_refs(decoded_arr_refs[".zarray"])
-
-        kerchunk_chunk_dict = {
-            k: v for k, v in decoded_arr_refs.items() if re.match(_CHUNK_KEY, k)
-        }
-        chunkmanifest = ChunkManifest.from_kerchunk_chunk_dict(kerchunk_chunk_dict)
+        chunk_dict, zarray, _zattrs = parse_array_refs(decoded_arr_refs)
+        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
 
         obj = object.__new__(cls)
-        obj._manifest = chunkmanifest
+        obj._manifest = manifest
         obj._zarray = zarray
 
         return obj
@@ -91,7 +83,7 @@ class ManifestArray:
         return self._zarray
 
     @property
-    def chunks(self) -> Tuple[int, ...]:
+    def chunks(self) -> tuple[int, ...]:
         return tuple(self.zarray.chunks)
 
     @property
@@ -111,21 +103,8 @@ class ManifestArray:
     def size(self) -> int:
         return int(np.prod(self.shape))
 
-    @property
-    def T(self) -> "ManifestArray":
-        raise NotImplementedError()
-
     def __repr__(self) -> str:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
-
-    def to_kerchunk_refs(self) -> KerchunkArrRefs:
-        # TODO is there enough information to get the attrs and so on here?
-        raise NotImplementedError()
-
-    def to_zarr(self, store) -> None:
-        raise NotImplementedError(
-            "Requires the chunk manifest ZEP to be formalized before we know what to write out here."
-        )
 
     def __array_function__(self, func, types, args, kwargs) -> Any:
         """
@@ -148,6 +127,8 @@ class ManifestArray:
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
+        if ufunc == np.isnan:
+            return _isnan(self.shape)
         return NotImplemented
 
     def __array__(self) -> np.ndarray:
@@ -164,7 +145,7 @@ class ManifestArray:
 
         Returns a numpy array of booleans, with elements that are True iff the manifests' ChunkEntry that this element would reside in is identical between the two arrays.
         """
-        if isinstance(other, (int, float, bool)):
+        if isinstance(other, (int, float, bool, np.ndarray)):
             # TODO what should this do when comparing against numpy arrays?
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         elif not isinstance(other, ManifestArray):
@@ -178,38 +159,25 @@ class ManifestArray:
         if self.zarray != other.zarray:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
-            # do full element-wise comparison
-
             # do chunk-wise comparison
-            boolean_chunk_dict = {
-                key: entry1 == entry2
-                for key, entry1, entry2 in zip(
-                    self.manifest.entries.keys(),
-                    self.manifest.entries.values(),
-                    other.manifest.entries.values(),
+            equal_chunk_paths = self.manifest._paths == other.manifest._paths
+            equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
+            equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
+
+            equal_chunks = (
+                equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
+            )
+
+            if not equal_chunks.all():
+                # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
+                return np.full(
+                    shape=self.shape, fill_value=False, dtype=np.dtype(bool)
                 )
-            }
-
-            # replace per-chunk booleans with numpy arrays of booleans of the shape of each chunk
-            array_boolean_chunk_dict = {
-                key: np.full(
-                    shape=self.chunks, fill_value=bool_val, dtype=np.dtype(bool)
-                )
-                for key, bool_val in boolean_chunk_dict
-            }
-
-            # assemble chunk-wise boolean blocks into an n-dimensional nested list
-            nested_list = _nested_list_from_chunk_keys(array_boolean_chunk_dict)
-
-            # assemble into the full result
-            result = np.block(nested_list)
-
-            # trim off any extra elements due to the final zarr chunk potentially having a different size
-            indexer = tuple([slice(None, length) for length in self.shape])
-            return result[indexer]
+            else:
+                raise RuntimeWarning("Should not be possible to get here")
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
-        """Needed because xarray will call this even when it's a no-op"""
+        """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
         if dtype != self.dtype:
             raise NotImplementedError()
         else:
@@ -247,6 +215,46 @@ class ManifestArray:
             return self
         else:
             raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+
+    def rename_paths(
+        self,
+        new: str | Callable[[str], str],
+    ) -> "ManifestArray":
+        """
+        Rename paths to chunks in this array's manifest.
+
+        Accepts either a string, in which case this new path will be used for all chunks, or
+        a function which accepts the old path and returns the new path.
+
+        Parameters
+        ----------
+        new
+            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
+
+        Returns
+        -------
+        ManifestArray
+
+        Examples
+        --------
+        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
+
+        >>> def local_to_s3_url(old_local_path: str) -> str:
+        ...     from pathlib import Path
+        ...
+        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
+        ...
+        ...     filename = Path(old_local_path).name
+        ...     return str(new_s3_bucket_url / filename)
+
+        >>> marr.rename_paths(local_to_s3_url)
+
+        See Also
+        --------
+        ChunkManifest.rename_paths
+        """
+        renamed_manifest = self.manifest.rename_paths(new)
+        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
 
 
 # Define type for arbitrarily-nested list of lists recursively:

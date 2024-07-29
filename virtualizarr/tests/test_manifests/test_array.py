@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import create_manifestarray
 from virtualizarr.zarr import ZArray
 
 
@@ -18,7 +19,7 @@ class TestManifestArray:
         shape = (5, 2, 20)
         zarray = ZArray(
             chunks=chunks,
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -34,41 +35,30 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
-    def test_create_invalid_manifestarray(self):
-        chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        }
-        manifest = ChunkManifest(entries=chunks_dict)
-        chunks = (5, 1, 10)
-        shape = (5, 2, 20)
-        zarray = ZArray(
-            chunks=chunks,
-            compressor="zlib",
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=shape,
-            zarr_format=2,
-        )
-
-        with pytest.raises(ValueError, match="Inconsistent chunk grid shape"):
-            ManifestArray(zarray=zarray, chunkmanifest=manifest)
-
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
             "0.0": ["test1.nc", 6144, 48],
         }
-        marr = ManifestArray.from_kerchunk_refs(arr_refs)
+        marr = ManifestArray._from_kerchunk_refs(arr_refs)
 
         assert marr.shape == (2, 3)
         assert marr.chunks == (2, 3)
         assert marr.dtype == np.dtype("int64")
         assert marr.zarray.compressor is None
-        assert marr.zarray.fill_value is None
+        assert marr.zarray.fill_value is np.nan
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
+
+    def test_create_scalar_manifestarray_from_kerchunk_refs(self):
+        arr_refs = {
+            ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}',
+            "0": ["test1.nc", 6144, 48],
+        }
+        marr = ManifestArray._from_kerchunk_refs(arr_refs)
+
+        assert marr.shape == ()
+        assert marr.chunks == ()
 
 
 class TestEquals:
@@ -84,7 +74,7 @@ class TestEquals:
         shape = (5, 2, 20)
         zarray = ZArray(
             chunks=chunks,
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -105,7 +95,7 @@ class TestEquals:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(5, 1, 10),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -130,8 +120,86 @@ class TestEquals:
         assert not (marr1 == marr2).all()
 
     @pytest.mark.skip(reason="Not Implemented")
-    def test_partly_equals(self):
-        ...
+    def test_partly_equals(self): ...
+
+
+class TestBroadcast:
+    def test_broadcast_existing_axis(self):
+        marr = create_manifestarray(shape=(1, 2), chunks=(1, 2))
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.chunks == (1, 2)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "1.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+            "2.0": {"path": "file.0.0.nc", "offset": 0, "length": 5},
+        }
+
+    def test_broadcast_new_axis(self):
+        marr = create_manifestarray(shape=(3,), chunks=(1,))
+        expanded = np.broadcast_to(marr, shape=(1, 3))
+        assert expanded.shape == (1, 3)
+        assert expanded.chunks == (1, 1)
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "file.0.nc", "offset": 0, "length": 5},
+            "0.1": {"path": "file.1.nc", "offset": 10, "length": 6},
+            "0.2": {"path": "file.2.nc", "offset": 20, "length": 7},
+        }
+
+    def test_broadcast_scalar(self):
+        # regression test
+        marr = create_manifestarray(shape=(), chunks=())
+        assert marr.shape == ()
+        assert marr.chunks == ()
+        assert marr.manifest.dict() == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
+
+        expanded = np.broadcast_to(marr, shape=(1,))
+        assert expanded.shape == (1,)
+        assert expanded.chunks == (1,)
+        assert expanded.manifest.dict() == {
+            "0": {"path": "file.0.nc", "offset": 0, "length": 5},
+        }
+
+    @pytest.mark.parametrize(
+        "shape, chunks, target_shape",
+        [
+            ((1,), (1,), ()),
+            ((2,), (1,), (1,)),
+            ((3,), (2,), (5, 4, 4)),
+            ((3, 2), (2, 2), (2, 3, 4)),
+        ],
+    )
+    def test_raise_on_invalid_broadcast_shapes(self, shape, chunks, target_shape):
+        marr = create_manifestarray(shape=shape, chunks=chunks)
+        with pytest.raises(ValueError):
+            np.broadcast_to(marr, shape=target_shape)
+
+    # TODO replace this parametrization with hypothesis strategies
+    @pytest.mark.parametrize(
+        "shape, chunks, target_shape",
+        [
+            ((1,), (1,), (3,)),
+            ((2,), (1,), (2,)),
+            ((3,), (2,), (5, 4, 3)),
+            ((3, 1), (2, 1), (2, 3, 4)),
+        ],
+    )
+    def test_broadcast_any_shape(self, shape, chunks, target_shape):
+        marr = create_manifestarray(shape=shape, chunks=chunks)
+
+        # do the broadcasting
+        broadcasted_marr = np.broadcast_to(marr, shape=target_shape)
+
+        # check that the resultant shape is correct
+        assert broadcasted_marr.shape == target_shape
+
+        # check that chunk shape has plausible ndims and lengths
+        broadcasted_chunk_shape = broadcasted_marr.chunks
+        assert len(broadcasted_chunk_shape) == broadcasted_marr.ndim
+        for len_arr, len_chunk in zip(broadcasted_marr.shape, broadcasted_chunk_shape):
+            assert len_chunk <= len_arr
 
 
 # TODO we really need some kind of fixtures to generate useful example data
@@ -141,7 +209,7 @@ class TestConcat:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(5, 1, 10),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -186,7 +254,7 @@ class TestStack:
         # both manifest arrays in this example have the same zarray properties
         zarray = ZArray(
             chunks=(5, 10),
-            compressor="zlib",
+            compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
             fill_value=0.0,
             filters=None,
@@ -231,7 +299,7 @@ def test_refuse_combine():
 
     zarray_common = {
         "chunks": (5, 1, 10),
-        "compressor": "zlib",
+        "compressor": {"id": "zlib", "level": 1},
         "dtype": np.dtype("int32"),
         "fill_value": 0.0,
         "filters": None,
@@ -242,28 +310,30 @@ def test_refuse_combine():
     chunks_dict1 = {
         "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
     }
+    chunkmanifest1 = ChunkManifest(entries=chunks_dict1)
     chunks_dict2 = {
         "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
     }
-    marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunks_dict1)
+    chunkmanifest2 = ChunkManifest(entries=chunks_dict2)
+    marr1 = ManifestArray(zarray=zarray_common, chunkmanifest=chunkmanifest1)
 
     zarray_wrong_compressor = zarray_common.copy()
     zarray_wrong_compressor["compressor"] = None
-    marr2 = ManifestArray(zarray=zarray_wrong_compressor, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_compressor, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
     zarray_wrong_dtype = zarray_common.copy()
     zarray_wrong_dtype["dtype"] = np.dtype("int64")
-    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
 
     zarray_wrong_dtype = zarray_common.copy()
     zarray_wrong_dtype["dtype"] = np.dtype("int64")
-    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunks_dict2)
+    marr2 = ManifestArray(zarray=zarray_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)

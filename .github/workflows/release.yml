@@ -1,0 +1,98 @@
+name: Build distribution
+on:
+  release:
+    types:
+      - published
+  # push:
+  #   branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-artifacts:
+    runs-on: ubuntu-latest
+    if: github.repository == 'zarr-developers/VirtualiZarr'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5.0.0
+        name: Install Python
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install setuptools setuptools-scm wheel twine check-manifest
+          git clean -xdf
+          git restore -SW .
+      - name: Build tarball and wheels
+        run: |
+          python -m build --sdist --wheel .
+      - name: Check built artifacts
+        run: |
+          python -m twine check --strict dist/*
+          pwd
+          if [ -f dist/virtualizarr-unknown.tar.gz ]; then
+            echo "❌ INVALID VERSION NUMBER"
+            exit 1
+          else
+            echo "✅ Looks good"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: releases
+          path: dist
+
+  test-built-dist:
+    needs: build-artifacts
+    runs-on: ubuntu-latest
+    environment:
+      name: test-release
+      url: https://test.pypi.org/p/virtualizarr
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-python@v5.0.0
+        name: Install Python
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: releases
+          path: dist
+      - name: List contents of built dist
+        run: |
+          ls -ltrh
+          ls -ltrh dist
+      - name: Verify the built dist/wheel is valid
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/virtualizarr*.whl
+          python -c "import virtualizarr; print(virtualizarr.__version__)"
+      - name: Publish package to TestPyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@v1.8.14
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # verbose: true
+
+  upload-to-pypi:
+    needs: test-built-dist
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/p/virtualizarr
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: releases
+          path: dist
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.8.14
