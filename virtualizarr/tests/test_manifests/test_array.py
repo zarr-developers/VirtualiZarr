@@ -119,8 +119,47 @@ class TestEquals:
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
         assert not (marr1 == marr2).all()
 
-    @pytest.mark.skip(reason="Not Implemented")
-    def test_partly_equals(self): ...
+    def test_partly_equals(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 1, 10),
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 1, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "bar.nc", "offset": 200, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+
+        expected = np.concatenate(
+            [
+                np.repeat(True, np.prod(marr1.zarray.chunks)).reshape(
+                    marr1.zarray.chunks
+                ),
+                np.repeat(False, np.prod(marr1.zarray.chunks)).reshape(
+                    marr1.zarray.chunks
+                ),
+            ],
+            axis=2,
+        )
+
+        comparison = marr1 == marr2
+        assert (comparison == expected).all()
 
 
 class TestBroadcast:
