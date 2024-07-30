@@ -419,6 +419,32 @@ class TestLoadVirtualDataset:
         }
         mock_read_kerchunk.assert_called_once_with(**args)
 
+    @patch("virtualizarr.kerchunk.parse_array_refs")
+    def test_open_dataset_with_scalars(self, mock_parse_array_refs, tmpdir):
+        expected_attrs = {"units": "K", "long_name": "scalar"}
+        mock_parse_array_refs.return_value = (
+            None,
+            ZArray(
+                chunks=(),
+                shape=(),
+                compressor={},
+                dtype=np.dtype("float32"),
+                fill_value=0.0,
+                filters=None,
+                order="C",
+                zarr_format=2,
+            ),
+            {**expected_attrs, **{"_ARRAY_DIMENSIONS": []}},
+        )
+
+        ds = xr.Dataset()
+        ds["scalar"] = xr.Variable(dims=(), data=None, attrs=expected_attrs)
+        ds.to_netcdf(f"{tmpdir}/scalar.nc")
+        vds = open_virtual_dataset(f"{tmpdir}/scalar.nc")
+        assert vds.scalar.dims == ()
+        assert vds.scalar.data == 0.0
+        assert vds.scalar.attrs == expected_attrs
+
 
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file):
