@@ -140,7 +140,7 @@ class TestKerchunkRoundtrip:
         # regression test for GH issue #105
 
         # set up example xarray dataset containing non-dimension coordinate variables
-        ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6).reshape(2, 3))})
+        ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6.0).reshape(2, 3))})
 
         # save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")

@@ -49,9 +49,9 @@ def create_manifestarray(
 
     zarray = ZArray(
         chunks=chunks,
-        compressor="zlib",
+        compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
         dtype=np.dtype("float32"),
-        fill_value=0.0,  # TODO change this to NaN?
+        fill_value=0.0,
         filters=None,
         order="C",
         shape=shape,

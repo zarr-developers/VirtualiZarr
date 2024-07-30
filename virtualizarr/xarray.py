@@ -10,6 +10,7 @@ from typing import (
 
 import ujson  # type: ignore
 import xarray as xr
+from upath import UPath
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
 from xarray.coding.times import CFDatetimeCoder
@@ -125,9 +126,14 @@ def open_virtual_dataset(
         )
     else:
         if reader_options is None:
-            reader_options = {
-                "storage_options": {"key": "", "secret": "", "anon": True}
-            }
+            universal_filepath = UPath(filepath)
+            protocol = universal_filepath.protocol
+            if protocol == "s3":
+                reader_options = {
+                    "storage_options": {"key": "", "secret": "", "anon": True}
+                }
+            else:
+                reader_options = {}
 
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?

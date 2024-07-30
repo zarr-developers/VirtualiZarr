@@ -12,6 +12,9 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- Serialize valid ZarrV3 metadata and require full compressor numcodec config (for :pull:`193`)
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Deprecations
 ~~~~~~~~~~~~
 
