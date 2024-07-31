@@ -67,7 +67,7 @@ class ZArray(BaseModel):
     chunks: tuple[int, ...]
     compressor: dict | None = None
     dtype: np.dtype
-    fill_value: FillValueT = Field(default=0.0, validate_default=True)
+    fill_value: FillValueT = Field(default=np.nan, validate_default=True)
     filters: list[dict] | None = None
     order: Literal["C", "F"]
     shape: tuple[int, ...]
