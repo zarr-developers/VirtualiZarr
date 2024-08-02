@@ -52,6 +52,15 @@ def test_metadata_roundtrip(tmpdir, vds_with_manifest_arrays: xr.Dataset):
     assert zarray == vds_with_manifest_arrays.a.data.zarray
 
 
+def test_uncompressed_variable_roundtrips(tmpdir, vds_with_manifest_arrays):
+    vds_with_manifest_arrays.a.data.zarray.compressor = None
+    vds_with_manifest_arrays.a.data.zarray.filters = None
+    dataset_to_zarr(vds_with_manifest_arrays, tmpdir / "store.zarr")
+    vds = open_virtual_dataset(tmpdir / "store.zarr", filetype="zarr_v3", indexes={})
+    assert vds.a.data.zarray.compressor is None
+    assert vds.a.data.zarray.filters is None
+
+
 def test_zarr_v3_metadata_conformance(tmpdir, vds_with_manifest_arrays: xr.Dataset):
     """
     Checks that the output metadata of an array variable conforms to this spec
