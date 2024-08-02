@@ -9,6 +9,9 @@ v1.0.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Load scalar variables by default. (:pull:`205`)
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
