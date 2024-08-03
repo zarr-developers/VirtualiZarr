@@ -368,9 +368,14 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
         for codec in metadata["codecs"]
         if codec["name"] not in ("transpose", "bytes")
     ]
-    compressor, *filters = [
+    num_codec_configs = [
         _configurable_to_num_codec_config(_filter) for _filter in all_codecs
     ]
+    # Uncompressed variables may have no codecs
+    if num_codec_configs:
+        compressor, *filters = num_codec_configs
+    else:
+        compressor, filters = None, []
     zarray = ZArray(
         chunks=chunk_shape,
         compressor=compressor,
