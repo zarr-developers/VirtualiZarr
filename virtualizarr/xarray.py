@@ -43,9 +43,7 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    reader_options: Optional[dict] = {
-        "storage_options": {"key": "", "secret": "", "anon": True}
-    },
+    reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -60,7 +58,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'dmrpp'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
@@ -343,13 +341,16 @@ def variable_from_kerchunk_refs(
 
     arr_refs = kerchunk.extract_array_refs(refs, var_name)
     chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-
-    manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
-
-    varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    if chunk_dict:
+        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    else:
+        # This means we encountered a scalar variable of dimension 0,
+        # very likely that it actually has no numeric value and its only purpose
+        # is to communicate dataset attributes.
+        varr = zarray.fill_value
 
     return xr.Variable(data=varr, dims=dims, attrs=zattrs)
 
