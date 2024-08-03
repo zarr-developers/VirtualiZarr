@@ -58,7 +58,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
+        Can be one of {'netcdf3', 'netcdf4', 'hdf4', 'tiff', 'grib', 'fits', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
