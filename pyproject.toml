@@ -45,6 +45,7 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
+    "h5py"
 ]
 
 
