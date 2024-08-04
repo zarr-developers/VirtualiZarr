@@ -42,6 +42,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+    zarr_v3 = auto()
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -223,7 +224,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     all_arr_refs = {}
     for var_name, var in ds.variables.items():
-        arr_refs = variable_to_kerchunk_arr_refs(var, var_name)
+        arr_refs = variable_to_kerchunk_arr_refs(var, str(var_name))
 
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
@@ -233,7 +234,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     zattrs = ds.attrs
     if ds.coords:
-        coord_names = list(ds.coords)
+        coord_names = [str(x) for x in ds.coords]
         # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
         # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
         zattrs["coordinates"] = " ".join(coord_names)

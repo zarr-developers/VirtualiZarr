@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import (
+    cast,
     TYPE_CHECKING,
     Any,
     Literal,
@@ -31,6 +32,7 @@ ZAttrs = NewType(
     "ZAttrs", dict[str, Any]
 )  # just the .zattrs (for one array or for the whole store/group)
 FillValueT = bool | str | float | int | list | None
+ZARR_FORMAT = Literal[2, 3]
 
 ZARR_DEFAULT_FILL_VALUE: dict[np.dtype, FillValueT] = {
     # numpy dtypes's hierarchy lets us avoid checking for all the widths
@@ -71,7 +73,7 @@ class ZArray(BaseModel):
     filters: list[dict] | None = None
     order: Literal["C", "F"]
     shape: tuple[int, ...]
-    zarr_format: Literal[2, 3] = 2
+    zarr_format: ZARR_FORMAT = 2
 
     @field_validator("dtype")
     @classmethod
@@ -109,6 +111,11 @@ class ZArray(BaseModel):
             fill_value = np.nan
 
         compressor = decoded_arr_refs_zarray["compressor"]
+        zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
+        if zarr_format not in (2, 3):
+            raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+        
+
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=compressor,
@@ -117,10 +124,10 @@ class ZArray(BaseModel):
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
-            zarr_format=int(decoded_arr_refs_zarray["zarr_format"]),
+            zarr_format=cast(ZARR_FORMAT, zarr_format),
         )
 
-    def dict(self) -> dict[str, Any]:
+    def dict(self) -> dict[str, Any]:  # type: ignore
         zarray_dict = dict(self)
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
         return zarray_dict
@@ -134,7 +141,7 @@ class ZArray(BaseModel):
     def replace(
         self,
         chunks: Optional[tuple[int, ...]] = None,
-        compressor: Optional[dict] = None,
+        compressor: Optional[__builtins__.dict] = None,
         dtype: Optional[np.dtype] = None,
         fill_value: Optional[float] = None,  # float or int?
         filters: Optional[list[dict]] = None,  # type: ignore[valid-type]
@@ -250,7 +257,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         group_metadata_file.write(json_dumps(group_metadata))
 
     for name, var in ds.variables.items():
-        array_dir = _storepath / name
+        array_dir = _storepath / str(name)
         marr = var.data
 
         # TODO move this check outside the writing loop so we don't write an incomplete store on failure?
@@ -286,7 +293,7 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
 
     marr.manifest.to_zarr_json(array_dir / "manifest.json")
 
-    metadata = zarr_v3_array_metadata(marr.zarray, list(var.dims), var.attrs)
+    metadata = zarr_v3_array_metadata(marr.zarray, [str(x) for x in var.dims], var.attrs)
     with open(array_dir / "zarr.json", "wb") as metadata_file:
         metadata_file.write(json_dumps(metadata))
 
