@@ -1,3 +1,4 @@
+import dataclasses
 import json
 from pathlib import Path
 from typing import (
@@ -12,14 +13,6 @@ import numcodecs
 import numpy as np
 import ujson  # type: ignore
 import xarray as xr
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_validator,
-    model_validator,
-)
-from typing_extensions import Self
 
 from virtualizarr.vendor.zarr.utils import json_dumps
 
@@ -47,38 +40,26 @@ https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
 """
 
 
-class Codec(BaseModel):
+@dataclasses.dataclass
+class Codec:
     compressor: dict | None = None
     filters: list[dict] | None = None
 
-    def __repr__(self) -> str:
-        return f"Codec(compressor={self.compressor}, filters={self.filters})"
 
-
-class ZArray(BaseModel):
+@dataclasses.dataclass
+class ZArray:
     """Just the .zarray information"""
 
     # TODO will this work for V3?
 
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,  # only here so pydantic doesn't complain about the numpy dtype field
-    )
-
-    chunks: tuple[int, ...]
-    compressor: dict | None = None
-    dtype: np.dtype
-    fill_value: FillValueT = Field(default=0.0, validate_default=True)
-    filters: list[dict] | None = None
-    order: Literal["C", "F"]
     shape: tuple[int, ...]
+    chunks: tuple[int, ...]
+    dtype: np.dtype
+    fill_value: FillValueT = dataclasses.field(default=0.0)
+    order: Literal["C", "F"] = "C"
+    compressor: dict | None = None
+    filters: list[dict] | None = None
     zarr_format: Literal[2, 3] = 2
-
-    @field_validator("dtype")
-    @classmethod
-    def validate_dtype(cls, dtype) -> np.dtype:
-        # Your custom validation logic here
-        # Convert numpy.dtype to a format suitable for Pydantic
-        return np.dtype(dtype)
 
     def __post_init__(self) -> None:
         if len(self.shape) != len(self.chunks):
@@ -87,19 +68,17 @@ class ZArray(BaseModel):
                 f"Array shape {self.shape} has ndim={self.shape} but chunk shape {self.chunks} has ndim={len(self.chunks)}"
             )
 
-    @model_validator(mode="after")
-    def _check_fill_value(self) -> Self:
+        if isinstance(self.dtype, str):
+            # Convert dtype string to numpy.dtype
+            self.dtype = np.dtype(self.dtype)
+
         if self.fill_value is None:
             self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype, 0.0)
-        return self
 
     @property
     def codec(self) -> Codec:
         """For comparison against other arrays."""
         return Codec(compressor=self.compressor, filters=self.filters)
-
-    def __repr__(self) -> str:
-        return f"ZArray(shape={self.shape}, chunks={self.chunks}, dtype={self.dtype}, compressor={self.compressor}, filters={self.filters}, fill_value={self.fill_value})"
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
@@ -121,7 +100,7 @@ class ZArray(BaseModel):
         )
 
     def dict(self) -> dict[str, Any]:
-        zarray_dict = dict(self)
+        zarray_dict = dataclasses.asdict(self)
         zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
         return zarray_dict
 
@@ -133,28 +112,12 @@ class ZArray(BaseModel):
 
     def replace(
         self,
-        chunks: Optional[tuple[int, ...]] = None,
-        compressor: Optional[dict] = None,
-        dtype: Optional[np.dtype] = None,
-        fill_value: Optional[float] = None,  # float or int?
-        filters: Optional[list[dict]] = None,  # type: ignore[valid-type]
-        order: Optional[Literal["C"] | Literal["F"]] = None,
-        shape: Optional[tuple[int, ...]] = None,
-        zarr_format: Optional[Literal[2] | Literal[3]] = None,
+        **kwargs: Any,
     ) -> "ZArray":
         """
         Convenience method to create a new ZArray from an existing one by altering only certain attributes.
         """
-        return ZArray(
-            chunks=chunks if chunks is not None else self.chunks,
-            compressor=compressor if compressor is not None else self.compressor,
-            dtype=dtype if dtype is not None else self.dtype,
-            fill_value=fill_value if fill_value is not None else self.fill_value,
-            filters=filters if filters is not None else self.filters,
-            shape=shape if shape is not None else self.shape,
-            order=order if order is not None else self.order,
-            zarr_format=zarr_format if zarr_format is not None else self.zarr_format,
-        )
+        return dataclasses.replace(self, **kwargs)
 
     def _v3_codec_pipeline(self) -> list:
         """
@@ -352,8 +315,8 @@ def metadata_from_zarr_json(filepath: Path) -> tuple[ZArray, list[str], dict]:
     attrs = metadata.pop("attributes")
     dim_names = metadata.pop("dimension_names")
 
-    chunk_shape = metadata["chunk_grid"]["configuration"]["chunk_shape"]
-    shape = metadata["shape"]
+    chunk_shape = tuple(metadata["chunk_grid"]["configuration"]["chunk_shape"])
+    shape = tuple(metadata["shape"])
     zarr_format = metadata["zarr_format"]
 
     if metadata["fill_value"] is None:

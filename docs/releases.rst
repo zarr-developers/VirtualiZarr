@@ -17,6 +17,9 @@ Breaking changes
 
 - Serialize valid ZarrV3 metadata and require full compressor numcodec config (for :pull:`193`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+- VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclasses `zarr.Array`, no longer inherit from `pydantic.BaseModel` (:pull:`xxx`)
+- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
+
 
 Deprecations
 ~~~~~~~~~~~~

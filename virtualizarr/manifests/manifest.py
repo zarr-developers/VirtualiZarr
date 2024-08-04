@@ -1,10 +1,10 @@
+import dataclasses
 import json
 import re
 from collections.abc import Iterable, Iterator
 from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
 from upath import UPath
 
 from virtualizarr.types import ChunkKey
@@ -25,21 +25,17 @@ class ChunkDictEntry(TypedDict):
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
-class ChunkEntry(BaseModel):
+@dataclasses.dataclass(frozen=True)
+class ChunkEntry:
     """
     Information for a single chunk in the manifest.
 
     Stored in the form `{"path": "s3://bucket/foo.nc", "offset": 100, "length": 100}`.
     """
 
-    model_config = ConfigDict(frozen=True)
-
     path: str  # TODO stricter typing/validation of possible local / remote paths?
     offset: int
     length: int
-
-    def __repr__(self) -> str:
-        return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
 
     @classmethod
     def from_kerchunk(
@@ -58,7 +54,7 @@ class ChunkEntry(BaseModel):
         return (self.path, self.offset, self.length)
 
     def dict(self) -> ChunkDictEntry:
-        return ChunkDictEntry(path=self.path, offset=self.offset, length=self.length)
+        return dataclasses.asdict(self)
 
 
 class ChunkManifest:

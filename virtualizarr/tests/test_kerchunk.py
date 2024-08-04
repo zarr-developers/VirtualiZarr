@@ -94,7 +94,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
             },
@@ -133,7 +133,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
             },
