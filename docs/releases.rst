@@ -12,6 +12,9 @@ New Features
 - Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
   By `Ayush Nag <https://github.com/ayushnag>`_.
 
+- Load scalar variables by default. (:pull:`205`)
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
