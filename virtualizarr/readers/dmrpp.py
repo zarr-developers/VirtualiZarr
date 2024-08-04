@@ -14,9 +14,12 @@ from virtualizarr.zarr import ZArray
 
 class DMRParser:
     """
-    Parses a DMR++ file and creates a virtual xr.Dataset.
-    Handles groups, dimensions, coordinates, data variables, encoding, chunk manifests, and attributes.
-    Highly modular to allow support for older dmrpp schema versions
+    Parser for the OPeNDAP DMR++ XML format.
+    Reads groups, dimensions, coordinates, data variables, encoding, chunk manifests, and attributes.
+    Highly modular to allow support for older dmrpp schema versions. Includes many utility functions to extract
+    different information such as finding all variable tags, splitting hdf5 groups, parsing dimensions, and more.
+
+    OPeNDAP DMR++ homepage: https://docs.opendap.org/index.php/DMR%2B%2B
     """
 
     # DAP and DMRPP XML namespaces
@@ -66,7 +69,7 @@ class DMRParser:
 
     def parse_dataset(self, group=None) -> xr.Dataset:
         """
-        Parse the dataset from the dmrpp file
+        Parses the given file and creates a virtual xr.Dataset with ManifestArrays.
 
         Parameters
         ----------
@@ -77,6 +80,29 @@ class DMRParser:
         Returns
         -------
         An xr.Dataset wrapping virtualized zarr arrays.
+
+        Examples
+        --------
+        Open a sample DMR++ file and parse the dataset
+
+        >>> import requests
+        >>> r = requests.get("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp")
+        >>> parser = DMRParser(r.text)
+        >>> vds = parser.parse_dataset()
+        >>> vds
+        <xarray.Dataset> Size: 4MB
+            Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
+            Dimensions without coordinates: phony_dim_0, phony_dim_1, phony_dim_2
+            Data variables:
+                d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
+
+        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp", indexes={})
+        >>> vds2
+        <xarray.Dataset> Size: 4MB
+            Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
+            Dimensions without coordinates: phony_dim_0, phony_dim_1, phony_dim_2
+            Data variables:
+                d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
         """
         if group is not None:
             # group = "/" + group.strip("/")  # ensure group is in form "/a/b"
@@ -191,7 +217,7 @@ class DMRParser:
                 attrs.update(self._parse_attribute(attr_tag))
         if group in all_groups:
             # replace aliased variable names with original names: gt1r_heights -> heights
-            orignames = self.find_original_names(all_groups[group])
+            orignames = self._find_original_names(all_groups[group])
             vds = self._parse_dataset(all_groups[group])
             # Only one group so found attrs are global attrs
             if len(all_groups) == 1:
@@ -199,7 +225,7 @@ class DMRParser:
             return vds.rename(orignames)
         raise ValueError(f"Group {group} not found in HDF5 DMR file")
 
-    def find_original_names(self, root: ET.Element) -> dict[str, str]:
+    def _find_original_names(self, root: ET.Element) -> dict[str, str]:
         orignames: dict[str, str] = {}
         vars_tags: list[ET.Element] = []
         for dap_dtype in self._dap_np_dtype:

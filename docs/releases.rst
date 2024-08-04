@@ -9,6 +9,9 @@ v1.0.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 

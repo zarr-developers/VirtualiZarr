@@ -66,3 +66,14 @@ VirtualiZarr's :py:class:`~virtualizarr.ManifestArray` objects support a limited
     stack
     expand_dims
     broadcast_to
+
+Readers
+=======
+
+.. currentmodule:: virtualizarr.readers.dmrpp
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    DMRParser
+    DMRParser.parse_dataset
