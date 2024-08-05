@@ -42,6 +42,7 @@ jobs:
 
       - name: Install virtualizarr
         run: |
+           uv pip install --system '.'
            uv pip install --system '.[test]'
 
       - name: Running Tests
