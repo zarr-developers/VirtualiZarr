@@ -4,6 +4,9 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests.array import ManifestArray
+from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.zarr import ZArray
 
 
 @pytest.mark.parametrize(
@@ -165,6 +168,50 @@ class TestKerchunkRoundtrip:
 
         # assert equal to original dataset
         xrt.assert_identical(roundtrip, ds)
+
+    def test_datetime64_dtype_fill_value(self, tmpdir, format):
+        chunks_dict = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        chunks = (1, 1, 1)
+        shape = (1, 1, 1)
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("<M8[ns]"),
+            # fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        ds = xr.Dataset(
+            {
+                "a": xr.DataArray(
+                    marr1,
+                    attrs={
+                        "_FillValue": np.datetime64("1970-01-01T00:00:00.000000000")
+                    },
+                )
+            }
+        )
+
+        if format == "dict":
+            # write those references to an in-memory kerchunk-formatted references dictionary
+            ds_refs = ds.virtualize.to_kerchunk(format=format)
+
+            # use fsspec to read the dataset from the kerchunk references dict
+            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk")
+        else:
+            # write those references to disk as kerchunk references format
+            ds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+            # use fsspec to read the dataset from disk via the kerchunk references
+            roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
+
+        assert roundtrip.a.attrs == ds.a.attrs
 
 
 def test_open_scalar_variable(tmpdir):

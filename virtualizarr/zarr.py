@@ -39,7 +39,7 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     np.dtype("int").kind: 0,
     np.dtype("float").kind: 0.0,
     np.dtype("complex").kind: [0.0, 0.0],
-    np.dtype("datetime64").kind: np.datetime64("NaT").view("i8").item(),
+    np.dtype("datetime64").kind: 0,
 }
 """
 The value and format of the fill_value depend on the `data_type` of the array.
