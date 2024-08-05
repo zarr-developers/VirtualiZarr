@@ -46,7 +46,6 @@ test = [
     "s3fs",
     "fastparquet",
     "h5py",
-    "hdf5",
     "tifffile",
     "astropy"
 
