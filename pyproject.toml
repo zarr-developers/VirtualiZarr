@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.06.0",
+    "xarray>=2024.6.0",
     "kerchunk>=0.2.5",
     "h5netcdf",
     "pydantic",
@@ -45,7 +45,11 @@ test = [
     "fsspec",
     "s3fs",
     "fastparquet",
-    "h5py"
+    "h5py",
+    "hdf5",
+    "tifffile",
+    "astropy"
+
 ]
 
 
