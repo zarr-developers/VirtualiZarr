@@ -7,7 +7,7 @@ import xarray.testing as xrt
 
 from virtualizarr import ManifestArray, open_virtual_dataset
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.zarr import dataset_to_zarr, metadata_from_zarr_json, ZArray
+from virtualizarr.zarr import ZArray, dataset_to_zarr, metadata_from_zarr_json
 
 
 @pytest.fixture
@@ -87,6 +87,7 @@ def test_replace_partial():
     assert result == expected
     assert result.shape == (2, 3)
     assert result.chunks == (2, 3)
+
 
 def test_replace_total():
     arr = ZArray(shape=(2, 3), chunks=(1, 1), dtype=np.dtype("<i8"))

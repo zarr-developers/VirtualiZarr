@@ -4,10 +4,8 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Literal,
     NewType,
-    Optional,
 )
 
 import numcodecs
