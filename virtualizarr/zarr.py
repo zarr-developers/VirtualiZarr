@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 from typing import (
-    cast,
     TYPE_CHECKING,
     Any,
     Literal,
     NewType,
     Optional,
+    cast,
 )
 
 import numcodecs
@@ -115,7 +115,6 @@ class ZArray(BaseModel):
         zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
         if zarr_format not in (2, 3):
             raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
-        
 
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
@@ -294,7 +293,9 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
 
     marr.manifest.to_zarr_json(array_dir / "manifest.json")
 
-    metadata = zarr_v3_array_metadata(marr.zarray, [str(x) for x in var.dims], var.attrs)
+    metadata = zarr_v3_array_metadata(
+        marr.zarray, [str(x) for x in var.dims], var.attrs
+    )
     with open(array_dir / "zarr.json", "wb") as metadata_file:
         metadata_file.write(json_dumps(metadata))
 

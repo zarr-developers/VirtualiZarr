@@ -6,9 +6,9 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import ManifestArray, open_virtual_dataset
+from virtualizarr.kerchunk import FileType
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.zarr import dataset_to_zarr, metadata_from_zarr_json
-from virtualizarr.kerchunk import FileType
 
 
 @pytest.fixture

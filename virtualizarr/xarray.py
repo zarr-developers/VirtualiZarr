@@ -1,7 +1,7 @@
-from io import BufferedIOBase
 import os
 import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
+from io import BufferedIOBase
 from pathlib import Path
 from typing import (
     Any,
@@ -31,7 +31,6 @@ from virtualizarr.zarr import (
     dataset_to_zarr,
     metadata_from_zarr_json,
 )
-
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 

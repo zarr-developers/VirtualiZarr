@@ -303,7 +303,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
-            fill_value=None
+            fill_value=None,
         )
 
     zarray_dict = zarray.to_kerchunk_json()
