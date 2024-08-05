@@ -1,7 +1,7 @@
 import h5py
 import pytest
 import xarray as xr
-import netCDF4 # type: ignore
+
 
 def pytest_addoption(parser):
     """Add command-line flags for pytest."""
@@ -27,7 +27,7 @@ def netcdf4_file(tmpdir):
 
     # Save it to disk as netCDF (in temporary directory)
     filepath = f"{tmpdir}/air.nc"
-    ds.to_netcdf(filepath, format="NETCDF4", engine='netcdf4')
+    ds.to_netcdf(filepath, format="NETCDF4")
     ds.close()
 
     return filepath
@@ -45,8 +45,8 @@ def netcdf4_files(tmpdir):
     # Save it to disk as netCDF (in temporary directory)
     filepath1 = f"{tmpdir}/air1.nc"
     filepath2 = f"{tmpdir}/air2.nc"
-    ds1.to_netcdf(filepath1, format="NETCDF4", engine='netcdf4')
-    ds2.to_netcdf(filepath2, format="NETCDF4", engine='netcdf4')
+    ds1.to_netcdf(filepath1)
+    ds2.to_netcdf(filepath2)
     ds1.close()
     ds2.close()
 
