@@ -32,13 +32,14 @@ ZAttrs = NewType(
 )  # just the .zattrs (for one array or for the whole store/group)
 FillValueT = bool | str | float | int | list | None
 
-ZARR_DEFAULT_FILL_VALUE: dict[np.dtype, FillValueT] = {
+ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     # numpy dtypes's hierarchy lets us avoid checking for all the widths
     # https://numpy.org/doc/stable/reference/arrays.scalars.html
-    np.dtype("bool"): False,
-    np.dtype("int"): 0,
-    np.dtype("float"): 0.0,
-    np.dtype("complex"): [0.0, 0.0],
+    np.dtype("bool").kind: False,
+    np.dtype("int").kind: 0,
+    np.dtype("float").kind: 0.0,
+    np.dtype("complex").kind: [0.0, 0.0],
+    np.dtype("datetime64").kind: 0,
 }
 """
 The value and format of the fill_value depend on the `data_type` of the array.
@@ -67,7 +68,7 @@ class ZArray(BaseModel):
     chunks: tuple[int, ...]
     compressor: dict | None = None
     dtype: np.dtype
-    fill_value: FillValueT = Field(default=0.0, validate_default=True)
+    fill_value: FillValueT = Field(None, validate_default=True)
     filters: list[dict] | None = None
     order: Literal["C", "F"]
     shape: tuple[int, ...]
@@ -90,7 +91,7 @@ class ZArray(BaseModel):
     @model_validator(mode="after")
     def _check_fill_value(self) -> Self:
         if self.fill_value is None:
-            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype, 0.0)
+            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
         return self
 
     @property
