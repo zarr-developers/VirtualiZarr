@@ -54,7 +54,7 @@ class ChunkEntry:
         return (self.path, self.offset, self.length)
 
     def dict(self) -> ChunkDictEntry:
-        return dataclasses.asdict(self)
+        return ChunkDictEntry(dataclasses.asdict(self))
 
 
 class ChunkManifest:

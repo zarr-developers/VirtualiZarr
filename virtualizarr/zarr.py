@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    Dict,
     Literal,
     NewType,
     Optional,
@@ -111,14 +112,40 @@ class ZArray:
             zarray_dict["fill_value"] = None
         return ujson.dumps(zarray_dict)
 
+    # ZArray.dict seems to shadow "dict", so need to use __builtins__ in the
+    # type signature below.
     def replace(
         self,
-        **kwargs: Any,
+        shape: tuple[int, ...] | None = None,
+        chunks: tuple[int, ...] | None = None,
+        dtype: np.dtype | str | None = None,
+        fill_value: FillValueT = None,
+        order: Literal["C", "F"] | None = None,
+        compressor: __builtins__["dict"] | None = None,
+        filters: list[dict] | None = None,
+        zarr_format: Literal[2, 3] | None = None,
     ) -> "ZArray":
         """
         Convenience method to create a new ZArray from an existing one by altering only certain attributes.
         """
-        return dataclasses.replace(self, **kwargs)
+        replacements = {}
+        if shape is not None:
+            replacements["shape"] = shape
+        if chunks is not None:
+            replacements["chunks"] = chunks
+        if dtype is not None:
+            replacements["dtype"] = dtype
+        if fill_value is not None:
+            replacements["fill_value"] = fill_value
+        if order is not None:
+            replacements["order"] = order
+        if compressor is not None:
+            replacements["compressor"] = compressor
+        if filters is not None:
+            replacements["filters"] = filters
+        if zarr_format is not None:
+            replacements["zarr_format"] = zarr_format
+        return dataclasses.replace(self, **replacements)
 
     def _v3_codec_pipeline(self) -> list:
         """
