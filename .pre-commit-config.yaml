@@ -18,20 +18,3 @@ repos:
         args: [ --fix ]
       # Run the formatter.
       - id: ruff-format
-
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.10.0
-  #   hooks:
-  #     - id: mypy
-  #       # Copied from setup.cfg
-  #       exclude: "properties|asv_bench|docs"
-  #       additional_dependencies: [
-  #           # Type stubs
-  #           types-python-dateutil,
-  #           types-setuptools,
-  #           types-PyYAML,
-  #           types-pytz,
-  #           # Dependencies that are typed
-  #           numpy,
-  #           typing-extensions>=4.1.0,
-  #         ]
