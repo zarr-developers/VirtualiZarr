@@ -38,6 +38,7 @@ def open_virtual_dataset(
     filepath: str,
     *,
     filetype: FileType | None = None,
+    group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     cftime_variables: Iterable[str] | None = None,
@@ -60,6 +61,8 @@ def open_virtual_dataset(
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
+    group : str, default is None
+        Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
@@ -135,78 +138,82 @@ def open_virtual_dataset(
             else:
                 reader_options = {}
 
-        # this is the only place we actually always need to use kerchunk directly
-        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = kerchunk.read_kerchunk_references_from_file(
-            filepath=filepath,
-            filetype=filetype,
-            reader_options=reader_options,
-        )
-        virtual_vars = virtual_vars_from_kerchunk_refs(
-            vds_refs,
-            drop_variables=drop_variables + loadable_variables,
-            virtual_array_class=virtual_array_class,
-        )
-        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
-        coord_names = ds_attrs.pop("coordinates", [])
+    # this is the only place we actually always need to use kerchunk directly
+    # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
+    vds_refs = kerchunk.read_kerchunk_references_from_file(
+        filepath=filepath,
+        filetype=filetype,
+        group=group,
+        reader_options=reader_options,
+    )
 
-        if indexes is None or len(loadable_variables) > 0:
-            # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-            # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-            # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            fpath = _fsspec_openfile_from_filepath(
-                filepath=filepath, reader_options=reader_options
+    virtual_vars = virtual_vars_from_kerchunk_refs(
+        vds_refs,
+        drop_variables=drop_variables + loadable_variables,
+        virtual_array_class=virtual_array_class,
+    )
+    ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+    coord_names = ds_attrs.pop("coordinates", [])
+
+    if indexes is None or len(loadable_variables) > 0:
+        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
+        fpath = _fsspec_openfile_from_filepath(
+            filepath=filepath, reader_options=reader_options
+        )
+        ds = xr.open_dataset(
+            fpath,
+            drop_variables=drop_variables,
+            decode_times=False,
+            group=group,
+        )
+
+        if indexes is None:
+            warnings.warn(
+                "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
+                "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
             )
 
-            ds = xr.open_dataset(
-                fpath, drop_variables=drop_variables, decode_times=False
-            )
-
-            if indexes is None:
-                warnings.warn(
-                    "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
-                    "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
-                )
-
-                # add default indexes by reading data from file
-                indexes = {name: index for name, index in ds.xindexes.items()}
-            elif indexes != {}:
-                # TODO allow manual specification of index objects
-                raise NotImplementedError()
-            else:
-                indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-            loadable_vars = {
-                name: var
-                for name, var in ds.variables.items()
-                if name in loadable_variables
-            }
-
-            for name in cftime_variables:
-                var = loadable_vars[name]
-                loadable_vars[name] = CFDatetimeCoder().decode(var, name=name)
-
-            # if we only read the indexes we can just close the file right away as nothing is lazy
-            if loadable_vars == {}:
-                ds.close()
+            # add default indexes by reading data from file
+            indexes = {name: index for name, index in ds.xindexes.items()}
+        elif indexes != {}:
+            # TODO allow manual specification of index objects
+            raise NotImplementedError()
         else:
-            loadable_vars = {}
-            indexes = {}
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-        vars = {**virtual_vars, **loadable_vars}
+        loadable_vars = {
+            name: var
+            for name, var in ds.variables.items()
+            if name in loadable_variables
+        }
 
-        data_vars, coords = separate_coords(vars, indexes, coord_names)
+        for name in cftime_variables:
+            var = loadable_vars[name]
+            loadable_vars[name] = CFDatetimeCoder().decode(var, name=name)
 
-        vds = xr.Dataset(
-            data_vars,
-            coords=coords,
-            # indexes={},  # TODO should be added in a later version of xarray
-            attrs=ds_attrs,
-        )
+        # if we only read the indexes we can just close the file right away as nothing is lazy
+        if loadable_vars == {}:
+            ds.close()
+    else:
+        loadable_vars = {}
+        indexes = {}
 
-        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+    vars = {**virtual_vars, **loadable_vars}
 
-        return vds
+    data_vars, coords = separate_coords(vars, indexes, coord_names)
+
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=ds_attrs,
+    )
+
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+    return vds
 
 
 def open_virtual_dataset_from_v3_store(
@@ -279,12 +286,12 @@ def virtual_vars_from_kerchunk_refs(
     """
 
     var_names = kerchunk.find_var_names(refs)
+
     if drop_variables is None:
         drop_variables = []
     var_names_to_keep = [
         var_name for var_name in var_names if var_name not in drop_variables
     ]
-
     vars = {
         var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
         for var_name in var_names_to_keep

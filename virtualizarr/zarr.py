@@ -135,7 +135,7 @@ class ZArray(BaseModel):
     def replace(
         self,
         chunks: Optional[tuple[int, ...]] = None,
-        compressor: Optional[dict] = None,
+        compressor: Optional[dict] = None,  # type: ignore[valid-type]
         dtype: Optional[np.dtype] = None,
         fill_value: Optional[float] = None,  # float or int?
         filters: Optional[list[dict]] = None,  # type: ignore[valid-type]

@@ -34,6 +34,19 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def hdf5_groups_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_files(tmpdir):
     # Set up example xarray dataset
     ds = xr.tutorial.open_dataset("air_temperature")
