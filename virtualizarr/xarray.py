@@ -124,6 +124,35 @@ def open_virtual_dataset(
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
+
+    if filetype == "kerchunk":
+        fpath = _fsspec_openfile_from_filepath(
+            filepath=filepath, reader_options=reader_options
+        )
+
+        from upath import UPath
+
+        kerchunk_storage_ftype = UPath(fpath.path).suffix
+
+        if kerchunk_storage_ftype == ".json":
+            import json
+
+            refs_dict = json.loads(fpath.read().decode("utf-8"))
+
+            vds = dataset_from_kerchunk_refs(refs_dict)
+            return vds
+        elif kerchunk_storage_ftype == ".parquet":
+            raise NotImplementedError
+
+            # Question: How should we read the parquet files
+            # into a dict to pass into dataset_from_kerchunk_refs?
+            # pandas, pyarrow table, duckdb?
+
+            # pd example retrieves: {'path': '...virtual_datas0/air.nc', 'offset': 15431, 'size': 7738000, 'raw': None}
+            # import pandas as pd
+            # refs_dict = pd.read_parquet(fpath.path).iloc[0].to_dict()
+            # vds = dataset_from_kerchunk_refs(refs_dict)
+
     else:
         if reader_options is None:
             universal_filepath = UPath(filepath)

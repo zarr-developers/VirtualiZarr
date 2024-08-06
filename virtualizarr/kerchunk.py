@@ -42,6 +42,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+    kerchunk = auto()
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -138,9 +139,6 @@ def _automatically_determine_filetype(
     fpath = _fsspec_openfile_from_filepath(
         filepath=filepath, reader_options=reader_options
     )
-    magic_bytes = fpath.read(8)
-    fpath.close()
-
     if magic_bytes.startswith(b"CDF"):
         filetype = FileType.netcdf3
     elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
