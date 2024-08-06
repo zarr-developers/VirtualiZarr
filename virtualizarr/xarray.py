@@ -129,7 +129,10 @@ def open_virtual_dataset(
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
-    if filetype == "zarr_v3":
+    # if filetype is user defined, convert to FileType
+    filetype = FileType(filetype)
+
+    if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
