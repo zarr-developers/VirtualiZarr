@@ -41,7 +41,7 @@ def isconfigurable(value: dict) -> bool:
 def test_zarr_v3_roundtrip(tmpdir, vds_with_manifest_arrays: xr.Dataset):
     vds_with_manifest_arrays.virtualize.to_zarr(tmpdir / "store.zarr")
     roundtrip = open_virtual_dataset(
-        str(tmpdir / "store.zarr"), filetype=FileType.zarr_v3, indexes={}
+        tmpdir / "store.zarr", filetype=FileType.zarr_v3, indexes={}
     )
 
     xrt.assert_identical(roundtrip, vds_with_manifest_arrays)
