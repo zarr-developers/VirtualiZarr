@@ -130,7 +130,8 @@ def open_virtual_dataset(
         raise NotImplementedError()
 
     # if filetype is user defined, convert to FileType
-    filetype = FileType(filetype)
+    if filetype is not None:
+        filetype = FileType(filetype)
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
