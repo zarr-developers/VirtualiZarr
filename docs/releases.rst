@@ -9,6 +9,9 @@ v1.0.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Load scalar variables by default. (:pull:`205`)
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
@@ -23,6 +26,9 @@ Bug fixes
 
 - Exclude empty chunks during `ChunkDict` construction. (:pull:`198`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+- Fixed regression in `fill_value` handling for datetime dtypes making virtual
+  Zarr stores unreadable (:pr:`206`)
+  By `Timothy Hodson <https://github.com/thodson-usgs>`_
 
 Documentation
 ~~~~~~~~~~~~~

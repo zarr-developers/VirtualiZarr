@@ -47,6 +47,7 @@ test = [
     "s3fs",
     "fastparquet",
     "imagecodecs-numcodecs",
+    "h5py"
 ]
 
 

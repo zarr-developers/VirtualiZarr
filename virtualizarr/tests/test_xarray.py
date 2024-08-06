@@ -427,6 +427,16 @@ class TestLoadVirtualDataset:
         }
         mock_determine_filetype.assert_called_once_with(**filetype_args)
 
+    def test_open_dataset_with_empty(self, hdf5_empty, tmpdir):
+        vds = open_virtual_dataset(hdf5_empty)
+        assert vds.empty.dims == ()
+        assert vds.empty.attrs == {"empty": "true"}
+
+    def test_open_dataset_with_scalar(self, hdf5_scalar, tmpdir):
+        vds = open_virtual_dataset(hdf5_scalar)
+        assert vds.scalar.dims == ()
+        assert vds.scalar.attrs == {"scalar": "true"}
+
 
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file):
