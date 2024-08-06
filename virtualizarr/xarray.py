@@ -124,6 +124,14 @@ def open_virtual_dataset(
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
+    if filetype == "dmrpp":
+        from virtualizarr.readers.dmrpp import DMRParser
+
+        fpath = _fsspec_openfile_from_filepath(
+            filepath=filepath, reader_options=reader_options
+        )
+        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
+        return parser.parse_dataset()
     else:
         if reader_options is None:
             universal_filepath = UPath(filepath)

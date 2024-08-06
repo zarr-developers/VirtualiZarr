@@ -42,6 +42,7 @@ class FileType(AutoName):
     tiff = auto()
     fits = auto()
     zarr = auto()
+    dmrpp = auto()
 
 
 class NumpyEncoder(json.JSONEncoder):
