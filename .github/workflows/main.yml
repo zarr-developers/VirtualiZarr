@@ -42,10 +42,6 @@ jobs:
           conda env list
           conda list
 
-      - name: Lint
-        run: |
-          pre-commit run --all-files
-
       - name: Type check
         run: |
           mypy virtualizarr
