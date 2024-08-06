@@ -1,4 +1,3 @@
-import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -143,7 +142,7 @@ class ManifestArray:
         """
         Element-wise equality checking.
 
-        Returns a numpy array of booleans.
+        Returns a numpy array of booleans, with elements that are True iff the manifests' chunk that this element would reside in is identical between the two arrays.
         """
         if isinstance(other, (int, float, bool, np.ndarray)):
             # TODO what should this do when comparing against numpy arrays?
@@ -159,32 +158,33 @@ class ManifestArray:
         if self.zarray != other.zarray:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
-            if self.manifest == other.manifest:
-                return np.full(shape=self.shape, fill_value=True, dtype=np.dtype(bool))
-            else:
-                # TODO this doesn't yet do what it should - it simply returns all False if any of the chunk entries are different.
-                # What it should do is return True for the locations where the chunk entries are the same.
-                warnings.warn(
-                    "__eq__ currently is over-cautious, returning an array of all False if any of the chunk entries don't match.",
-                    UserWarning,
+            # do chunk-wise comparison
+            equal_chunk_paths = self.manifest._paths == other.manifest._paths
+            equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
+            equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
+
+            equal_chunks = equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
+
+            def generate_boolean_subarrays(
+                boolean_element: bool, chunks: tuple[int, ...]
+            ) -> np.ndarray[Any, np.dtype[np.bool]]:  # type: ignore[name-defined]
+                """If a chunk is not equivalent then all elements in it are considered not equal, so repeat the boolean result."""
+                return (
+                    np.repeat(boolean_element, repeats=np.prod(chunks))
+                    .reshape(chunks)
+                    .astype(bool)  # type: ignore[attr-defined]  # TODO do we need this?
                 )
 
-                # do chunk-wise comparison
-                equal_chunk_paths = self.manifest._paths == other.manifest._paths
-                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
-                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
-
-                equal_chunks = (
-                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
+            # Replace every chunk in the manifest with the new sub-array of booleans
+            # Create a nested list of subarrays using np.ndindex for general N-dimensional support
+            boolean_subarrays = np.empty(self.manifest.shape_chunk_grid, dtype=object)
+            for idx in np.ndindex(self.manifest.shape_chunk_grid):
+                boolean_subarrays[idx] = generate_boolean_subarrays(
+                    equal_chunks[idx], self.chunks
                 )
 
-                if not equal_chunks.all():
-                    # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
-                    return np.full(
-                        shape=self.shape, fill_value=False, dtype=np.dtype(bool)
-                    )
-                else:
-                    raise RuntimeWarning("Should not be possible to get here")
+            # Use np.block to assemble the subarrays into boolean array of same shape as original ManifestArray
+            return np.block(boolean_subarrays.tolist())
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
