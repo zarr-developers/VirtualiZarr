@@ -18,6 +18,7 @@ dependencies:
   - codecov
   - pre-commit
   - ruff
+  - pandas-stubs
   - pytest-mypy
   - pytest-cov
   - pytest
