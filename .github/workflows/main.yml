@@ -34,16 +34,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          uv venv .venv
-          # echo "VIRTUAL_ENV=.venv" >> $GITHUB_ENV
+      # - name: Install uv
+      #   run: |
+      #     curl -LsSf https://astral.sh/uv/install.sh | sh
+      #     uv venv .venv
+      #     # echo "VIRTUAL_ENV=.venv" >> $GITHUB_ENV
 
       - name: Install virtualizarr
         run: |
-           uv pip install --system '.'
-           uv pip install --system '.[test]'
+           pip install '.[test]'
 
       - name: Running Tests
         run: |
