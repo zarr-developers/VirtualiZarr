@@ -52,8 +52,8 @@ def _dataset_chunk_manifest(
 
         shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks))
         paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
-        offsets = np.empty(shape, dtype=np.int32)
-        lengths = np.empty(shape, dtype=np.int32)
+        offsets = np.empty(shape, dtype=np.uint64)
+        lengths = np.empty(shape, dtype=np.uint64)
 
         def get_key(blob):
             return tuple([a // b for a, b in zip(blob.chunk_offset, dataset.chunks)])

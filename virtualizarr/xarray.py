@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
 from typing import (
@@ -9,6 +10,7 @@ from typing import (
 
 import ujson  # type: ignore
 import xarray as xr
+from upath import UPath
 from xarray import register_dataset_accessor
 from xarray.backends import BackendArray
 from xarray.coding.times import CFDatetimeCoder
@@ -128,9 +130,14 @@ def open_virtual_dataset(
         )
     else:
         if reader_options is None:
-            reader_options = {
-                "storage_options": {"key": "", "secret": "", "anon": True}
-            }
+            universal_filepath = UPath(filepath)
+            protocol = universal_filepath.protocol
+            if protocol == "s3":
+                reader_options = {
+                    "storage_options": {"key": "", "secret": "", "anon": True}
+                }
+            else:
+                reader_options = {}
         if filetype is None:
             filetype = _automatically_determine_filetype(
                 filepath=filepath, reader_options=reader_options
@@ -163,7 +170,6 @@ def open_virtual_dataset(
                 ".zattrs", {}
             )
             coord_names = ds_attrs.pop("coordinates", [])
-
         if indexes is None or len(loadable_variables) > 0:
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
             # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
@@ -177,6 +183,11 @@ def open_virtual_dataset(
             )
 
             if indexes is None:
+                warnings.warn(
+                    "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
+                    "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
+                )
+
                 # add default indexes by reading data from file
                 indexes = {name: index for name, index in ds.xindexes.items()}
             elif indexes != {}:

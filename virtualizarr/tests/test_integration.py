@@ -10,9 +10,7 @@ from virtualizarr import open_virtual_dataset
     "inline_threshold, vars_to_inline",
     [
         (5e2, ["lat", "lon"]),
-        pytest.param(
-            5e4, ["lat", "lon", "time"], marks=pytest.mark.xfail(reason="time encoding")
-        ),
+        (5e4, ["lat", "lon", "time"]),
         pytest.param(
             5e7,
             ["lat", "lon", "time", "air"],
@@ -149,7 +147,7 @@ class TestKerchunkRoundtrip:
         # regression test for GH issue #105
 
         # set up example xarray dataset containing non-dimension coordinate variables
-        ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6).reshape(2, 3))})
+        ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6.0).reshape(2, 3))})
 
         # save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")
@@ -188,5 +186,5 @@ def test_open_scalar_variable(tmpdir):
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(f"{tmpdir}/scalar.nc")
 
-    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc")
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
     assert vds["a"].shape == ()

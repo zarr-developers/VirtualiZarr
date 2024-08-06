@@ -1,10 +1,11 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
-from typing import Any, Callable, NewType, Tuple, Union, cast
+from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
+from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
@@ -15,7 +16,13 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]])
+class ChunkDictEntry(TypedDict):
+    path: str
+    offset: int
+    length: int
+
+
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
 class ChunkEntry(BaseModel):
@@ -35,16 +42,23 @@ class ChunkEntry(BaseModel):
         return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
 
     @classmethod
-    def from_kerchunk(cls, path_and_byte_range_info: list[str | int]) -> "ChunkEntry":
-        path, offset, length = path_and_byte_range_info
+    def from_kerchunk(
+        cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
+    ) -> "ChunkEntry":
+        if len(path_and_byte_range_info) == 1:
+            path = path_and_byte_range_info[0]
+            offset = 0
+            length = UPath(path).stat().st_size
+        else:
+            path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
-    def to_kerchunk(self) -> list[str | int]:
+    def to_kerchunk(self) -> tuple[str, int, int]:
         """Write out in the format that kerchunk uses for chunk entries."""
-        return [self.path, self.offset, self.length]
+        return (self.path, self.offset, self.length)
 
-    def dict(self) -> dict[str, Union[str, int]]:
-        return dict(path=self.path, offset=self.offset, length=self.length)
+    def dict(self) -> ChunkDictEntry:
+        return ChunkDictEntry(path=self.path, offset=self.offset, length=self.length)
 
 
 class ChunkManifest:
@@ -71,8 +85,8 @@ class ChunkManifest:
     """
 
     _paths: np.ndarray[Any, np.dtypes.StringDType]  # type: ignore[name-defined]
-    _offsets: np.ndarray[Any, np.dtype[np.int32]]
-    _lengths: np.ndarray[Any, np.dtype[np.int32]]
+    _offsets: np.ndarray[Any, np.dtype[np.uint64]]
+    _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
     def __init__(self, entries: dict) -> None:
         """
@@ -100,8 +114,8 @@ class ChunkManifest:
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())  # type: ignore[attr-defined]
-        offsets = np.empty(shape=shape, dtype=np.dtype("int32"))
-        lengths = np.empty(shape=shape, dtype=np.dtype("int32"))
+        offsets = np.empty(shape=shape, dtype=np.dtype("uint64"))
+        lengths = np.empty(shape=shape, dtype=np.dtype("uint64"))
 
         # populate the arrays
         for key, entry in entries.items():
@@ -128,8 +142,8 @@ class ChunkManifest:
     def from_arrays(
         cls,
         paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],  # type: ignore[name-defined]
-        offsets: np.ndarray[Any, np.dtype[np.int32]],
-        lengths: np.ndarray[Any, np.dtype[np.int32]],
+        offsets: np.ndarray[Any, np.dtype[np.uint64]],
+        lengths: np.ndarray[Any, np.dtype[np.uint64]],
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -161,13 +175,13 @@ class ChunkManifest:
             raise ValueError(
                 f"paths array must have a numpy variable-length string dtype, but got dtype {paths.dtype}"
             )
-        if offsets.dtype != np.dtype("int32"):
+        if offsets.dtype != np.dtype("uint64"):
             raise ValueError(
-                f"offsets array must have 32-bit integer dtype, but got dtype {offsets.dtype}"
+                f"offsets array must have 64-bit unsigned integer dtype, but got dtype {offsets.dtype}"
             )
-        if lengths.dtype != np.dtype("int32"):
+        if lengths.dtype != np.dtype("uint64"):
             raise ValueError(
-                f"lengths array must have 32-bit integer dtype, but got dtype {lengths.dtype}"
+                f"lengths array must have 64-bit unsigned integer dtype, but got dtype {lengths.dtype}"
             )
 
         # check shapes
@@ -252,7 +266,7 @@ class ChunkManifest:
                 [*coord_vectors, self._paths, self._offsets, self._lengths],
                 flags=("refs_ok",),
             )
-            if path.item()[0] != ""  # don't include entry if path='' (i.e. empty chunk)
+            if path.item() != ""  # don't include entry if path='' (i.e. empty chunk)
         }
 
         return cast(
@@ -283,12 +297,20 @@ class ChunkManifest:
             json.dump(entries, json_file, indent=4, separators=(", ", ": "))
 
     @classmethod
-    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
-        chunkentries = {
-            cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
-            for k, v in kerchunk_chunk_dict.items()
-        }
-        return ChunkManifest(entries=cast(ChunkDict, chunkentries))
+    def _from_kerchunk_chunk_dict(
+        cls,
+        # The type hint requires `Dict` instead of `dict` due to
+        # the conflicting ChunkManifest.dict method.
+        kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+    ) -> "ChunkManifest":
+        chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
+        for k, v in kerchunk_chunk_dict.items():
+            if isinstance(v, (str, bytes)):
+                raise NotImplementedError("TODO: handle inlined data")
+            elif not isinstance(v, (tuple, list)):
+                raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+            chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
+        return ChunkManifest(entries=chunk_entries)
 
     def rename_paths(
         self,
