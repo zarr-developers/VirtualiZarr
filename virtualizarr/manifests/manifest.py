@@ -57,7 +57,7 @@ class ChunkEntry(BaseModel):
         """Write out in the format that kerchunk uses for chunk entries."""
         return (self.path, self.offset, self.length)
 
-    def dict(self) -> ChunkDictEntry:  # type: ignore
+    def dict(self) -> ChunkDictEntry:  # type: ignore[override]
         return ChunkDictEntry(path=self.path, offset=self.offset, length=self.length)
 
 
@@ -238,7 +238,7 @@ class ChunkManifest:
     def __len__(self) -> int:
         return self._paths.size
 
-    def dict(self) -> ChunkDict:  # type: ignore
+    def dict(self) -> ChunkDict:  # type: ignore[override]
         """
         Convert the entire manifest to a nested dictionary.
 
