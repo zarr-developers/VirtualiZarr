@@ -6,6 +6,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import ManifestArray, open_virtual_dataset
+from virtualizarr.kerchunk import FileType
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.zarr import dataset_to_zarr, metadata_from_zarr_json
 
@@ -40,7 +41,7 @@ def isconfigurable(value: dict) -> bool:
 def test_zarr_v3_roundtrip(tmpdir, vds_with_manifest_arrays: xr.Dataset):
     vds_with_manifest_arrays.virtualize.to_zarr(tmpdir / "store.zarr")
     roundtrip = open_virtual_dataset(
-        tmpdir / "store.zarr", filetype="zarr_v3", indexes={}
+        tmpdir / "store.zarr", filetype=FileType.zarr_v3, indexes={}
     )
 
     xrt.assert_identical(roundtrip, vds_with_manifest_arrays)
