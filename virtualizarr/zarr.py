@@ -1,12 +1,7 @@
 import dataclasses
 import json
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    NewType,
-)
+from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
 import numcodecs
 import numpy as np
@@ -23,6 +18,7 @@ ZAttrs = NewType(
     "ZAttrs", dict[str, Any]
 )  # just the .zattrs (for one array or for the whole store/group)
 FillValueT = bool | str | float | int | list | None
+ZARR_FORMAT = Literal[2, 3]
 
 ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     # numpy dtypes's hierarchy lets us avoid checking for all the widths
@@ -88,6 +84,10 @@ class ZArray:
             fill_value = np.nan
 
         compressor = decoded_arr_refs_zarray["compressor"]
+        zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
+        if zarr_format not in (2, 3):
+            raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=compressor,
@@ -96,7 +96,7 @@ class ZArray:
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
-            zarr_format=int(decoded_arr_refs_zarray["zarr_format"]),
+            zarr_format=cast(ZARR_FORMAT, zarr_format),
         )
 
     def dict(self) -> dict[str, Any]:
@@ -239,7 +239,7 @@ def dataset_to_zarr(ds: xr.Dataset, storepath: str) -> None:
         group_metadata_file.write(json_dumps(group_metadata))
 
     for name, var in ds.variables.items():
-        array_dir = _storepath / name
+        array_dir = _storepath / str(name)
         marr = var.data
 
         # TODO move this check outside the writing loop so we don't write an incomplete store on failure?
@@ -275,7 +275,9 @@ def to_zarr_json(var: xr.Variable, array_dir: Path) -> None:
 
     marr.manifest.to_zarr_json(array_dir / "manifest.json")
 
-    metadata = zarr_v3_array_metadata(marr.zarray, list(var.dims), var.attrs)
+    metadata = zarr_v3_array_metadata(
+        marr.zarray, [str(x) for x in var.dims], var.attrs
+    )
     with open(array_dir / "zarr.json", "wb") as metadata_file:
         metadata_file.write(json_dumps(metadata))
 
