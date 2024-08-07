@@ -110,8 +110,8 @@ class ZArray:
             zarray_dict["fill_value"] = None
         return ujson.dumps(zarray_dict)
 
-    # ZArray.dict seems to shadow "dict", so need to use __builtins__ in the
-    # type signature below.
+    # ZArray.dict seems to shadow "dict", so we need the type ignore in
+    # the signature below.
     def replace(
         self,
         shape: tuple[int, ...] | None = None,
@@ -119,14 +119,14 @@ class ZArray:
         dtype: np.dtype | str | None = None,
         fill_value: FillValueT = None,
         order: Literal["C", "F"] | None = None,
-        compressor: __builtins__["dict"] | None = None,
-        filters: list[dict] | None = None,
+        compressor: dict | None = None,  # type: ignore[valid-type]
+        filters: list[dict] | None = None,  # type: ignore[valid-type]
         zarr_format: Literal[2, 3] | None = None,
     ) -> "ZArray":
         """
         Convenience method to create a new ZArray from an existing one by altering only certain attributes.
         """
-        replacements = {}
+        replacements: dict[str, Any] = {}
         if shape is not None:
             replacements["shape"] = shape
         if chunks is not None:
