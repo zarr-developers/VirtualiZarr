@@ -119,7 +119,7 @@ class ZArray:
         dtype: np.dtype | str | None = None,
         fill_value: FillValueT = None,
         order: Literal["C", "F"] | None = None,
-        compressor: dict | None = None,  # type: ignore[valid-type]
+        compressor: "dict | None" = None,  # type: ignore[valid-type]
         filters: list[dict] | None = None,  # type: ignore[valid-type]
         zarr_format: Literal[2, 3] | None = None,
     ) -> "ZArray":
