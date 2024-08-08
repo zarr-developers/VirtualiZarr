@@ -24,7 +24,6 @@ dependencies = [
     "xarray>=2024.06.0",
     "kerchunk>=0.2.5",
     "h5netcdf",
-    "pydantic",
     "numpy>=2.0.0",
     "ujson",
     "packaging",
