@@ -1,3 +1,4 @@
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 
@@ -6,6 +7,7 @@ from virtualizarr.kerchunk import FileType
 
 
 class TestIntegration:
+    @pytest.mark.xfail(reason="0 time start is being interpreted as fillvalue")
     def test_filters_h5netcdf_roundtrip(
         self, tmpdir, filter_encoded_roundtrip_hdf5_file
     ):

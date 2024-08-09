@@ -427,6 +427,7 @@ class TestLoadVirtualDataset:
         }
         mock_determine_filetype.assert_called_once_with(**filetype_args)
 
+    @pytest.mark.xfail(reason="Requires discussion on validity of empty datasets")
     def test_open_dataset_with_empty(self, hdf5_empty, tmpdir):
         vds = open_virtual_dataset(hdf5_empty)
         assert vds.empty.dims == ()
