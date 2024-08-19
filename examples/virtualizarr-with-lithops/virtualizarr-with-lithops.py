@@ -23,20 +23,18 @@ print(f"{len(file_pattern)} file paths were retrieved.")
 
 
 def map_references(fil):
-    """ Map function to open virtual datasets.
-    """
-    vds = open_virtual_dataset(fil,
-                               indexes={},
-                               loadable_variables=['Time'],
-                               cftime_variables=['Time'],
-                               )
+    """Map function to open virtual datasets."""
+    vds = open_virtual_dataset(
+        fil,
+        indexes={},
+        loadable_variables=["Time"],
+        cftime_variables=["Time"],
+    )
     return vds
 
 
 def reduce_references(results):
-    """ Reduce to concat virtual datasets.
-
-    """
+    """Reduce to concat virtual datasets."""
     combined_vds = xr.combine_nested(
         results,
         concat_dim=["Time"],

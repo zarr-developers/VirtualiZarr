@@ -71,7 +71,6 @@ class ZArray:
         if self.fill_value is None:
             self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
 
-
     @property
     def codec(self) -> Codec:
         """For comparison against other arrays."""
