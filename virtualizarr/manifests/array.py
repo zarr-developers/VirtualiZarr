@@ -131,7 +131,7 @@ class ManifestArray:
             return _isnan(self.shape)
         return NotImplemented
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self, dtype: np.typing.DTypeLike = None) -> np.ndarray:
         raise NotImplementedError(
             "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
         )

@@ -1,3 +1,4 @@
+import h5py
 import pytest
 import xarray as xr
 
@@ -50,3 +51,21 @@ def netcdf4_files(tmpdir):
     ds2.close()
 
     return filepath1, filepath2
+
+
+@pytest.fixture
+def hdf5_empty(tmpdir):
+    filepath = f"{tmpdir}/empty.nc"
+    f = h5py.File(filepath, "w")
+    dataset = f.create_dataset("empty", shape=(), dtype="float32")
+    dataset.attrs["empty"] = "true"
+    return filepath
+
+
+@pytest.fixture
+def hdf5_scalar(tmpdir):
+    filepath = f"{tmpdir}/scalar.nc"
+    f = h5py.File(filepath, "w")
+    dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
+    dataset.attrs["scalar"] = "true"
+    return filepath
