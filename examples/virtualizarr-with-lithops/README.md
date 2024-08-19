@@ -35,7 +35,7 @@ python virtualizarr-with-lithops.py
 ```
 
 ## Cleaning up
-To rebuild the Litops image, delete the existing one by running
+To rebuild the Lithops image, delete the existing one by running
 ```bash
 lithops runtime delete -b aws_lambda -d virtualizarr-runtime
 ```
