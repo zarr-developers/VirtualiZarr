@@ -1,7 +1,7 @@
 # Generate a virtual zarr dataset using lithops
 
 This example walks through how to create a virtual dataset from a collection of
-necdf files on s3 using lithops to open each file in parralel then concatenate
+netCDF files on s3 using lithops to open each file in parallel then concatenate
 them into a single virtual dataset.
 
 ## Credits
