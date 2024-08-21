@@ -55,9 +55,10 @@ todo_include_todos = False
 
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "repository_url": "https://github.com/TomNicholas/VirtualiZarr",
-    "repository_branch": "main",
-    "path_to_docs": "docs",
+    "github_user": "zarr-developers",
+    "github_repo": "VirtualiZarr",
+    "github_version": "main",
+    "doc_path": "docs",
 }
 html_title = "VirtualiZarr"
 
