@@ -59,6 +59,14 @@ html_theme_options = {
     "github_repo": "VirtualiZarr",
     "github_version": "main",
     "doc_path": "docs",
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/zarr-developers/VirtualiZarr",
+            "icon": "fa-brands fa-square-github",
+            "type": "fontawesome",
+        },
+    ]
 }
 html_title = "VirtualiZarr"
 
