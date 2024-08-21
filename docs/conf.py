@@ -63,7 +63,7 @@ html_theme_options = {
         {
             "name": "GitHub",
             "url": "https://github.com/zarr-developers/VirtualiZarr",
-            "icon": "fa-brands fa-square-github",
+            "icon": "fa-brands fa-github",
             "type": "fontawesome",
         },
     ]
