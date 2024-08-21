@@ -55,6 +55,7 @@ todo_include_todos = False
 
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
+    "use_edit_page_button": True,
     "github_user": "zarr-developers",
     "github_repo": "VirtualiZarr",
     "github_version": "main",
