@@ -244,15 +244,15 @@ class TestDetermineCoords:
         )
         assert set(vds.coords) == set(expected_coords)
 
-        #print(vds.attrs)
-        #assert False
+        # print(vds.attrs)
+        # assert False
 
         # TODO assert coord attributes have been altered
         for coord_name in expected_coords:
             print(vds[coord_name].attrs)
-            #assert vds[coord_name].attrs['']
+            # assert vds[coord_name].attrs['']
 
-        #assert False
+        # assert False
 
 
 class TestOpenVirtualDatasetAttrs:
