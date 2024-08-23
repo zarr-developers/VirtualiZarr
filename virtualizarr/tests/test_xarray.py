@@ -228,6 +228,33 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
+class TestDetermineCoords:
+    def test_determine_all_coords(self, netcdf4_file_with_2d_coords):
+        vds = open_virtual_dataset(netcdf4_file_with_2d_coords, indexes={})
+
+        expected_dimension_coords = ["ocean_time", "s_rho"]
+        expected_2d_coords = ["lon_rho", "lat_rho", "h"]
+        expected_1d_non_dimension_coords = ["Cs_r"]
+        expected_scalar_coords = ["hc", "Vtransform"]
+        expected_coords = (
+            expected_dimension_coords
+            + expected_2d_coords
+            + expected_1d_non_dimension_coords
+            + expected_scalar_coords
+        )
+        assert set(vds.coords) == set(expected_coords)
+
+        #print(vds.attrs)
+        #assert False
+
+        # TODO assert coord attributes have been altered
+        for coord_name in expected_coords:
+            print(vds[coord_name].attrs)
+            #assert vds[coord_name].attrs['']
+
+        #assert False
+
+
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file):
         # regression test for GH issue #150
