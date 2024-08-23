@@ -9,18 +9,22 @@ from typing import (
     Hashable,
     Literal,
     Optional,
+    TypeAlias,
     cast,
     overload,
 )
 
 import ujson  # type: ignore
+
+# TODO import specific functions/classes (i.e. open_dataset, Dataset, Variable, Coordinates) not just entire xarray namespace
 import xarray as xr
 from upath import UPath
 from xarray import register_dataset_accessor
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
+from xarray.conventions import decode_cf_variables
 from xarray.core.indexes import Index, PandasIndex
-from xarray.core.variable import IndexVariable
+from xarray.core.variable import IndexVariable, Variable
 
 import virtualizarr.kerchunk as kerchunk
 from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
@@ -31,6 +35,12 @@ from virtualizarr.zarr import (
     dataset_to_zarr,
     metadata_from_zarr_json,
 )
+
+T_Attrs = MutableMapping[Any, Any]
+T_Variables = Mapping[Any, Variable]
+# alias for (dims, data, attrs, encoding)
+T_VariableExpanded: TypeAlias = tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]]
+
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
@@ -162,7 +172,7 @@ def open_virtual_dataset(
             virtual_array_class=virtual_array_class,
         )
         ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
-        coord_names = ds_attrs.pop("coordinates", [])
+        # coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
@@ -214,16 +224,11 @@ def open_virtual_dataset(
 
         vars = {**virtual_vars, **loadable_vars}
 
-        data_vars, coords = separate_coords(vars, indexes, coord_names)
+        decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, ds_attrs)
 
-        vds = xr.Dataset(
-            data_vars,
-            coords=coords,
-            # indexes={},  # TODO should be added in a later version of xarray
-            attrs=ds_attrs,
+        vds = construct_virtual_dataset(
+            decoded_vars, indexes, decoded_attrs, coord_names
         )
-
-        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
         return vds
 
@@ -268,16 +273,11 @@ def open_virtual_dataset_from_v3_store(
     else:
         indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
+    decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, attrs)
 
-    ds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+    vds = construct_virtual_dataset(decoded_vars, indexes, decoded_attrs, coord_names)
 
-    return ds
+    return vds
 
 
 def virtual_vars_from_kerchunk_refs(
@@ -328,19 +328,15 @@ def dataset_from_kerchunk_refs(
     """
 
     vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
-    ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
-    coord_names = ds_attrs.pop("coordinates", [])
+    attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
+    # coord_names = ds_attrs.pop("coordinates", [])
 
     if indexes is None:
         indexes = {}
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
 
-    vds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+    decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, attrs)
+
+    vds = construct_virtual_dataset(decoded_vars, indexes, decoded_attrs, coord_names)
 
     return vds
 
@@ -366,29 +362,47 @@ def variable_from_kerchunk_refs(
     return xr.Variable(data=varr, dims=dims, attrs=zattrs)
 
 
-def separate_coords(
+def determine_cf_coords(
+    variables: T_Variables,
+    attributes: T_Attrs,
+) -> tuple[T_Variables, T_Attrs, set[Hashable]]:
+    """
+    Determines which variables are coordinate variables according to CF conventions.
+
+    Should not actually do any decoding of values in the variables, only inspect and possibly alter their metadata.
+    """
+    new_vars, attrs, coord_names = decode_cf_variables(
+        variables=variables,
+        attributes=attributes,
+        concat_characters=False,
+        mask_and_scale=False,
+        decode_times=False,
+        decode_coords="all",
+        drop_variables=None,  # should have already been dropped
+        use_cftime=False,  # done separately, to only the loadable_vars
+        decode_timedelta=False,  # done separately, to only the loadable_vars
+    )
+    return new_vars, attrs, coord_names
+
+
+def construct_virtual_dataset(
     vars: Mapping[str, xr.Variable],
     indexes: MutableMapping[str, Index],
+    attrs: T_Attrs,
     coord_names: Iterable[str] | None = None,
-) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
+) -> xr.Dataset:
     """
-    Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
+    Constructs the virtual dataset but without automatically building a pandas.Index for 1D coordinates.
 
     Currently requires this function as a workaround unless xarray PR #8124 is merged.
 
     Will also preserve any loaded variables and indexes it is passed.
     """
 
-    if coord_names is None:
-        coord_names = []
-
-    # split data and coordinate variables (promote dimension coordinates)
+    coord_vars: dict[str, T_VariableExpanded | xr.Variable] = {}
     data_vars = {}
-    coord_vars: dict[
-        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
-    ] = {}
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if name in coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
@@ -407,7 +421,74 @@ def separate_coords(
 
     coords = xr.Coordinates(coord_vars, indexes=indexes)
 
-    return data_vars, coords
+    print(indexes)
+
+    print(coords)
+    print(type(coords))
+
+    print(data_vars)
+
+    print(list(type(var._data) for var in data_vars.values()))
+    print(list(type(var.data) for var in data_vars.values()))
+
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=attrs,
+    )
+
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+    # TODO see how it's done inside `xr.decode_cf`
+
+    return vds
+
+
+# def _separate_coords(
+#     vars: Mapping[str, xr.Variable],
+#     indexes: MutableMapping[str, Index],
+#     coord_names: Iterable[str] | None = None,
+# ) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
+#     """
+#     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
+
+#     Currently requires this function as a workaround unless xarray PR #8124 is merged.
+
+#     Will also preserve any loaded variables and indexes it is passed.
+#     """
+
+#     if coord_names is None:
+#         coord_names = []
+
+#     # split data and coordinate variables (promote dimension coordinates)
+#     data_vars = {}
+#     coord_vars: dict[
+#         str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
+#     ] = {}
+#     found_coord_names: set[str] = set()
+#     for name, var in vars.items():
+#         if "coordinates" in var.attrs:
+#             found_coord_names.update(var.attrs["coordinates"].split(" "))
+#         if name in coord_names or var.dims == (name,) or name in found_coord_names:
+#             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
+#             if len(var.dims) == 1:
+#                 dim1d, *_ = var.dims
+#                 coord_vars[name] = (dim1d, var.data, var.attrs, var.encoding)
+
+#                 if isinstance(var, IndexVariable):
+#                     # unless variable actually already is a loaded IndexVariable,
+#                     # in which case we need to keep it and add the corresponding indexes explicitly
+#                     coord_vars[str(name)] = var
+#                     # TODO this seems suspect - will it handle datetimes?
+#                     indexes[name] = PandasIndex(var, dim1d)
+#             else:
+#                 coord_vars[name] = var
+#         else:
+#             data_vars[name] = var
+
+#     coords = xr.Coordinates(coord_vars, indexes=indexes)
+
+#     return data_vars, coords
 
 
 @register_dataset_accessor("virtualize")
