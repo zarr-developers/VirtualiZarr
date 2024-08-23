@@ -13,33 +13,66 @@ from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
 from virtualizarr.zarr import ZArray
 
 
-def test_wrapping():
-    chunks = (5, 10)
-    shape = (5, 20)
-    dtype = np.dtype("int32")
-    zarray = ZArray(
-        chunks=chunks,
-        compressor={"id": "zlib", "level": 1},
-        dtype=dtype,
-        fill_value=0.0,
-        filters=None,
-        order="C",
-        shape=shape,
-        zarr_format=2,
-    )
+class TestWrapping:
+    def test_wrapping(self):
+        chunks = (5, 10)
+        shape = (5, 20)
+        dtype = np.dtype("int32")
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=dtype,
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
 
-    chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
-    }
-    manifest = ChunkManifest(entries=chunks_dict)
-    marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-    ds = xr.Dataset({"a": (["x", "y"], marr)})
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        ds = xr.Dataset({"a": (["x", "y"], marr)})
 
-    assert isinstance(ds["a"].data, ManifestArray)
-    assert ds["a"].shape == shape
-    assert ds["a"].dtype == dtype
-    assert ds["a"].chunks == chunks
+        assert isinstance(ds["a"].data, ManifestArray)
+        assert ds["a"].shape == shape
+        assert ds["a"].dtype == dtype
+        assert ds["a"].chunks == chunks
+
+    def test_wrap_no_indexes(self):
+        chunks = (10,)
+        shape = (20,)
+        dtype = np.dtype("int32")
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=dtype,
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+
+        chunks_dict = {
+            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+
+        coords = xr.Coordinates({"x": (["x"], marr)}, indexes={})
+        ds = xr.Dataset(coords=coords)
+
+        assert isinstance(ds["x"].data, ManifestArray)
+        assert ds["x"].shape == shape
+        assert ds["x"].dtype == dtype
+        assert ds["x"].chunks == chunks
+        assert "x" in ds.coords
+        assert ds.xindexes == {}
 
 
 class TestEquals:
