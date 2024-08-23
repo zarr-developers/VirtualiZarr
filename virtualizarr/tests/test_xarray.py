@@ -338,7 +338,7 @@ class TestReadFromURL:
                 "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
             ),
             (
-                "netcdf3",
+                "netCDF3",
                 "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
             ),
             (
