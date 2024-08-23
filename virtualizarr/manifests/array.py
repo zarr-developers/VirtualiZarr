@@ -106,6 +106,17 @@ class ManifestArray:
     def __repr__(self) -> str:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
 
+    @property
+    def nbytes(self) -> int:
+        """
+        Size required to hold these references in memory in bytes.
+
+        Note this is not the size of the referenced array if it were actually loaded into memory,
+        this is only the size of the pointers to the chunk locations.
+        If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
+        """
+        return self.manifest.nbytes
+
     def __array_function__(self, func, types, args, kwargs) -> Any:
         """
         Hook to teach this class what to do if np.concat etc. is called on it.
