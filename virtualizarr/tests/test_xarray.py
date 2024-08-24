@@ -321,7 +321,12 @@ class TestReadFromS3:
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
         fpath = "s3://carbonplan-share/virtualizarr/local.nc"
-        vds = open_virtual_dataset(fpath, filetype=filetype, indexes=indexes)
+        vds = open_virtual_dataset(
+            fpath,
+            filetype=filetype,
+            indexes=indexes,
+            reader_options={"anon": True},
+        )
 
         assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
         for var in vds.variables:
