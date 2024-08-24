@@ -72,18 +72,18 @@ def read_kerchunk_references_from_file(
     filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
-    reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+    reader_options: dict, default {}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
     """
+
+    if reader_options is None:
+        reader_options = {}
 
     if filetype is None:
         filetype = _automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
-
-    if reader_options is None:
-        reader_options = {}
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -129,7 +129,7 @@ def read_kerchunk_references_from_file(
 def _automatically_determine_filetype(
     *,
     filepath: str,
-    reader_options: Optional[dict[str, Any]] = None,
+    reader_options: Optional[dict[str, Any]] = {},
 ) -> FileType:
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...

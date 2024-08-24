@@ -15,7 +15,6 @@ from typing import (
 
 import ujson  # type: ignore
 import xarray as xr
-from upath import UPath
 from xarray import register_dataset_accessor
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
@@ -83,7 +82,7 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    reader_options: dict, default {'storage_options': {'key': '', 'secret': '', 'anon': True}}
+    reader_options: dict, default {}
         Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
         Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
 
@@ -140,14 +139,7 @@ def open_virtual_dataset(
         )
     else:
         if reader_options is None:
-            universal_filepath = UPath(filepath)
-            protocol = universal_filepath.protocol
-            if protocol == "s3":
-                reader_options = {
-                    "storage_options": {"key": "", "secret": "", "anon": True}
-                }
-            else:
-                reader_options = {}
+            reader_options = {}
 
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
