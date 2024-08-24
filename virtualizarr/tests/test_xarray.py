@@ -325,7 +325,7 @@ class TestReadFromS3:
             fpath,
             filetype=filetype,
             indexes=indexes,
-            reader_options={"anon": True},
+            reader_options={"key": "", "secret": "", "anon": True},
         )
 
         assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
