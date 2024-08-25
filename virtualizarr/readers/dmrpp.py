@@ -1,11 +1,13 @@
 import os
 import warnings
 from collections import defaultdict
+from collections.abc import Mapping
 from typing import Any, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
 import xarray as xr
+from xarray.core.indexes import Index
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.types import ChunkKey
@@ -46,7 +48,7 @@ class DMRParser:
     }
     # Default zlib compression value
     _default_zlib_value = 6
-    # Encoding keys that should be cast to float
+    # Encoding keys that should be removed from attributes and placed in xarray encoding dict
     _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
 
     def __init__(self, dmr: str, data_filepath: Optional[str] = None):
@@ -67,7 +69,9 @@ class DMRParser:
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
 
-    def parse_dataset(self, group=None) -> xr.Dataset:
+    def parse_dataset(
+        self, group=None, indexes: Mapping[str, Index] = {}
+    ) -> xr.Dataset:
         """
         Parses the given file and creates a virtual xr.Dataset with ManifestArrays.
 
@@ -76,6 +80,10 @@ class DMRParser:
         group : str
             The group to parse. If None, and no groups are present, the dataset is parsed.
             If None and groups are present, the first group is parsed.
+
+        indexes : Mapping[str, Index], default is {}
+            Indexes to use on the returned xarray Dataset.
+            Default is {} which will avoid creating any indexes
 
         Returns
         -------
@@ -110,13 +118,16 @@ class DMRParser:
                 "/"
             )  # ensure group is in form "a/b/c"
         if self._is_hdf5(self.root):
-            return self._parse_hdf5_dataset(self.root, group)
+            return self._parse_hdf5_dataset(self.root, group, indexes)
         if self.data_filepath.endswith(".nc"):
-            return self._parse_netcdf4_dataset(self.root, group)
+            return self._parse_netcdf4_dataset(self.root, group, indexes)
         raise ValueError("DMR file must be HDF5 or netCDF4 based")
 
     def _parse_netcdf4_dataset(
-        self, root: ET.Element, group: Optional[str] = None
+        self,
+        root: ET.Element,
+        group: Optional[str] = None,
+        indexes: Mapping[str, Index] = {},
     ) -> xr.Dataset:
         """
         Parse the dataset from the netcdf4 based dmrpp with groups, starting at the given group.
@@ -143,14 +154,14 @@ class DMRParser:
                     "No groups found in NetCDF4 DMR file; ignoring group parameter"
                 )
             # no groups found and no group specified -> parse dataset
-            return self._parse_dataset(root)
+            return self._parse_dataset(root, indexes)
         all_groups = self._split_netcdf4(root)
         if group is None:
             # groups found and no group specified -> parse first group
-            return self._parse_dataset(group_tags[0])
+            return self._parse_dataset(group_tags[0], indexes)
         if group in all_groups:
             # groups found and group specified -> parse specified group
-            return self._parse_dataset(all_groups[group])
+            return self._parse_dataset(all_groups[group], indexes)
         else:
             # groups found and specified group not found -> error
             raise ValueError(f"Group {group} not found in NetCDF4 DMR file")
@@ -186,7 +197,10 @@ class DMRParser:
         return False
 
     def _parse_hdf5_dataset(
-        self, root: ET.Element, group: Optional[str] = None
+        self,
+        root: ET.Element,
+        group: Optional[str] = None,
+        indexes: Mapping[str, Index] = {},
     ) -> xr.Dataset:
         """
         Parse the dataset from the HDF5 based dmrpp with groups, starting at the given group.
@@ -201,13 +215,17 @@ class DMRParser:
             The group to parse. If None, and no groups are present, the dataset is parsed.
             If None and groups are present, the first group is parsed.
 
+        indexes : Mapping[str, Index], default is {}
+            Indexes to use on the returned xarray Dataset.
+            Default is {} which will avoid creating any indexes
+
         Returns
         -------
         xr.Dataset
         """
         all_groups = self._split_hdf5(root=root)
         if len(all_groups) == 0:
-            raise ValueError("No groups found in HDF based DMR file")
+            raise ValueError("No groups found in HDF based dmrpp file")
         if group is None:
             # pick a random group if no group is specified
             group = next(iter(all_groups))
@@ -218,14 +236,29 @@ class DMRParser:
         if group in all_groups:
             # replace aliased variable names with original names: gt1r_heights -> heights
             orignames = self._find_original_names(all_groups[group])
-            vds = self._parse_dataset(all_groups[group])
+            vds = self._parse_dataset(all_groups[group], indexes)
             # Only one group so found attrs are global attrs
             if len(all_groups) == 1:
                 vds.attrs.update(attrs)
             return vds.rename(orignames)
-        raise ValueError(f"Group {group} not found in HDF5 DMR file")
+        raise ValueError(f"Group {group} not found in HDF5 dmrpp file")
 
     def _find_original_names(self, root: ET.Element) -> dict[str, str]:
+        """
+        Find the original variable names from the HDF based groups. E.g. gt1r_heights -> heights
+
+        E.g. if the variable name is 'gt1r_heights', the original name is 'heights' from the group 'gt1r'.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The root element of the DMR file.
+
+        Returns
+        -------
+        dict[str, str]
+        """
+
         orignames: dict[str, str] = {}
         vars_tags: list[ET.Element] = []
         for dap_dtype in self._dap_np_dtype:
@@ -296,7 +329,9 @@ class DMRParser:
             groups_roots[next(iter(groups_roots))].extend(container_attr_tag)
         return groups_roots
 
-    def _parse_dataset(self, root: ET.Element) -> xr.Dataset:
+    def _parse_dataset(
+        self, root: ET.Element, indexes: Mapping[str, Index] = {}
+    ) -> xr.Dataset:
         """
         Parse the dataset using the root element of the DMR file.
 
@@ -332,7 +367,7 @@ class DMRParser:
             attrs.update(self._parse_attribute(attr_tag))
         return xr.Dataset(
             data_vars=data_vars,
-            coords=xr.Coordinates(coords=coord_vars, indexes={}),
+            coords=xr.Coordinates(coords=coord_vars, indexes=indexes),
             attrs=attrs,
         )
 
@@ -476,7 +511,7 @@ class DMRParser:
         )
         # Chunks and Filters
         filters = None
-        shape = tuple(dim_shapes.values())
+        shape: tuple[int] = tuple(dim_shapes.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmr:chunks", self._ns)
         if chunks_tag is not None:
@@ -490,8 +525,9 @@ class DMRParser:
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._ns):
             attrs.update(self._parse_attribute(attr_tag))
-        # Remove attributes only used for parsing logic
+        # Fill value is placed in encoding and thus removed from attributes
         fill_value = attrs.pop("_FillValue", 0.0)
+        # Remove attributes only used for parsing logic
         attrs.pop("fullnamepath", None)
         attrs.pop("origname", None)
         attrs.pop("coordinates", None)
@@ -615,7 +651,7 @@ class DMRParser:
         chunks_tag : ET.Element
             An ElementTree Element with a <chunks> tag.
 
-        chunks : tuple
+        chunks_shape : tuple
             Chunk sizes for each dimension. E.g. (1, 1447, 2895)
 
         Returns

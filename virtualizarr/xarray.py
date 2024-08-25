@@ -127,11 +127,18 @@ def open_virtual_dataset(
     if filetype == "dmrpp":
         from virtualizarr.readers.dmrpp import DMRParser
 
+        if loadable_variables != [] or cftime_variables != [] or indexes is None:
+            raise NotImplementedError(
+                "Specifying `loadable_variables`, `cftime_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+            )
+
         fpath = _fsspec_openfile_from_filepath(
             filepath=filepath, reader_options=reader_options
         )
         parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
-        return parser.parse_dataset()
+        vds = parser.parse_dataset()
+        vds.drop_vars(drop_variables)
+        return vds
     else:
         if reader_options is None:
             universal_filepath = UPath(filepath)
