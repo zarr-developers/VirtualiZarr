@@ -1,6 +1,6 @@
 from .manifests import ChunkManifest, ManifestArray  # type: ignore # noqa
-from .xarray import VirtualiZarrDatasetAccessor  # type: ignore # noqa
-from .xarray import open_virtual_dataset  # noqa: F401
+from .accessor import VirtualiZarrDatasetAccessor  # type: ignore # noqa
+from .backend import open_virtual_dataset  # noqa: F401
 
 from importlib.metadata import version as _version
 
