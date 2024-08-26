@@ -511,7 +511,7 @@ class DMRParser:
         )
         # Chunks and Filters
         filters = None
-        shape: tuple[int] = tuple(dim_shapes.values())
+        shape: tuple[int, ...] = tuple(dim_shapes.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmr:chunks", self._ns)
         if chunks_tag is not None:
