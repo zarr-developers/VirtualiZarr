@@ -137,7 +137,7 @@ def open_virtual_dataset(
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
-    if filetype == "dmrpp":
+    elif filetype.name.lower() == "dmrpp":
         from virtualizarr.readers.dmrpp import DMRParser
 
         if loadable_variables != [] or cftime_variables != [] or indexes is None:
