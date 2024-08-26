@@ -1,17 +1,16 @@
-from pathlib import Path
 import json
+from pathlib import Path
 from typing import Mapping
 
+import numcodecs
+import numpy as np
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
-import numpy as np
 
-import numcodecs
-
-from virtualizarr.zarr import ZArray
 from virtualizarr.backend import separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.zarr import ZArray
 
 
 def open_virtual_dataset_from_v3_store(

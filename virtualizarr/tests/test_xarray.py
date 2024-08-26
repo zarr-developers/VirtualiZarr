@@ -411,7 +411,7 @@ class TestLoadVirtualDataset:
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
-    @patch("virtualizarr.kerchunk.read_kerchunk_references_from_file")
+    @patch("virtualizarr.readers.kerchunk.read_kerchunk_references_from_file")
     def test_open_virtual_dataset_passes_expected_args(
         self, mock_read_kerchunk, netcdf4_file
     ):

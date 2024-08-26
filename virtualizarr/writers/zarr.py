@@ -1,10 +1,8 @@
-import json
 from pathlib import Path
 
+import numpy as np
 from xarray import Dataset
 from xarray.core.variable import Variable
-import numpy as np
-import numcodecs
 
 from virtualizarr.vendor.zarr.utils import json_dumps
 from virtualizarr.zarr import ZArray
@@ -115,4 +113,3 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
     metadata["attributes"] = attrs
 
     return metadata
-

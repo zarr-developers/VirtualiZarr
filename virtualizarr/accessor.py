@@ -1,17 +1,17 @@
+from pathlib import Path
 from typing import (
     Callable,
     Literal,
     overload,
 )
-from pathlib import Path
+
 import ujson  # type: ignore
+from xarray import Dataset, register_dataset_accessor
 
-from xarray import register_dataset_accessor, Dataset
-
-from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 from virtualizarr.kerchunk import KerchunkStoreRefs
-from virtualizarr.writers.zarr import dataset_to_zarr
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
+from virtualizarr.writers.zarr import dataset_to_zarr
 
 
 @register_dataset_accessor("virtualize")

@@ -1,14 +1,14 @@
 import base64
 import json
 from typing import cast
-import ujson
 
-from xarray import Dataset
-from xarray.core.variable import Variable
-from xarray.coding.times import CFDatetimeCoder
 import numpy as np
+import ujson
+from xarray import Dataset
+from xarray.coding.times import CFDatetimeCoder
+from xarray.core.variable import Variable
 
-from virtualizarr.kerchunk import KerchunkStoreRefs, KerchunkArrRefs
+from virtualizarr.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray
 
@@ -23,7 +23,6 @@ class NumpyEncoder(json.JSONEncoder):
         elif isinstance(obj, np.dtype):
             return str(obj)
         return json.JSONEncoder.default(self, obj)
-
 
 
 def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:

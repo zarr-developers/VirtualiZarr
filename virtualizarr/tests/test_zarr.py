@@ -6,7 +6,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import ManifestArray, open_virtual_dataset
-from virtualizarr.kerchunk import FileType
+from virtualizarr.backend import FileType
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.readers.zarr import metadata_from_zarr_json
 from virtualizarr.writers.zarr import dataset_to_zarr

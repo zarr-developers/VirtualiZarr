@@ -5,13 +5,15 @@ import ujson  # type: ignore
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.backend import dataset_from_kerchunk_refs
+from virtualizarr.backend import FileType
 from virtualizarr.kerchunk import (
-    FileType,
-    _automatically_determine_filetype,
     find_var_names,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.kerchunk import (
+    _automatically_determine_filetype,
+    dataset_from_kerchunk_refs,
+)
 
 
 def gen_ds_refs(

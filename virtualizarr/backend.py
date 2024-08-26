@@ -1,6 +1,7 @@
 import os
 import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
+from enum import Enum, auto
 from io import BufferedIOBase
 from typing import (
     Any,
@@ -15,12 +16,30 @@ from xarray.coding.times import CFDatetimeCoder
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
-import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
+
+
+class AutoName(Enum):
+    # Recommended by official Python docs for auto naming:
+    # https://docs.python.org/3/library/enum.html#using-automatic-values
+    def _generate_next_value_(name, start, count, last_values):
+        return name
+
+
+class FileType(AutoName):
+    netcdf3 = auto()
+    netcdf4 = auto()  # NOTE: netCDF4 is a subset of hdf5
+    hdf4 = auto()
+    hdf5 = auto()
+    grib = auto()
+    tiff = auto()
+    fits = auto()
+    zarr = auto()
+    dmrpp = auto()
+    zarr_v3 = auto()
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -144,12 +163,18 @@ def open_virtual_dataset(
         vds.drop_vars(drop_variables)
         return vds
     else:
+        from virtualizarr.kerchunk import fully_decode_arr_refs
+        from virtualizarr.readers.kerchunk import (
+            read_kerchunk_references_from_file,
+            virtual_vars_from_kerchunk_refs,
+        )
+
         if reader_options is None:
             reader_options = {}
 
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = kerchunk.read_kerchunk_references_from_file(
+        vds_refs = read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
             reader_options=reader_options,
@@ -159,7 +184,7 @@ def open_virtual_dataset(
             drop_variables=drop_variables + loadable_variables,
             virtual_array_class=virtual_array_class,
         )
-        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+        ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
         coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
@@ -224,92 +249,6 @@ def open_virtual_dataset(
         # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
         return vds
-
-
-def virtual_vars_from_kerchunk_refs(
-    refs: KerchunkStoreRefs,
-    drop_variables: list[str] | None = None,
-    virtual_array_class=ManifestArray,
-) -> dict[str, xr.Variable]:
-    """
-    Translate a store-level kerchunk reference dict into aaset of xarray Variables containing virtualized arrays.
-
-    Parameters
-    ----------
-    drop_variables: list[str], default is None
-        Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    """
-
-    var_names = kerchunk.find_var_names(refs)
-    if drop_variables is None:
-        drop_variables = []
-    var_names_to_keep = [
-        var_name for var_name in var_names if var_name not in drop_variables
-    ]
-
-    vars = {
-        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
-        for var_name in var_names_to_keep
-    }
-    return vars
-
-
-def dataset_from_kerchunk_refs(
-    refs: KerchunkStoreRefs,
-    drop_variables: list[str] = [],
-    virtual_array_class: type = ManifestArray,
-    indexes: MutableMapping[str, Index] | None = None,
-) -> xr.Dataset:
-    """
-    Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
-
-    drop_variables: list[str], default is None
-        Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    """
-
-    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
-    ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
-    coord_names = ds_attrs.pop("coordinates", [])
-
-    if indexes is None:
-        indexes = {}
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
-
-    vds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
-
-    return vds
-
-
-def variable_from_kerchunk_refs(
-    refs: KerchunkStoreRefs, var_name: str, virtual_array_class
-) -> xr.Variable:
-    """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
-
-    arr_refs = kerchunk.extract_array_refs(refs, var_name)
-    chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-    # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
-    dims = zattrs.pop("_ARRAY_DIMENSIONS")
-    if chunk_dict:
-        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
-    else:
-        # This means we encountered a scalar variable of dimension 0,
-        # very likely that it actually has no numeric value and its only purpose
-        # is to communicate dataset attributes.
-        varr = zarray.fill_value
-
-    return xr.Variable(data=varr, dims=dims, attrs=zattrs)
 
 
 def separate_coords(
