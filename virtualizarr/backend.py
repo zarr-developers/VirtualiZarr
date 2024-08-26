@@ -163,8 +163,9 @@ def open_virtual_dataset(
         vds.drop_vars(drop_variables)
         return vds
     else:
-        from virtualizarr.kerchunk import fully_decode_arr_refs
+        # we currently read every other filetype using kerchunks various file format backends
         from virtualizarr.readers.kerchunk import (
+            fully_decode_arr_refs,
             read_kerchunk_references_from_file,
             virtual_vars_from_kerchunk_refs,
         )

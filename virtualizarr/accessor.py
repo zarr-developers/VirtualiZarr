@@ -8,8 +8,8 @@ from typing import (
 import ujson  # type: ignore
 from xarray import Dataset, register_dataset_accessor
 
-from virtualizarr.kerchunk import KerchunkStoreRefs
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 from virtualizarr.writers.zarr import dataset_to_zarr
 

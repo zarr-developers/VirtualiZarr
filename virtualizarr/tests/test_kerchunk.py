@@ -2,12 +2,10 @@ import numpy as np
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.kerchunk import (
-    find_var_names,
-)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.kerchunk import (
     dataset_from_kerchunk_refs,
+    find_var_names,
 )
 
 

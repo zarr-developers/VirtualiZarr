@@ -3,7 +3,7 @@ from typing import Any, Callable, Union
 
 import numpy as np
 
-from ..kerchunk import KerchunkArrRefs
+from ..types.kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
 from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS, _isnan
 from .manifest import ChunkManifest
@@ -61,7 +61,10 @@ class ManifestArray:
 
     @classmethod
     def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
-        from virtualizarr.kerchunk import fully_decode_arr_refs, parse_array_refs
+        from virtualizarr.readers.kerchunk import (
+            fully_decode_arr_refs,
+            parse_array_refs,
+        )
 
         decoded_arr_refs = fully_decode_arr_refs(arr_refs)
 

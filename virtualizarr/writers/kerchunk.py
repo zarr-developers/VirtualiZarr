@@ -8,8 +8,8 @@ from xarray import Dataset
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.variable import Variable
 
-from virtualizarr.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.manifests.manifest import join
+from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.zarr import ZArray
 
 

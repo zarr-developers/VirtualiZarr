@@ -1,21 +1,20 @@
 import warnings
 from pathlib import Path
-from typing import Any, MutableMapping, Optional
+from typing import Any, MutableMapping, Optional, cast
 
+import ujson
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
 from virtualizarr.backend import FileType, separate_coords
-from virtualizarr.kerchunk import (
-    KerchunkStoreRefs,
-    extract_array_refs,
-    find_var_names,
-    fully_decode_arr_refs,
-    parse_array_refs,
-)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.types.kerchunk import (
+    KerchunkArrRefs,
+    KerchunkStoreRefs,
+)
 from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.zarr import ZArray, ZAttrs
 
 
 # TODO shouldn't this live in backend.py? Because it's not just useful for the kerchunk-specific readers...
@@ -208,3 +207,58 @@ def variable_from_kerchunk_refs(
         varr = zarray.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
+
+
+def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
+    """Find the names of zarr variables in this store/group."""
+
+    refs = ds_reference_dict["refs"]
+    found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
+    return list(found_var_names)
+
+
+def extract_array_refs(
+    ds_reference_dict: KerchunkStoreRefs, var_name: str
+) -> KerchunkArrRefs:
+    """Extract only the part of the kerchunk reference dict that is relevant to this one zarr array"""
+
+    found_var_names = find_var_names(ds_reference_dict)
+
+    refs = ds_reference_dict["refs"]
+    if var_name in found_var_names:
+        # TODO these function probably have more loops in them than they need to...
+
+        arr_refs = {
+            key.split("/")[1]: refs[key]
+            for key in refs.keys()
+            if var_name == key.split("/")[0]
+        }
+
+        return fully_decode_arr_refs(arr_refs)
+    else:
+        raise KeyError(
+            f"Could not find zarr array variable name {var_name}, only {found_var_names}"
+        )
+
+
+def parse_array_refs(
+    arr_refs: KerchunkArrRefs,
+) -> tuple[dict, ZArray, ZAttrs]:
+    zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
+    zattrs = arr_refs.pop(".zattrs", {})
+    chunk_dict = arr_refs
+
+    return chunk_dict, zarray, zattrs
+
+
+def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:
+    """
+    Only have to do this because kerchunk.SingleHdf5ToZarr apparently doesn't bother converting .zarray and .zattrs contents to dicts, see https://github.com/fsspec/kerchunk/issues/415 .
+    """
+    sanitized = d.copy()
+    for k, v in d.items():
+        if k.startswith("."):
+            # ensure contents of .zattrs and .zarray are python dictionaries
+            sanitized[k] = ujson.loads(v)
+
+    return cast(KerchunkArrRefs, sanitized)
