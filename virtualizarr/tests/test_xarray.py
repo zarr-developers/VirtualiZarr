@@ -481,7 +481,7 @@ class TestRenamePaths:
 
 def test_cftime_index(tmpdir):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
-
+    # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
     ds = xr.Dataset(
         data_vars={
             "tasmax": (["time", "lat", "lon"], np.random.rand(2, 18, 36)),
