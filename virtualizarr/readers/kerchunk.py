@@ -1,16 +1,20 @@
-
-from typing import Optional, Any
-from pathlib import Path
 import warnings
-from typing import MutableMapping
+from pathlib import Path
+from typing import Any, MutableMapping, Optional
 
-from xarray.core.variable import Variable
-from xarray.core.indexes import Index
 from xarray import Dataset
+from xarray.core.indexes import Index
+from xarray.core.variable import Variable
 
-from virtualizarr.kerchunk import KerchunkStoreRefs, find_var_names, extract_array_refs, parse_array_refs, fully_decode_arr_refs
-from virtualizarr.manifests import ManifestArray, ChunkManifest
-from virtualizarr.backend import separate_coords, FileType
+from virtualizarr.backend import FileType, separate_coords
+from virtualizarr.kerchunk import (
+    KerchunkStoreRefs,
+    extract_array_refs,
+    find_var_names,
+    fully_decode_arr_refs,
+    parse_array_refs,
+)
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 
 
@@ -118,7 +122,6 @@ def read_kerchunk_references_from_file(
 
     # TODO validate the references that were read before returning?
     return refs
-
 
 
 def virtual_vars_from_kerchunk_refs(
