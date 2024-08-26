@@ -253,7 +253,7 @@ class TestOpenVirtualDatasetIndexes:
     def test_create_default_indexes(self, netcdf4_file):
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
             vds = open_virtual_dataset(netcdf4_file, indexes=None)
-        ds = xr.open_dataset(netcdf4_file, decode_times=False)
+        ds = xr.open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -398,7 +398,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file, decode_times=False)
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
 
         for name in full_ds.variables:
             if name in vars_to_load:
@@ -479,8 +479,22 @@ class TestRenamePaths:
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
 
 
-def test_cftime_variables_must_be_in_loadable_variables(tmpdir):
-    ds = xr.Dataset(data_vars={"time": ["2024-06-21"]})
-    ds.to_netcdf(f"{tmpdir}/scalar.nc")
-    with pytest.raises(ValueError, match="'time' not in"):
-        open_virtual_dataset(f"{tmpdir}/scalar.nc", cftime_variables=["time"])
+def test_cftime_index(tmpdir):
+    """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
+
+    ds = xr.Dataset(
+        data_vars={
+            "tasmax": (["time", "lat", "lon"], np.random.rand(2, 18, 36)),
+        },
+        coords={
+            "time": np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]"),
+            "lat": np.arange(-90, 90, 10),
+            "lon": np.arange(-180, 180, 10),
+        },
+    )
+    ds.to_netcdf(f"{tmpdir}/tmp.nc")
+    vds = open_virtual_dataset(
+        f"{tmpdir}/tmp.nc", loadable_variables=["time", "lat", "lon"], indexes={}
+    )
+    # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
+    assert index_mappings_equal(vds.xindexes, ds.xindexes)

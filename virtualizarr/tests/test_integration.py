@@ -92,13 +92,11 @@ class TestKerchunkRoundtrip:
             f"{tmpdir}/air1.nc",
             indexes={},
             loadable_variables=time_vars,
-            cftime_variables=time_vars,
         )
         vds2 = open_virtual_dataset(
             f"{tmpdir}/air2.nc",
             indexes={},
             loadable_variables=time_vars,
-            cftime_variables=time_vars,
         )
 
         if decode_times is False:
