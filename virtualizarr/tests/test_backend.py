@@ -1,17 +1,77 @@
 from collections.abc import Mapping
 from unittest.mock import patch
 
-import pytest
 import numpy as np
-
-from xarray import open_dataset
+import pytest
 import xarray as xr
-from xarray.core.indexes import Index
 import xarray.testing as xrt
+from xarray import open_dataset
+from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.backend import FileType
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.readers.kerchunk import _automatically_determine_filetype
 from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
+
+
+def test_automatically_determine_filetype_netcdf3_netcdf4():
+    # test the NetCDF3 vs NetCDF4 automatic file type selection
+
+    ds = xr.Dataset({"a": (["x"], [0, 1])})
+    netcdf3_file_path = "/tmp/netcdf3.nc"
+    netcdf4_file_path = "/tmp/netcdf4.nc"
+
+    # write two version of NetCDF
+    ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
+    ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
+
+    assert FileType("netcdf3") == _automatically_determine_filetype(
+        filepath=netcdf3_file_path
+    )
+    assert FileType("hdf5") == _automatically_determine_filetype(
+        filepath=netcdf4_file_path
+    )
+
+
+@pytest.mark.parametrize(
+    "filetype,headerbytes",
+    [
+        ("netcdf3", b"CDF"),
+        ("hdf5", b"\x89HDF"),
+        ("grib", b"GRIB"),
+        ("tiff", b"II*"),
+        ("fits", b"SIMPLE"),
+    ],
+)
+def test_valid_filetype_bytes(tmp_path, filetype, headerbytes):
+    filepath = tmp_path / "file.abc"
+    with open(filepath, "wb") as f:
+        f.write(headerbytes)
+    assert FileType(filetype) == _automatically_determine_filetype(filepath=filepath)
+
+
+def test_notimplemented_filetype(tmp_path):
+    for headerbytes in [b"JUNK", b"\x0e\x03\x13\x01"]:
+        filepath = tmp_path / "file.abc"
+        with open(filepath, "wb") as f:
+            f.write(headerbytes)
+        with pytest.raises(NotImplementedError):
+            _automatically_determine_filetype(filepath=filepath)
+
+
+def test_FileType():
+    # tests if FileType converts user supplied strings to correct filetype
+    assert "netcdf3" == FileType("netcdf3").name
+    assert "netcdf4" == FileType("netcdf4").name
+    assert "hdf4" == FileType("hdf4").name
+    assert "hdf5" == FileType("hdf5").name
+    assert "grib" == FileType("grib").name
+    assert "tiff" == FileType("tiff").name
+    assert "fits" == FileType("fits").name
+    assert "zarr" == FileType("zarr").name
+    with pytest.raises(ValueError):
+        FileType(None)
 
 
 class TestOpenVirtualDatasetIndexes:
@@ -42,7 +102,6 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
             return False
 
     return True
-
 
 
 @network

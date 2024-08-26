@@ -1,21 +1,23 @@
 import itertools
 from typing import Optional
 
-import numpy as np
-import hypothesis.strategies as st
 import hypothesis.extra.numpy as npst
+import hypothesis.strategies as st
+import numpy as np
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray, ceildiv
 
 # TODO what's the official list here? There's nothing in https://zarr-specs.readthedocs.io/en/latest/v3/data-types.html ...
-#VALID_ZARR_DTYPES = [np.dtype('float32'), ...]
+# VALID_ZARR_DTYPES = [np.dtype('float32'), ...]
 VALID_ZARR_DTYPES = npst.scalar_dtypes()
 
 
 def create_manifestarray(
-    shape: tuple[int, ...], chunks: tuple[int, ...], dtype: np.dtype,
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
+    dtype: np.dtype,
 ) -> ManifestArray:
     """
     Create an example ManifestArray with sensible defaults.
@@ -79,20 +81,15 @@ def variables(
     chunks: Optional[tuple[int, ...]] = None,
     dtype: Optional[np.dtype] = None,
 ) -> ManifestArray:
-    
-
     if chunks is None:
         arr_ndim = len(shape)
         # TODO this may generate invalid chunk shapes...
         chunks = draw(
-            npst.array_shapes(
-                min_dims=arr_ndim, max_dims=arr_ndim, max_side=max(shape)
-            )
+            npst.array_shapes(min_dims=arr_ndim, max_dims=arr_ndim, max_side=max(shape))
         )
-    
+
     return create_manifestarray(
-        shape=shape, 
-        chunks=chunks, 
+        shape=shape,
+        chunks=chunks,
         dtype=dtype if dtype is not None else draw(VALID_ZARR_DTYPES),
     )
-    
