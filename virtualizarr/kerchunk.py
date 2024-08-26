@@ -43,6 +43,7 @@ class FileType(AutoName):
     fits = auto()
     zarr = auto()
     dmrpp = auto()
+    zarr_v3 = auto()
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -72,18 +73,18 @@ def read_kerchunk_references_from_file(
     filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
-    reader_options: dict, default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+    reader_options: dict, default {}
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
     """
+
+    if reader_options is None:
+        reader_options = {}
 
     if filetype is None:
         filetype = _automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
-
-    if reader_options is None:
-        reader_options = {}
 
     # if filetype is user defined, convert to FileType
     filetype = FileType(filetype)
@@ -129,7 +130,7 @@ def read_kerchunk_references_from_file(
 def _automatically_determine_filetype(
     *,
     filepath: str,
-    reader_options: Optional[dict[str, Any]] = None,
+    reader_options: Optional[dict[str, Any]] = {},
 ) -> FileType:
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
@@ -224,7 +225,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     all_arr_refs = {}
     for var_name, var in ds.variables.items():
-        arr_refs = variable_to_kerchunk_arr_refs(var, var_name)
+        arr_refs = variable_to_kerchunk_arr_refs(var, str(var_name))
 
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
@@ -234,7 +235,7 @@ def dataset_to_kerchunk_refs(ds: xr.Dataset) -> KerchunkStoreRefs:
 
     zattrs = ds.attrs
     if ds.coords:
-        coord_names = list(ds.coords)
+        coord_names = [str(x) for x in ds.coords]
         # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
         # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
         zattrs["coordinates"] = " ".join(coord_names)
@@ -303,6 +304,7 @@ def variable_to_kerchunk_arr_refs(var: xr.Variable, var_name: str) -> KerchunkAr
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
+            fill_value=None,
         )
 
     zarray_dict = zarray.to_kerchunk_json()

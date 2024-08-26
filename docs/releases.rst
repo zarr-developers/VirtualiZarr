@@ -20,6 +20,10 @@ Breaking changes
 
 - Serialize valid ZarrV3 metadata and require full compressor numcodec config (for :pull:`193`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+- VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
+  `pydantic.BaseModel` (:pull:`210`)
+- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
+
 
 Deprecations
 ~~~~~~~~~~~~
@@ -29,6 +33,9 @@ Bug fixes
 
 - Exclude empty chunks during `ChunkDict` construction. (:pull:`198`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+- Fixed regression in `fill_value` handling for datetime dtypes making virtual
+  Zarr stores unreadable (:pr:`206`)
+  By `Timothy Hodson <https://github.com/thodson-usgs>`_
 
 Documentation
 ~~~~~~~~~~~~~

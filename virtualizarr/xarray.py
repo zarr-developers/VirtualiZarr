@@ -1,18 +1,22 @@
+import os
 import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
+from io import BufferedIOBase
 from pathlib import Path
 from typing import (
+    Any,
     Callable,
+    Hashable,
     Literal,
     Optional,
+    cast,
     overload,
 )
 
 import ujson  # type: ignore
 import xarray as xr
-from upath import UPath
 from xarray import register_dataset_accessor
-from xarray.backends import BackendArray
+from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
@@ -26,6 +30,8 @@ from virtualizarr.zarr import (
     dataset_to_zarr,
     metadata_from_zarr_json,
 )
+
+XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -76,7 +82,7 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    reader_options: dict, default {'storage_options': {'key': '', 'secret': '', 'anon': True}}
+    reader_options: dict, default {}
         Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
         Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
 
@@ -85,6 +91,9 @@ def open_virtual_dataset(
     vds
         An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
+    loadable_vars: dict[str, xr.Variable]
+    virtual_vars: dict[str, xr.Variable]
+    vars: dict[str, xr.Variable]
 
     if drop_variables is None:
         drop_variables = []
@@ -119,7 +128,11 @@ def open_virtual_dataset(
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
-    if filetype == "zarr_v3":
+    # if filetype is user defined, convert to FileType
+    if filetype is not None:
+        filetype = FileType(filetype)
+
+    if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
@@ -141,14 +154,7 @@ def open_virtual_dataset(
         return vds
     else:
         if reader_options is None:
-            universal_filepath = UPath(filepath)
-            protocol = universal_filepath.protocol
-            if protocol == "s3":
-                reader_options = {
-                    "storage_options": {"key": "", "secret": "", "anon": True}
-                }
-            else:
-                reader_options = {}
+            reader_options = {}
 
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
@@ -173,8 +179,13 @@ def open_virtual_dataset(
                 filepath=filepath, reader_options=reader_options
             )
 
+            # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
+            # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
+
             ds = xr.open_dataset(
-                fpath, drop_variables=drop_variables, decode_times=False
+                cast(XArrayOpenT, fpath),
+                drop_variables=drop_variables,
+                decode_times=False,
             )
 
             if indexes is None:
@@ -192,7 +203,7 @@ def open_virtual_dataset(
                 indexes = dict(**indexes)  # for type hinting: to allow mutation
 
             loadable_vars = {
-                name: var
+                str(name): var
                 for name, var in ds.variables.items()
                 if name in loadable_variables
             }
@@ -280,7 +291,7 @@ def virtual_vars_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] | None = None,
     virtual_array_class=ManifestArray,
-) -> Mapping[str, xr.Variable]:
+) -> dict[str, xr.Variable]:
     """
     Translate a store-level kerchunk reference dict into aaset of xarray Variables containing virtualized arrays.
 
@@ -366,7 +377,7 @@ def separate_coords(
     vars: Mapping[str, xr.Variable],
     indexes: MutableMapping[str, Index],
     coord_names: Iterable[str] | None = None,
-) -> tuple[Mapping[str, xr.Variable], xr.Coordinates]:
+) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
@@ -380,7 +391,9 @@ def separate_coords(
 
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
-    coord_vars = {}
+    coord_vars: dict[
+        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
+    ] = {}
     for name, var in vars.items():
         if name in coord_names or var.dims == (name,):
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
@@ -391,7 +404,7 @@ def separate_coords(
                 if isinstance(var, IndexVariable):
                     # unless variable actually already is a loaded IndexVariable,
                     # in which case we need to keep it and add the corresponding indexes explicitly
-                    coord_vars[name] = var
+                    coord_vars[str(name)] = var
                     # TODO this seems suspect - will it handle datetimes?
                     indexes[name] = PandasIndex(var, dim1d)
             else:

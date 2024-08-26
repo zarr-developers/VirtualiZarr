@@ -12,6 +12,10 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   test:
@@ -41,6 +45,10 @@ jobs:
         run: |
           conda env list
           conda list
+
+      - name: Type check
+        run: |
+          mypy virtualizarr
 
       - name: Running Tests
         run: |
