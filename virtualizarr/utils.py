@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def _fsspec_openfile_from_filepath(
     *,
     filepath: str,
-    reader_options: Optional[dict] = {},
+    reader_options: Optional[dict] = None,
 ) -> OpenFileType:
     """Converts input filepath to fsspec openfile object.
 
@@ -43,6 +43,9 @@ def _fsspec_openfile_from_filepath(
 
     universal_filepath = UPath(filepath)
     protocol = universal_filepath.protocol
+
+    if reader_options is None:
+        reader_options = {}
 
     storage_options = reader_options.get("storage_options", {})  # type: ignore
 
