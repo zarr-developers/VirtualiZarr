@@ -7,7 +7,11 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backend import FileType, separate_coords
+from virtualizarr.backend import (
+    FileType,
+    construct_virtual_dataset,
+    determine_cf_coords,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -176,14 +180,10 @@ def dataset_from_kerchunk_refs(
 
     if indexes is None:
         indexes = {}
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
 
-    vds = Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+    decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, ds_attrs)
+
+    vds = construct_virtual_dataset(decoded_vars, indexes, decoded_attrs, coord_names)
 
     return vds
 

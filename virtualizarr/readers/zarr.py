@@ -8,7 +8,7 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backend import separate_coords
+from virtualizarr.backend import construct_virtual_dataset, determine_cf_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
@@ -53,16 +53,11 @@ def open_virtual_dataset_from_v3_store(
     else:
         indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
+    decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, attrs)
 
-    ds = Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+    vds = construct_virtual_dataset(decoded_vars, indexes, decoded_attrs, coord_names)
 
-    return ds
+    return vds
 
 
 def attrs_from_zarr_group_json(filepath: Path) -> dict:

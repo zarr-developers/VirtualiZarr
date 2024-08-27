@@ -7,19 +7,26 @@ from typing import (
     Any,
     Hashable,
     Optional,
+    TypeAlias,
     cast,
 )
 
 import xarray as xr
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
+from xarray.conventions import decode_cf_variables
 from xarray.core.indexes import Index, PandasIndex
-from xarray.core.variable import IndexVariable
+from xarray.core.variable import IndexVariable, Variable
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
+
+T_Attrs = MutableMapping[Any, Any]
+T_Variables = Mapping[Any, Variable]
+# alias for (dims, data, attrs, encoding)
+T_VariableExpanded: TypeAlias = tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]]
 
 
 class AutoName(Enum):
@@ -238,43 +245,56 @@ def open_virtual_dataset(
 
         vars = {**virtual_vars, **loadable_vars}
 
-        data_vars, coords = separate_coords(vars, indexes, coord_names)
+        decoded_vars, decoded_attrs, coord_names = determine_cf_coords(vars, ds_attrs)
 
-        vds = xr.Dataset(
-            data_vars,
-            coords=coords,
-            # indexes={},  # TODO should be added in a later version of xarray
-            attrs=ds_attrs,
+        vds = construct_virtual_dataset(
+            decoded_vars, indexes, decoded_attrs, coord_names
         )
-
-        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
         return vds
 
 
-def separate_coords(
+def determine_cf_coords(
+    variables: T_Variables,
+    attributes: T_Attrs,
+) -> tuple[T_Variables, T_Attrs, set[Hashable]]:
+    """
+    Determines which variables are coordinate variables according to CF conventions.
+
+    Should not actually do any decoding of values in the variables, only inspect and possibly alter their metadata.
+    """
+    new_vars, attrs, coord_names = decode_cf_variables(
+        variables=variables,
+        attributes=attributes,
+        concat_characters=False,
+        mask_and_scale=False,
+        decode_times=False,
+        decode_coords="all",
+        drop_variables=None,  # should have already been dropped
+        use_cftime=False,  # done separately, to only the loadable_vars
+        decode_timedelta=False,  # done separately, to only the loadable_vars
+    )
+    return new_vars, attrs, coord_names
+
+
+def construct_virtual_dataset(
     vars: Mapping[str, xr.Variable],
     indexes: MutableMapping[str, Index],
+    attrs: T_Attrs,
     coord_names: Iterable[str] | None = None,
-) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
+) -> xr.Dataset:
     """
-    Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
+    Constructs the virtual dataset but without automatically building a pandas.Index for 1D coordinates.
 
     Currently requires this function as a workaround unless xarray PR #8124 is merged.
 
     Will also preserve any loaded variables and indexes it is passed.
     """
 
-    if coord_names is None:
-        coord_names = []
-
-    # split data and coordinate variables (promote dimension coordinates)
+    coord_vars: dict[str, T_VariableExpanded | xr.Variable] = {}
     data_vars = {}
-    coord_vars: dict[
-        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
-    ] = {}
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if name in coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
@@ -293,4 +313,24 @@ def separate_coords(
 
     coords = xr.Coordinates(coord_vars, indexes=indexes)
 
-    return data_vars, coords
+    print(indexes)
+
+    print(coords)
+    print(type(coords))
+
+    print(data_vars)
+
+    print(list(type(var._data) for var in data_vars.values()))
+    print(list(type(var.data) for var in data_vars.values()))
+
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=attrs,
+    )
+
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+    # TODO see how it's done inside `xr.decode_cf`
+
+    return vds

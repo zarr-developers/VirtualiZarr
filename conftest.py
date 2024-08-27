@@ -54,6 +54,19 @@ def netcdf4_files(tmpdir):
 
 
 @pytest.fixture
+def netcdf4_file_with_2d_coords(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("ROMS_example.nc")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/ROMS_example.nc"
+    ds.to_netcdf(filepath, format="NETCDF4")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def hdf5_empty(tmpdir):
     filepath = f"{tmpdir}/empty.nc"
     f = h5py.File(filepath, "w")
