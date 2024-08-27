@@ -21,7 +21,7 @@ Manifests
 Reading
 =======
 
-.. currentmodule:: virtualizarr.xarray
+.. currentmodule:: virtualizarr.backend
 .. autosummary::
     :nosignatures:
     :toctree: generated/
@@ -32,7 +32,7 @@ Reading
 Serialization
 =============
 
-.. currentmodule:: virtualizarr.xarray
+.. currentmodule:: virtualizarr.accessor
 .. autosummary::
     :nosignatures:
     :toctree: generated/
@@ -44,7 +44,7 @@ Serialization
 Rewriting
 =============
 
-.. currentmodule:: virtualizarr.xarray
+.. currentmodule:: virtualizarr.accessor
 .. autosummary::
     :nosignatures:
     :toctree: generated/
