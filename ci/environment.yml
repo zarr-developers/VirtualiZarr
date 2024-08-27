@@ -9,7 +9,6 @@ dependencies:
   - netcdf4
   - xarray>=2024.6.0
   - kerchunk>=0.2.5
-  - pydantic
   - numpy>=2.0.0
   - ujson
   - packaging
@@ -17,7 +16,9 @@ dependencies:
   # Testing
   - codecov
   - pre-commit
+  - mypy
   - ruff
+  - pandas-stubs
   - pytest-mypy
   - pytest-cov
   - pytest
