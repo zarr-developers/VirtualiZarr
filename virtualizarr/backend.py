@@ -1,37 +1,45 @@
 import os
 import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
+from enum import Enum, auto
 from io import BufferedIOBase
-from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Hashable,
-    Literal,
     Optional,
     cast,
-    overload,
 )
 
-import ujson  # type: ignore
 import xarray as xr
-from xarray import register_dataset_accessor
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
-import virtualizarr.kerchunk as kerchunk
-from virtualizarr.kerchunk import FileType, KerchunkStoreRefs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
-from virtualizarr.zarr import (
-    attrs_from_zarr_group_json,
-    dataset_to_zarr,
-    metadata_from_zarr_json,
-)
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
+
+
+class AutoName(Enum):
+    # Recommended by official Python docs for auto naming:
+    # https://docs.python.org/3/library/enum.html#using-automatic-values
+    def _generate_next_value_(name, start, count, last_values):
+        return name
+
+
+class FileType(AutoName):
+    netcdf3 = auto()
+    netcdf4 = auto()  # NOTE: netCDF4 is a subset of hdf5
+    hdf4 = auto()
+    hdf5 = auto()
+    grib = auto()
+    tiff = auto()
+    fits = auto()
+    zarr = auto()
+    dmrpp = auto()
+    zarr_v3 = auto()
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -134,6 +142,8 @@ def open_virtual_dataset(
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
+        from virtualizarr.readers.zarr import open_virtual_dataset_from_v3_store
+
         return open_virtual_dataset_from_v3_store(
             storepath=filepath, drop_variables=drop_variables, indexes=indexes
         )
@@ -153,12 +163,19 @@ def open_virtual_dataset(
         vds.drop_vars(drop_variables)
         return vds
     else:
+        # we currently read every other filetype using kerchunks various file format backends
+        from virtualizarr.readers.kerchunk import (
+            fully_decode_arr_refs,
+            read_kerchunk_references_from_file,
+            virtual_vars_from_kerchunk_refs,
+        )
+
         if reader_options is None:
             reader_options = {}
 
         # this is the only place we actually always need to use kerchunk directly
         # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = kerchunk.read_kerchunk_references_from_file(
+        vds_refs = read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
             reader_options=reader_options,
@@ -168,7 +185,7 @@ def open_virtual_dataset(
             drop_variables=drop_variables + loadable_variables,
             virtual_array_class=virtual_array_class,
         )
-        ds_attrs = kerchunk.fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+        ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
         coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
@@ -235,144 +252,6 @@ def open_virtual_dataset(
         return vds
 
 
-def open_virtual_dataset_from_v3_store(
-    storepath: str,
-    drop_variables: list[str],
-    indexes: Mapping[str, Index] | None,
-) -> xr.Dataset:
-    """
-    Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
-    """
-    _storepath = Path(storepath)
-
-    ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
-    coord_names = ds_attrs.pop("coordinates", [])
-
-    # TODO recursive glob to create a datatree
-    # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
-    # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
-    all_paths = _storepath.glob("*/")
-    directory_paths = [p for p in all_paths if not p.is_file()]
-
-    vars = {}
-    for array_dir in directory_paths:
-        var_name = array_dir.name
-        if var_name in drop_variables:
-            break
-
-        zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
-        manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
-
-        marr = ManifestArray(chunkmanifest=manifest, zarray=zarray)
-        var = xr.Variable(data=marr, dims=dim_names, attrs=attrs)
-        vars[var_name] = var
-
-    if indexes is None:
-        raise NotImplementedError()
-    elif indexes != {}:
-        # TODO allow manual specification of index objects
-        raise NotImplementedError()
-    else:
-        indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
-
-    ds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
-
-    return ds
-
-
-def virtual_vars_from_kerchunk_refs(
-    refs: KerchunkStoreRefs,
-    drop_variables: list[str] | None = None,
-    virtual_array_class=ManifestArray,
-) -> dict[str, xr.Variable]:
-    """
-    Translate a store-level kerchunk reference dict into aaset of xarray Variables containing virtualized arrays.
-
-    Parameters
-    ----------
-    drop_variables: list[str], default is None
-        Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    """
-
-    var_names = kerchunk.find_var_names(refs)
-    if drop_variables is None:
-        drop_variables = []
-    var_names_to_keep = [
-        var_name for var_name in var_names if var_name not in drop_variables
-    ]
-
-    vars = {
-        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
-        for var_name in var_names_to_keep
-    }
-    return vars
-
-
-def dataset_from_kerchunk_refs(
-    refs: KerchunkStoreRefs,
-    drop_variables: list[str] = [],
-    virtual_array_class: type = ManifestArray,
-    indexes: MutableMapping[str, Index] | None = None,
-) -> xr.Dataset:
-    """
-    Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
-
-    drop_variables: list[str], default is None
-        Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    """
-
-    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
-    ds_attrs = kerchunk.fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
-    coord_names = ds_attrs.pop("coordinates", [])
-
-    if indexes is None:
-        indexes = {}
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
-
-    vds = xr.Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
-
-    return vds
-
-
-def variable_from_kerchunk_refs(
-    refs: KerchunkStoreRefs, var_name: str, virtual_array_class
-) -> xr.Variable:
-    """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
-
-    arr_refs = kerchunk.extract_array_refs(refs, var_name)
-    chunk_dict, zarray, zattrs = kerchunk.parse_array_refs(arr_refs)
-    # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
-    dims = zattrs.pop("_ARRAY_DIMENSIONS")
-    if chunk_dict:
-        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
-    else:
-        # This means we encountered a scalar variable of dimension 0,
-        # very likely that it actually has no numeric value and its only purpose
-        # is to communicate dataset attributes.
-        varr = zarray.fill_value
-
-    return xr.Variable(data=varr, dims=dims, attrs=zattrs)
-
-
 def separate_coords(
     vars: Mapping[str, xr.Variable],
     indexes: MutableMapping[str, Index],
@@ -415,155 +294,3 @@ def separate_coords(
     coords = xr.Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
-
-
-@register_dataset_accessor("virtualize")
-class VirtualiZarrDatasetAccessor:
-    """
-    Xarray accessor for writing out virtual datasets to disk.
-
-    Methods on this object are called via `ds.virtualize.{method}`.
-    """
-
-    def __init__(self, ds: xr.Dataset):
-        self.ds: xr.Dataset = ds
-
-    def to_zarr(self, storepath: str) -> None:
-        """
-        Serialize all virtualized arrays in this xarray dataset as a Zarr store.
-
-        Currently requires all variables to be backed by ManifestArray objects.
-
-        Not very useful until some implementation of a Zarr reader can actually read these manifest.json files.
-        See https://github.com/zarr-developers/zarr-specs/issues/287
-
-        Parameters
-        ----------
-        storepath : str
-        """
-        dataset_to_zarr(self.ds, storepath)
-
-    @overload
-    def to_kerchunk(
-        self, filepath: None, format: Literal["dict"]
-    ) -> KerchunkStoreRefs: ...
-
-    @overload
-    def to_kerchunk(self, filepath: str | Path, format: Literal["json"]) -> None: ...
-
-    @overload
-    def to_kerchunk(
-        self,
-        filepath: str | Path,
-        format: Literal["parquet"],
-        record_size: int = 100_000,
-        categorical_threshold: int = 10,
-    ) -> None: ...
-
-    def to_kerchunk(
-        self,
-        filepath: str | Path | None = None,
-        format: Literal["dict", "json", "parquet"] = "dict",
-        record_size: int = 100_000,
-        categorical_threshold: int = 10,
-    ) -> KerchunkStoreRefs | None:
-        """
-        Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
-
-        Parameters
-        ----------
-        filepath : str, default: None
-            File path to write kerchunk references into. Not required if format is 'dict'.
-        format : 'dict', 'json', or 'parquet'
-            Format to serialize the kerchunk references as.
-            If 'json' or 'parquet' then the 'filepath' argument is required.
-        record_size (parquet only): int
-            Number of references to store in each reference file (default 100,000). Bigger values
-            mean fewer read requests but larger memory footprint.
-        categorical_threshold (parquet only) : int
-            Encode urls as pandas.Categorical to reduce memory footprint if the ratio
-            of the number of unique urls to total number of refs for each variable
-            is greater than or equal to this number. (default 10)
-
-        References
-        ----------
-        https://fsspec.github.io/kerchunk/spec.html
-        """
-        refs = kerchunk.dataset_to_kerchunk_refs(self.ds)
-
-        if format == "dict":
-            return refs
-        elif format == "json":
-            if filepath is None:
-                raise ValueError("Filepath must be provided when format is 'json'")
-
-            with open(filepath, "w") as json_file:
-                ujson.dump(refs, json_file)
-
-            return None
-        elif format == "parquet":
-            from kerchunk.df import refs_to_dataframe
-
-            if isinstance(filepath, Path):
-                url = str(filepath)
-            elif isinstance(filepath, str):
-                url = filepath
-
-            # refs_to_dataframe is responsible for writing to parquet.
-            # at no point does it create a full in-memory dataframe.
-            refs_to_dataframe(
-                refs,
-                url=url,
-                record_size=record_size,
-                categorical_threshold=categorical_threshold,
-            )
-            return None
-        else:
-            raise ValueError(f"Unrecognized output format: {format}")
-
-    def rename_paths(
-        self,
-        new: str | Callable[[str], str],
-    ) -> xr.Dataset:
-        """
-        Rename paths to chunks in every ManifestArray in this dataset.
-
-        Accepts either a string, in which case this new path will be used for all chunks, or
-        a function which accepts the old path and returns the new path.
-
-        Parameters
-        ----------
-        new
-            New path to use for all chunks, either as a string, or as a function which accepts and returns strings.
-
-        Returns
-        -------
-        Dataset
-
-        Examples
-        --------
-        Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
-
-        >>> def local_to_s3_url(old_local_path: str) -> str:
-        ...     from pathlib import Path
-        ...
-        ...     new_s3_bucket_url = "http://s3.amazonaws.com/my_bucket/"
-        ...
-        ...     filename = Path(old_local_path).name
-        ...     return str(new_s3_bucket_url / filename)
-
-        >>> ds.virtualize.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ManifestArray.rename_paths
-        ChunkManifest.rename_paths
-        """
-
-        new_ds = self.ds.copy()
-        for var_name in new_ds.variables:
-            data = new_ds[var_name].data
-            if isinstance(data, ManifestArray):
-                new_ds[var_name].data = data.rename_paths(new=new)
-
-        return new_ds
