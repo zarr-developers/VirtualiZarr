@@ -104,6 +104,23 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
+class TestOpenVirtualDatasetAttrs:
+    def test_drop_array_dimensions(self, netcdf4_file):
+        # regression test for GH issue #150
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
+
+    def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
+        # regression test for GH issue #155
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert vds["lat"].attrs == {
+            "standard_name": "latitude",
+            "long_name": "Latitude",
+            "units": "degrees_north",
+            "axis": "Y",
+        }
+
+
 @network
 @requires_s3fs
 class TestReadFromS3:

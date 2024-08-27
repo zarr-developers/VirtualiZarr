@@ -222,23 +222,6 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-class TestOpenVirtualDatasetAttrs:
-    def test_drop_array_dimensions(self, netcdf4_file):
-        # regression test for GH issue #150
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
-        assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
-
-    def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
-        # regression test for GH issue #155
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
-        assert vds["lat"].attrs == {
-            "standard_name": "latitude",
-            "long_name": "Latitude",
-            "units": "degrees_north",
-            "axis": "Y",
-        }
-
-
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files):
         filepath1, filepath2 = netcdf4_files
