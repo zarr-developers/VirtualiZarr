@@ -45,7 +45,7 @@ def open_virtual_dataset(
     filetype: FileType | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
-    decode_times: bool = True,
+    decode_times: bool | None = None,
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
@@ -71,7 +71,7 @@ def open_virtual_dataset(
     loadable_variables: list[str], default is None
         Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
-    decode_times: bool, default is True
+    decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     cftime_variables: Iterable[str] | None = None
     indexes : Mapping[str, Index], default is None

@@ -325,7 +325,7 @@ Loading variables can be useful in a few scenarios:
 
 ### CF-encoded time variables
 
-To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to `True`).
+To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
 
 
 
