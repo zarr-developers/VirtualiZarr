@@ -306,7 +306,8 @@ class TestLoadVirtualDataset:
             indexes={},
         )
         full_ds = xr.open_dataset(
-            hdf5_groups_file, group="test/group",
+            hdf5_groups_file,
+            group="test/group",
         )
         for name in full_ds.variables:
             if name in vars_to_load:
