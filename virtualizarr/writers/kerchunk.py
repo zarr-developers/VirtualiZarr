@@ -3,7 +3,7 @@ import json
 from typing import cast
 
 import numpy as np
-import ujson
+import ujson  # type: ignore
 from xarray import Dataset
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.variable import Variable

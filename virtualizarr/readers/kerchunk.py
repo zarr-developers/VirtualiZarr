@@ -2,7 +2,7 @@ import warnings
 from pathlib import Path
 from typing import Any, MutableMapping, Optional, cast
 
-import ujson
+import ujson  # type: ignore
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable

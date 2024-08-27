@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import ujson
+import ujson  # type: ignore
 from xarray import Dataset
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray

@@ -1,5 +1,5 @@
 import numpy as np
-import ujson
+import ujson  # type: ignore
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
