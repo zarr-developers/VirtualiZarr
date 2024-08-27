@@ -46,6 +46,7 @@ def open_virtual_dataset(
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool = True,
+    cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
     reader_options: Optional[dict] = None,
@@ -72,6 +73,7 @@ def open_virtual_dataset(
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
     decode_times: bool, default is True
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
+    cftime_variables: Iterable[str] | None = None
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
@@ -88,6 +90,15 @@ def open_virtual_dataset(
     vds
         An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
+
+    if cftime_variables is not None:
+        # It seems like stacklevel=2 is req to surface this warning.
+        warnings.warn(
+            "cftime_variables is depreciated and will be ignored. Pass decode_times=True and loadable_variables=['time'] to decode time values to datetime objects.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     loadable_vars: dict[str, xr.Variable]
     virtual_vars: dict[str, xr.Variable]
     vars: dict[str, xr.Variable]
@@ -168,7 +179,7 @@ def open_virtual_dataset(
             ds = xr.open_dataset(
                 cast(XArrayOpenT, fpath),
                 drop_variables=drop_variables,
-                decode_times=True,
+                decode_times=decode_times,
             )
 
             if indexes is None:
