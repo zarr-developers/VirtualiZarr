@@ -81,7 +81,6 @@ def open_virtual_dataset(
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
     decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
-    cftime_variables: Iterable[str] | None = None
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
