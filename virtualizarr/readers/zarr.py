@@ -8,7 +8,7 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backend import determine_cf_coords, construct_virtual_dataset
+from virtualizarr.backend import construct_virtual_dataset, determine_cf_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 

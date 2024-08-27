@@ -7,19 +7,26 @@ from typing import (
     Any,
     Hashable,
     Optional,
+    TypeAlias,
     cast,
 )
 
 import xarray as xr
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.coding.times import CFDatetimeCoder
+from xarray.conventions import decode_cf_variables
 from xarray.core.indexes import Index, PandasIndex
-from xarray.core.variable import IndexVariable
+from xarray.core.variable import IndexVariable, Variable
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _fsspec_openfile_from_filepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
+
+T_Attrs = MutableMapping[Any, Any]
+T_Variables = Mapping[Any, Variable]
+# alias for (dims, data, attrs, encoding)
+T_VariableExpanded: TypeAlias = tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]]
 
 
 class AutoName(Enum):
