@@ -12,7 +12,6 @@ from typing import (
 
 import xarray as xr
 from xarray.backends import AbstractDataStore, BackendArray
-from xarray.coding.times import CFDatetimeCoder
 from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
@@ -54,6 +53,7 @@ def open_virtual_dataset(
     filetype: FileType | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
@@ -79,10 +79,8 @@ def open_virtual_dataset(
     loadable_variables: list[str], default is None
         Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
         Default is to open all variables as virtual arrays (i.e. ManifestArray).
-    cftime_variables : list[str], default is None
-        Interpret the value of specified vars using cftime, returning a datetime.
-        These will be automatically re-encoded with cftime. This list must be a subset
-        of ``loadable_variables``.
+    decode_times: bool | None, default is None
+        Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
@@ -99,6 +97,15 @@ def open_virtual_dataset(
     vds
         An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
     """
+
+    if cftime_variables is not None:
+        # It seems like stacklevel=2 is req to surface this warning.
+        warnings.warn(
+            "cftime_variables is depreciated and will be ignored. Pass decode_times=True and loadable_variables=['time'] to decode time values to datetime objects.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     loadable_vars: dict[str, xr.Variable]
     virtual_vars: dict[str, xr.Variable]
     vars: dict[str, xr.Variable]
@@ -119,20 +126,6 @@ def open_virtual_dataset(
     if common:
         raise ValueError(f"Cannot both load and drop variables {common}")
 
-    if cftime_variables is None:
-        cftime_variables = []
-    elif isinstance(cftime_variables, str):
-        cftime_variables = [cftime_variables]
-    else:
-        cftime_variables = list(cftime_variables)
-
-    if diff := (set(cftime_variables) - set(loadable_variables)):
-        missing_str = ", ".join([f"'{v}'" for v in diff])
-        raise ValueError(
-            "All ``cftime_variables`` must be included in ``loadable_variables`` "
-            f"({missing_str} not in ``loadable_variables``)"
-        )
-
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
@@ -150,9 +143,9 @@ def open_virtual_dataset(
     elif filetype == FileType.dmrpp:
         from virtualizarr.readers.dmrpp import DMRParser
 
-        if loadable_variables != [] or cftime_variables != [] or indexes is None:
+        if loadable_variables != [] or indexes is None:
             raise NotImplementedError(
-                "Specifying `loadable_variables`, `cftime_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+                "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
             )
 
         fpath = _fsspec_openfile_from_filepath(
@@ -202,7 +195,7 @@ def open_virtual_dataset(
             ds = xr.open_dataset(
                 cast(XArrayOpenT, fpath),
                 drop_variables=drop_variables,
-                decode_times=False,
+                decode_times=decode_times,
             )
 
             if indexes is None:
@@ -224,10 +217,6 @@ def open_virtual_dataset(
                 for name, var in ds.variables.items()
                 if name in loadable_variables
             }
-
-            for name in cftime_variables:
-                var = loadable_vars[name]
-                loadable_vars[name] = CFDatetimeCoder().decode(var, name=name)
 
             # if we only read the indexes we can just close the file right away as nothing is lazy
             if loadable_vars == {}:

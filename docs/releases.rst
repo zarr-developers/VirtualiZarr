@@ -9,6 +9,9 @@ v1.0.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Adds `decode_times` to open_virtual_dataset (:pull:`232`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 - Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
   By `Ayush Nag <https://github.com/ayushnag>`_.
 
@@ -17,16 +20,17 @@ New Features
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
-
 - Serialize valid ZarrV3 metadata and require full compressor numcodec config (for :pull:`193`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
   `pydantic.BaseModel` (:pull:`210`)
 - `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
 
-
 Deprecations
 ~~~~~~~~~~~~
+
+- Depreciates cftime_variables in open_virtual_dataset in favor of decode_times. (:pull:`232`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 Bug fixes
 ~~~~~~~~~
