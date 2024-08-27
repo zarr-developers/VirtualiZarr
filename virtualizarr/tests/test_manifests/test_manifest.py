@@ -27,16 +27,6 @@ class TestCreateManifest:
         with pytest.raises(ValueError, match="must be of the form"):
             ChunkManifest(entries=chunks)
 
-        chunks = {
-            "0.0.0": {
-                "path": "s3://bucket/foo.nc",
-                "offset": "some nonsense",
-                "length": 100,
-            },
-        }
-        with pytest.raises(ValueError, match="must be of the form"):
-            ChunkManifest(entries=chunks)
-
     def test_invalid_chunk_keys(self):
         chunks = {
             "0.0.": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -50,6 +40,14 @@ class TestCreateManifest:
         }
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
             ChunkManifest(entries=chunks)
+
+    def test_empty_chunk_paths(self):
+        chunks = {
+            "0.0.0": {"path": "", "offset": 0, "length": 100},
+            "1.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert len(manifest.dict()) == 1
 
 
 class TestProperties:

@@ -1,10 +1,11 @@
+import dataclasses
 import json
 import re
 from collections.abc import Iterable, Iterator
-from typing import Any, Callable, NewType, Tuple, Union, cast
+from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict
+from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
@@ -15,36 +16,49 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, dict[str, Union[str, int]]])
+class ChunkDictEntry(TypedDict):
+    path: str
+    offset: int
+    length: int
 
 
-class ChunkEntry(BaseModel):
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
+
+
+@dataclasses.dataclass(frozen=True)
+class ChunkEntry:
     """
     Information for a single chunk in the manifest.
 
     Stored in the form `{"path": "s3://bucket/foo.nc", "offset": 100, "length": 100}`.
     """
 
-    model_config = ConfigDict(frozen=True)
-
     path: str  # TODO stricter typing/validation of possible local / remote paths?
     offset: int
     length: int
 
-    def __repr__(self) -> str:
-        return f"ChunkEntry(path='{self.path}', offset={self.offset}, length={self.length})"
-
     @classmethod
-    def from_kerchunk(cls, path_and_byte_range_info: list[str | int]) -> "ChunkEntry":
-        path, offset, length = path_and_byte_range_info
+    def from_kerchunk(
+        cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
+    ) -> "ChunkEntry":
+        if len(path_and_byte_range_info) == 1:
+            path = path_and_byte_range_info[0]
+            offset = 0
+            length = UPath(path).stat().st_size
+        else:
+            path, offset, length = path_and_byte_range_info
         return ChunkEntry(path=path, offset=offset, length=length)
 
-    def to_kerchunk(self) -> list[str | int]:
+    def to_kerchunk(self) -> tuple[str, int, int]:
         """Write out in the format that kerchunk uses for chunk entries."""
-        return [self.path, self.offset, self.length]
+        return (self.path, self.offset, self.length)
 
-    def dict(self) -> dict[str, Union[str, int]]:
-        return dict(path=self.path, offset=self.offset, length=self.length)
+    def dict(self) -> ChunkDictEntry:
+        return ChunkDictEntry(
+            path=self.path,
+            offset=self.offset,
+            length=self.length,
+        )
 
 
 class ChunkManifest:
@@ -224,7 +238,7 @@ class ChunkManifest:
     def __len__(self) -> int:
         return self._paths.size
 
-    def dict(self) -> ChunkDict:
+    def dict(self) -> ChunkDict:  # type: ignore[override]
         """
         Convert the entire manifest to a nested dictionary.
 
@@ -252,7 +266,7 @@ class ChunkManifest:
                 [*coord_vectors, self._paths, self._offsets, self._lengths],
                 flags=("refs_ok",),
             )
-            if path.item()[0] != ""  # don't include entry if path='' (i.e. empty chunk)
+            if path.item() != ""  # don't include entry if path='' (i.e. empty chunk)
         }
 
         return cast(
@@ -283,12 +297,20 @@ class ChunkManifest:
             json.dump(entries, json_file, indent=4, separators=(", ", ": "))
 
     @classmethod
-    def _from_kerchunk_chunk_dict(cls, kerchunk_chunk_dict) -> "ChunkManifest":
-        chunkentries = {
-            cast(ChunkKey, k): ChunkEntry.from_kerchunk(v).dict()
-            for k, v in kerchunk_chunk_dict.items()
-        }
-        return ChunkManifest(entries=cast(ChunkDict, chunkentries))
+    def _from_kerchunk_chunk_dict(
+        cls,
+        # The type hint requires `Dict` instead of `dict` due to
+        # the conflicting ChunkManifest.dict method.
+        kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+    ) -> "ChunkManifest":
+        chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
+        for k, v in kerchunk_chunk_dict.items():
+            if isinstance(v, (str, bytes)):
+                raise NotImplementedError("TODO: handle inlined data")
+            elif not isinstance(v, (tuple, list)):
+                raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+            chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
+        return ChunkManifest(entries=chunk_entries)
 
     def rename_paths(
         self,

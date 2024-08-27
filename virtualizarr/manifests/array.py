@@ -4,9 +4,9 @@ from typing import Any, Callable, Union
 
 import numpy as np
 
-from ..kerchunk import KerchunkArrRefs
+from ..types.kerchunk import KerchunkArrRefs
 from ..zarr import ZArray
-from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS
+from .array_api import MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS, _isnan
 from .manifest import ChunkManifest
 
 
@@ -62,7 +62,10 @@ class ManifestArray:
 
     @classmethod
     def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
-        from virtualizarr.kerchunk import fully_decode_arr_refs, parse_array_refs
+        from virtualizarr.readers.kerchunk import (
+            fully_decode_arr_refs,
+            parse_array_refs,
+        )
 
         decoded_arr_refs = fully_decode_arr_refs(arr_refs)
 
@@ -128,9 +131,11 @@ class ManifestArray:
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
+        if ufunc == np.isnan:
+            return _isnan(self.shape)
         return NotImplemented
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self, dtype: np.typing.DTypeLike = None) -> np.ndarray:
         raise NotImplementedError(
             "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
         )

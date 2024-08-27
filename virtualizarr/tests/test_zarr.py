@@ -1,32 +1,29 @@
 import numpy as np
-import xarray as xr
-import xarray.testing as xrt
 
-from virtualizarr import ManifestArray, open_virtual_dataset
-from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.zarr import ZArray
 
 
-def test_zarr_v3_roundtrip(tmpdir):
-    arr = ManifestArray(
-        chunkmanifest=ChunkManifest(
-            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
-        ),
-        zarray=dict(
-            shape=(2, 3),
-            dtype=np.dtype("<i8"),
-            chunks=(2, 3),
-            compressor=None,
-            filters=None,
-            fill_value=np.nan,
-            order="C",
-            zarr_format=3,
-        ),
+def test_replace_partial():
+    arr = ZArray(shape=(2, 3), chunks=(1, 1), dtype=np.dtype("<i8"))
+    result = arr.replace(chunks=(2, 3))
+    expected = ZArray(shape=(2, 3), chunks=(2, 3), dtype=np.dtype("<i8"))
+    assert result == expected
+    assert result.shape == (2, 3)
+    assert result.chunks == (2, 3)
+
+
+def test_replace_total():
+    arr = ZArray(shape=(2, 3), chunks=(1, 1), dtype=np.dtype("<i8"))
+    kwargs = dict(
+        shape=(4, 4),
+        chunks=(2, 2),
+        dtype=np.dtype("<f8"),
+        fill_value=-1.0,
+        order="F",
+        compressor={"id": "zlib", "level": 1},
+        filters=[{"id": "blosc", "clevel": 5}],
+        zarr_format=3,
     )
-    original = xr.Dataset({"a": (["x", "y"], arr)}, attrs={"something": 0})
-
-    original.virtualize.to_zarr(tmpdir / "store.zarr")
-    roundtrip = open_virtual_dataset(
-        tmpdir / "store.zarr", filetype="zarr_v3", indexes={}
-    )
-
-    xrt.assert_identical(roundtrip, original)
+    result = arr.replace(**kwargs)
+    expected = ZArray(**kwargs)
+    assert result == expected
