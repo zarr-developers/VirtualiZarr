@@ -51,6 +51,7 @@ def open_virtual_dataset(
     filepath: str,
     *,
     filetype: FileType | None = None,
+    group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
@@ -74,6 +75,8 @@ def open_virtual_dataset(
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
+    group : str, default is None
+        Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
@@ -171,6 +174,7 @@ def open_virtual_dataset(
         vds_refs = read_kerchunk_references_from_file(
             filepath=filepath,
             filetype=filetype,
+            group=group,
             reader_options=reader_options,
         )
         virtual_vars = virtual_vars_from_kerchunk_refs(
@@ -195,6 +199,7 @@ def open_virtual_dataset(
             ds = xr.open_dataset(
                 cast(XArrayOpenT, fpath),
                 drop_variables=drop_variables,
+                group=group,
                 decode_times=decode_times,
             )
 
