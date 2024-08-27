@@ -82,7 +82,7 @@ class TestOpenVirtualDatasetIndexes:
     def test_create_default_indexes(self, netcdf4_file):
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
             vds = open_virtual_dataset(netcdf4_file, indexes=None)
-        ds = open_dataset(netcdf4_file, decode_times=False)
+        ds = open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -236,7 +236,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file, decode_times=False)
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
 
         for name in full_ds.variables:
             if name in vars_to_load:
@@ -271,10 +271,3 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
-
-
-def test_cftime_variables_must_be_in_loadable_variables(tmpdir):
-    ds = xr.Dataset(data_vars={"time": ["2024-06-21"]})
-    ds.to_netcdf(f"{tmpdir}/scalar.nc")
-    with pytest.raises(ValueError, match="'time' not in"):
-        open_virtual_dataset(f"{tmpdir}/scalar.nc", cftime_variables=["time"])
