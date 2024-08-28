@@ -15,7 +15,7 @@ from virtualizarr.zarr import ZArray
 
 def open_virtual_dataset_from_v3_store(
     storepath: str,
-    drop_variables: list[str] = None,
+    drop_variables: list[str] = [],
     indexes: Mapping[str, Index] | None = None,
 ) -> Dataset:
     """
