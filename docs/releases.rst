@@ -8,6 +8,9 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+- Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 - New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
   (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
 
