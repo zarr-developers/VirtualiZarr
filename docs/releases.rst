@@ -31,6 +31,9 @@ Breaking changes
   `pydantic.BaseModel` (:pull:`210`)
 - `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
 
+- Requires Zarr 3.0 (for :pull:`182`).
+  By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
+
 Deprecations
 ~~~~~~~~~~~~
 
