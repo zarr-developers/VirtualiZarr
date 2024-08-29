@@ -25,6 +25,7 @@ New Features
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
+
 - Serialize valid ZarrV3 metadata and require full compressor numcodec config (for :pull:`193`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
@@ -48,6 +49,10 @@ Bug fixes
 
 Documentation
 ~~~~~~~~~~~~~
+
+- Adds virtualizarr + coiled serverless example notebook (:pull`223`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
