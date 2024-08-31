@@ -230,10 +230,7 @@ class TestCombineUsingIndexes:
             vds1 = open_virtual_dataset(filepath1)
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
             vds2 = open_virtual_dataset(filepath2)
-
-        combined_vds = xr.combine_by_coords(
-            [vds2, vds1],
-        )
+        combined_vds = xr.combine_by_coords([vds2, vds1])
 
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
@@ -278,7 +275,7 @@ class TestRenamePaths:
         renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
         assert (
             renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
-            == "s3://bucket/air.nc"
+            == "s3://bucket/test_ds_netcdf4_full_time.nc"
         )
 
     def test_invalid_type(self, netcdf4_file):

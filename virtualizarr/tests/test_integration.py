@@ -36,7 +36,6 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
         netcdf4_file, loadable_variables=vars_to_inline, indexes={}
     )
     refs = vds.virtualize.to_kerchunk(format="dict")
-
     # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
     # assert refs == expected
     assert refs["refs"]["air/0.0.0"] == expected["refs"]["air/0.0.0"]
@@ -47,15 +46,11 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
-    def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
-        # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
-
-        # save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(f"{tmpdir}/air.nc")
+    def test_kerchunk_roundtrip_no_concat(self, netcdf4_file, tmpdir, format):
+        ds = xr.open_dataset(netcdf4_file, decode_times=False)
 
         # use open_dataset_via_kerchunk to read it as references
-        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
 
         if format == "dict":
             # write those references to an in-memory kerchunk-formatted references dictionary
@@ -76,12 +71,17 @@ class TestKerchunkRoundtrip:
         xrt.assert_identical(roundtrip, ds)
 
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
-    def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
+    def test_kerchunk_roundtrip_concat(
+        self, netcdf4_file, netcdf4_files, tmpdir, format, decode_times, time_vars
+    ):
+        netcdf1, netcdf2 = netcdf4_files
+
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
+        ds = xr.open_dataset(netcdf4_file, decode_times=decode_times)
 
         # split into two datasets
-        ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
+        ds1 = xr.open_dataset(netcdf1, decode_times=decode_times)
+        ds2 = xr.open_dataset(netcdf2, decode_times=decode_times)
 
         # save it to disk as netCDF (in temporary directory)
         ds1.to_netcdf(f"{tmpdir}/air1.nc")
