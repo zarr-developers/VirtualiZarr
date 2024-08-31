@@ -12,7 +12,7 @@ from virtualizarr.zarr import ZArray
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
     [
-        (16, ["lat", "lon"]),
+        (500, ["time", "lat", "lon"]),
         (5e3, ["lat", "lon", "time"]),
         pytest.param(
             5e7,
@@ -38,11 +38,9 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     refs = vds.virtualize.to_kerchunk(format="dict")
     # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
     # assert refs == expected
-
     assert refs["refs"]["air/0.0.0"] == expected["refs"]["air/0.0.0"]
     assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
     assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
-
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
