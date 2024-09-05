@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from unittest.mock import patch
 
+import fsspec
 import numpy as np
 import pytest
 import xarray as xr
@@ -82,7 +83,7 @@ class TestOpenVirtualDatasetIndexes:
     def test_create_default_indexes(self, netcdf4_file):
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
             vds = open_virtual_dataset(netcdf4_file, indexes=None)
-        ds = open_dataset(netcdf4_file, decode_times=False)
+        ds = open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -102,6 +103,31 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
             return False
 
     return True
+
+
+def test_cftime_index(tmpdir):
+    """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
+    # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
+    ds = xr.Dataset(
+        data_vars={
+            "tasmax": (["time", "lat", "lon"], np.random.rand(2, 18, 36)),
+        },
+        coords={
+            "time": np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]"),
+            "lat": np.arange(-90, 90, 10),
+            "lon": np.arange(-180, 180, 10),
+        },
+        attrs={"attr1_key": "attr1_val"},
+    )
+    ds.to_netcdf(f"{tmpdir}/tmp.nc")
+    vds = open_virtual_dataset(
+        f"{tmpdir}/tmp.nc", loadable_variables=["time", "lat", "lon"], indexes={}
+    )
+    # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
+    assert index_mappings_equal(vds.xindexes, ds.xindexes)
+    assert list(ds.coords) == list(vds.coords)
+    assert vds.dims == ds.dims
+    assert vds.attrs == ds.attrs
 
 
 class TestOpenVirtualDatasetAttrs:
@@ -167,6 +193,10 @@ class TestReadFromURL:
                 "hdf4",
                 "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
             ),
+            (
+                "hdf5",
+                "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
+            ),
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
             # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
             pytest.param(
@@ -193,9 +223,47 @@ class TestReadFromURL:
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
                 vds = open_virtual_dataset(url, reader_options={}, indexes={})
+        elif filetype == "hdf5":
+            vds = open_virtual_dataset(
+                url,
+                group="science/LSAR/GCOV/grids/frequencyA",
+                drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+                indexes={},
+                reader_options={},
+            )
+            assert isinstance(vds, xr.Dataset)
         else:
             vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
+
+    def test_virtualizarr_vs_local_nisar(self):
+        # Open group directly from locally cached file with xarray
+        url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
+        tmpfile = fsspec.open_local(
+            f"filecache::{url}", filecache=dict(cache_storage="/tmp", same_names=True)
+        )
+        hdf_group = "science/LSAR/GCOV/grids/frequencyA"
+        dsXR = xr.open_dataset(
+            tmpfile,
+            engine="h5netcdf",
+            group=hdf_group,
+            drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+            phony_dims="access",
+        )
+
+        # save group reference file via virtualizarr, then open with engine="kerchunk"
+        vds = open_virtual_dataset(
+            tmpfile,
+            group=hdf_group,
+            indexes={},
+            drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+        )
+        tmpref = "/tmp/cmip6.json"
+        vds.virtualize.to_kerchunk(tmpref, format="json")
+        dsV = xr.open_dataset(tmpref, engine="kerchunk")
+
+        # xrt.assert_identical(dsXR, dsV) #Attribute order changes
+        xrt.assert_equal(dsXR, dsV)
 
 
 class TestLoadVirtualDataset:
@@ -211,7 +279,7 @@ class TestLoadVirtualDataset:
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file, decode_times=False)
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
 
         for name in full_ds.variables:
             if name in vars_to_load:
@@ -224,6 +292,27 @@ class TestLoadVirtualDataset:
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
+    def test_group_kwarg(self, hdf5_groups_file):
+        with pytest.raises(ValueError, match="Multiple HDF Groups found"):
+            open_virtual_dataset(hdf5_groups_file)
+        with pytest.raises(ValueError, match="not found in"):
+            open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
+
+        vars_to_load = ["air", "time"]
+        vds = open_virtual_dataset(
+            hdf5_groups_file,
+            group="test/group",
+            loadable_variables=vars_to_load,
+            indexes={},
+        )
+        full_ds = xr.open_dataset(
+            hdf5_groups_file,
+            group="test/group",
+        )
+        for name in full_ds.variables:
+            if name in vars_to_load:
+                xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+
     @patch("virtualizarr.readers.kerchunk.read_kerchunk_references_from_file")
     def test_open_virtual_dataset_passes_expected_args(
         self, mock_read_kerchunk, netcdf4_file
@@ -233,6 +322,7 @@ class TestLoadVirtualDataset:
         args = {
             "filepath": netcdf4_file,
             "filetype": None,
+            "group": None,
             "reader_options": reader_options,
         }
         mock_read_kerchunk.assert_called_once_with(**args)
@@ -246,10 +336,3 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
-
-
-def test_cftime_variables_must_be_in_loadable_variables(tmpdir):
-    ds = xr.Dataset(data_vars={"time": ["2024-06-21"]})
-    ds.to_netcdf(f"{tmpdir}/scalar.nc")
-    with pytest.raises(ValueError, match="'time' not in"):
-        open_virtual_dataset(f"{tmpdir}/scalar.nc", cftime_variables=["time"])

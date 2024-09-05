@@ -57,6 +57,7 @@ def _automatically_determine_filetype(
 def read_kerchunk_references_from_file(
     filepath: str,
     filetype: FileType | None,
+    group: str | None,
     reader_options: Optional[dict[str, Any]] = None,
 ) -> KerchunkStoreRefs:
     """
@@ -69,7 +70,8 @@ def read_kerchunk_references_from_file(
     filetype : FileType, default: None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         If not provided will attempt to automatically infer the correct filetype from the the filepath's extension.
-    reader_options: dict, default {}
+    group : str, default is None
+        Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
         Dict passed into Kerchunk file readers. Note: Each Kerchunk file reader has distinct arguments,
         so ensure reader_options match selected Kerchunk reader arguments.
     """
@@ -96,6 +98,9 @@ def read_kerchunk_references_from_file(
         refs = SingleHdf5ToZarr(
             filepath, inline_threshold=0, **reader_options
         ).translate()
+
+        refs = extract_group(refs, group)
+
     elif filetype.name.lower() == "grib":
         # TODO Grib files should be handled as a DataTree object
         # see https://github.com/TomNicholas/VirtualiZarr/issues/11
@@ -121,6 +126,44 @@ def read_kerchunk_references_from_file(
 
     # TODO validate the references that were read before returning?
     return refs
+
+
+def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
+    """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
+    hdf_groups = [
+        k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
+    ]
+    if len(hdf_groups) == 1:
+        return vds_refs
+    else:
+        if group is None:
+            raise ValueError(
+                f"Multiple HDF Groups found. Must specify group= keyword to select one of {hdf_groups}"
+            )
+        else:
+            # Ensure supplied group kwarg is consistent with kerchunk keys
+            if not group.endswith("/"):
+                group += "/"
+            if group.startswith("/"):
+                group = group.removeprefix("/")
+
+        if group not in hdf_groups:
+            raise ValueError(f'Group "{group}" not found in {hdf_groups}')
+
+        # Filter by group prefix and remove prefix from all keys
+        groupdict = {
+            k.removeprefix(group): v
+            for k, v in vds_refs["refs"].items()
+            if k.startswith(group)
+        }
+        # Also remove group prefix from _ARRAY_DIMENSIONS
+        for k, v in groupdict.items():
+            if isinstance(v, str):
+                groupdict[k] = v.replace("\\/", "/").replace(group, "")
+
+        vds_refs["refs"] = groupdict
+
+        return KerchunkStoreRefs(vds_refs)
 
 
 def virtual_vars_from_kerchunk_refs(
@@ -214,6 +257,7 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
 
     refs = ds_reference_dict["refs"]
     found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
+
     return list(found_var_names)
 
 
@@ -235,6 +279,7 @@ def extract_array_refs(
         }
 
         return fully_decode_arr_refs(arr_refs)
+
     else:
         raise KeyError(
             f"Could not find zarr array variable name {var_name}, only {found_var_names}"

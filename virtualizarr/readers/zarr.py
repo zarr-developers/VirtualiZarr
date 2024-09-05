@@ -15,8 +15,8 @@ from virtualizarr.zarr import ZArray
 
 def open_virtual_dataset_from_v3_store(
     storepath: str,
-    drop_variables: list[str],
-    indexes: Mapping[str, Index] | None,
+    drop_variables: list[str] = [],
+    indexes: Mapping[str, Index] | None = None,
 ) -> Dataset:
     """
     Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
