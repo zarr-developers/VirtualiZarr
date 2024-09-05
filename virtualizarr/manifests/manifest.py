@@ -223,6 +223,17 @@ class ChunkManifest:
     def __repr__(self) -> str:
         return f"ChunkManifest<shape={self.shape_chunk_grid}>"
 
+    @property
+    def nbytes(self) -> int:
+        """
+        Size required to hold these references in memory in bytes.
+
+        Note this is not the size of the referenced chunks if they were actually loaded into memory,
+        this is only the size of the pointers to the chunk locations.
+        If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
+        """
+        return self._paths.nbytes + self._offsets.nbytes + self._lengths.nbytes
+
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         indices = split(key)
         path = self._paths[indices]
