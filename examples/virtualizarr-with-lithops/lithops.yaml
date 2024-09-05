@@ -1,0 +1,14 @@
+lithops:
+    backend: aws_lambda
+    storage: aws_s3
+
+aws:
+    region: us-west-2
+
+aws_lambda:
+    execution_role: arn:aws:iam::807615458658:role/lambdaLithopsExecutionRole
+    runtime: virtualizarr-runtime
+    runtime_memory: 2000
+
+aws_s3:
+    bucket: arn:aws:s3:::cubed-thodson-temp
