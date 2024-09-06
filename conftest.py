@@ -67,6 +67,17 @@ def netcdf4_files(tmpdir):
 
 
 @pytest.fixture
+def netcdf3_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+    ds.close()
+
+
+@pytest.fixture
 def hdf5_empty(tmpdir):
     filepath = f"{tmpdir}/empty.nc"
     f = h5py.File(filepath, "w")

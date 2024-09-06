@@ -24,6 +24,7 @@ dependencies:
   - pytest
   - pooch
   - scipy
+  - dask
   - fsspec
   - s3fs
   - fastparquet

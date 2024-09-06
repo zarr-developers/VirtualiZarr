@@ -33,6 +33,7 @@ def _importorskip(
 
 
 has_astropy, requires_astropy = _importorskip("astropy")
+has_dask, requires_dask = _importorskip("dask")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
 

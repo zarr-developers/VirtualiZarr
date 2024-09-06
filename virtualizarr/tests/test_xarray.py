@@ -255,6 +255,16 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
+def test_rechunk(netcdf3_file):
+    # start with uncompressed netCDF3 file on disk
+
+    # open and split into two time chunks using virtualizarr
+    vds = open_virtual_dataset(netcdf3_file, indexes={}).chunk(time=1460)
+
+    # check we have not accidentally created a dask array
+    assert isinstance(vds["air"].data, ManifestArray)
+
+
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
