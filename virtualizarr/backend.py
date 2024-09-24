@@ -104,7 +104,7 @@ def open_virtual_dataset(
     if cftime_variables is not None:
         # It seems like stacklevel=2 is req to surface this warning.
         warnings.warn(
-            "cftime_variables is depreciated and will be ignored. Pass decode_times=True and loadable_variables=['time'] to decode time values to datetime objects.",
+            "cftime_variables is deprecated and will be ignored. Pass decode_times=True and loadable_variables=['time'] to decode time values to datetime objects.",
             DeprecationWarning,
             stacklevel=2,
         )
