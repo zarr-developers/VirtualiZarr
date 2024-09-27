@@ -1,35 +1,12 @@
 import json
 
-import numpy as np
-import pytest
 import xarray.testing as xrt
 from xarray import Dataset
 
-from virtualizarr import ManifestArray, open_virtual_dataset
+from virtualizarr import open_virtual_dataset
 from virtualizarr.backend import FileType
-from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.readers.zarr import metadata_from_zarr_json
 from virtualizarr.writers.zarr import dataset_to_zarr
-
-
-@pytest.fixture
-def vds_with_manifest_arrays() -> Dataset:
-    arr = ManifestArray(
-        chunkmanifest=ChunkManifest(
-            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
-        ),
-        zarray=dict(
-            shape=(2, 3),
-            dtype=np.dtype("<i8"),
-            chunks=(2, 3),
-            compressor={"id": "zlib", "level": 1},
-            filters=None,
-            fill_value=0,
-            order="C",
-            zarr_format=3,
-        ),
-    )
-    return Dataset({"a": (["x", "y"], arr)}, attrs={"something": 0})
 
 
 def isconfigurable(value: dict) -> bool:
