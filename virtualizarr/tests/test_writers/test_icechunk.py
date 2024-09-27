@@ -20,7 +20,7 @@ async def icechunk_filestore(tmpdir) -> "IcechunkStore":
     from icechunk import IcechunkStore, StorageConfig
 
     storage = StorageConfig.filesystem(str(tmpdir))
-    store = await IcechunkStore.open(storage=storage, mode="r+")
+    store = await IcechunkStore.open(storage=storage, mode="w")
 
     # TODO instead yield store then store.close() ??
     return store
