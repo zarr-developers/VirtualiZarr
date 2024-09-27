@@ -1,9 +1,8 @@
-import pytest
-
 import numpy as np
+import pytest
 from xarray import Dataset
 
-from virtualizarr.manifests import ManifestArray, ChunkManifest
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
 @pytest.fixture
