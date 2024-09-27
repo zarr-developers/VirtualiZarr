@@ -22,6 +22,7 @@ async def icechunk_filestore(tmpdir) -> "IcechunkStore":
     storage = StorageConfig.filesystem(str(tmpdir))
     store = await IcechunkStore.open(storage=storage, mode="r+")
 
+    # TODO instead yield store then store.close() ??
     return store
 
 
@@ -29,6 +30,8 @@ async def icechunk_filestore(tmpdir) -> "IcechunkStore":
 async def test_write_to_icechunk(
     icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
 ):
-    dataset_to_icechunk(vds_with_manifest_arrays, icechunk_filestore)
+    store = await icechunk_filestore
 
-    print(icechunk_filestore)
+    dataset_to_icechunk(vds_with_manifest_arrays, store)
+
+    # TODO assert that arrays and references have been written
