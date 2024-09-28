@@ -42,8 +42,6 @@ class TestWriteVirtualRefs:
         assert isinstance(root_group, Group)
         assert root_group.attrs == {"something": 0}
 
-        # TODO assert that arrays, array attrs, and references have been written
-
         # TODO check against vds, then perhaps parametrize?
 
         # check array exists
@@ -62,6 +60,11 @@ class TestWriteVirtualRefs:
         # TODO check compressor, filters?
 
         # check array attrs
+        # TODO somehow this is broken by setting the dimension names???
+        # assert dict(arr.attrs) == {"units": "km"}
+
+        # check dimensions
+        assert arr.attrs["DIMENSION_NAMES"] == ["x", "y"]
 
         # check chunk references
 

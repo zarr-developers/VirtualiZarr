@@ -65,15 +65,18 @@ def write_variable_to_icechunk(
 
     # TODO do I need the returned zarr.array object for anything after ensuring the array has been created?
     # TODO should I be checking that this array doesn't already exist? Or is that icechunks' job?
-    group.create_array(
+    arr = group.create_array(
         name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
     )
 
-    # TODO we also need to set zarr attributes, including DIMENSION_NAMES
+    # TODO it would be nice if we could assign directly to the .attrs property
+    for k, v in var.attrs.items():
+        arr.attrs[k] = v
     # TODO we should probably be doing some encoding of those attributes?
+    arr.attrs["DIMENSION_NAMES"] = var.dims
 
     write_manifest_virtual_refs(
         store=store,

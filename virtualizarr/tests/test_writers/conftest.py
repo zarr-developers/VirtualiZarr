@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from xarray import Dataset
+from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
@@ -22,4 +23,5 @@ def vds_with_manifest_arrays() -> Dataset:
             zarr_format=3,
         ),
     )
-    return Dataset({"a": (["x", "y"], arr)}, attrs={"something": 0})
+    var = Variable(dims=["x", "y"], data=arr, attrs={"units": "km"})
+    return Dataset({"a": var}, attrs={"something": 0})
