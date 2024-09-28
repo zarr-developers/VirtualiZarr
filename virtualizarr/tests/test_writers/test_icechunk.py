@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 import pytest
@@ -13,24 +14,22 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def icechunk_filestore(tmpdir) -> "IcechunkStore":
+def icechunk_filestore(tmpdir) -> "IcechunkStore":
     from icechunk import IcechunkStore, StorageConfig
 
     storage = StorageConfig.filesystem(str(tmpdir))
-    # TODO if I use asyncio.run can I avoid this fixture and tests being async functions?
-    store = await IcechunkStore.open(storage=storage, mode="r+")
+
+    # TODO if icechunk exposed a synchronous version of .open then we wouldn't need to use asyncio.run here
+    store = asyncio.run(IcechunkStore.open(storage=storage, mode="r+"))
 
     # TODO instead yield store then store.close() ??
     return store
 
 
-@pytest.mark.asyncio
-async def test_write_to_icechunk(
+def test_write_to_icechunk(
     icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
 ):
-    store = await icechunk_filestore
-
-    dataset_to_icechunk(vds_with_manifest_arrays, store)
+    dataset_to_icechunk(vds_with_manifest_arrays, icechunk_filestore)
 
     # TODO assert that arrays and references have been written
 
