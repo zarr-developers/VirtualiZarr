@@ -5,8 +5,9 @@ import pytest
 
 pytest.importorskip("icechunk")
 
+import numpy as np
 from xarray import Dataset
-from zarr import group
+from zarr import Array, Group, group
 
 from virtualizarr.writers.icechunk import dataset_to_icechunk
 
@@ -32,12 +33,37 @@ class TestWriteVirtualRefs:
     def test_write_new_variable(
         self, icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
     ):
-        dataset_to_icechunk(vds_with_manifest_arrays, icechunk_filestore)
+        vds = vds_with_manifest_arrays
 
+        dataset_to_icechunk(vds, icechunk_filestore)
+
+        # check attrs
         root_group = group(store=icechunk_filestore)
+        assert isinstance(root_group, Group)
         assert root_group.attrs == {"something": 0}
 
         # TODO assert that arrays, array attrs, and references have been written
+
+        # TODO check against vds, then perhaps parametrize?
+
+        # check array exists
+        assert "a" in root_group
+        arr = root_group["a"]
+        assert isinstance(arr, Array)
+
+        # check array metadata
+        # TODO why doesn't a .zarr_format or .version attribute exist on zarr.Array?
+        # assert arr.zarr_format == 3
+        assert arr.shape == (2, 3)
+        assert arr.chunks == (2, 3)
+        assert arr.dtype == np.dtype("<i8")
+        assert arr.order == "C"
+        assert arr.fill_value == 0
+        # TODO check compressor, filters?
+
+        # check array attrs
+
+        # check chunk references
 
         # note: we don't need to test that committing actually works, because now we have confirmed
         # the refs are in the store (even uncommitted) it's icechunk's problem to manage now.
