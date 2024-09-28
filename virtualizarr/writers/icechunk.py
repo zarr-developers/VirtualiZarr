@@ -28,17 +28,21 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
 
+    # TODO should we check that the store supports writes at this point?
+
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?
-    root = Group.from_store(store=store)
+    root_group = Group.from_store(store=store)
 
     # TODO this is Frozen, the API for setting attributes must be something else
     # root_group.attrs = ds.attrs
+    for k, v in ds.attrs.items():
+        root_group.attrs[k] = v
 
     for name, var in ds.variables.items():
         write_variable_to_icechunk(
             store=store,
-            group=root,
+            group=root_group,
             name=name,
             var=var,
         )
