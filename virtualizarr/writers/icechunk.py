@@ -110,7 +110,7 @@ def write_manifest_virtual_refs(
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)
 
-        # TODO again this async stuff should be handled at the rust level, not here
+        # TODO this needs to be awaited or something
         # set each reference individually
         store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args

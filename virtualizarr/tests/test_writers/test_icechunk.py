@@ -30,7 +30,7 @@ def icechunk_filestore(tmpdir) -> "IcechunkStore":
 
 
 class TestWriteVirtualRefs:
-    def test_write_new_variable(
+    def test_write_new_virtual_variable(
         self, icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
     ):
         vds = vds_with_manifest_arrays
@@ -66,10 +66,25 @@ class TestWriteVirtualRefs:
         # check dimensions
         assert arr.attrs["DIMENSION_NAMES"] == ["x", "y"]
 
-        # check chunk references
+    def test_set_virtual_refs(
+        self, icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
+    ):
+        vds = vds_with_manifest_arrays
 
-        # note: we don't need to test that committing actually works, because now we have confirmed
-        # the refs are in the store (even uncommitted) it's icechunk's problem to manage now.
+        dataset_to_icechunk(vds, icechunk_filestore)
+
+        root_group = group(store=icechunk_filestore)
+        arr = root_group["a"]
+
+        # check chunk references
+        # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+
+        # TODO we can't check the chunk contents if the reference doesn't actually point to any real location
+        # TODO so we could use our netCDF file fixtures again? And use minio to test that this works with cloud urls?
+        assert arr[0, 0] == ...
+
+        # note: we don't need to test that committing works, because now we have confirmed
+        # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
 
 # TODO test writing loadable variables
