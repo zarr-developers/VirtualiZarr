@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -6,10 +7,14 @@ import pytest
 pytest.importorskip("icechunk")
 
 import numpy as np
-from xarray import Dataset
+import numpy.testing as npt
+from xarray import Dataset, open_dataset
+from xarray.core.variable import Variable
 from zarr import Array, Group, group
 
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import dataset_to_icechunk
+from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore
@@ -66,22 +71,45 @@ class TestWriteVirtualRefs:
         # check dimensions
         assert arr.attrs["DIMENSION_NAMES"] == ["x", "y"]
 
-    def test_set_virtual_refs(
-        self, icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
+    def test_set_single_virtual_ref(
+        self, icechunk_filestore: "IcechunkStore", netcdf4_file: Path
     ):
-        vds = vds_with_manifest_arrays
+        # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+        # vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+        # instead for now just write out byte ranges explicitly
+        manifest = ChunkManifest(
+            {"0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
+        )
+        zarray = ZArray(
+            shape=(2920, 25, 53),
+            chunks=(2920, 25, 53),
+            dtype=np.dtype("int16"),
+            compressor=None,
+            filters=None,
+            fill_value=None,
+        )
+        ma = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=zarray,
+        )
+        air = Variable(data=ma, dims=["time", "lat", "lon"])
+        vds = Dataset(
+            {"air": air},
+        )
 
         dataset_to_icechunk(vds, icechunk_filestore)
 
         root_group = group(store=icechunk_filestore)
-        arr = root_group["a"]
+        air_array = root_group["air"]
+        print(air_array)
 
         # check chunk references
         # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
 
-        # TODO we can't check the chunk contents if the reference doesn't actually point to any real location
-        # TODO so we could use our netCDF file fixtures again? And use minio to test that this works with cloud urls?
-        assert arr[0, 0] == ...
+        expected_ds = open_dataset(netcdf4_file)
+        expected_air_array = expected_ds["air"].to_numpy()
+        npt.assert_equal(air_array, expected_air_array)
 
         # note: we don't need to test that committing works, because now we have confirmed
         # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
