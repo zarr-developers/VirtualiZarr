@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -39,21 +40,38 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     for k, v in ds.attrs.items():
         root_group.attrs[k] = v
 
-    for name, var in ds.variables.items():
-        write_variable_to_icechunk(
+    # we should be able to write references for each variable concurrently
+    asyncio.run(
+        write_variables_to_icechunk_group(
+            ds.variables,
             store=store,
             group=root_group,
-            name=name,
-            var=var,
         )
+    )
 
-    return None
+
+async def write_variables_to_icechunk_group(
+    variables,
+    store,
+    group,
+):
+    await asyncio.gather(
+        *(
+            write_variable_to_icechunk(
+                store=store,
+                group=group,
+                arr_name=name,
+                var=var,
+            )
+            for name, var in variables.items()
+        )
+    )
 
 
-def write_variable_to_icechunk(
+async def write_variable_to_icechunk(
     store: "IcechunkStore",
     group: Group,
-    name: str,
+    arr_name: str,
     var: Variable,
 ) -> None:
     if not isinstance(var.data, ManifestArray):
@@ -63,13 +81,16 @@ def write_variable_to_icechunk(
     ma = var.data
     zarray = ma.zarray
 
-    # TODO do I need the returned zarr.array object for anything after ensuring the array has been created?
     # TODO should I be checking that this array doesn't already exist? Or is that icechunks' job?
     arr = group.create_array(
-        name,
+        arr_name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
+        # TODO fill_value?
+        # TODO order?
+        # TODO zarr format?
+        # TODO compressors?
     )
 
     # TODO it would be nice if we could assign directly to the .attrs property
@@ -78,21 +99,27 @@ def write_variable_to_icechunk(
     # TODO we should probably be doing some encoding of those attributes?
     arr.attrs["DIMENSION_NAMES"] = var.dims
 
-    write_manifest_virtual_refs(
+    await write_manifest_virtual_refs(
         store=store,
         group=group,
-        name=name,
+        arr_name=arr_name,
         manifest=ma.manifest,
     )
 
 
-def write_manifest_virtual_refs(
+async def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: Group,
-    name: str,
+    arr_name: str,
     manifest: ChunkManifest,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
+
+    key_prefix = f"{group.name}{arr_name}"
+    if key_prefix.startswith("/"):
+        # remove preceding / character
+        # TODO unsure if this is correct
+        key_prefix = key_prefix[1:]
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
@@ -110,11 +137,15 @@ def write_manifest_virtual_refs(
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)
 
+        key = f"{key_prefix}/{chunk_key}"  # should be of form 'group/name/0/1/2'
+
+        print(key)
+
         # TODO this needs to be awaited or something
         # set each reference individually
-        store.set_virtual_ref(
+        await store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
-            key=f"{group}/{name}/{chunk_key}",  # should be of form '/group/name/0/1/2'
+            key=key,
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
