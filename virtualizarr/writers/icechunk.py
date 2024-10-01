@@ -153,7 +153,6 @@ async def write_manifest_virtual_refs(
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)
 
-        # TODO this needs to be awaited or something
         # set each reference individually
         await store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
