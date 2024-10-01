@@ -40,7 +40,6 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     for k, v in ds.attrs.items():
         root_group.attrs[k] = v
 
-    # we should be able to write references for each variable concurrently
     asyncio.run(
         write_variables_to_icechunk_group(
             ds.variables,
@@ -55,12 +54,14 @@ async def write_variables_to_icechunk_group(
     store,
     group,
 ):
+    # we should be able to write references for each variable concurrently
+    # TODO we could also write to multiple groups concurrently, i.e. in a future DataTree.to_zarr(icechunkstore)
     await asyncio.gather(
         *(
             write_variable_to_icechunk(
                 store=store,
                 group=group,
-                arr_name=name,
+                name=name,
                 var=var,
             )
             for name, var in variables.items()
@@ -71,19 +72,37 @@ async def write_variables_to_icechunk_group(
 async def write_variable_to_icechunk(
     store: "IcechunkStore",
     group: Group,
-    arr_name: str,
+    name: str,
     var: Variable,
 ) -> None:
-    if not isinstance(var.data, ManifestArray):
+    """Write a single (possibly virtual) variable into an icechunk store"""
+
+    if isinstance(var.data, ManifestArray):
+        await write_virtual_variable_to_icechunk(
+            store=store,
+            group=group,
+            name=name,
+            var=var,
+        )
+    else:
         # TODO is writing loadable_variables just normal xarray ds.to_zarr?
         raise NotImplementedError()
+
+
+async def write_virtual_variable_to_icechunk(
+    store: "IcechunkStore",
+    group: Group,
+    name: str,
+    var: Variable,
+) -> None:
+    """Write a single virtual variable into an icechunk store"""
 
     ma = var.data
     zarray = ma.zarray
 
     # TODO should I be checking that this array doesn't already exist? Or is that icechunks' job?
     arr = group.create_array(
-        arr_name,
+        name=name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
@@ -102,7 +121,7 @@ async def write_variable_to_icechunk(
     await write_manifest_virtual_refs(
         store=store,
         group=group,
-        arr_name=arr_name,
+        arr_name=name,
         manifest=ma.manifest,
     )
 
