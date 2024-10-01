@@ -135,10 +135,6 @@ async def write_manifest_virtual_refs(
     """Write all the virtual references for one array manifest at once."""
 
     key_prefix = f"{group.name}{arr_name}"
-    if key_prefix.startswith("/"):
-        # remove preceding / character
-        # TODO unsure if this is correct
-        key_prefix = key_prefix[1:]
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
@@ -156,15 +152,11 @@ async def write_manifest_virtual_refs(
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)
 
-        key = f"{key_prefix}/{chunk_key}"  # should be of form 'group/name/0/1/2'
-
-        print(key)
-
         # TODO this needs to be awaited or something
         # set each reference individually
         await store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
-            key=key,
+            key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
