@@ -29,7 +29,8 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
 
-    # TODO should we check that the store supports writes at this point?
+    if not store.supports_writes:
+        raise ValueError("supplied store does not support writes")
 
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?
