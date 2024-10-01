@@ -100,8 +100,8 @@ async def write_virtual_variable_to_icechunk(
     ma = var.data
     zarray = ma.zarray
 
-    # TODO should I be checking that this array doesn't already exist? Or is that icechunks' job?
-    arr = group.create_array(
+    # creates array if it doesn't already exist
+    arr = group.require_array(
         name=name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
