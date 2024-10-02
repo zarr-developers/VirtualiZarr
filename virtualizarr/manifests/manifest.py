@@ -39,7 +39,14 @@ def validate_and_normalize_path_to_uri(path: str) -> str:
     # see https://en.wikipedia.org/wiki/File_URI_scheme
     if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
         # assume the path is local, and make it fully-qualified
-        return str(Path(path).as_uri())
+        try:
+            path = Path(path).as_uri()
+        except ValueError as e:
+            raise ValueError(
+                f"paths in the manifest must be absolute, but got {path}"
+            ) from e
+        else:
+            return str(path)
     else:
         return path
 

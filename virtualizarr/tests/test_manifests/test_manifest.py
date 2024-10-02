@@ -55,6 +55,10 @@ class TestCreateManifest:
         )
         assert chunkentry.path == "file:///local/foo.nc"
 
+    def test_only_absolute_paths(self):
+        with pytest.raises(ValueError, match="must be absolute"):
+            ChunkEntry(path="local/foo.nc", offset=100, length=100)
+
 
 class TestProperties:
     def test_chunk_grid_info(self):
