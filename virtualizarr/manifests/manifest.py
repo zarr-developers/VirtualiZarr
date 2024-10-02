@@ -36,18 +36,27 @@ ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
 def validate_and_normalize_path_to_uri(path: str) -> str:
-    # see https://en.wikipedia.org/wiki/File_URI_scheme
-    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        # assume the path is local, and make it fully-qualified
+    """
+    Makes all paths into fully-qualified absolute URIs, or raises
+
+    See https://en.wikipedia.org/wiki/File_URI_scheme
+    """
+    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
+        # assume the path is local
         try:
-            path = Path(path).as_uri()
+            return str(Path(path).as_uri())
         except ValueError as e:
-            raise ValueError(
-                f"paths in the manifest must be absolute, but got {path}"
-            ) from e
-        else:
-            return str(path)
+            if str(e) == "relative path can't be expressed as a file URI":
+                # problem is that path is relative instead of absolute, so add context to error message that this is forbidden
+                raise ValueError(
+                    f"paths in the manifest must be absolute, but got {path}"
+                ) from e
+            else:
+                # must be some other problem with the path
+                raise
     else:
+        # (empty paths are allowed through as they represent missing chunks)
+        # TODO should we do other validation here? e.g. to prevent a malformed path like `file:///directory//filename.nc`?
         return path
 
 
