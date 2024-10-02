@@ -79,7 +79,7 @@ class TestWriteVirtualRefs:
 
         # instead for now just write out byte ranges explicitly
         manifest = ChunkManifest(
-            {"0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
+            {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
         )
         zarray = ZArray(
             shape=(2920, 25, 53),
