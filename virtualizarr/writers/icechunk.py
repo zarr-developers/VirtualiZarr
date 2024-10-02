@@ -13,6 +13,17 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore
 
 
+VALID_URI_PREFIXES = {
+    "s3://",
+    "gs://",
+    "azure://",
+    "r2://",
+    "cos://",
+    "minio://",
+    "file:///",
+}
+
+
 def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
@@ -157,7 +168,16 @@ async def write_manifest_virtual_refs(
         await store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
             key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
-            location=path.item(),
+            location=as_file_uri(path.item()),
             offset=offset.item(),
             length=length.item(),
         )
+
+
+def as_file_uri(path):
+    # TODO a more robust solution to this requirement exists in https://github.com/zarr-developers/VirtualiZarr/pull/243
+    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
+        # assume path is local
+        return f"file://{path}"
+    else:
+        return path
