@@ -6,8 +6,9 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import ManifestArray, open_virtual_dataset
+from virtualizarr.kerchunk import FileType
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.zarr import dataset_to_zarr, metadata_from_zarr_json
+from virtualizarr.zarr import ZArray, dataset_to_zarr, metadata_from_zarr_json
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ def isconfigurable(value: dict) -> bool:
 def test_zarr_v3_roundtrip(tmpdir, vds_with_manifest_arrays: xr.Dataset):
     vds_with_manifest_arrays.virtualize.to_zarr(tmpdir / "store.zarr")
     roundtrip = open_virtual_dataset(
-        tmpdir / "store.zarr", filetype="zarr_v3", indexes={}
+        tmpdir / "store.zarr", filetype=FileType.zarr_v3, indexes={}
     )
 
     xrt.assert_identical(roundtrip, vds_with_manifest_arrays)
@@ -78,3 +79,29 @@ def test_zarr_v3_metadata_conformance(tmpdir, vds_with_manifest_arrays: xr.Datas
         and len(metadata["codecs"]) > 1
         and all(isconfigurable(codec) for codec in metadata["codecs"])
     )
+
+
+def test_replace_partial():
+    arr = ZArray(shape=(2, 3), chunks=(1, 1), dtype=np.dtype("<i8"))
+    result = arr.replace(chunks=(2, 3))
+    expected = ZArray(shape=(2, 3), chunks=(2, 3), dtype=np.dtype("<i8"))
+    assert result == expected
+    assert result.shape == (2, 3)
+    assert result.chunks == (2, 3)
+
+
+def test_replace_total():
+    arr = ZArray(shape=(2, 3), chunks=(1, 1), dtype=np.dtype("<i8"))
+    kwargs = dict(
+        shape=(4, 4),
+        chunks=(2, 2),
+        dtype=np.dtype("<f8"),
+        fill_value=-1.0,
+        order="F",
+        compressor={"id": "zlib", "level": 1},
+        filters=[{"id": "blosc", "clevel": 5}],
+        zarr_format=3,
+    )
+    result = arr.replace(**kwargs)
+    expected = ZArray(**kwargs)
+    assert result == expected
