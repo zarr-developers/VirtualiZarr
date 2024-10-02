@@ -119,10 +119,9 @@ async def write_virtual_variable_to_icechunk(
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
         codecs=zarray._v3_codec_pipeline(),
+        dimension_names=var.dims,
+        fill_value=zarray.fill_value,
         # TODO fill_value?
-        # TODO order?
-        # TODO zarr format?
-        # TODO compressors?
     )
 
     # TODO it would be nice if we could assign directly to the .attrs property
