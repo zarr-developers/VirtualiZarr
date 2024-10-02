@@ -23,6 +23,16 @@ class TestPathValidation:
             length=100,
         )
 
+    @pytest.mark.xfail(
+        reason="probably requires adding cloudpathlib dependency to do validation of remote bucket urls"
+    )
+    def test_catch_malformed_path(self):
+        with pytest.raises(ValueError):
+            ChunkEntry(path="s3://bucket//foo.nc", offset=100, length=100)
+
+        with pytest.raises(ValueError):
+            ChunkEntry(path="/directory//foo.nc", offset=100, length=100)
+
 
 class TestCreateManifest:
     def test_create_manifest(self):
