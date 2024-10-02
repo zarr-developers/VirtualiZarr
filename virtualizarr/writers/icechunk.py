@@ -118,6 +118,7 @@ async def write_virtual_variable_to_icechunk(
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
+        codecs=zarray._v3_codec_pipeline(),
         # TODO fill_value?
         # TODO order?
         # TODO zarr format?
@@ -129,6 +130,11 @@ async def write_virtual_variable_to_icechunk(
         arr.attrs[k] = v
     # TODO we should probably be doing some encoding of those attributes?
     arr.attrs["DIMENSION_NAMES"] = var.dims
+
+    _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+    for k, v in var.encoding.items():
+        if k in _encoding_keys:
+            arr.attrs[k] = v
 
     await write_manifest_virtual_refs(
         store=store,

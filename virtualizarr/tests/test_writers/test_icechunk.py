@@ -63,6 +63,7 @@ class TestWriteVirtualRefs:
         assert arr.order == "C"
         assert arr.fill_value == 0
         # TODO check compressor, filters?
+        #
 
         # check array attrs
         # TODO somehow this is broken by setting the dimension names???
@@ -93,7 +94,7 @@ class TestWriteVirtualRefs:
             chunkmanifest=manifest,
             zarray=zarray,
         )
-        air = Variable(data=ma, dims=["time", "lat", "lon"])
+        air = Variable(data=ma, dims=["time", "lat", "lon"], encoding={"scale_factor": 0.01})
         vds = Dataset(
             {"air": air},
         )
@@ -102,13 +103,20 @@ class TestWriteVirtualRefs:
 
         root_group = group(store=icechunk_filestore)
         air_array = root_group["air"]
-        print(air_array)
+
+        # check array metadata
+        assert air_array.shape == (2920, 25, 53)
+        assert air_array.chunks == (2920, 25, 53)
+        assert air_array.dtype == np.dtype("int16")
+        assert air_array.attrs['scale_factor'] == 0.01
+
+        scale_factor = air_array.attrs['scale_factor']
 
         # check chunk references
         # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
 
         expected_ds = open_dataset(netcdf4_file)
-        expected_air_array = expected_ds["air"].to_numpy()
+        expected_air_array = expected_ds["air"].to_numpy() / scale_factor
         npt.assert_equal(air_array, expected_air_array)
 
         # note: we don't need to test that committing works, because now we have confirmed
