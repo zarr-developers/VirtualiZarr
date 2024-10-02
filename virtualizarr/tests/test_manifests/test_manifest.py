@@ -1,6 +1,6 @@
 import pytest
 
-from virtualizarr.manifests import ChunkManifest
+from virtualizarr.manifests import ChunkEntry, ChunkManifest
 
 
 class TestCreateManifest:
@@ -49,6 +49,12 @@ class TestCreateManifest:
         manifest = ChunkManifest(entries=chunks)
         assert len(manifest.dict()) == 1
 
+    def test_normalize_paths(self):
+        chunkentry = ChunkEntry(
+            **{"path": "/local/foo.nc", "offset": 100, "length": 100}
+        )
+        assert chunkentry.path == "file:///local/foo.nc"
+
 
 class TestProperties:
     def test_chunk_grid_info(self):
@@ -67,14 +73,14 @@ class TestEquals:
     def test_equals(self):
         manifest1 = ChunkManifest(
             entries={
-                "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-                "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+                "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
             }
         )
         manifest2 = ChunkManifest(
             entries={
-                "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-                "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+                "0.0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+                "0.0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
             }
         )
         assert manifest1 != manifest2
@@ -101,7 +107,7 @@ class TestRenamePaths:
 
     def test_rename_using_function(self):
         chunks = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
 
@@ -120,7 +126,7 @@ class TestRenamePaths:
 
     def test_invalid_type(self):
         chunks = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
 
