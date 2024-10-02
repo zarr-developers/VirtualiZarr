@@ -151,6 +151,9 @@ class TestWriteVirtualRefs:
         assert air_array.chunks == (2920, 25, 53)
         assert air_array.dtype == np.dtype("int16")
         assert air_array.attrs['scale_factor'] == 0.01
+
+        # xarray performs this when cf_decoding is True, but we are not loading
+        # with xarray here so we scale it manually.
         scale_factor = air_array.attrs['scale_factor']
         scaled_air_array = air_array[:] * scale_factor
 
@@ -164,8 +167,6 @@ class TestWriteVirtualRefs:
         # note: we don't need to test that committing works, because now we have confirmed
         # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
-
-# TODO get test with encoding working
 
 # TODO test writing grids of multiple chunks
 
