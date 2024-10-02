@@ -1,6 +1,37 @@
 import pytest
 
-from virtualizarr.manifests import ChunkManifest
+from virtualizarr.manifests import ChunkEntry, ChunkManifest
+
+
+class TestPathValidation:
+    def test_normalize_paths_to_uris(self):
+        chunkentry = ChunkEntry(
+            path="/local/foo.nc",
+            offset=100,
+            length=100,
+        )
+        assert chunkentry.path == "file:///local/foo.nc"
+
+    def test_only_allow_absolute_paths(self):
+        with pytest.raises(ValueError, match="must be absolute"):
+            ChunkEntry(path="local/foo.nc", offset=100, length=100)
+
+    def test_allow_empty_path(self):
+        ChunkEntry(
+            path="",
+            offset=100,
+            length=100,
+        )
+
+    @pytest.mark.xfail(
+        reason="probably requires adding cloudpathlib dependency to do validation of remote bucket urls"
+    )
+    def test_catch_malformed_path(self):
+        with pytest.raises(ValueError):
+            ChunkEntry(path="s3://bucket//foo.nc", offset=100, length=100)
+
+        with pytest.raises(ValueError):
+            ChunkEntry(path="/directory//foo.nc", offset=100, length=100)
 
 
 class TestCreateManifest:
@@ -41,7 +72,7 @@ class TestCreateManifest:
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
             ChunkManifest(entries=chunks)
 
-    def test_empty_chunk_paths(self):
+    def test_remove_chunks_with_empty_paths(self):
         chunks = {
             "0.0.0": {"path": "", "offset": 0, "length": 100},
             "1.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -67,14 +98,14 @@ class TestEquals:
     def test_equals(self):
         manifest1 = ChunkManifest(
             entries={
-                "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-                "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+                "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
             }
         )
         manifest2 = ChunkManifest(
             entries={
-                "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-                "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+                "0.0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+                "0.0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
             }
         )
         assert manifest1 != manifest2
@@ -101,7 +132,7 @@ class TestRenamePaths:
 
     def test_rename_using_function(self):
         chunks = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
 
@@ -120,7 +151,7 @@ class TestRenamePaths:
 
     def test_invalid_type(self):
         chunks = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
 
