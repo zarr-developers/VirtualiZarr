@@ -169,7 +169,7 @@ class TestKerchunkRoundtrip:
 
     def test_datetime64_dtype_fill_value(self, tmpdir, format):
         chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)

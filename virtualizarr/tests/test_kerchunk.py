@@ -12,8 +12,8 @@ from virtualizarr.readers.kerchunk import (
 def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
