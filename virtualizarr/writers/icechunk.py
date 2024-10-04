@@ -2,7 +2,8 @@ import asyncio
 from typing import TYPE_CHECKING
 
 import numpy as np
-from xarray import Dataset
+from xarray import Dataset, conventions
+from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
 from zarr import Group
 
@@ -15,11 +16,11 @@ if TYPE_CHECKING:
 
 VALID_URI_PREFIXES = {
     "s3://",
-    "gs://",
-    "azure://",
-    "r2://",
-    "cos://",
-    "minio://",
+    # "gs://",
+    # "azure://",
+    # "r2://",
+    # "cos://",
+    # "minio://",
     "file:///",
 }
 
@@ -50,7 +51,7 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     # TODO this is Frozen, the API for setting attributes must be something else
     # root_group.attrs = ds.attrs
     for k, v in ds.attrs.items():
-        root_group.attrs[k] = v
+        root_group.attrs[k] = encode_zarr_attr_value(v)
 
     asyncio.run(
         write_variables_to_icechunk_group(
@@ -108,7 +109,6 @@ async def write_virtual_variable_to_icechunk(
     var: Variable,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-
     ma = var.data
     zarray = ma.zarray
 
@@ -118,17 +118,21 @@ async def write_virtual_variable_to_icechunk(
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
+        codecs=zarray._v3_codec_pipeline(),
+        dimension_names=var.dims,
+        fill_value=zarray.fill_value,
         # TODO fill_value?
-        # TODO order?
-        # TODO zarr format?
-        # TODO compressors?
     )
 
     # TODO it would be nice if we could assign directly to the .attrs property
     for k, v in var.attrs.items():
-        arr.attrs[k] = v
-    # TODO we should probably be doing some encoding of those attributes?
-    arr.attrs["DIMENSION_NAMES"] = var.dims
+        arr.attrs[k] = encode_zarr_attr_value(v)
+    arr.attrs["DIMENSION_NAMES"] = encode_zarr_attr_value(var.dims)
+
+    _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+    for k, v in var.encoding.items():
+        if k in _encoding_keys:
+            arr.attrs[k] = encode_zarr_attr_value(v)
 
     await write_manifest_virtual_refs(
         store=store,
