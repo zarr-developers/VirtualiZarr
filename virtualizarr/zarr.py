@@ -207,8 +207,10 @@ class ZArray:
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
         # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
         bytes = dict(
-            name="bytes", configuration={}
-        )  # TODO need to handle endianess configuration
+            name="bytes", configuration={
+                "endian": "little"  # TODO need to handle endianess configuration, but little is a sensible default for now
+            }
+        )
 
         # The order here is significant!
         # [ArrayArray] -> ArrayBytes -> [BytesBytes]
