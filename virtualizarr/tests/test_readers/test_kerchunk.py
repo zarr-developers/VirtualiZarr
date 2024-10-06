@@ -37,7 +37,7 @@ def test_dataset_from_df_refs():
 
     assert da.data.zarray.compressor is None
     assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value is np.nan
+    assert da.data.zarray.fill_value is 0
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {

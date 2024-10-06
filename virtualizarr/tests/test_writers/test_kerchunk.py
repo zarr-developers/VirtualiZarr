@@ -19,7 +19,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.nan,
+                fill_value=0,
                 order="C",
             ),
         )
@@ -30,7 +30,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":0,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
             },
@@ -51,7 +51,7 @@ class TestAccessor:
                 chunks=(2, 3),
                 compressor=None,
                 filters=None,
-                fill_value=np.nan,
+                fill_value=0,
                 order="C",
             ),
         )
@@ -69,7 +69,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":0,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["test.nc", 6144, 48],
             },

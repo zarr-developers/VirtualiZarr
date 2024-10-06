@@ -37,7 +37,7 @@ class TestManifestArray:
 
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
-            ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+            ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":0,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
             "0.0": ["test1.nc", 6144, 48],
         }
         marr = ManifestArray._from_kerchunk_refs(arr_refs)
@@ -46,13 +46,13 @@ class TestManifestArray:
         assert marr.chunks == (2, 3)
         assert marr.dtype == np.dtype("int64")
         assert marr.zarray.compressor is None
-        assert marr.zarray.fill_value is np.nan
+        assert marr.zarray.fill_value is 0
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
 
     def test_create_scalar_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
-            ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}',
+            ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":0,"filters":null,"order":"C","shape":[],"zarr_format":2}',
             "0": ["test1.nc", 6144, 48],
         }
         marr = ManifestArray._from_kerchunk_refs(arr_refs)
