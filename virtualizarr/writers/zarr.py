@@ -92,8 +92,8 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
         "configuration": {"chunk_shape": metadata.pop("chunks")},
     }
     metadata["chunk_key_encoding"] = {
-        "name": "default",
-        "configuration": {"separator": "/"},
+        "name": "v2",
+        "configuration": {"separator": "."},
     }
     metadata["codecs"] = zarray._v3_codec_pipeline()
     metadata.pop("filters")
