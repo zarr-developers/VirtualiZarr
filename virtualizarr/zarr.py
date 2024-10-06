@@ -66,6 +66,16 @@ class ZArray:
         if self.fill_value is None:
             self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
 
+        # Handle non-finite fill values
+        if not isinstance(self.fill_value, list):
+            if self.fill_value is np.nan:
+                self.fill_value = "NaN"
+            elif self.fill_value is np.inf:
+                self.fill_value = "Infinity"
+            elif self.fill_value is -np.inf:  # TODO: does this work?
+                self.fill_value = "-Infinity"
+        # TODO: Handle other data types (complex, etc.)
+
     @property
     def codec(self) -> Codec:
         """For comparison against other arrays."""
@@ -73,10 +83,22 @@ class ZArray:
 
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
+        dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
+
         # coerce type of fill_value as kerchunk can be inconsistent with this
         fill_value = decoded_arr_refs_zarray["fill_value"]
         if fill_value is None or fill_value == "NaN" or fill_value == "nan":
-            fill_value = np.nan
+            if dtype.kind == "f":
+                fill_value = np.nan
+            elif dtype.kind == "c":
+                fill_value = [np.nan, np.nan]
+            elif dtype.kind == "i":
+                fill_value = 0
+            else:
+                # TODO: Handle other data types
+                raise ValueError(
+                    f"Fill value {fill_value} is not valid for dtype {dtype}"
+                )
 
         compressor = decoded_arr_refs_zarray["compressor"]
         zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
@@ -185,8 +207,11 @@ class ZArray:
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
         # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
         bytes = dict(
-            name="bytes", configuration={}
-        )  # TODO need to handle endianess configuration
+            name="bytes",
+            configuration={
+                "endian": "little"  # TODO need to handle endianess configuration, but little is a sensible default for now
+            },
+        )
 
         # The order here is significant!
         # [ArrayArray] -> ArrayBytes -> [BytesBytes]
