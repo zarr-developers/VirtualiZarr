@@ -46,7 +46,7 @@ class TestManifestArray:
         assert marr.chunks == (2, 3)
         assert marr.dtype == np.dtype("int64")
         assert marr.zarray.compressor is None
-        assert marr.zarray.fill_value is 0
+        assert marr.zarray.fill_value == 0
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
 

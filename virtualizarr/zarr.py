@@ -72,7 +72,7 @@ class ZArray:
                 self.fill_value = "NaN"
             elif self.fill_value is np.inf:
                 self.fill_value = "Infinity"
-            elif self.fill_value is -np.inf: # TODO: does this work?
+            elif self.fill_value is -np.inf:  # TODO: does this work?
                 self.fill_value = "-Infinity"
         # TODO: Handle other data types (complex, etc.)
 
@@ -207,9 +207,10 @@ class ZArray:
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
         # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
         bytes = dict(
-            name="bytes", configuration={
+            name="bytes",
+            configuration={
                 "endian": "little"  # TODO need to handle endianess configuration, but little is a sensible default for now
-            }
+            },
         )
 
         # The order here is significant!
