@@ -66,6 +66,14 @@ class ZArray:
         if self.fill_value is None:
             self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
 
+        # Handle non-finite fill values
+        if self.fill_value is np.nan:
+            self.fill_value = "NaN"
+        elif self.fill_value is np.inf:
+            self.fill_value = "Infinity"
+        elif self.fill_value is -np.inf:
+            self.fill_value = "-Infinity"
+
     @property
     def codec(self) -> Codec:
         """For comparison against other arrays."""
