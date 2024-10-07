@@ -8,6 +8,11 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+
+- Stores test datasets in repo.
+  (:pull:`235`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+  Closes (:issue:`226`)
+
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
