@@ -8,6 +8,17 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+- Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+- New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
+  (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
+
+- Adds `decode_times` to open_virtual_dataset (:pull:`232`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+- Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
 
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
@@ -21,9 +32,11 @@ Breaking changes
   `pydantic.BaseModel` (:pull:`210`)
 - `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
 
-
 Deprecations
 ~~~~~~~~~~~~
+
+- Depreciates cftime_variables in open_virtual_dataset in favor of decode_times. (:pull:`232`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 Bug fixes
 ~~~~~~~~~
@@ -31,14 +44,21 @@ Bug fixes
 - Exclude empty chunks during `ChunkDict` construction. (:pull:`198`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - Fixed regression in `fill_value` handling for datetime dtypes making virtual
-  Zarr stores unreadable (:pr:`206`)
+  Zarr stores unreadable (:pull:`206`)
   By `Timothy Hodson <https://github.com/thodson-usgs>`_
 
 Documentation
 ~~~~~~~~~~~~~
 
+- Adds virtualizarr + coiled serverless example notebook (:pull`223`)
+  By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
+
+- Refactored internal structure significantly to split up everything to do with reading references from that to do with writing references.
+  (:issue:`229`) (:pull:`231`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.0.0:
 

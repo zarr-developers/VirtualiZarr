@@ -306,8 +306,8 @@ Dimensions:  (time: 2920, lat: 25, lon: 53)
 Coordinates:
     lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
     lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-  * time     (time) float32 12kB 1.867e+06 1.867e+06 ... 1.885e+06 1.885e+06
-Data variables:
+  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+  Data variables:
     air      (time, lat, lon) float64 31MB ...
 Attributes:
     Conventions:  COARDS
@@ -325,13 +325,15 @@ Loading variables can be useful in a few scenarios:
 
 ### CF-encoded time variables
 
-Notice that the `time` variable that was loaded above does not have the expected dtype. To correctly decode time variables according to the CF conventions (like `xr.open_dataset` does by default), you need to include them in an additional keyword argument `cftime_variables`:
+To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
+
+
 
 ```python
 vds = open_virtual_dataset(
     'air.nc',
     loadable_variables=['air', 'time'],
-    cftime_variables=['time'],
+    decode_times=True,
     indexes={},
 )
 ```
@@ -352,7 +354,7 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-Now the loaded time variable has a `datetime64[ns]` dtype. Any variables listed as `cftime_variables` must also be listed as `loadable_variables`.
+
 
 ## Writing virtual stores to disk
 
