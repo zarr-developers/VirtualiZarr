@@ -1,3 +1,4 @@
+import dataclasses
 from typing import List, Tuple, TypedDict, Union
 
 import h5py
@@ -6,7 +7,6 @@ import numcodecs.registry as registry
 import numpy as np
 from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
-from pydantic import BaseModel, field_validator
 from xarray.coding.variables import _choose_float_dtype
 
 _non_standard_filters = {
@@ -17,30 +17,33 @@ _non_standard_filters = {
 _hdf5plugin_imagecodecs = {"lz4": "imagecodecs_lz4h5", "bzip2": "imagecodecs_bz2"}
 
 
-class BloscProperties(BaseModel):
+@dataclasses.dataclass
+class BloscProperties:
     blocksize: int
     clevel: int
     shuffle: int
     cname: str
 
-    @field_validator("cname", mode="before")
-    def get_cname_from_code(cls, v):
+    def __post_init__(self):
         blosc_compressor_codes = {
             value: key
             for key, value in hdf5plugin._filters.Blosc._Blosc__COMPRESSIONS.items()
         }
-        return blosc_compressor_codes[v]
+        self.cname = blosc_compressor_codes[self.cname]
 
 
-class ZstdProperties(BaseModel):
+@dataclasses.dataclass
+class ZstdProperties:
     level: int
 
 
-class ShuffleProperties(BaseModel):
+@dataclasses.dataclass
+class ShuffleProperties:
     elementsize: int
 
 
-class ZlibProperties(BaseModel):
+@dataclasses.dataclass
+class ZlibProperties:
     level: int
 
 
@@ -66,10 +69,10 @@ def _filter_to_codec(
             id = id_str
         if id == "zlib":
             zlib_props = ZlibProperties(level=filter_properties)
-            conf = zlib_props.model_dump()  # type: ignore[assignment]
+            conf = dataclasses.asdict(zlib_props)
         if id == "shuffle" and isinstance(filter_properties, tuple):
             shuffle_props = ShuffleProperties(elementsize=filter_properties[0])
-            conf = shuffle_props.model_dump()  # type: ignore[assignment]
+            conf = dataclasses.asdict(shuffle_props)
         conf["id"] = id  # type: ignore[assignment]
     if id_int:
         filter = hdf5plugin.get_filters(id_int)[0]
@@ -77,18 +80,14 @@ def _filter_to_codec(
         if id in _hdf5plugin_imagecodecs.keys():
             id = _hdf5plugin_imagecodecs[id]
         if id == "blosc" and isinstance(filter_properties, tuple):
+            blosc_fields = [field.name for field in dataclasses.fields(BloscProperties)]
             blosc_props = BloscProperties(
-                **{
-                    k: v
-                    for k, v in zip(
-                        BloscProperties.model_fields.keys(), filter_properties[-4:]
-                    )
-                }
+                **{k: v for k, v in zip(blosc_fields, filter_properties[-4:])}
             )
-            conf = blosc_props.model_dump()  # type: ignore[assignment]
+            conf = dataclasses.asdict(blosc_props)
         if id == "zstd" and isinstance(filter_properties, tuple):
             zstd_props = ZstdProperties(level=filter_properties[0])
-            conf = zstd_props.model_dump()  # type: ignore[assignment]
+            conf = dataclasses.asdict(zstd_props)
         conf["id"] = id
     codec = registry.get_codec(conf)
     return codec
