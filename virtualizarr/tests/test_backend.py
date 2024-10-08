@@ -336,3 +336,43 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
+
+
+@pytest.mark.parametrize(
+    "reference_format",
+    [
+        "kerchunk_json",
+        pytest.param("kerchunk_parquet", marks=pytest.mark.skip(reason="wip")),
+    ],
+)
+def test_open_virtual_dataset_existing_kerchunk_refs(
+    tmp_path, netcdf4_file, reference_format
+):
+    from kerchunk.hdf import SingleHdf5ToZarr
+
+    # FIXME/WARNING/TODO: `inline_threshold` set to 1, so we don't get inlining of refs.
+    # Reading inlined vars as ManifestArrays is currently not implemented.
+    refs = SingleHdf5ToZarr(netcdf4_file, inline_threshold=1).translate()
+
+    if reference_format == "kerchunk_json":
+        import ujson
+
+        ref_filepath = tmp_path / "ref.json"
+        with open(ref_filepath, "wb") as f:
+            f.write(ujson.dumps(refs).encode())
+    # WIP
+    # if reference_format == 'kerchunk_parquet':
+    #     ref_filepath = tmp_path / 'ref.parquet'
+    #     from kerchunk.df import refs_to_dataframe
+    #     refs_to_dataframe(fo=refs, url = ref_filepath.as_posix())
+
+    vds = open_virtual_dataset(
+        filepath=ref_filepath, filetype=reference_format, indexes={}
+    )
+
+    # FIXME: variable names have a trailing \
+    assert list(vds) == ["time", "lat", "air", "lon"]
+    # FIXME: coodinates empty
+    assert set(vds.coords) == set("lat", "lon", "time")
+    # FIXME: coords [lat, lon, time] are in data variables
+    assert list(vds.variables) == ["air"]

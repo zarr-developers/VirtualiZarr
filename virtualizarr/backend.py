@@ -39,6 +39,8 @@ class FileType(AutoName):
     zarr = auto()
     dmrpp = auto()
     zarr_v3 = auto()
+    kerchunk_json = auto()
+    kerchunk_parquet = auto()
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -67,13 +69,14 @@ def open_virtual_dataset(
 
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
 
+
     Parameters
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'kerchunk_json', 'kerchunk_parquet'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
@@ -135,6 +138,23 @@ def open_virtual_dataset(
     # if filetype is user defined, convert to FileType
     if filetype is not None:
         filetype = FileType(filetype)
+
+    if filetype == FileType.kerchunk_json:
+        import ast
+
+        from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
+
+        fpath = _fsspec_openfile_from_filepath(
+            filepath=filepath, reader_options=reader_options
+        )
+
+        refs = ast.literal_eval(fpath.read().decode("utf-8"))
+
+        vds = dataset_from_kerchunk_refs(refs)
+        return vds
+
+    if filetype == FileType.kerchunk_parquet:
+        raise NotImplementedError()
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
