@@ -16,7 +16,8 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
@@ -136,25 +137,38 @@ def open_virtual_dataset(
         raise NotImplementedError()
 
     # if filetype is user defined, convert to FileType
+
     if filetype is not None:
         filetype = FileType(filetype)
+
+    if filetype == FileType.kerchunk_parquet:
+        from fsspec.implementations.reference import LazyReferenceMapper
+
+        from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
+
+        fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options).fs
+        lrm = LazyReferenceMapper(filepath, fs)
+
+        # build reference dict from KV pairs in LazyReferenceMapper
+        array_refs = {k: lrm[k] for k in lrm.keys()}
+
+        # where does version come from? Is it always 1?
+        full_reference = {"version": 1, "refs": array_refs}
+
+        return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
 
     if filetype == FileType.kerchunk_json:
         import ast
 
         from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
 
-        fpath = _fsspec_openfile_from_filepath(
+        fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
-        )
+        ).open_file()
 
         refs = ast.literal_eval(fpath.read().decode("utf-8"))
 
-        vds = dataset_from_kerchunk_refs(refs)
-        return vds
-
-    if filetype == FileType.kerchunk_parquet:
-        raise NotImplementedError()
+        return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
@@ -171,9 +185,9 @@ def open_virtual_dataset(
                 "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
             )
 
-        fpath = _fsspec_openfile_from_filepath(
+        fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
-        )
+        ).open_file()
         parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
         vds = parser.parse_dataset()
         vds.drop_vars(drop_variables)
@@ -209,9 +223,9 @@ def open_virtual_dataset(
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
             # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
             # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            fpath = _fsspec_openfile_from_filepath(
+            fpath = _FsspecFSFromFilepath(
                 filepath=filepath, reader_options=reader_options
-            )
+            ).open_file()
 
             # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
             # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.

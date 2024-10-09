@@ -13,7 +13,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.utils import _FsspecFSFromFilepath
 from virtualizarr.zarr import ZArray, ZAttrs
 
 
@@ -28,9 +28,9 @@ def _automatically_determine_filetype(
         raise NotImplementedError()
 
     # Read magic bytes from local or remote file
-    fpath = _fsspec_openfile_from_filepath(
+    fpath = _FsspecFSFromFilepath(
         filepath=filepath, reader_options=reader_options
-    )
+    ).open_file()
     magic_bytes = fpath.read(8)
     fpath.close()
 
