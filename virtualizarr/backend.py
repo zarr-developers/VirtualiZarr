@@ -159,31 +159,54 @@ def open_virtual_dataset(
         vds.drop_vars(drop_variables)
         return vds
     else:
-        # we currently read every other filetype using kerchunks various file format backends
-        from virtualizarr.readers.kerchunk import (
-            fully_decode_arr_refs,
-            read_kerchunk_references_from_file,
-            virtual_vars_from_kerchunk_refs,
-        )
-
         if reader_options is None:
             reader_options = {}
 
-        # this is the only place we actually always need to use kerchunk directly
-        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = read_kerchunk_references_from_file(
-            filepath=filepath,
-            filetype=filetype,
-            group=group,
-            reader_options=reader_options,
-        )
-        virtual_vars = virtual_vars_from_kerchunk_refs(
-            vds_refs,
-            drop_variables=drop_variables + loadable_variables,
-            virtual_array_class=virtual_array_class,
-        )
-        ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
-        coord_names = ds_attrs.pop("coordinates", [])
+        from virtualizarr.readers.kerchunk import _automatically_determine_filetype
+
+        if filetype is None:
+            filetype = _automatically_determine_filetype(
+                filepath=filepath, reader_options=reader_options
+            )
+        filetype = FileType(filetype)
+        if filetype == FileType.hdf5:
+            from virtualizarr.readers.hdf import (
+                attrs_from_root_group,
+                virtual_vars_from_hdf,
+            )
+
+            virtual_vars = virtual_vars_from_hdf(
+                path=filepath,
+                drop_variables=drop_variables + loadable_variables,
+                reader_options=reader_options,
+            )
+            ds_attrs = attrs_from_root_group(
+                path=filepath, reader_options=reader_options
+            )
+            coord_names = ds_attrs.pop("coordinates", [])
+        # we currently read every other filetype using kerchunks various file format backends
+        else:
+            from virtualizarr.readers.kerchunk import (
+                fully_decode_arr_refs,
+                read_kerchunk_references_from_file,
+                virtual_vars_from_kerchunk_refs,
+            )
+
+            # this is the only place we actually always need to use kerchunk directly
+            # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
+            vds_refs = read_kerchunk_references_from_file(
+                filepath=filepath,
+                filetype=filetype,
+                group=group,
+                reader_options=reader_options,
+            )
+            virtual_vars = virtual_vars_from_kerchunk_refs(
+                vds_refs,
+                drop_variables=drop_variables + loadable_variables,
+                virtual_array_class=virtual_array_class,
+            )
+            ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
+            coord_names = ds_attrs.pop("coordinates", [])
 
         if indexes is None or len(loadable_variables) > 0:
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...

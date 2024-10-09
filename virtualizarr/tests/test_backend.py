@@ -313,19 +313,18 @@ class TestLoadVirtualDataset:
             if name in vars_to_load:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
-    @patch("virtualizarr.readers.kerchunk.read_kerchunk_references_from_file")
+    @patch("virtualizarr.readers.hdf.virtual_vars_from_hdf")
     def test_open_virtual_dataset_passes_expected_args(
-        self, mock_read_kerchunk, netcdf4_file
+        self, mock_read_hdf, netcdf4_file
     ):
         reader_options = {"option1": "value1", "option2": "value2"}
         open_virtual_dataset(netcdf4_file, indexes={}, reader_options=reader_options)
         args = {
-            "filepath": netcdf4_file,
-            "filetype": None,
-            "group": None,
+            "path": netcdf4_file,
+            "drop_variables": [],
             "reader_options": reader_options,
         }
-        mock_read_kerchunk.assert_called_once_with(**args)
+        mock_read_hdf.assert_called_once_with(**args)
 
     def test_open_dataset_with_empty(self, hdf5_empty, tmpdir):
         vds = open_virtual_dataset(hdf5_empty)
