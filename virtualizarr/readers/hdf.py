@@ -186,6 +186,8 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
             fill_value = fill_value[0]
         if np.isnan(fill_value):
             fill_value = float("nan")
+        if isinstance(fill_value, np.generic):
+            fill_value = fill_value.item()
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,
