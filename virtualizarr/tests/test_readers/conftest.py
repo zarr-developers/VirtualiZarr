@@ -1,5 +1,5 @@
-import h5py
-import hdf5plugin
+import h5py  # type: ignore
+import hdf5plugin  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr

@@ -1,7 +1,7 @@
 import math
-from typing import List, Mapping, Optional, Union
+from typing import Dict, List, Optional, Union
 
-import h5py
+import h5py  # type: ignore
 import numpy as np
 import xarray as xr
 
@@ -209,7 +209,7 @@ def virtual_vars_from_hdf(
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
-) -> Mapping[str, xr.Variable]:
+) -> Dict[str, xr.Variable]:
     if drop_variables is None:
         drop_variables = []
     open_file = _fsspec_openfile_from_filepath(

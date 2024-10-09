@@ -1,4 +1,4 @@
-import h5py
+import h5py  # type: ignore
 import imagecodecs
 import numcodecs
 import numpy as np

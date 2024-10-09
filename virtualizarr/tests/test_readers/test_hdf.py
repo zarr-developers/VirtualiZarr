@@ -1,4 +1,4 @@
-import h5py
+import h5py  # type: ignore
 import pytest
 
 from virtualizarr.readers.hdf import (

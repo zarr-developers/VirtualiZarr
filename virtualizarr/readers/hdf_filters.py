@@ -1,8 +1,8 @@
 import dataclasses
 from typing import List, Tuple, TypedDict, Union
 
-import h5py
-import hdf5plugin
+import h5py  # type: ignore
+import hdf5plugin  # type: ignore
 import numcodecs.registry as registry
 import numpy as np
 from numcodecs.abc import Codec
@@ -68,7 +68,7 @@ def _filter_to_codec(
         else:
             id = id_str
         if id == "zlib":
-            zlib_props = ZlibProperties(level=filter_properties)
+            zlib_props = ZlibProperties(level=filter_properties)  # type: ignore
             conf = dataclasses.asdict(zlib_props)
         if id == "shuffle" and isinstance(filter_properties, tuple):
             shuffle_props = ShuffleProperties(elementsize=filter_properties[0])
