@@ -177,7 +177,7 @@ def open_virtual_dataset(
 
             virtual_vars = virtual_vars_from_hdf(
                 path=filepath,
-                drop_variables=drop_variables,
+                drop_variables=drop_variables + loadable_variables,
                 reader_options=reader_options,
             )
             ds_attrs = attrs_from_root_group(
