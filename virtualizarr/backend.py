@@ -162,6 +162,13 @@ def open_virtual_dataset(
         if reader_options is None:
             reader_options = {}
 
+        from virtualizarr.readers.kerchunk import _automatically_determine_filetype
+
+        if filetype is None:
+            filetype = _automatically_determine_filetype(
+                filepath=filepath, reader_options=reader_options
+            )
+        filetype = FileType(filetype)
         if filetype == FileType.hdf5:
             from virtualizarr.readers.hdf import (
                 attrs_from_root_group,
