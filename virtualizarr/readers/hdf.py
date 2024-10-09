@@ -31,7 +31,6 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
-
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             return None
@@ -49,7 +48,6 @@ def _dataset_chunk_manifest(
         num_chunks = dsid.get_num_chunks()
         if num_chunks == 0:
             raise ValueError("The dataset is chunked but contains no chunks")
-
         shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks))
         paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
         offsets = np.empty(shape, dtype=np.uint64)
@@ -184,6 +182,10 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
         else:
             dtype = dataset.dtype
             fill_value = dataset.fillvalue
+        if isinstance(fill_value, np.ndarray):
+            fill_value = fill_value[0]
+        if np.isnan(fill_value):
+            fill_value = float("nan")
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,
