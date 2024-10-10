@@ -82,3 +82,26 @@ def hdf5_scalar(tmpdir):
     dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
     dataset.attrs["scalar"] = "true"
     return filepath
+
+
+@pytest.fixture
+def example_reference_dict() -> dict:
+    return {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            ".zattrs": '{"coordinates":"lat time lon"}',
+            "air/0.0.0": ["tmp.nc", 9123, 10600],
+            "air/.zarray": '{"shape":[4,25,53],"chunks":[4,25,53],"dtype":"<i2","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+            "air/.zattrs": '{"scale_factor":0.01,"_ARRAY_DIMENSIONS":["time","lat","lon"]}',
+            "lat/0": ["tmp.nc", 4927, 100],
+            "lat/.zarray": '{"shape":[25],"chunks":[25],"dtype":"<f4","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+            "lat/.zattrs": '{"axis":"Y","long_name":"Latitude","standard_name":"latitude","units":"degrees_north","_ARRAY_DIMENSIONS":["lat"]}',
+            "time/0": ["tmp.nc", 23396, 16],
+            "time/.zarray": '{"shape":[4],"chunks":[4],"dtype":"<f4","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+            "time/.zattrs": '{"calendar":"standard","long_name":"Time","standard_name":"time","units":"hours since 1800-01-01","_ARRAY_DIMENSIONS":["time"]}',
+            "lon/0": ["tmp.nc", 23184, 212],
+            "lon/.zarray": '{"shape":[53],"chunks":[53],"dtype":"<f4","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+            "lon/.zattrs": '{"axis":"X","long_name":"Longitude","standard_name":"longitude","units":"degrees_east","_ARRAY_DIMENSIONS":["lon"]}',
+        },
+    }

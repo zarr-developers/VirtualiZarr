@@ -336,3 +336,35 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
+
+
+@pytest.mark.parametrize(
+    "reference_format",
+    [
+        "kerchunk_json",
+        "kerchunk_parquet",
+    ],
+)
+def test_open_virtual_dataset_existing_kerchunk_refs(
+    tmp_path, example_reference_dict, reference_format
+):
+    if reference_format == "kerchunk_json":
+        ref_filepath = tmp_path / "ref.json"
+
+        import ujson
+
+        with open(ref_filepath, "w") as json_file:
+            ujson.dump(example_reference_dict, json_file)
+
+    if reference_format == "kerchunk_parquet":
+        from kerchunk.df import refs_to_dataframe
+
+        ref_filepath = tmp_path / "ref.parquet"
+        refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+    vds = open_virtual_dataset(
+        filepath=ref_filepath.as_posix(), filetype=reference_format, indexes={}
+    )
+
+    assert list(vds) == ["air"]
+    assert set(vds.coords) == set(["lat", "lon", "time"])
+    assert set(vds.variables) == set(["lat", "air", "lon", "time"])

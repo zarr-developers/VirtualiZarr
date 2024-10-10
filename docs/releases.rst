@@ -8,6 +8,11 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+
+
+- Can open `kerchunk` reference files with ``open_virtual_dataset``.
+  (:pull:`251`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_ & `Kristen Thyng <https://github.com/kthyng>`_.
+
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 

@@ -87,6 +87,10 @@ ignore_missing_imports = true
 module = "kerchunk.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "ujson.*"
+ignore_missing_imports = true
+
 [tool.ruff]
 # Same as Black.
 line-length = 88

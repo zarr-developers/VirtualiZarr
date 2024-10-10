@@ -7,7 +7,7 @@ import fsspec.implementations.memory
 import pytest
 import xarray as xr
 
-from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def test_fsspec_openfile_from_path(tmp_path: pathlib.Path, dataset: xr.Dataset) 
     f = tmp_path / "dataset.nc"
     dataset.to_netcdf(f)
 
-    result = _fsspec_openfile_from_filepath(filepath=f.as_posix())
+    result = _FsspecFSFromFilepath(filepath=f.as_posix()).open_file()
     assert isinstance(result, fsspec.implementations.local.LocalFileOpener)
 
 
@@ -32,6 +32,6 @@ def test_fsspec_openfile_memory(dataset: xr.Dataset):
         with fs.open("dataset.nc", mode="wb") as f:
             dataset.to_netcdf(f, engine="h5netcdf")
 
-    result = _fsspec_openfile_from_filepath(filepath="memory://dataset.nc")
+    result = _FsspecFSFromFilepath(filepath="memory://dataset.nc").open_file()
     with result:
         assert isinstance(result, fsspec.implementations.memory.MemoryFile)
