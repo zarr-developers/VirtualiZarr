@@ -293,9 +293,9 @@ class TestLoadVirtualDataset:
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
     def test_group_kwarg(self, hdf5_groups_file):
-        with pytest.raises(ValueError, match="Multiple HDF Groups found"):
+        with pytest.raises(NotImplementedError, match="Nested groups"):
             open_virtual_dataset(hdf5_groups_file)
-        with pytest.raises(ValueError, match="not found in"):
+        with pytest.raises(KeyError, match="doesn't exist"):
             open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
 
         vars_to_load = ["air", "time"]
@@ -321,6 +321,7 @@ class TestLoadVirtualDataset:
         open_virtual_dataset(netcdf4_file, indexes={}, reader_options=reader_options)
         args = {
             "path": netcdf4_file,
+            "group": None,
             "drop_variables": [],
             "reader_options": reader_options,
         }

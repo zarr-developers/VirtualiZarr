@@ -113,10 +113,20 @@ class TestVirtualVarsFromHDF:
         variables = virtual_vars_from_hdf(chunked_dimensions_netcdf4_file)
         assert len(variables) == 3
 
-    def test_groups_not_implemented(self, group_hdf5_file):
+    def test_nested_groups_not_implemented(self, nested_group_hdf5_file):
         with pytest.raises(NotImplementedError):
-            virtual_vars_from_hdf(group_hdf5_file)
+            virtual_vars_from_hdf(path=nested_group_hdf5_file, group="group")
 
     def test_drop_variables(self, multiple_datasets_hdf5_file):
-        variables = virtual_vars_from_hdf(multiple_datasets_hdf5_file, ["data2"])
+        variables = virtual_vars_from_hdf(
+            path=multiple_datasets_hdf5_file, drop_variables=["data2"]
+        )
         assert "data2" not in variables.keys()
+
+    def test_dataset_in_group(self, group_hdf5_file):
+        variables = virtual_vars_from_hdf(path=group_hdf5_file, group="group")
+        assert len(variables) == 1
+
+    def test_non_group_error(self, group_hdf5_file):
+        with pytest.raises(ValueError):
+            virtual_vars_from_hdf(path=group_hdf5_file, group="group/data")

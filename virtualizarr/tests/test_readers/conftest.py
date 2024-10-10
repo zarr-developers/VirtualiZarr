@@ -118,7 +118,20 @@ def root_attributes_hdf5_file(tmpdir):
 def group_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/group.nc"
     f = h5py.File(filepath, "w")
-    f.create_group("group")
+    g = f.create_group("group")
+    data = np.random.random((10, 10))
+    g.create_dataset("data", data=data)
+    return filepath
+
+
+@pytest.fixture
+def nested_group_hdf5_file(tmpdir):
+    filepath = f"{tmpdir}/nested_group.nc"
+    f = h5py.File(filepath, "w")
+    g = f.create_group("group")
+    data = np.random.random((10, 10))
+    g.create_dataset("data", data=data)
+    g.create_group("nested_group")
     return filepath
 
 

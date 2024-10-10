@@ -209,6 +209,7 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
 
 def virtual_vars_from_hdf(
     path: str,
+    group: Optional[str] = None,
     drop_variables: Optional[List[str]] = None,
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
@@ -220,11 +221,17 @@ def virtual_vars_from_hdf(
         filepath=path, reader_options=reader_options
     )
     f = h5py.File(open_file, mode="r")
+    if group:
+        g = f[group]
+        if not isinstance(g, h5py.Group):
+            raise ValueError("The provided group is not an HDF group")
+    else:
+        g = f
     variables = {}
-    for key in f.keys():
+    for key in g.keys():
         if key not in drop_variables:
-            if isinstance(f[key], h5py.Dataset):
-                variable = _dataset_to_variable(path, f[key])
+            if isinstance(g[key], h5py.Dataset):
+                variable = _dataset_to_variable(path, g[key])
                 if variable is not None:
                     variables[key] = variable
             else:
@@ -235,6 +242,7 @@ def virtual_vars_from_hdf(
 
 def attrs_from_root_group(
     path: str,
+    group: Optional[str] = None,
     reader_options: Optional[dict] = {
         "storage_options": {"key": "", "secret": "", "anon": True}
     },
@@ -243,5 +251,11 @@ def attrs_from_root_group(
         filepath=path, reader_options=reader_options
     )
     f = h5py.File(open_file, mode="r")
-    attrs = _extract_attrs(f)
+    if group:
+        g = f[group]
+        if not isinstance(g, h5py.Group):
+            raise ValueError("The provided group is not an HDF group")
+    else:
+        g = f
+    attrs = _extract_attrs(g)
     return attrs
