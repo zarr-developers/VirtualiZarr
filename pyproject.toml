@@ -46,7 +46,8 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "scipy"]
+    "scipy",
+]
 
 
 [project.urls]
