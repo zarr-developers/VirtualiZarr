@@ -350,15 +350,17 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 ):
     if reference_format == "kerchunk_json":
         ref_filepath = tmp_path / "ref.json"
-        with open(ref_filepath, "w") as f:
-            f.write(repr(example_reference_dict))
+
+        import ujson
+
+        with open(ref_filepath, "w") as json_file:
+            ujson.dump(example_reference_dict, json_file)
 
     if reference_format == "kerchunk_parquet":
         from kerchunk.df import refs_to_dataframe
 
         ref_filepath = tmp_path / "ref.parquet"
         refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
-
     vds = open_virtual_dataset(
         filepath=ref_filepath.as_posix(), filetype=reference_format, indexes={}
     )

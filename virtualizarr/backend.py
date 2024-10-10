@@ -158,7 +158,7 @@ def open_virtual_dataset(
         return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
 
     if filetype == FileType.kerchunk_json:
-        import ast
+        import ujson
 
         from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
 
@@ -166,8 +166,7 @@ def open_virtual_dataset(
             filepath=filepath, reader_options=reader_options
         ).open_file()
 
-        refs = ast.literal_eval(fpath.read().decode("utf-8"))
-
+        refs = ujson.load(fpath)
         return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
 
     if filetype == FileType.zarr_v3:
