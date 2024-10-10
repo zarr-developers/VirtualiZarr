@@ -8,7 +8,7 @@ pytest.importorskip("icechunk")
 
 import numpy as np
 import numpy.testing as npt
-from xarray import Dataset, open_dataset
+from xarray import Dataset, open_dataset, open_zarr
 from xarray.core.variable import Variable
 from zarr import Array, Group, group
 
@@ -70,7 +70,7 @@ class TestWriteVirtualRefs:
         # assert dict(arr.attrs) == {"units": "km"}
 
         # check dimensions
-        assert arr.attrs["DIMENSION_NAMES"] == ["x", "y"]
+        assert arr.attrs["_ARRAY_DIMENSIONS"] == ["x", "y"]
 
     def test_set_single_virtual_ref_without_encoding(
         self, icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
@@ -110,6 +110,8 @@ class TestWriteVirtualRefs:
         expected_ds = open_dataset(simple_netcdf4)
         expected_array = expected_ds["foo"].to_numpy()
         npt.assert_equal(array, expected_array)
+
+        #ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
 
         # note: we don't need to test that committing works, because now we have confirmed
         # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.

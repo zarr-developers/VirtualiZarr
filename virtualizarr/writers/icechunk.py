@@ -25,7 +25,7 @@ VALID_URI_PREFIXES = {
 }
 
 
-def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
+async def dataset_to_icechunk_async(ds: Dataset, store: "IcechunkStore") -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
 
@@ -52,13 +52,17 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     # root_group.attrs = ds.attrs
     for k, v in ds.attrs.items():
         root_group.attrs[k] = encode_zarr_attr_value(v)
+    
+    return await write_variables_to_icechunk_group(
+        ds.variables,
+        store=store,
+        group=root_group,
+    )
 
+
+def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     asyncio.run(
-        write_variables_to_icechunk_group(
-            ds.variables,
-            store=store,
-            group=root_group,
-        )
+        dataset_to_icechunk_async(ds=ds, store=store)
     )
 
 
@@ -113,12 +117,13 @@ async def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
 
     # creates array if it doesn't already exist
+    codecs = zarray._v3_codec_pipeline()
     arr = group.require_array(
         name=name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
-        codecs=zarray._v3_codec_pipeline(),
+        #codecs=codecs,
         dimension_names=var.dims,
         fill_value=zarray.fill_value,
         # TODO fill_value?
@@ -127,7 +132,7 @@ async def write_virtual_variable_to_icechunk(
     # TODO it would be nice if we could assign directly to the .attrs property
     for k, v in var.attrs.items():
         arr.attrs[k] = encode_zarr_attr_value(v)
-    arr.attrs["DIMENSION_NAMES"] = encode_zarr_attr_value(var.dims)
+    arr.attrs["_ARRAY_DIMENSIONS"] = encode_zarr_attr_value(var.dims)
 
     _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
     for k, v in var.encoding.items():
