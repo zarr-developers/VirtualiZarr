@@ -46,9 +46,9 @@ jobs:
           conda env list
           conda list
 
-      # - name: Type check
-      #   run: |
-      #     mypy virtualizarr
+      - name: Type check
+        run: |
+          mypy virtualizarr
 
       - name: Running Tests
         run: |
