@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 import numcodecs
 import numpy as np
 import ujson  # type: ignore
+from zarr.core.metadata.v3 import parse_codecs
 
 if TYPE_CHECKING:
     pass
@@ -140,7 +141,7 @@ class ZArray:
             replacements["zarr_format"] = zarr_format
         return dataclasses.replace(self, **replacements)
 
-    def _v3_codec_pipeline(self) -> list:
+    def _v3_codec_pipeline(self) -> Any:
         """
         VirtualiZarr internally uses the `filters`, `compressor`, and `order` attributes
         from zarr v2, but to create conformant zarr v3 metadata those 3 must be turned into `codecs` objects.
@@ -190,7 +191,11 @@ class ZArray:
 
         # The order here is significant!
         # [ArrayArray] -> ArrayBytes -> [BytesBytes]
-        codec_pipeline = [transpose, bytes] + compressor + filters
+        raw_codec_pipeline = [transpose, bytes] + compressor + filters
+
+        # convert the pipeline repr into actual v3 codec objects
+        codec_pipeline = parse_codecs(raw_codec_pipeline)
+
         return codec_pipeline
 
 

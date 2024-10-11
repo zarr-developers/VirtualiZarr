@@ -117,13 +117,12 @@ async def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
 
     # creates array if it doesn't already exist
-    codecs = zarray._v3_codec_pipeline()
     arr = group.require_array(
         name=name,
         shape=zarray.shape,
         chunk_shape=zarray.chunks,
         dtype=encode_dtype(zarray.dtype),
-        #codecs=codecs,
+        codecs=zarray._v3_codec_pipeline(),
         dimension_names=var.dims,
         fill_value=zarray.fill_value,
         # TODO fill_value?
