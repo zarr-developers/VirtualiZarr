@@ -84,7 +84,7 @@ class ChunkManifest:
     so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
     """
 
-    _paths: np.ndarray[Any, np.dtypes.StringDType]  # type: ignore[name-defined]
+    _paths: np.ndarray[Any, np.dtypes.StringDType]
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
@@ -113,7 +113,10 @@ class ChunkManifest:
         shape = get_chunk_grid_shape(entries.keys())
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
-        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())  # type: ignore[attr-defined]
+        paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
+            np.ndarray[Any, np.dtypes.StringDType],
+            np.empty(shape=shape, dtype=np.dtypes.StringDType()),
+        )
         offsets = np.empty(shape=shape, dtype=np.dtype("uint64"))
         lengths = np.empty(shape=shape, dtype=np.dtype("uint64"))
 
@@ -141,7 +144,7 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
-        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],  # type: ignore[name-defined]
+        paths: np.ndarray[Any, np.dtypes.StringDType],
         offsets: np.ndarray[Any, np.dtype[np.uint64]],
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
     ) -> "ChunkManifest":
