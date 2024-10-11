@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray",
+    "xarray>=2024.06.0",
     "kerchunk>=0.2.5",
     "h5netcdf",
     "numpy>=2.0.0",
