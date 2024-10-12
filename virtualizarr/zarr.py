@@ -218,6 +218,4 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
     num_codec_copy = num_codec.copy()
     name = num_codec_copy.pop("id")
-    if name == 'zlib':
-        name = 'gzip'
     return {"name": name, "configuration": num_codec_copy}
