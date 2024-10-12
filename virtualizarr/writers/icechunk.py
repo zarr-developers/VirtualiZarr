@@ -103,7 +103,8 @@ async def write_variable_to_icechunk(
         )
     else:
         # TODO is writing loadable_variables just normal xarray ds.to_zarr?
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        print("skipping non-virtual variable", name)
 
 
 async def write_virtual_variable_to_icechunk(
@@ -117,6 +118,7 @@ async def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
 
     # creates array if it doesn't already exist
+    print(name, zarray.fill_value)
     arr = group.require_array(
         name=name,
         shape=zarray.shape,

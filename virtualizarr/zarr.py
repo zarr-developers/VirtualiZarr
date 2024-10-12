@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 import numcodecs
 import numpy as np
 import ujson  # type: ignore
-from zarr.core.metadata.v3 import parse_codecs
 
 if TYPE_CHECKING:
     pass
@@ -75,8 +74,9 @@ class ZArray:
     @classmethod
     def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
         # coerce type of fill_value as kerchunk can be inconsistent with this
+        dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
         fill_value = decoded_arr_refs_zarray["fill_value"]
-        if fill_value is None or fill_value == "NaN" or fill_value == "nan":
+        if np.issubdtype(dtype, np.floating) and (fill_value is None or fill_value == "NaN" or fill_value == "nan"):
             fill_value = np.nan
 
         compressor = decoded_arr_refs_zarray["compressor"]
@@ -87,7 +87,7 @@ class ZArray:
         return ZArray(
             chunks=tuple(decoded_arr_refs_zarray["chunks"]),
             compressor=compressor,
-            dtype=np.dtype(decoded_arr_refs_zarray["dtype"]),
+            dtype=dtype,
             fill_value=fill_value,
             filters=decoded_arr_refs_zarray["filters"],
             order=decoded_arr_refs_zarray["order"],
@@ -154,47 +154,46 @@ class ZArray:
             post_compressor: Iterable[BytesBytesCodec] #optional
         ```
         """
-        if self.filters:
-            filter_codecs_configs = [
-                numcodecs.get_codec(filter).get_config() for filter in self.filters
-            ]
-            filters = [
-                dict(name=codec.pop("id"), configuration=codec)
-                for codec in filter_codecs_configs
-            ]
-        else:
-            filters = []
+        try:
+            from zarr.core.metadata.v3 import parse_codecs
+        except ImportError:
+            raise ImportError(
+                "zarr v3 is required to generate v3 codec pipelines"
+            )
 
         # Noting here that zarr v3 has very few codecs specificed in the official spec,
         # and that there are far more codecs in `numcodecs`. We take a gamble and assume
         # that the codec names and configuration are simply mapped into zarrv3 "configurables".
-        if self.compressor:
-            compressor = [_num_codec_config_to_configurable(self.compressor)]
+        if self.filters:
+            codec_configs = [
+                _num_codec_config_to_configurable(filter) for filter in self.filters
+            ]
         else:
-            compressor = []
+            codec_configs = []
+        if self.compressor:
+            codec_configs.append(_num_codec_config_to_configurable(self.compressor))
 
         # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
         # Either "C" or "F", defining the layout of bytes within each chunk of the array.
         # "C" means row-major order, i.e., the last dimension varies fastest;
         # "F" means column-major order, i.e., the first dimension varies fastest.
-        if self.order == "C":
-            order = tuple(range(len(self.shape)))
-        elif self.order == "F":
+        # For now, we only need transpose if the order is not "C"
+        if self.order == "F":
             order = tuple(reversed(range(len(self.shape))))
-
-        transpose = dict(name="transpose", configuration=dict(order=order))
+            transpose = dict(name="transpose", configuration=dict(order=order))
+            codec_configs.append(transpose)
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
         # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
         bytes = dict(
             name="bytes", configuration={}
         )  # TODO need to handle endianess configuration
-
+        codec_configs.append(bytes)
         # The order here is significant!
         # [ArrayArray] -> ArrayBytes -> [BytesBytes]
-        raw_codec_pipeline = [transpose, bytes] + compressor + filters
+        codec_configs.reverse()
 
         # convert the pipeline repr into actual v3 codec objects
-        codec_pipeline = parse_codecs(raw_codec_pipeline)
+        codec_pipeline = parse_codecs(codec_configs)
 
         return codec_pipeline
 
@@ -218,4 +217,7 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     Convert a numcodecs codec into a zarr v3 configurable.
     """
     num_codec_copy = num_codec.copy()
-    return {"name": num_codec_copy.pop("id"), "configuration": num_codec_copy}
+    name = num_codec_copy.pop("id")
+    if name == 'zlib':
+        name = 'gzip'
+    return {"name": name, "configuration": num_codec_copy}
