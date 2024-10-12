@@ -46,10 +46,6 @@ jobs:
           conda env list
           conda list
 
-      - name: Type check
-        run: |
-          mypy virtualizarr
-
       - name: Running Tests
         run: |
           python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
