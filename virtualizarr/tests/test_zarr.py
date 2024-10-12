@@ -27,3 +27,31 @@ def test_replace_total():
     result = arr.replace(**kwargs)
     expected = ZArray(**kwargs)
     assert result == expected
+
+
+def test_nan_fill_value_from_kerchunk():
+    i_arr = ZArray.from_kerchunk_refs({
+        "chunks": [2, 3],
+        "compressor": None,
+        "dtype": "<i8",
+        "fill_value": None,
+        "filters": None,
+        "order": "C",
+        "shape": [2, 3],
+        "zarr_format": 2,
+    })
+
+    assert i_arr.fill_value == 0
+
+    f_arr = ZArray.from_kerchunk_refs({
+        "chunks": [2, 3],
+        "compressor": None,
+        "dtype": "<f8",
+        "fill_value": None,
+        "filters": None,
+        "order": "C",
+        "shape": [2, 3],
+        "zarr_format": 2,
+    })
+
+    assert f_arr.fill_value is np.nan
