@@ -118,7 +118,6 @@ async def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
 
     # creates array if it doesn't already exist
-    print(name, zarray.fill_value)
     arr = group.require_array(
         name=name,
         shape=zarray.shape,
