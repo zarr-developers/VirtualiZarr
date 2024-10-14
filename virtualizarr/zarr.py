@@ -160,18 +160,8 @@ class ZArray:
             raise ImportError(
                 "zarr v3 is required to generate v3 codec pipelines"
             )
-
-        # Noting here that zarr v3 has very few codecs specificed in the official spec,
-        # and that there are far more codecs in `numcodecs`. We take a gamble and assume
-        # that the codec names and configuration are simply mapped into zarrv3 "configurables".
-        if self.filters:
-            codec_configs = [
-                _num_codec_config_to_configurable(filter) for filter in self.filters
-            ]
-        else:
-            codec_configs = []
-        if self.compressor:
-            codec_configs.append(_num_codec_config_to_configurable(self.compressor))
+        
+        codec_configs = []
 
         # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
         # Either "C" or "F", defining the layout of bytes within each chunk of the array.
@@ -182,15 +172,24 @@ class ZArray:
             order = tuple(reversed(range(len(self.shape))))
             transpose = dict(name="transpose", configuration=dict(order=order))
             codec_configs.append(transpose)
+
         # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
         # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
         bytes = dict(
             name="bytes", configuration={}
         )  # TODO need to handle endianess configuration
         codec_configs.append(bytes)
-        # The order here is significant!
-        # [ArrayArray] -> ArrayBytes -> [BytesBytes]
-        codec_configs.reverse()
+
+        # Noting here that zarr v3 has very few codecs specificed in the official spec,
+        # and that there are far more codecs in `numcodecs`. We take a gamble and assume
+        # that the codec names and configuration are simply mapped into zarrv3 "configurables".
+        if self.filters:
+            codec_configs.extend([
+                _num_codec_config_to_configurable(filter) for filter in self.filters
+            ])
+
+        if self.compressor:
+            codec_configs.append(_num_codec_config_to_configurable(self.compressor))
 
         # convert the pipeline repr into actual v3 codec objects
         codec_pipeline = parse_codecs(codec_configs)
