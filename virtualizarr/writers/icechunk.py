@@ -1,8 +1,7 @@
-import asyncio
 from typing import TYPE_CHECKING
 
 import numpy as np
-from xarray import Dataset, conventions
+from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
 from zarr import Group
@@ -52,7 +51,7 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     # root_group.attrs = ds.attrs
     for k, v in ds.attrs.items():
         root_group.attrs[k] = encode_zarr_attr_value(v)
-    
+
     return write_variables_to_icechunk_group(
         ds.variables,
         store=store,

@@ -8,7 +8,7 @@ pytest.importorskip("icechunk")
 
 import numpy as np
 import numpy.testing as npt
-from xarray import Dataset, open_dataset, open_zarr
+from xarray import Dataset, open_dataset
 from xarray.core.variable import Variable
 from zarr import Array, Group, group
 
@@ -111,7 +111,7 @@ class TestWriteVirtualRefs:
         expected_array = expected_ds["foo"].to_numpy()
         npt.assert_equal(array, expected_array)
 
-        #ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
+        # ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
 
         # note: we don't need to test that committing works, because now we have confirmed
         # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -138,7 +138,9 @@ class TestWriteVirtualRefs:
             chunkmanifest=manifest,
             zarray=zarray,
         )
-        air = Variable(data=ma, dims=["time", "lat", "lon"], encoding={"scale_factor": 0.01})
+        air = Variable(
+            data=ma, dims=["time", "lat", "lon"], encoding={"scale_factor": 0.01}
+        )
         vds = Dataset(
             {"air": air},
         )
@@ -152,11 +154,11 @@ class TestWriteVirtualRefs:
         assert air_array.shape == (2920, 25, 53)
         assert air_array.chunks == (2920, 25, 53)
         assert air_array.dtype == np.dtype("int16")
-        assert air_array.attrs['scale_factor'] == 0.01
+        assert air_array.attrs["scale_factor"] == 0.01
 
         # xarray performs this when cf_decoding is True, but we are not loading
         # with xarray here so we scale it manually.
-        scale_factor = air_array.attrs['scale_factor']
+        scale_factor = air_array.attrs["scale_factor"]
         scaled_air_array = air_array[:] * scale_factor
 
         # check chunk references
