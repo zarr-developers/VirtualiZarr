@@ -164,10 +164,10 @@ def open_virtual_dataset(
             lrm = LazyReferenceMapper(filepath, fs.fs)
 
             # build reference dict from KV pairs in LazyReferenceMapper
+            # is there a better / more preformant way to extract this?
             array_refs = {k: lrm[k] for k in lrm.keys()}
 
-            # where does version come from? Is it always 1?
-            full_reference = {"version": 1, "refs": array_refs}
+            full_reference = {"refs": array_refs}
 
             return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
 
