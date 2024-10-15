@@ -25,7 +25,7 @@ VALID_URI_PREFIXES = {
 }
 
 
-async def dataset_to_icechunk_async(ds: Dataset, store: "IcechunkStore") -> None:
+def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
 
@@ -53,40 +53,28 @@ async def dataset_to_icechunk_async(ds: Dataset, store: "IcechunkStore") -> None
     for k, v in ds.attrs.items():
         root_group.attrs[k] = encode_zarr_attr_value(v)
     
-    return await write_variables_to_icechunk_group(
+    return write_variables_to_icechunk_group(
         ds.variables,
         store=store,
         group=root_group,
     )
 
 
-def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
-    asyncio.run(
-        dataset_to_icechunk_async(ds=ds, store=store)
-    )
-
-
-async def write_variables_to_icechunk_group(
+def write_variables_to_icechunk_group(
     variables,
     store,
     group,
 ):
-    # we should be able to write references for each variable concurrently
-    # TODO we could also write to multiple groups concurrently, i.e. in a future DataTree.to_zarr(icechunkstore)
-    await asyncio.gather(
-        *(
-            write_variable_to_icechunk(
-                store=store,
-                group=group,
-                name=name,
-                var=var,
-            )
-            for name, var in variables.items()
+    for name, var in variables.items():
+        write_variable_to_icechunk(
+            store=store,
+            group=group,
+            name=name,
+            var=var,
         )
-    )
 
 
-async def write_variable_to_icechunk(
+def write_variable_to_icechunk(
     store: "IcechunkStore",
     group: Group,
     name: str,
@@ -95,7 +83,7 @@ async def write_variable_to_icechunk(
     """Write a single (possibly virtual) variable into an icechunk store"""
 
     if isinstance(var.data, ManifestArray):
-        await write_virtual_variable_to_icechunk(
+        write_virtual_variable_to_icechunk(
             store=store,
             group=group,
             name=name,
@@ -107,7 +95,7 @@ async def write_variable_to_icechunk(
         print("skipping non-virtual variable", name)
 
 
-async def write_virtual_variable_to_icechunk(
+def write_virtual_variable_to_icechunk(
     store: "IcechunkStore",
     group: Group,
     name: str,
@@ -139,7 +127,7 @@ async def write_virtual_variable_to_icechunk(
         if k in _encoding_keys:
             arr.attrs[k] = encode_zarr_attr_value(v)
 
-    await write_manifest_virtual_refs(
+    write_manifest_virtual_refs(
         store=store,
         group=group,
         arr_name=name,
@@ -147,7 +135,7 @@ async def write_virtual_variable_to_icechunk(
     )
 
 
-async def write_manifest_virtual_refs(
+def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: Group,
     arr_name: str,
@@ -174,7 +162,7 @@ async def write_manifest_virtual_refs(
         chunk_key = "/".join(str(i) for i in index)
 
         # set each reference individually
-        await store.set_virtual_ref(
+        store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
             key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
             location=as_file_uri(path.item()),
