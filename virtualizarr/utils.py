@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, Dict, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -25,14 +25,14 @@ class _FsspecFSFromFilepath:
     filepath : str
         Input filepath
     reader_options : dict, optional
-        Dict containing kwargs to pass to file opener, by default {}
+        dict containing kwargs to pass to file opener, by default {}
     fs : Option | None
         The fsspec filesystem object, created in __post_init__
 
     """
 
     filepath: str
-    reader_options: Optional[Dict] = field(default_factory=dict)
+    reader_options: Optional[dict] = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
 
     def open_file(self) -> OpenFileType:

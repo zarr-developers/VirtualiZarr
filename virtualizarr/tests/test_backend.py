@@ -341,14 +341,17 @@ class TestLoadVirtualDataset:
 @pytest.mark.parametrize(
     "reference_format",
     [
-        "kerchunk_json",
-        "kerchunk_parquet",
+        "json",
+        "parquet",
     ],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
-    tmp_path, example_reference_dict, reference_format
+    tmp_path, netcdf4_virtual_dataset, reference_format
 ):
-    if reference_format == "kerchunk_json":
+    example_reference_dict = netcdf4_virtual_dataset.virtualize.to_kerchunk(
+        format="dict"
+    )
+    if reference_format == "json":
         ref_filepath = tmp_path / "ref.json"
 
         import ujson
@@ -356,15 +359,42 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         with open(ref_filepath, "w") as json_file:
             ujson.dump(example_reference_dict, json_file)
 
-    if reference_format == "kerchunk_parquet":
+    if reference_format == "parquet":
         from kerchunk.df import refs_to_dataframe
 
         ref_filepath = tmp_path / "ref.parquet"
         refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
     vds = open_virtual_dataset(
-        filepath=ref_filepath.as_posix(), filetype=reference_format, indexes={}
+        filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
     )
 
-    assert list(vds) == ["air"]
-    assert set(vds.coords) == set(["lat", "lon", "time"])
-    assert set(vds.variables) == set(["lat", "air", "lon", "time"])
+    # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+    # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
+
+    refs = vds.virtualize.to_kerchunk(format="dict")
+    expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+    assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
+    assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
+    assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
+    assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
+
+    assert list(vds) == list(netcdf4_virtual_dataset)
+    assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
+    assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
+
+
+def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
+    # For now, we raise a NotImplementedError if we read existing references that have inlined data
+    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
+
+    ref_filepath = tmp_path / "ref.json"
+
+    import ujson
+
+    with open(ref_filepath, "w") as json_file:
+        ujson.dump(netcdf4_inlined_ref, json_file)
+
+    with pytest.raises(NotImplementedError):
+        open_virtual_dataset(
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+        )

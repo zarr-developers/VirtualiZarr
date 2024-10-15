@@ -309,7 +309,9 @@ class ChunkManifest:
         chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
         for k, v in kerchunk_chunk_dict.items():
             if isinstance(v, (str, bytes)):
-                raise NotImplementedError("TODO: handle inlined data")
+                raise NotImplementedError(
+                    "Reading inlined reference data is currently not supported. [ToDo]"
+                )
             elif not isinstance(v, (tuple, list)):
                 raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
             chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()

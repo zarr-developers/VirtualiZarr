@@ -40,8 +40,7 @@ class FileType(AutoName):
     zarr = auto()
     dmrpp = auto()
     zarr_v3 = auto()
-    kerchunk_json = auto()
-    kerchunk_parquet = auto()
+    kerchunk = auto()
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -77,7 +76,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'kerchunk_json', 'kerchunk_parquet'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
@@ -141,33 +140,36 @@ def open_virtual_dataset(
     if filetype is not None:
         filetype = FileType(filetype)
 
-    if filetype == FileType.kerchunk_parquet:
+    if filetype == FileType.kerchunk:
+        # add parquet path
         from fsspec.implementations.reference import LazyReferenceMapper
 
         from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
 
-        fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options).fs
-        lrm = LazyReferenceMapper(filepath, fs)
+        fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
-        # build reference dict from KV pairs in LazyReferenceMapper
-        array_refs = {k: lrm[k] for k in lrm.keys()}
+        # yuck, but JSON doesn't have magic bytes
+        if fs.filepath.endswith(".json"):
+            import ujson
 
-        # where does version come from? Is it always 1?
-        full_reference = {"version": 1, "refs": array_refs}
+            from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
 
-        return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
+            fpath = fs.open_file()
 
-    if filetype == FileType.kerchunk_json:
-        import ujson
+            refs = ujson.load(fpath)
+            return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
 
-        from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
+        # also yuck, but the .parquet isn't actually a parquet it's a directory that contains named parquets for each group.
+        if fs.filepath.endswith("ref.parquet"):
+            lrm = LazyReferenceMapper(filepath, fs.fs)
 
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
-        ).open_file()
+            # build reference dict from KV pairs in LazyReferenceMapper
+            array_refs = {k: lrm[k] for k in lrm.keys()}
 
-        refs = ujson.load(fpath)
-        return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
+            # where does version come from? Is it always 1?
+            full_reference = {"version": 1, "refs": array_refs}
+
+            return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
