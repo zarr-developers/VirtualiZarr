@@ -34,6 +34,20 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def netcdf4_virtual_dataset(netcdf4_file):
+    from virtualizarr import open_virtual_dataset
+
+    return open_virtual_dataset(netcdf4_file, indexes={})
+
+
+@pytest.fixture
+def netcdf4_inlined_ref(netcdf4_file):
+    from kerchunk.hdf import SingleHdf5ToZarr
+
+    return SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
+
+
+@pytest.fixture
 def hdf5_groups_file(tmpdir):
     # Set up example xarray dataset
     ds = xr.tutorial.open_dataset("air_temperature")

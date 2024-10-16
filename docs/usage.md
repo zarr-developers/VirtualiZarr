@@ -421,6 +421,18 @@ Currently there are not yet any zarr v3 readers which understand the chunk manif
 This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
 ```
 
+## Opening Kerchunk references as virtual datasets
+
+You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
+
+```python
+
+vds = open_virtual_dataset('combined.json', format='kerchunk')
+# or
+vds = open_virtual_dataset('combined.parquet', format='kerchunk')
+
+```
+
 ## Rewriting existing manifests
 
 Sometimes it can be useful to rewrite the contents of an already-generated manifest or virtual dataset.
