@@ -340,10 +340,7 @@ class TestLoadVirtualDataset:
 
 @pytest.mark.parametrize(
     "reference_format",
-    [
-        "json",
-        "parquet",
-    ],
+    ["json", "parquet", "invalid"],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
@@ -351,36 +348,51 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
     example_reference_dict = netcdf4_virtual_dataset.virtualize.to_kerchunk(
         format="dict"
     )
-    if reference_format == "json":
-        ref_filepath = tmp_path / "ref.json"
 
-        import ujson
+    if reference_format == "invalid":
+        # Test invalid file format leads to ValueError
+        ref_filepath = tmp_path / "ref.csv"
+        with open(ref_filepath.as_posix(), mode="w") as of:
+            of.write("tmp")
 
-        with open(ref_filepath, "w") as json_file:
-            ujson.dump(example_reference_dict, json_file)
+        with pytest.raises(ValueError):
+            open_virtual_dataset(
+                filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+            )
 
-    if reference_format == "parquet":
-        from kerchunk.df import refs_to_dataframe
+    else:
+        # Test valid json and parquet reference formats
 
-        ref_filepath = tmp_path / "ref.parquet"
-        refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
-    vds = open_virtual_dataset(
-        filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
-    )
+        if reference_format == "json":
+            ref_filepath = tmp_path / "ref.json"
 
-    # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
-    # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
+            import ujson
 
-    refs = vds.virtualize.to_kerchunk(format="dict")
-    expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
-    assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
-    assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
-    assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
-    assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
+            with open(ref_filepath, "w") as json_file:
+                ujson.dump(example_reference_dict, json_file)
 
-    assert list(vds) == list(netcdf4_virtual_dataset)
-    assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
-    assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
+        if reference_format == "parquet":
+            from kerchunk.df import refs_to_dataframe
+
+            ref_filepath = tmp_path / "ref.parquet"
+            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+
+        vds = open_virtual_dataset(
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+        )
+
+        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
+        refs = vds.virtualize.to_kerchunk(format="dict")
+        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+        assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
+        assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
+        assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
+        assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
+
+        assert list(vds) == list(netcdf4_virtual_dataset)
+        assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
+        assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
 
 
 def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):

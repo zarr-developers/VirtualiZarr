@@ -45,6 +45,10 @@ class _FsspecFSFromFilepath:
         """
         return self.fs.open(self.filepath)
 
+    def read_bytes(self, bytes: int) -> bytes:
+        with self.open_file() as of:
+            return of.read(bytes)
+
     def __post_init__(self) -> None:
         """Initialize the fsspec filesystem object"""
         import fsspec
