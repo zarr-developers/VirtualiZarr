@@ -40,7 +40,7 @@ class TestAccessor:
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_dict_empty(self):
-        manifest = ChunkManifest.empty()
+        manifest = ChunkManifest(entries={})
         arr = ManifestArray(
             chunkmanifest=manifest,
             zarray=dict(
