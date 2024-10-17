@@ -2,7 +2,7 @@ import os
 import warnings
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -11,7 +11,31 @@ from xarray.core.indexes import Index
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.types import ChunkKey
+from virtualizarr.utils import _FsspecFSFromFilepath
 from virtualizarr.zarr import ZArray
+
+
+def open_virtual_dataset(
+    filepath,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    indexes: Mapping[str, Index] | None = None,
+    reader_options: Optional[dict] = None,
+) -> xr.Dataset:
+    # TODO more sanitization of input types?
+
+    if loadable_variables != [] or indexes is None:
+        raise NotImplementedError(
+            "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+        )
+
+    fpath = _FsspecFSFromFilepath(
+        filepath=filepath, reader_options=reader_options
+    ).open_file()
+    parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
+    vds = parser.parse_dataset()
+    vds.drop_vars(drop_variables)
+    return vds
 
 
 class DMRParser:

@@ -3,6 +3,7 @@ import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
 from enum import Enum, auto
 from io import BufferedIOBase
+from pathlib import Path
 from typing import (
     Any,
     Hashable,
@@ -43,6 +44,51 @@ class FileType(AutoName):
     kerchunk = auto()
 
 
+def automatically_determine_filetype(
+    *,
+    filepath: str,
+    reader_options: Optional[dict[str, Any]] = {},
+) -> FileType:
+    """
+    Attempt to automatically infer the correct reader for this filetype.
+
+    Uses magic bytes and file / directory suffixes.
+    """
+
+    # TODO this should ideally handle every filetype that we have a reader for, not just kerchunk
+
+    # TODO how do we handle kerchunk json / parquet here?
+    if Path(filepath).suffix == ".zarr":
+        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
+        raise NotImplementedError()
+
+    # Read magic bytes from local or remote file
+    fpath = _FsspecFSFromFilepath(
+        filepath=filepath, reader_options=reader_options
+    ).open_file()
+    magic_bytes = fpath.read(8)
+    fpath.close()
+
+    if magic_bytes.startswith(b"CDF"):
+        filetype = FileType.netcdf3
+    elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
+        raise NotImplementedError("HDF4 formatted files not supported")
+    elif magic_bytes.startswith(b"\x89HDF"):
+        filetype = FileType.hdf5
+    elif magic_bytes.startswith(b"GRIB"):
+        filetype = FileType.grib
+    elif magic_bytes.startswith(b"II*"):
+        filetype = FileType.tiff
+    elif magic_bytes.startswith(b"SIMPLE"):
+        filetype = FileType.fits
+    else:
+        raise NotImplementedError(
+            f"Unrecognised file based on header bytes: {magic_bytes}"
+        )
+
+    return filetype
+
+
 class ManifestBackendArray(ManifestArray, BackendArray):
     """Using this prevents xarray from wrapping the KerchunkArray in ExplicitIndexingAdapter etc."""
 
@@ -68,7 +114,6 @@ def open_virtual_dataset(
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
 
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
-
 
     Parameters
     ----------
@@ -135,12 +180,22 @@ def open_virtual_dataset(
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
-    # if filetype is user defined, convert to FileType
+    if reader_options is None:
+        reader_options = {}
 
     if filetype is not None:
+        # if filetype is user defined, convert to FileType
         filetype = FileType(filetype)
+    else:
+        filetype = automatically_determine_filetype(
+            filepath=filepath, reader_options=reader_options
+        )
 
     if filetype == FileType.kerchunk:
+        from virtualizarr.readers.kerchunk import open_virtual_dataset
+
+        return open_virtual_dataset(filepath, reader_options)
+
         from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
 
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
@@ -174,28 +229,25 @@ def open_virtual_dataset(
                 "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
             )
 
-    if filetype == FileType.zarr_v3:
-        # TODO is there a neat way of auto-detecting this?
-        from virtualizarr.readers.zarr import open_virtual_dataset_from_v3_store
+    elif filetype == FileType.zarr_v3:
+        from virtualizarr.readers.zarr_v3 import open_virtual_dataset
 
-        return open_virtual_dataset_from_v3_store(
-            storepath=filepath, drop_variables=drop_variables, indexes=indexes
+        return open_virtual_dataset(
+            storepath=filepath,
+            drop_variables=drop_variables,
+            indexes=indexes,
         )
+
     elif filetype == FileType.dmrpp:
-        from virtualizarr.readers.dmrpp import DMRParser
+        from virtualizarr.readers.dmrpp import open_virtual_dataset
 
-        if loadable_variables != [] or indexes is None:
-            raise NotImplementedError(
-                "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
-            )
-
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
-        ).open_file()
-        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
-        vds = parser.parse_dataset()
-        vds.drop_vars(drop_variables)
-        return vds
+        return open_virtual_dataset(
+            filepath,
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
+            reader_options=reader_options,
+        )
     else:
         # we currently read every other filetype using kerchunks various file format backends
         from virtualizarr.readers.kerchunk import (

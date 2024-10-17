@@ -1,5 +1,4 @@
 import warnings
-from pathlib import Path
 from typing import Any, MutableMapping, Optional, cast
 
 from xarray import Dataset
@@ -12,45 +11,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import _FsspecFSFromFilepath
 from virtualizarr.zarr import ZArray, ZAttrs
-
-
-# TODO shouldn't this live in backend.py? Because it's not just useful for the kerchunk-specific readers...
-def _automatically_determine_filetype(
-    *,
-    filepath: str,
-    reader_options: Optional[dict[str, Any]] = {},
-) -> FileType:
-    if Path(filepath).suffix == ".zarr":
-        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
-        raise NotImplementedError()
-
-    # Read magic bytes from local or remote file
-    fpath = _FsspecFSFromFilepath(
-        filepath=filepath, reader_options=reader_options
-    ).open_file()
-    magic_bytes = fpath.read(8)
-    fpath.close()
-
-    if magic_bytes.startswith(b"CDF"):
-        filetype = FileType.netcdf3
-    elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
-        raise NotImplementedError("HDF4 formatted files not supported")
-    elif magic_bytes.startswith(b"\x89HDF"):
-        filetype = FileType.hdf5
-    elif magic_bytes.startswith(b"GRIB"):
-        filetype = FileType.grib
-    elif magic_bytes.startswith(b"II*"):
-        filetype = FileType.tiff
-    elif magic_bytes.startswith(b"SIMPLE"):
-        filetype = FileType.fits
-    else:
-        raise NotImplementedError(
-            f"Unrecognised file based on header bytes: {magic_bytes}"
-        )
-
-    return filetype
 
 
 def read_kerchunk_references_from_file(
@@ -79,7 +40,7 @@ def read_kerchunk_references_from_file(
         reader_options = {}
 
     if filetype is None:
-        filetype = _automatically_determine_filetype(
+        filetype = automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
 
