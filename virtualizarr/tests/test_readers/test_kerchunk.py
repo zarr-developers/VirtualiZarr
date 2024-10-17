@@ -24,7 +24,6 @@ def gen_ds_refs(
     }
 
 
-@requires_kerchunk
 def test_dataset_from_df_refs():
     ds_refs = gen_ds_refs()
     ds = dataset_from_kerchunk_refs(ds_refs)
@@ -46,7 +45,6 @@ def test_dataset_from_df_refs():
     }
 
 
-@requires_kerchunk
 def test_dataset_from_df_refs_with_filters():
     import ujson
 
