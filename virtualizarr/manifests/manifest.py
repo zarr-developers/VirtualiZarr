@@ -2,6 +2,7 @@ import dataclasses
 import json
 import re
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
@@ -9,6 +10,15 @@ from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
+VALID_URI_PREFIXES = {
+    "s3://",
+    "gs://",
+    "azure://",
+    "r2://",
+    "cos://",
+    "minio://",
+    "file:///",
+}
 _INTEGER = (
     r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
 )
@@ -25,18 +35,48 @@ class ChunkDictEntry(TypedDict):
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
+def validate_and_normalize_path_to_uri(path: str) -> str:
+    """
+    Makes all paths into fully-qualified absolute URIs, or raises
+
+    See https://en.wikipedia.org/wiki/File_URI_scheme
+    """
+    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
+        # assume the path is local
+        try:
+            return str(Path(path).as_uri())
+        except ValueError as e:
+            if str(e) == "relative path can't be expressed as a file URI":
+                # problem is that path is relative instead of absolute, so add context to error message that this is forbidden
+                raise ValueError(
+                    f"paths in the manifest must be absolute, but got {path}"
+                ) from e
+            else:
+                # must be some other problem with the path
+                raise
+    else:
+        # (empty paths are allowed through as they represent missing chunks)
+        # TODO should we do other validation here? e.g. to prevent a malformed path like `file:///directory//filename.nc`?
+        return path
+
+
+# TODO combine this with the ChunkDictEntry class?
 @dataclasses.dataclass(frozen=True)
 class ChunkEntry:
     """
     Information for a single chunk in the manifest.
 
-    Stored in the form `{"path": "s3://bucket/foo.nc", "offset": 100, "length": 100}`.
+    Stored in the form `{"path": "s3://bucket//foo.nc", "offset": 100, "length": 100}`.
     """
 
-    path: str  # TODO stricter typing/validation of possible local / remote paths?
+    path: str
     offset: int
     length: int
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "path", validate_and_normalize_path_to_uri(self.path))
+
+    # TODO kerchunk-specific constructors and translators could just live in the kerchunk module as functions
     @classmethod
     def from_kerchunk(
         cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
@@ -70,10 +110,10 @@ class ChunkManifest:
     The manifest can be converted to or from a dictionary which looks like this
 
         {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+            "0.0.0": {"path": "s3://bucket//foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket//foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket//foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket//foo.nc", "offset": 400, "length": 100},
         }
 
     using the .__init__() and .dict() methods, so users of this class can think of the manifest as if it were a dict mapping zarr chunk keys to byte ranges.
@@ -98,10 +138,10 @@ class ChunkManifest:
             Chunk keys and byte range information, as a dictionary of the form
 
                 {
-                    "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-                    "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-                    "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-                    "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+                    "0.0.0": {"path": "s3://bucket//foo.nc", "offset": 100, "length": 100},
+                    "0.0.1": {"path": "s3://bucket//foo.nc", "offset": 200, "length": 100},
+                    "0.1.0": {"path": "s3://bucket//foo.nc", "offset": 300, "length": 100},
+                    "0.1.1": {"path": "s3://bucket//foo.nc", "offset": 400, "length": 100},
                 }
         """
 
@@ -248,10 +288,10 @@ class ChunkManifest:
         The returned dict will be of the form
 
         {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+            "0.0.0": {"path": "s3://bucket//foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket//foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket//foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket//foo.nc", "offset": 400, "length": 100},
         }
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
