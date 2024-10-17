@@ -266,6 +266,9 @@ class ChunkManifest:
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
 
+        if len(self) == 0:
+            return cast(ChunkDict, {})
+
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
