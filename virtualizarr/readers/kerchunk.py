@@ -243,6 +243,11 @@ def variable_from_kerchunk_refs(
     if chunk_dict:
         manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    elif len(zarray.shape) != 0:
+        raise ValueError(
+            f"variable {var_name} appears to be broken:"
+            " it is supposed to have at least one chunk, but none can be found."
+        )
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
