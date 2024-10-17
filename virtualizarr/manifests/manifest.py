@@ -144,8 +144,11 @@ class ChunkManifest:
     @classmethod
     def empty(cls) -> "ChunkManifest":
         """Create an empty chunk manifest."""
+        paths: np.ndarray[Any, np.dtypes.StringDType] = np.array(
+            (), dtype=np.dtypes.StringDType
+        )
         return cls.from_arrays(
-            paths=np.array((), dtype=np.dtypes.StringDType),
+            paths=paths,
             offsets=np.array((), dtype="uint64"),
             lengths=np.array((), dtype="uint64"),
         )
