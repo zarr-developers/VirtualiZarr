@@ -1,7 +1,6 @@
 import dataclasses
 from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
-import numcodecs
 import numpy as np
 
 if TYPE_CHECKING:
@@ -154,6 +153,8 @@ class ZArray:
             post_compressor: Iterable[BytesBytesCodec] #optional
         ```
         """
+        import numcodecs
+
         if self.filters:
             filter_codecs_configs = [
                 numcodecs.get_codec(filter).get_config() for filter in self.filters
