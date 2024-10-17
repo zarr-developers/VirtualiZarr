@@ -6,9 +6,11 @@ import xarray.testing as xrt
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.tests import requires_kerchunk
 from virtualizarr.zarr import ZArray
 
 
+@requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
     [
@@ -45,6 +47,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
+@requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
     def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
@@ -212,6 +215,7 @@ class TestKerchunkRoundtrip:
         assert roundtrip.a.attrs == ds.a.attrs
 
 
+@requires_kerchunk
 def test_open_scalar_variable(tmpdir):
     # regression test for GH issue #100
 

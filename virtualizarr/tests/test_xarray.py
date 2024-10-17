@@ -4,6 +4,7 @@ import xarray as xr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
 from virtualizarr.zarr import ZArray
 
 
@@ -222,6 +223,7 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
+@requires_kerchunk
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files):
         filepath1, filepath2 = netcdf4_files
@@ -255,6 +257,7 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
+@requires_kerchunk
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})

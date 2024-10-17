@@ -3,8 +3,10 @@ import pandas as pd
 from xarray import Dataset
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
 
 
+@requires_kerchunk
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
         manifest = ChunkManifest(
