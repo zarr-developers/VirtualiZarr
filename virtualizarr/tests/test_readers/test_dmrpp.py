@@ -6,17 +6,15 @@ from virtualizarr.tests import network
 
 urls = [
     (
-        "netcdf4",
-        "https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5",
-        "dmrpp",
-        "https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp",
+        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc",
+        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc.dmrpp",
     )
 ]
 
 
 @network
-@pytest.mark.parametrize("data_type, data_url, dmrpp_type, dmrpp_url", urls)
-def test_dmrpp_reader(data_type, data_url, dmrpp_type, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, indexes={}, filetype=dmrpp_type)
+@pytest.mark.parametrize("data_url, dmrpp_url", urls)
+def test_dmrpp_reader(data_url, dmrpp_url):
+    result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
     expected = open_virtual_dataset(data_url, indexes={})
     xr.testing.assert_identical(result, expected)
