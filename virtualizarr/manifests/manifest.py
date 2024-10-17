@@ -258,6 +258,9 @@ class ChunkManifest:
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
 
+        if len(self) == 0:
+            return cast(ChunkDict, {})
+
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
@@ -386,6 +389,9 @@ def get_ndim_from_key(key: str) -> int:
 
 
 def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
+    if not chunk_keys:
+        return
+
     # Check if all keys have the correct form
     for key in chunk_keys:
         if not re.match(_CHUNK_KEY, key):

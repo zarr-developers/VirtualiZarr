@@ -242,6 +242,9 @@ def variable_from_kerchunk_refs(
     if chunk_dict:
         manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    elif len(zarray.shape) != 0:
+        manifest = ChunkManifest(entries={})
+        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
