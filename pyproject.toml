@@ -26,6 +26,7 @@ dependencies = [
     "packaging",
     "universal-pathlib",
     "numcodecs",
+    "ujson",
 ]
 
 [project.optional-dependencies]
@@ -47,7 +48,6 @@ test = [
     "ruff",
     "s3fs",
     "scipy",
-    "ujson",
 ]
 
 
