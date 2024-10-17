@@ -142,19 +142,6 @@ class ChunkManifest:
         self._lengths = lengths
 
     @classmethod
-    def empty(cls) -> "ChunkManifest":
-        """Create an empty chunk manifest."""
-        paths = cast(
-            np.ndarray[Any, np.dtypes.StringDType],
-            np.array((), dtype=np.dtypes.StringDType),
-        )
-        return cls.from_arrays(
-            paths=paths,
-            offsets=np.array((), dtype="uint64"),
-            lengths=np.array((), dtype="uint64"),
-        )
-
-    @classmethod
     def from_arrays(
         cls,
         paths: np.ndarray[Any, np.dtypes.StringDType],
@@ -401,6 +388,9 @@ def get_ndim_from_key(key: str) -> int:
 
 
 def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
+    if not chunk_keys:
+        return
+
     # Check if all keys have the correct form
     for key in chunk_keys:
         if not re.match(_CHUNK_KEY, key):
