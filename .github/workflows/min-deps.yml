@@ -1,4 +1,4 @@
-name: CI
+name: min-deps
 
 on:
   push:
