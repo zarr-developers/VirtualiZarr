@@ -4,7 +4,6 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
     dataset_from_kerchunk_refs,
 )
-from virtualizarr.tests import requires_kerchunk
 
 
 def gen_ds_refs(
