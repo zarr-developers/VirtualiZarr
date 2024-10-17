@@ -8,7 +8,7 @@ from xarray import Dataset
 from virtualizarr import ManifestArray, open_virtual_dataset
 from virtualizarr.backend import FileType
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.readers.zarr import metadata_from_zarr_json
+from virtualizarr.readers.zarr_v3 import metadata_from_zarr_json
 from virtualizarr.writers.zarr import dataset_to_zarr
 
 

@@ -3,6 +3,7 @@ import warnings
 from collections.abc import Iterable, Mapping, MutableMapping
 from enum import Enum, auto
 from io import BufferedIOBase
+from pathlib import Path
 from typing import (
     Any,
     Hashable,
@@ -11,12 +12,12 @@ from typing import (
 )
 
 import xarray as xr
+from xarray import Dataset
 from xarray.backends import AbstractDataStore, BackendArray
 from xarray.core.indexes import Index, PandasIndex
-from xarray.core.variable import IndexVariable
+from xarray.core.variable import IndexVariable, Variable
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
@@ -41,6 +42,51 @@ class FileType(AutoName):
     dmrpp = auto()
     zarr_v3 = auto()
     kerchunk = auto()
+
+
+def automatically_determine_filetype(
+    *,
+    filepath: str,
+    reader_options: Optional[dict[str, Any]] = {},
+) -> FileType:
+    """
+    Attempt to automatically infer the correct reader for this filetype.
+
+    Uses magic bytes and file / directory suffixes.
+    """
+
+    # TODO this should ideally handle every filetype that we have a reader for, not just kerchunk
+
+    # TODO how do we handle kerchunk json / parquet here?
+    if Path(filepath).suffix == ".zarr":
+        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
+        raise NotImplementedError()
+
+    # Read magic bytes from local or remote file
+    fpath = _FsspecFSFromFilepath(
+        filepath=filepath, reader_options=reader_options
+    ).open_file()
+    magic_bytes = fpath.read(8)
+    fpath.close()
+
+    if magic_bytes.startswith(b"CDF"):
+        filetype = FileType.netcdf3
+    elif magic_bytes.startswith(b"\x0e\x03\x13\x01"):
+        raise NotImplementedError("HDF4 formatted files not supported")
+    elif magic_bytes.startswith(b"\x89HDF"):
+        filetype = FileType.hdf5
+    elif magic_bytes.startswith(b"GRIB"):
+        filetype = FileType.grib
+    elif magic_bytes.startswith(b"II*"):
+        filetype = FileType.tiff
+    elif magic_bytes.startswith(b"SIMPLE"):
+        filetype = FileType.fits
+    else:
+        raise NotImplementedError(
+            f"Unrecognised file based on header bytes: {magic_bytes}"
+        )
+
+    return filetype
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -68,7 +114,6 @@ def open_virtual_dataset(
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
 
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
-
 
     Parameters
     ----------
@@ -112,10 +157,6 @@ def open_virtual_dataset(
             stacklevel=2,
         )
 
-    loadable_vars: dict[str, xr.Variable]
-    virtual_vars: dict[str, xr.Variable]
-    vars: dict[str, xr.Variable]
-
     if drop_variables is None:
         drop_variables = []
     elif isinstance(drop_variables, str):
@@ -135,153 +176,189 @@ def open_virtual_dataset(
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
 
-    # if filetype is user defined, convert to FileType
+    if reader_options is None:
+        reader_options = {}
 
     if filetype is not None:
+        # if filetype is user defined, convert to FileType
         filetype = FileType(filetype)
-
-    if filetype == FileType.kerchunk:
-        from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
-
-        fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
-
-        # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        if fs.filepath.endswith("ref.parquet"):
-            from fsspec.implementations.reference import LazyReferenceMapper
-
-            lrm = LazyReferenceMapper(filepath, fs.fs)
-
-            # build reference dict from KV pairs in LazyReferenceMapper
-            # is there a better / more preformant way to extract this?
-            array_refs = {k: lrm[k] for k in lrm.keys()}
-
-            full_reference = {"refs": array_refs}
-
-            return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
-
-        # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
-        # https://fsspec.github.io/kerchunk/spec.html
-        elif fs.read_bytes(9).startswith(b'{"version'):
-            import ujson
-
-            with fs.open_file() as of:
-                refs = ujson.load(of)
-
-            return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
-
-        else:
-            raise ValueError(
-                "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
-            )
-
-    if filetype == FileType.zarr_v3:
-        # TODO is there a neat way of auto-detecting this?
-        from virtualizarr.readers.zarr import open_virtual_dataset_from_v3_store
-
-        return open_virtual_dataset_from_v3_store(
-            storepath=filepath, drop_variables=drop_variables, indexes=indexes
+    else:
+        filetype = automatically_determine_filetype(
+            filepath=filepath, reader_options=reader_options
         )
-    elif filetype == FileType.dmrpp:
-        from virtualizarr.readers.dmrpp import DMRParser
 
-        if loadable_variables != [] or indexes is None:
-            raise NotImplementedError(
-                "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+    # TODO define these through a pluggable entrypoint system instead
+    match filetype.name.lower():
+        case "kerchunk":
+            from virtualizarr.readers.kerchunk import open_virtual_dataset
+
+            return open_virtual_dataset(filepath, reader_options)
+
+        case "zarr_v3":
+            from virtualizarr.readers.zarr_v3 import open_virtual_dataset
+
+            return open_virtual_dataset(
+                storepath=filepath,
+                drop_variables=drop_variables,
+                indexes=indexes,
             )
 
+        case "dmrpp":
+            from virtualizarr.readers.dmrpp import open_virtual_dataset
+
+            return open_virtual_dataset(
+                filepath,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+
+        case "netcdf3":
+            from virtualizarr.readers.netcdf3 import open_virtual_dataset
+
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+
+        case "hdf5" | "netcdf4":
+            from virtualizarr.readers.hdf5 import open_virtual_dataset
+
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+
+        case "grib":
+            # TODO Grib files should be handled as a DataTree object
+            # see https://github.com/TomNicholas/VirtualiZarr/issues/11
+            raise NotImplementedError(f"Unsupported file type: {filetype}")
+
+        case "tiff":
+            from virtualizarr.readers.tiff import open_virtual_dataset
+
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+
+        case "fits":
+            from virtualizarr.readers.fits import open_virtual_dataset
+
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+        case _:
+            raise NotImplementedError(f"Unsupported file type: {filetype.name}")
+
+
+# TODO move these out into a backend/utils.py module? Or readers/common.py?
+def open_loadable_vars_and_indexes(
+    filepath: str,
+    loadable_variables,
+    reader_options,
+    drop_variables,
+    indexes,
+    group,
+    decode_times,
+) -> tuple[Mapping[str, Variable], Mapping[str, Index]]:
+    """
+    Open selected variables and indexes using xarray.
+
+    Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
+    """
+
+    # TODO get rid of this if?
+    if indexes is None or len(loadable_variables) > 0:
+        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
         fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
         ).open_file()
-        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
-        vds = parser.parse_dataset()
-        vds.drop_vars(drop_variables)
-        return vds
-    else:
-        # we currently read every other filetype using kerchunks various file format backends
-        from virtualizarr.readers.kerchunk import (
-            fully_decode_arr_refs,
-            read_kerchunk_references_from_file,
-            virtual_vars_from_kerchunk_refs,
-        )
 
-        if reader_options is None:
-            reader_options = {}
+        # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
+        # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
 
-        # this is the only place we actually always need to use kerchunk directly
-        # TODO avoid even reading byte ranges for variables that will be dropped later anyway?
-        vds_refs = read_kerchunk_references_from_file(
-            filepath=filepath,
-            filetype=filetype,
+        ds = xr.open_dataset(
+            cast(XArrayOpenT, fpath),
+            drop_variables=drop_variables,
             group=group,
-            reader_options=reader_options,
+            decode_times=decode_times,
         )
-        virtual_vars = virtual_vars_from_kerchunk_refs(
-            vds_refs,
-            drop_variables=drop_variables + loadable_variables,
-            virtual_array_class=virtual_array_class,
-        )
-        ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
-        coord_names = ds_attrs.pop("coordinates", [])
 
-        if indexes is None or len(loadable_variables) > 0:
-            # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-            # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-            # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            fpath = _FsspecFSFromFilepath(
-                filepath=filepath, reader_options=reader_options
-            ).open_file()
-
-            # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
-            # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
-
-            ds = xr.open_dataset(
-                cast(XArrayOpenT, fpath),
-                drop_variables=drop_variables,
-                group=group,
-                decode_times=decode_times,
+        if indexes is None:
+            warnings.warn(
+                "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
+                "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
             )
 
-            if indexes is None:
-                warnings.warn(
-                    "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
-                    "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
-                )
-
-                # add default indexes by reading data from file
-                indexes = {name: index for name, index in ds.xindexes.items()}
-            elif indexes != {}:
-                # TODO allow manual specification of index objects
-                raise NotImplementedError()
-            else:
-                indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-            loadable_vars = {
-                str(name): var
-                for name, var in ds.variables.items()
-                if name in loadable_variables
-            }
-
-            # if we only read the indexes we can just close the file right away as nothing is lazy
-            if loadable_vars == {}:
-                ds.close()
+            # add default indexes by reading data from file
+            indexes = {name: index for name, index in ds.xindexes.items()}
+        elif indexes != {}:
+            # TODO allow manual specification of index objects
+            raise NotImplementedError()
         else:
-            loadable_vars = {}
-            indexes = {}
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-        vars = {**virtual_vars, **loadable_vars}
+        # TODO we should drop these earlier by using drop_variables
+        loadable_vars = {
+            str(name): var
+            for name, var in ds.variables.items()
+            if name in loadable_variables
+        }
 
-        data_vars, coords = separate_coords(vars, indexes, coord_names)
+        # if we only read the indexes we can just close the file right away as nothing is lazy
+        if loadable_vars == {}:
+            ds.close()
+    else:
+        loadable_vars = {}
+        indexes = {}
 
-        vds = xr.Dataset(
-            data_vars,
-            coords=coords,
-            # indexes={},  # TODO should be added in a later version of xarray
-            attrs=ds_attrs,
-        )
+    return loadable_vars, indexes
 
-        # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
-        return vds
+def construct_virtual_dataset(
+    virtual_vars,
+    loadable_vars,
+    indexes,
+    coord_names,
+    attrs,
+) -> Dataset:
+    """Construct a virtual Datset from consistuent parts."""
+
+    vars = {**virtual_vars, **loadable_vars}
+
+    data_vars, coords = separate_coords(vars, indexes, coord_names)
+
+    vds = xr.Dataset(
+        data_vars,
+        coords=coords,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=attrs,
+    )
+
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+    return vds
 
 
 def separate_coords(

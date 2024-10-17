@@ -13,7 +13,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
 
-def open_virtual_dataset_from_v3_store(
+def open_virtual_dataset(
     storepath: str,
     drop_variables: list[str] = [],
     indexes: Mapping[str, Index] | None = None,
