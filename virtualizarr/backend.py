@@ -215,11 +215,16 @@ def open_virtual_dataset(
             )
 
         case "netcdf3":
-            from kerchunk.netCDF3 import NetCDF3ToZarr
+            from virtualizarr.readers.netcdf3 import open_virtual_dataset
 
-            refs = NetCDF3ToZarr(
-                filepath, inline_threshold=0, **reader_options
-            ).translate()
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
 
         case "hdf5" | "netcdf4":
             from virtualizarr.readers.hdf5 import open_virtual_dataset
@@ -239,16 +244,16 @@ def open_virtual_dataset(
             raise NotImplementedError(f"Unsupported file type: {filetype}")
 
         case "tiff":
-            from kerchunk.tiff import tiff_to_zarr
+            from virtualizarr.readers.tiff import open_virtual_dataset
 
-            reader_options.pop("storage_options", {})
-            warnings.warn(
-                "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
-                UserWarning,
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
             )
-
-            # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-            refs = {"refs": tiff_to_zarr(filepath, **reader_options)}
 
         case "fits":
             from kerchunk.fits import process_file
