@@ -256,11 +256,16 @@ def open_virtual_dataset(
             )
 
         case "fits":
-            from kerchunk.fits import process_file
+            from virtualizarr.readers.fits import open_virtual_dataset
 
-            # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-            refs = {"refs": process_file(filepath, **reader_options)}
-
+            return open_virtual_dataset(
+                filepath,
+                group=group,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
         case _:
             raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
