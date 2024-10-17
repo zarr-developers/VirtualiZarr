@@ -167,43 +167,43 @@ def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variab
     # This chunk determination logic mirrors zarr-python's create
     # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
 
+    chunks = dataset.chunks if dataset.chunks else dataset.shape
+    codecs = codecs_from_dataset(dataset)
+    cfcodec = cfcodec_from_dataset(dataset)
+    attrs = _extract_attrs(dataset)
+    if cfcodec:
+        codecs.insert(0, cfcodec["codec"])
+        dtype = cfcodec["target_dtype"]
+        attrs.pop("scale_factor", None)
+        attrs.pop("add_offset", None)
+        fill_value = cfcodec["codec"].decode(dataset.fillvalue)
+    else:
+        dtype = dataset.dtype
+        fill_value = dataset.fillvalue
+    if isinstance(fill_value, np.ndarray):
+        fill_value = fill_value[0]
+    if np.isnan(fill_value):
+        fill_value = float("nan")
+    if isinstance(fill_value, np.generic):
+        fill_value = fill_value.item()
+    filters = [codec.get_config() for codec in codecs]
+    zarray = ZArray(
+        chunks=chunks,
+        compressor=None,
+        dtype=dtype,
+        fill_value=fill_value,
+        filters=filters,
+        order="C",
+        shape=dataset.shape,
+        zarr_format=2,
+    )
+    dims = _dataset_dims(dataset)
     manifest = _dataset_chunk_manifest(path, dataset)
     if manifest:
-        chunks = dataset.chunks if dataset.chunks else dataset.shape
-        codecs = codecs_from_dataset(dataset)
-        cfcodec = cfcodec_from_dataset(dataset)
-        attrs = _extract_attrs(dataset)
-        if cfcodec:
-            codecs.insert(0, cfcodec["codec"])
-            dtype = cfcodec["target_dtype"]
-            attrs.pop("scale_factor", None)
-            attrs.pop("add_offset", None)
-            fill_value = cfcodec["codec"].decode(dataset.fillvalue)
-        else:
-            dtype = dataset.dtype
-            fill_value = dataset.fillvalue
-        if isinstance(fill_value, np.ndarray):
-            fill_value = fill_value[0]
-        if np.isnan(fill_value):
-            fill_value = float("nan")
-        if isinstance(fill_value, np.generic):
-            fill_value = fill_value.item()
-        filters = [codec.get_config() for codec in codecs]
-        zarray = ZArray(
-            chunks=chunks,
-            compressor=None,
-            dtype=dtype,
-            fill_value=fill_value,
-            filters=filters,
-            order="C",
-            shape=dataset.shape,
-            zarr_format=2,
-        )
         marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-        dims = _dataset_dims(dataset)
         variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
     else:
-        variable = None
+        variable = xr.Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)
     return variable
 
 
