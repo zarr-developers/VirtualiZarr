@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import ujson  # type: ignore
 
 from virtualizarr.manifests import ManifestArray
@@ -61,3 +62,21 @@ def test_dataset_from_df_refs_with_filters():
     ds = dataset_from_kerchunk_refs(ds_refs)
     da = ds["a"]
     assert da.data.zarray.filters == filters
+
+
+def test_empty_netcdf4():
+    zarray = {
+        "chunks": [50, 100],
+        "compressor": None,
+        "dtype": "<i8",
+        "fill_value": 100,
+        "filters": None,
+        "order": "C",
+        "shape": [100, 200],
+        "zarr_format": 2,
+    }
+    refs = gen_ds_refs(zarray=ujson.dumps(zarray))
+    del refs["refs"]["a/0.0"]
+
+    with pytest.raises(ValueError, match="variable a appears to be broken"):
+        dataset_from_kerchunk_refs(refs)
