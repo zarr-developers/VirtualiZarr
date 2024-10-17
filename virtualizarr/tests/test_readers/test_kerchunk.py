@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import ujson  # type: ignore
 
 from virtualizarr.manifests import ManifestArray
@@ -78,5 +77,8 @@ def test_empty_netcdf4():
     refs = gen_ds_refs(zarray=ujson.dumps(zarray))
     del refs["refs"]["a/0.0"]
 
-    with pytest.raises(ValueError, match="variable a appears to be broken"):
-        dataset_from_kerchunk_refs(refs)
+    ds = dataset_from_kerchunk_refs(refs)
+    assert "a" in ds.variables
+    assert isinstance(ds["a"].data, ManifestArray)
+    assert ds["a"].sizes == {"x": 100, "y": 200}
+    assert ds["a"].chunksizes == {"x": 50, "y": 100}
