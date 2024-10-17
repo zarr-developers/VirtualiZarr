@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 
 import numpy as np
 
@@ -217,9 +217,12 @@ def stack(
     new_shape.insert(axis, length_along_new_stacked_axis)
 
     # do stacking of entries in manifest
-    stacked_paths = np.stack(
-        [arr.manifest._paths for arr in arrays],
-        axis=axis,
+    stacked_paths = cast(  # `np.stack` apparently is type hinted as if the output could have Any dtype
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.stack(
+            [arr.manifest._paths for arr in arrays],
+            axis=axis,
+        ),
     )
     stacked_offsets = np.stack(
         [arr.manifest._offsets for arr in arrays],
@@ -296,10 +299,14 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     )
 
     # do broadcasting of entries in manifest
-    broadcasted_paths = np.broadcast_to(
-        x.manifest._paths,
-        shape=new_chunk_grid_shape,
+    broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.broadcast_to(
+            x.manifest._paths,
+            shape=new_chunk_grid_shape,
+        ),
     )
+
     broadcasted_offsets = np.broadcast_to(
         x.manifest._offsets,
         shape=new_chunk_grid_shape,

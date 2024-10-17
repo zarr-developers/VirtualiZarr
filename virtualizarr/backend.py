@@ -16,7 +16,8 @@ from xarray.core.indexes import Index, PandasIndex
 from xarray.core.variable import IndexVariable
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.utils import _fsspec_openfile_from_filepath
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
@@ -39,6 +40,7 @@ class FileType(AutoName):
     zarr = auto()
     dmrpp = auto()
     zarr_v3 = auto()
+    kerchunk = auto()
 
 
 class ManifestBackendArray(ManifestArray, BackendArray):
@@ -67,13 +69,14 @@ def open_virtual_dataset(
 
     Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
 
+
     Parameters
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'zarr_v3', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4” and “hdf5”.
@@ -133,8 +136,43 @@ def open_virtual_dataset(
         raise NotImplementedError()
 
     # if filetype is user defined, convert to FileType
+
     if filetype is not None:
         filetype = FileType(filetype)
+
+    if filetype == FileType.kerchunk:
+        from virtualizarr.readers.kerchunk import dataset_from_kerchunk_refs
+
+        fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
+
+        # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
+        if fs.filepath.endswith("ref.parquet"):
+            from fsspec.implementations.reference import LazyReferenceMapper
+
+            lrm = LazyReferenceMapper(filepath, fs.fs)
+
+            # build reference dict from KV pairs in LazyReferenceMapper
+            # is there a better / more preformant way to extract this?
+            array_refs = {k: lrm[k] for k in lrm.keys()}
+
+            full_reference = {"refs": array_refs}
+
+            return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
+
+        # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
+        # https://fsspec.github.io/kerchunk/spec.html
+        elif fs.read_bytes(9).startswith(b'{"version'):
+            import ujson
+
+            with fs.open_file() as of:
+                refs = ujson.load(of)
+
+            return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
+
+        else:
+            raise ValueError(
+                "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
+            )
 
     if filetype == FileType.zarr_v3:
         # TODO is there a neat way of auto-detecting this?
@@ -151,9 +189,9 @@ def open_virtual_dataset(
                 "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
             )
 
-        fpath = _fsspec_openfile_from_filepath(
+        fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
-        )
+        ).open_file()
         parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
         vds = parser.parse_dataset()
         vds.drop_vars(drop_variables)
@@ -189,9 +227,9 @@ def open_virtual_dataset(
             # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
             # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
             # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-            fpath = _fsspec_openfile_from_filepath(
+            fpath = _FsspecFSFromFilepath(
                 filepath=filepath, reader_options=reader_options
-            )
+            ).open_file()
 
             # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
             # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
