@@ -9,6 +9,7 @@ dependencies:
   - netcdf4
   - xarray>=2024.6.0
   - numpy>=2.0.0
+  - numcodecs
   - packaging
   - universal_pathlib
   # Testing
