@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from unittest.mock import patch
 
-import fsspec
 import numpy as np
 import pytest
 import xarray as xr
@@ -237,6 +236,8 @@ class TestReadFromURL:
             assert isinstance(vds, xr.Dataset)
 
     def test_virtualizarr_vs_local_nisar(self):
+        import fsspec
+
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
         tmpfile = fsspec.open_local(

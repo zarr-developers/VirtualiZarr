@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
 import numcodecs
 import numpy as np
-import ujson  # type: ignore
 
 if TYPE_CHECKING:
     pass
@@ -100,6 +99,8 @@ class ZArray:
         return zarray_dict
 
     def to_kerchunk_json(self) -> str:
+        import ujson
+
         zarray_dict = self.dict()
         if zarray_dict["fill_value"] is np.nan:
             zarray_dict["fill_value"] = None

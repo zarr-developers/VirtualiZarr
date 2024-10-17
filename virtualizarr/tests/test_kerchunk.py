@@ -7,8 +7,10 @@ from virtualizarr.readers.kerchunk import (
     dataset_from_kerchunk_refs,
     find_var_names,
 )
+from virtualizarr.tests import requires_kerchunk
 
 
+@requires_kerchunk
 def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
@@ -40,6 +42,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
     xrt.assert_equal(roundtrip, ds)
 
 
+@requires_kerchunk
 def test_no_duplicates_find_var_names():
     """Verify that we get a deduplicated list of var names"""
     ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}

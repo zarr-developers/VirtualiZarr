@@ -2,7 +2,6 @@ import warnings
 from pathlib import Path
 from typing import Any, MutableMapping, Optional, cast
 
-import ujson  # type: ignore
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
@@ -300,6 +299,8 @@ def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:
     """
     Only have to do this because kerchunk.SingleHdf5ToZarr apparently doesn't bother converting .zarray and .zattrs contents to dicts, see https://github.com/fsspec/kerchunk/issues/415 .
     """
+    import ujson
+
     sanitized = d.copy()
     for k, v in d.items():
         if k.startswith("."):
