@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Mapping
+from typing import Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
@@ -15,22 +15,37 @@ from virtualizarr.zarr import ZArray
 
 class ZarrV3VirtualBackend(VirtualBackend):
     def open_virtual_dataset(
-        storepath: str,
-        drop_variables: list[str] = [],
+        filepath: str,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_options: Optional[dict] = None,
     ) -> Dataset:
         """
-        Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
-        """
-        _storepath = Path(storepath)
+        Read a Zarr v3 store containing chunk manifests and return an xarray Dataset containing virtualized arrays.
 
-        ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
+        This is experimental - chunk manifests are not part of the Zarr v3 Spec.
+        """
+        storepath = Path(filepath)
+
+        if group:
+            raise NotImplementedError()
+
+        if loadable_variables or decode_times:
+            raise NotImplementedError()
+
+        if reader_options:
+            raise NotImplementedError()
+
+        ds_attrs = attrs_from_zarr_group_json(storepath / "zarr.json")
         coord_names = ds_attrs.pop("coordinates", [])
 
         # TODO recursive glob to create a datatree
         # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
         # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
-        all_paths = _storepath.glob("*/")
+        all_paths = storepath.glob("*/")
         directory_paths = [p for p in all_paths if not p.is_file()]
 
         vars = {}

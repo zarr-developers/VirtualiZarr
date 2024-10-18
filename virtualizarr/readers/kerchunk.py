@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import Iterable, Mapping, Optional
 
 import ujson
 from xarray import Dataset
+from xarray.core.indexes import Index
 
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
@@ -14,6 +15,11 @@ from virtualizarr.utils import _FsspecFSFromFilepath
 class KerchunkVirtualBackend(VirtualBackend):
     def open_virtual_dataset(
         filepath: str,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         """Reads existing kerchunk references (in JSON or parquet) format."""
