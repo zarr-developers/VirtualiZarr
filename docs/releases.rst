@@ -38,7 +38,7 @@ Breaking changes
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
   `pydantic.BaseModel` (:pull:`210`)
-- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
+- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`210`)
 
 Deprecations
 ~~~~~~~~~~~~
@@ -58,7 +58,7 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
-- Adds virtualizarr + coiled serverless example notebook (:pull`223`)
+- Adds virtualizarr + coiled serverless example notebook (:pull:`223`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 
