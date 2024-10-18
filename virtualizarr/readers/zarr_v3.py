@@ -8,61 +8,62 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backend import separate_coords
+from virtualizarr.backends.common import VirtualBackend, separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import ZArray
 
 
-def open_virtual_dataset(
-    storepath: str,
-    drop_variables: list[str] = [],
-    indexes: Mapping[str, Index] | None = None,
-) -> Dataset:
-    """
-    Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
-    """
-    _storepath = Path(storepath)
+class ZarrV3VirtualBackend(VirtualBackend):
+    def open_virtual_dataset(
+        storepath: str,
+        drop_variables: list[str] = [],
+        indexes: Mapping[str, Index] | None = None,
+    ) -> Dataset:
+        """
+        Read a Zarr v3 store and return an xarray Dataset containing virtualized arrays.
+        """
+        _storepath = Path(storepath)
 
-    ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
-    coord_names = ds_attrs.pop("coordinates", [])
+        ds_attrs = attrs_from_zarr_group_json(_storepath / "zarr.json")
+        coord_names = ds_attrs.pop("coordinates", [])
 
-    # TODO recursive glob to create a datatree
-    # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
-    # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
-    all_paths = _storepath.glob("*/")
-    directory_paths = [p for p in all_paths if not p.is_file()]
+        # TODO recursive glob to create a datatree
+        # Note: this .is_file() check should not be necessary according to the pathlib docs, but tests fail on github CI without it
+        # see https://github.com/TomNicholas/VirtualiZarr/pull/45#discussion_r1547833166
+        all_paths = _storepath.glob("*/")
+        directory_paths = [p for p in all_paths if not p.is_file()]
 
-    vars = {}
-    for array_dir in directory_paths:
-        var_name = array_dir.name
-        if var_name in drop_variables:
-            break
+        vars = {}
+        for array_dir in directory_paths:
+            var_name = array_dir.name
+            if var_name in drop_variables:
+                break
 
-        zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
-        manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
+            zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
+            manifest = ChunkManifest.from_zarr_json(str(array_dir / "manifest.json"))
 
-        marr = ManifestArray(chunkmanifest=manifest, zarray=zarray)
-        var = Variable(data=marr, dims=dim_names, attrs=attrs)
-        vars[var_name] = var
+            marr = ManifestArray(chunkmanifest=manifest, zarray=zarray)
+            var = Variable(data=marr, dims=dim_names, attrs=attrs)
+            vars[var_name] = var
 
-    if indexes is None:
-        raise NotImplementedError()
-    elif indexes != {}:
-        # TODO allow manual specification of index objects
-        raise NotImplementedError()
-    else:
-        indexes = dict(**indexes)  # for type hinting: to allow mutation
+        if indexes is None:
+            raise NotImplementedError()
+        elif indexes != {}:
+            # TODO allow manual specification of index objects
+            raise NotImplementedError()
+        else:
+            indexes = dict(**indexes)  # for type hinting: to allow mutation
 
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
+        data_vars, coords = separate_coords(vars, indexes, coord_names)
 
-    ds = Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=ds_attrs,
-    )
+        ds = Dataset(
+            data_vars,
+            coords=coords,
+            # indexes={},  # TODO should be added in a later version of xarray
+            attrs=ds_attrs,
+        )
 
-    return ds
+        return ds
 
 
 def attrs_from_zarr_group_json(filepath: Path) -> dict:

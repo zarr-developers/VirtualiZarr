@@ -1,0 +1,1 @@
+from virtualizarr.backends.api import open_virtual_dataset
