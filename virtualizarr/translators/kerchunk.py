@@ -10,7 +10,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import ZArray, ZAttrs
+from virtualizarr.zarr import ZArray, ZAttrs, determine_chunk_grid_shape
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
@@ -148,6 +148,12 @@ def variable_from_kerchunk_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    elif len(zarray.shape) != 0:
+        # empty variables don't have physical chunks, but zarray shows that the variable
+        # is at least 1D
+        shape = determine_chunk_grid_shape(zarray.shape, zarray.chunks)
+        manifest = ChunkManifest(entries={}, shape=shape)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
