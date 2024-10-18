@@ -14,6 +14,7 @@ from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.utils import check_for_collisions
 
 
@@ -42,7 +43,7 @@ class TIFFVirtualBackend(VirtualBackend):
         )
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = {"refs": tiff_to_zarr(filepath, **reader_options)}
+        refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
 
         refs = extract_group(refs, group)
 

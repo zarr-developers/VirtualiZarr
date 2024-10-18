@@ -13,6 +13,7 @@ from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
 class FITSVirtualBackend(VirtualBackend):
@@ -27,7 +28,7 @@ class FITSVirtualBackend(VirtualBackend):
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = {"refs": process_file(filepath, **reader_options)}
+        refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 
         refs = extract_group(refs, group)
 
