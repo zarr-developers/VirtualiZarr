@@ -11,7 +11,7 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 
 class AutoName(Enum):
@@ -142,21 +142,10 @@ def open_virtual_dataset(
             stacklevel=2,
         )
 
-    if drop_variables is None:
-        drop_variables = []
-    elif isinstance(drop_variables, str):
-        drop_variables = [drop_variables]
-    else:
-        drop_variables = list(drop_variables)
-    if loadable_variables is None:
-        loadable_variables = []
-    elif isinstance(loadable_variables, str):
-        loadable_variables = [loadable_variables]
-    else:
-        loadable_variables = list(loadable_variables)
-    common = set(drop_variables).intersection(set(loadable_variables))
-    if common:
-        raise ValueError(f"Cannot both load and drop variables {common}")
+    drop_variables, loadable_variables = check_for_collisions(
+        drop_variables,
+        loadable_variables,
+    )
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()

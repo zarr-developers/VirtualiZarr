@@ -13,6 +13,7 @@ from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
+from virtualizarr.utils import check_for_collisions
 
 
 class HDF5VirtualBackend(VirtualBackend):
@@ -26,6 +27,11 @@ class HDF5VirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        drop_variables, loadable_variables = check_for_collisions(
+            drop_variables,
+            loadable_variables,
+        )
+
         refs = SingleHdf5ToZarr(
             filepath, inline_threshold=0, **reader_options
         ).translate()

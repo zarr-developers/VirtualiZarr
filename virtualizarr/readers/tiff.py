@@ -14,6 +14,7 @@ from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
+from virtualizarr.utils import check_for_collisions
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -27,6 +28,13 @@ class TIFFVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        drop_variables, loadable_variables = check_for_collisions(
+            drop_variables=drop_variables, loadable_variables=loadable_variables
+        )
+
+        if reader_options is None:
+            reader_options = {}
+
         reader_options.pop("storage_options", {})
         warnings.warn(
             "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",

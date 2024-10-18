@@ -37,6 +37,7 @@ class FITSVirtualBackend(VirtualBackend):
             drop_variables,
         )
 
+        # TODO this wouldn't work until you had an xarray backend for FITS installed
         loadable_vars, indexes = open_loadable_vars_and_indexes(
             filepath,
             loadable_variables=loadable_variables,
