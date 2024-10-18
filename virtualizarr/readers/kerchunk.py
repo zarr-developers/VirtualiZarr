@@ -3,7 +3,7 @@ from typing import Optional
 import ujson
 from xarray import Dataset
 
-from virtualizarr.backends.common import VirtualBackend
+from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,

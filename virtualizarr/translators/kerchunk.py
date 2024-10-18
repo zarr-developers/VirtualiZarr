@@ -4,8 +4,8 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backends.common import separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,

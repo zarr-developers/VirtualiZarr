@@ -8,8 +8,8 @@ from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
-from virtualizarr.backends.common import VirtualBackend, separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.common import VirtualBackend, separate_coords
 from virtualizarr.zarr import ZArray
 
 

@@ -4,7 +4,7 @@ from kerchunk.hdf import SingleHdf5ToZarr
 from xarray import Dataset
 from xarray.core.indexes import Index
 
-from virtualizarr.backends.common import (
+from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
     open_loadable_vars_and_indexes,

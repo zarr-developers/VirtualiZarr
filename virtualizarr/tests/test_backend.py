@@ -9,7 +9,7 @@ from xarray import open_dataset
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.backends.api import FileType, automatically_determine_filetype
+from virtualizarr.backend import FileType, automatically_determine_filetype
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.tests import (
     has_astropy,

@@ -9,8 +9,8 @@ import numpy as np
 import xarray as xr
 from xarray.core.indexes import Index
 
-from virtualizarr.backends.common import VirtualBackend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath
 from virtualizarr.zarr import ZArray
