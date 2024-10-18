@@ -204,15 +204,15 @@ class TestBroadcast:
             assert len_chunk <= len_arr
 
     @pytest.mark.parametrize(
-        "shape, chunks, target_shape",
+        "shape, chunks, grid_shape, target_shape",
         [
-            ((1,), (1,), (3,)),
-            ((2,), (1,), (2,)),
-            ((3,), (2,), (5, 4, 3)),
-            ((3, 1), (2, 1), (2, 3, 4)),
+            ((1,), (1,), (1,), (3,)),
+            ((2,), (1,), (2,), (2,)),
+            ((3,), (2,), (2,), (5, 4, 3)),
+            ((3, 1), (2, 1), (2, 1), (2, 3, 4)),
         ],
     )
-    def test_broadcast_empty(self, shape, chunks, target_shape):
+    def test_broadcast_empty(self, shape, chunks, grid_shape, target_shape):
         zarray = ZArray(
             chunks=chunks,
             compressor={"id": "zlib", "level": 1},
@@ -223,7 +223,7 @@ class TestBroadcast:
             shape=shape,
             zarr_format=2,
         )
-        manifest = ChunkManifest(entries={})
+        manifest = ChunkManifest(entries={}, shape=grid_shape)
         marr = ManifestArray(zarray, manifest)
 
         expanded = np.broadcast_to(marr, shape=target_shape)
