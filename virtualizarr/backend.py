@@ -253,4 +253,3 @@ def open_virtual_dataset(
             )
         case _:
             raise NotImplementedError(f"Unsupported file type: {filetype.name}")
-
