@@ -40,6 +40,12 @@ class ZarrV3VirtualBackend(VirtualBackend):
         if reader_options:
             raise NotImplementedError()
 
+        drop_vars: list[str]
+        if drop_variables is None:
+            drop_vars = []
+        else:
+            drop_vars = list(drop_variables)
+
         ds_attrs = attrs_from_zarr_group_json(storepath / "zarr.json")
         coord_names = ds_attrs.pop("coordinates", [])
 
@@ -52,7 +58,7 @@ class ZarrV3VirtualBackend(VirtualBackend):
         vars = {}
         for array_dir in directory_paths:
             var_name = array_dir.name
-            if var_name in drop_variables:
+            if var_name in drop_vars:
                 break
 
             zarray, dim_names, attrs = metadata_from_zarr_json(array_dir / "zarr.json")
