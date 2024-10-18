@@ -13,7 +13,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
 from virtualizarr.utils import _FsspecFSFromFilepath
-from virtualizarr.zarr import ZArray, ZAttrs
+from virtualizarr.zarr import ZArray, ZAttrs, ceildiv
 
 
 # TODO shouldn't this live in backend.py? Because it's not just useful for the kerchunk-specific readers...
@@ -230,6 +230,13 @@ def dataset_from_kerchunk_refs(
     return vds
 
 
+def determine_chunk_grid_shape(zarray):
+    return tuple(
+        ceildiv(length, chunksize)
+        for length, chunksize in zip(zarray.shape, zarray.chunks)
+    )
+
+
 def variable_from_kerchunk_refs(
     refs: KerchunkStoreRefs, var_name: str, virtual_array_class
 ) -> Variable:
@@ -241,6 +248,12 @@ def variable_from_kerchunk_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+    elif len(zarray.shape) != 0:
+        # empty variables don't have physical chunks, but zarray shows that the variable
+        # is at least 1D
+        shape = determine_chunk_grid_shape(zarray)
+        manifest = ChunkManifest(entries={}, shape=shape)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
