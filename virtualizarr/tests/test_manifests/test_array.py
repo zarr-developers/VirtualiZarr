@@ -331,6 +331,44 @@ class TestStack:
         assert result.zarray.order == zarray.order
         assert result.zarray.zarr_format == zarray.zarr_format
 
+    def test_stack_empty(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 10),
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {}
+        manifest1 = ChunkManifest(entries=chunks_dict1)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+
+        result = np.stack([marr1, marr2], axis=1)
+
+        assert result.shape == (5, 2, 20)
+        assert result.chunks == (5, 1, 10)
+        assert result.manifest.dict() == {
+            "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.zarray.compressor == zarray.compressor
+        assert result.zarray.filters == zarray.filters
+        assert result.zarray.fill_value == zarray.fill_value
+        assert result.zarray.order == zarray.order
+        assert result.zarray.zarr_format == zarray.zarr_format
+
 
 def test_refuse_combine():
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
