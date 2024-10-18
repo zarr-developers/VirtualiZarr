@@ -210,6 +210,12 @@ def ceildiv(a: int, b: int) -> int:
     return -(a // -b)
 
 
+def determine_chunk_grid_shape(
+    shape: tuple[int, ...], chunks: tuple[int, ...]
+) -> tuple[int, ...]:
+    return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
+
+
 def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
