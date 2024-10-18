@@ -28,6 +28,9 @@ New Features
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 
+- Support empty files (:pull:`260`)
+  By `Justus Magin <https://github.com/keewis>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
