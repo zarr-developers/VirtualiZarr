@@ -296,7 +296,7 @@ class TestConcat:
         )
 
         chunks_dict1 = {}
-        manifest1 = ChunkManifest(entries=chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 1, 2))
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {
@@ -379,7 +379,7 @@ class TestStack:
         )
 
         chunks_dict1 = {}
-        manifest1 = ChunkManifest(entries=chunks_dict1)
+        manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {

@@ -1,3 +1,4 @@
+import math
 import warnings
 from pathlib import Path
 from typing import Any, MutableMapping, Optional, cast
@@ -230,6 +231,13 @@ def dataset_from_kerchunk_refs(
     return vds
 
 
+def determine_chunk_grid_shape(zarray):
+    return tuple(
+        math.ceil(length / chunksize)
+        for length, chunksize in zip(zarray.shape, zarray.chunks)
+    )
+
+
 def variable_from_kerchunk_refs(
     refs: KerchunkStoreRefs, var_name: str, virtual_array_class
 ) -> Variable:
@@ -245,7 +253,8 @@ def variable_from_kerchunk_refs(
     elif len(zarray.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
-        manifest = ChunkManifest(entries={})
+        shape = determine_chunk_grid_shape(zarray)
+        manifest = ChunkManifest(entries={}, shape=shape)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,

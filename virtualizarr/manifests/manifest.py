@@ -89,7 +89,7 @@ class ChunkManifest:
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
-    def __init__(self, entries: dict) -> None:
+    def __init__(self, entries: dict, shape: tuple[int, ...] | None = None) -> None:
         """
         Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
 
@@ -109,9 +109,8 @@ class ChunkManifest:
         # TODO do some input validation here first?
         validate_chunk_keys(entries.keys())
 
-        # TODO should we actually optionally pass chunk grid shape in,
-        # in case there are not enough chunks to give correct idea of full shape?
-        shape = get_chunk_grid_shape(entries.keys())
+        if shape is None:
+            shape = get_chunk_grid_shape(entries.keys())
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
@@ -257,9 +256,6 @@ class ChunkManifest:
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
-
-        if len(self) == 0:
-            return cast(ChunkDict, {})
 
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
