@@ -20,6 +20,14 @@ class TestCreateManifest:
         manifest = ChunkManifest(entries=chunks)
         assert manifest.dict() == chunks
 
+        chunks = {}
+        manifest = ChunkManifest(entries=chunks, shape=(2, 2))
+        assert manifest.dict() == chunks
+
+    def test_create_manifest_empty_missing_shape(self):
+        with pytest.raises(ValueError, match="chunk grid shape if no chunks"):
+            ChunkManifest(entries={})
+
     def test_invalid_chunk_entries(self):
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc"},
