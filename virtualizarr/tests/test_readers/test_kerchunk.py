@@ -1,4 +1,5 @@
 import numpy as np
+import ujson
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
@@ -45,8 +46,6 @@ def test_dataset_from_df_refs():
 
 
 def test_dataset_from_df_refs_with_filters():
-    import ujson
-
     filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
