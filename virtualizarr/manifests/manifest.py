@@ -105,6 +105,8 @@ class ChunkManifest:
                     "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
                 }
         """
+        if shape is None and not entries:
+            raise ValueError("need a chunk grid shape if no chunks given")
 
         # TODO do some input validation here first?
         validate_chunk_keys(entries.keys())
