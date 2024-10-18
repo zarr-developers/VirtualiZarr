@@ -13,6 +13,7 @@ from virtualizarr.utils import _FsspecFSFromFilepath
 
 
 class KerchunkVirtualBackend(VirtualBackend):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,

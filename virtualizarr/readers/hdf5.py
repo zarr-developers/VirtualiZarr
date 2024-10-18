@@ -16,6 +16,7 @@ from virtualizarr.translators.kerchunk import (
 
 
 class HDF5VirtualBackend(VirtualBackend):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,

@@ -170,6 +170,7 @@ def separate_coords(
 
 
 class VirtualBackend(ABC):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,
@@ -181,6 +182,7 @@ class VirtualBackend(ABC):
     ) -> Dataset:
         raise NotImplementedError()
 
+    @staticmethod
     def open_virtual_datatree(
         path: str,
         group: str | None = None,

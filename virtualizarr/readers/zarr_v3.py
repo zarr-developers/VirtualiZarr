@@ -14,6 +14,7 @@ from virtualizarr.zarr import ZArray
 
 
 class ZarrV3VirtualBackend(VirtualBackend):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,

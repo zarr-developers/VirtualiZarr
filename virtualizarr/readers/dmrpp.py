@@ -18,6 +18,7 @@ from virtualizarr.zarr import ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,

@@ -16,6 +16,7 @@ from virtualizarr.translators.kerchunk import (
 
 
 class FITSVirtualBackend(VirtualBackend):
+    @staticmethod
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,
