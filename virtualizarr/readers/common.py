@@ -35,7 +35,6 @@ class ManifestBackendArray(ManifestArray, BackendArray):
     ...
 
 
-# TODO move these out into a backend/utils.py module? Or readers/common.py?
 def open_loadable_vars_and_indexes(
     filepath: str,
     loadable_variables,
