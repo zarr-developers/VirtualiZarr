@@ -7,6 +7,7 @@ import fsspec.implementations.memory
 import pytest
 import xarray as xr
 
+from virtualizarr.tests import requires_scipy
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 
@@ -25,6 +26,7 @@ def test_fsspec_openfile_from_path(tmp_path: pathlib.Path, dataset: xr.Dataset) 
     assert isinstance(result, fsspec.implementations.local.LocalFileOpener)
 
 
+@requires_scipy
 def test_fsspec_openfile_memory(dataset: xr.Dataset):
     fs = fsspec.filesystem("memory")
     with contextlib.redirect_stderr(None):

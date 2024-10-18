@@ -1,7 +1,6 @@
 from collections.abc import Mapping
 from unittest.mock import patch
 
-import fsspec
 import numpy as np
 import pytest
 import xarray as xr
@@ -13,9 +12,17 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.backend import FileType
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import _automatically_determine_filetype
-from virtualizarr.tests import has_astropy, has_tifffile, network, requires_s3fs
+from virtualizarr.tests import (
+    has_astropy,
+    has_tifffile,
+    network,
+    requires_kerchunk,
+    requires_s3fs,
+    requires_scipy,
+)
 
 
+@requires_scipy
 def test_automatically_determine_filetype_netcdf3_netcdf4():
     # test the NetCDF3 vs NetCDF4 automatic file type selection
 
@@ -75,6 +82,7 @@ def test_FileType():
         FileType(None)
 
 
+@requires_kerchunk
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file):
         vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -105,6 +113,7 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
+@requires_kerchunk
 def test_cftime_index(tmpdir):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
@@ -130,6 +139,7 @@ def test_cftime_index(tmpdir):
     assert vds.attrs == ds.attrs
 
 
+@requires_kerchunk
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file):
         # regression test for GH issue #150
@@ -237,6 +247,8 @@ class TestReadFromURL:
             assert isinstance(vds, xr.Dataset)
 
     def test_virtualizarr_vs_local_nisar(self):
+        import fsspec
+
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
         tmpfile = fsspec.open_local(
@@ -266,6 +278,7 @@ class TestReadFromURL:
         xrt.assert_equal(dsXR, dsV)
 
 
+@requires_kerchunk
 class TestLoadVirtualDataset:
     def test_loadable_variables(self, netcdf4_file):
         vars_to_load = ["air", "time"]
@@ -338,6 +351,7 @@ class TestLoadVirtualDataset:
         assert vds.scalar.attrs == {"scalar": "true"}
 
 
+@requires_kerchunk
 @pytest.mark.parametrize(
     "reference_format",
     ["json", "parquet", "invalid"],
@@ -395,6 +409,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
 
 
+@requires_kerchunk
 def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     # For now, we raise a NotImplementedError if we read existing references that have inlined data
     # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932

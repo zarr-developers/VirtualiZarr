@@ -5,7 +5,6 @@ from collections.abc import Iterable, Iterator
 from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
-from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
@@ -41,6 +40,8 @@ class ChunkEntry:
     def from_kerchunk(
         cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
     ) -> "ChunkEntry":
+        from upath import UPath
+
         if len(path_and_byte_range_info) == 1:
             path = path_and_byte_range_info[0]
             offset = 0

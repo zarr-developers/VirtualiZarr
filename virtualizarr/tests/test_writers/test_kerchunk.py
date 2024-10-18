@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
-import ujson  # type: ignore
 from xarray import Dataset
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
 
 
+@requires_kerchunk
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
         manifest = ChunkManifest(
@@ -69,6 +70,8 @@ class TestAccessor:
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_json(self, tmp_path):
+        import ujson
+
         manifest = ChunkManifest(
             entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
         )
@@ -106,6 +109,8 @@ class TestAccessor:
         assert loaded_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_parquet(self, tmp_path):
+        import ujson
+
         chunks_dict = {
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},

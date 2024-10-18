@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import create_manifestarray
+from virtualizarr.tests import create_manifestarray, requires_kerchunk
 from virtualizarr.zarr import ZArray
 
 
@@ -35,6 +35,7 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
+    @requires_kerchunk
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
@@ -50,6 +51,7 @@ class TestManifestArray:
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
 
+    @requires_kerchunk
     def test_create_scalar_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}',
