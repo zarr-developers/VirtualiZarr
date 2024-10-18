@@ -201,6 +201,38 @@ class TestBroadcast:
         for len_arr, len_chunk in zip(broadcasted_marr.shape, broadcasted_chunk_shape):
             assert len_chunk <= len_arr
 
+    @pytest.mark.parametrize(
+        "shape, chunks, target_shape",
+        [
+            ((1,), (1,), (3,)),
+            ((2,), (1,), (2,)),
+            ((3,), (2,), (5, 4, 3)),
+            ((3, 1), (2, 1), (2, 3, 4)),
+        ],
+    )
+    def test_broadcast_empty(self, shape, chunks, target_shape):
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+        manifest = ChunkManifest(entries={})
+        marr = ManifestArray(zarray, manifest)
+
+        expanded = np.broadcast_to(marr, shape=target_shape)
+        assert expanded.shape == target_shape
+        assert len(expanded.chunks) == expanded.ndim
+        assert all(
+            len_chunk <= len_arr
+            for len_arr, len_chunk in zip(expanded.shape, expanded.chunks)
+        )
+        assert expanded.manifest.dict() == {}
+
 
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
