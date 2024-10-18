@@ -63,7 +63,7 @@ def test_dataset_from_df_refs_with_filters():
     assert da.data.zarray.filters == filters
 
 
-def test_empty_netcdf4():
+def test_dataset_from_kerchunk_refs_empty_chunk_manifest():
     zarray = {
         "chunks": [50, 100],
         "compressor": None,
