@@ -244,6 +244,8 @@ def variable_from_kerchunk_refs(
         manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     elif len(zarray.shape) != 0:
+        # empty variables don't have physical chunks, but zarray shows that the variable
+        # is at least 1D
         manifest = ChunkManifest(entries={})
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     else:
