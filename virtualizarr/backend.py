@@ -166,7 +166,13 @@ def open_virtual_dataset(
         case "kerchunk":
             from virtualizarr.readers.kerchunk import KerchunkVirtualBackend
 
-            return KerchunkVirtualBackend.open_virtual_dataset(filepath, reader_options)
+            return KerchunkVirtualBackend.open_virtual_dataset(
+                filepath,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
 
         case "zarr_v3":
             from virtualizarr.readers.zarr_v3 import ZarrV3VirtualBackend
