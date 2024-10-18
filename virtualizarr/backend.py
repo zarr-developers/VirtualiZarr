@@ -183,7 +183,7 @@ def open_virtual_dataset(
             from virtualizarr.readers.zarr_v3 import ZarrV3VirtualBackend
 
             return ZarrV3VirtualBackend.open_virtual_dataset(
-                storepath=filepath,
+                filepath=filepath,
                 drop_variables=drop_variables,
                 indexes=indexes,
             )
