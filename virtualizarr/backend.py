@@ -168,6 +168,7 @@ def open_virtual_dataset(
 
             return KerchunkVirtualBackend.open_virtual_dataset(
                 filepath,
+                group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
                 indexes=indexes,
@@ -178,9 +179,12 @@ def open_virtual_dataset(
             from virtualizarr.readers.zarr_v3 import ZarrV3VirtualBackend
 
             return ZarrV3VirtualBackend.open_virtual_dataset(
-                filepath=filepath,
+                filepath,
+                group=group,
                 drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
                 indexes=indexes,
+                reader_options=reader_options,
             )
 
         case "dmrpp":
@@ -188,6 +192,7 @@ def open_virtual_dataset(
 
             return DMRPPVirtualBackend.open_virtual_dataset(
                 filepath,
+                group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
                 indexes=indexes,
