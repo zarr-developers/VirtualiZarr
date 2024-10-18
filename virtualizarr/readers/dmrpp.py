@@ -13,7 +13,7 @@ from xarray.core.variable import Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 from virtualizarr.zarr import ZArray
 
 
@@ -28,7 +28,10 @@ class DMRPPVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        # TODO more sanitization of input types?
+        loadable_variables, drop_variables = check_for_collisions(
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+        )
 
         if loadable_variables != [] or decode_times or indexes is None:
             raise NotImplementedError(
@@ -41,10 +44,11 @@ class DMRPPVirtualBackend(VirtualBackend):
         fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
         ).open_file()
+
         parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
         vds = parser.parse_dataset()
-        vds.drop_vars(drop_variables)
-        return vds
+
+        return vds.drop_vars(drop_variables)
 
 
 class DMRParser:
