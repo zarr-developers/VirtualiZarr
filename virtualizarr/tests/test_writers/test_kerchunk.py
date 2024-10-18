@@ -40,6 +40,35 @@ class TestAccessor:
         result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
+    def test_accessor_to_kerchunk_dict_empty(self):
+        manifest = ChunkManifest(entries={}, shape=(1, 1))
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=dict(
+                shape=(2, 3),
+                dtype=np.dtype("<i8"),
+                chunks=(2, 3),
+                compressor=None,
+                filters=None,
+                fill_value=np.nan,
+                order="C",
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        expected_ds_refs = {
+            "version": 1,
+            "refs": {
+                ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            },
+        }
+
+        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
+        assert result_ds_refs == expected_ds_refs
+
     def test_accessor_to_kerchunk_json(self, tmp_path):
         import ujson
 
