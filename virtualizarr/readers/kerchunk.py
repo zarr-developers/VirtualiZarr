@@ -9,7 +9,7 @@ from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 
 class KerchunkVirtualBackend(VirtualBackend):
@@ -25,6 +25,17 @@ class KerchunkVirtualBackend(VirtualBackend):
     ) -> Dataset:
         """Reads existing kerchunk references (in JSON or parquet) format."""
 
+        if group:
+            raise NotImplementedError()
+
+        loadable_variables, drop_variables = check_for_collisions(
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+        )
+
+        if loadable_variables or indexes or decode_times:
+            raise NotImplementedError()
+
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
@@ -39,7 +50,7 @@ class KerchunkVirtualBackend(VirtualBackend):
 
             full_reference = {"refs": array_refs}
 
-            return dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
+            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
 
         # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
         # https://fsspec.github.io/kerchunk/spec.html
@@ -47,9 +58,12 @@ class KerchunkVirtualBackend(VirtualBackend):
             with fs.open_file() as of:
                 refs = ujson.load(of)
 
-            return dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
+            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
 
         else:
             raise ValueError(
                 "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
             )
+
+        # TODO would be more efficient to drop these before converting them into ManifestArrays, i.e. drop them from the kerchunk refs dict
+        return vds.drop_vars(drop_variables)
