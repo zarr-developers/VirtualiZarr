@@ -1,4 +1,3 @@
-import math
 import warnings
 from pathlib import Path
 from typing import Any, MutableMapping, Optional, cast
@@ -14,7 +13,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
 from virtualizarr.utils import _FsspecFSFromFilepath
-from virtualizarr.zarr import ZArray, ZAttrs
+from virtualizarr.zarr import ZArray, ZAttrs, ceildiv
 
 
 # TODO shouldn't this live in backend.py? Because it's not just useful for the kerchunk-specific readers...
@@ -233,7 +232,7 @@ def dataset_from_kerchunk_refs(
 
 def determine_chunk_grid_shape(zarray):
     return tuple(
-        math.ceil(length / chunksize)
+        ceildiv(length, chunksize)
         for length, chunksize in zip(zarray.shape, zarray.chunks)
     )
 
