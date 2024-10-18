@@ -24,7 +24,7 @@ XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
 if TYPE_CHECKING:
     try:
-        from xarray import DataTree
+        from xarray import DataTree  # type: ignore[attr-defined]
     except ImportError:
         DataTree = Any
 
