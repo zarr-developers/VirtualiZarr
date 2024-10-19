@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
-import ujson  # type: ignore
 from xarray import Dataset
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
 
 
+@requires_kerchunk
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
         manifest = ChunkManifest(
@@ -39,7 +40,38 @@ class TestAccessor:
         result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
+    def test_accessor_to_kerchunk_dict_empty(self):
+        manifest = ChunkManifest(entries={}, shape=(1, 1))
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=dict(
+                shape=(2, 3),
+                dtype=np.dtype("<i8"),
+                chunks=(2, 3),
+                compressor=None,
+                filters=None,
+                fill_value=np.nan,
+                order="C",
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        expected_ds_refs = {
+            "version": 1,
+            "refs": {
+                ".zgroup": '{"zarr_format":2}',
+                ".zattrs": "{}",
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            },
+        }
+
+        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
+        assert result_ds_refs == expected_ds_refs
+
     def test_accessor_to_kerchunk_json(self, tmp_path):
+        import ujson
+
         manifest = ChunkManifest(
             entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
         )
@@ -77,6 +109,8 @@ class TestAccessor:
         assert loaded_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_parquet(self, tmp_path):
+        import ujson
+
         chunks_dict = {
             "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "foo.nc", "offset": 200, "length": 100},

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
 
 import numpy as np
-from upath import UPath
 
 from virtualizarr.types import ChunkKey
 
@@ -81,6 +80,8 @@ class ChunkEntry:
     def from_kerchunk(
         cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
     ) -> "ChunkEntry":
+        from upath import UPath
+
         if len(path_and_byte_range_info) == 1:
             path = path_and_byte_range_info[0]
             offset = 0
@@ -124,11 +125,11 @@ class ChunkManifest:
     so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
     """
 
-    _paths: np.ndarray[Any, np.dtypes.StringDType]  # type: ignore[name-defined]
+    _paths: np.ndarray[Any, np.dtypes.StringDType]
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
-    def __init__(self, entries: dict) -> None:
+    def __init__(self, entries: dict, shape: tuple[int, ...] | None = None) -> None:
         """
         Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
 
@@ -144,16 +145,20 @@ class ChunkManifest:
                     "0.1.1": {"path": "s3://bucket//foo.nc", "offset": 400, "length": 100},
                 }
         """
+        if shape is None and not entries:
+            raise ValueError("need a chunk grid shape if no chunks given")
 
         # TODO do some input validation here first?
         validate_chunk_keys(entries.keys())
 
-        # TODO should we actually optionally pass chunk grid shape in,
-        # in case there are not enough chunks to give correct idea of full shape?
-        shape = get_chunk_grid_shape(entries.keys())
+        if shape is None:
+            shape = get_chunk_grid_shape(entries.keys())
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
-        paths = np.empty(shape=shape, dtype=np.dtypes.StringDType())  # type: ignore[attr-defined]
+        paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
+            np.ndarray[Any, np.dtypes.StringDType],
+            np.empty(shape=shape, dtype=np.dtypes.StringDType()),
+        )
         offsets = np.empty(shape=shape, dtype=np.dtype("uint64"))
         lengths = np.empty(shape=shape, dtype=np.dtype("uint64"))
 
@@ -181,7 +186,7 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
-        paths: np.ndarray[Any, np.dtype[np.dtypes.StringDType]],  # type: ignore[name-defined]
+        paths: np.ndarray[Any, np.dtypes.StringDType],
         offsets: np.ndarray[Any, np.dtype[np.uint64]],
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
     ) -> "ChunkManifest":
@@ -346,7 +351,9 @@ class ChunkManifest:
         chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
         for k, v in kerchunk_chunk_dict.items():
             if isinstance(v, (str, bytes)):
-                raise NotImplementedError("TODO: handle inlined data")
+                raise NotImplementedError(
+                    "Reading inlined reference data is currently not supported. [ToDo]"
+                )
             elif not isinstance(v, (tuple, list)):
                 raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
             chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
@@ -420,6 +427,9 @@ def get_ndim_from_key(key: str) -> int:
 
 
 def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
+    if not chunk_keys:
+        return
+
     # Check if all keys have the correct form
     for key in chunk_keys:
         if not re.match(_CHUNK_KEY, key):

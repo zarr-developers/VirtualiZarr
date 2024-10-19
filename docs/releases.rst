@@ -8,6 +8,11 @@ v1.0.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
+
+
+- Can open `kerchunk` reference files with ``open_virtual_dataset``.
+  (:pull:`251`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_ & `Kristen Thyng <https://github.com/kthyng>`_.
+
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
@@ -23,6 +28,9 @@ New Features
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 
+- Support empty files (:pull:`260`)
+  By `Justus Magin <https://github.com/keewis>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
@@ -30,7 +38,7 @@ Breaking changes
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
   `pydantic.BaseModel` (:pull:`210`)
-- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`xxx`)
+- `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`210`)
 
 Deprecations
 ~~~~~~~~~~~~
@@ -50,7 +58,7 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
-- Adds virtualizarr + coiled serverless example notebook (:pull`223`)
+- Adds virtualizarr + coiled serverless example notebook (:pull:`223`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 
@@ -59,6 +67,8 @@ Internal Changes
 
 - Refactored internal structure significantly to split up everything to do with reading references from that to do with writing references.
   (:issue:`229`) (:pull:`231`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Refactored readers to consider every filetype as a separate reader, all standardized to present the same `open_virtual_dataset` interface internally.
+  (:pull:`261`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.0.0:
 

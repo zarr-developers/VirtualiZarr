@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import create_manifestarray
+from virtualizarr.tests import create_manifestarray, requires_kerchunk
 from virtualizarr.zarr import ZArray
 
 
@@ -35,6 +35,7 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
+    @requires_kerchunk
     def test_create_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
@@ -50,6 +51,7 @@ class TestManifestArray:
         assert marr.zarray.filters is None
         assert marr.zarray.order == "C"
 
+    @requires_kerchunk
     def test_create_scalar_manifestarray_from_kerchunk_refs(self):
         arr_refs = {
             ".zarray": '{"chunks":[],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}',
@@ -201,6 +203,38 @@ class TestBroadcast:
         for len_arr, len_chunk in zip(broadcasted_marr.shape, broadcasted_chunk_shape):
             assert len_chunk <= len_arr
 
+    @pytest.mark.parametrize(
+        "shape, chunks, grid_shape, target_shape",
+        [
+            ((1,), (1,), (1,), (3,)),
+            ((2,), (1,), (2,), (2,)),
+            ((3,), (2,), (2,), (5, 4, 3)),
+            ((3, 1), (2, 1), (2, 1), (2, 3, 4)),
+        ],
+    )
+    def test_broadcast_empty(self, shape, chunks, grid_shape, target_shape):
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+        manifest = ChunkManifest(entries={}, shape=grid_shape)
+        marr = ManifestArray(zarray, manifest)
+
+        expanded = np.broadcast_to(marr, shape=target_shape)
+        assert expanded.shape == target_shape
+        assert len(expanded.chunks) == expanded.ndim
+        assert all(
+            len_chunk <= len_arr
+            for len_arr, len_chunk in zip(expanded.shape, expanded.chunks)
+        )
+        assert expanded.manifest.dict() == {}
+
 
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
@@ -248,6 +282,44 @@ class TestConcat:
         assert result.zarray.order == zarray.order
         assert result.zarray.zarr_format == zarray.zarr_format
 
+    def test_concat_empty(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 1, 10),
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 1, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {}
+        manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 1, 2))
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+
+        result = np.concatenate([marr1, marr2], axis=1)
+
+        assert result.shape == (5, 2, 20)
+        assert result.chunks == (5, 1, 10)
+        assert result.manifest.dict() == {
+            "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.zarray.compressor == zarray.compressor
+        assert result.zarray.filters == zarray.filters
+        assert result.zarray.fill_value == zarray.fill_value
+        assert result.zarray.order == zarray.order
+        assert result.zarray.zarr_format == zarray.zarr_format
+
 
 class TestStack:
     def test_stack(self):
@@ -286,6 +358,44 @@ class TestStack:
             "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
+        }
+        assert result.zarray.compressor == zarray.compressor
+        assert result.zarray.filters == zarray.filters
+        assert result.zarray.fill_value == zarray.fill_value
+        assert result.zarray.order == zarray.order
+        assert result.zarray.zarr_format == zarray.zarr_format
+
+    def test_stack_empty(self):
+        # both manifest arrays in this example have the same zarray properties
+        zarray = ZArray(
+            chunks=(5, 10),
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("int32"),
+            fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=(5, 20),
+            zarr_format=2,
+        )
+
+        chunks_dict1 = {}
+        manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+
+        chunks_dict2 = {
+            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+        }
+        manifest2 = ChunkManifest(entries=chunks_dict2)
+        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+
+        result = np.stack([marr1, marr2], axis=1)
+
+        assert result.shape == (5, 2, 20)
+        assert result.chunks == (5, 1, 10)
+        assert result.manifest.dict() == {
+            "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
         }
         assert result.zarray.compressor == zarray.compressor
         assert result.zarray.filters == zarray.filters
