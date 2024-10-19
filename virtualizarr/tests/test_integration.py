@@ -4,11 +4,53 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests.array import ManifestArray
-from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
+from virtualizarr.translators.kerchunk import (
+    dataset_from_kerchunk_refs,
+    find_var_names,
+)
 from virtualizarr.zarr import ZArray
 
 
+def test_kerchunk_roundtrip_in_memory_no_concat():
+    # Set up example xarray dataset
+    chunks_dict = {
+        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+    }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(
+        zarray=dict(
+            shape=(2, 4),
+            dtype=np.dtype("<i8"),
+            chunks=(2, 2),
+            compressor=None,
+            filters=None,
+            fill_value=np.nan,
+            order="C",
+        ),
+        chunkmanifest=manifest,
+    )
+    ds = xr.Dataset({"a": (["x", "y"], marr)})
+
+    # Use accessor to write it out to kerchunk reference dict
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+
+    # Use dataset_from_kerchunk_refs to reconstruct the dataset
+    roundtrip = dataset_from_kerchunk_refs(ds_refs)
+
+    # Assert equal to original dataset
+    xrt.assert_equal(roundtrip, ds)
+
+
+def test_no_duplicates_find_var_names():
+    """Verify that we get a deduplicated list of var names"""
+    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
+    assert len(find_var_names(ref_dict)) == 1
+
+
+@requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
     [
@@ -45,6 +87,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
+@requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
     def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
@@ -212,6 +255,7 @@ class TestKerchunkRoundtrip:
         assert roundtrip.a.attrs == ds.a.attrs
 
 
+@requires_kerchunk
 def test_open_scalar_variable(tmpdir):
     # regression test for GH issue #100
 

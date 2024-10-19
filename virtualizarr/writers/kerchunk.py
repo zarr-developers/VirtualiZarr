@@ -3,7 +3,6 @@ import json
 from typing import cast
 
 import numpy as np
-import ujson  # type: ignore
 from xarray import Dataset
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.variable import Variable
@@ -29,6 +28,8 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
     """
     Create a dictionary containing kerchunk-style store references from a single xarray.Dataset (which wraps ManifestArray objects).
     """
+
+    import ujson
 
     all_arr_refs = {}
     for var_name, var in ds.variables.items():

@@ -22,12 +22,11 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.06.0",
-    "kerchunk>=0.2.5",
-    "h5netcdf",
     "numpy>=2.0.0",
-    "ujson",
     "packaging",
     "universal-pathlib",
+    "numcodecs",
+    "ujson",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +34,9 @@ test = [
     "codecov",
     "fastparquet",
     "fsspec",
+    "h5netcdf",
     "h5py",
+    "kerchunk>=0.2.5",
     "mypy",
     "netcdf4",
     "pandas-stubs",
