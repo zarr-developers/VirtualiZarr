@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 
 import numpy as np
 
-from virtualizarr.zarr import Codec, ceildiv
+from virtualizarr.zarr import Codec, determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 
@@ -293,10 +293,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     )
 
     # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
-        for axis_length, chunk_length in zip(new_shape, new_chunk_shape)
-    )
+    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
 
     # do broadcasting of entries in manifest
     broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype

@@ -3,16 +3,53 @@ import warnings
 from collections import defaultdict
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
-import xarray as xr
+from xarray import Coordinates, Dataset
 from xarray.core.indexes import Index
+from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 from virtualizarr.zarr import ZArray
+
+
+class DMRPPVirtualBackend(VirtualBackend):
+    @staticmethod
+    def open_virtual_dataset(
+        filepath: str,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, Index] | None = None,
+        reader_options: Optional[dict] = None,
+    ) -> Dataset:
+        loadable_variables, drop_variables = check_for_collisions(
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+        )
+
+        if loadable_variables != [] or decode_times or indexes is None:
+            raise NotImplementedError(
+                "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+            )
+
+        if group:
+            raise NotImplementedError()
+
+        fpath = _FsspecFSFromFilepath(
+            filepath=filepath, reader_options=reader_options
+        ).open_file()
+
+        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
+        vds = parser.parse_dataset()
+
+        return vds.drop_vars(drop_variables)
 
 
 class DMRParser:
@@ -70,9 +107,7 @@ class DMRParser:
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
 
-    def parse_dataset(
-        self, group=None, indexes: Mapping[str, Index] = {}
-    ) -> xr.Dataset:
+    def parse_dataset(self, group=None, indexes: Mapping[str, Index] = {}) -> Dataset:
         """
         Parses the given file and creates a virtual xr.Dataset with ManifestArrays.
 
@@ -192,7 +227,7 @@ class DMRParser:
 
     def _parse_dataset(
         self, root: ET.Element, indexes: Mapping[str, Index] = {}
-    ) -> xr.Dataset:
+    ) -> Dataset:
         """
         Parse the dataset using the root element of the DMR++ file.
 
@@ -218,8 +253,8 @@ class DMRParser:
         if len(coord_names) == 0 or len(coord_names) < len(dims):
             coord_names = set(dims.keys())
         # Seperate and parse coords + data variables
-        coord_vars: dict[str, xr.Variable] = {}
-        data_vars: dict[str, xr.Variable] = {}
+        coord_vars: dict[str, Variable] = {}
+        data_vars: dict[str, Variable] = {}
         for var_tag in self._find_var_tags(root):
             variable = self._parse_variable(var_tag)
             if var_tag.attrib["name"] in coord_names:
@@ -230,9 +265,9 @@ class DMRParser:
         attrs: dict[str, str] = {}
         for attr_tag in root.iterfind("dap:Attribute", self._ns):
             attrs.update(self._parse_attribute(attr_tag))
-        return xr.Dataset(
+        return Dataset(
             data_vars=data_vars,
-            coords=xr.Coordinates(coords=coord_vars, indexes=indexes),
+            coords=Coordinates(coords=coord_vars, indexes=indexes),
             attrs=attrs,
         )
 
@@ -338,7 +373,7 @@ class DMRParser:
                     dimension_tags.append(dimension_tag)
         return dimension_tags
 
-    def _parse_variable(self, var_tag: ET.Element) -> xr.Variable:
+    def _parse_variable(self, var_tag: ET.Element) -> Variable:
         """
         Parse a variable from a DMR++ tag.
 
@@ -402,7 +437,7 @@ class DMRParser:
         )
         marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
         encoding = {k: attrs.get(k) for k in self._encoding_keys if k in attrs}
-        return xr.Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
+        return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
         """
