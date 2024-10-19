@@ -5,11 +5,11 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.kerchunk import (
+from virtualizarr.tests import requires_kerchunk
+from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
     find_var_names,
 )
-from virtualizarr.tests import requires_kerchunk
 from virtualizarr.zarr import ZArray
 
 

@@ -67,6 +67,8 @@ Internal Changes
 
 - Refactored internal structure significantly to split up everything to do with reading references from that to do with writing references.
   (:issue:`229`) (:pull:`231`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Refactored readers to consider every filetype as a separate reader, all standardized to present the same `open_virtual_dataset` interface internally.
+  (:pull:`261`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.0.0:
 
