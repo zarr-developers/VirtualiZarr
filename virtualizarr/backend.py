@@ -171,6 +171,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -183,6 +184,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -195,6 +197,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -207,6 +210,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -219,6 +223,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -236,6 +241,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
@@ -248,6 +254,7 @@ def open_virtual_dataset(
                 group=group,
                 drop_variables=drop_variables,
                 loadable_variables=loadable_variables,
+                decode_times=decode_times,
                 indexes=indexes,
                 reader_options=reader_options,
             )
