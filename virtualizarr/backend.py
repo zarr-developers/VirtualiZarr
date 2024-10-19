@@ -10,8 +10,22 @@ from typing import (
 from xarray import Dataset
 from xarray.core.indexes import Index
 
+from virtualizarr.readers import *
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+
+# TODO add entrypoint to allow external libraries to add to this mapping
+VIRTUAL_BACKENDS = {
+    "kerchunk": KerchunkVirtualBackend,
+    "zarr_v3": ZarrV3VirtualBackend,
+    "dmrpp": DMRPPVirtualBackend,
+    # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
+    "netcdf3": NetCDF3VirtualBackend,
+    "hdf5": HDF5VirtualBackend,
+    "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
+    "tiff": TIFFVirtualBackend,
+    "fits": FITSVirtualBackend,
+}
 
 
 class AutoName(Enum):
@@ -161,102 +175,19 @@ def open_virtual_dataset(
             filepath=filepath, reader_options=reader_options
         )
 
-    # TODO define these through a mapping to registered pluggable entrypoints instead
-    match filetype.name.lower():
-        case "kerchunk":
-            from virtualizarr.readers.kerchunk import KerchunkVirtualBackend
+    backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())
 
-            return KerchunkVirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
+    if backend_cls is None:
+        raise NotImplementedError(f"Unsupported file type: {filetype.name}")
 
-        case "zarr_v3":
-            from virtualizarr.readers.zarr_v3 import ZarrV3VirtualBackend
+    vds = backend_cls.open_virtual_dataset(
+        filepath,
+        group=group,
+        drop_variables=drop_variables,
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        indexes=indexes,
+        reader_options=reader_options,
+    )
 
-            return ZarrV3VirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-
-        case "dmrpp":
-            from virtualizarr.readers.dmrpp import DMRPPVirtualBackend
-
-            return DMRPPVirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-
-        case "netcdf3":
-            from virtualizarr.readers.netcdf3 import NetCDF3VirtualBackend
-
-            return NetCDF3VirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-
-        case "hdf5" | "netcdf4":
-            from virtualizarr.readers.hdf5 import HDF5VirtualBackend
-
-            return HDF5VirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-
-        case "grib":
-            # TODO Grib files should be handled as a DataTree object
-            # see https://github.com/TomNicholas/VirtualiZarr/issues/11
-            raise NotImplementedError(f"Unsupported file type: {filetype}")
-
-        case "tiff":
-            from virtualizarr.readers.tiff import TIFFVirtualBackend
-
-            return TIFFVirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-
-        case "fits":
-            from virtualizarr.readers.fits import FITSVirtualBackend
-
-            return FITSVirtualBackend.open_virtual_dataset(
-                filepath,
-                group=group,
-                drop_variables=drop_variables,
-                loadable_variables=loadable_variables,
-                decode_times=decode_times,
-                indexes=indexes,
-                reader_options=reader_options,
-            )
-        case _:
-            raise NotImplementedError(f"Unsupported file type: {filetype.name}")
+    return vds
