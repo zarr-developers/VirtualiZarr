@@ -1,6 +1,5 @@
 from typing import Iterable, Mapping, Optional
 
-from kerchunk.fits import process_file
 from xarray import Dataset
 from xarray.core.indexes import Index
 
@@ -27,6 +26,8 @@ class FITSVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        from kerchunk.fits import process_file
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 

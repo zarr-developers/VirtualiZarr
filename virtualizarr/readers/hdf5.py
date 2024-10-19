@@ -1,6 +1,5 @@
 from typing import Iterable, Mapping, Optional
 
-from kerchunk.hdf import SingleHdf5ToZarr
 from xarray import Dataset
 from xarray.core.indexes import Index
 
@@ -27,6 +26,8 @@ class HDF5VirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        from kerchunk.hdf import SingleHdf5ToZarr
+
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,

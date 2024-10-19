@@ -1,6 +1,5 @@
 from typing import Iterable, Mapping, Optional
 
-from kerchunk.netCDF3 import NetCDF3ToZarr
 from xarray import Dataset
 from xarray.core.indexes import Index
 
@@ -27,6 +26,8 @@ class NetCDF3VirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        from kerchunk.netCDF3 import NetCDF3ToZarr
+
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,

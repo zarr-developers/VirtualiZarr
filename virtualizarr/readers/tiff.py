@@ -1,7 +1,6 @@
 import warnings
 from typing import Iterable, Mapping, Optional
 
-from kerchunk.tiff import tiff_to_zarr
 from xarray import Dataset
 from xarray.core.indexes import Index
 
@@ -29,6 +28,8 @@ class TIFFVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        from kerchunk.tiff import tiff_to_zarr
+
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables=drop_variables, loadable_variables=loadable_variables
         )

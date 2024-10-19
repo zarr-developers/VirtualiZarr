@@ -10,8 +10,16 @@ from typing import (
 from xarray import Dataset
 from xarray.core.indexes import Index
 
-from virtualizarr.readers import *
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.readers import (
+    DMRPPVirtualBackend,
+    FITSVirtualBackend,
+    HDF5VirtualBackend,
+    KerchunkVirtualBackend,
+    NetCDF3VirtualBackend,
+    TIFFVirtualBackend,
+    ZarrV3VirtualBackend,
+)
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 # TODO add entrypoint to allow external libraries to add to this mapping
