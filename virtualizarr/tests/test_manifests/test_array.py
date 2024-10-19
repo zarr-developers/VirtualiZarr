@@ -383,8 +383,8 @@ class TestStack:
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
 
         chunks_dict2 = {
-            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
@@ -394,8 +394,8 @@ class TestStack:
         assert result.shape == (5, 2, 20)
         assert result.chunks == (5, 1, 10)
         assert result.manifest.dict() == {
-            "0.1.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
         assert result.zarray.compressor == zarray.compressor
         assert result.zarray.filters == zarray.filters
