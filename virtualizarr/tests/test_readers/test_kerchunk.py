@@ -41,7 +41,7 @@ def test_dataset_from_df_refs():
     assert da.data.zarray.order == "C"
 
     assert da.data.manifest.dict() == {
-        "0.0": {"path": "test1.nc", "offset": 6144, "length": 48}
+        "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
     }
 
 
