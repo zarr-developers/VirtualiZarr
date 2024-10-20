@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Iterable, Optional, Union
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -13,49 +13,76 @@ if TYPE_CHECKING:
     ]
 
 
-def _fsspec_openfile_from_filepath(
-    *,
-    filepath: str,
-    reader_options: Optional[dict] = {},
-) -> OpenFileType:
-    """Converts input filepath to fsspec openfile object.
+from dataclasses import dataclass, field
+
+
+@dataclass
+class _FsspecFSFromFilepath:
+    """Class to create fsspec Filesystem from input filepath.
 
     Parameters
     ----------
     filepath : str
         Input filepath
-    reader_options : _type_, optional
-        Dict containing kwargs to pass to file opener, by default {'storage_options':{'key':'', 'secret':'', 'anon':True}}
+    reader_options : dict, optional
+        dict containing kwargs to pass to file opener, by default {}
+    fs : Option | None
+        The fsspec filesystem object, created in __post_init__
 
-    Returns
-    -------
-    OpenFileType
-        An open file-like object, specific to the protocol supplied in filepath.
-
-    Raises
-    ------
-    NotImplementedError
-        Raises a Not Implemented Error if filepath protocol is not supported.
     """
 
-    import fsspec
-    from upath import UPath
+    filepath: str
+    reader_options: Optional[dict] = field(default_factory=dict)
+    fs: fsspec.AbstractFileSystem = field(init=False)
 
-    universal_filepath = UPath(filepath)
-    protocol = universal_filepath.protocol
+    def open_file(self) -> OpenFileType:
+        """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
 
-    if protocol == "s3":
-        protocol_defaults = {"key": "", "secret": "", "anon": True}
+        Returns
+        -------
+        OpenFileType
+            file opened with fsspec
+        """
+        return self.fs.open(self.filepath)
+
+    def read_bytes(self, bytes: int) -> bytes:
+        with self.open_file() as of:
+            return of.read(bytes)
+
+    def __post_init__(self) -> None:
+        """Initialize the fsspec filesystem object"""
+        import fsspec
+        from upath import UPath
+
+        universal_filepath = UPath(self.filepath)
+        protocol = universal_filepath.protocol
+
+        self.reader_options = self.reader_options or {}
+        storage_options = self.reader_options.get("storage_options", {})  # type: ignore
+
+        self.fs = fsspec.filesystem(protocol, **storage_options)
+
+
+def check_for_collisions(
+    drop_variables: Iterable[str] | None,
+    loadable_variables: Iterable[str] | None,
+) -> tuple[list[str], list[str]]:
+    if drop_variables is None:
+        drop_variables = []
+    elif isinstance(drop_variables, str):
+        drop_variables = [drop_variables]
     else:
-        protocol_defaults = {}
+        drop_variables = list(drop_variables)
 
-    if reader_options is None:
-        reader_options = {}
+    if loadable_variables is None:
+        loadable_variables = []
+    elif isinstance(loadable_variables, str):
+        loadable_variables = [loadable_variables]
+    else:
+        loadable_variables = list(loadable_variables)
 
-    storage_options = reader_options.get("storage_options", {})  # type: ignore
+    common = set(drop_variables).intersection(set(loadable_variables))
+    if common:
+        raise ValueError(f"Cannot both load and drop variables {common}")
 
-    # using dict merge operator to add in defaults if keys are not specified
-    storage_options = protocol_defaults | storage_options
-    fpath = fsspec.filesystem(protocol, **storage_options).open(filepath)
-
-    return fpath
+    return drop_variables, loadable_variables

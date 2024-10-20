@@ -33,7 +33,9 @@ def _importorskip(
 
 
 has_astropy, requires_astropy = _importorskip("astropy")
+has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
+has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
 
 
@@ -48,9 +50,9 @@ def create_manifestarray(
 
     zarray = ZArray(
         chunks=chunks,
-        compressor="zlib",
+        compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
         dtype=np.dtype("float32"),
-        fill_value=0.0,  # TODO change this to NaN?
+        fill_value=0.0,
         filters=None,
         order="C",
         shape=shape,

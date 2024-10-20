@@ -1,8 +1,8 @@
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
 
 import numpy as np
 
-from virtualizarr.zarr import Codec, ceildiv
+from virtualizarr.zarr import Codec, determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 
@@ -217,9 +217,12 @@ def stack(
     new_shape.insert(axis, length_along_new_stacked_axis)
 
     # do stacking of entries in manifest
-    stacked_paths = np.stack(
-        [arr.manifest._paths for arr in arrays],
-        axis=axis,
+    stacked_paths = cast(  # `np.stack` apparently is type hinted as if the output could have Any dtype
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.stack(
+            [arr.manifest._paths for arr in arrays],
+            axis=axis,
+        ),
     )
     stacked_offsets = np.stack(
         [arr.manifest._offsets for arr in arrays],
@@ -290,16 +293,17 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     )
 
     # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
-        for axis_length, chunk_length in zip(new_shape, new_chunk_shape)
-    )
+    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
 
     # do broadcasting of entries in manifest
-    broadcasted_paths = np.broadcast_to(
-        x.manifest._paths,
-        shape=new_chunk_grid_shape,
+    broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.broadcast_to(
+            x.manifest._paths,
+            shape=new_chunk_grid_shape,
+        ),
     )
+
     broadcasted_offsets = np.broadcast_to(
         x.manifest._offsets,
         shape=new_chunk_grid_shape,
@@ -356,8 +360,8 @@ def isnan(x: "ManifestArray", /) -> np.ndarray:
 
     Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
     """
-    return np.full(
-        shape=x.shape,
-        fill_value=False,
-        dtype=np.dtype(bool),
-    )
+    return _isnan(x.shape)
+
+
+def _isnan(shape: tuple):
+    return np.full(shape=shape, fill_value=False, dtype=np.dtype(bool))

@@ -16,6 +16,8 @@ The above steps would also be performed using the `kerchunk` library alone, but 
 
 ## How do VirtualiZarr and Kerchunk compare?
 
+You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
+
 Users of kerchunk may find the following comparison table useful, which shows which features of kerchunk map on to which features of VirtualiZarr.
 | Component / Feature                                                      | Kerchunk                                                                                                                            | VirtualiZarr                                                                                                                                     |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |

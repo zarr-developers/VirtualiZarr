@@ -55,11 +55,23 @@ todo_include_todos = False
 
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "repository_url": "https://github.com/TomNicholas/VirtualiZarr",
-    "repository_branch": "main",
-    "path_to_docs": "docs",
+    "use_edit_page_button": True,
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/zarr-developers/VirtualiZarr",
+            "icon": "fa-brands fa-github",
+            "type": "fontawesome",
+        },
+    ]
 }
 html_title = "VirtualiZarr"
+html_context = {
+    "github_user": "zarr-developers",
+    "github_repo": "VirtualiZarr",
+    "github_version": "main",
+    "doc_path": "docs",
+}
 
 # remove sidebar, see GH issue #82
 html_css_files = [

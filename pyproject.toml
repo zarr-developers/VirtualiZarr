@@ -22,30 +22,33 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.06.0",
-    "kerchunk>=0.2.5",
-    "h5netcdf",
-    "pydantic",
     "numpy>=2.0.0",
-    "ujson",
     "packaging",
     "universal-pathlib",
     "zarr>=3.0.0a0"
+    "numcodecs",
+    "ujson",
 ]
 
 [project.optional-dependencies]
 test = [
     "codecov",
-    "pre-commit",
-    "ruff",
-    "pytest-mypy",
-    "pytest-cov",
-    "pytest",
-    "pooch",
-    "scipy",
-    "netcdf4",
-    "fsspec",
-    "s3fs",
     "fastparquet",
+    "fsspec",
+    "h5netcdf",
+    "h5py",
+    "kerchunk>=0.2.5",
+    "mypy",
+    "netcdf4",
+    "pandas-stubs",
+    "pooch",
+    "pre-commit",
+    "pytest-cov",
+    "pytest-mypy",
+    "pytest",
+    "ruff",
+    "s3fs",
+    "scipy",
 ]
 
 
@@ -70,11 +73,25 @@ exclude = ["docs", "tests", "tests.*", "docs.*"]
 [tool.setuptools.package-data]
 datatree = ["py.typed"]
 
-
-
-[mypy]
+[tool.mypy]
 files = "virtualizarr/**/*.py"
 show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "fsspec.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "numcodecs.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "kerchunk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ujson.*"
+ignore_missing_imports = true
 
 [tool.ruff]
 # Same as Black.

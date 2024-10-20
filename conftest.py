@@ -1,3 +1,4 @@
+import h5py
 import pytest
 import xarray as xr
 
@@ -33,6 +34,33 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def netcdf4_virtual_dataset(netcdf4_file):
+    from virtualizarr import open_virtual_dataset
+
+    return open_virtual_dataset(netcdf4_file, indexes={})
+
+
+@pytest.fixture
+def netcdf4_inlined_ref(netcdf4_file):
+    from kerchunk.hdf import SingleHdf5ToZarr
+
+    return SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
+
+
+@pytest.fixture
+def hdf5_groups_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_files(tmpdir):
     # Set up example xarray dataset
     ds = xr.tutorial.open_dataset("air_temperature")
@@ -50,3 +78,21 @@ def netcdf4_files(tmpdir):
     ds2.close()
 
     return filepath1, filepath2
+
+
+@pytest.fixture
+def hdf5_empty(tmpdir):
+    filepath = f"{tmpdir}/empty.nc"
+    f = h5py.File(filepath, "w")
+    dataset = f.create_dataset("empty", shape=(), dtype="float32")
+    dataset.attrs["empty"] = "true"
+    return filepath
+
+
+@pytest.fixture
+def hdf5_scalar(tmpdir):
+    filepath = f"{tmpdir}/scalar.nc"
+    f = h5py.File(filepath, "w")
+    dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
+    dataset.attrs["scalar"] = "true"
+    return filepath
