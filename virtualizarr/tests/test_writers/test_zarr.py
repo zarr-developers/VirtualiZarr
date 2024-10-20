@@ -16,7 +16,7 @@ from virtualizarr.writers.zarr import dataset_to_zarr
 def vds_with_manifest_arrays() -> Dataset:
     arr = ManifestArray(
         chunkmanifest=ChunkManifest(
-            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+            entries={"0.0": dict(path="/test.nc", offset=6144, length=48)}
         ),
         zarray=dict(
             shape=(2, 3),

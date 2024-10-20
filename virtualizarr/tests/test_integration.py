@@ -16,8 +16,8 @@ from virtualizarr.zarr import ZArray
 def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
@@ -212,7 +212,7 @@ class TestKerchunkRoundtrip:
 
     def test_datetime64_dtype_fill_value(self, tmpdir, format):
         chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)

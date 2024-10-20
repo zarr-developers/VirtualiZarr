@@ -60,6 +60,13 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
     return cast(KerchunkStoreRefs, ds_refs)
 
 
+def remove_file_uri_prefix(path: str):
+    if path.startswith("file:///"):
+        return path.removeprefix("file://")
+    else:
+        return path
+
+
 def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRefs:
     """
     Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
@@ -72,7 +79,11 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         marr = var.data
 
         arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): [entry["path"], entry["offset"], entry["length"]]
+            str(chunk_key): [
+                remove_file_uri_prefix(entry["path"]),
+                entry["offset"],
+                entry["length"],
+            ]
             for chunk_key, entry in marr.manifest.dict().items()
         }
 
