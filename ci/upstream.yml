@@ -1,0 +1,28 @@
+name: virtualizarr-min-deps
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - numpy>=2.0.0
+  - packaging
+  - ujson
+  - universal_pathlib
+  # Testing
+  - codecov
+  - pre-commit
+  - mypy
+  - ruff
+  - pandas-stubs
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - fsspec
+- pip:
+    - zarr==3.0.0b1
+    - git+https://github.com/pydata/xarray@zarr-v3
+    - git+https://github.com/zarr-developers/numcodecs@zarr3-codecs
