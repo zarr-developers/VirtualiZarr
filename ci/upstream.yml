@@ -23,7 +23,7 @@ dependencies:
   - pooch
   - fsspec
   - pip:
-  pip: 
+  pip:
     - zarr==3.0.0b1
     - git+https://github.com/pydata/xarray@zarr-v3
     - git+https://github.com/zarr-developers/numcodecs@zarr3-codecs
