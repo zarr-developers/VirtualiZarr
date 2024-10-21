@@ -74,7 +74,9 @@ class ZArray:
         # coerce type of fill_value as kerchunk can be inconsistent with this
         dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
         fill_value = decoded_arr_refs_zarray["fill_value"]
-        if np.issubdtype(dtype, np.floating) and (fill_value is None or fill_value == "NaN" or fill_value == "nan"):
+        if np.issubdtype(dtype, np.floating) and (
+            fill_value is None or fill_value == "NaN" or fill_value == "nan"
+        ):
             fill_value = np.nan
 
         compressor = decoded_arr_refs_zarray["compressor"]
@@ -157,10 +159,8 @@ class ZArray:
         try:
             from zarr.core.metadata.v3 import parse_codecs
         except ImportError:
-            raise ImportError(
-                "zarr v3 is required to generate v3 codec pipelines"
-            )
-        
+            raise ImportError("zarr v3 is required to generate v3 codec pipelines")
+
         codec_configs = []
 
         # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
@@ -184,9 +184,9 @@ class ZArray:
         # and that there are far more codecs in `numcodecs`. We take a gamble and assume
         # that the codec names and configuration are simply mapped into zarrv3 "configurables".
         if self.filters:
-            codec_configs.extend([
-                _num_codec_config_to_configurable(filter) for filter in self.filters
-            ])
+            codec_configs.extend(
+                [_num_codec_config_to_configurable(filter) for filter in self.filters]
+            )
 
         if self.compressor:
             codec_configs.append(_num_codec_config_to_configurable(self.compressor))
