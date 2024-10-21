@@ -65,7 +65,11 @@ def write_variables_to_icechunk_group(
     group,
 ):
     print(variables)
-    virtual_variables = {name: var for name, var in variables.items() if isinstance(var.data, ManifestArray)}
+    virtual_variables = {
+        name: var
+        for name, var in variables.items()
+        if isinstance(var.data, ManifestArray)
+    }
 
     for name, var in virtual_variables.items():
         write_virtual_variable_to_icechunk(
@@ -75,8 +79,10 @@ def write_variables_to_icechunk_group(
             var=var,
         )
 
-    loadable_variables = {name: var for name, var in variables.items() if name not in virtual_variables}
-    
+    loadable_variables = {
+        name: var for name, var in variables.items() if name not in virtual_variables
+    }
+
     ds = Dataset(loadable_variables)
     ds.to_zarr(store, zarr_format=3, consolidated=False, mode="r+")
 
@@ -96,7 +102,9 @@ def write_variable_to_icechunk(
             var=var,
         )
     else:
-        raise ValueError("Cannot write non-virtual variables as virtual variables to Icechunk stores")
+        raise ValueError(
+            "Cannot write non-virtual variables as virtual variables to Icechunk stores"
+        )
 
 
 def write_virtual_variable_to_icechunk(
