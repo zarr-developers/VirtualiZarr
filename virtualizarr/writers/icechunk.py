@@ -154,7 +154,7 @@ def write_manifest_virtual_refs(
             "multi_index",
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
         ],
-        op_flags=[["readonly"]] * 3, # type: ignore
+        op_flags=[["readonly"]] * 3,  # type: ignore
     )
     for path, offset, length in it:
         index = it.multi_index
