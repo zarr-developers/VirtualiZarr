@@ -33,146 +33,205 @@ def icechunk_filestore(tmpdir) -> "IcechunkStore":
     return store
 
 
-class TestWriteVirtualRefs:
-    def test_write_new_virtual_variable(
-        self, icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
-    ):
-        vds = vds_with_manifest_arrays
+def test_write_new_virtual_variable(
+    icechunk_filestore: "IcechunkStore", vds_with_manifest_arrays: Dataset
+):
+    vds = vds_with_manifest_arrays
 
-        dataset_to_icechunk(vds, icechunk_filestore)
+    dataset_to_icechunk(vds, icechunk_filestore)
 
-        # check attrs
-        root_group = group(store=icechunk_filestore)
-        assert isinstance(root_group, Group)
-        assert root_group.attrs == {"something": 0}
+    # check attrs
+    root_group = group(store=icechunk_filestore)
+    assert isinstance(root_group, Group)
+    assert root_group.attrs == {"something": 0}
 
-        # TODO check against vds, then perhaps parametrize?
+    # TODO check against vds, then perhaps parametrize?
 
-        # check array exists
-        assert "a" in root_group
-        arr = root_group["a"]
-        assert isinstance(arr, Array)
+    # check array exists
+    assert "a" in root_group
+    arr = root_group["a"]
+    assert isinstance(arr, Array)
 
-        # check array metadata
-        # TODO why doesn't a .zarr_format or .version attribute exist on zarr.Array?
-        # assert arr.zarr_format == 3
-        assert arr.shape == (2, 3)
-        assert arr.chunks == (2, 3)
-        assert arr.dtype == np.dtype("<i8")
-        assert arr.order == "C"
-        assert arr.fill_value == 0
-        # TODO check compressor, filters?
-        #
+    # check array metadata
+    # TODO why doesn't a .zarr_format or .version attribute exist on zarr.Array?
+    # assert arr.zarr_format == 3
+    assert arr.shape == (2, 3)
+    assert arr.chunks == (2, 3)
+    assert arr.dtype == np.dtype("<i8")
+    assert arr.order == "C"
+    assert arr.fill_value == 0
+    # TODO check compressor, filters?
+    #
 
-        # check array attrs
-        # TODO somehow this is broken by setting the dimension names???
-        # assert dict(arr.attrs) == {"units": "km"}
+    # check array attrs
+    # TODO somehow this is broken by setting the dimension names???
+    # assert dict(arr.attrs) == {"units": "km"}
 
-        # check dimensions
-        assert arr.attrs["_ARRAY_DIMENSIONS"] == ["x", "y"]
+    # check dimensions
+    assert arr.attrs["_ARRAY_DIMENSIONS"] == ["x", "y"]
 
-    def test_set_single_virtual_ref_without_encoding(
-        self, icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
-    ):
-        # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-        # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-        # instead for now just write out byte ranges explicitly
-        manifest = ChunkManifest(
-            {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
-        )
-        zarray = ZArray(
-            shape=(3, 4),
-            chunks=(3, 4),
-            dtype=np.dtype("int32"),
-            compressor=None,
-            filters=None,
-            fill_value=None,
-        )
-        ma = ManifestArray(
-            chunkmanifest=manifest,
-            zarray=zarray,
-        )
-        foo = Variable(data=ma, dims=["x", "y"])
-        vds = Dataset(
-            {"foo": foo},
-        )
+def test_set_single_virtual_ref_without_encoding(
+    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
+):
+    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+    # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-        dataset_to_icechunk(vds, icechunk_filestore)
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
+    )
+    zarray = ZArray(
+        shape=(3, 4),
+        chunks=(3, 4),
+        dtype=np.dtype("int32"),
+        compressor=None,
+        filters=None,
+        fill_value=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        zarray=zarray,
+    )
+    foo = Variable(data=ma, dims=["x", "y"])
+    vds = Dataset(
+        {"foo": foo},
+    )
 
-        root_group = group(store=icechunk_filestore)
-        array = root_group["foo"]
+    dataset_to_icechunk(vds, icechunk_filestore)
 
-        # check chunk references
-        # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+    root_group = group(store=icechunk_filestore)
+    array = root_group["foo"]
 
-        expected_ds = open_dataset(simple_netcdf4)
-        expected_array = expected_ds["foo"].to_numpy()
-        npt.assert_equal(array, expected_array)
+    # check chunk references
+    # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
 
-        # ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
+    expected_ds = open_dataset(simple_netcdf4)
+    expected_array = expected_ds["foo"].to_numpy()
+    npt.assert_equal(array, expected_array)
 
-        # note: we don't need to test that committing works, because now we have confirmed
-        # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
+    # ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
 
-    def test_set_single_virtual_ref_with_encoding(
-        self, icechunk_filestore: "IcechunkStore", netcdf4_file: Path
-    ):
-        # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-        # vds = open_virtual_dataset(netcdf4_file, indexes={})
+    # note: we don't need to test that committing works, because now we have confirmed
+    # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
-        # instead for now just write out byte ranges explicitly
-        manifest = ChunkManifest(
-            {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
-        )
-        zarray = ZArray(
-            shape=(2920, 25, 53),
-            chunks=(2920, 25, 53),
-            dtype=np.dtype("int16"),
-            compressor=None,
-            filters=None,
-            fill_value=None,
-        )
-        ma = ManifestArray(
-            chunkmanifest=manifest,
-            zarray=zarray,
-        )
-        air = Variable(
-            data=ma, dims=["time", "lat", "lon"], encoding={"scale_factor": 0.01}
-        )
-        vds = Dataset(
-            {"air": air},
-        )
 
-        dataset_to_icechunk(vds, icechunk_filestore)
+def test_set_single_virtual_ref_with_encoding(
+    icechunk_filestore: "IcechunkStore", netcdf4_file: Path
+):
+    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+    # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-        root_group = group(store=icechunk_filestore)
-        air_array = root_group["air"]
-        assert isinstance(air_array, Array)
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
+    )
+    zarray = ZArray(
+        shape=(2920, 25, 53),
+        chunks=(2920, 25, 53),
+        dtype=np.dtype("int16"),
+        compressor=None,
+        filters=None,
+        fill_value=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        zarray=zarray,
+    )
+    air = Variable(
+        data=ma, dims=["time", "lat", "lon"], encoding={"scale_factor": 0.01}
+    )
+    vds = Dataset(
+        {"air": air},
+    )
 
-        # check array metadata
-        assert air_array.shape == (2920, 25, 53)
-        assert air_array.chunks == (2920, 25, 53)
-        assert air_array.dtype == np.dtype("int16")
-        assert air_array.attrs["scale_factor"] == 0.01
+    dataset_to_icechunk(vds, icechunk_filestore)
 
-        # xarray performs this when cf_decoding is True, but we are not loading
-        # with xarray here so we scale it manually.
-        scale_factor = air_array.attrs["scale_factor"]
-        scaled_air_array = air_array[:] * scale_factor  # type: ignore
+    root_group = group(store=icechunk_filestore)
+    air_array = root_group["air"]
+    assert isinstance(air_array, Array)
 
-        # check chunk references
-        # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+    # check array metadata
+    assert air_array.shape == (2920, 25, 53)
+    assert air_array.chunks == (2920, 25, 53)
+    assert air_array.dtype == np.dtype("int16")
+    assert air_array.attrs["scale_factor"] == 0.01
 
-        expected_ds = open_dataset(netcdf4_file)
-        expected_air_array = expected_ds["air"].to_numpy()
-        npt.assert_equal(scaled_air_array, expected_air_array)
+    # xarray performs this when cf_decoding is True, but we are not loading
+    # with xarray here so we scale it manually.
+    scale_factor = air_array.attrs["scale_factor"]
+    scaled_air_array = air_array[:] * scale_factor  # type: ignore
 
-        # note: we don't need to test that committing works, because now we have confirmed
-        # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
+    # check chunk references
+    # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+
+    expected_ds = open_dataset(netcdf4_file)
+    expected_air_array = expected_ds["air"].to_numpy()
+    npt.assert_equal(scaled_air_array, expected_air_array)
+
+    # note: we don't need to test that committing works, because now we have confirmed
+    # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
 
 # TODO test writing grids of multiple chunks
+def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file: Path):
+    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+    # vds = open_virtual_dataset(netcdf4_file, indexes={})
+    with open(netcdf4_file, "rb") as f:
+        f.seek(200)
+        actual_data = f.read(64)
+
+    # instead for now just write out random byte ranges explicitly
+    manifest = ChunkManifest(
+        {
+            "0.0": {"path": netcdf4_file, "offset": 200, "length": 16},
+            "0.1": {"path": netcdf4_file, "offset": 216, "length": 16},
+            "1.0": {"path": netcdf4_file, "offset": 232, "length": 16},
+            "1.1": {"path": netcdf4_file, "offset": 248, "length": 16},
+        }
+    )
+    zarray = ZArray(
+        shape=(4, 4),
+        chunks=(2, 2),
+        dtype=np.dtype("<i4"),
+        compressor=None,
+        filters=None,
+        fill_value=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        zarray=zarray,
+    )
+    air = Variable(data=ma, dims=["y", "x"])
+    vds = Dataset(
+        {"air": air},
+    )
+
+    dataset_to_icechunk(vds, icechunk_filestore)
+
+    root_group = group(store=icechunk_filestore)
+    air_array = root_group["air"]
+    assert isinstance(air_array, Array)
+
+    # check array metadata
+    assert air_array.shape == (4, 4)
+    assert air_array.chunks == (2, 2)
+    assert air_array.dtype == np.dtype("int32")
+
+    # check chunk references
+    assert np.allclose(
+        air_array[:2, :2], np.frombuffer(actual_data[:16], "<i4").reshape(2, 2)
+    )
+    assert np.allclose(
+        air_array[:2, 2:], np.frombuffer(actual_data[16:32], "<i4").reshape(2, 2)
+    )
+    assert np.allclose(
+        air_array[2:, :2], np.frombuffer(actual_data[32:48], "<i4").reshape(2, 2)
+    )
+    assert np.allclose(
+        air_array[2:, 2:], np.frombuffer(actual_data[48:], "<i4").reshape(2, 2)
+    )
+
 
 # TODO test writing to a group that isn't the root group
 
