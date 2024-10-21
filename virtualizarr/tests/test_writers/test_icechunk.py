@@ -149,6 +149,7 @@ class TestWriteVirtualRefs:
 
         root_group = group(store=icechunk_filestore)
         air_array = root_group["air"]
+        assert isinstance(air_array, Array)
 
         # check array metadata
         assert air_array.shape == (2920, 25, 53)
@@ -159,7 +160,7 @@ class TestWriteVirtualRefs:
         # xarray performs this when cf_decoding is True, but we are not loading
         # with xarray here so we scale it manually.
         scale_factor = air_array.attrs["scale_factor"]
-        scaled_air_array = air_array[:] * scale_factor
+        scaled_air_array = air_array[:] * scale_factor # type: ignore
 
         # check chunk references
         # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method

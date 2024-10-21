@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from xarray import Dataset
@@ -101,7 +101,7 @@ def write_virtual_variable_to_icechunk(
     var: Variable,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    ma = var.data
+    ma = cast(ManifestArray, var.data)
     zarray = ma.zarray
 
     # creates array if it doesn't already exist
@@ -154,7 +154,7 @@ def write_manifest_virtual_refs(
             "multi_index",
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
         ],
-        op_flags=[["readonly"]] * 3,
+        op_flags=[["readonly"]] * 3, # type: ignore
     )
     for path, offset, length in it:
         index = it.multi_index
