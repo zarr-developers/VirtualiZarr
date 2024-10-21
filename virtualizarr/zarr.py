@@ -157,8 +157,7 @@ class ZArray:
         ```
         """
         try:
-            # type: ignore[import-untyped]
-            from zarr.core.metadata.v3 import (
+            from zarr.core.metadata.v3 import (  # type: ignore[import-untyped]
                 parse_codecs,
             )
         except ImportError:
