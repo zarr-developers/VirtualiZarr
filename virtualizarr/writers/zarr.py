@@ -80,7 +80,6 @@ def to_zarr_json(var: Variable, array_dir: Path) -> None:
 def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) -> dict:
     """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
     # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
-
     metadata = zarray.dict()
 
     # adjust to match v3 spec
@@ -95,7 +94,7 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
         "name": "default",
         "configuration": {"separator": "/"},
     }
-    metadata["codecs"] = zarray._v3_codec_pipeline()
+    metadata["codecs"] = tuple(c.to_dict() for c in zarray._v3_codec_pipeline())
     metadata.pop("filters")
     metadata.pop("compressor")
     metadata.pop("order")

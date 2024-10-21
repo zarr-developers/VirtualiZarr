@@ -27,7 +27,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=np.nan,
+            fill_value=None,
             order="C",
         ),
         chunkmanifest=manifest,
