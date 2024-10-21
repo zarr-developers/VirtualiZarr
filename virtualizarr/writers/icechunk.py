@@ -148,9 +148,9 @@ def write_manifest_virtual_refs(
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
     # type: ignore[arg-type]
-    it = np.nditer( 
+    it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],
-        flags=[  
+        flags=[
             "refs_ok",
             "multi_index",
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
