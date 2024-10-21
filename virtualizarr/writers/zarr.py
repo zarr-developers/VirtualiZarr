@@ -80,11 +80,6 @@ def to_zarr_json(var: Variable, array_dir: Path) -> None:
 def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) -> dict:
     """Construct a v3-compliant metadata dict from v2 zarray + information stored on the xarray variable."""
     # TODO it would be nice if we could use the zarr-python metadata.ArrayMetadata classes to do this conversion for us
-    try:
-        from zarr.core.metadata.v3 import ArrayV3Metadata
-    except ImportError:
-        raise ImportError("zarr-python v3+ must be installed to use this function")
-
     metadata = zarray.dict()
 
     # adjust to match v3 spec
