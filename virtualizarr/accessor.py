@@ -5,7 +5,6 @@ from typing import (
     overload,
 )
 
-import ujson  # type: ignore
 from xarray import Dataset, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
@@ -91,6 +90,8 @@ class VirtualiZarrDatasetAccessor:
         if format == "dict":
             return refs
         elif format == "json":
+            import ujson
+
             if filepath is None:
                 raise ValueError("Filepath must be provided when format is 'json'")
 

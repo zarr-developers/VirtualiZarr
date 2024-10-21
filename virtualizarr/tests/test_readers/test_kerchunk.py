@@ -1,5 +1,5 @@
 import numpy as np
-import ujson  # type: ignore
+import ujson
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
@@ -61,3 +61,24 @@ def test_dataset_from_df_refs_with_filters():
     ds = dataset_from_kerchunk_refs(ds_refs)
     da = ds["a"]
     assert da.data.zarray.filters == filters
+
+
+def test_dataset_from_kerchunk_refs_empty_chunk_manifest():
+    zarray = {
+        "chunks": [50, 100],
+        "compressor": None,
+        "dtype": "<i8",
+        "fill_value": 100,
+        "filters": None,
+        "order": "C",
+        "shape": [100, 200],
+        "zarr_format": 2,
+    }
+    refs = gen_ds_refs(zarray=ujson.dumps(zarray))
+    del refs["refs"]["a/0.0"]
+
+    ds = dataset_from_kerchunk_refs(refs)
+    assert "a" in ds.variables
+    assert isinstance(ds["a"].data, ManifestArray)
+    assert ds["a"].sizes == {"x": 100, "y": 200}
+    assert ds["a"].chunksizes == {"x": 50, "y": 100}
