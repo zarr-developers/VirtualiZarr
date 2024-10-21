@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from xarray import Dataset
@@ -147,14 +147,15 @@ def write_manifest_virtual_refs(
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
+    # type: ignore
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],
-        flags=cast(Sequence[np._NDIterFlagsKind], [
+        flags=[
             "refs_ok",
             "multi_index",
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
-        ]),
-        op_flags=cast(Sequence[Sequence[np._NDIterOpFlagsKind]], [["readonly"]] * 3),
+        ],
+        op_flags=[["readonly"]] * 3,  # type: ignore
     )
     for path, offset, length in it:
         index = it.multi_index
