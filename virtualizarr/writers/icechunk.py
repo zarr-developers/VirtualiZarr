@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Sequence, cast
 
 import numpy as np
 from xarray import Dataset
@@ -149,13 +149,13 @@ def write_manifest_virtual_refs(
     # but Icechunk need to expose a suitable API first
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],
-        flags=[
+        flags=cast(Sequence[np._NDIterFlagsKind], [
             "refs_ok",
             "multi_index",
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
-        ],
-        op_flags=[["readonly"]] * 3,  # type: ignore
-    )  # type: ignore
+        ]),
+        op_flags=cast(Sequence[Sequence[np._NDIterOpFlagsKind]], [["readonly"]] * 3),
+    )
     for path, offset, length in it:
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)

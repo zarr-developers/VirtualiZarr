@@ -157,9 +157,10 @@ class ZArray:
         ```
         """
         try:
+            # type: ignore[import-untyped]
             from zarr.core.metadata.v3 import (
                 parse_codecs,
-            )  # type: ignore[import-untyped]
+            )
         except ImportError:
             raise ImportError("zarr v3 is required to generate v3 codec pipelines")
 
