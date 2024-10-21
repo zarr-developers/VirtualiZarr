@@ -10,7 +10,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
-    from icechunk import IcechunkStore
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 VALID_URI_PREFIXES = {
@@ -155,7 +155,7 @@ def write_manifest_virtual_refs(
             "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
         ],
         op_flags=[["readonly"]] * 3,  # type: ignore
-    )
+    ) # type: ignore
     for path, offset, length in it:
         index = it.multi_index
         chunk_key = "/".join(str(i) for i in index)
