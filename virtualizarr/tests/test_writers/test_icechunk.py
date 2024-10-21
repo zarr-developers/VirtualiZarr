@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def icechunk_filestore(tmpdir) -> "IcechunkStore":
     from icechunk import IcechunkStore, StorageConfig
 
@@ -28,7 +28,7 @@ def icechunk_filestore(tmpdir) -> "IcechunkStore":
 
     # TODO if icechunk exposed a synchronous version of .open then we wouldn't need to use asyncio.run here
     # TODO is this the correct mode to use?
-    store = asyncio.run(IcechunkStore.open(storage=storage, mode="a"))
+    store = IcechunkStore.create(storage=storage, mode="w")
 
     # TODO instead yield store then store.close() ??
     return store
