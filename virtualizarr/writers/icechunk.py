@@ -149,11 +149,14 @@ def write_manifest_virtual_refs(
     # but Icechunk need to expose a suitable API first
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],
-        flags=cast(Sequence[np._NDIterFlagsKind], [
-            "refs_ok",
-            "multi_index",
-            "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
-        ]),
+        flags=cast(
+            Sequence[np._NDIterFlagsKind],
+            [
+                "refs_ok",
+                "multi_index",
+                "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
+            ],
+        ),
         op_flags=cast(Sequence[Sequence[np._NDIterOpFlagsKind]], [["readonly"]] * 3),
     )
     for path, offset, length in it:
