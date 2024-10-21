@@ -221,6 +221,9 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
     """
+    if num_codec["id"].startswith("numcodecs."):
+        return num_codec
+
     num_codec_copy = num_codec.copy()
     name = "numcodecs." + num_codec_copy.pop("id")
     return {"name": name, "configuration": num_codec_copy}

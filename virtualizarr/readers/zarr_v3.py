@@ -150,5 +150,7 @@ def _configurable_to_num_codec_config(configurable: dict) -> dict:
     """
     configurable_copy = configurable.copy()
     codec_id = configurable_copy.pop("name")
+    if codec_id.startswith("numcodecs."):
+        codec_id = codec_id[len("numcodecs.") :]
     configuration = configurable_copy.pop("configuration")
     return numcodecs.get_codec({"id": codec_id, **configuration}).get_config()

@@ -28,7 +28,7 @@ def icechunk_filestore(tmpdir) -> "IcechunkStore":
 
     # TODO if icechunk exposed a synchronous version of .open then we wouldn't need to use asyncio.run here
     # TODO is this the correct mode to use?
-    store = asyncio.run(IcechunkStore.open(storage=storage, mode="r+"))
+    store = asyncio.run(IcechunkStore.open(storage=storage, mode="a"))
 
     # TODO instead yield store then store.close() ??
     return store
