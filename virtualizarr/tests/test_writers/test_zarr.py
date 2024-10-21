@@ -1,7 +1,10 @@
 import json
 
+import pytest
 import xarray.testing as xrt
 from xarray import Dataset
+
+pytest.importorskip("zarr.core.metadata.v3")
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.backend import FileType
