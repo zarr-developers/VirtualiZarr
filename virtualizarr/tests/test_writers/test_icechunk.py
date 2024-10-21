@@ -10,14 +10,14 @@ import numpy as np
 import numpy.testing as npt
 from xarray import Dataset, open_dataset
 from xarray.core.variable import Variable
-from zarr import Array, Group, group
+from zarr import Array, Group, group  # type: ignore[import-untyped]
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import dataset_to_icechunk
 from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
-    from icechunk import IcechunkStore
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 @pytest.fixture
