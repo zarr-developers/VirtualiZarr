@@ -4,9 +4,7 @@ from typing import Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
-from xarray import Dataset
-from xarray.core.indexes import Index
-from xarray.core.variable import Variable
+from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend, separate_coords
