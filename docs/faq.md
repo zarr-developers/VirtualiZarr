@@ -45,6 +45,19 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.virtualize.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | Zarr v3 store with `manifest.json` files                                 | n/a                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
 
+## I already have Kerchunked data, do I have to redo that work?
+
+No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can re-save them into a new format, e.g. [Icechunk](https://icechunk.io/) like so:
+
+```python
+from virtualizarr import open_virtual_dataset
+
+vds = open_virtual_dataset('refs.json')
+# vds = open_virtual_dataset('refs.parq')  # kerchunk parquet files are supported too
+
+vds.virtualize.to_icechunk(icechunkstore)
+```
+
 ## Why a new project?
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
