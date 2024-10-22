@@ -31,6 +31,9 @@ New Features
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
 
+- Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
+  By `Matt Iannucci <https://github.com/mpiannucci>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
