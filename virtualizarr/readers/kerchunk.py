@@ -1,8 +1,7 @@
 from typing import Iterable, Mapping, Optional
 
 import ujson
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs

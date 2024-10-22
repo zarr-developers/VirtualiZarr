@@ -1,8 +1,7 @@
 import warnings
 from typing import Iterable, Mapping, Optional
 
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.readers.common import (
     VirtualBackend,
