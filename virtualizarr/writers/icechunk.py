@@ -10,6 +10,7 @@ from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+    from zarr import Group  # type: ignore
 
 
 VALID_URI_PREFIXES = {
@@ -99,7 +100,7 @@ def write_variables_to_icechunk_group(
 
 def write_variable_to_icechunk(
     store: "IcechunkStore",
-    group: Group,
+    group: "Group",
     name: str,
     var: Variable,
 ) -> None:
@@ -119,7 +120,7 @@ def write_variable_to_icechunk(
 
 def write_virtual_variable_to_icechunk(
     store: "IcechunkStore",
-    group: Group,
+    group: "Group",
     name: str,
     var: Variable,
 ) -> None:
@@ -159,7 +160,7 @@ def write_virtual_variable_to_icechunk(
 
 def write_manifest_virtual_refs(
     store: "IcechunkStore",
-    group: Group,
+    group: "Group",
     arr_name: str,
     manifest: ChunkManifest,
 ) -> None:
