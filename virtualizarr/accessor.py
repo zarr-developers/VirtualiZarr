@@ -46,9 +46,9 @@ class VirtualiZarrDatasetAccessor:
 
     def to_icechunk(self, store: "IcechunkStore") -> None:
         """
-        Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
+        Write an xarray dataset to an Icechunk store.
 
-        Currently requires all variables to be backed by ManifestArray objects.
+        Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
 
         Parameters
         ----------
