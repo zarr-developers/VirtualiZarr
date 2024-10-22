@@ -126,9 +126,7 @@ def test_set_single_virtual_ref_with_encoding(
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-    expected_ds = open_dataset(netcdf4_file).drop_vars(
-        ["lon", "lat", "time"]
-    )
+    expected_ds = open_dataset(netcdf4_file).drop_vars(["lon", "lat", "time"])
     # these atyttirbutes encode floats different and I am not sure why, but its not important enough to block everything
     expected_ds.air.attrs.pop("actual_range")
 
