@@ -112,7 +112,7 @@ def test_set_single_virtual_ref_without_encoding(
 
     ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
     # TODO: Check using xarray.testing.assert_identical
-    assert npt.assert_equal(ds.foo.values, expected_ds.foo.values)
+    assert np.array_equal(ds.foo.values, expected_ds.foo.values)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -229,16 +229,16 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
     assert air_array.dtype == np.dtype("int32")
 
     # check chunk references
-    assert npt.assert_equal(
+    assert np.array_equal(
         air_array[:2, :2], np.frombuffer(actual_data[:16], "<i4").reshape(2, 2)
     )
-    assert npt.assert_equal(
+    assert np.array_equal(
         air_array[:2, 2:], np.frombuffer(actual_data[16:32], "<i4").reshape(2, 2)
     )
-    assert npt.assert_equal(
+    assert np.array_equal(
         air_array[2:, :2], np.frombuffer(actual_data[32:48], "<i4").reshape(2, 2)
     )
-    assert npt.assert_equal(
+    assert np.array_equal(
         air_array[2:, 2:], np.frombuffer(actual_data[48:], "<i4").reshape(2, 2)
     )
 
