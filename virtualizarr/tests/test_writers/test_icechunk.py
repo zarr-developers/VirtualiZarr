@@ -152,10 +152,7 @@ def test_set_single_virtual_ref_with_encoding(
         encoding={"scale_factor": 0.01},
         attrs=expected_ds.air.attrs,
     )
-    vds = Dataset(
-        {"air": air},
-        attrs=expected_ds.attrs
-    )
+    vds = Dataset({"air": air}, attrs=expected_ds.attrs)
 
     dataset_to_icechunk(vds, icechunk_filestore)
 
