@@ -74,6 +74,7 @@ def test_write_new_virtual_variable(
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
 ):
+    import xarray.testing as xrt
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
@@ -112,7 +113,7 @@ def test_set_single_virtual_ref_without_encoding(
 
     ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
     # TODO: Check using xarray.testing.assert_identical
-    assert np.array_equal(ds.foo.values, expected_ds.foo.values)
+    xrt.assert_identical(ds.foo, expected_ds.foo)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -121,10 +122,11 @@ def test_set_single_virtual_ref_without_encoding(
 def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore", netcdf4_file: Path
 ):
+    import xarray.testing as xrt
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-    expected_ds = open_dataset(netcdf4_file, chunks={}).drop_vars(
+    expected_ds = open_dataset(netcdf4_file).drop_vars(
         ["lon", "lat", "time"]
     )
     # these atyttirbutes encode floats different and I am not sure why, but its not important enough to block everything
@@ -172,10 +174,7 @@ def test_set_single_virtual_ref_with_encoding(
     # Load in the dataset, we drop the coordinates because we don't have them in the zarr test case
     # Check with xarray
     ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
-    # TODO: Check using xarray.testing.assert_identical
-    assert ds.attrs == expected_ds.attrs
-    assert ds.air.attrs == expected_ds.air.attrs
-    assert np.array_equal(ds.air.values, expected_ds.air.values)
+    xrt.assert_identical(ds, expected_ds)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -226,16 +225,16 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
     assert air_array.dtype == np.dtype("int32")
 
     # check chunk references
-    assert np.array_equal(
+    npt.assert_equal(
         air_array[:2, :2], np.frombuffer(actual_data[:16], "<i4").reshape(2, 2)
     )
-    assert np.array_equal(
+    npt.assert_equal(
         air_array[:2, 2:], np.frombuffer(actual_data[16:32], "<i4").reshape(2, 2)
     )
-    assert np.array_equal(
+    npt.assert_equal(
         air_array[2:, :2], np.frombuffer(actual_data[32:48], "<i4").reshape(2, 2)
     )
-    assert np.array_equal(
+    npt.assert_equal(
         air_array[2:, 2:], np.frombuffer(actual_data[48:], "<i4").reshape(2, 2)
     )
 
@@ -277,7 +276,7 @@ def test_write_loadable_variable(
     assert air_array.shape == (3, 4)
     assert air_array.dtype == np.dtype("float64")
     assert air_array.attrs["units"] == "km"
-    assert np.allclose(air_array[:], la_v[:])
+    npt.assert_equal(air_array[:], la_v[:])
 
     pres_array = root_group["pres"]
     assert isinstance(pres_array, Array)
