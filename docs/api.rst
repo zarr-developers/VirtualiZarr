@@ -51,6 +51,8 @@ If you want to write a new reader to create virtual references pointing to a cus
 Manifests
 ---------
 
+VirtualiZarr uses these classes to store virtual references internally.
+
 .. currentmodule:: virtualizarr.manifests
 .. autosummary::
     :nosignatures:
