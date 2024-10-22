@@ -74,10 +74,13 @@ def write_variables_to_icechunk_group(
         name: var for name, var in variables.items() if name not in virtual_variables
     }
 
-    # First write all the non-virtual variables, because xarray has issues with overwriting the root
-    # group's attributes after the first variable is written
-    ds = Dataset(loadable_variables)
-    ds.to_zarr(store, zarr_format=3, consolidated=False, mode="a")
+    # First write all the non-virtual variables
+    if len(loadable_variables) > 0:
+        # NOTE: We must set the attributes of the group before writing the dataset because the dataset
+        # will overwrite the root group's attributes with the dataset's attributes.
+        # TODO: Is this a sign that something is incorrect?
+        ds = Dataset(loadable_variables, attrs=group.attrs)
+        ds.to_zarr(store, zarr_format=3, consolidated=False, mode="a")
 
     # Then finish by writing the virtual variables to the same group
     for name, var in virtual_variables.items():
