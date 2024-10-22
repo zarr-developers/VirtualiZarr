@@ -55,11 +55,12 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
 
     # TODO this is Frozen, the API for setting attributes must be something else
     # root_group.attrs = ds.attrs
-    for k, v in ds.attrs.items():
-        root_group.attrs[k] = encode_zarr_attr_value(v)
+    # for k, v in ds.attrs.items():
+    #     root_group.attrs[k] = encode_zarr_attr_value(v)
 
     return write_variables_to_icechunk_group(
         ds.variables,
+        ds.attrs,
         store=store,
         group=root_group,
     )
@@ -67,6 +68,7 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
 
 def write_variables_to_icechunk_group(
     variables,
+    attrs,
     store,
     group,
 ):
@@ -81,12 +83,11 @@ def write_variables_to_icechunk_group(
     }
 
     # First write all the non-virtual variables
-    if len(loadable_variables) > 0:
-        # NOTE: We must set the attributes of the group before writing the dataset because the dataset
-        # will overwrite the root group's attributes with the dataset's attributes.
-        # TODO: Is this a sign that something is incorrect?
-        ds = Dataset(loadable_variables, attrs=group.attrs)
-        ds.to_zarr(store, zarr_format=3, consolidated=False, mode="a")
+    # NOTE: We set the attributes of the group before writing the dataset because the dataset
+    # will overwrite the root group's attributes with the dataset's attributes. We take advantage
+    # of xarrays zarr integration to ignore having to format the attributes ourselves.
+    ds = Dataset(loadable_variables, attrs=attrs)
+    ds.to_zarr(store, zarr_format=3, consolidated=False, mode="a")
 
     # Then finish by writing the virtual variables to the same group
     for name, var in virtual_variables.items():
