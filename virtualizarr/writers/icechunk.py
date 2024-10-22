@@ -34,8 +34,13 @@ def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore") -> None:
     ds: xr.Dataset
     store: IcechunkStore
     """
-    from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from zarr import Group  # type: ignore[import-untyped]
+    try:
+        from icechunk import IcechunkStore  # type: ignore[import-not-found]
+        from zarr import Group  # type: ignore[import-untyped]
+    except ImportError:
+        raise ImportError(
+            "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
+        )
 
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
