@@ -64,13 +64,22 @@ def write_variables_to_icechunk_group(
     store,
     group,
 ):
-    print(variables)
     virtual_variables = {
         name: var
         for name, var in variables.items()
         if isinstance(var.data, ManifestArray)
     }
 
+    loadable_variables = {
+        name: var for name, var in variables.items() if name not in virtual_variables
+    }
+
+    # First write all the non-virtual variables, because xarray has issues with overwriting the root
+    # group's attributes after the first variable is written
+    ds = Dataset(loadable_variables)
+    ds.to_zarr(store, zarr_format=3, consolidated=False, mode='a')
+
+    # Then finish by writing the virtual variables to the same group
     for name, var in virtual_variables.items():
         write_virtual_variable_to_icechunk(
             store=store,
@@ -78,13 +87,6 @@ def write_variables_to_icechunk_group(
             name=name,
             var=var,
         )
-
-    loadable_variables = {
-        name: var for name, var in variables.items() if name not in virtual_variables
-    }
-
-    ds = Dataset(loadable_variables)
-    ds.to_zarr(store, zarr_format=3, consolidated=False, mode="r+")
 
 
 def write_variable_to_icechunk(
@@ -165,7 +167,7 @@ def write_manifest_virtual_refs(
         flags=[
             "refs_ok",
             "multi_index",
-            "c_index",  # TODO is "c_index" correct? what's the convention for zarr chunk keys?
+            "c_index",
         ],
         op_flags=[["readonly"]] * 3,  # type: ignore
     )

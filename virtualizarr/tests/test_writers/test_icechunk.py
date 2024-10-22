@@ -173,7 +173,6 @@ def test_set_single_virtual_ref_with_encoding(
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
 
-# TODO test writing grids of multiple chunks
 def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file: Path):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -233,9 +232,55 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
     )
 
 
-# TODO test writing to a group that isn't the root group
+def test_write_loadable_variable(
+    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
+):
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
+    )
+    zarray = ZArray(
+        shape=(3, 4),
+        chunks=(3, 4),
+        dtype=np.dtype("int32"),
+        compressor=None,
+        filters=None,
+        fill_value=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        zarray=zarray,
+    )
 
-# TODO test writing loadable variables
+    ma_v = Variable(data=ma, dims=["x", "y"])
+
+    la_v = Variable(
+        dims=["x", "y"],
+        data=np.random.rand(3, 4),
+        attrs={"units": "km"},
+    )
+    vds = Dataset({"air": la_v}, {"pres": ma_v})
+
+    dataset_to_icechunk(vds, icechunk_filestore)
+
+    root_group = group(store=icechunk_filestore)
+    air_array = root_group["air"]
+    assert isinstance(air_array, Array)
+    assert air_array.shape == (3, 4)
+    assert air_array.dtype == np.dtype("float64")
+    assert air_array.attrs["units"] == "km"
+    assert np.allclose(air_array[:], la_v[:])
+
+    pres_array = root_group["pres"]
+    assert isinstance(pres_array, Array)
+    assert pres_array.shape == (3, 4)
+    assert pres_array.dtype == np.dtype("int32")
+    expected_ds = open_dataset(simple_netcdf4)
+    expected_array = expected_ds["foo"].to_numpy()
+    npt.assert_equal(pres_array, expected_array)
+
+
+# TODO test writing to a group that isn't the root group
 
 # TODO roundtripping tests - requires icechunk compatibility with xarray
 
