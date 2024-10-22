@@ -111,7 +111,9 @@ def test_set_single_virtual_ref_without_encoding(
     npt.assert_equal(array, expected_array)
 
     ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
-    assert np.allclose(ds.foo.to_numpy(), expected_ds.foo.to_numpy())
+    import xarray.testing as xrt
+
+    assert xrt.assert_identical(ds, expected_ds)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
