@@ -54,6 +54,7 @@ class VirtualiZarrDatasetAccessor:
         store: IcechunkStore
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
+
         dataset_to_icechunk(self.ds, store)
 
     @overload
