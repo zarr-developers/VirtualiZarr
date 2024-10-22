@@ -7,7 +7,7 @@ pytest.importorskip("icechunk")
 
 import numpy as np
 import numpy.testing as npt
-from xarray import Dataset, open_dataset
+from xarray import Dataset, open_dataset, open_zarr
 from xarray.core.variable import Variable
 from zarr import Array, Group, group  # type: ignore[import-untyped]
 
@@ -110,7 +110,8 @@ def test_set_single_virtual_ref_without_encoding(
     expected_array = expected_ds["foo"].to_numpy()
     npt.assert_equal(array, expected_array)
 
-    # ds = open_zarr(store=icechunk_filestore, group='foo', zarr_format=3, consolidated=False)
+    ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
+    assert np.allclose(ds.foo.to_numpy(), expected_ds.foo.to_numpy())
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -168,6 +169,10 @@ def test_set_single_virtual_ref_with_encoding(
     expected_ds = open_dataset(netcdf4_file)
     expected_air_array = expected_ds["air"].to_numpy()
     npt.assert_equal(scaled_air_array, expected_air_array)
+
+    # Check with xarray
+    ds = open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
+    assert np.allclose(ds.air.to_numpy(), expected_ds.air.to_numpy())
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
