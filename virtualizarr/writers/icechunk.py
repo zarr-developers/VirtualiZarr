@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
 VALID_URI_PREFIXES = {
     "s3://",
-    # "gs://",
-    # "azure://",
+    # "gs://",  # https://github.com/earth-mover/icechunk/issues/265
+    # "azure://",  # https://github.com/earth-mover/icechunk/issues/266
     # "r2://",
     # "cos://",
     # "minio://",
