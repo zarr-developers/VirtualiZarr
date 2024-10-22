@@ -10,7 +10,6 @@ from xarray import Dataset, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.writers.icechunk import dataset_to_icechunk
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 from virtualizarr.writers.zarr import dataset_to_zarr
 
@@ -54,6 +53,7 @@ class VirtualiZarrDatasetAccessor:
         ----------
         store: IcechunkStore
         """
+        from virtualizarr.writers.icechunk import dataset_to_icechunk
         dataset_to_icechunk(self.ds, store)
 
     @overload
