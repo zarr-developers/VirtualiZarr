@@ -6,7 +6,7 @@ VirtualiZarr (pronounced like "virtualize" but more piratey) grew out of [discus
 
 You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
 
-_Please see the [documentation](https://virtualizarr.readthedocs.io/en/latest/)_
+_Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/api.html)_
 
 ### Development Status and Roadmap
 

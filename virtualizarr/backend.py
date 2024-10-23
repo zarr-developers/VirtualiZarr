@@ -7,8 +7,7 @@ from typing import (
     Optional,
 )
 
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (

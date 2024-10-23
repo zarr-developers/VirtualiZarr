@@ -11,11 +11,16 @@ from typing import (
     cast,
 )
 
-import xarray as xr
-from xarray import Dataset
+from xarray import (
+    Coordinates,
+    Dataset,
+    Index,
+    IndexVariable,
+    Variable,
+    open_dataset,
+)
 from xarray.backends import AbstractDataStore, BackendArray
-from xarray.core.indexes import Index, PandasIndex
-from xarray.core.variable import IndexVariable, Variable
+from xarray.core.indexes import PandasIndex
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _FsspecFSFromFilepath
@@ -62,7 +67,7 @@ def open_loadable_vars_and_indexes(
         # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
         # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
 
-        ds = xr.open_dataset(
+        ds = open_dataset(
             cast(XArrayOpenT, fpath),
             drop_variables=drop_variables,
             group=group,
@@ -113,7 +118,7 @@ def construct_virtual_dataset(
 
     data_vars, coords = separate_coords(vars, indexes, coord_names)
 
-    vds = xr.Dataset(
+    vds = Dataset(
         data_vars,
         coords=coords,
         # indexes={},  # TODO should be added in a later version of xarray
@@ -126,10 +131,10 @@ def construct_virtual_dataset(
 
 
 def separate_coords(
-    vars: Mapping[str, xr.Variable],
+    vars: Mapping[str, Variable],
     indexes: MutableMapping[str, Index],
     coord_names: Iterable[str] | None = None,
-) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
+) -> tuple[dict[str, Variable], Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
@@ -144,7 +149,7 @@ def separate_coords(
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
     coord_vars: dict[
-        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
+        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
     ] = {}
     for name, var in vars.items():
         if name in coord_names or var.dims == (name,):
@@ -164,7 +169,7 @@ def separate_coords(
         else:
             data_vars[name] = var
 
-    coords = xr.Coordinates(coord_vars, indexes=indexes)
+    coords = Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
 
