@@ -3,7 +3,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 import virtualizarr
-from virtualizarr.readers.kerchunk import FileType
+from virtualizarr.backend import FileType
 
 
 class TestIntegration:

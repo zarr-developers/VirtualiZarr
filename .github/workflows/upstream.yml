@@ -1,4 +1,4 @@
-name: CI
+name: upstream
 
 on:
   push:
@@ -26,14 +26,14 @@ jobs:
         shell: bash -l {0}
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: ci/environment.yml
+          environment-file: ci/upstream.yml
           cache-environment: true
           create-args: >-
             python=${{matrix.python-version}}
@@ -48,7 +48,7 @@ jobs:
 
       - name: Running Tests
         run: |
-          python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+          python -m pytest ./virtualizarr --cov=./ --cov-report=xml --verbose
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4

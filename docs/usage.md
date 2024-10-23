@@ -396,6 +396,23 @@ combined_ds = xr.open_dataset('combined.parq', engine="kerchunk")
 
 By default references are placed in separate parquet file when the total number of references exceeds `record_size`. If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
 
+### Writing to an Icechunk Store
+
+We can also write these references out as an [IcechunkStore](https://icechunk.io/). `Icechunk` is a Open-source, cloud-native transactional tensor storage engine that is compatible with zarr version 3. To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`ds.virtualize.to_icechunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
+
+```python
+# create an icechunk store
+from icechunk import IcechunkStore, StorageConfig, StoreConfig, VirtualRefConfig
+storage = StorageConfig.filesystem(str('combined'))
+store = IcechunkStore.create(storage=storage, mode="w", config=StoreConfig(
+    virtual_ref_config=VirtualRefConfig.s3_anonymous(region='us-east-1'),
+))
+
+combined_vds.virtualize.to_icechunk(store)
+```
+
+See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
+
 ### Writing as Zarr
 
 Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`ds.virtualize.to_zarr <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
@@ -419,6 +436,18 @@ The advantage of this format is that any zarr v3 reader that understands the chu
 Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
 
 This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+```
+
+## Opening Kerchunk references as virtual datasets
+
+You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
+
+```python
+
+vds = open_virtual_dataset('combined.json', format='kerchunk')
+# or
+vds = open_virtual_dataset('combined.parquet', format='kerchunk')
+
 ```
 
 ## Rewriting existing manifests

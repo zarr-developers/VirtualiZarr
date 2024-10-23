@@ -22,14 +22,14 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "xarray>=2024.06.0",
-    "kerchunk>=0.2.5",
-    "h5netcdf",
-    "pydantic",
     "numpy>=2.0.0",
-    "ujson",
     "packaging",
     "universal-pathlib",
+    "h5py",
     "hdf5plugin",
+    "numcodecs",
+    "imagecodecs-numcodecs",
+    "ujson",
 ]
 
 [project.optional-dependencies]
@@ -37,9 +37,14 @@ test = [
     "codecov",
     "fastparquet",
     "fsspec",
+    "h5netcdf",
     "h5py",
+    "hdf5plugin",
+    "kerchunk>=0.2.5",
     "mypy",
     "netcdf4",
+    "numcodecs",
+    "imagecodecs-numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -48,9 +53,6 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "fastparquet",
-    "imagecodecs-numcodecs",
-    "h5py",
     "scipy",
 ]
 
@@ -90,6 +92,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "kerchunk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ujson.*"
 ignore_missing_imports = true
 
 [tool.ruff]
