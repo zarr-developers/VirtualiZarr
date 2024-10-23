@@ -3,8 +3,7 @@ from typing import Dict, Iterable, List, Mapping, Optional, Union
 
 import h5py  # type: ignore
 import numpy as np
-from xarray import Dataset, Variable
-from xarray.core.indexes import Index
+from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.readers.common import (
