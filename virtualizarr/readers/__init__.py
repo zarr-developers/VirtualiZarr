@@ -4,7 +4,10 @@ from virtualizarr.readers.hdf5 import HDF5VirtualBackend
 from virtualizarr.readers.kerchunk import KerchunkVirtualBackend
 from virtualizarr.readers.netcdf3 import NetCDF3VirtualBackend
 from virtualizarr.readers.tiff import TIFFVirtualBackend
-from virtualizarr.readers.zarr_v3 import ZarrV3VirtualBackend
+from virtualizarr.readers.zarr import (
+    ZarrV3ChunkManifestVirtualBackend,
+    ZarrVirtualBackend,
+)
 
 __all__ = [
     "DMRPPVirtualBackend",
@@ -13,5 +16,6 @@ __all__ = [
     "KerchunkVirtualBackend",
     "NetCDF3VirtualBackend",
     "TIFFVirtualBackend",
-    "ZarrV3VirtualBackend",
+    "ZarrVirtualBackend",
+    "ZarrV3ChunkManifestVirtualBackend",
 ]
