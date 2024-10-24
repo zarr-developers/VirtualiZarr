@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -85,6 +87,54 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
     assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
+
+
+# we should parameterize for:
+# - group
+# - drop_variables
+# - loadable_variables
+# - store readable over cloud storage?
+# - zarr store version v2, v3
+
+
+# testing out pytest parameterization with dataclasses :shrug: -- we can revert to a more normal style
+@dataclass
+class ZarrV2Param:
+    loadable_variables: list[str] | None
+    drop_variables: list[str] | None
+
+
+ZARR_V2_PARAMS = [
+    ZarrV2Param(loadable_variables=None, drop_variables=None),
+    ZarrV2Param(loadable_variables=["time"], drop_variables=None),
+    ZarrV2Param(loadable_variables=None, drop_variables=["lat", "lon"]),
+    ZarrV2Param(loadable_variables=["lat", "lon"], drop_variables=["time"]),
+]
+
+# @requires_zarrV3 # we should have this, but we need the decorator to understand beta versions?
+
+
+@pytest.mark.parametrize(
+    "input_params",
+    [inputs for inputs in ZARR_V2_PARAMS],
+)
+def test_zarrV2_roundtrip(zarr_v2_store, input_params):
+    # ds = xr.open_zarr(zarr_v2_store)
+
+    open_virtual_dataset(
+        zarr_v2_store,
+        loadable_variables=input_params.loadable_variables,
+        drop_variables=input_params.drop_variables,
+        indexes={},
+    )
+    # assert vds has:
+    # loadable vars are np arrays?
+    # drop vars are not present
+    # virtual vars are manifest arrays, not loaded arrays
+
+    # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose?
+    # from xarray.testing import assert_duckarray_allclose
+    # xrt.assert_allclose(ds, vds)
 
 
 @requires_kerchunk

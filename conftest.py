@@ -35,6 +35,24 @@ def netcdf4_file(tmpdir):
     return filepath
 
 
+@pytest.fixture()
+def zarr_v2_store(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature", chunks={})
+    # grabbing a piece and making sure there are multiple chunks present (2): Frozen({'time': (5, 5), 'lat': (9,), 'lon': (18,)})
+    chunked_subset = ds.isel(
+        time=slice(0, 10), lat=slice(0, 9), lon=slice(0, 18)
+    ).chunk({"time": 5})
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.zarr"
+
+    chunked_subset.to_zarr(filepath, zarr_format=2)
+    ds.close()
+
+    return filepath
+
+
 @pytest.fixture
 def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr import open_virtual_dataset
