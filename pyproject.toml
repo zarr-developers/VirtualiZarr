@@ -29,7 +29,7 @@ dependencies = [
     "hdf5plugin",
     "numcodecs",
     "imagecodecs",
-    "imagecodecs-numcodecs",
+    "imagecodecs-numcodecs==2024.6.1",
     "ujson",
 ]
 
