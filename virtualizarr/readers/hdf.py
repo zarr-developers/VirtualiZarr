@@ -127,7 +127,9 @@ class HDFVirtualBackend(VirtualBackend):
                     add_chunk_info(dsid.get_chunk_info(index))
 
             chunk_manifest = ChunkManifest.from_arrays(
-                paths=paths, offsets=offsets, lengths=lengths
+                paths=paths,
+                offsets=offsets,
+                lengths=lengths,  # type: ignore
             )
             return chunk_manifest
 

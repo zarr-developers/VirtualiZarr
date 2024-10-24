@@ -187,7 +187,7 @@ def open_virtual_dataset(
     if backend:
         backend_cls = backend
     else:
-        backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())
+        backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())  # type: ignore
 
     if backend_cls is None:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
