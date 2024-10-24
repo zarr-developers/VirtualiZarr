@@ -5,6 +5,7 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
@@ -63,8 +64,9 @@ def test_no_duplicates_find_var_names():
         ),
     ],
 )
+@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 def test_numpy_arrays_to_inlined_kerchunk_refs(
-    netcdf4_file, inline_threshold, vars_to_inline
+    netcdf4_file, inline_threshold, vars_to_inline, hdf_backend
 ):
     from kerchunk.hdf import SingleHdf5ToZarr
 
@@ -75,7 +77,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
     # loading the variables should produce same result as inlining them using kerchunk
     vds = open_virtual_dataset(
-        netcdf4_file, loadable_variables=vars_to_inline, indexes={}
+        netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
     )
     refs = vds.virtualize.to_kerchunk(format="dict")
 
@@ -90,7 +92,8 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 @requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
-    def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
+    @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+    def test_kerchunk_roundtrip_no_concat(self, tmpdir, format, hdf_backend):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
 
@@ -98,7 +101,7 @@ class TestKerchunkRoundtrip:
         ds.to_netcdf(f"{tmpdir}/air.nc")
 
         # use open_dataset_via_kerchunk to read it as references
-        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
+        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={}, backend=hdf_backend)
 
         if format == "dict":
             # write those references to an in-memory kerchunk-formatted references dictionary
@@ -122,8 +125,11 @@ class TestKerchunkRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
+    @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
-    def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
+    def test_kerchunk_roundtrip_concat(
+        self, tmpdir, format, hdf_backend, decode_times, time_vars
+    ):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
 
@@ -139,11 +145,13 @@ class TestKerchunkRoundtrip:
             f"{tmpdir}/air1.nc",
             indexes={},
             loadable_variables=time_vars,
+            backend=hdf_backend,
         )
         vds2 = open_virtual_dataset(
             f"{tmpdir}/air2.nc",
             indexes={},
             loadable_variables=time_vars,
+            backend=hdf_backend,
         )
 
         if decode_times is False:
@@ -187,7 +195,8 @@ class TestKerchunkRoundtrip:
             assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
             assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
 
-    def test_non_dimension_coordinates(self, tmpdir, format):
+    @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+    def test_non_dimension_coordinates(self, tmpdir, format, hdf_backend):
         # regression test for GH issue #105
 
         # set up example xarray dataset containing non-dimension coordinate variables
@@ -196,7 +205,9 @@ class TestKerchunkRoundtrip:
         # save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")
 
-        vds = open_virtual_dataset(f"{tmpdir}/non_dim_coords.nc", indexes={})
+        vds = open_virtual_dataset(
+            f"{tmpdir}/non_dim_coords.nc", indexes={}, backend=hdf_backend
+        )
 
         assert "lat" in vds.coords
         assert "coordinates" not in vds.attrs
@@ -269,11 +280,12 @@ class TestKerchunkRoundtrip:
 
 
 @requires_kerchunk
-def test_open_scalar_variable(tmpdir):
+@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+def test_open_scalar_variable(tmpdir, hdf_backend):
     # regression test for GH issue #100
 
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(f"{tmpdir}/scalar.nc")
 
-    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={}, backend=hdf_backend)
     assert vds["a"].shape == ()
