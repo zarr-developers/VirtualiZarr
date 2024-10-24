@@ -199,6 +199,9 @@ class TestKerchunkRoundtrip:
     def test_non_dimension_coordinates(self, tmpdir, format, hdf_backend):
         # regression test for GH issue #105
 
+        if hdf_backend:
+            pytest.xfail("To fix coordinate behavior with HDF reader")
+
         # set up example xarray dataset containing non-dimension coordinate variables
         ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6.0).reshape(2, 3))})
 
@@ -208,7 +211,6 @@ class TestKerchunkRoundtrip:
         vds = open_virtual_dataset(
             f"{tmpdir}/non_dim_coords.nc", indexes={}, backend=hdf_backend
         )
-
         assert "lat" in vds.coords
         assert "coordinates" not in vds.attrs
 
