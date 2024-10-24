@@ -10,9 +10,11 @@ dependencies:
   - xarray>=2024.6.0
   - numpy>=2.0.0
   - numcodecs
+  - imagecodecs>=2024.6.1
   - packaging
   - ujson
   - universal_pathlib
+  - hdf5plugin
   # Testing
   - codecov
   - pre-commit
@@ -24,3 +26,6 @@ dependencies:
   - pytest
   - pooch
   - fsspec
+  - pip
+  - pip:
+    - imagecodecs-numcodecs
