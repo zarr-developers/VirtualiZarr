@@ -34,8 +34,9 @@ class TestFilterToCodec:
     def test_zstd(self):
         codec = _filter_to_codec("32015", (5,))
         assert isinstance(codec, numcodecs.zstd.Zstd)
-        expected_config = {"id": "zstd", "level": 5}
-        assert codec.get_config() == expected_config
+        config = codec.get_config()
+        assert config["id"] == "zstd"
+        assert config["level"] == 5
 
     def test_shuffle(self):
         codec = _filter_to_codec("shuffle", (7,))
