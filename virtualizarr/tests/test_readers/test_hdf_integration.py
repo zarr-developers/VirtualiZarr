@@ -1,0 +1,54 @@
+import pytest
+import xarray as xr
+import xarray.testing as xrt
+
+import virtualizarr
+from virtualizarr.backend import FileType
+from virtualizarr.readers.hdf import HDFVirtualBackend
+from virtualizarr.tests import requires_kerchunk
+
+
+@requires_kerchunk
+@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+class TestIntegration:
+    @pytest.mark.xfail(reason="0 time start is being interpreted as fillvalue")
+    def test_filters_h5netcdf_roundtrip(
+        self, tmpdir, filter_encoded_roundtrip_hdf5_file, hdf_backend
+    ):
+        ds = xr.open_dataset(filter_encoded_roundtrip_hdf5_file, decode_times=True)
+        vds = virtualizarr.open_virtual_dataset(
+            filter_encoded_roundtrip_hdf5_file,
+            loadable_variables=["time"],
+            cftime_variables=["time"],
+            backend=hdf_backend,
+        )
+        kerchunk_file = f"{tmpdir}/kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk", decode_times=True)
+        xrt.assert_allclose(ds, roundtrip)
+
+    @pytest.mark.xfail(reason="Coordinate issue affecting kerchunk and HDF reader.")
+    def test_filters_netcdf4_roundtrip(
+        self, tmpdir, filter_encoded_roundtrip_netcdf4_file, hdf_backend
+    ):
+        filepath = filter_encoded_roundtrip_netcdf4_file["filepath"]
+        ds = xr.open_dataset(filepath)
+        vds = virtualizarr.open_virtual_dataset(
+            filepath, filetype=FileType("netcdf4"), backend=hdf_backend
+        )
+        kerchunk_file = f"{tmpdir}/kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_equal(ds, roundtrip)
+
+    def test_filter_and_cf_roundtrip(
+        self, tmpdir, filter_and_cf_roundtrip_hdf5_file, hdf_backend
+    ):
+        ds = xr.open_dataset(filter_and_cf_roundtrip_hdf5_file)
+        vds = virtualizarr.open_virtual_dataset(
+            filter_and_cf_roundtrip_hdf5_file, backend=hdf_backend
+        )
+        kerchunk_file = f"{tmpdir}/filter_cf_kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_allclose(ds, roundtrip)
