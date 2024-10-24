@@ -77,9 +77,9 @@ class ZarrVirtualBackend(VirtualBackend):
             # 3a.  Use zarr-python to get the attributes and the dimension names, 
             # and coordinate names (which come from the .zmetadata or zarr.json)
             array_metadata = zg[var].metadata
-            # are `_ARRAY_DIMENSIONS` how xarray gets coords?
-            array_dims = array_metadata.attributes['_ARRAY_DIMENSIONS']
+            
             array_metadata_dict = array_metadata.to_dict()
+            array_dims = array_metadata_dict['attributes'].pop("_ARRAY_DIMENSIONS")
 
             array_encoding = {
                 'chunks': array_metadata_dict['chunks'],
@@ -158,7 +158,7 @@ class ZarrVirtualBackend(VirtualBackend):
 
             # 3h. Wrap that ManifestArray in an xarray.Variable, using the dims and attrs we read before
             array_variable = Variable(
-                        dims=array_dims, data=array_manifest_array, attrs=array_metadata_dict, encoding=array_encoding
+                        dims=array_dims, data=array_manifest_array, attrs=array_metadata_dict['attributes'], encoding=array_encoding
                     )
 
             array_variable_list.append(array_variable)
