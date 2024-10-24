@@ -5,8 +5,10 @@ import xarray.testing as xrt
 import virtualizarr
 from virtualizarr.backend import FileType
 from virtualizarr.readers.hdf import HDFVirtualBackend
+from virtualizarr.tests import requires_kerchunk
 
 
+@requires_kerchunk
 @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 class TestIntegration:
     @pytest.mark.xfail(reason="0 time start is being interpreted as fillvalue")
@@ -43,8 +45,7 @@ class TestIntegration:
     ):
         ds = xr.open_dataset(filter_and_cf_roundtrip_hdf5_file)
         vds = virtualizarr.open_virtual_dataset(
-            filter_and_cf_roundtrip_hdf5_file,
-            backend=hdf_backend,
+            filter_and_cf_roundtrip_hdf5_file, backend=hdf_backend
         )
         kerchunk_file = f"{tmpdir}/filter_cf_kerchunk.json"
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
