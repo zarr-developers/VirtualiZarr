@@ -245,7 +245,6 @@ class TestReadFromURL:
                     url,
                     reader_options={},
                     indexes={},
-                    backend=hdf_backend,
                 )
         elif filetype == "hdf5":
             vds = open_virtual_dataset(
@@ -258,7 +257,7 @@ class TestReadFromURL:
             )
             assert isinstance(vds, xr.Dataset)
         else:
-            vds = open_virtual_dataset(url, indexes={}, backend=hdf_backend)
+            vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
     def test_virtualizarr_vs_local_nisar(self, hdf_backend):
