@@ -17,14 +17,14 @@ from virtualizarr.readers import (
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
-    ZarrV3VirtualBackend,
+    ZarrVirtualBackend,
 )
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
-    "zarr_v3": ZarrV3VirtualBackend,
+    "zarr_v3": ZarrVirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
     "netcdf3": NetCDF3VirtualBackend,
