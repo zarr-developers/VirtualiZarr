@@ -30,11 +30,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+hdf_reader = [
+    "fsspec",
+    "hdf5plugin",
+    "imagecodecs",
+    "imagecodecs-numcodecs==2024.6.1",
+]
 test = [
     "codecov",
     "fastparquet",
     "fsspec",
-    "h5netcdf",
     "h5py",
     "hdf5plugin",
     "imagecodecs",

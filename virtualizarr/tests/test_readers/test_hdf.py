@@ -2,8 +2,14 @@ import h5py  # type: ignore
 import pytest
 
 from virtualizarr.readers.hdf import HDFVirtualBackend
+from virtualizarr.tests import (
+    requires_hdf5plugin,
+    requires_imagecodecs,
+)
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestDatasetChunkManifest:
     def test_empty_chunks(self, empty_chunks_hdf5_file):
         f = h5py.File(empty_chunks_hdf5_file)
@@ -47,6 +53,8 @@ class TestDatasetChunkManifest:
         assert manifest.shape_chunk_grid == (2, 8)
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestDatasetDims:
     def test_single_dimension_scale(self, single_dimension_scale_hdf5_file):
         f = h5py.File(single_dimension_scale_hdf5_file)
@@ -73,6 +81,8 @@ class TestDatasetDims:
         assert dims == ["phony_dim_0", "phony_dim_1"]
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestDatasetToVariable:
     def test_chunked_dataset(self, chunked_dimensions_netcdf4_file):
         f = h5py.File(chunked_dimensions_netcdf4_file)
@@ -97,6 +107,8 @@ class TestDatasetToVariable:
         assert var.attrs["attribute_name"] == "attribute_name"
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestExtractAttributes:
     def test_string_attribute(self, string_attributes_hdf5_file):
         f = h5py.File(string_attributes_hdf5_file)
@@ -116,6 +128,8 @@ class TestExtractAttributes:
         assert len(attrs.keys()) == 2
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestVirtualVarsFromHDF:
     def test_variable_with_dimensions(self, chunked_dimensions_netcdf4_file):
         variables = HDFVirtualBackend._virtual_vars_from_hdf(

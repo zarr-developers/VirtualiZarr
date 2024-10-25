@@ -1,13 +1,24 @@
 import dataclasses
+import warnings
 from typing import List, Tuple, TypedDict, Union
 
 import h5py  # type: ignore
-import hdf5plugin  # type: ignore
 import numcodecs.registry as registry
 import numpy as np
 from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
 from xarray.coding.variables import _choose_float_dtype
+
+try:
+    import hdf5plugin  # type: ignore
+except ModuleNotFoundError:
+    hdf5plugin = None  # type: ignore
+    warnings.warn("hdf5plugin is required for HDF reader")
+
+try:
+    import imagecodecs  # noqa
+except ModuleNotFoundError:
+    warnings.warn("imagecodecs is required for HDF reader")
 
 _non_standard_filters = {
     "gzip": "zlib",

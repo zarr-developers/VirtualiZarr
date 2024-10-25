@@ -1,11 +1,18 @@
+import warnings
+
 import h5py  # type: ignore
-import hdf5plugin  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
 from packaging.version import Version
 from xarray.tests.test_dataset import create_test_data
 from xarray.util.print_versions import netcdf_and_hdf5_versions
+
+try:
+    import hdf5plugin  # type: ignore
+except ModuleNotFoundError:
+    hdf5plugin = None  # type: ignore
+    warnings.warn("hdf5plugin is required for HDF reader")
 
 
 @pytest.fixture

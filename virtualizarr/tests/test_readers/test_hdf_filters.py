@@ -1,15 +1,29 @@
+import warnings
+
 import h5py  # type: ignore
-import imagecodecs
 import numcodecs
 import numpy as np
+
+try:
+    import imagecodecs  # noqa
+except ModuleNotFoundError:
+    imagecodecs = None  # type: ignore
+    warnings.warn("imagecodecs is required for HDF reader")
+
 
 from virtualizarr.readers.hdf_filters import (
     _filter_to_codec,
     cfcodec_from_dataset,
     codecs_from_dataset,
 )
+from virtualizarr.tests import (
+    requires_hdf5plugin,
+    requires_imagecodecs,
+)
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestFilterToCodec:
     def test_gzip_uses_zlib_numcodec(self):
         codec = _filter_to_codec("gzip", 1)
@@ -45,6 +59,8 @@ class TestFilterToCodec:
         assert codec.get_config() == expected_config
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestCodecsFromDataSet:
     def test_numcodec_decoding(self, np_uncompressed, filter_encoded_hdf5_file):
         f = h5py.File(filter_encoded_hdf5_file)
@@ -61,6 +77,8 @@ class TestCodecsFromDataSet:
                 assert decoded == np_uncompressed.tobytes()
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestCFCodecFromDataset:
     def test_no_cf_convention(self, filter_encoded_hdf5_file):
         f = h5py.File(filter_encoded_hdf5_file)
