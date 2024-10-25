@@ -194,6 +194,19 @@ def write_virtual_variable_to_icechunk(
     )
 
 
+def generate_chunk_key(
+    index: np.nditer.multi_index,
+    append_axis: Optional[int] = None,
+    existing_num_chunks: Optional[int] = None,
+) -> str:
+    if append_axis is not None:
+        list_index = list(index)
+        # Offset by the number of existing chunks on the append axis
+        list_index[append_axis] += existing_num_chunks
+        index = tuple(list_index)
+    return "/".join(str(i) for i in index)
+
+
 def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: "Group",
@@ -209,6 +222,8 @@ def write_manifest_virtual_refs(
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
+    # Aimee: the manifest (and it's corresponding paths, offsets and lengths, already has the shape of the datacube's chunks
+    # so we want to increment the resulting multi index
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
@@ -220,13 +235,9 @@ def write_manifest_virtual_refs(
     )
 
     for path, offset, length in it:
+        # it.multi_index will be an iterator of the chunk shape
         index = it.multi_index
-        if append_axis is not None:
-            list_index = list(index)
-            # Offset by the number of existing chunks on the append axis
-            list_index[append_axis] += existing_num_chunks
-            index = tuple(list_index)
-        chunk_key = "/".join(str(i) for i in index)
+        chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
 
         # set each reference individually
         store.set_virtual_ref(
