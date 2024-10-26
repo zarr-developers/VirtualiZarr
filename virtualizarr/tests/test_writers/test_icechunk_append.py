@@ -28,23 +28,56 @@ def icechunk_storage(tmpdir) -> "StorageConfig":
     return storage
 
 
-def gen_virtual_dataset(file_uri: str):
-    manifest = ChunkManifest({"0.0": {"path": file_uri, "offset": 6144, "length": 48}})
+def generate_chunk_manifest(
+    netcdf4_file: str,
+    shape: tuple[int, int] = (3, 4),
+    chunks: tuple[int, int] = (3, 4),
+    base_offset=6144,
+    length=48,
+) -> ChunkManifest:
+    chunk_dict = {}
+    num_chunks_x = shape[0] // chunks[0]
+    num_chunks_y = shape[1] // chunks[1]
+    offset = base_offset
+
+    for i in range(num_chunks_x):
+        for j in range(num_chunks_y):
+            chunk_index = f"{i}.{j}"
+            chunk_dict[chunk_index] = {
+                "path": netcdf4_file,
+                "offset": offset,
+                "length": length,
+            }
+            offset += length  # Increase offset for each chunk
+    return ChunkManifest(chunk_dict)
+
+
+def gen_virtual_dataset(
+    file_uri: str,
+    shape: tuple[int, int] = (3, 4),
+    chunks: tuple[int, int] = (3, 4),
+    dtype: np.dtype = np.dtype("int32"),
+    compressor: str = None,
+    filters: str = None,
+    fill_value: str = None,
+    variable_name: str = "foo",
+):
+    manifest = generate_chunk_manifest(file_uri, shape, chunks)
     zarray = ZArray(
-        shape=(3, 4),
-        chunks=(3, 4),
-        dtype=np.dtype("int32"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
+        shape=shape,
+        chunks=chunks,
+        dtype=dtype,
+        compressor=compressor,
+        filters=filters,
+        fill_value=fill_value,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
         zarray=zarray,
     )
-    foo = Variable(data=ma, dims=["x", "y"])
+    var = Variable(data=ma, dims=["x", "y"])
     return Dataset(
-        {"foo": foo},
+        {variable_name: var},
     )
 
 
@@ -55,7 +88,7 @@ def test_set_single_virtual_ref_without_encoding(
     from icechunk import IcechunkStore
 
     # generate virtual dataset
-    vds = gen_virtual_dataset(simple_netcdf4)
+    vds = gen_virtual_dataset(file_uri=simple_netcdf4)
 
     # create the icechunk store and commit the first virtual dataset
     icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
@@ -78,3 +111,31 @@ def test_set_single_virtual_ref_without_encoding(
         [expected_ds["foo"], expected_ds["foo"]], dim="x"
     ).to_numpy()
     npt.assert_equal(array, expected_array)
+
+
+# def test_append_virtual_ref_with_encoding(
+#     icechunk_storage: "StorageConfig", netcdf4_files: tuple[str, str]
+# ):
+#     import xarray as xr
+#     from icechunk import IcechunkStore
+
+#     # generate virtual dataset
+#     filepath1, filepath2 = netcdf4_files
+#     vds1, vds2 = open_virtual_dataset(filepath1), open_virtual_dataset(filepath2)
+
+#     # create the icechunk store and commit the first virtual dataset
+#     icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+#     dataset_to_icechunk(vds1, icechunk_filestore)
+#     icechunk_filestore.commit(
+#         "test commit"
+#     )  # need to commit it in order to append to it in the next lines
+
+#     # Append the same dataset to the same store
+#     icechunk_filestore_append = IcechunkStore.open_existing(
+#         storage=icechunk_storage, mode="a"
+#     )
+#     dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+
+#     root_group = group(store=icechunk_filestore_append)
+#     array = root_group["foo"]
+#     import pdb; pdb.set_trace()

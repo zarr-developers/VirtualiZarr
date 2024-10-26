@@ -145,7 +145,7 @@ def write_virtual_variable_to_icechunk(
     # Aimee: resize the array if it already exists
     # TODO: assert chunking and encoding is the same
     existing_keys = tuple(group.array_keys())
-    append_axis, existing_num_chunks = None, None
+    append_axis, existing_num_chunks, arr = None, None, None
     if name in existing_keys and mode == "a":
         # resize
         dims = var.dims
@@ -159,19 +159,20 @@ def write_virtual_variable_to_icechunk(
             new_shape = list(existing_array.shape)
             new_shape[append_axis] += var.shape[append_axis]
             shape = tuple(new_shape)
-            existing_array.resize(new_shape)
-
-    # creates array if it doesn't already exist
-    arr = group.require_array(
-        name=name,
-        shape=shape,
-        chunk_shape=zarray.chunks,
-        dtype=encode_dtype(zarray.dtype),
-        codecs=zarray._v3_codec_pipeline(),
-        dimension_names=var.dims,
-        fill_value=zarray.fill_value,
-        # TODO fill_value?
-    )
+            # this doesn't seem to actually resize the array
+            arr = existing_array.resize(shape)
+    else:
+        # create array if it doesn't already exist
+        arr = group.require_array(
+            name=name,
+            shape=shape,
+            chunk_shape=zarray.chunks,
+            dtype=encode_dtype(zarray.dtype),
+            codecs=zarray._v3_codec_pipeline(),
+            dimension_names=var.dims,
+            fill_value=zarray.fill_value,
+            # TODO fill_value?
+        )
 
     # TODO it would be nice if we could assign directly to the .attrs property
     # Aimee: assert that new attributes are the same as existing attributes
