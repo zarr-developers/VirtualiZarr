@@ -127,7 +127,7 @@ def test_set_single_virtual_ref_with_encoding(
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
     expected_ds = open_dataset(netcdf4_file).drop_vars(["lon", "lat", "time"])
-    # these atyttirbutes encode floats different and I am not sure why, but its not important enough to block everything
+    # these attributes encode floats different and I am not sure why, but its not important enough to block everything
     expected_ds.air.attrs.pop("actual_range")
 
     # instead for now just write out byte ranges explicitly
