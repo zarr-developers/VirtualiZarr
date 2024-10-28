@@ -8,10 +8,8 @@ from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend, separate_coords
+from virtualizarr.utils import check_for_collisions
 from virtualizarr.zarr import ZArray
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
-
-
 
 
 class ZarrVirtualBackend(VirtualBackend):
@@ -30,22 +28,20 @@ class ZarrVirtualBackend(VirtualBackend):
 
         """
 
-
-
         ######### tmp testing! ############
-        reader_options={}
-        loadable_variables='time'
-        filepath = 'tmp_2_chunk.zarr'
+        reader_options = {}
+        loadable_variables = "time"
+        filepath = "tmp_2_chunk.zarr"
 
         # check that Zarr is V3
         # 1a
+        import zarr
         from packaging import version
-        import zarr 
-        
+
         if version.parse(zarr.__version__).major < 3:
-            raise ImportError(f"Zarr V3 is required")
-    
-        # If drop_variables or loadable_variables is None, 
+            raise ImportError("Zarr V3 is required")
+
+        # If drop_variables or loadable_variables is None,
         # check_for_collisions will convert them to an empty list
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
@@ -66,44 +62,50 @@ class ZarrVirtualBackend(VirtualBackend):
         zarr_arrays = [val for val in zg.keys()]
 
         # 2b. and check that all loadable_variables are present
-        assert set(loadable_variables).issubset(set(zarr_arrays)), f'loadable_variables ({loadable_variables}) is not a subset of variables in existing Zarr store. This zarr contains:  {zarr_arrays}'
+        assert set(
+            loadable_variables
+        ).issubset(
+            set(zarr_arrays)
+        ), f"loadable_variables ({loadable_variables}) is not a subset of variables in existing Zarr store. This zarr contains:  {zarr_arrays}"
 
         # virtual variables are available variables minus drop variables & loadable variables
-        virtual_variables = list(set(zarr_arrays) - set(loadable_variables) - set(drop_variables))
+        virtual_variables = list(
+            set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
+        )
 
         array_variable_list = []
         # 3. For each virtual variable:
         for var in virtual_variables:
-            # 3a.  Use zarr-python to get the attributes and the dimension names, 
+            # 3a.  Use zarr-python to get the attributes and the dimension names,
             # and coordinate names (which come from the .zmetadata or zarr.json)
             array_metadata = zg[var].metadata
-            
+
             array_metadata_dict = array_metadata.to_dict()
-            array_dims = array_metadata_dict['attributes'].pop("_ARRAY_DIMENSIONS")
+            array_dims = array_metadata_dict["attributes"].pop("_ARRAY_DIMENSIONS")
 
             array_encoding = {
-                'chunks': array_metadata_dict['chunks'],
-                'compressor': array_metadata_dict['compressor'],
-                'dtype': array_metadata_dict['dtype'],
-                'fill_value': array_metadata_dict['fill_value'],
-                'order': array_metadata_dict['order'],
+                "chunks": array_metadata_dict["chunks"],
+                "compressor": array_metadata_dict["compressor"],
+                "dtype": array_metadata_dict["dtype"],
+                "fill_value": array_metadata_dict["fill_value"],
+                "order": array_metadata_dict["order"],
             }
-            
 
-            # 3b. 
-            # Use zarr-python to also get the dtype and chunk grid info + everything else needed to create the virtualizarr.zarr.ZArray object (eventually we can skip this step and use a zarr-python array metadata class directly instead of virtualizarr.zarr.ZArray            
-            array_zarray = ZArray(shape = array_metadata_dict['shape'],
-                            chunks = array_metadata_dict['chunks'],
-                            dtype = array_metadata_dict['dtype'],
-                            fill_value = array_metadata_dict['fill_value'], 
-                            order = array_metadata_dict['order'],
-                            compressor = array_metadata_dict['compressor'],
-                            filters=array_metadata_dict['filters'], 
-                            zarr_format=array_metadata_dict['zarr_format'],
-                            )
+            # 3b.
+            # Use zarr-python to also get the dtype and chunk grid info + everything else needed to create the virtualizarr.zarr.ZArray object (eventually we can skip this step and use a zarr-python array metadata class directly instead of virtualizarr.zarr.ZArray
+            array_zarray = ZArray(
+                shape=array_metadata_dict["shape"],
+                chunks=array_metadata_dict["chunks"],
+                dtype=array_metadata_dict["dtype"],
+                fill_value=array_metadata_dict["fill_value"],
+                order=array_metadata_dict["order"],
+                compressor=array_metadata_dict["compressor"],
+                filters=array_metadata_dict["filters"],
+                zarr_format=array_metadata_dict["zarr_format"],
+            )
             # 3c. Use the knowledge of the store location, variable name, and the zarr format to deduce which directory / S3 prefix the chunks must live in.
             # QUESTION: how to get chunk keys from zarr-python
-            # fsspec ex: 
+            # fsspec ex:
             # array_mapper = fsspec.get_mapper(path / 'air')
             # [val for val in mapper] -> ['.zarray', '.zattrs', '0.0.0']
             # zarr python: ?
@@ -114,63 +116,71 @@ class ZarrVirtualBackend(VirtualBackend):
             # add in fsspec stuff for now
 
             #########################
-            # GET KEYS FOR MANIFESTS - 
+            # GET KEYS FOR MANIFESTS -
             # get size, path, offset etc in dict to build ChunkManifest
             #########################
 
-            import fsspec 
-            array_mapper = fsspec.get_mapper(filepath + '/' + var)
+            import fsspec
+
+            array_mapper = fsspec.get_mapper(filepath + "/" + var)
 
             # grab all chunk keys. skip metadata files - do we need this?
-            array_keys = [val for val in array_mapper if not val.startswith('.')]
-
-   
+            array_keys = [val for val in array_mapper if not val.startswith(".")]
 
             # 3d. List all the chunks in that directory using fsspec.ls(detail=True), as that should also return the nbytes of each chunk. Remember that chunks are allowed to be missing.
             # 3e. The offset of each chunk is just 0 (ignoring sharding for now), and the length is the file size fsspec returned. The paths are just all the paths fsspec listed.
 
-            # probably trying to do too much in one big dict/list comprehension 
+            # probably trying to do too much in one big dict/list comprehension
             # uses fsspec.ls on the array to get a list of dicts of info including chunk size
             # filters out metadata to get only chunks
             # uses fsspec.utils._unstrip_protocol utility to clean up path
-            
+
             # "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             # "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
 
             # array path to use for all chunks
-            array_path = fsspec.utils._unstrip_protocol(array_mapper.root,array_mapper.fs)
+            array_path = fsspec.utils._unstrip_protocol(
+                array_mapper.root, array_mapper.fs
+            )
 
-            array_chunk_sizes = {val['name'].split('/')[-1]:
-                                    {'path':array_path,
-                                    'offset': 0,
-                                    'length': val['size']
-                                    } for val in array_mapper.fs.ls(array_mapper.root, detail=True) if not val['name'].endswith(('.zarray', '.zattrs', '.zgroup'))}
-            
+            array_chunk_sizes = {
+                val["name"].split("/")[-1]: {
+                    "path": array_path,
+                    "offset": 0,
+                    "length": val["size"],
+                }
+                for val in array_mapper.fs.ls(array_mapper.root, detail=True)
+                if not val["name"].endswith((".zarray", ".zattrs", ".zgroup"))
+            }
+
             # 3f. Parse the path and length information returned by fsspec into the structure that we can pass to ChunkManifest.__init__
             # Initialize array chunk manifest from dictionary
             array_chunkmanifest = ChunkManifest(array_chunk_sizes)
 
             # 3g. Create a ManifestArray from our ChunkManifest and ZArray
-            array_manifest_array = ManifestArray(zarray=array_zarray, chunkmanifest=array_chunkmanifest)
+            array_manifest_array = ManifestArray(
+                zarray=array_zarray, chunkmanifest=array_chunkmanifest
+            )
             #########################
             #########################
-
 
             # 3h. Wrap that ManifestArray in an xarray.Variable, using the dims and attrs we read before
             array_variable = Variable(
-                        dims=array_dims, data=array_manifest_array, attrs=array_metadata_dict['attributes'], encoding=array_encoding
-                    )
+                dims=array_dims,
+                data=array_manifest_array,
+                attrs=array_metadata_dict["attributes"],
+                encoding=array_encoding,
+            )
 
             array_variable_list.append(array_variable)
         # 4 Get the loadable_variables by just using xr.open_zarr on the same store (should use drop_variables to avoid handling the virtual variables that we already have).
         if loadable_variables:
-            import xarray as xr 
+            import xarray as xr
+
             # we wanna drop 'drop_variables' but also virtual variables since we already **manifested** them.
-            ds = xr.open_zarr(filepath, drop_variables=list(set(drop_variables + virtual_variables)))
-
-
-
-
+            ds = xr.open_zarr(
+                filepath, drop_variables=list(set(drop_variables + virtual_variables))
+            )
 
         # For each virtual variable:
         if group:
@@ -228,7 +238,8 @@ class ZarrVirtualBackend(VirtualBackend):
         )
 
         return ds
-    
+
+
 # class ZarrV3VirtualBackend(VirtualBackend):
 #     @staticmethod
 #     def open_virtual_dataset(
@@ -245,7 +256,6 @@ class ZarrVirtualBackend(VirtualBackend):
 
 #         This is experimental - chunk manifests are not part of the Zarr v3 Spec.
 #         """
-
 
 
 #         storepath = Path(filepath)
