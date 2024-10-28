@@ -94,7 +94,9 @@ def write_variables_to_icechunk_group(
     # will overwrite the root group's attributes with the dataset's attributes. We take advantage
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
     ds = Dataset(loadable_variables, attrs=attrs)
-    ds.to_zarr(store, zarr_format=3, consolidated=False, mode="a")
+    ds.to_zarr(
+        store, zarr_format=3, consolidated=False, mode="a", append_dim=append_dim
+    )
 
     # Then finish by writing the virtual variables to the same group
     for name, var in virtual_variables.items():
@@ -158,6 +160,7 @@ def write_virtual_variable_to_icechunk(
             )
             new_shape = list(existing_array.shape)
             new_shape[append_axis] += var.shape[append_axis]
+            # Tom: I wonder if some axis-handling logic from the concat function I wrote for ManifestArray could be re-used here.
             shape = tuple(new_shape)
             # this doesn't seem to actually resize the array
             arr = existing_array.resize(shape)
