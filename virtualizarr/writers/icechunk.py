@@ -6,6 +6,7 @@ from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import array_api as manifest_api
 from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
@@ -131,6 +132,50 @@ def write_variable_to_icechunk(
         )
 
 
+def num_chunks(
+    array,
+    axis: int,
+):
+    return array.shape[axis] // array.chunks[axis]
+
+
+def resize_array(
+    group: "Group",
+    name: str,
+    var: Variable,
+    append_axis: int,
+):  # -> "Array":
+    existing_array = group[name]
+    new_shape = list(existing_array.shape)
+    new_shape[append_axis] += var.shape[append_axis]
+    return existing_array.resize(tuple(new_shape))
+
+
+def get_axis(
+    dims: list[str],
+    dim_name: str,
+) -> int:
+    return dims.index(dim_name)
+
+
+import zarr
+
+
+def _check_compatibile_arrays(
+    ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
+):
+    manifest_api._check_same_dtypes([ma.dtype, existing_array.dtype])
+    # this is kind of gross - _v3_codec_pipeline returns a tuple
+    # Question: Does anything need to be done to apply the codecs to the new manifest array?
+    manifest_api._check_same_codecs(
+        [list(ma.zarray._v3_codec_pipeline()), existing_array.metadata.codecs]
+    )
+    manifest_api._check_same_chunk_shapes([ma.chunks, existing_array.chunks])
+    manifest_api._check_same_ndims([ma.ndim, existing_array.ndim])
+    arr_shapes = [ma.shape, existing_array.shape]
+    manifest_api._check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+
+
 def write_virtual_variable_to_icechunk(
     store: "IcechunkStore",
     group: "Group",
@@ -141,34 +186,36 @@ def write_virtual_variable_to_icechunk(
     """Write a single virtual variable into an icechunk store"""
     ma = cast(ManifestArray, var.data)
     zarray = ma.zarray
-    shape = zarray.shape
     mode = store.mode.str
 
     # Aimee: resize the array if it already exists
     # TODO: assert chunking and encoding is the same
-    existing_keys = tuple(group.array_keys())
+    dims = var.dims
     append_axis, existing_num_chunks, arr = None, None, None
-    if name in existing_keys and mode == "a":
-        # resize
-        dims = var.dims
-        if append_dim in dims:
-            append_axis = dims.index(append_dim)
-            existing_array = group[name]
-            existing_size = existing_array.shape[append_axis]
-            existing_num_chunks = int(
-                existing_size / existing_array.chunks[append_axis]
-            )
-            new_shape = list(existing_array.shape)
-            new_shape[append_axis] += var.shape[append_axis]
-            # Tom: I wonder if some axis-handling logic from the concat function I wrote for ManifestArray could be re-used here.
-            shape = tuple(new_shape)
-            # this doesn't seem to actually resize the array
-            arr = existing_array.resize(shape)
+    if mode == "a" and append_dim in dims:
+        existing_array = group[name]
+        append_axis = get_axis(dims, append_dim)
+        # check if arrays can be concatenated
+        _check_compatibile_arrays(ma, existing_array, append_axis)
+
+        # determine number of existing chunks along the append axis
+        existing_num_chunks = num_chunks(
+            array=group[name],
+            axis=append_axis,
+        )
+
+        # resize the array
+        arr = resize_array(
+            group=group,
+            name=name,
+            var=var,
+            append_axis=append_axis,
+        )
     else:
         # create array if it doesn't already exist
         arr = group.require_array(
             name=name,
-            shape=shape,
+            shape=zarray.shape,
             chunk_shape=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
             codecs=zarray._v3_codec_pipeline(),

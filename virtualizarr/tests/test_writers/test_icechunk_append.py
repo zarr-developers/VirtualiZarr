@@ -67,7 +67,7 @@ def generate_chunk_manifest(
 def gen_virtual_dataset(
     file_uri: str,
     shape: tuple[int, int] = (3, 4),
-    chunks: tuple[int, int] = (3, 4),
+    chunk_shape: tuple[int, int] = (3, 4),
     dtype: np.dtype = np.dtype("int32"),
     compressor: str = None,
     filters: str = None,
@@ -81,13 +81,13 @@ def gen_virtual_dataset(
     manifest = generate_chunk_manifest(
         file_uri,
         shape=shape,
-        chunks=chunks,
+        chunks=chunk_shape,
         base_offset=base_offset,
         length=length,
     )
     zarray = ZArray(
         shape=shape,
-        chunks=chunks,
+        chunks=chunk_shape,
         dtype=dtype,
         compressor=compressor,
         filters=filters,
@@ -107,7 +107,11 @@ def gen_virtual_dataset(
     )
 
 
-def test_set_single_virtual_ref_without_encoding(
+# Success cases
+
+
+## When appending to a single virtual ref without encoding, it succeeds
+def test_append_virtual_ref_without_encoding(
     icechunk_storage: "StorageConfig", simple_netcdf4: str
 ):
     import xarray as xr
@@ -139,7 +143,7 @@ def test_set_single_virtual_ref_without_encoding(
     npt.assert_equal(array, expected_array)
 
 
-# encoding is applied
+## When appending to a virtual ref with encoding, it succeeds
 def test_append_virtual_ref_with_encoding(
     icechunk_storage: "StorageConfig", netcdf4_files: tuple[str, str]
 ):
@@ -153,7 +157,7 @@ def test_append_virtual_ref_with_encoding(
         gen_virtual_dataset(
             file_uri=filepath1,
             shape=(1460, 25, 53),
-            chunks=(1460, 25, 53),
+            chunk_shape=(1460, 25, 53),
             dims=["time", "lat", "lon"],
             dtype=np.dtype("int16"),
             variable_name="air",
@@ -164,7 +168,7 @@ def test_append_virtual_ref_with_encoding(
         gen_virtual_dataset(
             file_uri=filepath2,
             shape=(1460, 25, 53),
-            chunks=(1460, 25, 53),
+            chunk_shape=(1460, 25, 53),
             dims=["time", "lat", "lon"],
             dtype=np.dtype("int16"),
             variable_name="air",
@@ -196,8 +200,103 @@ def test_append_virtual_ref_with_encoding(
     npt.assert_equal(array.get_basic_selection() * scale_factor, expected_array)
 
 
-# when chunking is different it fails
-# There's a whole beartrap here around noticing if the last chunk is smaller than the other chunks. We should throw in that case (because zarr can't support it without variable-length chunks).
-# when encoding is different it fails
-# when using compression it works
-# Should also test that it raises a clear error if you try to append with chunks of a different dtype etc. I would hope zarr-python would throw that for us.
+## When appending to a virtual ref with compression, it succeeds
+@pytest.mark.skip(reason="working on this")
+def test_append_with_compression_succeeds(
+    icechunk_storage: "StorageConfig", simple_netcdf4: str
+):
+    from icechunk import IcechunkStore
+
+    # Generate compressed dataset
+    vds = gen_virtual_dataset(
+        file_uri=simple_netcdf4, compressor="zlib", dtype=np.dtype("int16")
+    )
+
+    # Create icechunk store and commit the compressed dataset
+    icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+    dataset_to_icechunk(vds, icechunk_filestore)
+    icechunk_filestore.commit("test commit")
+
+    # Append another dataset with compatible compression
+    icechunk_filestore_append = IcechunkStore.open_existing(
+        storage=icechunk_storage, mode="a"
+    )
+    dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
+
+
+## When chunk shapes are different it fails
+@pytest.mark.skip(reason="working on this")
+def test_append_with_different_chunking_fails(
+    icechunk_storage: "StorageConfig", simple_netcdf4: str
+):
+    from icechunk import IcechunkStore
+
+    # Generate a virtual dataset with specific chunking
+    vds = gen_virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
+
+    # Create icechunk store and commit the dataset
+    icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+    dataset_to_icechunk(vds, icechunk_filestore)
+    icechunk_filestore.commit("test commit")
+
+    # Try to append dataset with different chunking, expect failure
+    vds_different_chunking = gen_virtual_dataset(
+        file_uri=simple_netcdf4, chunk_shape=(1, 1)
+    )
+    icechunk_filestore_append = IcechunkStore.open_existing(
+        storage=icechunk_storage, mode="a"
+    )
+    with pytest.raises(ValueError, match="incompatible chunking"):
+        dataset_to_icechunk(
+            vds_different_chunking, icechunk_filestore_append, append_dim="x"
+        )
+
+
+## When encoding is different it fails
+@pytest.mark.skip(reason="working on this")
+def test_append_with_different_encoding_fails(
+    icechunk_storage: "StorageConfig", simple_netcdf4: str
+):
+    from icechunk import IcechunkStore
+
+    # Generate datasets with different encoding
+    vds1 = gen_virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.1})
+    vds2 = gen_virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.01})
+
+    # Create icechunk store and commit the first dataset
+    icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+    dataset_to_icechunk(vds1, icechunk_filestore)
+    icechunk_filestore.commit("test commit")
+
+    # Try to append with different encoding, expect failure
+    icechunk_filestore_append = IcechunkStore.open_existing(
+        storage=icechunk_storage, mode="a"
+    )
+    with pytest.raises(ValueError, match="incompatible encoding"):
+        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
+
+
+# When sizes of other dimensions are different, it fails
+@pytest.mark.skip(reason="working on this")
+def test_other_dimensions_different_length_fails(
+    icechunk_storage: "StorageConfig", simple_netcdf4: str
+):
+    from icechunk import IcechunkStore
+
+    # Generate datasets with different lengths in non-append dimensions
+    vds1 = gen_virtual_dataset(file_uri=simple_netcdf4, shape=(5, 4))  # shape (5, 4)
+    vds2 = gen_virtual_dataset(file_uri=simple_netcdf4, shape=(6, 4))  # shape (6, 4)
+
+    # Create icechunk store and commit the first dataset
+    icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+    dataset_to_icechunk(vds1, icechunk_filestore)
+    icechunk_filestore.commit("test commit")
+
+    # Attempt to append dataset with different length in non-append dimension, expect failure
+    icechunk_filestore_append = IcechunkStore.open_existing(
+        storage=icechunk_storage, mode="a"
+    )
+    with pytest.raises(
+        ValueError, match="incompatible lengths in non-append dimensions"
+    ):
+        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
