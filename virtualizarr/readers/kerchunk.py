@@ -38,7 +38,9 @@ class KerchunkVirtualBackend(VirtualBackend):
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        if fs.filepath.endswith(".parquet") and fs.fs.isfile(f"{fs.filepath}/.zmetadata"):
+        if fs.filepath.endswith(".parquet") and fs.fs.isfile(
+            f"{fs.filepath}/.zmetadata"
+        ):
             from fsspec.implementations.reference import LazyReferenceMapper
 
             lrm = LazyReferenceMapper(filepath, fs.fs)
