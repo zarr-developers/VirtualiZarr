@@ -111,3 +111,17 @@ def simple_netcdf4(tmpdir):
     ds.to_netcdf(filepath)
 
     return filepath
+
+
+@pytest.fixture(params=[None, "zlib"])
+def compressed_cftime_hdf5_file(tmpdir, request):
+    ds = xr.tutorial.open_dataset("air_temperature")
+    encoding = {}
+    if request.param == "zlib":
+        encoding_config = {"zlib": True, "complevel": 1}
+        for var_name in ds.variables:
+            encoding[var_name] = encoding_config
+
+    filepath = f"{tmpdir}/zlib_cftime_xarray.nc"
+    ds.to_netcdf(filepath, encoding=encoding)
+    return filepath

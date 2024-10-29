@@ -264,3 +264,17 @@ def test_open_scalar_variable(tmpdir):
 
     vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
     assert vds["a"].shape == ()
+
+
+@requires_kerchunk
+def test_zlib_cftime_hdf5_roundtrip(tmpdir, compressed_cftime_hdf5_file):
+    ds = xr.open_dataset(compressed_cftime_hdf5_file, decode_times=True)
+    vds = open_virtual_dataset(
+        compressed_cftime_hdf5_file,
+        loadable_variables=["time"],
+        decode_times=True,
+    )
+    kerchunk_file = f"{tmpdir}/zlib_cftime_hdf5_kerchunk.json"
+    vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+    roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk", decode_times=True)
+    xrt.assert_allclose(ds, roundtrip)
