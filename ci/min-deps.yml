@@ -1,0 +1,26 @@
+name: virtualizarr-min-deps
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - xarray>=2024.6.0
+  - numpy>=2.0.0
+  - numcodecs
+  - packaging
+  - ujson
+  - universal_pathlib
+  # Testing
+  - codecov
+  - pre-commit
+  - mypy
+  - ruff
+  - pandas-stubs
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - fsspec

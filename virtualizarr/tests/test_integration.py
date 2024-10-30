@@ -4,8 +4,53 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests import requires_kerchunk
+from virtualizarr.translators.kerchunk import (
+    dataset_from_kerchunk_refs,
+    find_var_names,
+)
+from virtualizarr.zarr import ZArray
 
 
+def test_kerchunk_roundtrip_in_memory_no_concat():
+    # Set up example xarray dataset
+    chunks_dict = {
+        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+    }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(
+        zarray=dict(
+            shape=(2, 4),
+            dtype=np.dtype("<i8"),
+            chunks=(2, 2),
+            compressor=None,
+            filters=None,
+            fill_value=None,
+            order="C",
+        ),
+        chunkmanifest=manifest,
+    )
+    ds = xr.Dataset({"a": (["x", "y"], marr)})
+
+    # Use accessor to write it out to kerchunk reference dict
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+
+    # Use dataset_from_kerchunk_refs to reconstruct the dataset
+    roundtrip = dataset_from_kerchunk_refs(ds_refs)
+
+    # Assert equal to original dataset
+    xrt.assert_equal(roundtrip, ds)
+
+
+def test_no_duplicates_find_var_names():
+    """Verify that we get a deduplicated list of var names"""
+    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
+    assert len(find_var_names(ref_dict)) == 1
+
+
+@requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
     [
@@ -42,6 +87,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
+@requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
     def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
@@ -89,13 +135,11 @@ class TestKerchunkRoundtrip:
             f"{tmpdir}/air1.nc",
             indexes={},
             loadable_variables=time_vars,
-            cftime_variables=time_vars,
         )
         vds2 = open_virtual_dataset(
             f"{tmpdir}/air2.nc",
             indexes={},
             loadable_variables=time_vars,
-            cftime_variables=time_vars,
         )
 
         if decode_times is False:
@@ -166,7 +210,52 @@ class TestKerchunkRoundtrip:
         # assert equal to original dataset
         xrt.assert_identical(roundtrip, ds)
 
+    def test_datetime64_dtype_fill_value(self, tmpdir, format):
+        chunks_dict = {
+            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        chunks = (1, 1, 1)
+        shape = (1, 1, 1)
+        zarray = ZArray(
+            chunks=chunks,
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("<M8[ns]"),
+            # fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
+        )
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        ds = xr.Dataset(
+            {
+                "a": xr.DataArray(
+                    marr1,
+                    attrs={
+                        "_FillValue": np.datetime64("1970-01-01T00:00:00.000000000")
+                    },
+                )
+            }
+        )
 
+        if format == "dict":
+            # write those references to an in-memory kerchunk-formatted references dictionary
+            ds_refs = ds.virtualize.to_kerchunk(format=format)
+
+            # use fsspec to read the dataset from the kerchunk references dict
+            roundtrip = xr.open_dataset(ds_refs, engine="kerchunk")
+        else:
+            # write those references to disk as kerchunk references format
+            ds.virtualize.to_kerchunk(f"{tmpdir}/refs.{format}", format=format)
+
+            # use fsspec to read the dataset from disk via the kerchunk references
+            roundtrip = xr.open_dataset(f"{tmpdir}/refs.{format}", engine="kerchunk")
+
+        assert roundtrip.a.attrs == ds.a.attrs
+
+
+@requires_kerchunk
 def test_open_scalar_variable(tmpdir):
     # regression test for GH issue #100
 

@@ -1,0 +1,30 @@
+name: virtualizarr-min-deps
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - numpy>=2.0.0
+  - packaging
+  - ujson
+  - universal_pathlib
+  # Testing
+  - codecov
+  - pre-commit
+  - mypy
+  - ruff
+  - pandas-stubs
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - fsspec
+  - pip
+  - pip:
+    - icechunk # Installs zarr v3 as dependency
+    - git+https://github.com/pydata/xarray@zarr-v3  # zarr-v3 compatibility branch
+    - git+https://github.com/zarr-developers/numcodecs@zarr3-codecs  # zarr-v3 compatibility branch
+    # - git+https://github.com/fsspec/kerchunk@main  # kerchunk is currently incompatible with zarr-python v3 (https://github.com/fsspec/kerchunk/pull/516)
