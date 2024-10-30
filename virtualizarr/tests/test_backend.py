@@ -156,6 +156,23 @@ class TestOpenVirtualDatasetAttrs:
         }
 
 
+class TestDetermineCoords:
+    def test_determine_all_coords(self, netcdf4_file_with_2d_coords):
+        vds = open_virtual_dataset(netcdf4_file_with_2d_coords, indexes={})
+
+        expected_dimension_coords = ["ocean_time", "s_rho"]
+        expected_2d_coords = ["lon_rho", "lat_rho", "h"]
+        expected_1d_non_dimension_coords = ["Cs_r"]
+        expected_scalar_coords = ["hc", "Vtransform"]
+        expected_coords = (
+            expected_dimension_coords
+            + expected_2d_coords
+            + expected_1d_non_dimension_coords
+            + expected_scalar_coords
+        )
+        assert set(vds.coords) == set(expected_coords)
+
+
 @network
 @requires_s3fs
 class TestReadFromS3:
