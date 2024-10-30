@@ -156,8 +156,13 @@ class TestOpenVirtualDatasetAttrs:
         }
 
 
+@requires_kerchunk
 class TestDetermineCoords:
-    def test_determine_all_coords(self, netcdf4_file_with_2d_coords):
+    def test_infer_one_dimensional_coords(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert set(vds.coords) == {"time", "lat", "lon"}
+
+    def test_var_attr_coords(self, netcdf4_file_with_2d_coords):
         vds = open_virtual_dataset(netcdf4_file_with_2d_coords, indexes={})
 
         expected_dimension_coords = ["ocean_time", "s_rho"]
