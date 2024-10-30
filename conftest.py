@@ -36,6 +36,28 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def compressed_netcdf4_files(tmpdir):
+    ds = xr.tutorial.open_dataset("air_temperature")
+    # Define compression options for NetCDF
+    encoding = {
+        var: dict(compression="gzip", compression_opts=4) for var in ds.data_vars
+    }
+
+    ds1 = ds.isel(time=slice(None, 1460))
+    ds2 = ds.isel(time=slice(1460, None))
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath1 = f"{tmpdir}/air1_compressed.nc"
+    filepath2 = f"{tmpdir}/air2_compressed.nc"
+    ds1.to_netcdf(filepath1, engine="h5netcdf", encoding=encoding)
+    ds2.to_netcdf(filepath2, engine="h5netcdf", encoding=encoding)
+    ds1.close()
+    ds2.close()
+
+    return filepath1, filepath2
+
+
+@pytest.fixture
 def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr import open_virtual_dataset
 

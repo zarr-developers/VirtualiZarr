@@ -227,5 +227,5 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
         return num_codec
 
     num_codec_copy = num_codec.copy()
-    name = "numcodecs." + num_codec_copy.pop("id")
+    name = num_codec_copy.pop("id")
     return {"name": name, "configuration": num_codec_copy}
