@@ -9,6 +9,8 @@ from xarray import Dataset, Index, Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import (
     VirtualBackend,
+    construct_virtual_dataset,
+    open_loadable_vars_and_indexes,
     separate_coords,
 )
 from virtualizarr.utils import check_for_collisions
@@ -30,18 +32,6 @@ class ZarrVirtualBackend(VirtualBackend):
         Create a virtual dataset from an existing Zarr store
         """
 
-        # ToDo:
-        # group, decode_times and reader_options not used yet
-        # testing
-        # steps 5-8 incomplete
-
-        ######### tmp for testing! ############
-        # reader_options={}
-        # loadable_variables='time'
-        # drop_variables=[]
-        # indexes={}
-        # filepath = 'tmp_2_chunk.zarr'
-
         # check that Zarr is V3
         # 1a
         import zarr
@@ -57,11 +47,6 @@ class ZarrVirtualBackend(VirtualBackend):
         )
 
         # can we avoid fsspec here if we are using zarr-python for all the reading?
-        # fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
-        ######### tmp############
-
-        # store = zarr.storage.LocalStore(filepath)
-        # zg = zarr.open_consolidated(filepath)
 
         # 1b.
 
@@ -78,15 +63,15 @@ class ZarrVirtualBackend(VirtualBackend):
         ), f"loadable_variables ({loadable_variables}) is not a subset of variables in existing Zarr store. This zarr contains:  {zarr_arrays}"
 
         # virtual variables are available variables minus drop variables & loadable variables
-        virtual_variables = list(
+        virtual_vars = list(
             set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
         )
 
-        array_variable_list = []
+        virtual_variable_mapping = {}
         all_array_dims = []
 
         # 3. For each virtual variable:
-        for var in virtual_variables:
+        for var in virtual_vars:
             # 3a.  Use zarr-python to get the attributes and the dimension names,
             # and coordinate names (which come from the .zmetadata or zarr.json)
             array_metadata = zg[var].metadata
@@ -96,7 +81,8 @@ class ZarrVirtualBackend(VirtualBackend):
             # extract _ARRAY_DIMENSIONS and remove it from attrs
             array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
 
-            # should these have defaults?
+            # should these have defaults defined and shared across readers?
+            # Should these have common validation for Zarr V3 codecs & such?
             array_encoding = {
                 "chunks": array_metadata_dict.get("chunks", None),
                 "compressor": array_metadata_dict.get("compressor", None),
@@ -119,39 +105,20 @@ class ZarrVirtualBackend(VirtualBackend):
             )
 
             # 3c. Use the knowledge of the store location, variable name, and the zarr format to deduce which directory / S3 prefix the chunks must live in.
-            # QUESTION: how to get chunk keys from zarr-python
-            # fsspec ex:
-            # array_mapper = fsspec.get_mapper(path / 'air')
-            # [val for val in mapper] -> ['.zarray', '.zattrs', '0.0.0']
-            # zarr python: ?
-            # <Array file://tmp.zarr/air shape=(1, 1, 1) dtype=int16>
-            # air.chunks -> (1, 1, 1)
-
             # ToDo Replace fsspec w/ Zarr python for chunk size: https://github.com/zarr-developers/zarr-python/pull/2426
-            # add in fsspec stuff for now
-
-            #########################
-            # GET KEYS FOR MANIFESTS -
-            # get size, path, offset etc in dict to build ChunkManifest
-            #########################
 
             import fsspec
 
             array_mapper = fsspec.get_mapper(filepath + "/" + var)
 
-            # grab all chunk keys. skip metadata files - do we need this for anything?
-            array_keys = [val for val in array_mapper if not val.startswith(".")]
-
             # 3d. List all the chunks in that directory using fsspec.ls(detail=True), as that should also return the nbytes of each chunk. Remember that chunks are allowed to be missing.
+
             # 3e. The offset of each chunk is just 0 (ignoring sharding for now), and the length is the file size fsspec returned. The paths are just all the paths fsspec listed.
 
             # probably trying to do too much in one big dict/list comprehension
             # uses fsspec.ls on the array to get a list of dicts of info including chunk size
             # filters out metadata to get only chunks
             # uses fsspec.utils._unstrip_protocol utility to clean up path
-
-            # "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            # "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
 
             # array path to use for all chunks
             array_path = fsspec.utils._unstrip_protocol(
@@ -177,8 +144,6 @@ class ZarrVirtualBackend(VirtualBackend):
             array_manifest_array = ManifestArray(
                 zarray=array_zarray, chunkmanifest=array_chunkmanifest
             )
-            #########################
-            #########################
 
             # 3h. Wrap that ManifestArray in an xarray.Variable, using the dims and attrs we read before
             array_variable = Variable(
@@ -188,44 +153,36 @@ class ZarrVirtualBackend(VirtualBackend):
                 encoding=array_encoding,
             )
 
-            array_variable_list.append(array_variable)
+            virtual_variable_mapping[f"{var}"] = array_variable
 
             all_array_dims.extend([dim for dim in array_dims])
 
-        # do we need this for `separate_coords`?
-        # Extending list + flatten so we don't have nested lists
-        all_array_dims = list(set(all_array_dims))
+        coord_names = list(set(all_array_dims))
 
         # 4 Get the loadable_variables by just using xr.open_zarr on the same store (should use drop_variables to avoid handling the virtual variables that we already have).
-        if loadable_variables:
-            import xarray as xr
+        # We want to drop 'drop_variables' but also virtual variables since we already **manifested** them.
 
-            # we wanna drop 'drop_variables' but also virtual variables since we already **manifested** them.
-            ds = xr.open_zarr(
-                filepath, drop_variables=list(set(drop_variables + virtual_variables))
-            )
+        non_loadable_variables = list(set(virtual_vars).union(set(drop_variables)))
 
-        # 5 Use separate_coords to set the correct variables as coordinate variables (and avoid building indexes whilst doing it)
-
-        # this fails - --> 154 for name, var in vars.items(): - AttributeError: 'list' object has no attribute 'items'
-
-        # separate_coords(
-        #     vars = list(set(loadable_variables + virtual_variables)),
-        #     indexes= indexes,
-        #     coord_names=all_array_dims,
-        # )
+        # pre made func for this?! Woohoo
+        loadable_vars, indexes = open_loadable_vars_and_indexes(
+            filepath,
+            loadable_variables=loadable_variables,
+            reader_options=reader_options,
+            drop_variables=non_loadable_variables,
+            indexes=indexes,
+            group=group,
+            decode_times=decode_times,
+        )
 
         # 6 Merge all the variables into one xr.Dataset and return it.
-
-        # ToDo
-        # return vds
-
-        # 7 All the above should be wrapped in a virtualizarr.readers.zarr.open_virtual_dataset function, which then should be called as a method from a ZarrVirtualBackend(VirtualBackend) subclass.
-
-        # Done
-
-        # 8 Finally add that ZarrVirtualBackend to the list of readers in virtualizarr.backend.py
-        # Done
+        return construct_virtual_dataset(
+            virtual_vars=virtual_variable_mapping,
+            loadable_vars=loadable_vars,
+            indexes=indexes,
+            coord_names=coord_names,
+            attrs=zg.attrs.asdict(),
+        )
 
 
 class ZarrV3ChunkManifestVirtualBackend(VirtualBackend):

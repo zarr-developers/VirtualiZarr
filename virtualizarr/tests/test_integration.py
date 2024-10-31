@@ -79,6 +79,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     vds = open_virtual_dataset(
         netcdf4_file, loadable_variables=vars_to_inline, indexes={}
     )
+
     refs = vds.virtualize.to_kerchunk(format="dict")
 
     # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
@@ -95,8 +96,6 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 # - loadable_variables
 # - store readable over cloud storage?
 # - zarr store version v2, v3
-
-
 # testing out pytest parameterization with dataclasses :shrug: -- we can revert to a more normal style
 @dataclass
 class ZarrV2Param:
@@ -119,20 +118,34 @@ ZARR_V2_PARAMS = [
     [inputs for inputs in ZARR_V2_PARAMS],
 )
 def test_zarrV2_roundtrip(zarr_v2_store, input_params):
-    # ds = xr.open_zarr(zarr_v2_store)
-
-    open_virtual_dataset(
+    ds = open_virtual_dataset(
         zarr_v2_store,
         loadable_variables=input_params.loadable_variables,
         drop_variables=input_params.drop_variables,
         indexes={},
     )
+
+    # THIS FAILS! TypeError: np.float32(nan) is not JSON serializable
+    # Question: How do we handle this fill value: fill_value=np.float32(nan)
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+
+    # tmp fix if you want to override the fill vals!
+    ds.lat.data.zarray.fill_value = float("nan")
+    ds.time.data.zarray.fill_value = float("nan")
+    ds.lon.data.zarray.fill_value = float("nan")
+
+    # Use dataset_from_kerchunk_refs to reconstruct the dataset
+    roundtrip = dataset_from_kerchunk_refs(ds_refs)
+
+    # Assert equal to original dataset
+    xrt.assert_equal(roundtrip, ds)
+
     # assert vds has:
     # loadable vars are np arrays?
     # drop vars are not present
     # virtual vars are manifest arrays, not loaded arrays
 
-    # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose?
+    # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose? or just roundtrip it.
     # from xarray.testing import assert_duckarray_allclose
     # xrt.assert_allclose(ds, vds)
 

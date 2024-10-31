@@ -49,13 +49,17 @@ class _FsspecFSFromFilepath:
         with self.open_file() as of:
             return of.read(bytes)
 
+    def get_mapper(self):
+        """Returns a mapper for use with Zarr"""
+        return self.fs.get_mapper(self.filepath)
+
     def __post_init__(self) -> None:
         """Initialize the fsspec filesystem object"""
         import fsspec
         from upath import UPath
 
-        universal_filepath = UPath(self.filepath)
-        protocol = universal_filepath.protocol
+        self.filepath = UPath(self.filepath)
+        protocol = self.filepath.protocol
 
         self.reader_options = self.reader_options or {}
         storage_options = self.reader_options.get("storage_options", {})  # type: ignore
