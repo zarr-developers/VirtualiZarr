@@ -37,20 +37,22 @@ def netcdf4_file(tmpdir):
 
 @pytest.fixture
 def compressed_netcdf4_files(tmpdir):
-    ds = xr.tutorial.open_dataset("air_temperature")
-    # Define compression options for NetCDF
-    encoding = {
-        var: dict(compression="gzip", compression_opts=4) for var in ds.data_vars
-    }
-
+    # without chunks={} we get a compression error: zlib.error: Error -3 while decompressing data: incorrect header check
+    ds = xr.tutorial.open_dataset("air_temperature", chunks={})
     ds1 = ds.isel(time=slice(None, 1460))
     ds2 = ds.isel(time=slice(1460, None))
+    # Define compression options for NetCDF
+    encoding = {
+        # without encoding the chunksizes, irregular ones are chosen
+        var: dict(zlib=True, complevel=4, chunksizes=(1460, 25, 53))
+        for var in ds.data_vars
+    }
 
     # Save it to disk as netCDF (in temporary directory)
     filepath1 = f"{tmpdir}/air1_compressed.nc"
     filepath2 = f"{tmpdir}/air2_compressed.nc"
-    ds1.to_netcdf(filepath1, engine="h5netcdf", encoding=encoding)
-    ds2.to_netcdf(filepath2, engine="h5netcdf", encoding=encoding)
+    ds1.to_netcdf(filepath1, encoding=encoding, engine="h5netcdf")
+    ds2.to_netcdf(filepath2, encoding=encoding, engine="h5netcdf")
     ds1.close()
     ds2.close()
 

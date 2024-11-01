@@ -188,8 +188,6 @@ def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
     mode = store.mode.str
 
-    # Aimee: resize the array if it already exists
-    # TODO: assert chunking and encoding is the same
     dims = var.dims
     append_axis, existing_num_chunks, arr = None, None, None
     if mode == "a" and append_dim in dims:

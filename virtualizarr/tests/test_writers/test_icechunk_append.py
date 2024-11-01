@@ -159,7 +159,7 @@ def test_append_virtual_ref_with_encoding(
             shape=(1460, 25, 53),
             chunk_shape=(1460, 25, 53),
             dims=["time", "lat", "lon"],
-            dtype=np.dtype("int16"),
+            dtype=np.dtype("float64"),
             variable_name="air",
             encoding={"scale_factor": scale_factor},
             base_offset=15419,
@@ -170,7 +170,7 @@ def test_append_virtual_ref_with_encoding(
             shape=(1460, 25, 53),
             chunk_shape=(1460, 25, 53),
             dims=["time", "lat", "lon"],
-            dtype=np.dtype("int16"),
+            dtype=np.dtype("float64"),
             variable_name="air",
             encoding={"scale_factor": scale_factor},
             base_offset=15419,
@@ -201,7 +201,6 @@ def test_append_virtual_ref_with_encoding(
 
 
 ## When appending to a virtual ref with compression, it succeeds
-@pytest.mark.skip(reason="Failing with gzip.BadGzipFile: Not a gzipped file")
 def test_append_with_compression_succeeds(
     icechunk_storage: "StorageConfig", compressed_netcdf4_files: str
 ):
@@ -213,24 +212,25 @@ def test_append_with_compression_succeeds(
     vds1, vds2 = (
         gen_virtual_dataset(
             file_uri=file1,
-            # https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#metadata
-            compressor={"id": "gzip", "level": 4},
-            dtype=np.dtype("int16"),
-            variable_name="air",
             shape=(1460, 25, 53),
             chunk_shape=(1460, 25, 53),
-            base_offset=15419,
-            length=3869000,
+            compressor={"id": "zlib", "level": 4},
+            dims=["time", "lat", "lon"],
+            dtype=np.dtype("float64"),
+            variable_name="air",
+            base_offset=23214,
+            length=3936114,
         ),
         gen_virtual_dataset(
             file_uri=file2,
-            compressor={"id": "gzip", "level": 4},
-            dtype=np.dtype("int16"),
-            variable_name="air",
             shape=(1460, 25, 53),
             chunk_shape=(1460, 25, 53),
-            base_offset=15419,
-            length=3869000,
+            compressor={"id": "zlib", "level": 4},
+            dims=["time", "lat", "lon"],
+            dtype=np.dtype("float64"),
+            variable_name="air",
+            base_offset=23214,
+            length=3938672,
         ),
     )
 
