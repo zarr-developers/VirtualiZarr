@@ -1,6 +1,4 @@
-import os
 import warnings
-from collections import defaultdict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -43,7 +41,7 @@ class DMRPPVirtualBackend(VirtualBackend):
             filepath=filepath, reader_options=reader_options
         ).open_file()
 
-        parser = DMRParser(fpath.read())
+        parser = DMRParser(ET.parse(fpath), data_filepath=filepath.strip(".dmrpp"))
         vds = parser.parse_dataset(group=group, indexes=indexes)
 
         return vds.drop_vars(drop_variables)
@@ -86,7 +84,7 @@ class DMRParser:
     # Encoding keys that should be removed from attributes and placed in xarray encoding dict
     _ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
 
-    def __init__(self, dmrpp_str: str, data_filepath: Optional[str] = None):
+    def __init__(self, root: ET.Element, data_filepath: Optional[str] = None):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
 
@@ -99,7 +97,7 @@ class DMRParser:
             The path to the actual data file that will be set in the chunk manifests.
             If None, the data file path is taken from the DMR++ file.
         """
-        self.root = ET.fromstring(dmrpp_str)
+        self.root = root
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
@@ -148,21 +146,23 @@ class DMRParser:
         group_tags = self.root.findall("dap:Group", self._NS)
         if group is not None:
             group = Path(group)
+            if not group.is_absolute():
+                group = Path("/") / group
             if len(group_tags) == 0:
                 warnings.warn("No groups found in DMR++ file; ignoring group parameter")
             else:
                 all_groups = self._split_groups(self.root)
-                if group.name in all_groups:
-                    return self._parse_dataset(all_groups[group.name], indexes)
+                if str(group) in all_groups:
+                    return self._parse_dataset(all_groups[str(group)], indexes)
                 else:
-                    raise ValueError(f"Group {group.name} not found in DMR++ file")
+                    raise ValueError(f"Group {group} not found in DMR++ file")
         return self._parse_dataset(self.root, indexes)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
         """
         Find the element in the root element by converting the fully qualified name to an xpath query.
 
-        E.g. fqn = "/a/b" --> root.find("./[*[@name='a']/*[@name='b']")
+        E.g. fqn = "/a/b" --> root.find("./*[@name='a']/*[@name='b']")
         See more about OPeNDAP fully qualified names (FQN) here: https://docs.opendap.org/index.php/DAP4:_Specification_Volume_1#Fully_Qualified_Names
 
         Parameters
@@ -180,7 +180,7 @@ class DMRParser:
         ValueError
             If the fully qualified name is not found in the root element.
         """
-        if fqn == "":
+        if fqn == "/":
             return self.root
         elements = fqn.strip("/").split("/")  # /a/b/ --> ['a', 'b']
         xpath_segments = [f"*[@name='{element}']" for element in elements]
@@ -204,26 +204,26 @@ class DMRParser:
         -------
         dict[str, ET.Element]
         """
-        all_groups: dict[str, ET.Element] = defaultdict(
-            lambda: ET.Element(root.tag, root.attrib)
-        )
+        all_groups: dict[str, ET.Element] = {}
         dataset_tags = [
             d for d in root if d.tag != "{" + self._NS["dap"] + "}" + "Group"
         ]
         if len(dataset_tags) > 0:
+            all_groups["/"] = ET.Element(root.tag, root.attrib)
             all_groups["/"].extend(dataset_tags)
-        all_groups.update(self._split_groups_recursive(root))
+        all_groups.update(self._split_groups_recursive(root, Path("/")))
         return all_groups
 
     def _split_groups_recursive(
         self, root: ET.Element, current_path=Path("")
     ) -> dict[Path, ET.Element]:
-        group_dict = defaultdict(lambda: ET.Element(root.tag, root.attrib))
+        group_dict: dict[str, ET.Element] = {}
         for g in root.iterfind("dap:Group", self._NS):
-            new_path = str(current_path / g.attrib["name"])
+            new_path = str(current_path / Path(g.attrib["name"]))
             dataset_tags = [
                 d for d in g if d.tag != "{" + self._NS["dap"] + "}" + "Group"
             ]
+            group_dict[new_path] = ET.Element(g.tag, g.attrib)
             group_dict[new_path].extend(dataset_tags)
             group_dict.update(self._split_groups_recursive(g, new_path))
         return group_dict
@@ -249,16 +249,21 @@ class DMRParser:
         for dim in dimension_tags:
             dims.update(self._parse_dim(dim))
         # Data variables and coordinates
-        coord_names = self._find_coord_names(root)
-        # if no coord_names are found or coords don't include dims, dims are used as coords
-        if len(coord_names) == 0 or len(coord_names) < len(dims):
-            coord_names = set(dims.keys())
+        coord_names: set[str] = set()
+        coord_tags = root.findall(
+            ".//dap:Attribute[@name='coordinates']/dap:Value", self._NS
+        )
+        for c in coord_tags:
+            coord_names.update(c.text.split(" "))
         # Seperate and parse coords + data variables
         coord_vars: dict[str, Variable] = {}
         data_vars: dict[str, Variable] = {}
         for var_tag in self._find_var_tags(root):
             variable = self._parse_variable(var_tag)
-            if var_tag.attrib["name"] in coord_names:
+            # Either coordinates are explicitly defined or 1d variable with same name as dimension is a coordinate
+            if var_tag.attrib["name"] in coord_names or (
+                len(variable.dims) == 1 and variable.dims[0] == var_tag.attrib["name"]
+            ):
                 coord_vars[var_tag.attrib["name"]] = variable
             else:
                 data_vars[var_tag.attrib["name"]] = variable
@@ -297,37 +302,11 @@ class DMRParser:
             vars_tags += root.findall(f"dap:{dap_dtype}", self._NS)
         return vars_tags
 
-    def _find_coord_names(self, root: ET.Element) -> set[str]:
-        """
-        Find the name of all coordinates in root. Checks inside all variables and global attributes.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The root element of the DMR++ file.
-
-        Returns
-        -------
-        set[str] : The set of unique coordinate names.
-        """
-        # Check for coordinate names within each variable attributes
-        coord_names: set[str] = set()
-        coord_tags = root.findall(
-            ".//dap:Attribute[@name='coordinates']/dap:Value", self._NS
-        )
-        for c in coord_tags:
-            coord_names.update(c.text.split(" "))
-        map_tags = root.findall(".//dap:Map", self._NS)
-        for m in map_tags:
-            coord_names.add(Path(m.attrib["name"]).name)
-        return coord_names
-
-    def _parse_dim(self, root: ET.Element) -> dict[str, int | None]:
+    def _parse_dim(self, root: ET.Element) -> dict[str, int]:
         """
         Parse single <Dim> or <Dimension> tag
 
         If the tag has no name attribute, it is a phony dimension. E.g. <Dim size="300"/> --> {"phony_dim": 300}
-        If the tag has no size attribute, it is an unlimited dimension. E.g. <Dim name="time"/> --> {"time": None}
         If the tag has both name and size attributes, it is a regular dimension. E.g. <Dim name="lat" size="1447"/> --> {"lat": 1447}
 
         Parameters
@@ -342,10 +321,8 @@ class DMRParser:
         """
         if "name" not in root.attrib and "size" in root.attrib:
             return {"phony_dim": int(root.attrib["size"])}
-        if "name" in root.attrib and "size" not in root.attrib:
-            return {os.path.basename(root.attrib["name"]): None}
         if "name" in root.attrib and "size" in root.attrib:
-            return {os.path.basename(root.attrib["name"]): int(root.attrib["size"])}
+            return {Path(root.attrib["name"]).name: int(root.attrib["size"])}
         raise ValueError("Not enough information to parse Dim/Dimension tag")
 
     def _find_dimension_tags(self, root: ET.Element) -> list[ET.Element]:
