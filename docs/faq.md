@@ -68,3 +68,31 @@ We have a lot of ideas, including:
 - [Generating references without kerchunk](https://github.com/zarr-developers/VirtualiZarr/issues/78)
 
 If you see other opportunities then we would love to hear your ideas!
+
+## Is this compatible with Icechunk?
+
+Yes! VirtualiZarr allows you to ingest data as virtual references and write those references into an Icechunk Store. See the [Icechunk documentation on creating virtaul datasets.](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr)
+
+## I already have Kerchunked data, do I have to redo that work?
+
+No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can re-save them into a new format, e.g. [Icechunk](https://icechunk.io/) like so:
+
+```python
+from virtualizarr import open_virtual_dataset
+
+vds = open_virtual_dataset('refs.json')
+# vds = open_virtual_dataset('refs.parq')  # kerchunk parquet files are supported too
+
+vds.virtualize.to_icechunk(icechunkstore)
+```
+
+## Can I add a new reader for my custom file format?
+
+There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) for some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
+
+VirtualiZarr is designed in a way to make this as straightforward as possible. If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
+) will be helpful.
+
+You can also use this approach to write a reader that starts from a kerchunk-formatted virtual references dict.
+
+Currently if you want to call your new reader from `virtualizarr.open_virtual_dataset` you would need to open a PR to this repository, but we plan to generalize this system to allow 3rd party libraries to plug in via an entrypoint (see [issue #245](https://github.com/zarr-developers/VirtualiZarr/issues/245)).

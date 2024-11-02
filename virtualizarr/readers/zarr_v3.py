@@ -4,9 +4,7 @@ from typing import Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
-from xarray import Dataset
-from xarray.core.indexes import Index
-from xarray.core.variable import Variable
+from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend, separate_coords
@@ -150,5 +148,7 @@ def _configurable_to_num_codec_config(configurable: dict) -> dict:
     """
     configurable_copy = configurable.copy()
     codec_id = configurable_copy.pop("name")
+    if codec_id.startswith("numcodecs."):
+        codec_id = codec_id[len("numcodecs.") :]
     configuration = configurable_copy.pop("configuration")
     return numcodecs.get_codec({"id": codec_id, **configuration}).get_config()

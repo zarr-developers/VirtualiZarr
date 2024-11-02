@@ -5,9 +5,7 @@ from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from xarray import Coordinates, Dataset
-from xarray.core.indexes import Index
-from xarray.core.variable import Variable
+from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend
