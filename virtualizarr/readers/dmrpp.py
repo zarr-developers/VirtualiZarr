@@ -11,7 +11,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
-from virtualizarr.zarr import ZArray
+from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -39,7 +39,9 @@ class DMRPPVirtualBackend(VirtualBackend):
             filepath=filepath, reader_options=reader_options
         ).open_file()
 
-        parser = DMRParser(ET.parse(fpath), data_filepath=filepath.strip(".dmrpp"))
+        parser = DMRParser(
+            root=ET.parse(fpath).getroot(), data_filepath=filepath.strip(".dmrpp")
+        )
         vds = parser.parse_dataset(group=group, indexes=indexes)
 
         return vds.drop_vars(drop_variables)
@@ -150,8 +152,8 @@ class DMRParser:
                 warnings.warn("No groups found in DMR++ file; ignoring group parameter")
             else:
                 all_groups = self._split_groups(self.root)
-                if str(group) in all_groups:
-                    return self._parse_dataset(all_groups[str(group)], indexes)
+                if group in all_groups:
+                    return self._parse_dataset(all_groups[group], indexes)
                 else:
                     raise ValueError(f"Group {group} not found in DMR++ file")
         return self._parse_dataset(self.root, indexes)
@@ -188,7 +190,7 @@ class DMRParser:
             raise ValueError(f"Path {fqn} not found in provided root")
         return element
 
-    def _split_groups(self, root: ET.Element) -> dict[str, ET.Element]:
+    def _split_groups(self, root: ET.Element) -> dict[Path, ET.Element]:
         """
         Split the input <Dataset> element into several <Dataset> ET.Elements by <Group> name.
         E.g. {"/": <Dataset>, "left": <Dataset>, "right": <Dataset>}
@@ -200,24 +202,24 @@ class DMRParser:
 
         Returns
         -------
-        dict[str, ET.Element]
+        dict[Path, ET.Element]
         """
-        all_groups: dict[str, ET.Element] = {}
+        all_groups: dict[Path, ET.Element] = {}
         dataset_tags = [
             d for d in root if d.tag != "{" + self._NS["dap"] + "}" + "Group"
         ]
         if len(dataset_tags) > 0:
-            all_groups["/"] = ET.Element(root.tag, root.attrib)
-            all_groups["/"].extend(dataset_tags)
+            all_groups[Path("/")] = ET.Element(root.tag, root.attrib)
+            all_groups[Path("/")].extend(dataset_tags)
         all_groups.update(self._split_groups_recursive(root, Path("/")))
         return all_groups
 
     def _split_groups_recursive(
         self, root: ET.Element, current_path=Path("")
     ) -> dict[Path, ET.Element]:
-        group_dict: dict[str, ET.Element] = {}
+        group_dict: dict[Path, ET.Element] = {}
         for g in root.iterfind("dap:Group", self._NS):
-            new_path = str(current_path / Path(g.attrib["name"]))
+            new_path = current_path / Path(g.attrib["name"])
             dataset_tags = [
                 d for d in g if d.tag != "{" + self._NS["dap"] + "}" + "Group"
             ]
@@ -252,7 +254,8 @@ class DMRParser:
             ".//dap:Attribute[@name='coordinates']/dap:Value", self._NS
         )
         for c in coord_tags:
-            coord_names.update(c.text.split(" "))
+            if c.text is not None:
+                coord_names.update(c.text.split(" "))
         # Seperate and parse coords + data variables
         coord_vars: dict[str, Variable] = {}
         data_vars: dict[str, Variable] = {}
@@ -363,7 +366,7 @@ class DMRParser:
         xr.Variable
         """
         # Dimension info
-        dims: {str, int} = {}
+        dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
         if not dimension_tags:
             raise ValueError("Variable has no dimensions")
@@ -396,7 +399,7 @@ class DMRParser:
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         # Fill value is placed in encoding and thus removed from attributes
-        fill_value = attrs.pop("_FillValue", np.nan)
+        fill_value = attrs.pop("_FillValue", ZARR_DEFAULT_FILL_VALUE[dtype.kind])
         # create ManifestArray and ZArray
         zarray = ZArray(
             chunks=chunks_shape,
