@@ -19,10 +19,9 @@ from xarray import (
     Variable,
     open_dataset,
 )
-from xarray.backends import AbstractDataStore, BackendArray
+from xarray.backends import AbstractDataStore
 from xarray.core.indexes import PandasIndex
 
-from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
@@ -32,12 +31,6 @@ if TYPE_CHECKING:
         from xarray import DataTree  # type: ignore[attr-defined]
     except ImportError:
         DataTree = Any
-
-
-class ManifestBackendArray(ManifestArray, BackendArray):
-    """Using this prevents xarray from wrapping the KerchunkArray in ExplicitIndexingAdapter etc."""
-
-    ...
 
 
 def open_loadable_vars_and_indexes(
