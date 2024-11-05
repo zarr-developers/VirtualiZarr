@@ -11,7 +11,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
-from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
+from virtualizarr.zarr import ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -399,7 +399,7 @@ class DMRParser:
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         # Fill value is placed in encoding and thus removed from attributes
-        fill_value = attrs.pop("_FillValue", ZARR_DEFAULT_FILL_VALUE[dtype.kind])
+        fill_value = attrs.pop("_FillValue", None)
         # create ManifestArray and ZArray
         zarray = ZArray(
             chunks=chunks_shape,
