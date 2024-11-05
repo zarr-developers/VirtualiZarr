@@ -144,8 +144,13 @@ def separate_coords(
     coord_vars: dict[
         str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
     ] = {}
+    found_coord_names: set[str] = set()
+    # Search through variable attributes for coordinate names
+    for var in vars.values():
+        if "coordinates" in var.attrs:
+            found_coord_names.update(var.attrs["coordinates"].split(" "))
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if name in coord_names or var.dims == (name,) or name in found_coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
