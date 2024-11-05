@@ -385,13 +385,13 @@ Currently you can only serialize in-memory variables to kerchunk references if t
 When you have many chunks, the reference file can get large enough to be unwieldy as json. In that case the references can be instead stored as parquet. Again this uses kerchunk internally.
 
 ```python
-combined_vds.virtualize.to_kerchunk('combined.parq', format='parquet')
+combined_vds.virtualize.to_kerchunk('combined.parquet', format='parquet')
 ```
 
 And again we can read these references using the "kerchunk" backend as if it were a regular Zarr store
 
 ```python
-combined_ds = xr.open_dataset('combined.parq', engine="kerchunk")
+combined_ds = xr.open_dataset('combined.parquet', engine="kerchunk")
 ```
 
 By default references are placed in separate parquet file when the total number of references exceeds `record_size`. If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
@@ -444,9 +444,9 @@ You can open existing Kerchunk `json` or `parquet` references as Virtualizarr vi
 
 ```python
 
-vds = open_virtual_dataset('combined.json', format='kerchunk')
+vds = open_virtual_dataset('combined.json', filetype='kerchunk', indexes={})
 # or
-vds = open_virtual_dataset('combined.parquet', format='kerchunk')
+vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
 
 ```
 

@@ -19,10 +19,9 @@ from xarray import (
     Variable,
     open_dataset,
 )
-from xarray.backends import AbstractDataStore, BackendArray
+from xarray.backends import AbstractDataStore
 from xarray.core.indexes import PandasIndex
 
-from virtualizarr.manifests import ManifestArray
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
@@ -32,12 +31,6 @@ if TYPE_CHECKING:
         from xarray import DataTree  # type: ignore[attr-defined]
     except ImportError:
         DataTree = Any
-
-
-class ManifestBackendArray(ManifestArray, BackendArray):
-    """Using this prevents xarray from wrapping the KerchunkArray in ExplicitIndexingAdapter etc."""
-
-    ...
 
 
 def open_loadable_vars_and_indexes(
@@ -151,8 +144,13 @@ def separate_coords(
     coord_vars: dict[
         str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
     ] = {}
+    found_coord_names: set[str] = set()
+    # Search through variable attributes for coordinate names
+    for var in vars.values():
+        if "coordinates" in var.attrs:
+            found_coord_names.update(var.attrs["coordinates"].split(" "))
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if name in coord_names or var.dims == (name,) or name in found_coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
