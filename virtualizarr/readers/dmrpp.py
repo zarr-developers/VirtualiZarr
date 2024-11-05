@@ -40,7 +40,8 @@ class DMRPPVirtualBackend(VirtualBackend):
         ).open_file()
 
         parser = DMRParser(
-            root=ET.parse(fpath).getroot(), data_filepath=filepath.strip(".dmrpp")
+            root=ET.parse(fpath).getroot(),
+            data_filepath=filepath.removesuffix(".dmrpp"),
         )
         vds = parser.parse_dataset(group=group, indexes=indexes)
 
