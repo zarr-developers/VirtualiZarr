@@ -57,6 +57,8 @@ Bug fixes
 - Fixed regression in `fill_value` handling for datetime dtypes making virtual
   Zarr stores unreadable (:pull:`206`)
   By `Timothy Hodson <https://github.com/thodson-usgs>`_
+- Fixed bug with writing of `dimension_names` into zarr metadata.
+  (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
