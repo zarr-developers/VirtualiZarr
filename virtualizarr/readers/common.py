@@ -4,7 +4,6 @@ from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
 from io import BufferedIOBase
 from typing import (
-    TYPE_CHECKING,
     Any,
     Hashable,
     Optional,
@@ -14,6 +13,7 @@ from typing import (
 from xarray import (
     Coordinates,
     Dataset,
+    DataTree,
     Index,
     IndexVariable,
     Variable,
@@ -25,12 +25,6 @@ from xarray.core.indexes import PandasIndex
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
-
-if TYPE_CHECKING:
-    try:
-        from xarray import DataTree  # type: ignore[attr-defined]
-    except ImportError:
-        DataTree = Any
 
 
 def open_loadable_vars_and_indexes(
@@ -194,5 +188,5 @@ class VirtualBackend(ABC):
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
-    ) -> "DataTree":
+    ) -> DataTree:
         raise NotImplementedError()
