@@ -29,6 +29,9 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- FAQ answers on Icechunk compatibility, converting from existing Kerchunk references to Icechunk, and how to add a new reader for a custom file format.
+  (:pull:`266`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
