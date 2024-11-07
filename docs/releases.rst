@@ -42,6 +42,8 @@ Breaking changes
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
   `pydantic.BaseModel` (:pull:`210`)
 - `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`210`)
+- Minimum required version of Xarray is now v2024.10.0.
+  (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
