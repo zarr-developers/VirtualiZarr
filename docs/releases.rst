@@ -1,36 +1,57 @@
 Release notes
 =============
 
-.. _v1.0.1:
+.. _v1.1.1:
 
-v1.0.1 (unreleased)
+v1.1.1 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Minimum required version of Xarray is now v2024.10.0.
+  (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed bug with writing of `dimension_names` into zarr metadata.
+  (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.1.0:
+
+v1.1.0 (22nd Oct 2024)
+----------------------
+
+New Features
+~~~~~~~~~~~~
 
 - Can open `kerchunk` reference files with ``open_virtual_dataset``.
   (:pull:`251`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_ & `Kristen Thyng <https://github.com/kthyng>`_.
-
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
   (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
-
 - Adds `decode_times` to open_virtual_dataset (:pull:`232`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
   By `Ayush Nag <https://github.com/ayushnag>`_.
-
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
-
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
-
 - Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
   By `Matt Iannucci <https://github.com/mpiannucci>`_.
 
@@ -42,8 +63,6 @@ Breaking changes
 - VirtualiZarr's `ZArray`, `ChunkEntry`, and `Codec` no longer subclass
   `pydantic.BaseModel` (:pull:`210`)
 - `ZArray`'s `__init__` signature has changed to match `zarr.Array`'s (:pull:`210`)
-- Minimum required version of Xarray is now v2024.10.0.
-  (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -59,15 +78,12 @@ Bug fixes
 - Fixed regression in `fill_value` handling for datetime dtypes making virtual
   Zarr stores unreadable (:pull:`206`)
   By `Timothy Hodson <https://github.com/thodson-usgs>`_
-- Fixed bug with writing of `dimension_names` into zarr metadata.
-  (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
 
 - Adds virtualizarr + coiled serverless example notebook (:pull:`223`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
