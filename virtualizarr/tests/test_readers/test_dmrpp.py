@@ -1,3 +1,4 @@
+import textwrap
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -22,7 +23,8 @@ urls = [
 
 @pytest.fixture
 def basic_dmrpp() -> DMRParser:
-    xml_str = """<?xml version="1.0" encoding="ISO-8859-1"?>
+    xml_str = """\
+    <?xml version="1.0" encoding="ISO-8859-1"?>
     <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
         <Dimension name="x" size="720"/>
         <Dimension name="y" size="1440"/>
@@ -109,12 +111,13 @@ def basic_dmrpp() -> DMRParser:
         </Attribute>
     </Dataset>
     """
-    return DMRParser(root=ET.fromstring(xml_str))
+    return DMRParser(root=ET.fromstring(textwrap.dedent(xml_str)))
 
 
 @pytest.fixture
 def nested_groups_dmrpp() -> DMRParser:
-    xml_str = """<?xml version="1.0" encoding="ISO-8859-1"?>
+    xml_str = """\
+    <?xml version="1.0" encoding="ISO-8859-1"?>
     <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
         <Dimension name="a" size="10"/>
         <Dimension name="b" size="10"/>
@@ -163,7 +166,7 @@ def nested_groups_dmrpp() -> DMRParser:
         </Group>
     </Dataset>
     """
-    return DMRParser(root=ET.fromstring(xml_str))
+    return DMRParser(root=ET.fromstring(textwrap.dedent(xml_str)))
 
 
 @network
