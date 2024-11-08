@@ -21,6 +21,8 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Handle root and nested groups with ``dmrpp`` backend (:pull:`265`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
 - Fixed bug with writing of `dimension_names` into zarr metadata.
   (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Fixed bug causing CF-compliant variables not to be identified as coordinates (:pull:`191`)
