@@ -68,7 +68,7 @@ def test_write_new_virtual_variable(
     # assert dict(arr.attrs) == {"units": "km"}
 
     # check dimensions
-    assert arr.attrs["_ARRAY_DIMENSIONS"] == ["x", "y"]
+    assert arr.metadata.dimension_names == ("x", "y")
 
 
 def test_set_single_virtual_ref_without_encoding(

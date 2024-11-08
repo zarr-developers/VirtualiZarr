@@ -4,7 +4,6 @@ from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
 from io import BufferedIOBase
 from typing import (
-    TYPE_CHECKING,
     Any,
     Hashable,
     Optional,
@@ -14,6 +13,7 @@ from typing import (
 from xarray import (
     Coordinates,
     Dataset,
+    DataTree,
     Index,
     IndexVariable,
     Variable,
@@ -25,12 +25,6 @@ from xarray.core.indexes import PandasIndex
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
-
-if TYPE_CHECKING:
-    try:
-        from xarray import DataTree  # type: ignore[attr-defined]
-    except ImportError:
-        DataTree = Any
 
 
 def open_loadable_vars_and_indexes(
@@ -144,8 +138,13 @@ def separate_coords(
     coord_vars: dict[
         str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
     ] = {}
+    found_coord_names: set[str] = set()
+    # Search through variable attributes for coordinate names
+    for var in vars.values():
+        if "coordinates" in var.attrs:
+            found_coord_names.update(var.attrs["coordinates"].split(" "))
     for name, var in vars.items():
-        if name in coord_names or var.dims == (name,):
+        if name in coord_names or var.dims == (name,) or name in found_coord_names:
             # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
             if len(var.dims) == 1:
                 dim1d, *_ = var.dims
@@ -189,5 +188,5 @@ class VirtualBackend(ABC):
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
-    ) -> "DataTree":
+    ) -> DataTree:
         raise NotImplementedError()
