@@ -9,7 +9,6 @@ from virtualizarr.readers.common import (
     open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
-    extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
@@ -45,7 +44,9 @@ class TIFFVirtualBackend(VirtualBackend):
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
 
-        refs = extract_group(refs, group)
+        print(refs)
+
+        # refs = extract_group(refs, group)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
