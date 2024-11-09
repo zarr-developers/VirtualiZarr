@@ -120,3 +120,16 @@ def simple_netcdf4(tmpdir):
     ds.to_netcdf(filepath)
 
     return filepath
+
+
+@pytest.fixture
+def random_tiff(tmpdir):
+    from PIL import Image
+
+    array = np.random.randint(0, 255, (128, 128), dtype=np.uint8)
+    img = Image.fromarray(array)
+
+    filepath = tmpdir / "rand.tiff"
+    img.save(filepath)
+
+    return str(filepath)
