@@ -1,9 +1,9 @@
-from xarray import Dataset
 import numpy as np
+from xarray import Dataset
 
-from virtualizarr.tests import requires_pillow
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.tests import requires_pillow
 
 
 @requires_pillow
@@ -12,7 +12,7 @@ def test_random_tiff(random_tiff):
 
     assert isinstance(vds, Dataset)
 
-    # TODO what is the name of this array expected to be??    
+    # TODO what is the name of this array expected to be??
     assert list(vds.variables) == ["foo"]
     vda = vds["foo"]
 
@@ -22,5 +22,5 @@ def test_random_tiff(random_tiff):
     assert isinstance(vda.data, ManifestArray)
     manifest = vda.data.manifest
     assert manifest.dict() == {
-        '0.0': {'path': random_tiff, 'offset': 122, 'length': 16384} 
+        "0.0": {"path": random_tiff, "offset": 122, "length": 16384}
     }
