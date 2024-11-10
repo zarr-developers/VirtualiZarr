@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Optional, cast
 
 import numpy as np
+import zarr
 from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
@@ -158,10 +159,7 @@ def get_axis(
     return dims.index(dim_name)
 
 
-import zarr
-
-
-def _check_compatibile_arrays(
+def _check_compatible_arrays(
     ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
 ):
     manifest_api._check_same_dtypes([ma.dtype, existing_array.dtype])
@@ -204,7 +202,7 @@ def write_virtual_variable_to_icechunk(
         append_axis = get_axis(dims, append_dim)
         # check if arrays can be concatenated
         check_compatible_encodings(var.encoding, existing_array.attrs)
-        _check_compatibile_arrays(ma, existing_array, append_axis)
+        _check_compatible_arrays(ma, existing_array, append_axis)
 
         # determine number of existing chunks along the append axis
         existing_num_chunks = num_chunks(
