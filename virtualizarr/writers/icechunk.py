@@ -223,10 +223,8 @@ def write_virtual_variable_to_icechunk(
         )
 
         # TODO it would be nice if we could assign directly to the .attrs property
-        # Aimee: Can we assume that the attributes are the same for the new array?
         for k, v in var.attrs.items():
             arr.attrs[k] = encode_zarr_attr_value(v)
-        arr.attrs["_ARRAY_DIMENSIONS"] = encode_zarr_attr_value(var.dims)
 
         _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
         for k, v in var.encoding.items():

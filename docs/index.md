@@ -59,13 +59,8 @@ virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
 Now you can open your shiny new Zarr store instantly:
 
 ```python
-fs = fsspec.filesystem('reference', fo='combined.json')
-m = fs.get_mapper('')
-
-ds = xr.open_dataset(m, engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
+ds = xr.open_dataset('combined.json', engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
 ```
-
-(Since we serialized the cached results using the kerchunk specification then opening this zarr store still requires using fsspec via the kerchunk xarray backend.)
 
 No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
 
