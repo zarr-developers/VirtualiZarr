@@ -12,7 +12,7 @@ from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from zarr import Group  # type: ignore
+    from zarr import Array, Group  # type: ignore
 
 
 VALID_URI_PREFIXES = {
@@ -111,28 +111,6 @@ def write_variables_to_icechunk_group(
         )
 
 
-def write_variable_to_icechunk(
-    store: "IcechunkStore",
-    group: "Group",
-    name: str,
-    var: Variable,
-    append_dim: Optional[str] = None,
-) -> None:
-    """Write a single (possibly virtual) variable into an icechunk store"""
-    if isinstance(var.data, ManifestArray):
-        write_virtual_variable_to_icechunk(
-            store=store,
-            group=group,
-            name=name,
-            var=var,
-            append_dim=append_dim,
-        )
-    else:
-        raise ValueError(
-            "Cannot write non-virtual variables as virtual variables to Icechunk stores"
-        )
-
-
 def num_chunks(
     array,
     axis: int,
@@ -145,7 +123,7 @@ def resize_array(
     name: str,
     var: Variable,
     append_axis: int,
-):  # -> "Array":
+) -> "Array":
     existing_array = group[name]
     new_shape = list(existing_array.shape)
     new_shape[append_axis] += var.shape[append_axis]
@@ -250,16 +228,18 @@ def write_virtual_variable_to_icechunk(
 
 
 def generate_chunk_key(
-    index: np.nditer.multi_index,
+    index: tuple[int, ...],
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
 ) -> str:
-    if append_axis is not None:
-        list_index = list(index)
-        # Offset by the number of existing chunks on the append axis
-        list_index[append_axis] += existing_num_chunks
-        index = tuple(list_index)
-    return "/".join(str(i) for i in index)
+    if append_axis and append_axis >= len(index):
+        raise ValueError(
+            f"append_axis {append_axis} is greater than the number of indices {len(index)}"
+        )
+    return "/".join(
+        str(ind + existing_num_chunks) if axis is append_axis else str(ind)
+        for axis, ind in enumerate(index)
+    )
 
 
 def write_manifest_virtual_refs(
