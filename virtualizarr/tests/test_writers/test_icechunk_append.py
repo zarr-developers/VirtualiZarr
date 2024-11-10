@@ -303,7 +303,9 @@ def test_append_with_different_encoding_fails(
     icechunk_filestore_append = IcechunkStore.open_existing(
         storage=icechunk_storage, mode="a"
     )
-    with pytest.raises(ValueError, match="incompatible encoding"):
+    with pytest.raises(
+        ValueError, match="Cannot concatenate arrays with different values for encoding"
+    ):
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
 
 

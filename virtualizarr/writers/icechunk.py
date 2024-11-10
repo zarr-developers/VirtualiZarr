@@ -176,6 +176,15 @@ def _check_compatibile_arrays(
     manifest_api._check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
+def check_compatible_encodings(encoding1, encoding2):
+    for key, value in encoding1.items():
+        if key in encoding2:
+            if encoding2[key] != value:
+                raise ValueError(
+                    f"Cannot concatenate arrays with different values for encoding key {key}: {encoding2[key]} != {value}"
+                )
+
+
 def write_virtual_variable_to_icechunk(
     store: "IcechunkStore",
     group: "Group",
@@ -194,6 +203,7 @@ def write_virtual_variable_to_icechunk(
         existing_array = group[name]
         append_axis = get_axis(dims, append_dim)
         # check if arrays can be concatenated
+        check_compatible_encodings(var.encoding, existing_array.attrs)
         _check_compatibile_arrays(ma, existing_array, append_axis)
 
         # determine number of existing chunks along the append axis
