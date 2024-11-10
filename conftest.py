@@ -59,6 +59,7 @@ def compressed_netcdf4_files(tmpdir):
     return filepath1, filepath2
 
 
+@pytest.fixture
 def netcdf4_file_with_2d_coords(tmpdir):
     ds = xr.tutorial.open_dataset("ROMS_example")
     filepath = f"{tmpdir}/ROMS_example.nc"
