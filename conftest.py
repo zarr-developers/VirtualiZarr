@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 import h5py
 import numpy as np
 import pytest
@@ -36,27 +38,30 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
-def compressed_netcdf4_files(tmpdir):
-    # without chunks={} we get a compression error: zlib.error: Error -3 while decompressing data: incorrect header check
-    ds = xr.tutorial.open_dataset("air_temperature", chunks={})
-    ds1 = ds.isel(time=slice(None, 1460))
-    ds2 = ds.isel(time=slice(1460, None))
-    # Define compression options for NetCDF
-    encoding = {
-        # without encoding the chunksizes, irregular ones are chosen
-        var: dict(zlib=True, complevel=4, chunksizes=(1460, 25, 53))
-        for var in ds.data_vars
-    }
+def netcdf4_files_factory(tmpdir) -> callable:
+    def create_netcdf4_files(
+        encoding: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> tuple[str, str]:
+        # Set up example xarray dataset
+        ds = xr.tutorial.open_dataset("air_temperature", chunks={})
 
-    # Save it to disk as netCDF (in temporary directory)
-    filepath1 = f"{tmpdir}/air1_compressed.nc"
-    filepath2 = f"{tmpdir}/air2_compressed.nc"
-    ds1.to_netcdf(filepath1, encoding=encoding, engine="h5netcdf")
-    ds2.to_netcdf(filepath2, encoding=encoding, engine="h5netcdf")
-    ds1.close()
-    ds2.close()
+        # Split dataset into two parts
+        ds1 = ds.isel(time=slice(None, 1460))
+        ds2 = ds.isel(time=slice(1460, None))
 
-    return filepath1, filepath2
+        # Save datasets to disk as NetCDF in the temporary directory with the provided encoding
+        filepath1 = f"{tmpdir}/air1.nc"
+        filepath2 = f"{tmpdir}/air2.nc"
+        ds1.to_netcdf(filepath1, encoding=encoding, engine="h5netcdf")
+        ds2.to_netcdf(filepath2, encoding=encoding, engine="h5netcdf")
+
+        # Close datasets
+        ds1.close()
+        ds2.close()
+
+        return filepath1, filepath2
+
+    return create_netcdf4_files
 
 
 @pytest.fixture
@@ -93,26 +98,6 @@ def hdf5_groups_file(tmpdir):
     ds.close()
 
     return filepath
-
-
-@pytest.fixture
-def netcdf4_files(tmpdir):
-    # Set up example xarray dataset
-    ds = xr.tutorial.open_dataset("air_temperature")
-
-    # split inrto equal chunks so we can concatenate them back together later
-    ds1 = ds.isel(time=slice(None, 1460))
-    ds2 = ds.isel(time=slice(1460, None))
-
-    # Save it to disk as netCDF (in temporary directory)
-    filepath1 = f"{tmpdir}/air1.nc"
-    filepath2 = f"{tmpdir}/air2.nc"
-    ds1.to_netcdf(filepath1)
-    ds2.to_netcdf(filepath2)
-    ds1.close()
-    ds2.close()
-
-    return filepath1, filepath2
 
 
 @pytest.fixture

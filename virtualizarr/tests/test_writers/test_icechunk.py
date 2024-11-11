@@ -430,26 +430,23 @@ class TestAppend:
             storage=icechunk_storage, mode="a"
         )
         dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
-
-        root_group = group(store=icechunk_filestore_append)
-        array = root_group["foo"]
+        array = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
 
         expected_ds = open_dataset(simple_netcdf4)
-        expected_array = xr.concat(
-            [expected_ds["foo"], expected_ds["foo"]], dim="x"
-        ).to_numpy()
-        npt.assert_equal(array, expected_array)
+        expected_array = xr.concat([expected_ds, expected_ds], dim="x")
+        xr.testing.assert_equal(array.foo, expected_array.foo)
 
     ## When appending to a virtual ref with encoding, it succeeds
     def test_append_virtual_ref_with_encoding(
-        self, icechunk_storage: "StorageConfig", netcdf4_files: tuple[str, str]
+        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: callable
     ):
         import xarray as xr
         from icechunk import IcechunkStore
 
         # generate virtual dataset
-        filepath1, filepath2 = netcdf4_files
         scale_factor = 0.01
+        encoding = {"air": {"scale_factor": scale_factor}}
+        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
         vds1, vds2 = (
             gen_virtual_dataset(
                 file_uri=filepath1,
@@ -459,7 +456,7 @@ class TestAppend:
                 dtype=np.dtype("int16"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=15419,
+                base_offset=20122,
                 length=3869000,
             ),
             gen_virtual_dataset(
@@ -470,7 +467,7 @@ class TestAppend:
                 dtype=np.dtype("int16"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=15419,
+                base_offset=20122,
                 length=3869000,
             ),
         )
@@ -487,23 +484,25 @@ class TestAppend:
             storage=icechunk_storage, mode="a"
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
 
-        root_group = group(store=icechunk_filestore_append)
-        array = root_group["air"]
         expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
-        expected_array = xr.concat(
-            [expected_ds1["air"], expected_ds2["air"]], dim="time"
-        ).to_numpy()
-        npt.assert_equal(array.get_basic_selection() * scale_factor, expected_array)
+        expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time").drop_vars(
+            ["lon", "lat", "time"], errors="ignore"
+        )
+        xr.testing.assert_identical(new_ds.air, expected_ds.air)
 
     ## When appending to a virtual ref with compression, it succeeds
     def test_append_with_compression_succeeds(
-        self, icechunk_storage: "StorageConfig", compressed_netcdf4_files: str
+        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: callable
     ):
         import xarray as xr
         from icechunk import IcechunkStore
 
-        file1, file2 = compressed_netcdf4_files
+        encoding = encoding = {
+            "air": {"zlib": True, "complevel": 4, "chunksizes": (1460, 25, 53)}
+        }
+        file1, file2 = netcdf4_files_factory(encoding=encoding)
         # Generate compressed dataset
         vds1, vds2 = (
             gen_virtual_dataset(
@@ -540,14 +539,17 @@ class TestAppend:
             storage=icechunk_storage, mode="a"
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
-        root_group = group(store=icechunk_filestore_append)
-        array = root_group["air"]
+        icechunk_filestore_append.commit("appended data")
+        updated_ds = xr.open_zarr(
+            store=icechunk_filestore_append, consolidated=False, zarr_format=3
+        )
 
         expected_ds1, expected_ds2 = open_dataset(file1), open_dataset(file2)
-        expected_array = xr.concat(
-            [expected_ds1["air"], expected_ds2["air"]], dim="time"
-        ).to_numpy()
-        npt.assert_equal(array, expected_array)
+        expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
+        # Aimee: Double check this is necessary
+        expected_ds = expected_ds.drop_vars(["lon", "lat", "time"], errors="ignore")
+        # Aimee: Dataset attributes are not present on the new icechunk store
+        xr.testing.assert_equal(updated_ds.air, expected_ds.air)
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
@@ -607,7 +609,7 @@ class TestAppend:
             dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
 
     @pytest.mark.xfail(reason="Working on test")
-    def test_other_dimensions_different_length_fails(
+    def test_dimensions_do_not_align(
         self, icechunk_storage: "StorageConfig", simple_netcdf4: str
     ):
         from icechunk import IcechunkStore
