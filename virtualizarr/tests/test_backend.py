@@ -324,6 +324,12 @@ class TestLoadVirtualDataset:
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
+    def test_explicit_filetype_and_backend(self, netcdf4_file):
+        with pytest.raises(ValueError):
+            open_virtual_dataset(
+                netcdf4_file, filetype="hdf", backend=HDFVirtualBackend
+            )
+
     @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
     def test_group_kwarg(self, hdf5_groups_file, hdf_backend):
         if hdf_backend:
