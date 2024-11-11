@@ -399,6 +399,7 @@ def gen_virtual_dataset(
     )
     return Dataset(
         {variable_name: var},
+        attrs=ds.attrs,
     )
 
 
@@ -434,7 +435,8 @@ class TestAppend:
 
         expected_ds = open_dataset(simple_netcdf4)
         expected_array = xr.concat([expected_ds, expected_ds], dim="x")
-        xr.testing.assert_equal(array.foo, expected_array.foo)
+        # Aimee: attributes for actual_range differ [185.16000366210935, 322.1000061035156] vs [185.16 322.1]
+        xr.testing.assert_equal(array, expected_array)
 
     ## When appending to a virtual ref with encoding, it succeeds
     def test_append_virtual_ref_with_encoding(
@@ -445,30 +447,33 @@ class TestAppend:
 
         # generate virtual dataset
         scale_factor = 0.01
-        encoding = {"air": {"scale_factor": scale_factor}}
+        encoding = {"air": {"scale_factor": scale_factor, "dtype": np.dtype("float64")}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
+        # from virtualizarr import open_virtual_dataset
+        # vds1, vds2 = open_virtual_dataset(filepath1), open_virtual_dataset(filepath2)
+        # import pdb; pdb.set_trace()
         vds1, vds2 = (
             gen_virtual_dataset(
                 file_uri=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
-                dtype=np.dtype("int16"),
+                dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=20122,
-                length=3869000,
+                base_offset=20146,
+                length=15476000,
             ),
             gen_virtual_dataset(
                 file_uri=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
-                dtype=np.dtype("int16"),
+                dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=20122,
-                length=3869000,
+                base_offset=20146,
+                length=15476000,
             ),
         )
 
@@ -490,7 +495,7 @@ class TestAppend:
         expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time").drop_vars(
             ["lon", "lat", "time"], errors="ignore"
         )
-        xr.testing.assert_identical(new_ds.air, expected_ds.air)
+        xr.testing.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with compression, it succeeds
     def test_append_with_compression_succeeds(
@@ -546,10 +551,8 @@ class TestAppend:
 
         expected_ds1, expected_ds2 = open_dataset(file1), open_dataset(file2)
         expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
-        # Aimee: Double check this is necessary
         expected_ds = expected_ds.drop_vars(["lon", "lat", "time"], errors="ignore")
-        # Aimee: Dataset attributes are not present on the new icechunk store
-        xr.testing.assert_equal(updated_ds.air, expected_ds.air)
+        xr.testing.assert_equal(updated_ds, expected_ds)
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
