@@ -56,6 +56,10 @@ def dataset_to_icechunk(
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?
     if store.mode.str == "a":
+        if append_dim is None:
+            raise ValueError(
+                "append_dim must be provided when opening store in append mode"
+            )
         root_group = Group.open(store=store, zarr_format=3)
     else:
         root_group = Group.from_store(store=store)
