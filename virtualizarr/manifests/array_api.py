@@ -25,7 +25,7 @@ def implements(numpy_function):
     return decorator
 
 
-def _check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
+def check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
     """
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
@@ -34,7 +34,19 @@ def _check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([arr.zarray.codec for arr in arrays])
+    def get_codecs(array):
+        import zarr
+
+        from .array import ManifestArray
+
+        if isinstance(array, ManifestArray):
+            if array.zarray.zarr_format == 3:
+                return list(array.zarray._v3_codec_pipeline())
+            return array.zarray.codec
+        if isinstance(array, zarr.core.array.Array):
+            return array.metadata.codecs
+
+    _check_same_codecs([get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
     _check_same_chunk_shapes([arr.chunks for arr in arrays])
@@ -106,9 +118,9 @@ def concatenate(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    _check_combineable_zarr_arrays(arrays)
+    check_combineable_zarr_arrays(arrays)
 
-    _check_same_ndims([arr.ndim for arr in arrays])
+    check_same_ndims([arr.ndim for arr in arrays])
 
     # Ensure we handle axis being passed as a negative integer
     first_arr = arrays[0]
@@ -116,7 +128,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    _check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+    check_same_shapes_except_on_concat_axis(arr_shapes, axis)
 
     # find what new array shape must be
     new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])
@@ -151,7 +163,7 @@ def concatenate(
     return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
-def _check_same_ndims(ndims: list[int]) -> None:
+def check_same_ndims(ndims: list[int]) -> None:
     first_ndim, *other_ndims = ndims
     for other_ndim in other_ndims:
         if other_ndim != first_ndim:
@@ -160,7 +172,7 @@ def _check_same_ndims(ndims: list[int]) -> None:
             )
 
 
-def _check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
+def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
     """Check that shapes are compatible for concatenation"""
 
     shapes_without_concat_axis = [
@@ -199,9 +211,9 @@ def stack(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    _check_combineable_zarr_arrays(arrays)
+    check_combineable_zarr_arrays(arrays)
 
-    _check_same_ndims([arr.ndim for arr in arrays])
+    check_same_ndims([arr.ndim for arr in arrays])
     arr_shapes = [arr.shape for arr in arrays]
     _check_same_shapes(arr_shapes)
 

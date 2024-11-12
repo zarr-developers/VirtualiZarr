@@ -387,6 +387,7 @@ def gen_virtual_dataset(
         compressor=compressor,
         filters=filters,
         fill_value=fill_value,
+        zarr_format=3,
     )
     ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
     ds = open_dataset(file_uri)

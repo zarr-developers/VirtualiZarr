@@ -140,16 +140,10 @@ def get_axis(
 def _check_compatible_arrays(
     ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
 ):
-    manifest_api._check_same_dtypes([ma.dtype, existing_array.dtype])
-    # this is kind of gross - _v3_codec_pipeline returns a tuple
-    # Question: Does anything need to be done to apply the codecs to the new manifest array?
-    manifest_api._check_same_codecs(
-        [list(ma.zarray._v3_codec_pipeline()), existing_array.metadata.codecs]
-    )
-    manifest_api._check_same_chunk_shapes([ma.chunks, existing_array.chunks])
-    manifest_api._check_same_ndims([ma.ndim, existing_array.ndim])
+    manifest_api.check_combineable_zarr_arrays([ma, existing_array])
+    manifest_api.check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
-    manifest_api._check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+    manifest_api.check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
 def check_compatible_encodings(encoding1, encoding2):
