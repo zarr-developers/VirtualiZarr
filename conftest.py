@@ -54,6 +54,15 @@ def zarr_v2_store(tmpdir):
 
 
 @pytest.fixture
+def netcdf4_file_with_2d_coords(tmpdir):
+    ds = xr.tutorial.open_dataset("ROMS_example")
+    filepath = f"{tmpdir}/ROMS_example.nc"
+    ds.to_netcdf(filepath, format="NETCDF4")
+    ds.close()
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr import open_virtual_dataset
 
