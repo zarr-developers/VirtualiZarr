@@ -612,19 +612,22 @@ class TestAppend:
         ):
             dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
 
-    @pytest.mark.xfail(reason="Working on test")
     def test_dimensions_do_not_align(
         self, icechunk_storage: "StorageConfig", simple_netcdf4: str
     ):
         from icechunk import IcechunkStore
 
-        # Generate datasets with different lengths in non-append dimensions
+        # Generate datasets with different lengths on the non-append dimension (x)
         vds1 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, shape=(5, 4)
-        )  # shape (5, 4)
+            # {'x': 5, 'y': 4}
+            file_uri=simple_netcdf4,
+            shape=(5, 4),
+        )
         vds2 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, shape=(6, 4)
-        )  # shape (6, 4)
+            # {'x': 6, 'y': 4}
+            file_uri=simple_netcdf4,
+            shape=(6, 4),
+        )
 
         # Create icechunk store and commit the first dataset
         icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
@@ -635,10 +638,8 @@ class TestAppend:
         icechunk_filestore_append = IcechunkStore.open_existing(
             storage=icechunk_storage, mode="a"
         )
-        with pytest.raises(
-            ValueError, match="incompatible lengths in non-append dimensions"
-        ):
-            dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
+        with pytest.raises(ValueError, match="Cannot concatenate arrays with shapes"):
+            dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="y")
 
     @pytest.mark.xfail(reason="Not implemented yet")
     def test_no_append_dim_in_append_mode_it_fails(self):
