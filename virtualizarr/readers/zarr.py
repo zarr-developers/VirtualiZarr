@@ -56,11 +56,11 @@ class ZarrVirtualBackend(VirtualBackend):
         zarr_arrays = [val for val in zg.keys()]
 
         # 2b. and check that all loadable_variables are present
-        assert set(
-            loadable_variables
-        ).issubset(
-            set(zarr_arrays)
-        ), f"loadable_variables ({loadable_variables}) is not a subset of variables in existing Zarr store. This zarr contains:  {zarr_arrays}"
+        missing_vars = set(loadable_variables) - set(zarr_arrays)
+        if missing_vars:
+            raise ValueError(
+                f"Some loadable variables specified are not present in this zarr store: {missing_vars}"
+            )
 
         # virtual variables are available variables minus drop variables & loadable variables
         virtual_vars = list(
