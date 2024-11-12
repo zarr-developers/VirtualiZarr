@@ -666,6 +666,32 @@ class TestAppend:
             # This should raise a ValueError because append_dim is not provided
             dataset_to_icechunk(vds, icechunk_filestore_append)
 
+    def test_append_dim_not_in_dims_raises_error(
+        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+    ):
+        """
+        Test that attempting to append with an append_dim not present in dims raises a ValueError.
+        """
+        from icechunk import IcechunkStore
+
+        vds = gen_virtual_dataset(
+            file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
+        )
+
+        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+        dataset_to_icechunk(vds, icechunk_filestore)
+        icechunk_filestore.commit("initial commit")
+
+        # Attempt to append using a non-existent append_dim "z"
+        icechunk_filestore_append = IcechunkStore.open_existing(
+            storage=icechunk_storage, mode="a"
+        )
+        with pytest.raises(
+            ValueError,
+            match="append_dim='z' does not match any existing dataset dimensions",
+        ):
+            dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="z")
+
 
 # TODO test writing to a group that isn't the root group
 

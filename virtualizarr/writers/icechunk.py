@@ -173,7 +173,11 @@ def write_virtual_variable_to_icechunk(
 
     dims = var.dims
     append_axis, existing_num_chunks, arr = None, None, None
-    if mode == "a" and append_dim in dims:
+    if append_dim and append_dim not in dims:
+        raise ValueError(
+            f"append_dim {append_dim} not found in variable dimensions {dims}"
+        )
+    if mode == "a":
         existing_array = group[name]
         append_axis = get_axis(dims, append_dim)
         # check if arrays can be concatenated
