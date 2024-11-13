@@ -310,3 +310,15 @@ def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
     ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
 
     return filepath
+
+
+@pytest.fixture
+def root_coordinates_hdf5_file(tmpdir, np_uncompressed_int16):
+    filepath = f"{tmpdir}/coordinates.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.random((100, 100))
+    f.create_dataset(name="data", data=data, chunks=True)
+    f.create_dataset(name="lat", data=data)
+    f.create_dataset(name="lon", data=data)
+    f.attrs.create(name="coordinates", data="lat lon")
+    return filepath

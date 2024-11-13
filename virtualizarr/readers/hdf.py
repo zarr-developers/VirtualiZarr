@@ -53,9 +53,8 @@ class HDFVirtualBackend(VirtualBackend):
         attrs = HDFVirtualBackend._attrs_from_root_group(
             path=filepath, reader_options=reader_options, group=group
         )
-
-        coord_names = attrs.pop("coordinates", [])
-
+        coordinates_attr = attrs.pop("coordinates", "")
+        coord_names = coordinates_attr.split()
         return construct_virtual_dataset(
             virtual_vars=virtual_vars,
             loadable_vars=loadable_vars,

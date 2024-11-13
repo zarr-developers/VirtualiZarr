@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import h5py  # type: ignore
 import pytest
 
@@ -160,3 +162,19 @@ class TestVirtualVarsFromHDF:
             HDFVirtualBackend._virtual_vars_from_hdf(
                 path=group_hdf5_file, group="group/data"
             )
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestOpenVirtualDataset:
+    @patch("virtualizarr.readers.hdf.construct_virtual_dataset")
+    @patch("virtualizarr.readers.hdf.open_loadable_vars_and_indexes")
+    def test_coord_names(
+        self,
+        open_loadable_vars_and_indexes,
+        construct_virtual_dataset,
+        root_coordinates_hdf5_file,
+    ):
+        open_loadable_vars_and_indexes.return_value = (0, 0)
+        HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
+        assert construct_virtual_dataset.call_args[1]["coord_names"] == ["lat", "lon"]
