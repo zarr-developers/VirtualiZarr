@@ -36,9 +36,7 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
     """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
-    hdf_groups = [
-        k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
-    ]
+    hdf_groups = find_groups(vds_refs)
     if len(hdf_groups) == 1:
         return vds_refs
     else:
@@ -97,7 +95,9 @@ def virtual_vars_from_kerchunk_refs(
     ]
 
     vars = {
-        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
+        var_name: variable_from_kerchunk_refs(
+            extract_array_refs(refs, var_name), virtual_array_class
+        )
         for var_name in var_names_to_keep
     }
     return vars
@@ -138,11 +138,10 @@ def dataset_from_kerchunk_refs(
 
 
 def variable_from_kerchunk_refs(
-    refs: KerchunkStoreRefs, var_name: str, virtual_array_class
+    arr_refs: KerchunkArrRefs, virtual_array_class
 ) -> Variable:
     """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
 
-    arr_refs = extract_array_refs(refs, var_name)
     chunk_dict, zarray, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
@@ -162,6 +161,11 @@ def variable_from_kerchunk_refs(
         varr = zarray.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
+
+
+def find_groups(refs: KerchunkStoreRefs) -> list[str]:
+    """Find the names of zarr groups in this store."""
+    return [k.removesuffix(".zgroup") for k in refs["refs"].keys() if ".zgroup" in k]
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
