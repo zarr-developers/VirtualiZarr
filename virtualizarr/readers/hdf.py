@@ -50,7 +50,7 @@ class HDFVirtualBackend(VirtualBackend):
             decode_times=decode_times,
         )
 
-        attrs = HDFVirtualBackend._attrs_from_root_group(
+        attrs = HDFVirtualBackend._get_group_attrs(
             path=filepath, reader_options=reader_options, group=group
         )
         coordinates_attr = attrs.pop("coordinates", "")
@@ -298,7 +298,7 @@ class HDFVirtualBackend(VirtualBackend):
         return variables
 
     @staticmethod
-    def _attrs_from_root_group(
+    def _get_group_attrs(
         path: str,
         group: Optional[str] = None,
         reader_options: Optional[dict] = {
