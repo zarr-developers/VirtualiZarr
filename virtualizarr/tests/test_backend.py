@@ -13,7 +13,6 @@ from virtualizarr.backend import FileType, automatically_determine_filetype
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.tests import (
     has_astropy,
-    has_tifffile,
     network,
     requires_kerchunk,
     requires_s3fs,
@@ -233,9 +232,7 @@ class TestReadFromURL:
             pytest.param(
                 "tiff",
                 "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-                marks=pytest.mark.xfail(
-                    reason="not yet implemented"
-                ),
+                marks=pytest.mark.xfail(reason="not yet implemented"),
             ),
             pytest.param(
                 "fits",
