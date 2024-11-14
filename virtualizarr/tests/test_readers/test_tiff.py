@@ -1,20 +1,16 @@
 import numpy as np
-from xarray import Dataset
+from xarray import DataArray
 
-from virtualizarr import open_virtual_dataset
+from virtualizarr import open_virtual_dataarray
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.tests import requires_pillow
 
 
 @requires_pillow
 def test_random_tiff(random_tiff):
-    vds = open_virtual_dataset(random_tiff, indexes={})
+    vda = open_virtual_dataarray(random_tiff, indexes={})
 
-    assert isinstance(vds, Dataset)
-
-    # TODO what is the name of this array expected to be??
-    assert list(vds.variables) == ["foo"]
-    vda = vds["foo"]
+    assert isinstance(vda, DataArray)
 
     assert vda.sizes == {"X": 128, "Y": 128}
     assert vda.dtype == np.uint8
