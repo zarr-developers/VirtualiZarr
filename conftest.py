@@ -2,7 +2,10 @@ import h5py
 import numpy as np
 import pytest
 import xarray as xr
+from packaging.version import Version
 from xarray.core.variable import Variable
+from xarray.tests.test_dataset import create_test_data
+from xarray.util.print_versions import netcdf_and_hdf5_versions
 
 
 def pytest_addoption(parser):
@@ -111,3 +114,33 @@ def simple_netcdf4(tmpdir):
     ds.to_netcdf(filepath)
 
     return filepath
+
+
+@pytest.fixture()
+def skip_test_for_libhdf5_version():
+    versions = netcdf_and_hdf5_versions()
+    libhdf5_version = Version(versions[0][1])
+    return libhdf5_version < Version("1.14")
+
+
+@pytest.fixture(params=["blosc_zlib"])
+def filter_encoded_roundtrip_netcdf4_file(
+    tmpdir, request, skip_test_for_libhdf5_version
+):
+    if skip_test_for_libhdf5_version:
+        pytest.skip("Requires libhdf5 >= 1.14")
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    if "blosc" in request.param:
+        encoding_config = {
+            "compression": request.param,
+            "chunksizes": (20, 40),
+            "original_shape": ds.var2.shape,
+            "blosc_shuffle": 1,
+            "fletcher32": False,
+        }
+    #  Check on how handle scalar dim.
+    ds = ds.drop_dims("dim3")
+    ds["var2"].encoding.update(encoding_config)
+    filepath = f"{tmpdir}/{request.param}_xarray.nc"
+    ds.to_netcdf(filepath, engine="netcdf4")
+    return {"filepath": filepath, "compressor": request.param}

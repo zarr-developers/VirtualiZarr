@@ -264,3 +264,14 @@ def test_open_scalar_variable(tmpdir):
 
     vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
     assert vds["a"].shape == ()
+
+
+@requires_kerchunk
+def test_filters_netcdf4_roundtrip(filter_encoded_roundtrip_netcdf4_file, tmpdir):
+    filepath = filter_encoded_roundtrip_netcdf4_file["filepath"]
+    ds = xr.open_dataset(filepath)
+    vds = open_virtual_dataset(filepath)
+    kerchunk_file = f"{tmpdir}/kerchunk.json"
+    vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+    roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+    xrt.assert_equal(ds, roundtrip)
