@@ -212,7 +212,6 @@ def open_virtual_dataarray(
     virtual_array_class=ManifestArray,
     reader_options: Optional[dict] = None,
 ) -> DataArray:
-    
     drop_variables, loadable_variables = check_for_collisions(
         drop_variables,
         loadable_variables,

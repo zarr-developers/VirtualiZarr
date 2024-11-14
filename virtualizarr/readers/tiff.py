@@ -1,7 +1,7 @@
 from typing import Iterable, Mapping, Optional
 
-from xarray import DataArray, Dataset, Index
 import zarr
+from xarray import DataArray, Dataset, Index
 
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.readers.zarr import virtual_variable_from_zarr_array
@@ -18,7 +18,6 @@ class TIFFVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        
         from tifffile import imread
 
         store = imread(filepath, aszarr=True)
@@ -42,16 +41,17 @@ class TIFFVirtualBackend(VirtualBackend):
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        
         from tifffile import imread
 
         store = imread(filepath, aszarr=True)
 
         try:
             zg = zarr.open_group(store, mode="r")
-        except zarr.errors.ContainsArrayError as err:
+        except zarr.errors.ContainsArrayError:
             # TODO tidy this up
-            print("TIFF file contains only a single array, please use `open_virtual_dataarray` instead")
+            print(
+                "TIFF file contains only a single array, please use `open_virtual_dataarray` instead"
+            )
             raise
 
         raise NotImplementedError()

@@ -125,7 +125,6 @@ def construct_virtual_dataarray(
     coord_names: Iterable[str],
     attrs: dict[str, str],
 ) -> DataArray:
-
     vda = DataArray(
         data=virtual_var,
         coords=coord_names,

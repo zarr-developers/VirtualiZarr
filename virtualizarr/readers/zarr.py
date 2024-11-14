@@ -1,10 +1,10 @@
 import io
 
-from xarray import Variable
 import zarr
+from xarray import Variable
 
-from virtualizarr.zarr import ZArray
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.zarr import ZArray
 
 
 def virtual_variable_from_zarr_array(za: zarr.Array) -> Variable:
@@ -28,9 +28,9 @@ def virtual_variable_from_zarr_array(za: zarr.Array) -> Variable:
         order=za.order,
         compressor=za.compressor,
         filters=za.filters,
-        #zarr_format=za.zarr_format,
+        # zarr_format=za.zarr_format,
     )
-    
+
     manifest = chunkmanifest_from_zarr_array(za)
 
     ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
@@ -44,7 +44,7 @@ def chunkmanifest_from_zarr_array(za: zarr.Array) -> ChunkManifest:
     of2 = io.StringIO()
 
     # TODO handle remote urls
-    za.store.write_fsspec(of2)# , url=url)
+    za.store.write_fsspec(of2)  # , url=url)
     out = ujson.loads(of2.getvalue())
 
     print(out)
