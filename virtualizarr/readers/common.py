@@ -12,6 +12,7 @@ from typing import (
 
 from xarray import (
     Coordinates,
+    DataArray,
     Dataset,
     DataTree,
     Index,
@@ -93,11 +94,11 @@ def open_loadable_vars_and_indexes(
 
 
 def construct_virtual_dataset(
-    virtual_vars,
-    loadable_vars,
-    indexes,
-    coord_names,
-    attrs,
+    virtual_vars: Mapping[str, Variable],
+    loadable_vars: Mapping[str, Variable],
+    indexes: Mapping[str, Index],
+    coord_names: Iterable[str],
+    attrs: dict[str, str],
 ) -> Dataset:
     """Construct a virtual Datset from consistuent parts."""
 
@@ -115,6 +116,23 @@ def construct_virtual_dataset(
     # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
 
     return vds
+
+
+def construct_virtual_dataarray(
+    virtual_var: Variable,
+    loadable_vars: Mapping[str, Variable],
+    indexes: Mapping[str, Index],
+    coord_names: Iterable[str],
+    attrs: dict[str, str],
+) -> DataArray:
+
+    vda = DataArray(
+        data=virtual_var,
+        coords=coord_names,
+        # indexes={},  # TODO should be added in a later version of xarray
+        attrs=attrs,
+    )
+    return vda
 
 
 def separate_coords(
@@ -167,6 +185,18 @@ def separate_coords(
 
 
 class VirtualBackend(ABC):
+    @staticmethod
+    def open_virtual_dataarray(
+        filepath: str,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, Index] | None = None,
+        reader_options: Optional[dict] = None,
+    ) -> DataArray:
+        raise NotImplementedError()
+
     @staticmethod
     def open_virtual_dataset(
         filepath: str,

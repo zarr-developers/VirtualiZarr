@@ -7,7 +7,7 @@ from typing import (
     Optional,
 )
 
-from xarray import Dataset, Index
+from xarray import DataArray, Dataset, Index
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
@@ -198,3 +198,53 @@ def open_virtual_dataset(
     )
 
     return vds
+
+
+def open_virtual_dataarray(
+    filepath: str,
+    *,
+    filetype: FileType | None = None,
+    group: str | None = None,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+    indexes: Mapping[str, Index] | None = None,
+    virtual_array_class=ManifestArray,
+    reader_options: Optional[dict] = None,
+) -> DataArray:
+    
+    drop_variables, loadable_variables = check_for_collisions(
+        drop_variables,
+        loadable_variables,
+    )
+
+    if virtual_array_class is not ManifestArray:
+        raise NotImplementedError()
+
+    if reader_options is None:
+        reader_options = {}
+
+    if filetype is not None:
+        # if filetype is user defined, convert to FileType
+        filetype = FileType(filetype)
+    else:
+        filetype = automatically_determine_filetype(
+            filepath=filepath, reader_options=reader_options
+        )
+
+    backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())
+
+    if backend_cls is None:
+        raise NotImplementedError(f"Unsupported file type: {filetype.name}")
+
+    vda = backend_cls.open_virtual_dataarray(
+        filepath,
+        group=group,
+        drop_variables=drop_variables,
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        indexes=indexes,
+        reader_options=reader_options,
+    )
+
+    return vda
