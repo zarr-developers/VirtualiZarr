@@ -66,6 +66,20 @@ class CFCodec(TypedDict):
 def _filter_to_codec(
     filter_id: str, filter_properties: Union[int, None, Tuple] = None
 ) -> Codec:
+    """
+    Convert an h5py filter to an equivalent numcodec
+
+    Parameters
+    ----------
+    filter_id: str
+        An h5py filter id code.
+    filter_properties : int or None or Tuple
+        A single or Tuple of h5py filter configuration codes.
+
+    Returns
+    -------
+        A numcodec codec
+    """
     id_int = None
     id_str = None
     try:
@@ -105,6 +119,19 @@ def _filter_to_codec(
 
 
 def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
+    """
+    Converts select h5py dataset CF convention attrs to CFCodec
+
+    Parameters
+    ----------
+    dataset: h5py.Dataset
+       An h5py dataset.
+
+    Returns
+    -------
+    CFCodec
+        A CFCodec.
+    """
     attributes = {attr: dataset.attrs[attr] for attr in dataset.attrs}
     mapping = {}
     if "scale_factor" in attributes:
@@ -139,6 +166,19 @@ def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
 
 
 def codecs_from_dataset(dataset: h5py.Dataset) -> List[Codec]:
+    """
+    Extracts a list of numcodecs from an h5py dataset
+
+    Parameters
+    ----------
+    dataset: h5py.Dataset
+       An h5py dataset.
+
+    Returns
+    -------
+    list
+        A list of numcodecs codecs.
+    """
     codecs = []
     for filter_id, filter_properties in dataset._filters.items():
         codec = _filter_to_codec(filter_id, filter_properties)

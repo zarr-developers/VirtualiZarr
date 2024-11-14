@@ -73,9 +73,9 @@ class HDFVirtualBackend(VirtualBackend):
         Parameters
         ----------
         path: str
-            The path the HDF5 container file
-         dset : h5py.Dataset
-            HDF5 dataset for which to create a ChunkManifest
+            The path of the HDF5 file
+        dataset : h5py.Dataset
+            h5py dataset for which to create a ChunkManifest
 
         Returns
         -------
@@ -144,7 +144,7 @@ class HDFVirtualBackend(VirtualBackend):
         Parameters
         ----------
         dataset : h5py.Dataset
-            HDF5 dataset.
+            An h5py dataset.
 
         Returns
         -------
@@ -222,6 +222,20 @@ class HDFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[Variable]:
+        """
+        Extract an xarray Variable with ManifestArray data from an h5py dataset
+
+        Parameters
+        ----------
+        dataset : h5py.Dataset
+            An h5py dataset.
+
+        Returns
+        -------
+        list: xarray.Variable
+            A list of xarray variables.
+
+        """
         # This chunk determination logic mirrors zarr-python's create
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
 
@@ -273,6 +287,27 @@ class HDFVirtualBackend(VirtualBackend):
             "storage_options": {"key": "", "secret": "", "anon": True}
         },
     ) -> Dict[str, Variable]:
+        """
+        Extract xarray Variables with ManifestArray data from an HDF file or group
+
+        Parameters
+        ----------
+        path: str
+            The path of the hdf5 file.
+        group: str
+            The name of the group for which to extract variables.
+        drop_variables: list of str
+            A list of variable names to skip extracting.
+        reader_options: dict
+            A dictionary of reader options passed to fsspec when opening the
+            file.
+
+        Returns
+        -------
+        dict
+            A dictionary of Xarray Variables with the variable names as keys.
+
+        """
         if drop_variables is None:
             drop_variables = []
         open_file = _FsspecFSFromFilepath(
