@@ -16,7 +16,6 @@ from virtualizarr.readers import (
     HDF5VirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
-    TIFFVirtualBackend,
     ZarrV3VirtualBackend,
 )
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -30,7 +29,7 @@ VIRTUAL_BACKENDS = {
     "netcdf3": NetCDF3VirtualBackend,
     "hdf5": HDF5VirtualBackend,
     "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
-    "tiff": TIFFVirtualBackend,
+    # "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,
 }
 
