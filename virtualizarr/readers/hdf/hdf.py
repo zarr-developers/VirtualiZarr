@@ -11,7 +11,7 @@ from virtualizarr.readers.common import (
     construct_virtual_dataset,
     open_loadable_vars_and_indexes,
 )
-from virtualizarr.readers.hdf_filters import cfcodec_from_dataset, codecs_from_dataset
+from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 from virtualizarr.zarr import ZArray

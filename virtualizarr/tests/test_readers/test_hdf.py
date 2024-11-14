@@ -167,8 +167,8 @@ class TestVirtualVarsFromHDF:
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestOpenVirtualDataset:
-    @patch("virtualizarr.readers.hdf.construct_virtual_dataset")
-    @patch("virtualizarr.readers.hdf.open_loadable_vars_and_indexes")
+    @patch("virtualizarr.readers.hdf.hdf.construct_virtual_dataset")
+    @patch("virtualizarr.readers.hdf.hdf.open_loadable_vars_and_indexes")
     def test_coord_names(
         self,
         open_loadable_vars_and_indexes,

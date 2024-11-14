@@ -11,7 +11,7 @@ except ModuleNotFoundError:
     warnings.warn("imagecodecs is required for HDF reader")
 
 
-from virtualizarr.readers.hdf_filters import (
+from virtualizarr.readers.hdf.filters import (
     _filter_to_codec,
     cfcodec_from_dataset,
     codecs_from_dataset,
