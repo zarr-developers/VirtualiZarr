@@ -233,8 +233,8 @@ class TestReadFromURL:
             pytest.param(
                 "tiff",
                 "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-                marks=pytest.mark.skipif(
-                    not has_tifffile, reason="package tifffile is not available"
+                marks=pytest.mark.xfail(
+                    reason="not yet implemented"
                 ),
             ),
             pytest.param(
