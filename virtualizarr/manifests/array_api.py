@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Iterable, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Union, cast
 
 import numpy as np
 
@@ -27,7 +27,9 @@ def implements(numpy_function):
     return decorator
 
 
-def check_combineable_zarr_arrays(arrays: Iterable["ManifestArray" | "Array"]) -> None:
+def check_combineable_zarr_arrays(
+    arrays: Iterable[Union["ManifestArray", "Array"]],
+) -> None:
     """
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
