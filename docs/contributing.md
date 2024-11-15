@@ -4,6 +4,8 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 ## Contributing code
 
+Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
+
 ```bash
 mamba env create -f ci/environment.yml
 mamba activate virtualizarr-tests
@@ -14,6 +16,8 @@ python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --
 ```
 
 ## Contributing documentation
+
+Whilst the CI will build the updated documentation for each PR, it can also be useful to check that the documentation has rendered as expected by building it locally.
 
 ### Build the documentation locally
 
@@ -32,6 +36,8 @@ make html
 Open `docs/_build/html/index.html` in a web browser (on MacOS you can do this from the terminal using `open docs/_build/html/index.html`).
 
 ## Making a release
+
+Anyone with commit privileges to the repository can issue a release.
 
 1. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
 2. Select draft a new release.
