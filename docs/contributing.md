@@ -33,7 +33,7 @@ Open `docs/_build/html/index.html` in a web browser
 1. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
 2. Select draft a new release.
 3. Select 'Choose a tag', then 'create a new tag'
-4. Enter the name for the new tag following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release denotes that “some small effort may be required to make sure this version works for you”).
+4. Enter the name for the new tag following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
 4. Click 'Generate Release Notes' to draft notes based on merged pull requests.
 5. Edit the draft release notes for consistency.
 6. Publish the release.
