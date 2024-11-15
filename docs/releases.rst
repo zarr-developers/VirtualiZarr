@@ -35,6 +35,8 @@ Documentation
   (:pull:`266`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Clarify which readers actually currently work in FAQ, and temporarily remove tiff from the auto-detection.
   (:issue:`291`, :pull:`296`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minor improvements to the Contributing Guide.
+  (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
