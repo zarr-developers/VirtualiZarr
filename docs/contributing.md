@@ -36,4 +36,4 @@ Open `docs/_build/html/index.html` in a web browser
 4. Enter the name for the new tag following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
 4. Click 'Generate Release Notes' to draft notes based on merged pull requests.
 5. Edit the draft release notes for consistency.
-6. Publish the release.
+6. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
