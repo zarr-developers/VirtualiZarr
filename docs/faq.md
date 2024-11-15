@@ -45,6 +45,7 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as JSON                                        | `ujson.dumps(h5chunks.translate())` , then read using an `fsspec.filesystem` mapper                                | `ds.virtualize.to_kerchunk('combined.json', format='JSON')` , then read using an `fsspec.filesystem` mapper                                      |
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.virtualize.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | Zarr v3 store with `manifest.json` files                                 | n/a                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
+| [Icechunk](https://icechunk.io/) store                          | n/a                                                                                                                                 | `ds.virtualize.to_icechunk()`, then read back via xarray (requires zarr-python v3).                                |
 
 ## Why a new project?
 
