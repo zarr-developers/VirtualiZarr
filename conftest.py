@@ -41,9 +41,10 @@ def netcdf4_file(tmpdir):
 def netcdf4_files_factory(tmpdir) -> callable:
     def create_netcdf4_files(
         encoding: Optional[Dict[str, Dict[str, Any]]] = None,
+        chunks: Optional[Dict[str, int]] = None,
     ) -> tuple[str, str]:
         # Set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", chunks={})
+        ds = xr.tutorial.open_dataset("air_temperature", chunks=chunks)
 
         # Split dataset into two parts
         ds1 = ds.isel(time=slice(None, 1460))

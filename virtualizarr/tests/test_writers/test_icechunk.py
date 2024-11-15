@@ -451,7 +451,7 @@ class TestAppend:
 
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor, "dtype": np.dtype("float64")}}
-        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
+        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding, chunks={})
         vds1, vds2 = (
             gen_virtual_dataset(
                 file_uri=filepath1,
@@ -505,7 +505,7 @@ class TestAppend:
         from icechunk import IcechunkStore
 
         encoding = {"air": {"zlib": True, "complevel": 4, "chunksizes": (1460, 25, 53)}}
-        file1, file2 = netcdf4_files_factory(encoding=encoding)
+        file1, file2 = netcdf4_files_factory(encoding=encoding, chunks={})
         # Generate compressed dataset
         vds1, vds2 = (
             gen_virtual_dataset(
