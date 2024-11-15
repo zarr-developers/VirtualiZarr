@@ -27,7 +27,7 @@ make html
 
 ### Access the documentation locally
 
-Open `docs/_build/html/index.html` in a web browser
+Open `docs/_build/html/index.html` in a web browser (on MacOS you can do this from the terminal using `open docs/_build/html/index.html`).
 
 ## Making a release
 
