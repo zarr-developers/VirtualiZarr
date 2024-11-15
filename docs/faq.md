@@ -72,7 +72,7 @@ If you see other opportunities then we would love to hear your ideas!
 
 ## Is this compatible with Icechunk?
 
-Yes! VirtualiZarr allows you to ingest data as virtual references and write those references into an Icechunk Store. See the [Icechunk documentation on creating virtaul datasets.](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr)
+Yes! VirtualiZarr allows you to ingest data as virtual references and write those references into an Icechunk Store. See the [Icechunk documentation on creating virtual datasets.](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr)
 
 ## I already have Kerchunked data, do I have to redo that work?
 
