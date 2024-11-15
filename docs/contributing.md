@@ -17,7 +17,7 @@ python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --
 
 ```bash
 mamba env create -f ci/doc.yml
-mamba activate docs
+mamba activate virtualizarr-docs
 pip install -e . # From project's root - needed to generate API docs
 cd docs # From project's root
 rm -rf generated
