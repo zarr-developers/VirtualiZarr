@@ -163,9 +163,7 @@ def virtual_dataset_from_zarr_group(
     )
 
     virtual_variable_mapping = {
-        f"{var}": construct_virtual_array(
-            zarr_group=zg, var_name=var, filepath=filepath
-        )
+        f"{var}": construct_virtual_array(zarr_group=zg, var_name=var)
         for var in virtual_vars
     }
 
@@ -206,21 +204,18 @@ def virtual_dataset_from_zarr_group(
     )
 
 
-def construct_chunk_key_mapping(
-    zarr_group: zarr.core.group.Group, array_name: str
-) -> dict:
-    # ZARR VERSION
-    # how can we get this JUST for the array keys, not all
+def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) -> dict:
     import asyncio
     import pathlib
 
     async def get_chunk_size(chunk_key: pathlib.PosixPath) -> int:
-        # async get chunk size
+        # async get chunk size of a chunk key
         return await zarr_group.store.getsize(chunk_key)
 
     async def get_chunk_paths() -> dict:
+        # this type hint for dict is doing a lot of work. Should this be a dataclass or typed dict?
         chunk_paths = {}
-        # Is there a way to list per array?
+        # Is there a way to call `zarr_group.store.list()` per array?
         async for item in zarr_group.store.list():
             if not item.endswith(
                 (".zarray", ".zattrs", ".zgroup", ".zmetadata")
@@ -238,22 +233,19 @@ def construct_chunk_key_mapping(
     return asyncio.run(get_chunk_paths())
 
 
-def construct_virtual_array(
-    zarr_group, var_name, filepath
-):  # filepath can be removed once we remove fsspec bit
-    # 3a.  Use zarr-python to get the attributes and the dimension names,
-    # and coordinate names (which come from the .zmetadata or zarr.json)
+def construct_virtual_array(zarr_group: zarr.core.Group, var_name: str):
     array_metadata = zarr_group[var_name].metadata
 
     array_metadata_dict = array_metadata.to_dict()
-
-    # ARRAY_DIMENSIONS should be removed downstream in the icechunk writer
 
     if zarr_group[var_name].metadata.zarr_format == 3:
         array_dims = zarr_group[var_name].metadata.dimension_names
 
     else:
         # v2 stores
+        # ARRAY_DIMENSIONS should be removed downstream in the icechunk writer.
+        # Should we remove them here as well?
+
         array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
 
     # should these have defaults defined and shared across readers?
@@ -266,8 +258,6 @@ def construct_virtual_array(
         "order": array_metadata_dict.get("order", None),
     }
 
-    # 3b.
-    # Use zarr-python to also get the dtype and chunk grid info + everything else needed to create the virtualizarr.zarr.ZArray object (eventually we can skip this step and use a zarr-python array metadata class directly instead of virtualizarr.zarr.ZArray
     array_zarray = ZArray(
         shape=array_metadata_dict.get("shape", None),
         chunks=array_metadata_dict.get("chunks", None),
@@ -283,12 +273,10 @@ def construct_virtual_array(
 
     array_chunkmanifest = ChunkManifest(array_chunk_sizes)
 
-    # 3g. Create a ManifestArray from our ChunkManifest and ZArray
     array_manifest_array = ManifestArray(
         zarray=array_zarray, chunkmanifest=array_chunkmanifest
     )
 
-    # 3h. Wrap that ManifestArray in an xarray.Variable, using the dims and attrs we read before
     array_variable = Variable(
         dims=array_dims,
         data=array_manifest_array,
