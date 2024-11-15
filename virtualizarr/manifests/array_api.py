@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, Union, cast
 
 import numpy as np
 
@@ -27,8 +27,11 @@ def implements(numpy_function):
     return decorator
 
 
-def _get_codecs(array: Union["ManifestArray", "Array"]) -> list[Codec]:
-    from zarr import Array
+def _get_codecs(array: Union["ManifestArray", "Array"]) -> list[Optional["Codec"]]:
+    try:
+        from zarr import Array
+    except ImportError:
+        Array = None  # Fallback if `zarr` is not installed
 
     from .array import ManifestArray
 
@@ -36,8 +39,12 @@ def _get_codecs(array: Union["ManifestArray", "Array"]) -> list[Codec]:
         if array.zarray.zarr_format == 3:
             return list(array.zarray._v3_codec_pipeline())
         return [array.zarray.codec]
-    if isinstance(array, Array):
+    if Array and isinstance(array, Array):
         return array.metadata.codecs
+
+    raise ImportError(
+        "zarr is not installed, and the provided array is not of type ManifestArray."
+    )
 
 
 def check_combineable_zarr_arrays(
