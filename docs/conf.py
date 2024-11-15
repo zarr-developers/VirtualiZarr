@@ -49,6 +49,9 @@ pygments_style = "sphinx"
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+# -- Myst Options -------------------------------------------------
+
+myst_heading_anchors = 3
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -78,7 +81,7 @@ html_css_files = [
     'custom.css',
 ]
 
-html_logo = "_static/_future_logo.png"
+# html_logo = "_static/_future_logo.png"
 
 html_static_path = ["_static"]
 
