@@ -27,6 +27,19 @@ def implements(numpy_function):
     return decorator
 
 
+def _get_codecs(array: Union["ManifestArray", "Array"]) -> list[Codec]:
+    from zarr import Array
+
+    from .array import ManifestArray
+
+    if isinstance(array, ManifestArray):
+        if array.zarray.zarr_format == 3:
+            return list(array.zarray._v3_codec_pipeline())
+        return [array.zarray.codec]
+    if isinstance(array, Array):
+        return array.metadata.codecs
+
+
 def check_combineable_zarr_arrays(
     arrays: Iterable[Union["ManifestArray", "Array"]],
 ) -> None:
@@ -38,19 +51,7 @@ def check_combineable_zarr_arrays(
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    def get_codecs(array):
-        import zarr
-
-        from .array import ManifestArray
-
-        if isinstance(array, ManifestArray):
-            if array.zarray.zarr_format == 3:
-                return list(array.zarray._v3_codec_pipeline())
-            return array.zarray.codec
-        if isinstance(array, zarr.core.array.Array):
-            return array.metadata.codecs
-
-    _check_same_codecs([get_codecs(arr) for arr in arrays])
+    _check_same_codecs([_get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
     _check_same_chunk_shapes([arr.chunks for arr in arrays])
