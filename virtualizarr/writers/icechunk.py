@@ -5,6 +5,7 @@ import zarr  # type: ignore[import-untyped]
 from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
+from zarr import Array
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests import array_api as manifest_api
@@ -12,7 +13,7 @@ from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from zarr import Array, Group  # type: ignore
+    from zarr import Group  # type: ignore
 
 
 VALID_URI_PREFIXES = {
