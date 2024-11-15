@@ -26,9 +26,9 @@ extensions = [
 ]
 
 extlinks = {
-    "issue": ("https://github.com/pydata/xarray/issues/%s", "GH%s"),
-    "pull": ("https://github.com/pydata/xarray/pull/%s", "PR%s"),
-    "discussion": ("https://github.com/pydata/xarray/discussions/%s", "D%s"),
+    "issue": ("https://github.com/zarr-developers/virtualizarr/issues/%s", "GH%s"),
+    "pull": ("https://github.com/zarr-developers/virtualizarr/pull/%s", "PR%s"),
+    "discussion": ("https://github.com/zarr-developers/virtualizarr/discussions/%s", "D%s"),
 }
 
 # Add any paths that contain templates here, relative to this directory.
