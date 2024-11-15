@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from pathlib import Path, PosixPath
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
@@ -16,6 +16,9 @@ from virtualizarr.readers.common import (
 )
 from virtualizarr.utils import check_for_collisions
 from virtualizarr.zarr import ZArray
+
+if TYPE_CHECKING:
+    from pathlib import PosixPath
 
 
 class ZarrVirtualBackend(VirtualBackend):
@@ -137,8 +140,8 @@ class ZarrV3ChunkManifestVirtualBackend(VirtualBackend):
 def virtual_dataset_from_zarr_group(
     filepath: str,
     group: str | None = None,
-    drop_variables: Iterable[str] | None = None,
-    loadable_variables: Iterable[str] | None = None,
+    drop_variables: Iterable[str] | None = [],
+    loadable_variables: Iterable[str] | None = [],
     decode_times: bool | None = None,
     indexes: Mapping[str, Index] | None = None,
     reader_options: Optional[dict] = None,
@@ -147,10 +150,8 @@ def virtual_dataset_from_zarr_group(
 
     zg = zarr.open_group(filepath, mode="r")
 
-    # 2a. Use zarr-python to list the arrays in the store
     zarr_arrays = [val for val in zg.keys()]
 
-    # 2b. and check that all loadable_variables are present
     missing_vars = set(loadable_variables) - set(zarr_arrays)
     if missing_vars:
         raise ValueError(
@@ -161,7 +162,9 @@ def virtual_dataset_from_zarr_group(
     virtual_vars = list(
         set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
     )
+    import ipdb
 
+    ipdb.set_trace()
     virtual_variable_mapping = {
         f"{var}": construct_virtual_array(zarr_group=zg, var_name=var)
         for var in virtual_vars
@@ -206,9 +209,8 @@ def virtual_dataset_from_zarr_group(
 
 def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) -> dict:
     import asyncio
-    import pathlib
 
-    async def get_chunk_size(chunk_key: pathlib.PosixPath) -> int:
+    async def get_chunk_size(chunk_key: PosixPath) -> int:
         # async get chunk size of a chunk key
         return await zarr_group.store.getsize(chunk_key)
 
@@ -233,7 +235,7 @@ def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) ->
     return asyncio.run(get_chunk_paths())
 
 
-def construct_virtual_array(zarr_group: zarr.core.Group, var_name: str):
+def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     array_metadata = zarr_group[var_name].metadata
 
     array_metadata_dict = array_metadata.to_dict()
@@ -250,6 +252,7 @@ def construct_virtual_array(zarr_group: zarr.core.Group, var_name: str):
 
     # should these have defaults defined and shared across readers?
     # Should these have common validation for Zarr V3 codecs & such?
+    # Note! It seems like zarr v2 and v3 don't have the same array_encoding keys..
     array_encoding = {
         "chunks": array_metadata_dict.get("chunks", None),
         "compressor": array_metadata_dict.get("compressor", None),
