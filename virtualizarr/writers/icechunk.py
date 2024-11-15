@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Optional, cast
 
 import numpy as np
-import zarr
+import zarr  # type: ignore[import-untyped]
 from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable

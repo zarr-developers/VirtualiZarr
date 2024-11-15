@@ -11,7 +11,7 @@ import numpy.testing as npt
 from xarray import Dataset, concat, open_dataset, open_zarr
 from xarray.core.variable import Variable
 from zarr import Array, Group, group  # type: ignore[import-untyped]
-from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata import ArrayV3Metadata  # type: ignore[import-untyped]
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import dataset_to_icechunk, generate_chunk_key
