@@ -205,21 +205,21 @@ def skip_test_for_libhdf5_version():
     return libhdf5_version < Version("1.14")
 
 
-@pytest.fixture(params=["blosc_zlib"])
+@pytest.fixture(params=["blosc_zlib", ""])
 def filter_encoded_roundtrip_netcdf4_file(
     tmpdir, request, skip_test_for_libhdf5_version
 ):
     if skip_test_for_libhdf5_version:
         pytest.skip("Requires libhdf5 >= 1.14")
     ds = create_test_data(dim_sizes=(20, 80, 10))
+    encoding_config = {
+        "chunksizes": (20, 40),
+        "original_shape": ds.var2.shape,
+        "blosc_shuffle": 1,
+        "fletcher32": False,
+    }
     if "blosc" in request.param:
-        encoding_config = {
-            "compression": request.param,
-            "chunksizes": (20, 40),
-            "original_shape": ds.var2.shape,
-            "blosc_shuffle": 1,
-            "fletcher32": False,
-        }
+        encoding_config["compression"] = request.param
     #  Check on how handle scalar dim.
     ds = ds.drop_dims("dim3")
     ds["var2"].encoding.update(encoding_config)
