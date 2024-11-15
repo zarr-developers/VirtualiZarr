@@ -162,9 +162,7 @@ def virtual_dataset_from_zarr_group(
     virtual_vars = list(
         set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
     )
-    import ipdb
 
-    ipdb.set_trace()
     virtual_variable_mapping = {
         f"{var}": construct_virtual_array(zarr_group=zg, var_name=var)
         for var in virtual_vars
