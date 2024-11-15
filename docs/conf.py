@@ -18,12 +18,18 @@ extensions = [
     "myst_nb",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.extlinks",
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "sphinx_design",
     "sphinx.ext.napoleon",
 ]
 
+extlinks = {
+    "issue": ("https://github.com/pydata/xarray/issues/%s", "GH%s"),
+    "pull": ("https://github.com/pydata/xarray/pull/%s", "PR%s"),
+    "discussion": ("https://github.com/pydata/xarray/discussions/%s", "D%s"),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
