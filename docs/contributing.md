@@ -15,6 +15,8 @@ python -m pip install -e . --no-deps
 python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
 ```
 
+The `--run-network-tests` argument is optional - it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
+
 ## Contributing documentation
 
 Whilst the CI will build the updated documentation for each PR, it can also be useful to check that the documentation has rendered as expected by building it locally.
