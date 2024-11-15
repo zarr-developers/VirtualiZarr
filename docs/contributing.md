@@ -37,3 +37,4 @@ Open `docs/_build/html/index.html` in a web browser
 4. Click 'Generate Release Notes' to draft notes based on merged pull requests.
 5. Edit the draft release notes for consistency.
 6. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
+7. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
