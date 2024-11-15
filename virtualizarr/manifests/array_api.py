@@ -7,6 +7,8 @@ from virtualizarr.zarr import Codec, determine_chunk_grid_shape
 from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
+    from zarr import Array  # type: ignore
+
     from .array import ManifestArray
 
 
@@ -25,7 +27,7 @@ def implements(numpy_function):
     return decorator
 
 
-def check_combineable_zarr_arrays(arrays: Iterable["ManifestArray"]) -> None:
+def check_combineable_zarr_arrays(arrays: Iterable["ManifestArray" | "Array"]) -> None:
     """
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.

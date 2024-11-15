@@ -129,6 +129,8 @@ def resize_array(
     append_axis: int,
 ) -> "Array":
     existing_array = group[name]
+    if not isinstance(existing_array, Array):
+        raise ValueError("Expected existing array to be a zarr.core.Array")
     new_shape = list(existing_array.shape)
     new_shape[append_axis] += var.shape[append_axis]
     return existing_array.resize(tuple(new_shape))
@@ -136,8 +138,10 @@ def resize_array(
 
 def get_axis(
     dims: list[str],
-    dim_name: str,
+    dim_name: Optional[str],
 ) -> int:
+    if dim_name is None:
+        raise ValueError("dim_name must be provided")
     return dims.index(dim_name)
 
 
@@ -150,7 +154,7 @@ def _check_compatible_arrays(
     manifest_api.check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
-def check_compatible_encodings(encoding1, encoding2):
+def _check_compatible_encodings(encoding1, encoding2):
     for key, value in encoding1.items():
         if key in encoding2:
             if encoding2[key] != value:
@@ -171,7 +175,7 @@ def write_virtual_variable_to_icechunk(
     zarray = ma.zarray
     mode = store.mode.str
 
-    dims = var.dims
+    dims: list[str] = cast(list[str], list(var.dims))
     append_axis, existing_num_chunks, arr = None, None, None
     if append_dim and append_dim not in dims:
         raise ValueError(
@@ -179,9 +183,11 @@ def write_virtual_variable_to_icechunk(
         )
     if mode == "a":
         existing_array = group[name]
+        if not isinstance(existing_array, Array):
+            raise ValueError("Expected existing array to be a zarr.core.Array")
         append_axis = get_axis(dims, append_dim)
         # check if arrays can be concatenated
-        check_compatible_encodings(var.encoding, existing_array.attrs)
+        _check_compatible_encodings(var.encoding, existing_array.attrs)
         _check_compatible_arrays(ma, existing_array, append_axis)
 
         # determine number of existing chunks along the append axis
@@ -239,7 +245,9 @@ def generate_chunk_key(
             f"append_axis {append_axis} is greater than the number of indices {len(index)}"
         )
     return "/".join(
-        str(ind + existing_num_chunks) if axis is append_axis else str(ind)
+        str(ind + existing_num_chunks)
+        if axis is append_axis and existing_num_chunks is not None
+        else str(ind)
         for axis, ind in enumerate(index)
     )
 

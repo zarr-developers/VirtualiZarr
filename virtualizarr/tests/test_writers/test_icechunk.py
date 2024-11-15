@@ -1,6 +1,6 @@
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, cast
 
 import pytest
 
@@ -11,6 +11,7 @@ import numpy.testing as npt
 from xarray import Dataset, concat, open_dataset, open_zarr
 from xarray.core.variable import Variable
 from zarr import Array, Group, group  # type: ignore[import-untyped]
+from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import dataset_to_icechunk, generate_chunk_key
@@ -69,7 +70,8 @@ def test_write_new_virtual_variable(
     # assert dict(arr.attrs) == {"units": "km"}
 
     # check dimensions
-    assert arr.metadata.dimension_names == ("x", "y")
+    if isinstance(arr.metadata, ArrayV3Metadata):
+        assert arr.metadata.dimension_names == ("x", "y")
 
 
 def test_set_single_virtual_ref_without_encoding(
@@ -361,17 +363,17 @@ def generate_chunk_manifest(
 
 def gen_virtual_dataset(
     file_uri: str,
-    shape: tuple[int, int] = (3, 4),
-    chunk_shape: tuple[int, int] = (3, 4),
+    shape: tuple[int, ...] = (3, 4),
+    chunk_shape: tuple[int, ...] = (3, 4),
     dtype: np.dtype = np.dtype("int32"),
-    compressor: dict = None,
-    filters: str = None,
-    fill_value: str = None,
-    encoding: dict = None,
+    compressor: Optional[dict] = None,
+    filters: Optional[list[dict[Any, Any]]] = None,
+    fill_value: Optional[str] = None,
+    encoding: Optional[dict] = None,
     variable_name: str = "foo",
     base_offset: int = 6144,
     length: int = 48,
-    dims: list[str] = None,
+    dims: Optional[list[str]] = None,
 ):
     manifest = generate_chunk_manifest(
         file_uri,
@@ -391,7 +393,8 @@ def gen_virtual_dataset(
     )
     ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
     ds = open_dataset(file_uri)
-    dims = dims or ds.sizes.keys()
+    ds_dims: list[str] = cast(list[str], list(ds.dims))
+    dims = dims or ds_dims
     var = Variable(
         data=ma,
         dims=dims,
@@ -441,7 +444,7 @@ class TestAppend:
 
     ## When appending to a virtual ref with encoding, it succeeds
     def test_append_virtual_ref_with_encoding(
-        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: callable
+        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
         from icechunk import IcechunkStore
@@ -496,7 +499,7 @@ class TestAppend:
 
     ## When appending to a virtual ref with compression, it succeeds
     def test_append_with_compression_succeeds(
-        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: callable
+        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
         from icechunk import IcechunkStore
