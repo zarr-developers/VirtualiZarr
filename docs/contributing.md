@@ -1,5 +1,7 @@
 # Contributing
 
+Contributions are welcome and encouraged! We ask only that all contributors follow the [Zarr Developers Code of Conduct](https://github.com/zarr-developers/.github/blob/main/CODE_OF_CONDUCT.md).
+
 ## Contributing code
 
 ```bash
