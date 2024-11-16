@@ -43,7 +43,7 @@ def netcdf4_files_factory(tmpdir) -> callable:
         encoding: Optional[Dict[str, Dict[str, Any]]] = None,
         chunks: Optional[Dict[str, int]] = None,
     ) -> tuple[str, str]:
-        # Set up example xarray dataset
+        # Aimee: Figure out why chunks={} is the only way to get the icechunk append tests to pass
         ds = xr.tutorial.open_dataset("air_temperature", chunks=chunks)
 
         # Split dataset into two parts

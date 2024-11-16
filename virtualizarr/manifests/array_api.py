@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Union, cast
 
 import numpy as np
 
-from virtualizarr.zarr import Codec, determine_chunk_grid_shape
+from virtualizarr.zarr import determine_chunk_grid_shape
 
+from .get_codecs import get_codecs
 from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
@@ -27,26 +28,6 @@ def implements(numpy_function):
     return decorator
 
 
-def _get_codecs(array: Union["ManifestArray", "Array"]) -> list[Optional["Codec"]]:
-    try:
-        from zarr import Array
-    except ImportError:
-        Array = None  # Fallback if `zarr` is not installed
-
-    from .array import ManifestArray
-
-    if isinstance(array, ManifestArray):
-        if array.zarray.zarr_format == 3:
-            return list(array.zarray._v3_codec_pipeline())
-        return [array.zarray.codec]
-    if Array and isinstance(array, Array):
-        return array.metadata.codecs
-
-    raise ImportError(
-        "zarr is not installed, and the provided array is not of type ManifestArray."
-    )
-
-
 def check_combineable_zarr_arrays(
     arrays: Iterable[Union["ManifestArray", "Array"]],
 ) -> None:
@@ -58,7 +39,7 @@ def check_combineable_zarr_arrays(
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([_get_codecs(arr) for arr in arrays])
+    _check_same_codecs([get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
     _check_same_chunk_shapes([arr.chunks for arr in arrays])
@@ -75,7 +56,10 @@ def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
             )
 
 
-def _check_same_codecs(codecs: list[Codec]) -> None:
+# Aimee: is there a way to type this list? ManifestArrays will return a list of virtualizarr.zarr.Codec objects
+# whereas Zarr v3 arrays will return a list of ArrayArrayCodec, etc
+# and Zarr v2 arrays will return ??
+def _check_same_codecs(codecs: list[Any]) -> None:
     first_codec, *other_codecs = codecs
     for codec in other_codecs:
         if codec != first_codec:

@@ -128,13 +128,14 @@ def resize_array(
     name: str,
     var: Variable,
     append_axis: int,
-) -> "Array":
+) -> Array:
     existing_array = group[name]
     if not isinstance(existing_array, Array):
         raise ValueError("Expected existing array to be a zarr.core.Array")
     new_shape = list(existing_array.shape)
     new_shape[append_axis] += var.shape[append_axis]
-    return existing_array.resize(tuple(new_shape))
+    existing_array.resize(tuple(new_shape))
+    return existing_array
 
 
 def get_axis(
@@ -268,8 +269,6 @@ def write_manifest_virtual_refs(
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
-    # Aimee: the manifest (and it's corresponding paths, offsets and lengths, already has the shape of the datacube's chunks
-    # so we want to increment the resulting multi index
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
