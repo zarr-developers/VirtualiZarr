@@ -18,12 +18,18 @@ extensions = [
     "myst_nb",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.extlinks",
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "sphinx_design",
     "sphinx.ext.napoleon",
 ]
 
+extlinks = {
+    "issue": ("https://github.com/zarr-developers/virtualizarr/issues/%s", "GH%s"),
+    "pull": ("https://github.com/zarr-developers/virtualizarr/pull/%s", "PR%s"),
+    "discussion": ("https://github.com/zarr-developers/virtualizarr/discussions/%s", "D%s"),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -49,6 +55,9 @@ pygments_style = "sphinx"
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+# -- Myst Options -------------------------------------------------
+
+myst_heading_anchors = 3
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -78,7 +87,7 @@ html_css_files = [
     'custom.css',
 ]
 
-html_logo = "_static/_future_logo.png"
+# html_logo = "_static/_future_logo.png"
 
 html_static_path = ["_static"]
 
