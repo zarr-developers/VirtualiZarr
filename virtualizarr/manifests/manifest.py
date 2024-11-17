@@ -70,12 +70,12 @@ class ChunkManifest:
 
     The manifest can be converted to or from a dictionary which looks like this
 
-        {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-        }
+    |    {
+    |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+    |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+    |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+    |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+    |    }
 
     using the .__init__() and .dict() methods, so users of this class can think of the manifest as if it were a dict mapping zarr chunk keys to byte ranges.
 
@@ -98,12 +98,12 @@ class ChunkManifest:
         entries: dict
             Chunk keys and byte range information, as a dictionary of the form
 
-                {
-                    "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-                    "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-                    "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-                    "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-                }
+            |    {
+            |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+            |    }
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
