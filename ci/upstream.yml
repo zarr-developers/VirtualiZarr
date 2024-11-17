@@ -3,7 +3,6 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - dask
   - xarray>=2024.10.0
   - h5netcdf
   - h5py

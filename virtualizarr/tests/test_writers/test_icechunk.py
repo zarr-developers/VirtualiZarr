@@ -450,7 +450,7 @@ class TestAppend:
 
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor, "dtype": np.dtype("float64")}}
-        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding, chunks={})
+        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
         vds1, vds2 = (
             gen_virtual_dataset(
                 file_uri=filepath1,
@@ -460,7 +460,7 @@ class TestAppend:
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=20146,
+                base_offset=15419,
                 length=15476000,
             ),
             gen_virtual_dataset(
@@ -471,7 +471,7 @@ class TestAppend:
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=20146,
+                base_offset=15419,
                 length=15476000,
             ),
         )
@@ -503,8 +503,15 @@ class TestAppend:
         import xarray.testing as xrt
         from icechunk import IcechunkStore
 
-        encoding = {"air": {"zlib": True, "complevel": 4, "chunksizes": (1460, 25, 53)}}
-        file1, file2 = netcdf4_files_factory(encoding=encoding, chunks={})
+        encoding = {
+            "air": {
+                "zlib": True,
+                "complevel": 4,
+                "chunksizes": (1460, 25, 53),
+                "shuffle": False,
+            }
+        }
+        file1, file2 = netcdf4_files_factory(encoding=encoding)
         # Generate compressed dataset
         vds1, vds2 = (
             gen_virtual_dataset(
@@ -515,7 +522,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                base_offset=23214,
+                base_offset=18043,
                 length=3936114,
             ),
             gen_virtual_dataset(
@@ -526,7 +533,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                base_offset=23214,
+                base_offset=18043,
                 length=3938672,
             ),
         )

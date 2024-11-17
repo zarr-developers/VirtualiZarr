@@ -41,10 +41,9 @@ def netcdf4_file(tmpdir):
 def netcdf4_files_factory(tmpdir) -> callable:
     def create_netcdf4_files(
         encoding: Optional[Dict[str, Dict[str, Any]]] = None,
-        chunks: Optional[Dict[str, int]] = None,
     ) -> tuple[str, str]:
         # Aimee: Figure out why chunks={} is the only way to get the icechunk append tests to pass
-        ds = xr.tutorial.open_dataset("air_temperature", chunks=chunks)
+        ds = xr.tutorial.open_dataset("air_temperature")
 
         # Split dataset into two parts
         ds1 = ds.isel(time=slice(None, 1460))
@@ -53,8 +52,8 @@ def netcdf4_files_factory(tmpdir) -> callable:
         # Save datasets to disk as NetCDF in the temporary directory with the provided encoding
         filepath1 = f"{tmpdir}/air1.nc"
         filepath2 = f"{tmpdir}/air2.nc"
-        ds1.to_netcdf(filepath1, encoding=encoding, engine="h5netcdf")
-        ds2.to_netcdf(filepath2, encoding=encoding, engine="h5netcdf")
+        ds1.to_netcdf(filepath1, encoding=encoding)
+        ds2.to_netcdf(filepath2, encoding=encoding)
 
         # Close datasets
         ds1.close()
