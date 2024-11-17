@@ -48,6 +48,8 @@ test = [
     "ruff",
     "s3fs",
     "scipy",
+    "tifffile",
+    "pillow",
 ]
 
 
