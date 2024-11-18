@@ -42,7 +42,6 @@ def netcdf4_files_factory(tmpdir) -> callable:
     def create_netcdf4_files(
         encoding: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> tuple[str, str]:
-        # Aimee: Figure out why chunks={} is the only way to get the icechunk append tests to pass
         ds = xr.tutorial.open_dataset("air_temperature")
 
         # Split dataset into two parts
