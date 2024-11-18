@@ -15,7 +15,6 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    has_tifffile,
     network,
     requires_kerchunk,
     requires_s3fs,
@@ -164,6 +163,28 @@ class TestOpenVirtualDatasetAttrs:
         }
 
 
+@requires_kerchunk
+class TestDetermineCoords:
+    def test_infer_one_dimensional_coords(self, netcdf4_file):
+        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        assert set(vds.coords) == {"time", "lat", "lon"}
+
+    def test_var_attr_coords(self, netcdf4_file_with_2d_coords):
+        vds = open_virtual_dataset(netcdf4_file_with_2d_coords, indexes={})
+
+        expected_dimension_coords = ["ocean_time", "s_rho"]
+        expected_2d_coords = ["lon_rho", "lat_rho", "h"]
+        expected_1d_non_dimension_coords = ["Cs_r"]
+        expected_scalar_coords = ["hc", "Vtransform"]
+        expected_coords = (
+            expected_dimension_coords
+            + expected_2d_coords
+            + expected_1d_non_dimension_coords
+            + expected_scalar_coords
+        )
+        assert set(vds.coords) == set(expected_coords)
+
+
 @network
 @requires_s3fs
 class TestReadFromS3:
@@ -218,9 +239,7 @@ class TestReadFromURL:
             pytest.param(
                 "tiff",
                 "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-                marks=pytest.mark.skipif(
-                    not has_tifffile, reason="package tifffile is not available"
-                ),
+                marks=pytest.mark.xfail(reason="not yet implemented"),
             ),
             pytest.param(
                 "fits",

@@ -6,7 +6,7 @@ dependencies:
   - h5py
   - hdf5
   - netcdf4
-  - xarray>=2024.6.0
+  - xarray>=2024.10.0
   - numpy>=2.0.0
   - numcodecs
   - packaging

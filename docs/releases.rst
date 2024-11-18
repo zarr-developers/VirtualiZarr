@@ -1,36 +1,73 @@
 Release notes
 =============
 
-.. _v1.0.1:
+.. _v1.1.1:
 
-v1.0.1 (unreleased)
+v1.1.1 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Minimum required version of Xarray is now v2024.10.0.
+  (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Handle root and nested groups with ``dmrpp`` backend (:pull:`265`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
+- Fixed bug with writing of `dimension_names` into zarr metadata.
+  (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fixed bug causing CF-compliant variables not to be identified as coordinates (:pull:`191`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+- FAQ answers on Icechunk compatibility, converting from existing Kerchunk references to Icechunk, and how to add a new reader for a custom file format.
+  (:pull:`266`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify which readers actually currently work in FAQ, and temporarily remove tiff from the auto-detection.
+  (:issue:`291`, :pull:`296`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minor improvements to the Contributing Guide.
+  (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- More minor improvements to the Contributing Guide.
+  (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Support downstream type checking by adding py.typed marker file.
+  (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+
+.. _v1.1.0:
+
+v1.1.0 (22nd Oct 2024)
+----------------------
+
+New Features
+~~~~~~~~~~~~
 
 - Can open `kerchunk` reference files with ``open_virtual_dataset``.
   (:pull:`251`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_ & `Kristen Thyng <https://github.com/kthyng>`_.
-
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
   (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
-
 - Adds `decode_times` to open_virtual_dataset (:pull:`232`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
   By `Ayush Nag <https://github.com/ayushnag>`_.
-
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
-
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
-
 - Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
   By `Matt Iannucci <https://github.com/mpiannucci>`_.
 
@@ -63,7 +100,6 @@ Documentation
 
 - Adds virtualizarr + coiled serverless example notebook (:pull:`223`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
