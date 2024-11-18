@@ -37,6 +37,7 @@ has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
+has_pillow, requires_pillow = _importorskip("PIL")
 
 
 def create_manifestarray(
