@@ -1,5 +1,5 @@
 import math
-from typing import Dict, Iterable, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
 from xarray import Dataset, Index, Variable
@@ -15,7 +15,11 @@ from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
 from virtualizarr.zarr import ZArray
 
-h5py = soft_import("h5py", "For reading hdf files")
+if TYPE_CHECKING:
+    import h5py  # type: ignore
+
+
+h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
 
 class HDFVirtualBackend(VirtualBackend):

@@ -1,5 +1,5 @@
 import dataclasses
-from typing import List, Tuple, TypedDict, Union
+from typing import TYPE_CHECKING, List, Tuple, TypedDict, Union
 
 import numcodecs.registry as registry
 import numpy as np
@@ -9,9 +9,16 @@ from xarray.coding.variables import _choose_float_dtype
 
 from virtualizarr.utils import soft_import
 
-h5py = soft_import("h5py", "For reading hdf files")
-hdf5plugin = soft_import("hdf5plugin", "For reading hdf files with filters")
-imagecodecs = soft_import("imagecodecs", "For reading hdf files with filters")
+if TYPE_CHECKING:
+    import h5py  # type: ignore
+
+h5py = soft_import("h5py", "For reading hdf files", strict=False)
+hdf5plugin = soft_import(
+    "hdf5plugin", "For reading hdf files with filters", strict=False
+)
+imagecodecs = soft_import(
+    "imagecodecs", "For reading hdf files with filters", strict=False
+)
 
 
 _non_standard_filters = {
