@@ -64,13 +64,10 @@ def _is_zarr_array(array: object) -> bool:
 def _get_zarr_array_codecs(array: "Array") -> Any:
     """Get codecs for a Zarr Array based on its format."""
     try:
-        from zarr import Array
-
-        if not isinstance(array, Array):
-            raise ValueError("Provided array is not a Zarr Array.")
-
+        # For Zarr v3
         if hasattr(array, "metadata") and hasattr(array.metadata, "codecs"):
             return array.metadata.codecs
+        # For Zarr v2
         elif hasattr(array, "compressor") and hasattr(array, "filters"):
             return [Codec(compressor=array.compressor, filters=array.filters)]
         else:
