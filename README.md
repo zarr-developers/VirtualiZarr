@@ -11,7 +11,8 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/zarr-developers/VirtualiZarr)](https://github.com/zarr-developers/VirtualiZarr/releases)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/virtualizarr?label=pypi%7Cdownloads)](https://pypistats.org/packages/virtualizarr)
-[![Conda - Downloads](https://anaconda.org/conda-forge/virtualizarr/badges/downloads.svg?label=conda%7Cdownloads)](https://anaconda.org/conda-forge/virtualizarr)
+[![Conda - Downloads](https://img.shields.io/conda/d/conda-forge/virtualizarr
+)](https://anaconda.org/conda-forge/virtualizarr)
 
 **VirtualiZarr creates virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
 
