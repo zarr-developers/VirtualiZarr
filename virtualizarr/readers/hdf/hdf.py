@@ -1,4 +1,5 @@
 import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
@@ -20,6 +21,15 @@ if TYPE_CHECKING:
 
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
+
+if not h5py:
+
+    @dataclass
+    class h5py_stub:
+        Group: str
+        Dataset: str
+
+    h5py = h5py_stub(Group="", Dataset="")
 
 
 class HDFVirtualBackend(VirtualBackend):
