@@ -11,8 +11,16 @@ from virtualizarr.utils import soft_import
 
 if TYPE_CHECKING:
     import h5py  # type: ignore
+    from h5py import Dataset, Group  # type: ignore
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
+if h5py:
+    Dataset = h5py.Dataset
+    Group = h5py.Group
+else:
+    Dataset = dict()
+    Group = dict()
+
 hdf5plugin = soft_import(
     "hdf5plugin", "For reading hdf files with filters", strict=False
 )
@@ -119,7 +127,7 @@ def _filter_to_codec(
     return codec
 
 
-def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
+def cfcodec_from_dataset(dataset: Dataset) -> Codec | None:
     """
     Converts select h5py dataset CF convention attrs to CFCodec
 
@@ -166,7 +174,7 @@ def cfcodec_from_dataset(dataset: h5py.Dataset) -> Codec | None:
         return None
 
 
-def codecs_from_dataset(dataset: h5py.Dataset) -> List[Codec]:
+def codecs_from_dataset(dataset: Dataset) -> List[Codec]:
     """
     Extracts a list of numcodecs from an h5py dataset
 

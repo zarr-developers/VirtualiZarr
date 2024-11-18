@@ -1,9 +1,9 @@
 import math
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
-from xarray import Dataset, Index, Variable
+import xarray as xr
+from xarray import Index, Variable
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 from virtualizarr.readers.common import (
@@ -18,18 +18,15 @@ from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     import h5py  # type: ignore
-
+    from h5py import Dataset, Group  # type: ignore
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
-
-if not h5py:
-
-    @dataclass
-    class h5py_stub:
-        Group: str
-        Dataset: str
-
-    h5py = h5py_stub(Group="", Dataset="")
+if h5py:
+    Dataset = h5py.Dataset
+    Group = h5py.Group
+else:
+    Dataset = dict()
+    Group = dict()
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -42,7 +39,7 @@ class HDFVirtualBackend(VirtualBackend):
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         reader_options: Optional[dict] = None,
-    ) -> Dataset:
+    ) -> xr.Dataset:
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,
@@ -79,9 +76,7 @@ class HDFVirtualBackend(VirtualBackend):
         )
 
     @staticmethod
-    def _dataset_chunk_manifest(
-        path: str, dataset: h5py.Dataset
-    ) -> Optional[ChunkManifest]:
+    def _dataset_chunk_manifest(path: str, dataset: Dataset) -> Optional[ChunkManifest]:
         """
         Generate ChunkManifest for HDF5 dataset.
 
@@ -148,7 +143,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(dataset: h5py.Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(dataset: Dataset) -> Union[List[str], List[None]]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -190,14 +185,14 @@ class HDFVirtualBackend(VirtualBackend):
         return dims
 
     @staticmethod
-    def _extract_attrs(h5obj: Union[h5py.Dataset, h5py.Group]):
+    def _extract_attrs(h5obj: Union[Dataset, Group]):
         """
         Extract attributes from an HDF5 group or dataset.
 
         Parameters
         ----------
         h5obj : h5py.Group or h5py.Dataset
-            An HDF5 group or dataset.
+            An h5py group or dataset.
         """
         _HIDDEN_ATTRS = {
             "REFERENCE_LIST",
@@ -236,7 +231,7 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
-    def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[Variable]:
+    def _dataset_to_variable(path: str, dataset: Dataset) -> Optional[Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
@@ -338,7 +333,7 @@ class HDFVirtualBackend(VirtualBackend):
         variables = {}
         for key in g.keys():
             if key not in drop_variables:
-                if isinstance(g[key], h5py.Dataset):
+                if isinstance(g[key], Dataset):
                     variable = HDFVirtualBackend._dataset_to_variable(path, g[key])
                     if variable is not None:
                         variables[key] = variable
