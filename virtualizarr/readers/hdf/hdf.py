@@ -1,7 +1,6 @@
 import math
 from typing import Dict, Iterable, List, Mapping, Optional, Union
 
-import h5py  # type: ignore
 import numpy as np
 from xarray import Dataset, Index, Variable
 
@@ -13,8 +12,10 @@ from virtualizarr.readers.common import (
 )
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
 from virtualizarr.zarr import ZArray
+
+h5py = soft_import("h5py", "For reading hdf files")
 
 
 class HDFVirtualBackend(VirtualBackend):
