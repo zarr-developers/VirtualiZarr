@@ -43,6 +43,9 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Support downstream type checking by adding py.typed marker file.
+  (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+
 .. _v1.1.0:
 
 v1.1.0 (22nd Oct 2024)
