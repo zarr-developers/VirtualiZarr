@@ -229,7 +229,7 @@ class TestConcat:
 @requires_kerchunk
 @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 class TestCombineUsingIndexes:
-    def test_combine_by_coords(self, netcdf4_files_factory: Callable):
+    def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
         filepath1, filepath2 = netcdf4_files_factory()
 
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
