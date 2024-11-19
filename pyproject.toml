@@ -31,7 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # non-kerchunk readers
-hdf_reader = [
+hdf = [
     "fsspec",
     "h5py",
     "hdf5plugin",
@@ -39,25 +39,25 @@ hdf_reader = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 # kerchunk-based readers
-hdf5_reader = [
+hdf5 = [
     "kerchunk>=0.25.0",
     "h5py",
 ]
-netcdf3_reader = [
+netcdf3 = [
     "kerchunk>=0.25.0",
     "scipy",
 ]
-fits_reader = [
+fits = [
     "kerchunk>=0.25.0",
     "astropy",
 ]
 # un-implemented readers
-# tiff_reader = [
+# tiff = [
 #     "kerchunk>=0.25.0",
 #     "tifffile",
 # ]
-# grib_reader = ["kerchunk>=0.25.0"]
-# zarr_reader = ["zarr==3.0.0b2"]
+# grib = ["kerchunk>=0.25.0"]
+# zarr = ["zarr==3.0.0b2"]
 all_readers = [
     "virtualizarr[hdf]",
     "virtualizarr[hdf5]",
