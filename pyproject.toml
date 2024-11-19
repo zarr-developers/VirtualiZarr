@@ -63,9 +63,9 @@ all_readers = [
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
-    "virtualizarr[tiff]",
-    "virtualizarr[grib]",
-    "virtualizarr[zarr]",
+#    "virtualizarr[tiff]",
+#    "virtualizarr[grib]",
+#    "virtualizarr[zarr]",
 ]
 # writers
 icechunk = ["icechunk"]
