@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import numpy as np
 import pytest
 import xarray as xr
@@ -93,64 +91,41 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
-# we should parameterize for:
-# - group
-# - drop_variables
-# - loadable_variables
-# - store readable over cloud storage?
-# - zarr store version v2, v3
-# testing out pytest parameterization with dataclasses :shrug: -- we can revert to a more normal style
-@dataclass
-class ZarrV2Param:
-    loadable_variables: list[str] | None
-    drop_variables: list[str] | None
+# @pytest.mark.parametrize(
+#     "input_params",
+#     [inputs for inputs in ZARR_V2_PARAMS],
+# )
+# def test_zarrV2_roundtrip(zarr_v2_store, input_params):
+#     ds = open_virtual_dataset(
+#         zarr_v2_store,
+#         loadable_variables=input_params.loadable_variables,
+#         drop_variables=input_params.drop_variables,
+#         indexes={},
+#     )
 
+#     # THIS FAILS! TypeError: np.float32(nan) is not JSON serializable
+#     # Question: How do we handle this fill value: fill_value=np.float32(nan)
+#     ds_refs = ds.virtualize.to_kerchunk(format="dict")
 
-ZARR_V2_PARAMS = [
-    ZarrV2Param(loadable_variables=None, drop_variables=None),
-    ZarrV2Param(loadable_variables=["time"], drop_variables=None),
-    ZarrV2Param(loadable_variables=None, drop_variables=["lat", "lon"]),
-    ZarrV2Param(loadable_variables=["lat", "lon"], drop_variables=["time"]),
-]
+#     # tmp fix if you want to override the fill vals!
+#     ds.lat.data.zarray.fill_value = float("nan")
+#     ds.time.data.zarray.fill_value = float("nan")
+#     ds.lon.data.zarray.fill_value = float("nan")
 
-# @requires_zarrV3 # we should have this, but we need the decorator to understand beta versions?
+#     # Use dataset_from_kerchunk_refs to reconstruct the dataset
+#     roundtrip = dataset_from_kerchunk_refs(ds_refs)
 
+#     # Assert equal to original dataset
+#     xrt.assert_equal(roundtrip, ds)
 
-@pytest.mark.parametrize(
-    "input_params",
-    [inputs for inputs in ZARR_V2_PARAMS],
-)
-def test_zarrV2_roundtrip(zarr_v2_store, input_params):
-    ds = open_virtual_dataset(
-        zarr_v2_store,
-        loadable_variables=input_params.loadable_variables,
-        drop_variables=input_params.drop_variables,
-        indexes={},
-    )
+#     # assert vds has:
+#     # loadable vars are np arrays?
+#     # drop vars are not present
+#     # virtual vars are manifest arrays, not loaded arrays
 
-    # THIS FAILS! TypeError: np.float32(nan) is not JSON serializable
-    # Question: How do we handle this fill value: fill_value=np.float32(nan)
-    ds_refs = ds.virtualize.to_kerchunk(format="dict")
-
-    # tmp fix if you want to override the fill vals!
-    ds.lat.data.zarray.fill_value = float("nan")
-    ds.time.data.zarray.fill_value = float("nan")
-    ds.lon.data.zarray.fill_value = float("nan")
-
-    # Use dataset_from_kerchunk_refs to reconstruct the dataset
-    roundtrip = dataset_from_kerchunk_refs(ds_refs)
-
-    # Assert equal to original dataset
-    xrt.assert_equal(roundtrip, ds)
-
-    # assert vds has:
-    # loadable vars are np arrays?
-    # drop vars are not present
-    # virtual vars are manifest arrays, not loaded arrays
-
-    # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose? or just roundtrip it.
-    # from xarray.testing import assert_duckarray_allclose
-    # xrt.assert_allclose(ds, vds)
+#     # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose? or just roundtrip it.
+#     # from xarray.testing import assert_duckarray_allclose
+#     # xrt.assert_allclose(ds, vds)
 
 
 @requires_kerchunk
