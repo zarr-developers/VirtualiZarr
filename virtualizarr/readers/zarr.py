@@ -253,14 +253,14 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
         array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
 
     array_zarray = ZArray(
-        shape=array_metadata_dict.get("shape", None),
-        chunks=array_metadata_dict.get("chunks", None),
-        dtype=array_metadata_dict.get("dtype", None),
-        fill_value=array_metadata_dict.get("fill_value", None),
-        order=array_metadata_dict.get("order", None),
-        compressor=array_metadata_dict.get("compressor", None),
-        filters=array_metadata_dict.get("filters", None),
-        zarr_format=array_metadata_dict.get("zarr_format", None),
+        shape=array_metadata.shape,
+        chunks=array_metadata.chunks,
+        dtype=array_metadata.dtype,
+        fill_value=array_metadata.fill_value,
+        order=array_metadata.order,
+        compressor=array_metadata.compressor,
+        filters=array_metadata.filters,
+        zarr_format=array_metadata.zarr_format,
     )
 
     array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name)
