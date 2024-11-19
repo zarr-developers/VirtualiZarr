@@ -21,7 +21,7 @@ def _xarray_subset():
         {"time": 5}
     )
 
-
+@network
 @pytest.fixture(params=[2, 3])
 def zarr_store(tmpdir, request):
     ds = _xarray_subset()
