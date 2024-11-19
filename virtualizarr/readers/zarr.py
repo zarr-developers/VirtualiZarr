@@ -221,14 +221,17 @@ async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str) -> dict:
         if not item.endswith(
             (".zarray", ".zattrs", ".zgroup", ".zmetadata")
         ) and item.startswith(array_name):
-            # dict key is created by splitting the value from store.list() by the array_name and trailing /....yuck..
+            # dict key is created by splitting the value from store.list() by the array_name and trailing /....yuck.
+            # It would be great if we can ask Zarr for this: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844486393
             chunk_paths[item.split(array_name + "/")[-1]] = {
                 "path": (
                     zarr_group.store.root / item
-                ).as_uri(),  # should this be as_posix() or as_uri()
+                ).as_uri(),  # as_uri to comply with https://github.com/zarr-developers/VirtualiZarr/pull/243
                 "offset": 0,
                 "length": await get_chunk_size(zarr_group, item),
             }
+            # This won't work for sharded stores: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844487578
+
     return chunk_paths
 
 
@@ -247,10 +250,6 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
         array_dims = zarr_group[var_name].metadata.dimension_names
 
     else:
-        # v2 stores
-        # ARRAY_DIMENSIONS should be removed downstream in the icechunk writer.
-        # Should we remove them here as well?
-
         array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
 
     # should these have defaults defined and shared across readers?
