@@ -23,30 +23,59 @@ dynamic = ["version"]
 dependencies = [
     "xarray>=2024.10.0",
     "numpy>=2.0.0",
-    "packaging",
     "universal-pathlib",
     "numcodecs",
     "ujson",
+    "packaging",
 ]
 
 [project.optional-dependencies]
+# non-kerchunk readers
 hdf_reader = [
     "fsspec",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "numcodecs"
+]
+# kerchunk-based readers
+hdf5_reader = [
+    "kerchunk>=0.25.0",
+    "h5py",
+]
+netcdf3_reader = [
+    "kerchunk>=0.25.0",
+    "scipy",
+]
+fits_reader = [
+    "kerchunk>=0.25.0",
+    "astropy",
+]
+# un-implemented readers
+# tiff_reader = [
+#     "kerchunk>=0.25.0",
+#     "tifffile",
+# ]
+# grib_reader = ["kerchunk>=0.25.0"]
+# zarr_reader = ["zarr==3.0.0b2"]
+all_readers = [
+    "virtualizarr[hdf]",
+    "virtualizarr[hdf5]",
+    "virtualizarr[netcdf3]",
+    "virtualizarr[fits]",
+    "virtualizarr[tiff]",
+    "virtualizarr[grib]",
+    "virtualizarr[zarr]",
+]
+# writers
+icechunk = ["icechunk"]
+all = [
+    "virtualizarr[all_readers]",
+    "virtualizarr[icechunk]",
 ]
 test = [
     "codecov",
-    "fastparquet",
-    "fsspec",
-    "h5py",
-    "kerchunk>=0.2.5",
     "mypy",
-    "netcdf4",
-    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -55,10 +84,8 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "scipy",
-    "virtualizarr[hdf_reader]"
+    "virtualizarr[all]"
 ]
-
 
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"
