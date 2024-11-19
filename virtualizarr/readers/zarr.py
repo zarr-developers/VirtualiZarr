@@ -208,32 +208,34 @@ def virtual_dataset_from_zarr_group(
     )
 
 
+async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> int:
+    # async get chunk size of a chunk key
+    return await zarr_group.store.getsize(chunk_key)
+
+
+async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str) -> dict:
+    # this type hint for dict is doing a lot of work. Should this be a dataclass or typed dict?
+    chunk_paths = {}
+    # Is there a way to call `zarr_group.store.list()` per array?
+    async for item in zarr_group.store.list():
+        if not item.endswith(
+            (".zarray", ".zattrs", ".zgroup", ".zmetadata")
+        ) and item.startswith(array_name):
+            # dict key is created by splitting the value from store.list() by the array_name and trailing /....yuck..
+            chunk_paths[item.split(array_name + "/")[-1]] = {
+                "path": (
+                    zarr_group.store.root / item
+                ).as_uri(),  # should this be as_posix() or as_uri()
+                "offset": 0,
+                "length": await get_chunk_size(zarr_group, item),
+            }
+    return chunk_paths
+
+
 def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) -> dict:
     import asyncio
 
-    async def get_chunk_size(chunk_key: PosixPath) -> int:
-        # async get chunk size of a chunk key
-        return await zarr_group.store.getsize(chunk_key)
-
-    async def get_chunk_paths() -> dict:
-        # this type hint for dict is doing a lot of work. Should this be a dataclass or typed dict?
-        chunk_paths = {}
-        # Is there a way to call `zarr_group.store.list()` per array?
-        async for item in zarr_group.store.list():
-            if not item.endswith(
-                (".zarray", ".zattrs", ".zgroup", ".zmetadata")
-            ) and item.startswith(array_name):
-                # dict key is created by splitting the value from store.list() by the array_name and trailing /....yuck..
-                chunk_paths[item.split(array_name + "/")[-1]] = {
-                    "path": (
-                        zarr_group.store.root / item
-                    ).as_uri(),  # should this be as_posix() or as_uri()
-                    "offset": 0,
-                    "length": await get_chunk_size(item),
-                }
-        return chunk_paths
-
-    return asyncio.run(get_chunk_paths())
+    return asyncio.run(get_chunk_paths(zarr_group, array_name))
 
 
 def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
