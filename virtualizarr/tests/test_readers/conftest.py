@@ -28,6 +28,7 @@ def zarr_store(tmpdir, request):
     filepath = f"{tmpdir}/air.zarr"
     ds.to_zarr(filepath, zarr_format=request.param)
     ds.close()
+    return filepath
 
 
 @pytest.fixture
