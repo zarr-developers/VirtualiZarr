@@ -252,17 +252,6 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     else:
         array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
 
-    # should these have defaults defined and shared across readers?
-    # Should these have common validation for Zarr V3 codecs & such?
-    # Note! It seems like zarr v2 and v3 don't have the same array_encoding keys..
-    array_encoding = {
-        "chunks": array_metadata_dict.get("chunks", None),
-        "compressor": array_metadata_dict.get("compressor", None),
-        "dtype": array_metadata_dict.get("dtype", None),
-        "fill_value": array_metadata_dict.get("fill_value", None),
-        "order": array_metadata_dict.get("order", None),
-    }
-
     array_zarray = ZArray(
         shape=array_metadata_dict.get("shape", None),
         chunks=array_metadata_dict.get("chunks", None),
@@ -286,7 +275,6 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
         dims=array_dims,
         data=array_manifest_array,
         attrs=array_metadata_dict.get("attributes", {}),
-        encoding=array_encoding,
     )
 
     return array_variable
