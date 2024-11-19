@@ -8,7 +8,7 @@ from ..codecs import get_codecs
 from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
-    from zarr import Array
+    from zarr import Array  # type: ignore[import-untyped]
 
     from .array import ManifestArray
 
