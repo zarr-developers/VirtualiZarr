@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import io
 from typing import TYPE_CHECKING, Iterable, Optional, Union
 
@@ -90,3 +91,16 @@ def check_for_collisions(
         raise ValueError(f"Cannot both load and drop variables {common}")
 
     return drop_variables, loadable_variables
+
+
+def soft_import(name: str, reason: str, strict: Optional[bool] = True):
+    try:
+        return importlib.import_module(name)
+    except (ImportError, ModuleNotFoundError):
+        if strict:
+            raise ImportError(
+                f"for {reason}, the {name} package is required. "
+                f"Please install it via pip or conda."
+            )
+        else:
+            return None

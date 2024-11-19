@@ -33,9 +33,20 @@ Documentation
 
 - FAQ answers on Icechunk compatibility, converting from existing Kerchunk references to Icechunk, and how to add a new reader for a custom file format.
   (:pull:`266`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify which readers actually currently work in FAQ, and temporarily remove tiff from the auto-detection.
+  (:issue:`291`, :pull:`296`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minor improvements to the Contributing Guide.
+  (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- More minor improvements to the Contributing Guide.
+  (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+
+- Added experimental new HDF file reader which doesn't use kerchunk, accessible by importing ``virtualizarr.readers.hdf.HDFVirtualBackend``.
+  (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
+- Support downstream type checking by adding py.typed marker file.
+  (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
 
 .. _v1.1.0:
 
