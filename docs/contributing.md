@@ -26,7 +26,7 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 ```bash
 mamba env create -f ci/doc.yml
 mamba activate virtualizarr-docs
-pip install -e . # From project's root - needed to generate API docs
+python -m pip install -e .  # From project's root - needed to generate API docs
 cd docs # From project's root
 rm -rf generated
 make clean

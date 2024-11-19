@@ -37,9 +37,14 @@ Documentation
   (:issue:`291`, :pull:`296`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Minor improvements to the Contributing Guide.
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- More minor improvements to the Contributing Guide.
+  (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+
+- Support downstream type checking by adding py.typed marker file.
+  (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
 
 .. _v1.1.0:
 

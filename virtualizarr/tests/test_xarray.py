@@ -6,6 +6,7 @@ import xarray as xr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.zarr import ZArray
 
@@ -226,14 +227,15 @@ class TestConcat:
 
 
 @requires_kerchunk
+@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files_factory: Callable):
         filepath1, filepath2 = netcdf4_files_factory()
 
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1)
+            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2)
+            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
@@ -242,13 +244,13 @@ class TestCombineUsingIndexes:
         assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
 
     @pytest.mark.xfail(reason="Not yet implemented, see issue #18")
-    def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files):
+    def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files, hdf_backend):
         filepath1, filepath2 = netcdf4_files
 
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1)
+            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2)
+            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
@@ -260,17 +262,18 @@ class TestCombineUsingIndexes:
 
 
 @requires_kerchunk
+@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 class TestRenamePaths:
-    def test_rename_to_str(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+    def test_rename_to_str(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
         assert (
             renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
             == "s3://bucket/air.nc"
         )
 
-    def test_rename_using_function(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+    def test_rename_using_function(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
 
         def local_to_s3_url(old_local_path: str) -> str:
             from pathlib import Path
@@ -286,15 +289,20 @@ class TestRenamePaths:
             == "s3://bucket/air.nc"
         )
 
-    def test_invalid_type(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+    def test_invalid_type(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
 
         with pytest.raises(TypeError):
             vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
-    def test_mixture_of_manifestarrays_and_numpy_arrays(self, netcdf4_file):
+    def test_mixture_of_manifestarrays_and_numpy_arrays(
+        self, netcdf4_file, hdf_backend
+    ):
         vds = open_virtual_dataset(
-            netcdf4_file, indexes={}, loadable_variables=["lat", "lon"]
+            netcdf4_file,
+            indexes={},
+            loadable_variables=["lat", "lon"],
+            backend=hdf_backend,
         )
         renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
         assert (

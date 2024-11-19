@@ -16,8 +16,10 @@ from virtualizarr.readers import (
     HDF5VirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
+    TIFFVirtualBackend,
     ZarrV3VirtualBackend,
 )
+from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 # TODO add entrypoint to allow external libraries to add to this mapping
@@ -26,10 +28,10 @@ VIRTUAL_BACKENDS = {
     "zarr_v3": ZarrV3VirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
-    "netcdf3": NetCDF3VirtualBackend,
     "hdf5": HDF5VirtualBackend,
     "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
-    # "tiff": TIFFVirtualBackend,
+    "netcdf3": NetCDF3VirtualBackend,
+    "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,
 }
 
@@ -112,6 +114,7 @@ def open_virtual_dataset(
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
     reader_options: Optional[dict] = None,
+    backend: Optional[VirtualBackend] = None,
 ) -> Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -173,6 +176,9 @@ def open_virtual_dataset(
     if reader_options is None:
         reader_options = {}
 
+    if backend and filetype:
+        raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
+
     if filetype is not None:
         # if filetype is user defined, convert to FileType
         filetype = FileType(filetype)
@@ -180,8 +186,10 @@ def open_virtual_dataset(
         filetype = automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
-
-    backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())
+    if backend:
+        backend_cls = backend
+    else:
+        backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())  # type: ignore
 
     if backend_cls is None:
         raise NotImplementedError(f"Unsupported file type: {filetype.name}")
