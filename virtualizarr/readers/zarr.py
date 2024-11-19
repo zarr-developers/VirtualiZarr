@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path, PosixPath
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
-import zarr
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -19,6 +20,8 @@ from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     from pathlib import PosixPath
+
+    import zarr
 
 
 class ZarrVirtualBackend(VirtualBackend):
