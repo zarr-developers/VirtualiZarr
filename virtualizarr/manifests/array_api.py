@@ -4,11 +4,11 @@ import numpy as np
 
 from virtualizarr.zarr import determine_chunk_grid_shape
 
-from .get_codecs import get_codecs
+from ..codecs import get_codecs
 from .manifest import ChunkManifest
 
 if TYPE_CHECKING:
-    from zarr import Array  # type: ignore
+    from zarr import Array
 
     from .array import ManifestArray
 
