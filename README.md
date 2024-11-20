@@ -1,5 +1,19 @@
 # VirtualiZarr
 
+[![CI](https://github.com/zarr-developers/VirtualiZarr/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/zarr-developers/VirtualiZarr/actions?query=workflow%3ACI)
+[![Code coverage](https://codecov.io/gh/zarr-developers/VirtualiZarr/branch/main/graph/badge.svg?flag=unittests)](https://codecov.io/gh/zarr-developers/VirtualiZarr)
+[![Docs](https://readthedocs.org/projects/virtualizarr/badge/?version=latest)](https://virtualizarr.readthedocs.io/en/latest/)
+[![Linted and Formatted with Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
+[![pre-commit Enabled](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
+[![Apache 2.0 License](https://img.shields.io/badge/license-Apache%202-cb2533.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Python Versions](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/zarr-developers/VirtualiZarr/main/pyproject.toml&logo=Python&logoColor=gold&label=Python)](https://docs.python.org)
+
+[![Latest Release](https://img.shields.io/github/v/release/zarr-developers/VirtualiZarr)](https://github.com/zarr-developers/VirtualiZarr/releases)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/virtualizarr?label=pypi%7Cdownloads)](https://pypistats.org/packages/virtualizarr)
+[![Conda - Downloads](https://img.shields.io/conda/d/conda-forge/virtualizarr
+)](https://anaconda.org/conda-forge/virtualizarr)
+
 **VirtualiZarr creates virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
 
 VirtualiZarr (pronounced like "virtualizer" but more piratey) grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
