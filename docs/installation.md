@@ -40,12 +40,15 @@ The basic `pip install virtualizarr` will only install the minimal required depe
 
 ## Install Test Dependencies
 
+For local development you will want to install the test dependencies so that you can run all the tests in the test suite:
+
 ```shell
 pip install '-e .[test]'
 ```
 
-
 ## Install Docs Dependencies
+
+To build the documentation locally you will need further dependencies:
 
 ```shell
 pip install '-e .[docs]'
