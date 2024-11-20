@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-import zarr
 from numcodecs import Blosc, Delta
 from packaging.version import parse
 
@@ -92,6 +91,8 @@ class TestCodecs:
         codecs=None,
         zarr_format=2,
     ):
+        import zarr
+
         shared_kwargs = {
             "shape": (1000, 1000),
             "chunks": (100, 100),
