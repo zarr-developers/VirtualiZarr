@@ -124,7 +124,9 @@ class TestCodecs:
             compressor=Blosc(
                 cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE, blocksize=0
             ),
-            filters=(Delta(dtype="<i4"),),
+            filters=[
+                Delta(dtype="<i4"),
+            ],
         )
         assert actual_codecs == expected_codecs
 
