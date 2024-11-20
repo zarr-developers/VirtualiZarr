@@ -53,11 +53,8 @@ def _get_manifestarray_codecs(
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a ManifestArray based on its zarr_format."""
     if array.zarray.zarr_format == 3:
-        # I think this returns a list from a tuple of Zarr Codec objects (zarr.abc.codec)
         return array.zarray._v3_codec_pipeline()
     elif array.zarray.zarr_format == 2:
-        # This returns virtualizarr.zarr.ZArray.codec which is
-        # its own data class with compression as a dict and filters as a list of dicts
         return array.zarray.codec
     else:
         raise ValueError("Unsupported zarr_format for ManifestArray.")
@@ -93,5 +90,8 @@ def _get_zarr_array_codecs(
     # For zarr format v2
     elif hasattr(array, "metadata") and array.metadata.zarr_format == 2:
         return Codec(
-            compressor=array.metadata.compressor, filters=array.metadata.filters
-        )  # type: ignore[attr-defined]
+            compressor=array.metadata.compressor,
+            filters=list(array.metadata.filters or ()),
+        )
+    else:
+        raise ValueError("Unsupported zarr_format for Zarr Array.")
