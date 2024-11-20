@@ -49,7 +49,7 @@ class TestCodecs:
     @requires_zarr_python_v3
     def test_manifest_array_codecs_v3(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
-        from zarr.codecs import BytesCodec
+        from zarr.codecs import BytesCodec  # type: ignore[import-untyped]
 
         manifest_array = self.create_manifest_array(zarr_format=3)
 
@@ -65,7 +65,7 @@ class TestCodecs:
         codecs=None,
         zarr_format=2,
     ):
-        import zarr
+        import zarr  # type: ignore[import-untyped]
 
         shared_kwargs = {
             "shape": (1000, 1000),
@@ -108,7 +108,7 @@ class TestCodecs:
 
     @requires_zarr_python_v3
     def test_zarr_v3_array_codecs(self):
-        from zarr.codecs import BytesCodec
+        from zarr.codecs import BytesCodec  # type: ignore[import-untyped]
 
         zarr_array_v3 = self.create_zarr_array(
             codecs=[BytesCodec(endian="little")], zarr_format=3
