@@ -9,6 +9,9 @@ v1.1.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Optional dependencies can now be installed in groups via pip. See the installation docs.
+  (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
