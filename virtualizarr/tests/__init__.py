@@ -37,7 +37,7 @@ has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
-has_zarrV3, requires_zarrV3 = _importorskip("zarr", minversion="3.0.0")
+has_zarrV3, requires_zarrV3 = _importorskip("zarr", minversion="2.99.0")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 
