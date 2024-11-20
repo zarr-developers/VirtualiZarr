@@ -77,14 +77,21 @@ def _get_zarr_array_codecs(
     array: "Array",
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a Zarr Array based on its format."""
-    try:
-        # For Zarr v3
-        if hasattr(array, "metadata") and array.metadata.zarr_format == 3:
-            return tuple(array.metadata.codecs)
-        # For Zarr v2
-        elif hasattr(array, "_meta") and array._meta.zarr_format == 2:
-            return Codec(compressor=array.compressor, filters=array.filters)  # type: ignore[attr-defined]
-        else:
-            raise ValueError("Unsupported zarr_format for Zarr Array.")
-    except ImportError:
-        raise ImportError("zarr is not installed, but a Zarr Array was provided.")
+    import zarr
+    from packaging import version
+
+    # Check that zarr-python v3 is installed
+    required_version = "3.0.0b"
+    installed_version = zarr.__version__
+    if version.parse(installed_version) < version.parse(required_version):
+        raise NotImplementedError(
+            f"zarr-python v3 or higher is required, but version {installed_version} is installed."
+        )
+    # For zarr format v3
+    if hasattr(array, "metadata") and array.metadata.zarr_format == 3:
+        return tuple(array.metadata.codecs)
+    # For zarr format v2
+    elif hasattr(array, "metadata") and array.metadata.zarr_format == 2:
+        return Codec(
+            compressor=array.metadata.compressor, filters=array.metadata.filters
+        )  # type: ignore[attr-defined]
