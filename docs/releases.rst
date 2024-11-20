@@ -43,6 +43,8 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Added experimental new HDF file reader which doesn't use kerchunk, accessible by importing ``virtualizarr.readers.hdf.HDFVirtualBackend``.
+  (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
 
