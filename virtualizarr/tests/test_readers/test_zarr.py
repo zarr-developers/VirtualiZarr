@@ -27,49 +27,22 @@ def test_dataset_from_zarr(zarr_store):
     zg_metadata_dict = zg.metadata.to_dict()
 
     arrays = [val for val in zg.keys()]
-
+    zarray_checks = [
+        "shape",
+        "chunks",
+        "dtype",
+        "order",
+        "compressor",
+        "filters",
+        "zarr_format",
+    ]  # "dtype"
     # loop through each array and check ZArray info
     for array in arrays:
-        # shape match
-        assert (
-            vds[array].data.zarray.shape
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array]["shape"]
-        )
-        # match chunks
-        assert (
-            vds[array].data.zarray.chunks
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array]["chunks"]
-        )
-
-        assert (
-            vds[array].data.zarray.dtype
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array]["dtype"]
-        )
+        for attr in zarray_checks:
+            assert (
+                getattr(vds[array].data.zarray, attr)
+                == zg_metadata_dict["consolidated_metadata"]["metadata"][array][attr]
+            )
 
         # Failure! fill value from zarr is None, None: ipdb> np.dtype(None): dtype('float64') is coerced in zarr.py L21 to 0.0.
         # assert vds[array].data.zarray.fill_value == zg_metadata_dict['consolidated_metadata']['metadata'][array]['fill_value']
-
-        # match order
-        assert (
-            vds[array].data.zarray.order
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array]["order"]
-        )
-        # match compressor
-        assert (
-            vds[array].data.zarray.compressor
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
-                "compressor"
-            ]
-        )
-        # match filters
-        assert (
-            vds[array].data.zarray.filters
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array]["filters"]
-        )
-        # match format
-        assert (
-            vds[array].data.zarray.zarr_format
-            == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
-                "zarr_format"
-            ]
-        )
