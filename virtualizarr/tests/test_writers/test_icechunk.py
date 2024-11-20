@@ -126,8 +126,6 @@ def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore", netcdf4_file: Path
 ):
     import xarray.testing as xrt
-    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-    # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
     expected_ds = open_dataset(netcdf4_file).drop_vars(["lon", "lat", "time"])
     # these attributes encode floats different and I am not sure why, but its not important enough to block everything
@@ -438,8 +436,7 @@ class TestAppend:
 
         expected_ds = open_dataset(simple_netcdf4)
         expected_array = concat([expected_ds, expected_ds], dim="x")
-        # Aimee: attributes for actual_range differ [185.16000366210935, 322.1000061035156] vs [185.16 322.1]
-        xrt.assert_equal(array, expected_array)
+        xrt.assert_identical(array, expected_array)
 
     ## When appending to a virtual ref with encoding, it succeeds
     def test_append_virtual_ref_with_encoding(
@@ -449,7 +446,7 @@ class TestAppend:
         from icechunk import IcechunkStore
 
         scale_factor = 0.01
-        encoding = {"air": {"scale_factor": scale_factor, "dtype": np.dtype("float64")}}
+        encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
         vds1, vds2 = (
             gen_virtual_dataset(
@@ -494,6 +491,9 @@ class TestAppend:
         expected_ds = concat([expected_ds1, expected_ds2], dim="time").drop_vars(
             ["lon", "lat", "time"], errors="ignore"
         )
+        # Because we encode attributes, attributes may differ, for example
+        # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
+        # but encoded it is [185.16000366210935, 322.1000061035156]
         xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with compression, it succeeds
