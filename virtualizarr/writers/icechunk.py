@@ -156,7 +156,6 @@ def _check_compatible_arrays(
     manifest_api.check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     manifest_api.check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
-    _check_compatible_encodings(ma.encoding, existing_array.attrs)
 
 
 def _check_compatible_encodings(encoding1, encoding2):
@@ -194,6 +193,7 @@ def write_virtual_variable_to_icechunk(
 
         # check if arrays can be concatenated
         _check_compatible_arrays(ma, existing_array, append_axis)
+        _check_compatible_encodings(var.encoding, existing_array.attrs)
 
         # determine number of existing chunks along the append axis
         existing_num_chunks = num_chunks(
