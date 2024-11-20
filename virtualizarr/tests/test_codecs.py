@@ -1,41 +1,15 @@
-from functools import wraps
 from unittest.mock import patch
 
 import numpy as np
-import pytest
 from numcodecs import Blosc, Delta
-from packaging.version import parse
 
 from virtualizarr import ChunkManifest, ManifestArray
 from virtualizarr.codecs import get_codecs
+from virtualizarr.tests import (
+    requires_zarr_python,
+    requires_zarr_python_v3,
+)
 from virtualizarr.zarr import Codec
-
-
-def requires_version(package_name, required_version):
-    """
-    Decorator to skip a test if the specified package is not installed or does not meet the required version.
-
-    Args:
-        package_name (str): Name of the package to check.
-        required_version (str): Minimum required version of the package.
-    """
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Attempt to import the package
-            package = pytest.importorskip(package_name)
-            # Check if the version meets the requirement
-            if parse(package.__version__) < parse(required_version):
-                pytest.skip(
-                    f"'{package_name}' version >= {required_version} is required."
-                )
-            # Proceed with the test
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 class TestCodecs:
@@ -72,7 +46,7 @@ class TestCodecs:
         )
         assert actual_codecs == expected_codecs
 
-    @requires_version("zarr", "3.0.0b")
+    @requires_zarr_python_v3
     def test_manifest_array_codecs_v3(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
         from zarr.codecs import BytesCodec
@@ -113,6 +87,7 @@ class TestCodecs:
 
         return zarr_array
 
+    @requires_zarr_python_v3
     def test_zarr_v2_array_codecs(self):
         # Define your codecs (compressor and filters)
         compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
@@ -131,7 +106,7 @@ class TestCodecs:
         )
         assert actual_codecs == expected_codecs
 
-    @requires_version("zarr", "3.0.0b")
+    @requires_zarr_python_v3
     def test_zarr_v3_array_codecs(self):
         from zarr.codecs import BytesCodec
 
@@ -144,6 +119,7 @@ class TestCodecs:
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
 
+    @requires_zarr_python
     def test_unsupported_zarr_python(self):
         zarr_array = self.create_zarr_array()
         unsupported_zarr_version = "2.18.3"
