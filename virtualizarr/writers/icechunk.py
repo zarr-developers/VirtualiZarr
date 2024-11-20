@@ -130,6 +130,8 @@ def resize_array(
     append_axis: int,
 ) -> Array:
     existing_array = group[name]
+    # This is the second time we check if the array is an instance of zarr.core.Array
+    # but it's necessary to ensure .shape and .resize are available
     if not isinstance(existing_array, Array):
         raise ValueError("Expected existing array to be a zarr.core.Array")
     new_shape = list(existing_array.shape)
@@ -150,10 +152,11 @@ def get_axis(
 def _check_compatible_arrays(
     ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
 ):
-    manifest_api.check_combineable_zarr_arrays([ma, existing_array])
+    manifest_api.check_combinable_zarr_arrays([ma, existing_array])
     manifest_api.check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     manifest_api.check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+    _check_compatible_encodings(ma.encoding, existing_array.attrs)
 
 
 def _check_compatible_encodings(encoding1, encoding2):
@@ -188,8 +191,8 @@ def write_virtual_variable_to_icechunk(
         if not isinstance(existing_array, Array):
             raise ValueError("Expected existing array to be a zarr.core.Array")
         append_axis = get_axis(dims, append_dim)
+
         # check if arrays can be concatenated
-        _check_compatible_encodings(var.encoding, existing_array.attrs)
         _check_compatible_arrays(ma, existing_array, append_axis)
 
         # determine number of existing chunks along the append axis
@@ -215,7 +218,6 @@ def write_virtual_variable_to_icechunk(
             codecs=zarray._v3_codec_pipeline(),
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
-            # TODO fill_value?
         )
 
         # TODO it would be nice if we could assign directly to the .attrs property

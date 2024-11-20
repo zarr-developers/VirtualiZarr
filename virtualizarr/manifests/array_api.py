@@ -28,7 +28,7 @@ def implements(numpy_function):
     return decorator
 
 
-def check_combineable_zarr_arrays(
+def check_combinable_zarr_arrays(
     arrays: Iterable[Union["ManifestArray", "Array"]],
 ) -> None:
     """
@@ -114,7 +114,7 @@ def concatenate(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    check_combineable_zarr_arrays(arrays)
+    check_combinable_zarr_arrays(arrays)
 
     check_same_ndims([arr.ndim for arr in arrays])
 
@@ -207,7 +207,7 @@ def stack(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    check_combineable_zarr_arrays(arrays)
+    check_combinable_zarr_arrays(arrays)
 
     check_same_ndims([arr.ndim for arr in arrays])
     arr_shapes = [arr.shape for arr in arrays]
