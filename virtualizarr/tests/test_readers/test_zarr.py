@@ -2,9 +2,10 @@ import pytest
 import zarr
 
 from virtualizarr.readers.zarr import virtual_dataset_from_zarr_group
-from virtualizarr.tests import network
+from virtualizarr.tests import network, requires_zarrV3
 
 
+@requires_zarrV3
 @network
 @pytest.mark.parametrize(
     "zarr_store",
