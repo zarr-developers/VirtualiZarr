@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# non-kerchunk readers
+# non-kerchunk-based readers
 hdf = [
     "fsspec",
     "h5py",
@@ -69,9 +69,15 @@ all_readers = [
 ]
 # writers
 icechunk = ["icechunk"]
+# technically also a reader, as fastparquet is also required to read parquet-formatted kerchunk references
+kerchunk = ["fastparquet"]
+all_writers = [
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+]
 all = [
     "virtualizarr[all_readers]",
-    "virtualizarr[icechunk]",
+    "virtualizarr[all_writers]",
 ]
 test = [
     "codecov",
