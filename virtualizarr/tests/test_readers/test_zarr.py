@@ -1,8 +1,9 @@
+import numpy as np
 import pytest
 import zarr
 
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.readers.zarr import virtual_dataset_from_zarr_group
 from virtualizarr.tests import network, requires_zarrV3
 
 
@@ -22,44 +23,64 @@ from virtualizarr.tests import network, requires_zarrV3
     ],
     indirect=True,
 )
-def test_dataset_from_zarr(zarr_store):
-    zg = zarr.open_group(zarr_store)
-    vds = virtual_dataset_from_zarr_group(filepath=zarr_store, indexes={})
+class TestOpenVirtualDatasetZarr:
+    def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
+        # check that loadable variables works
+        vds = open_virtual_dataset(
+            filepath=zarr_store, loadable_variables=loadable_variables, indexes={}
+        )
+        assert isinstance(vds["time"].data, np.ndarray)
+        assert isinstance(vds["air"].data, np.ndarray)
 
-    zg_metadata_dict = zg.metadata.to_dict()
-    non_var_arrays = ["time", "lat", "lon"]
-    # check dims and coords are present
-    assert set(vds.coords) == set(non_var_arrays)
-    assert set(vds.dims) == set(non_var_arrays)
-    # check vars match
-    assert set(vds.keys()) == set(["air"])
+    def test_drop_variables(self, zarr_store, drop_variables=["air"]):
+        # check variable is dropped
+        vds = open_virtual_dataset(
+            filepath=zarr_store, drop_variables=drop_variables, indexes={}
+        )
+        assert len(vds.data_vars) == 0
 
-    # arrays are ManifestArrays
-    for array in list(vds):
-        assert isinstance(vds[array].data, ManifestArray)
+    def test_virtual_dataset_from_zarr_group(self, zarr_store):
+        # check that loadable variables works
 
-    # check top level attrs
-    assert zg.attrs.asdict() == vds.attrs
+        zg = zarr.open_group(zarr_store)
+        vds = open_virtual_dataset(filepath=zarr_store, indexes={})
 
-    # check ZArray values
-    arrays = [val for val in zg.keys()]
-    zarray_checks = [
-        "shape",
-        "chunks",
-        "dtype",
-        "order",
-        "compressor",
-        "filters",
-        "zarr_format",
-    ]  # "dtype"
+        zg_metadata_dict = zg.metadata.to_dict()
+        non_var_arrays = ["time", "lat", "lon"]
+        # check dims and coords are present
+        assert set(vds.coords) == set(non_var_arrays)
+        assert set(vds.dims) == set(non_var_arrays)
+        # check vars match
+        assert set(vds.keys()) == set(["air"])
 
-    # Failure! fill value from zarr is None, None: ipdb> np.dtype(None): dtype('float64') is coerced in zarr.py L21 to 0.0.
-    # assert vds[array].data.zarray.fill_value == zg_metadata_dict['consolidated_metadata']['metadata'][array]['fill_value']
+        # arrays are ManifestArrays
+        for array in list(vds):
+            assert isinstance(vds[array].data, ManifestArray)
 
-    # loop through each array and check ZArray info
-    for array in arrays:
-        for attr in zarray_checks:
-            assert (
-                getattr(vds[array].data.zarray, attr)
-                == zg_metadata_dict["consolidated_metadata"]["metadata"][array][attr]
-            )
+        # check top level attrs
+        assert zg.attrs.asdict() == vds.attrs
+
+        # check ZArray values
+        arrays = [val for val in zg.keys()]
+        zarray_checks = [
+            "shape",
+            "chunks",
+            "dtype",
+            "order",
+            "compressor",
+            "filters",
+            "zarr_format",
+        ]  # "dtype"
+
+        # Failure! fill value from zarr is None, None: ipdb> np.dtype(None): dtype('float64') is coerced in zarr.py L21 to 0.0.
+        # assert vds[array].data.zarray.fill_value == zg_metadata_dict['consolidated_metadata']['metadata'][array]['fill_value']
+
+        # loop through each array and check ZArray info
+        for array in arrays:
+            for attr in zarray_checks:
+                assert (
+                    getattr(vds[array].data.zarray, attr)
+                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
+                        attr
+                    ]
+                )
