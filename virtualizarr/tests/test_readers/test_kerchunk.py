@@ -1,6 +1,6 @@
 import numpy as np
-import ujson
 import pytest
+import ujson
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
@@ -88,24 +88,23 @@ def test_dataset_from_kerchunk_refs_empty_chunk_manifest():
 def test_handle_relative_paths():
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     ds_refs = gen_ds_refs(chunk=["test1.nc", 6144, 48])
-    with pytest.raises(ValueError, match='must be absolute'):
+    with pytest.raises(ValueError, match="must be absolute"):
         ds = dataset_from_kerchunk_refs(ds_refs)
 
     ds_refs = gen_ds_refs(chunk=["./test1.nc", 6144, 48])
-    with pytest.raises(ValueError, match='must be absolute'):
+    with pytest.raises(ValueError, match="must be absolute"):
         ds = dataset_from_kerchunk_refs(ds_refs)
 
+    with pytest.raises(ValueError, match="must be ab"):
+        dataset_from_kerchunk_refs(ds_refs, fs_root="some_directory/")
 
-    with pytest.raises(ValueError, match='must be ab'):
-        dataset_from_kerchunk_refs(ds_refs, fs_root='some_directory/')
-
-    ds = dataset_from_kerchunk_refs(ds_refs, fs_root='some_directory/')
+    ds = dataset_from_kerchunk_refs(ds_refs, fs_root="some_directory/")
     da = ds["a"]
     assert da.data.manifest.dict() == {
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
     }
 
-    ds = dataset_from_kerchunk_refs(ds_refs, fs_root='file:///some_directory/')
+    ds = dataset_from_kerchunk_refs(ds_refs, fs_root="file:///some_directory/")
     da = ds["a"]
     assert da.data.manifest.dict() == {
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}

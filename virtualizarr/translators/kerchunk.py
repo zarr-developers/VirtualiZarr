@@ -107,7 +107,9 @@ def virtual_vars_from_kerchunk_refs(
     ]
 
     vars = {
-        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class, fs_root=fs_root)
+        var_name: variable_from_kerchunk_refs(
+            refs, var_name, virtual_array_class, fs_root=fs_root
+        )
         for var_name in var_names_to_keep
     }
     return vars
@@ -130,7 +132,9 @@ def dataset_from_kerchunk_refs(
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
-    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class, fs_root=fs_root)
+    vars = virtual_vars_from_kerchunk_refs(
+        refs, drop_variables, virtual_array_class, fs_root=fs_root
+    )
     ds_attrs = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
 
@@ -209,7 +213,9 @@ def chunkentry_from_kerchunk(
         length = UPath(path).stat().st_size
     else:
         path, offset, length = path_and_byte_range_info
-    return ChunkEntry.with_validation(path=path, offset=offset, length=length, fs_root=fs_root)
+    return ChunkEntry.with_validation(
+        path=path, offset=offset, length=length, fs_root=fs_root
+    )
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
