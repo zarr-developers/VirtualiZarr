@@ -1,20 +1,20 @@
-name: virtualizarr-tests
+name: virtualizarr-min-deps
 channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - xarray>=2024.10.0
   - h5netcdf
   - h5py
   - hdf5
   - netcdf4
-  - xarray>=2024.10.0
-  - kerchunk>=0.2.5
   - numpy>=2.0.0
-  - ujson
   - packaging
+  - ujson
   - universal_pathlib
   - hdf5plugin
   - numcodecs
+  - imagecodecs>=2024.6.1
   # Testing
   - codecov
   - pre-commit
@@ -25,15 +25,9 @@ dependencies:
   - pytest-cov
   - pytest
   - pooch
-  - scipy
   - fsspec
-  - s3fs
-  - fastparquet
-  - imagecodecs>=2024.6.1
-  # for opening tiff files
-  - tifffile
-  # for opening FITS files
-  - astropy
   - pip
   - pip:
+    - icechunk # Installs zarr v3 as dependency
+    # - git+https://github.com/fsspec/kerchunk@main  # kerchunk is currently incompatible with zarr-python v3 (https://github.com/fsspec/kerchunk/pull/516)
     - imagecodecs-numcodecs==2024.6.1

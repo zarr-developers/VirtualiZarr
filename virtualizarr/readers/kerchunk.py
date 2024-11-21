@@ -1,8 +1,7 @@
 from typing import Iterable, Mapping, Optional
 
 import ujson
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
@@ -39,7 +38,9 @@ class KerchunkVirtualBackend(VirtualBackend):
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        if fs.filepath.endswith("ref.parquet"):
+        if fs.filepath.endswith(".parquet") and fs.fs.isfile(
+            f"{fs.filepath}/.zmetadata"
+        ):
             from fsspec.implementations.reference import LazyReferenceMapper
 
             lrm = LazyReferenceMapper(filepath, fs.fs)
@@ -62,7 +63,7 @@ class KerchunkVirtualBackend(VirtualBackend):
 
         else:
             raise ValueError(
-                "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
+                "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. If your Kerchunk generated references are saved in parquet format, make sure the file extension is `.parquet`. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
             )
 
         # TODO would be more efficient to drop these before converting them into ManifestArrays, i.e. drop them from the kerchunk refs dict

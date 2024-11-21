@@ -1,6 +1,8 @@
 import h5py
+import numpy as np
 import pytest
 import xarray as xr
+from xarray.core.variable import Variable
 
 
 def pytest_addoption(parser):
@@ -30,6 +32,15 @@ def netcdf4_file(tmpdir):
     ds.to_netcdf(filepath, format="NETCDF4")
     ds.close()
 
+    return filepath
+
+
+@pytest.fixture
+def netcdf4_file_with_2d_coords(tmpdir):
+    ds = xr.tutorial.open_dataset("ROMS_example")
+    filepath = f"{tmpdir}/ROMS_example.nc"
+    ds.to_netcdf(filepath, format="NETCDF4")
+    ds.close()
     return filepath
 
 
@@ -95,4 +106,17 @@ def hdf5_scalar(tmpdir):
     f = h5py.File(filepath, "w")
     dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
     dataset.attrs["scalar"] = "true"
+    return filepath
+
+
+@pytest.fixture
+def simple_netcdf4(tmpdir):
+    filepath = f"{tmpdir}/simple.nc"
+
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4)
+    var = Variable(data=arr, dims=["x", "y"])
+    ds = xr.Dataset({"foo": var})
+
+    ds.to_netcdf(filepath)
+
     return filepath

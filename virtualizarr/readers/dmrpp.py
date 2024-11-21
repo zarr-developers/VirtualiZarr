@@ -1,14 +1,11 @@
-import os
 import warnings
-from collections import defaultdict
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from xarray import Coordinates, Dataset
-from xarray.core.indexes import Index
-from xarray.core.variable import Variable
+from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import VirtualBackend
@@ -38,15 +35,15 @@ class DMRPPVirtualBackend(VirtualBackend):
                 "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
             )
 
-        if group:
-            raise NotImplementedError()
-
         fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
         ).open_file()
 
-        parser = DMRParser(fpath.read(), data_filepath=filepath.strip(".dmrpp"))
-        vds = parser.parse_dataset()
+        parser = DMRParser(
+            root=ET.parse(fpath).getroot(),
+            data_filepath=filepath.removesuffix(".dmrpp"),
+        )
+        vds = parser.parse_dataset(group=group, indexes=indexes)
 
         return vds.drop_vars(drop_variables)
 
@@ -62,12 +59,12 @@ class DMRParser:
     """
 
     # DAP and DMRPP XML namespaces
-    _ns = {
+    _NS = {
         "dap": "http://xml.opendap.org/ns/DAP/4.0#",
-        "dmr": "http://xml.opendap.org/dap/dmrpp/1.0.0#",
+        "dmrpp": "http://xml.opendap.org/dap/dmrpp/1.0.0#",
     }
     # DAP data types to numpy data types
-    _dap_np_dtype = {
+    _DAP_NP_DTYPE = {
         "Byte": "uint8",
         "UByte": "uint8",
         "Int8": "int8",
@@ -84,24 +81,24 @@ class DMRParser:
         "String": "object",
     }
     # Default zlib compression value
-    _default_zlib_value = 6
+    _DEFAULT_ZLIB_VALUE = 6
     # Encoding keys that should be removed from attributes and placed in xarray encoding dict
-    _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+    _ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
 
-    def __init__(self, dmr: str, data_filepath: Optional[str] = None):
+    def __init__(self, root: ET.Element, data_filepath: Optional[str] = None):
         """
-        Initialize the DMRParser with the given DMR data and data file path.
+        Initialize the DMRParser with the given DMR++ file contents and source data file path.
 
         Parameters
         ----------
-        dmr : str
-            The DMR file contents as a string.
+        dmrpp_str : str
+            The dmrpp file contents as a string.
 
         data_filepath : str, optional
             The path to the actual data file that will be set in the chunk manifests.
-            If None, the data file path is taken from the DMR file.
+            If None, the data file path is taken from the DMR++ file.
         """
-        self.root = ET.fromstring(dmr)
+        self.root = root
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
@@ -147,64 +144,57 @@ class DMRParser:
             Data variables:
                 d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
         """
+        group_tags = self.root.findall("dap:Group", self._NS)
         if group is not None:
-            # group = "/" + group.strip("/")  # ensure group is in form "/a/b"
-            group = os.path.normpath(group).removeprefix(
-                "/"
-            )  # ensure group is in form "a/b/c"
-        if self._is_hdf5(self.root):
-            return self._parse_hdf5_dataset(self.root, group, indexes)
-        if self.data_filepath.endswith(".nc"):
-            return self._parse_netcdf4_dataset(self.root, group, indexes)
-        raise ValueError("DMR file must be HDF5 or netCDF4 based")
+            group = Path(group)
+            if not group.is_absolute():
+                group = Path("/") / group
+            if len(group_tags) == 0:
+                warnings.warn("No groups found in DMR++ file; ignoring group parameter")
+            else:
+                all_groups = self._split_groups(self.root)
+                if group in all_groups:
+                    return self._parse_dataset(all_groups[group], indexes)
+                else:
+                    raise ValueError(f"Group {group} not found in DMR++ file")
+        return self._parse_dataset(self.root, indexes)
 
-    def _parse_netcdf4_dataset(
-        self,
-        root: ET.Element,
-        group: Optional[str] = None,
-        indexes: Mapping[str, Index] = {},
-    ) -> Dataset:
+    def find_node_fqn(self, fqn: str) -> ET.Element:
         """
-        Parse the dataset from the netcdf4 based dmrpp with groups, starting at the given group.
-        Set root to the given group.
+        Find the element in the root element by converting the fully qualified name to an xpath query.
+
+        E.g. fqn = "/a/b" --> root.find("./*[@name='a']/*[@name='b']")
+        See more about OPeNDAP fully qualified names (FQN) here: https://docs.opendap.org/index.php/DAP4:_Specification_Volume_1#Fully_Qualified_Names
 
         Parameters
         ----------
-        root : ET.Element
-            The root element of the DMR file.
-
-        group : str
-            The group to parse. If None, and no groups are present, the dataset is parsed.
-            If None and groups are present, the first group is parsed.
+        fqn : str
+            The fully qualified name of an element. E.g. "/a/b"
 
         Returns
         -------
-        xr.Dataset
-        """
-        group_tags = root.findall("dap:Group", self._ns)
-        if len(group_tags) == 0:
-            if group is not None:
-                # no groups found and group specified -> warning
-                warnings.warn(
-                    "No groups found in NetCDF4 DMR file; ignoring group parameter"
-                )
-            # no groups found and no group specified -> parse dataset
-            return self._parse_dataset(root, indexes)
-        all_groups = self._split_netcdf4(root)
-        if group is None:
-            # groups found and no group specified -> parse first group
-            return self._parse_dataset(group_tags[0], indexes)
-        if group in all_groups:
-            # groups found and group specified -> parse specified group
-            return self._parse_dataset(all_groups[group], indexes)
-        else:
-            # groups found and specified group not found -> error
-            raise ValueError(f"Group {group} not found in NetCDF4 DMR file")
+        ET.Element
+            The matching node found within the root element.
 
-    def _split_netcdf4(self, root: ET.Element) -> dict[str, ET.Element]:
+        Raises
+        ------
+        ValueError
+            If the fully qualified name is not found in the root element.
         """
-        Split the input <Group> element into several <Dataset> ET.Elements by netcdf4 group
-        E.g. {"left": <Dataset>, "right": <Dataset>}
+        if fqn == "/":
+            return self.root
+        elements = fqn.strip("/").split("/")  # /a/b/ --> ['a', 'b']
+        xpath_segments = [f"*[@name='{element}']" for element in elements]
+        xpath_query = "./" + "/".join(xpath_segments)  # "./[*[@name='a']/*[@name='b']"
+        element = self.root.find(xpath_query, self._NS)
+        if element is None:
+            raise ValueError(f"Path {fqn} not found in provided root")
+        return element
+
+    def _split_groups(self, root: ET.Element) -> dict[Path, ET.Element]:
+        """
+        Split the input <Dataset> element into several <Dataset> ET.Elements by <Group> name.
+        E.g. {"/": <Dataset>, "left": <Dataset>, "right": <Dataset>}
 
         Parameters
         ----------
@@ -213,192 +203,81 @@ class DMRParser:
 
         Returns
         -------
-        dict[str, ET.Element]
+        dict[Path, ET.Element]
         """
-        group_tags = root.findall("dap:Group", self._ns)
-        all_groups: dict[str, ET.Element] = defaultdict(
-            lambda: ET.Element(root.tag, root.attrib)
-        )
-        for group_tag in group_tags:
-            all_groups[os.path.normpath(group_tag.attrib["name"])] = group_tag
+        all_groups: dict[Path, ET.Element] = {}
+        dataset_tags = [
+            d for d in root if d.tag != "{" + self._NS["dap"] + "}" + "Group"
+        ]
+        if len(dataset_tags) > 0:
+            all_groups[Path("/")] = ET.Element(root.tag, root.attrib)
+            all_groups[Path("/")].extend(dataset_tags)
+        all_groups.update(self._split_groups_recursive(root, Path("/")))
         return all_groups
 
-    def _is_hdf5(self, root: ET.Element) -> bool:
-        """Check if the DMR file is HDF5 based."""
-        if root.find(".//dap:Attribute[@name='fullnamepath']", self._ns) is not None:
-            return True
-        if root.find("./dap:Attribute[@name='HDF5_GLOBAL']", self._ns) is not None:
-            return True
-        return False
-
-    def _parse_hdf5_dataset(
-        self,
-        root: ET.Element,
-        group: Optional[str] = None,
-        indexes: Mapping[str, Index] = {},
-    ) -> Dataset:
-        """
-        Parse the dataset from the HDF5 based dmrpp with groups, starting at the given group.
-        Set root to the given group.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The root element of the DMR file.
-
-        group : str
-            The group to parse. If None, and no groups are present, the dataset is parsed.
-            If None and groups are present, the first group is parsed.
-
-        indexes : Mapping[str, Index], default is {}
-            Indexes to use on the returned xarray Dataset.
-            Default is {} which will avoid creating any indexes
-
-        Returns
-        -------
-        xr.Dataset
-        """
-        all_groups = self._split_hdf5(root=root)
-        if len(all_groups) == 0:
-            raise ValueError("No groups found in HDF based dmrpp file")
-        if group is None:
-            # pick a random group if no group is specified
-            group = next(iter(all_groups))
-        attrs = {}
-        for attr_tag in root.iterfind("dap:Attribute", self._ns):
-            if attr_tag.attrib["type"] != "Container":
-                attrs.update(self._parse_attribute(attr_tag))
-        if group in all_groups:
-            # replace aliased variable names with original names: gt1r_heights -> heights
-            orignames = self._find_original_names(all_groups[group])
-            vds = self._parse_dataset(all_groups[group], indexes)
-            # Only one group so found attrs are global attrs
-            if len(all_groups) == 1:
-                vds.attrs.update(attrs)
-            return vds.rename(orignames)
-        raise ValueError(f"Group {group} not found in HDF5 dmrpp file")
-
-    def _find_original_names(self, root: ET.Element) -> dict[str, str]:
-        """
-        Find the original variable names from the HDF based groups. E.g. gt1r_heights -> heights
-
-        E.g. if the variable name is 'gt1r_heights', the original name is 'heights' from the group 'gt1r'.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The root element of the DMR file.
-
-        Returns
-        -------
-        dict[str, str]
-        """
-
-        orignames: dict[str, str] = {}
-        vars_tags: list[ET.Element] = []
-        for dap_dtype in self._dap_np_dtype:
-            vars_tags += root.findall(f"dap:{dap_dtype}", self._ns)
-        for var_tag in vars_tags:
-            origname_tag = var_tag.find(
-                "./dap:Attribute[@name='origname']/dap:Value", self._ns
-            )
-            if origname_tag is not None and origname_tag.text is not None:
-                orignames[var_tag.attrib["name"]] = origname_tag.text
-        return orignames
-
-    def _split_hdf5(self, root: ET.Element) -> dict[str, ET.Element]:
-        """
-        Split the input <Dataset> element into several <Dataset> ET.Elements by HDF5 group
-        E.g. {"gtr1/heights": <Dataset>, "gtr1/temperatures": <Dataset>}. Builds up new <Dataset> elements
-        each with dimensions, variables, and attributes.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The root element of the DMR file.
-
-        Returns
-        -------
-        dict[str, ET.Element]
-        """
-        # Add all variable, dimension, and attribute tags to their respective groups
-        groups_roots: dict[str, ET.Element] = defaultdict(
-            lambda: ET.Element(root.tag, root.attrib)
-        )
-        group_dims: dict[str, set[str]] = defaultdict(
-            set
-        )  # {"gt1r/heights": {"dim1", "dim2", ...}}
-        vars_tags: list[ET.Element] = []
-        for dap_dtype in self._dap_np_dtype:
-            vars_tags += root.findall(f"dap:{dap_dtype}", self._ns)
-        # Variables
-        for var_tag in vars_tags:
-            fullname_tag = var_tag.find(
-                "./dap:Attribute[@name='fullnamepath']/dap:Value", self._ns
-            )
-            if fullname_tag is not None and fullname_tag.text is not None:
-                # '/gt1r/heights/ph_id_pulse' -> 'gt1r/heights'
-                group_name = os.path.dirname(fullname_tag.text).removeprefix("/")
-                groups_roots[group_name].append(var_tag)
-                dim_tags = var_tag.findall("dap:Dim", self._ns)
-                dims = self._parse_multi_dims(dim_tags)
-                group_dims[group_name].update(dims.keys())
-        # Dimensions
-        for dim_tag in root.iterfind("dap:Dimension", self._ns):
-            for g, d in group_dims.items():
-                if dim_tag.attrib["name"] in d:
-                    groups_roots[g].append(dim_tag)
-        # Attributes
-        container_attr_tag = root.find("dap:Attribute[@name='HDF5_GLOBAL']", self._ns)
-        if container_attr_tag is None:
-            attrs_tags = root.findall("dap:Attribute", self._ns)
-            for attr_tag in attrs_tags:
-                fullname_tag = attr_tag.find(
-                    "./dap:Attribute[@name='fullnamepath']/dap:Value", self._ns
-                )
-                if fullname_tag is not None and fullname_tag.text is not None:
-                    group_name = os.path.dirname(fullname_tag.text).removeprefix("/")
-                    # Add all attributes to the new dataset
-                    groups_roots[group_name].extend(attr_tag)
-        else:
-            groups_roots[next(iter(groups_roots))].extend(container_attr_tag)
-        return groups_roots
+    def _split_groups_recursive(
+        self, root: ET.Element, current_path=Path("")
+    ) -> dict[Path, ET.Element]:
+        group_dict: dict[Path, ET.Element] = {}
+        for g in root.iterfind("dap:Group", self._NS):
+            new_path = current_path / Path(g.attrib["name"])
+            dataset_tags = [
+                d for d in g if d.tag != "{" + self._NS["dap"] + "}" + "Group"
+            ]
+            group_dict[new_path] = ET.Element(g.tag, g.attrib)
+            group_dict[new_path].extend(dataset_tags)
+            group_dict.update(self._split_groups_recursive(g, new_path))
+        return group_dict
 
     def _parse_dataset(
         self, root: ET.Element, indexes: Mapping[str, Index] = {}
     ) -> Dataset:
         """
-        Parse the dataset using the root element of the DMR file.
+        Parse the dataset using the root element of the DMR++ file.
 
         Parameters
         ----------
         root : ET.Element
-            The root element of the DMR file.
+            The root element of the DMR++ file.
 
         Returns
         -------
         xr.Dataset
         """
         # Dimension names and sizes
-        dim_tags = root.findall("dap:Dimension", self._ns)
-        dataset_dims = self._parse_multi_dims(dim_tags)
+        dims: dict[str, int] = {}
+        dimension_tags = self._find_dimension_tags(root)
+        for dim in dimension_tags:
+            dims.update(self._parse_dim(dim))
         # Data variables and coordinates
-        coord_names = self._find_coord_names(root)
-        # if no coord_names are found or coords don't include dims, dims are used as coords
-        if len(coord_names) == 0 or len(coord_names) < len(dataset_dims):
-            coord_names = set(dataset_dims.keys())
+        coord_names: set[str] = set()
+        coord_tags = root.findall(
+            ".//dap:Attribute[@name='coordinates']/dap:Value", self._NS
+        )
+        for c in coord_tags:
+            if c.text is not None:
+                coord_names.update(c.text.split(" "))
         # Seperate and parse coords + data variables
         coord_vars: dict[str, Variable] = {}
         data_vars: dict[str, Variable] = {}
         for var_tag in self._find_var_tags(root):
-            variable = self._parse_variable(var_tag, dataset_dims)
-            if var_tag.attrib["name"] in coord_names:
+            variable = self._parse_variable(var_tag)
+            # Either coordinates are explicitly defined or 1d variable with same name as dimension is a coordinate
+            if var_tag.attrib["name"] in coord_names or (
+                len(variable.dims) == 1 and variable.dims[0] == var_tag.attrib["name"]
+            ):
                 coord_vars[var_tag.attrib["name"]] = variable
             else:
                 data_vars[var_tag.attrib["name"]] = variable
         # Attributes
         attrs: dict[str, str] = {}
-        for attr_tag in self.root.iterfind("dap:Attribute", self._ns):
+        # Look for an attribute tag called "HDF5_GLOBAL" and unpack it
+        hdf5_global_attrs = root.find("dap:Attribute[@name='HDF5_GLOBAL']", self._NS)
+        if hdf5_global_attrs is not None:
+            # Remove the container attribute and add its children to the root dataset
+            root.remove(hdf5_global_attrs)
+            root.extend(hdf5_global_attrs)
+        for attr_tag in root.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         return Dataset(
             data_vars=data_vars,
@@ -408,58 +287,28 @@ class DMRParser:
 
     def _find_var_tags(self, root: ET.Element) -> list[ET.Element]:
         """
-        Find all variable tags in the DMR file. Also known as array tags.
+        Find all variable tags in the DMR++ file. Also known as array tags.
         Tags are labeled with the DAP data type. E.g. <Float32>, <Int16>, <String>
 
         Parameters
         ----------
         root : ET.Element
-            The root element of the DMR file.
+            The root element of the DMR++ file.
 
         Returns
         -------
         list[ET.Element]
         """
         vars_tags: list[ET.Element] = []
-        for dap_dtype in self._dap_np_dtype:
-            vars_tags += root.findall(f"dap:{dap_dtype}", self._ns)
+        for dap_dtype in self._DAP_NP_DTYPE:
+            vars_tags += root.findall(f"dap:{dap_dtype}", self._NS)
         return vars_tags
 
-    def _find_coord_names(self, root: ET.Element) -> set[str]:
-        """
-        Find the name of all coordinates in root. Checks inside all variables and global attributes.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The root element of the DMR file.
-
-        Returns
-        -------
-        set[str] : The set of unique coordinate names.
-        """
-        # Check for coordinate names within each variable attributes
-        coord_names: set[str] = set()
-        for var_tag in self._find_var_tags(root):
-            coord_tag = var_tag.find(
-                "./dap:Attribute[@name='coordinates']/dap:Value", self._ns
-            )
-            if coord_tag is not None and coord_tag.text is not None:
-                coord_names.update(coord_tag.text.split(" "))
-            for map_tag in var_tag.iterfind("dap:Map", self._ns):
-                coord_names.add(map_tag.attrib["name"].removeprefix("/"))
-        # Check for coordinate names in a global attribute
-        coord_tag = var_tag.find("./dap:Attribute[@name='coordinates']", self._ns)
-        if coord_tag is not None and coord_tag.text is not None:
-            coord_names.update(coord_tag.text.split(" "))
-        return coord_names
-
-    def _parse_dim(self, root: ET.Element) -> dict[str, int | None]:
+    def _parse_dim(self, root: ET.Element) -> dict[str, int]:
         """
         Parse single <Dim> or <Dimension> tag
 
         If the tag has no name attribute, it is a phony dimension. E.g. <Dim size="300"/> --> {"phony_dim": 300}
-        If the tag has no size attribute, it is an unlimited dimension. E.g. <Dim name="time"/> --> {"time": None}
         If the tag has both name and size attributes, it is a regular dimension. E.g. <Dim name="lat" size="1447"/> --> {"lat": 1447}
 
         Parameters
@@ -474,98 +323,84 @@ class DMRParser:
         """
         if "name" not in root.attrib and "size" in root.attrib:
             return {"phony_dim": int(root.attrib["size"])}
-        if "name" in root.attrib and "size" not in root.attrib:
-            return {os.path.basename(root.attrib["name"]): None}
         if "name" in root.attrib and "size" in root.attrib:
-            return {os.path.basename(root.attrib["name"]): int(root.attrib["size"])}
+            return {Path(root.attrib["name"]).name: int(root.attrib["size"])}
         raise ValueError("Not enough information to parse Dim/Dimension tag")
 
-    def _parse_multi_dims(
-        self, dim_tags: list[ET.Element], global_dims: dict[str, int] = {}
-    ) -> dict:
+    def _find_dimension_tags(self, root: ET.Element) -> list[ET.Element]:
         """
-        Parse multiple <Dim> or <Dimension> tags. Generally <Dim> tags are found within dmrpp variable tags.
+        Find the all tags with dimension information.
 
-        Returns best possible matching of {dimension: shape} present in the list and global_dims. E.g tags=(Dim("lat", None), Dim("lon", None)) and global_dims={"lat": 100, "lon": 100, "time": 5} --> {"lat": 100, "lon": 100}
-
-        E.g. tags=(Dim("time", None), Dim("", 200)) and global_dims={"lat": 100, "lon": 100, "time": 5} --> {"time": 5, "phony_dim0": 200}
-
-        This function is often used to fill in missing sizes from the global_dims. E.g. Variable tags may contain only dimension names and not sizes. If the {name: size} matching is known from the global_dims, it is used to fill in the missing sizes.
+        First attempts to find Dimension tags, then falls back to Dim tags.
+        If Dim tags are found, the fully qualified name is used to find the corresponding Dimension tag.
 
         Parameters
         ----------
-        dim_tags : tuple[ET.Element]
-            A tuple of ElementTree Elements representing dimensions in the DMR file.
-
-        global_dims : dict
-            A dictionary of dimension names and sizes. E.g. {"time": 1, "lat": 1447, "lon": 2895}
+        root : ET.Element
+            An ElementTree Element from a DMR++ file.
 
         Returns
         -------
-        dict
-            E.g. {"time": 1, "lat": 1447, "lon": 2895}
+        list[ET.Element]
         """
-        dims: dict[str, int | None] = {}
-        for dim_tag in dim_tags:
-            dim: dict[str, int | None] = self._parse_dim(dim_tag)
-            if "phony_dim" in dim:
-                dims["phony_dim_" + str(len(dims))] = dim["phony_dim"]
-            else:
-                dims.update(dim)
-        for name, size in list(dims.items()):
-            if name in global_dims and size is None:
-                dims[name] = global_dims[name]
-        return dims
+        dimension_tags = root.findall("dap:Dimension", self._NS)
+        if not dimension_tags:
+            # Dim tags contain a fully qualified name that references a Dimension tag elsewhere in the DMR++
+            dim_tags = root.findall("dap:Dim", self._NS)
+            for d in dim_tags:
+                dimension_tag = self.find_node_fqn(d.attrib["name"])
+                if dimension_tag is not None:
+                    dimension_tags.append(dimension_tag)
+        return dimension_tags
 
-    def _parse_variable(
-        self, var_tag: ET.Element, dataset_dims: dict[str, int]
-    ) -> Variable:
+    def _parse_variable(self, var_tag: ET.Element) -> Variable:
         """
-        Parse a variable from a DMR tag.
+        Parse a variable from a DMR++ tag.
 
         Parameters
         ----------
         var_tag : ET.Element
-            An ElementTree Element representing a variable in the DMR file. Will have DAP dtype as tag.
-
-        dataset_dims : dict
-            A dictionary of dimension names and sizes. E.g. {"time": 1, "lat": 1447, "lon": 2895}
-            Must contain at least all the dimensions used by the variable. Necessary since the variable
-            metadata only contains the dimension names and not the sizes.
+            An ElementTree Element representing a variable in the DMR++ file. Will have DAP dtype as tag. E.g. <Float32>
 
         Returns
         -------
         xr.Variable
         """
-        # Dimension names
-        dim_tags = var_tag.findall("dap:Dim", self._ns)
-        dim_shapes = self._parse_multi_dims(dim_tags, dataset_dims)
+        # Dimension info
+        dims: dict[str, int] = {}
+        dimension_tags = self._find_dimension_tags(var_tag)
+        if not dimension_tags:
+            raise ValueError("Variable has no dimensions")
+        for dim in dimension_tags:
+            dims.update(self._parse_dim(dim))
         # convert DAP dtype to numpy dtype
         dtype = np.dtype(
-            self._dap_np_dtype[var_tag.tag.removeprefix("{" + self._ns["dap"] + "}")]
+            self._DAP_NP_DTYPE[var_tag.tag.removeprefix("{" + self._NS["dap"] + "}")]
         )
         # Chunks and Filters
         filters = None
-        shape: tuple[int, ...] = tuple(dim_shapes.values())
+        shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
-        chunks_tag = var_tag.find("dmr:chunks", self._ns)
+        chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
         if chunks_tag is not None:
             # Chunks
-            found_chunk_dims = self._parse_chunks_dimensions(chunks_tag)
-            chunks_shape = found_chunk_dims if found_chunk_dims is not None else shape
+            chunk_dim_text = chunks_tag.findtext(
+                "dmrpp:chunkDimensionSizes", namespaces=self._NS
+            )
+            if chunk_dim_text is not None:
+                # 1 1447 2895 -> (1, 1447, 2895)
+                chunks_shape = tuple(map(int, chunk_dim_text.split()))
+            else:
+                chunks_shape = shape
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
             filters = self._parse_filters(chunks_tag, dtype)
         # Attributes
         attrs: dict[str, Any] = {}
-        for attr_tag in var_tag.iterfind("dap:Attribute", self._ns):
+        for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         # Fill value is placed in encoding and thus removed from attributes
-        fill_value = attrs.pop("_FillValue", 0.0)
-        # Remove attributes only used for parsing logic
-        attrs.pop("fullnamepath", None)
-        attrs.pop("origname", None)
-        attrs.pop("coordinates", None)
+        fill_value = attrs.pop("_FillValue", None)
         # create ManifestArray and ZArray
         zarray = ZArray(
             chunks=chunks_shape,
@@ -576,14 +411,13 @@ class DMRParser:
             shape=shape,
         )
         marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
-        encoding = {k: attrs.get(k) for k in self._encoding_keys if k in attrs}
-        return Variable(
-            dims=dim_shapes.keys(), data=marr, attrs=attrs, encoding=encoding
-        )
+        encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
+        return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
         """
-        Parse an attribute from a DMR attr tag. Converts the attribute value to a native python type.
+        Parse an attribute from a DMR++ attr tag. Converts the attribute value to a native python type.
+        Raises an exception if nested attributes are passed. Container attributes must be unwrapped in the parent function.
 
         Parameters
         ----------
@@ -597,8 +431,13 @@ class DMRParser:
         attr: dict[str, Any] = {}
         values = []
         if "type" in attr_tag.attrib and attr_tag.attrib["type"] == "Container":
-            return attr
-        dtype = np.dtype(self._dap_np_dtype[attr_tag.attrib["type"]])
+            # DMR++ build information that is not part of the dataset
+            if attr_tag.attrib["name"] == "build_dmrpp_metadata":
+                return {}
+            raise ValueError(
+                "Nested attributes cannot be assigned to a variable or dataset"
+            )
+        dtype = np.dtype(self._DAP_NP_DTYPE[attr_tag.attrib["type"]])
         # if multiple Value tags are present, store as "key": "[v1, v2, ...]"
         for value_tag in attr_tag:
             # cast attribute to native python type using dmr provided dtype
@@ -607,6 +446,7 @@ class DMRParser:
                 if dtype != np.object_
                 else value_tag.text
             )
+            # "*" may represent nan values in DMR++
             if val == "*":
                 val = np.nan
             values.append(val)
@@ -617,7 +457,7 @@ class DMRParser:
         self, chunks_tag: ET.Element, dtype: np.dtype
     ) -> list[dict] | None:
         """
-        Parse filters from a DMR chunks tag.
+        Parse filters from a DMR++ chunks tag.
 
         Parameters
         ----------
@@ -645,7 +485,7 @@ class DMRParser:
                             "id": "zlib",
                             "level": int(
                                 chunks_tag.attrib.get(
-                                    "deflateLevel", self._default_zlib_value
+                                    "deflateLevel", self._DEFAULT_ZLIB_VALUE
                                 )
                             ),
                         }
@@ -653,33 +493,11 @@ class DMRParser:
             return filters
         return None
 
-    def _parse_chunks_dimensions(
-        self, chunks_tag: ET.Element
-    ) -> tuple[int, ...] | None:
-        """
-        Parse the chunk dimensions from a DMR chunks tag. Returns None if no chunk dimensions are found.
-
-        Parameters
-        ----------
-        chunks_tag : ET.Element
-            An ElementTree Element with a <chunks> tag.
-
-        Returns
-        -------
-        tuple[int, ...] | None
-
-        """
-        chunk_dim_tag = chunks_tag.find("dmr:chunkDimensionSizes", self._ns)
-        if chunk_dim_tag is not None and chunk_dim_tag.text is not None:
-            # 1 1447 2895 -> (1, 1447, 2895)
-            return tuple(map(int, chunk_dim_tag.text.split()))
-        return None
-
     def _parse_chunks(
         self, chunks_tag: ET.Element, chunks_shape: tuple[int, ...]
     ) -> ChunkManifest:
         """
-        Parse the chunk manifest from a DMR chunks tag.
+        Parse the chunk manifest from a DMR++ chunks tag.
 
         Parameters
         ----------
@@ -698,7 +516,7 @@ class DMRParser:
             [0 for i in range(len(chunks_shape))] if chunks_shape else [0]
         )
         chunk_key_template = ".".join(["{}" for i in range(len(default_num))])
-        for chunk_tag in chunks_tag.iterfind("dmr:chunk", self._ns):
+        for chunk_tag in chunks_tag.iterfind("dmrpp:chunk", self._NS):
             chunk_num = default_num
             if "chunkPositionInArray" in chunk_tag.attrib:
                 # "[0,1023,10235]" -> ["0","1023","10235"]
