@@ -6,9 +6,9 @@ import xarray as xr
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import (
+    ChunkEntry,
     ChunkManifest,
     ManifestArray,
-    validate_chunk_entry,
 )
 from virtualizarr.readers.common import (
     VirtualBackend,
@@ -104,7 +104,7 @@ class HDFVirtualBackend(VirtualBackend):
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
 
-                chunk_entry = validate_chunk_entry(
+                chunk_entry = ChunkEntry.with_validation(
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)

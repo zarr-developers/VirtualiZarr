@@ -29,52 +29,51 @@ class ChunkEntry(TypedDict):
     offset: int
     length: int
 
+    @classmethod
+    def with_validation(
+        cls, *, path: str, offset: int, length: int, fs_root: str | None = None
+    ) -> "ChunkEntry":
+        """
+        Constructor which validates each part of the chunk entry.
 
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
+        Parameters
+        ----------
+        fs_root
+            The root of the filesystem on which these references were generated.
+            Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+        """
 
+        # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
 
-# TODO reinstate ChunkEntry as a dataclass, but with an alternative constructor that can accept fs_root?
-def validate_chunk_entry(
-    path: str, offset: int, length: int, fs_root: str | None = None
-) -> ChunkEntry:
-    """
-    Validate each part of the chunk entry.
+        path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
 
-    Parameters
-    ----------
-    fs_root
-        The root of the filesystem on which these references were generated.
-        Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
-    """
-    path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+        if isinstance(offset, np.integer):
+            _offset = int(offset)
+        elif isinstance(offset, int):
+            _offset = offset
+        else:
+            raise TypeError(
+                f"chunk entry byte offset must of type int, but got type {type(offset)}"
+            )
+        if _offset < 0:
+            raise ValueError(
+                f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
+            )
 
-    if isinstance(offset, np.integer):
-        _offset = int(offset)
-    elif isinstance(offset, int):
-        _offset = offset
-    else:
-        raise TypeError(
-            f"chunk entry byte offset must of type int, but got type {type(offset)}"
-        )
-    if _offset < 0:
-        raise ValueError(
-            f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
-        )
+        if isinstance(length, np.integer):
+            _length = int(length)
+        elif isinstance(length, int):
+            _length = length
+        else:
+            raise TypeError(
+                f"chunk entry byte offset must of type int, but got type {type(length)}"
+            )
+        if _length < 0:
+            raise ValueError(
+                f"chunk entry byte offset must be a positive integer, but got offset={_length}"
+            )
 
-    if isinstance(length, np.integer):
-        _length = int(length)
-    elif isinstance(length, int):
-        _length = length
-    else:
-        raise TypeError(
-            f"chunk entry byte offset must of type int, but got type {type(length)}"
-        )
-    if _length < 0:
-        raise ValueError(
-            f"chunk entry byte offset must be a positive integer, but got offset={_length}"
-        )
-
-    return ChunkEntry(path=path, offset=offset, length=length)
+        return ChunkEntry(path=path, offset=offset, length=length)
 
 
 def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) -> str:
@@ -111,6 +110,9 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         # TODO should we do other validation here? e.g. to prevent a malformed path like `file:///directory//filename.nc`?
         return path
+
+
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
 
 
 class ChunkManifest:
@@ -183,7 +185,7 @@ class ChunkManifest:
                 raise ValueError(msg)
 
             path, offset, length = entry.values()
-            entry = validate_chunk_entry(path=path, offset=offset, length=length)
+            entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)
 
             split_key = split(key)
             paths[split_key] = entry["path"]

@@ -5,7 +5,7 @@ from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey, validate_chunk_entry
+from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -208,7 +208,7 @@ def chunkentry_from_kerchunk(
         length = UPath(path).stat().st_size
     else:
         path, offset, length = path_and_byte_range_info
-    return validate_chunk_entry(path=path, offset=offset, length=length)
+    return ChunkEntry.with_validation(path=path, offset=offset, length=length)
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:

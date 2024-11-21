@@ -1,11 +1,11 @@
 import pytest
 
-from virtualizarr.manifests import ChunkManifest, validate_chunk_entry
+from virtualizarr.manifests import ChunkEntry, ChunkManifest
 
 
 class TestPathValidation:
     def test_normalize_paths_to_uris(self):
-        chunkentry = validate_chunk_entry(
+        chunkentry = ChunkEntry.with_validation(
             path="/local/foo.nc",
             offset=100,
             length=100,
@@ -14,10 +14,10 @@ class TestPathValidation:
 
     def test_only_allow_absolute_paths(self):
         with pytest.raises(ValueError, match="must be absolute"):
-            validate_chunk_entry(path="local/foo.nc", offset=100, length=100)
+            ChunkEntry.with_validation(path="local/foo.nc", offset=100, length=100)
 
     def test_allow_empty_path(self):
-        validate_chunk_entry(
+        ChunkEntry.with_validation(
             path="",
             offset=100,
             length=100,
@@ -30,10 +30,14 @@ class TestPathValidation:
     )
     def test_catch_malformed_path(self):
         with pytest.raises(ValueError):
-            validate_chunk_entry(path="s3://bucket//foo.nc", offset=100, length=100)
+            ChunkEntry.with_validation(
+                path="s3://bucket//foo.nc", offset=100, length=100
+            )
 
         with pytest.raises(ValueError):
-            validate_chunk_entry(path="/directory//foo.nc", offset=100, length=100)
+            ChunkEntry.with_validation(
+                path="/directory//foo.nc", offset=100, length=100
+            )
 
 
 class TestCreateManifest:
