@@ -164,15 +164,15 @@ class ChunkManifest:
 
         # populate the arrays
         for key, entry in entries.items():
-            try:
-                path, offset, length = entry.values()
-                entry = ChunkEntry(path=path, offset=offset, length=length)
-            except (ValueError, TypeError) as e:
+            if not isinstance(entry, dict) or len(entry) != 3:
                 msg = (
                     "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
                     f"but got {entry}"
                 )
-                raise ValueError(msg) from e
+                raise ValueError(msg)
+
+            path, offset, length = entry.values()
+            entry = ChunkEntry(path=path, offset=offset, length=length)
 
             split_key = split(key)
             paths[split_key] = entry.path
