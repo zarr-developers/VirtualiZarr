@@ -70,12 +70,8 @@ class TestOpenVirtualDatasetZarr:
             "compressor",
             "filters",
             "zarr_format",
-        ]  # "dtype"
-
-        # Failure! fill value from zarr is None, None: ipdb> np.dtype(None): dtype('float64') is coerced in zarr.py L21 to 0.0.
-        # assert vds[array].data.zarray.fill_value == zg_metadata_dict['consolidated_metadata']['metadata'][array]['fill_value']
-
-        # loop through each array and check ZArray info
+            "dtype",
+        ]
         for array in arrays:
             for attr in zarray_checks:
                 assert (
