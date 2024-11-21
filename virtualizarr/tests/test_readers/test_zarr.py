@@ -16,9 +16,9 @@ from virtualizarr.tests import network, requires_zarrV3
         pytest.param(
             3,
             id="Zarr V3",
-            marks=pytest.mark.skip(
-                reason="ToDo/WIP: Need to translate metadata naming conventions/transforms"
-            ),
+            # marks=pytest.mark.skip(
+            #     reason="ToDo/WIP: Need to translate metadata naming conventions/transforms"
+            # ),
         ),
     ],
     indirect=True,

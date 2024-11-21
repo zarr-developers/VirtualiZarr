@@ -247,24 +247,12 @@ def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) ->
 def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     array_metadata = zarr_group[var_name].metadata
 
-    array_metadata_dict = array_metadata.to_dict()
-
-    if zarr_group[var_name].metadata.zarr_format == 3:
-        array_dims = zarr_group[var_name].metadata.dimension_names
-
+    array_dims = array_metadata.dimension_names
+    attrs = array_metadata.attributes
+    if array_metadata.zarr_format == 3:
+        array_zarray = _parse_zarr_v3_metadata(metadata=array_metadata)
     else:
-        array_dims = array_metadata_dict.get("attributes").pop("_ARRAY_DIMENSIONS")
-
-    array_zarray = ZArray(
-        shape=array_metadata.shape,
-        chunks=array_metadata.chunks,
-        dtype=array_metadata.dtype,
-        fill_value=array_metadata.fill_value,
-        order=array_metadata.order,
-        compressor=array_metadata.compressor,
-        filters=array_metadata.filters,
-        zarr_format=array_metadata.zarr_format,
-    )
+        array_zarray = _parse_zarr_v2_metadata(metadata=array_metadata)
 
     array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name)
 
@@ -277,10 +265,50 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     array_variable = Variable(
         dims=array_dims,
         data=array_manifest_array,
-        attrs=array_metadata_dict.get("attributes", {}),
+        attrs=attrs,
     )
 
     return array_variable
+
+
+def _parse_zarr_v2_metadata(metadata: zarr.core.group.GroupMetadata) -> ZArray:
+    return ZArray(
+        shape=metadata.shape,
+        chunks=metadata.chunks,
+        dtype=metadata.dtype,
+        fill_value=metadata.fill_value,
+        order="C",
+        compressor=metadata.compressor,
+        filters=metadata.filters,
+        zarr_format=metadata.zarr_format,
+    )
+
+
+def _parse_zarr_v3_metadata(metadata: zarr.core.group.GroupMetadata) -> ZArray:
+    if metadata.fill_value is None:
+        raise ValueError(
+            "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
+        )
+    else:
+        fill_value = metadata.fill_value
+    all_codecs = [
+        codec
+        for codec in metadata.to_dict()["codecs"]
+        if codec["configuration"]["endian"] not in ("transpose", "bytes")
+    ]
+    compressor, *filters = [
+        _configurable_to_num_codec_config(_filter) for _filter in all_codecs
+    ]
+    return ZArray(
+        chunks=metadata.chunk_grid.chunk_shape,
+        compressor=compressor,
+        dtype=np.dtype(metadata.data_type),
+        fill_value=fill_value,
+        filters=filters or None,
+        order="C",
+        shape=metadata.shape,
+        zarr_format=metadata.zarr_format,
+    )
 
 
 def attrs_from_zarr_group_json(filepath: Path) -> dict:
@@ -348,4 +376,5 @@ def _configurable_to_num_codec_config(configurable: dict) -> dict:
     if codec_id.startswith("numcodecs."):
         codec_id = codec_id[len("numcodecs.") :]
     configuration = configurable_copy.pop("configuration")
+
     return numcodecs.get_codec({"id": codec_id, **configuration}).get_config()
