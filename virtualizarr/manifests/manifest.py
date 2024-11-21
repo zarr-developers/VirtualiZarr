@@ -88,28 +88,62 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         The root of the filesystem on which these references were generated.
         Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     """
-    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
-        # TODO refactor this logic?
-        try:
-            return str(Path(path).as_uri())
-        except ValueError as e:
-            if str(e) == "relative path can't be expressed as a file URI":
-                # problem is that path is relative instead of absolute
-                if fs_root is not None:
-                    # use knowledge of filesystem root to convert to absolute path
-                    return str(fs_root / Path(path).as_uri())
-                else:
-                    # add context to error message that relative paths are forbidden
-                    raise ValueError(
-                        f"paths in the manifest must be absolute, but got {path}, and fs_root was not specified"
-                    ) from e
-            else:
-                # must be some other problem with the path
-                raise
-    else:
+    if path == "":
         # (empty paths are allowed through as they represent missing chunks)
-        # TODO should we do other validation here? e.g. to prevent a malformed path like `file:///directory//filename.nc`?
         return path
+    
+    try: 
+        path = as_absolute_or_uri(path)
+    except ValueError as e:
+        if "is a relative path" in str(e):
+            path = relative_path_as_uri(path, fs_root)
+        else:
+            # must be some other problem with the path
+            raise
+    
+    return path
+            
+
+def as_absolute_or_uri(path: str) -> str:
+
+    # TODO the neatest way to handle all these cases may be to use cloudpathlib?
+
+    # TODO use urllib.parse instead https://github.com/zarr-developers/VirtualiZarr/pull/243#discussion_r1853019990
+    if any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
+        return path
+    
+    # TODO in python 3.13 we could use Path.from_uri() ?
+
+    _path = Path(path)
+    if _path.is_absolute():
+        return path
+
+    raise ValueError(f"path {path} is a relative path")
+
+
+def relative_path_as_uri(path: Path, fs_root: str | None) -> str:
+
+    if fs_root is None:
+        raise ValueError(
+            f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+        )
+
+    # check fs_root itself is a URI/URL/absolute path to directory
+    # TODO improve error message in this case?
+    fs_root = as_absolute_or_uri(fs_root)
+
+    return join_fs_root_to_path_to_create_uri(path, fs_root)
+
+
+def join_fs_root_to_path_to_create_uri(fs_root: str, path: str) -> str:
+    # fs_root is an absolute path or uri at this point
+    # path is a relative posix path at this point
+
+    # TODO in python 3.13 we could use Path.from_uri() ?
+    joined = Path(fs_root) / Path(path)
+
+    # TODO what if it's an S3 URL?
+    return joined.as_uri()
 
 
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
