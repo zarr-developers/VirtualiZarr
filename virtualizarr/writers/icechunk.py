@@ -8,7 +8,12 @@ from xarray.core.variable import Variable
 from zarr import Array
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests import array_api as manifest_api
+from virtualizarr.manifests.utils import (
+    check_combinable_zarr_arrays,
+    check_compatible_encodings,
+    check_same_ndims,
+    check_same_shapes_except_on_concat_axis,
+)
 from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
@@ -149,22 +154,13 @@ def get_axis(
     return dims.index(dim_name)
 
 
-def _check_compatible_arrays(
+def check_compatible_arrays(
     ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
 ):
-    manifest_api.check_combinable_zarr_arrays([ma, existing_array])
-    manifest_api.check_same_ndims([ma.ndim, existing_array.ndim])
+    check_combinable_zarr_arrays([ma, existing_array])
+    check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
-    manifest_api.check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
-
-
-def _check_compatible_encodings(encoding1, encoding2):
-    for key, value in encoding1.items():
-        if key in encoding2:
-            if encoding2[key] != value:
-                raise ValueError(
-                    f"Cannot concatenate arrays with different values for encoding key {key}: {encoding2[key]} != {value}"
-                )
+    check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
 def write_virtual_variable_to_icechunk(
@@ -192,8 +188,8 @@ def write_virtual_variable_to_icechunk(
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
-        _check_compatible_arrays(ma, existing_array, append_axis)
-        _check_compatible_encodings(var.encoding, existing_array.attrs)
+        check_compatible_arrays(ma, existing_array, append_axis)
+        check_compatible_encodings(var.encoding, existing_array.attrs)
 
         # determine number of existing chunks along the append axis
         existing_num_chunks = num_chunks(
