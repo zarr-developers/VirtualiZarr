@@ -197,11 +197,12 @@ def write_virtual_variable_to_icechunk(
             axis=append_axis,
         )
 
+        arr = group[name]
+
         # resize the array
-        arr = resize_array(
-            group=group,
-            name=name,
-            var=var,
+        resize_array(
+            arr,
+            shape_to_append=var.shape,
             append_axis=append_axis,
         )
     else:
