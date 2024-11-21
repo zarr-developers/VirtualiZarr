@@ -34,22 +34,33 @@ class ChunkDictEntry(TypedDict):
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
 
 
-def validate_and_normalize_path_to_uri(path: str) -> str:
+def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) -> str:
     """
     Makes all paths into fully-qualified absolute URIs, or raises
 
     See https://en.wikipedia.org/wiki/File_URI_scheme
+
+    Parameters
+    ----------
+    fs_root
+        The root of the filesystem on which these references were generated.
+        Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     """
     if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
-        # assume the path is local
+        # TODO refactor this logic?
         try:
             return str(Path(path).as_uri())
         except ValueError as e:
             if str(e) == "relative path can't be expressed as a file URI":
-                # problem is that path is relative instead of absolute, so add context to error message that this is forbidden
-                raise ValueError(
-                    f"paths in the manifest must be absolute, but got {path}"
-                ) from e
+                # problem is that path is relative instead of absolute
+                if fs_root is not None:
+                    # use knowledge of filesystem root to convert to absolute path
+                    return str(fs_root / Path(path).as_uri())
+                else:
+                    # add context to error message that relative paths are forbidden
+                    raise ValueError(
+                        f"paths in the manifest must be absolute, but got {path}, and fs_root was not specified"
+                    ) from e
             else:
                 # must be some other problem with the path
                 raise
