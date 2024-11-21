@@ -1,4 +1,3 @@
-import dataclasses
 import json
 import re
 from collections.abc import Iterable, Iterator
@@ -25,13 +24,57 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-class ChunkDictEntry(TypedDict):
+class ChunkEntry(TypedDict):
     path: str
     offset: int
     length: int
 
 
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
+
+
+# TODO reinstate ChunkEntry as a dataclass, but with an alternative constructor that can accept fs_root?
+def validate_chunk_entry(
+    path: str, offset: int, length: int, fs_root: str | None = None
+) -> ChunkEntry:
+    """
+    Validate each part of the chunk entry.
+
+    Parameters
+    ----------
+    fs_root
+        The root of the filesystem on which these references were generated.
+        Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+    """
+    path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+
+    if isinstance(offset, np.integer):
+        _offset = int(offset)
+    elif isinstance(offset, int):
+        _offset = offset
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(offset)}"
+        )
+    if _offset < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
+        )
+
+    if isinstance(length, np.integer):
+        _length = int(length)
+    elif isinstance(length, int):
+        _length = length
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(length)}"
+        )
+    if _length < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_length}"
+        )
+
+    return ChunkEntry(path=path, offset=offset, length=length)
 
 
 def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) -> str:
@@ -68,34 +111,6 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         # TODO should we do other validation here? e.g. to prevent a malformed path like `file:///directory//filename.nc`?
         return path
-
-
-# TODO combine this with the ChunkDictEntry class?
-@dataclasses.dataclass(frozen=True)
-class ChunkEntry:
-    """
-    Information for a single chunk in the manifest.
-
-    Stored in the form `{"path": "s3://bucket//foo.nc", "offset": 100, "length": 100}`.
-    """
-
-    path: str
-    offset: int
-    length: int
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "path", validate_and_normalize_path_to_uri(self.path))
-
-    def to_kerchunk(self) -> tuple[str, int, int]:
-        """Write out in the format that kerchunk uses for chunk entries."""
-        return (self.path, self.offset, self.length)
-
-    def dict(self) -> ChunkDictEntry:
-        return ChunkDictEntry(
-            path=self.path,
-            offset=self.offset,
-            length=self.length,
-        )
 
 
 class ChunkManifest:
@@ -168,12 +183,12 @@ class ChunkManifest:
                 raise ValueError(msg)
 
             path, offset, length = entry.values()
-            entry = ChunkEntry(path=path, offset=offset, length=length)
+            entry = validate_chunk_entry(path=path, offset=offset, length=length)
 
             split_key = split(key)
-            paths[split_key] = entry.path
-            offsets[split_key] = entry.offset
-            lengths[split_key] = entry.length
+            paths[split_key] = entry["path"]
+            offsets[split_key] = entry["offset"]
+            lengths[split_key] = entry["length"]
 
         self._paths = paths
         self._offsets = offsets

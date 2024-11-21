@@ -3,9 +3,13 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
 import xarray as xr
-from xarray import Index, Variable
+from xarray import Dataset, Index, Variable
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    validate_chunk_entry,
+)
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -99,11 +103,12 @@ class HDFVirtualBackend(VirtualBackend):
             else:
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
-                chunk_entry = ChunkEntry(
+
+                chunk_entry = validate_chunk_entry(
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)
-                chunk_entries = {chunk_key: chunk_entry.dict()}
+                chunk_entries = {chunk_key: chunk_entry}
                 chunk_manifest = ChunkManifest(entries=chunk_entries)
                 return chunk_manifest
         else:

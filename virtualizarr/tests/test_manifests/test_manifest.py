@@ -1,37 +1,39 @@
 import pytest
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest
+from virtualizarr.manifests import ChunkManifest, validate_chunk_entry
 
 
 class TestPathValidation:
     def test_normalize_paths_to_uris(self):
-        chunkentry = ChunkEntry(
+        chunkentry = validate_chunk_entry(
             path="/local/foo.nc",
             offset=100,
             length=100,
         )
-        assert chunkentry.path == "file:///local/foo.nc"
+        assert chunkentry["path"] == "file:///local/foo.nc"
 
     def test_only_allow_absolute_paths(self):
         with pytest.raises(ValueError, match="must be absolute"):
-            ChunkEntry(path="local/foo.nc", offset=100, length=100)
+            validate_chunk_entry(path="local/foo.nc", offset=100, length=100)
 
     def test_allow_empty_path(self):
-        ChunkEntry(
+        validate_chunk_entry(
             path="",
             offset=100,
             length=100,
         )
+
+    # TODO test the fs_root parameter
 
     @pytest.mark.xfail(
         reason="probably requires adding cloudpathlib dependency to do validation of remote bucket urls"
     )
     def test_catch_malformed_path(self):
         with pytest.raises(ValueError):
-            ChunkEntry(path="s3://bucket//foo.nc", offset=100, length=100)
+            validate_chunk_entry(path="s3://bucket//foo.nc", offset=100, length=100)
 
         with pytest.raises(ValueError):
-            ChunkEntry(path="/directory//foo.nc", offset=100, length=100)
+            validate_chunk_entry(path="/directory//foo.nc", offset=100, length=100)
 
 
 class TestCreateManifest:

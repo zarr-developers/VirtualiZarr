@@ -5,7 +5,7 @@ from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import ChunkDictEntry, ChunkEntry, ChunkKey
+from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey, validate_chunk_entry
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -183,7 +183,7 @@ def manifest_from_kerchunk_chunk_dict(
 ) -> ChunkManifest:
     """Create a single ChunkManifest from the mapping of keys to chunk information stored inside kerchunk array refs."""
 
-    chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
+    chunk_entries: dict[ChunkKey, ChunkEntry] = {}
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
             raise NotImplementedError(
@@ -191,7 +191,7 @@ def manifest_from_kerchunk_chunk_dict(
             )
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
-        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root).dict()
+        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
     return ChunkManifest(entries=chunk_entries)
 
 
@@ -208,7 +208,7 @@ def chunkentry_from_kerchunk(
         length = UPath(path).stat().st_size
     else:
         path, offset, length = path_and_byte_range_info
-    return ChunkEntry(path=path, offset=offset, length=length)
+    return validate_chunk_entry(path=path, offset=offset, length=length)
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
