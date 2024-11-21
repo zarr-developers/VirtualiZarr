@@ -213,16 +213,19 @@ async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> i
     return await zarr_group.store.getsize(chunk_key)
 
 
+async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> bool:
+    return await zarr_group.store.exists(chunk_key)
+
+
 async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str) -> dict:
-    # this type hint for dict is doing a lot of work. Should this be a dataclass or typed dict?
     chunk_paths = {}
     # Is there a way to call `zarr_group.store.list()` per array?
     async for item in zarr_group.store.list():
-        if not item.endswith(
-            (".zarray", ".zattrs", ".zgroup", ".zmetadata")
-        ) and item.startswith(array_name):
-            # dict key is created by splitting the value from store.list() by the array_name and trailing /....yuck.
-            # It would be great if we can ask Zarr for this: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844486393
+        if (
+            not item.endswith((".zarray", ".zattrs", ".zgroup", ".zmetadata"))
+            and item.startswith(array_name)
+            and chunk_exists(zarr_group=zarr_group, chunk_key=item)
+        ):
             chunk_paths[item.split(array_name + "/")[-1]] = {
                 "path": (
                     zarr_group.store.root / item
