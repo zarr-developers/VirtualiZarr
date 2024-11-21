@@ -129,20 +129,12 @@ def num_chunks(
 
 
 def resize_array(
-    group: "Group",
-    name: str,
-    var: Variable,
+    arr: "Array",
     append_axis: int,
-) -> Array:
-    existing_array = group[name]
-    # This is the second time we check if the array is an instance of zarr.core.Array
-    # but it's necessary to ensure .shape and .resize are available
-    if not isinstance(existing_array, Array):
-        raise ValueError("Expected existing array to be a zarr.core.Array")
-    new_shape = list(existing_array.shape)
-    new_shape[append_axis] += var.shape[append_axis]
-    existing_array.resize(tuple(new_shape))
-    return existing_array
+) -> None:
+    new_shape = list(arr.shape)
+    new_shape[append_axis] += arr.shape[append_axis]
+    arr.resize(tuple(new_shape))
 
 
 def get_axis(
@@ -176,7 +168,7 @@ def write_virtual_variable_to_icechunk(
     mode = store.mode.str
 
     dims: list[str] = cast(list[str], list(var.dims))
-    append_axis, existing_num_chunks, arr = None, None, None
+    existing_num_chunks = 0
     if append_dim and append_dim not in dims:
         raise ValueError(
             f"append_dim {append_dim} not found in variable dimensions {dims}"
@@ -197,15 +189,13 @@ def write_virtual_variable_to_icechunk(
             axis=append_axis,
         )
 
-        arr = group[name]
-
         # resize the array
         resize_array(
-            arr,
-            shape_to_append=var.shape,
+            existing_array,
             append_axis=append_axis,
         )
     else:
+        append_axis = None
         # create array if it doesn't already exist
         arr = group.require_array(
             name=name,
