@@ -3,7 +3,7 @@ import json
 import re
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
+from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 
@@ -74,21 +74,6 @@ class ChunkEntry:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "path", validate_and_normalize_path_to_uri(self.path))
-
-    # TODO kerchunk-specific constructors and translators could just live in the kerchunk module as functions
-    @classmethod
-    def from_kerchunk(
-        cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
-    ) -> "ChunkEntry":
-        from upath import UPath
-
-        if len(path_and_byte_range_info) == 1:
-            path = path_and_byte_range_info[0]
-            offset = 0
-            length = UPath(path).stat().st_size
-        else:
-            path, offset, length = path_and_byte_range_info
-        return ChunkEntry(path=path, offset=offset, length=length)
 
     def to_kerchunk(self) -> tuple[str, int, int]:
         """Write out in the format that kerchunk uses for chunk entries."""
@@ -340,24 +325,6 @@ class ChunkManifest:
         entries = self.dict()
         with open(filepath, "w") as json_file:
             json.dump(entries, json_file, indent=4, separators=(", ", ": "))
-
-    @classmethod
-    def _from_kerchunk_chunk_dict(
-        cls,
-        # The type hint requires `Dict` instead of `dict` due to
-        # the conflicting ChunkManifest.dict method.
-        kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
-    ) -> "ChunkManifest":
-        chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
-        for k, v in kerchunk_chunk_dict.items():
-            if isinstance(v, (str, bytes)):
-                raise NotImplementedError(
-                    "Reading inlined reference data is currently not supported. [ToDo]"
-                )
-            elif not isinstance(v, (tuple, list)):
-                raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
-            chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
-        return ChunkManifest(entries=chunk_entries)
 
     def rename_paths(
         self,

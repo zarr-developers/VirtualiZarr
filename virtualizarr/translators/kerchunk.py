@@ -5,6 +5,7 @@ from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import ChunkDictEntry, ChunkEntry, ChunkKey
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -147,7 +148,7 @@ def variable_from_kerchunk_refs(
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
-        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+        manifest = manifest_from_kerchunk_chunk_dict(chunk_dict)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     elif len(zarray.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
@@ -162,6 +163,38 @@ def variable_from_kerchunk_refs(
         varr = zarray.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
+
+
+def manifest_from_kerchunk_chunk_dict(
+    kerchunk_chunk_dict: dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+) -> ChunkManifest:
+    """Create a single ChunkManifest from the mapping of keys to chunk information stored inside kerchunk array refs."""
+
+    chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
+    for k, v in kerchunk_chunk_dict.items():
+        if isinstance(v, (str, bytes)):
+            raise NotImplementedError(
+                "Reading inlined reference data is currently not supported. [ToDo]"
+            )
+        elif not isinstance(v, (tuple, list)):
+            raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+        chunk_entries[k] = chunkentry_from_kerchunk(v).dict()
+    return ChunkManifest(entries=chunk_entries)
+
+
+def chunkentry_from_kerchunk(
+    path_and_byte_range_info: tuple[str] | tuple[str, int, int],
+) -> ChunkEntry:
+    """Create a single validated ChunkEntry object from whatever kerchunk contains under that chunk key."""
+    from upath import UPath
+
+    if len(path_and_byte_range_info) == 1:
+        path = path_and_byte_range_info[0]
+        offset = 0
+        length = UPath(path).stat().st_size
+    else:
+        path, offset, length = path_and_byte_range_info
+    return ChunkEntry(path=path, offset=offset, length=length)
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
