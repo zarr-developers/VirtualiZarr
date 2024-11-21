@@ -224,7 +224,7 @@ async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str) -> dict:
         if (
             not item.endswith((".zarray", ".zattrs", ".zgroup", ".zmetadata"))
             and item.startswith(array_name)
-            and chunk_exists(zarr_group=zarr_group, chunk_key=item)
+            and await chunk_exists(zarr_group=zarr_group, chunk_key=item)
         ):
             chunk_paths[item.split(array_name + "/")[-1]] = {
                 "path": (
