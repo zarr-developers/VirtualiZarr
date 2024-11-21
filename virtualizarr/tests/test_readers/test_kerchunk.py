@@ -11,7 +11,7 @@ def gen_ds_refs(
     zgroup: str = '{"zarr_format":2}',
     zarray: str = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
     zattrs: str = '{"_ARRAY_DIMENSIONS":["x","y"]}',
-    chunk: list = ["test1.nc", 6144, 48],
+    chunk: list = ["/test1.nc", 6144, 48],
 ):
     return {
         "version": 1,
