@@ -1,11 +1,9 @@
 from typing import TYPE_CHECKING, Optional, cast
 
 import numpy as np
-import zarr  # type: ignore[import-untyped]
 from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
-from zarr import Array
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import (
@@ -18,7 +16,7 @@ from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from zarr import Group  # type: ignore
+    from zarr import Array, Group  # type: ignore
 
 
 VALID_URI_PREFIXES = {
@@ -147,7 +145,7 @@ def get_axis(
 
 
 def check_compatible_arrays(
-    ma: ManifestArray, existing_array: zarr.core.array.Array, append_axis: int
+    ma: ManifestArray, existing_array: "Array", append_axis: int
 ):
     check_combinable_zarr_arrays([ma, existing_array])
     check_same_ndims([ma.ndim, existing_array.ndim])
@@ -163,6 +161,8 @@ def write_virtual_variable_to_icechunk(
     append_dim: Optional[str] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
+    from zarr import Array
+
     ma = cast(ManifestArray, var.data)
     zarray = ma.zarray
     mode = store.mode.str
