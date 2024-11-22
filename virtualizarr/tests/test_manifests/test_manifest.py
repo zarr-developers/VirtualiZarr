@@ -39,19 +39,21 @@ class TestPathValidation:
 
     # TODO test the fs_root parameter
 
-    @pytest.mark.xfail(
-        reason="probably requires adding cloudpathlib dependency to do validation of remote bucket urls"
+    @pytest.mark.parametrize(
+        "path",
+        [
+            pytest.param(
+                "s3://BUCKET/foo.nc",
+                marks=pytest.mark.xfail(
+                    reason="cloudpathlib should ideally do stricter validation - see https://github.com/drivendataorg/cloudpathlib/issues/489"
+                ),
+            ),
+            "https://site.com/###/foo.nc",
+        ],
     )
-    def test_catch_malformed_path(self):
+    def test_catch_malformed_path(self, path):
         with pytest.raises(ValueError):
-            ChunkEntry.with_validation(
-                path="s3://bucket//foo.nc", offset=100, length=100
-            )
-
-        with pytest.raises(ValueError):
-            ChunkEntry.with_validation(
-                path="/directory//foo.nc", offset=100, length=100
-            )
+            ChunkEntry.with_validation(path=path, offset=100, length=100)
 
 
 class TestCreateManifest:
