@@ -1,7 +1,9 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
+from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 from cloudpathlib import AnyPath
@@ -85,24 +87,43 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         return path
 
-    _path = AnyPath(path)
+    if path.startswith("http://") or path.startswith("https://"):
+        # TODO if cloudpathlib supported HttpPaths then we wouldn't need this separate logic branch (https://github.com/drivendataorg/cloudpathlib/issues/455)
 
-    # TODO should we require that the file has a suffix here?
-    if not _path.is_absolute():
-        if fs_root is None:
+        # hopefully this should raise if given a malformed URL?
+        components = urlparse(path)
+
+        _path = Path(components.path)
+        if not _path.suffix:
             raise ValueError(
-                f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
-        else:
-            _path = convert_relative_path_to_absolute(_path, fs_root)
 
-    return _path.as_uri()
+        return urlunparse(components)
+    else:
+        _path = AnyPath(path)
+
+        if not _path.suffix:
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        if not _path.is_absolute():
+            if fs_root is None:
+                raise ValueError(
+                    f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+                )
+            else:
+                _path = convert_relative_path_to_absolute(_path, fs_root)
+
+        return _path.as_uri()
 
 
 def convert_relative_path_to_absolute(path: AnyPath, fs_root: str) -> AnyPath:
     _fs_root = AnyPath(fs_root)
 
     if not _fs_root.is_absolute() or _fs_root.suffix:
+        # TODO handle http url roots using urllib.parse.urljoin? (or ideally cloudpathlib)
         raise ValueError(
             f"fs_root must be an absolute path to a directory or bucket prefix, but got {fs_root}"
         )
