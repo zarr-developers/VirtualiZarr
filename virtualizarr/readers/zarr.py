@@ -246,13 +246,17 @@ def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) ->
 
 def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     array_metadata = zarr_group[var_name].metadata
-
-    array_dims = array_metadata.dimension_names
     attrs = array_metadata.attributes
-    if array_metadata.zarr_format == 3:
-        array_zarray = _parse_zarr_v3_metadata(metadata=array_metadata)
-    else:
+
+    if array_metadata.zarr_format == 2:
         array_zarray = _parse_zarr_v2_metadata(metadata=array_metadata)
+        array_dims = attrs["_ARRAY_DIMENSIONS"]
+    elif array_metadata.zarr_format == 3:
+        array_zarray = _parse_zarr_v3_metadata(metadata=array_metadata)
+        array_dims = array_metadata.dimension_names
+
+    else:
+        raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
     array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name)
 
