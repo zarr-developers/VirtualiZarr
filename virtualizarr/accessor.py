@@ -46,6 +46,8 @@ class VirtualiZarrDatasetAccessor:
 
         Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
 
+        If `append_dim` is provided, the virtual dataset will be appended on the append_dim axis to the existing IcechunkStore.
+
         Parameters
         ----------
         store: IcechunkStore
