@@ -100,6 +100,11 @@ def test_handle_relative_paths():
     ):
         dataset_from_kerchunk_refs(ds_refs, fs_root="some_directory/")
 
+    with pytest.raises(
+        ValueError, match="fs_root must be an absolute path to a directory"
+    ):
+        dataset_from_kerchunk_refs(ds_refs, fs_root="/some_directory/file.nc")
+
     ds = dataset_from_kerchunk_refs(ds_refs, fs_root="/some_directory/")
     da = ds["a"]
     assert da.data.manifest.dict() == {

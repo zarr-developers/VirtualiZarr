@@ -1,22 +1,13 @@
 import json
 import re
 from collections.abc import Iterable, Iterator
-from pathlib import Path
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 
 import numpy as np
+from cloudpathlib import AnyPath
 
 from virtualizarr.types import ChunkKey
 
-VALID_URI_PREFIXES = {
-    "s3://",
-    "gs://",
-    "azure://",
-    "r2://",
-    "cos://",
-    "minio://",
-    "file:///",
-}
 _INTEGER = (
     r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
 )
@@ -78,9 +69,11 @@ class ChunkEntry(TypedDict):
 
 def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) -> str:
     """
-    Makes all paths into fully-qualified absolute URIs, or raises
+    Makes all paths into fully-qualified absolute URIs, or raises.
 
     See https://en.wikipedia.org/wiki/File_URI_scheme
+
+    Uses cloudpathlib, so currently only understands local filepaths, S3, GCP, and Azure bucket URLs.
 
     Parameters
     ----------
@@ -92,26 +85,24 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         return path
 
-    from cloudpathlib import AnyPath
-
     _path = AnyPath(path)
 
+    # TODO should we require that the file has a suffix here?
     if not _path.is_absolute():
         if fs_root is None:
             raise ValueError(
                 f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
             )
         else:
-            _path = relative_path_to_absolute(_path, fs_root)
+            _path = convert_relative_path_to_absolute(_path, fs_root)
 
     return _path.as_uri()
 
 
-def relative_path_to_absolute(path: Path, fs_root: str) -> str:
-    from cloudpathlib import AnyPath
-
+def convert_relative_path_to_absolute(path: AnyPath, fs_root: str) -> AnyPath:
     _fs_root = AnyPath(fs_root)
-    if not _fs_root.is_absolute():
+
+    if not _fs_root.is_absolute() or _fs_root.suffix:
         raise ValueError(
             f"fs_root must be an absolute path to a directory or bucket prefix, but got {fs_root}"
         )
@@ -215,6 +206,8 @@ class ChunkManifest:
 
         Useful if you want to avoid the memory overhead of creating an intermediate dictionary first,
         as these 3 arrays are what will be used internally to store the references.
+
+        This method also skips validation checks on the file paths - if you want to check e.g. that the paths are all absolute then use ``__init__()``.
 
         Parameters
         ----------
