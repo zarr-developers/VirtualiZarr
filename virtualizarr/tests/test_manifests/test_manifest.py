@@ -23,6 +23,20 @@ class TestPathValidation:
             length=100,
         )
 
+    @pytest.mark.parametrize(
+        "url", ["http://site.com/file.nc", "https://site.com/file.nc"]
+    )
+    def test_allow_http_urls(self, url):
+        chunkentry = ChunkEntry.with_validation(path=url, offset=100, length=100)
+        assert chunkentry["path"] == url
+
+    @pytest.mark.parametrize(
+        "path", ["/directory/file", "s3://bucket/file", "https://site.com/file"]
+    )
+    def test_disallow_paths_without_file_suffixes(self, path):
+        with pytest.raises(ValueError, match="this path has no file suffix"):
+            ChunkEntry.with_validation(path=path, offset=100, length=100)
+
     # TODO test the fs_root parameter
 
     @pytest.mark.xfail(
