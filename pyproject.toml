@@ -25,6 +25,7 @@ dependencies = [
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
+    "cloudpathlib",
     "numcodecs",
     "ujson",
 ]
@@ -58,7 +59,6 @@ test = [
     "scipy",
     "virtualizarr[hdf_reader]"
 ]
-
 
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"

@@ -12,6 +12,7 @@ dependencies:
   - packaging
   - ujson
   - universal_pathlib
+  - cloudpathlib
   - hdf5plugin
   - numcodecs
   - imagecodecs>=2024.6.1

@@ -12,6 +12,7 @@ dependencies:
   - packaging
   - ujson
   - universal_pathlib
+  - cloudpathlib
   # Testing
   - codecov
   - pre-commit

@@ -13,6 +13,7 @@ dependencies:
   - ujson
   - packaging
   - universal_pathlib
+  - cloudpathlib
   - hdf5plugin
   - numcodecs
   # Testing
