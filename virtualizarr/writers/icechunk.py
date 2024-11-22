@@ -5,10 +5,13 @@ from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
 from xarray.core.variable import Variable
 
+from virtualizarr.codecs import get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import (
-    check_combinable_zarr_arrays,
     check_compatible_encodings,
+    check_same_chunk_shapes,
+    check_same_codecs,
+    check_same_dtypes,
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
@@ -147,7 +150,10 @@ def get_axis(
 def check_compatible_arrays(
     ma: ManifestArray, existing_array: "Array", append_axis: int
 ):
-    check_combinable_zarr_arrays([ma, existing_array])
+    arrays = [ma, existing_array]
+    check_same_dtypes([arr.dtype for arr in arrays])
+    check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
+    check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
@@ -180,8 +186,6 @@ def write_virtual_variable_to_icechunk(
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
-        # if the manifest array has zarr format v2 compression and filter, we need to convert it to v3
-        ma.zarray.zarr_format = 3
         check_compatible_arrays(ma, existing_array, append_axis)
         check_compatible_encodings(var.encoding, existing_array.attrs)
 

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .array import ManifestArray
 
 
-def _check_same_dtypes(dtypes: list[np.dtype]) -> None:
+def check_same_dtypes(dtypes: list[np.dtype]) -> None:
     """Check all the dtypes are the same"""
 
     first_dtype, *other_dtypes = dtypes
@@ -30,7 +30,7 @@ def check_compatible_encodings(encoding1, encoding2):
                 )
 
 
-def _check_same_codecs(codecs: list[Any]) -> None:
+def check_same_codecs(codecs: list[Any]) -> None:
     first_codec, *other_codecs = codecs
     for codec in other_codecs:
         if codec != first_codec:
@@ -41,7 +41,7 @@ def _check_same_codecs(codecs: list[Any]) -> None:
             )
 
 
-def _check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
+def check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
     """Check all the chunk shapes are the same"""
 
     first_chunks, *other_chunks_list = chunks_list
@@ -99,14 +99,14 @@ def check_combinable_zarr_arrays(
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
     """
-    _check_same_dtypes([arr.dtype for arr in arrays])
+    check_same_dtypes([arr.dtype for arr in arrays])
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
-    _check_same_codecs([get_codecs(arr) for arr in arrays])
+    check_same_codecs([get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
-    _check_same_chunk_shapes([arr.chunks for arr in arrays])
+    check_same_chunk_shapes([arr.chunks for arr in arrays])
 
 
 def check_compatible_arrays(
