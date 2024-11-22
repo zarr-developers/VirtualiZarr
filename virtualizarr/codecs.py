@@ -87,7 +87,10 @@ def _get_zarr_array_codecs(
         raise NotImplementedError(
             f"zarr-python v3 or higher is required, but version {installed_version} is installed."
         )
-    from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+    from zarr.core.metadata import (  # type: ignore[import-untyped]
+        ArrayV2Metadata,
+        ArrayV3Metadata,
+    )
 
     # For zarr format v3
     if isinstance(array.metadata, ArrayV3Metadata):

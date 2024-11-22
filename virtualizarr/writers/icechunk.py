@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
 from xarray import Dataset
@@ -150,7 +150,7 @@ def get_axis(
 def check_compatible_arrays(
     ma: "ManifestArray", existing_array: "Array", append_axis: int
 ):
-    arrays = [ma, existing_array]  # type: List[Union[ManifestArray, Array]]
+    arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
     check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
     check_same_chunk_shapes([arr.chunks for arr in arrays])
