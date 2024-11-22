@@ -1,6 +1,6 @@
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple, cast
 
 import pytest
 
@@ -372,7 +372,7 @@ def gen_virtual_dataset(
     base_offset: int = 6144,
     length: int = 48,
     dims: Optional[list[str]] = None,
-    zarr_format: int = 2,
+    zarr_format: Literal[2, 3] = 2,
 ):
     manifest = generate_chunk_manifest(
         file_uri,
@@ -503,7 +503,7 @@ class TestAppend:
         self,
         icechunk_storage: "StorageConfig",
         netcdf4_files_factory: Callable,
-        zarr_format: int,
+        zarr_format: Literal[2, 3],
     ):
         import xarray.testing as xrt
         from icechunk import IcechunkStore
