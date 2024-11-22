@@ -49,6 +49,7 @@ class VirtualiZarrDatasetAccessor:
         Parameters
         ----------
         store: IcechunkStore
+        append_dim: str, optional
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
