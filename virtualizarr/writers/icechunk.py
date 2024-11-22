@@ -180,6 +180,8 @@ def write_virtual_variable_to_icechunk(
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
+        # if the manifest array has zarr format v2 compression and filter, we need to convert it to v3
+        ma.zarray.zarr_format = 3
         check_compatible_arrays(ma, existing_array, append_axis)
         check_compatible_encodings(var.encoding, existing_array.attrs)
 

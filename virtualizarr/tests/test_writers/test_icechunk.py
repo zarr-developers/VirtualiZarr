@@ -372,6 +372,7 @@ def gen_virtual_dataset(
     base_offset: int = 6144,
     length: int = 48,
     dims: Optional[list[str]] = None,
+    zarr_format: int = 2,
 ):
     manifest = generate_chunk_manifest(
         file_uri,
@@ -387,7 +388,7 @@ def gen_virtual_dataset(
         compressor=compressor,
         filters=filters,
         fill_value=fill_value,
-        zarr_format=3,
+        zarr_format=zarr_format,
     )
     ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
     ds = open_dataset(file_uri)
@@ -497,8 +498,12 @@ class TestAppend:
         xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with compression, it succeeds
+    @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_append_with_compression_succeeds(
-        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
+        self,
+        icechunk_storage: "StorageConfig",
+        netcdf4_files_factory: Callable,
+        zarr_format: int,
     ):
         import xarray.testing as xrt
         from icechunk import IcechunkStore
@@ -524,6 +529,7 @@ class TestAppend:
                 variable_name="air",
                 base_offset=18043,
                 length=3936114,
+                zarr_format=zarr_format,
             ),
             gen_virtual_dataset(
                 file_uri=file2,
@@ -535,6 +541,7 @@ class TestAppend:
                 variable_name="air",
                 base_offset=18043,
                 length=3938672,
+                zarr_format=zarr_format,
             ),
         )
 
