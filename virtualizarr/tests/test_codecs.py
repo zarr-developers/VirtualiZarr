@@ -47,6 +47,7 @@ class TestCodecs:
         )
         assert actual_codecs == expected_codecs
 
+    @requires_zarr_python_v3
     def test_manifest_array_zarr_v2_normalized(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
         compressor = {"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}
