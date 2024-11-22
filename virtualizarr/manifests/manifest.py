@@ -92,56 +92,31 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         return path
 
-    try:
-        path = as_absolute_or_uri(path)
-    except ValueError as e:
-        if "is a relative path" in str(e):
-            path = relative_path_as_uri(path, fs_root)
+    from cloudpathlib import AnyPath
+
+    _path = AnyPath(path)
+
+    if not _path.is_absolute():
+        if fs_root is None:
+            raise ValueError(
+                f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+            )
         else:
-            # must be some other problem with the path
-            raise
+            _path = relative_path_to_absolute(_path, fs_root)
 
-    return path
-
-
-def as_absolute_or_uri(path: str) -> str:
-    # TODO the neatest way to handle all these cases may be to use cloudpathlib?
-
-    # TODO use urllib.parse instead https://github.com/zarr-developers/VirtualiZarr/pull/243#discussion_r1853019990
-    if any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        return path
-
-    # TODO in python 3.13 we could use Path.from_uri() ?
-
-    _path = Path(path)
-    if _path.is_absolute():
-        return path
-
-    raise ValueError(f"path {path} is a relative path")
+    return _path.as_uri()
 
 
-def relative_path_as_uri(path: Path, fs_root: str | None) -> str:
-    if fs_root is None:
+def relative_path_to_absolute(path: Path, fs_root: str) -> str:
+    from cloudpathlib import AnyPath
+
+    _fs_root = AnyPath(fs_root)
+    if not _fs_root.is_absolute():
         raise ValueError(
-            f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+            f"fs_root must be an absolute path to a directory or bucket prefix, but got {fs_root}"
         )
 
-    # check fs_root itself is a URI/URL/absolute path to directory
-    # TODO improve error message in this case?
-    fs_root = as_absolute_or_uri(fs_root)
-
-    return join_fs_root_to_path_to_create_uri(path, fs_root)
-
-
-def join_fs_root_to_path_to_create_uri(fs_root: str, path: str) -> str:
-    # fs_root is an absolute path or uri at this point
-    # path is a relative posix path at this point
-
-    # TODO in python 3.13 we could use Path.from_uri() ?
-    joined = Path(fs_root) / Path(path)
-
-    # TODO what if it's an S3 URL?
-    return joined.as_uri()
+    return _fs_root / path
 
 
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
