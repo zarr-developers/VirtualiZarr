@@ -37,8 +37,6 @@ class TestPathValidation:
         with pytest.raises(ValueError, match="this path has no file suffix"):
             ChunkEntry.with_validation(path=path, offset=100, length=100)
 
-    # TODO test the fs_root parameter
-
     @pytest.mark.parametrize(
         "path",
         [
@@ -54,6 +52,40 @@ class TestPathValidation:
     def test_catch_malformed_path(self, path):
         with pytest.raises(ValueError):
             ChunkEntry.with_validation(path=path, offset=100, length=100)
+
+
+class TestConvertingRelativePathsUsingFSRoot:
+    def test_fs_root_must_be_absolute(self):
+        with pytest.raises(ValueError, match="fs_root must be an absolute"):
+            ChunkEntry.with_validation(
+                path="local/foo.nc", offset=100, length=100, fs_root="directory"
+            )
+
+    def test_fs_root_must_not_have_file_suffix(self):
+        with pytest.raises(ValueError, match="fs_root must be an absolute"):
+            ChunkEntry.with_validation(
+                path="local/foo.nc", offset=100, length=100, fs_root="directory.nc"
+            )
+
+    @pytest.mark.parametrize(
+        "fs_root, expected_path",
+        [
+            ("file:///tom/home/", "file:///tom/home/directory/file.nc"),
+            ("s3://bucket/", "s3://bucket/directory/file.nc"),
+            pytest.param(
+                "https://site.com/",
+                "https://site.com/file.nc",
+                marks=pytest.mark.xfail(
+                    reason="passing a http url to fs_root is    not yet implemented",
+                ),
+            ),
+        ],
+    )
+    def test_convert_to_absolute_uri(self, fs_root, expected_path):
+        chunkentry = ChunkEntry.with_validation(
+            path="directory/file.nc", offset=100, length=100, fs_root=fs_root
+        )
+        assert chunkentry["path"] == expected_path
 
 
 class TestCreateManifest:

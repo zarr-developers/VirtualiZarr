@@ -101,7 +101,6 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
 
         return urlunparse(components)
     else:
-        
         _path = AnyPath(path)
 
         if not _path.suffix:
@@ -117,7 +116,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
             else:
                 _path = convert_relative_path_to_absolute(_path, fs_root)
 
-        # TODO use a regex to check that cloud paths are not malformed? 
+        # TODO use a regex to check that cloud paths are not malformed?
         # Ideally cloudpathlib would do this but see https://github.com/drivendataorg/cloudpathlib/issues/489
 
         return _path.as_uri()
