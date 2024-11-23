@@ -2,6 +2,7 @@ import os
 import warnings
 from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
+from importlib.metadata import version
 from io import BufferedIOBase
 from typing import (
     Any,
@@ -10,6 +11,7 @@ from typing import (
     cast,
 )
 
+import xarray
 from xarray import (
     Coordinates,
     Dataset,
@@ -25,9 +27,12 @@ from xarray.core.types import ReadBuffer
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
-XArrayOpenT = (
-    str | os.PathLike[Any] | ReadBuffer[Any] | BufferedIOBase | AbstractDataStore
-)
+if version(xarray) > "2024.10.0":
+    XArrayOpenT = (
+        str | os.PathLike[Any] | ReadBuffer[Any] | BufferedIOBase | AbstractDataStore
+    )
+else:
+    XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
 
 def open_loadable_vars_and_indexes(
