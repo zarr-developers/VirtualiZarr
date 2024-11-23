@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, ItemsView, KeysView, ValuesView
 from pathlib import Path
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
@@ -221,9 +221,11 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
+        *,
         paths: np.ndarray[Any, np.dtypes.StringDType],
         offsets: np.ndarray[Any, np.dtype[np.uint64]],
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
+        validate_entries: bool = True,
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -231,13 +233,14 @@ class ChunkManifest:
         Useful if you want to avoid the memory overhead of creating an intermediate dictionary first,
         as these 3 arrays are what will be used internally to store the references.
 
-        This method also skips validation checks on the file paths - if you want to check e.g. that the paths are all absolute then use ``__init__()``.
-
         Parameters
         ----------
         paths: np.ndarray
         offsets: np.ndarray
         lengths: np.ndarray
+        validate_entries: bool
+            Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
+            Set to False to skip validation for performance reasons.
         """
 
         # check types
@@ -276,6 +279,9 @@ class ChunkManifest:
             raise ValueError(
                 f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
             )
+        
+        if validate_entries:
+            ...
 
         obj = object.__new__(cls)
         obj._paths = paths
@@ -335,7 +341,6 @@ class ChunkManifest:
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
-
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
@@ -429,6 +434,7 @@ class ChunkManifest:
             paths=renamed_paths,
             offsets=self._offsets,
             lengths=self._lengths,
+            validate_entries=True,
         )
 
 
