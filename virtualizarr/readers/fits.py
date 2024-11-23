@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
@@ -36,6 +37,7 @@ class FITSVirtualBackend(VirtualBackend):
             refs,
             loadable_variables,
             drop_variables,
+            fs_root=Path.cwd().as_uri(),
         )
 
         # TODO this wouldn't work until you had an xarray backend for FITS installed
