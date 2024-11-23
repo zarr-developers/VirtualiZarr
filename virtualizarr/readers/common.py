@@ -11,7 +11,7 @@ from typing import (
     cast,
 )
 
-import xarray
+import xarray  # noqa
 from xarray import (
     Coordinates,
     Dataset,
@@ -23,11 +23,12 @@ from xarray import (
 )
 from xarray.backends import AbstractDataStore
 from xarray.core.indexes import PandasIndex
-from xarray.core.types import ReadBuffer
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
-if version(xarray) > "2024.10.0":
+if version("xarray") > "2024.10.0":
+    from xarray.core.types import ReadBuffer
+
     XArrayOpenT = (
         str | os.PathLike[Any] | ReadBuffer[Any] | BufferedIOBase | AbstractDataStore
     )
