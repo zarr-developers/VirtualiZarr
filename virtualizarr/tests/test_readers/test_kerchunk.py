@@ -1,6 +1,11 @@
+from pathlib import Path
+from typing import Any, Callable, Generator, Optional
+
 import numpy as np
+import pytest
 import ujson
 
+from virtualizarr.backend import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.kerchunk import (
     dataset_from_kerchunk_refs,
@@ -8,11 +13,20 @@ from virtualizarr.readers.kerchunk import (
 
 
 def gen_ds_refs(
-    zgroup: str = '{"zarr_format":2}',
-    zarray: str = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
-    zattrs: str = '{"_ARRAY_DIMENSIONS":["x","y"]}',
-    chunk: list = ["test1.nc", 6144, 48],
+    zgroup: str | None = None,
+    zarray: str | None = None,
+    zattrs: str | None = None,
+    chunk: list | None = None,
 ):
+    if zgroup is None:
+        zgroup = '{"zarr_format":2}'
+    if zarray is None:
+        zarray = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}'
+    if zattrs is None:
+        zattrs = '{"_ARRAY_DIMENSIONS":["x","y"]}'
+    if chunk is None:
+        chunk = ["test1.nc", 6144, 48]
+
     return {
         "version": 1,
         "refs": {
@@ -24,28 +38,54 @@ def gen_ds_refs(
     }
 
 
-def test_dataset_from_df_refs():
-    ds_refs = gen_ds_refs()
-    ds = dataset_from_kerchunk_refs(ds_refs)
-    assert "a" in ds
-    da = ds["a"]
-    assert isinstance(da.data, ManifestArray)
-    assert da.dims == ("x", "y")
-    assert da.shape == (2, 3)
-    assert da.chunks == (2, 3)
-    assert da.dtype == np.dtype("<i8")
+@pytest.fixture
+def refs_file_factory(
+    tmp_path: Path,
+) -> Generator[
+    Callable[[Optional[Any], Optional[Any], Optional[Any], Optional[Any]], str],
+    None,
+    None,
+]:
+    """
+    Fixture which defers creation of the references file until the parameters zgroup etc. are known.
+    """
 
-    assert da.data.zarray.compressor is None
-    assert da.data.zarray.filters is None
-    assert da.data.zarray.fill_value == 0
-    assert da.data.zarray.order == "C"
+    def _refs_file(zgroup=None, zarray=None, zattrs=None, chunk=None) -> str:
+        refs = gen_ds_refs(zgroup=zgroup, zarray=zarray, zattrs=zattrs, chunk=chunk)
+        filepath = tmp_path / "refs.json"
 
-    assert da.data.manifest.dict() == {
+        with open(filepath, "w") as json_file:
+            ujson.dump(refs, json_file)
+
+        return str(filepath)
+
+    yield _refs_file
+
+
+def test_dataset_from_df_refs(refs_file_factory: str):
+    refs_file = refs_file_factory()
+
+    vds = open_virtual_dataset(refs_file, filetype="kerchunk")
+
+    assert "a" in vds
+    vda = vds["a"]
+    assert isinstance(vda.data, ManifestArray)
+    assert vda.dims == ("x", "y")
+    assert vda.shape == (2, 3)
+    assert vda.chunks == (2, 3)
+    assert vda.dtype == np.dtype("<i8")
+
+    assert vda.data.zarray.compressor is None
+    assert vda.data.zarray.filters is None
+    assert vda.data.zarray.fill_value == 0
+    assert vda.data.zarray.order == "C"
+
+    assert vda.data.manifest.dict() == {
         "0.0": {"path": "test1.nc", "offset": 6144, "length": 48}
     }
 
 
-def test_dataset_from_df_refs_with_filters():
+def test_dataset_from_df_refs_with_filters(refs_file_factory):
     filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
@@ -57,10 +97,12 @@ def test_dataset_from_df_refs_with_filters():
         "shape": [2, 3],
         "zarr_format": 2,
     }
-    ds_refs = gen_ds_refs(zarray=ujson.dumps(zarray))
-    ds = dataset_from_kerchunk_refs(ds_refs)
-    da = ds["a"]
-    assert da.data.zarray.filters == filters
+    refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
+
+    vds = open_virtual_dataset(refs_file, filetype="kerchunk")
+
+    vda = vds["a"]
+    assert vda.data.zarray.filters == filters
 
 
 def test_dataset_from_kerchunk_refs_empty_chunk_manifest():
