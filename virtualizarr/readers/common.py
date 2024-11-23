@@ -175,6 +175,7 @@ class VirtualBackend(ABC):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         raise NotImplementedError()
@@ -187,6 +188,7 @@ class VirtualBackend(ABC):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> DataTree:
         raise NotImplementedError()
