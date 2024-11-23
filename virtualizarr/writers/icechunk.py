@@ -67,6 +67,10 @@ def dataset_to_icechunk(
             raise ValueError(
                 "append_dim must be provided when opening store in append mode"
             )
+        if append_dim not in ds.dims:
+            raise ValueError(
+                f"append_dim {append_dim} not found in dataset dimensions {ds.dims}"
+            )
         root_group = Group.open(store=store, zarr_format=3)
     else:
         root_group = Group.from_store(store=store)
@@ -175,19 +179,16 @@ def write_virtual_variable_to_icechunk(
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
-    if append_dim and append_dim not in dims:
-        raise ValueError(
-            f"append_dim {append_dim} not found in variable dimensions {dims}"
-        )
-    if mode == "a":
-        existing_array = group[name]
-        if not isinstance(existing_array, Array):
+    if mode == "a" and append_dim in dims:
+        # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
+        # for example, if you resize an array, it resizes the array but not the bound variable.
+        if not isinstance(group[name], Array):
             raise ValueError("Expected existing array to be a zarr.core.Array")
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
-        check_compatible_arrays(ma, existing_array, append_axis)
-        check_compatible_encodings(var.encoding, existing_array.attrs)
+        check_compatible_arrays(ma, group[name], append_axis)
+        check_compatible_encodings(var.encoding, group[name].attrs)
 
         # determine number of existing chunks along the append axis
         existing_num_chunks = num_chunks(
@@ -197,12 +198,13 @@ def write_virtual_variable_to_icechunk(
 
         # resize the array
         resize_array(
-            existing_array,
+            group[name],
             append_axis=append_axis,
         )
     else:
         append_axis = None
         # create array if it doesn't already exist
+
         arr = group.require_array(
             name=name,
             shape=zarray.shape,
