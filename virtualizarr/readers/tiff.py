@@ -26,8 +26,14 @@ class TIFFVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        if reader_kwargs:
+            raise NotImplementedError(
+                "TIFF reader does not understand any reader_kwargs"
+            )
+
         from kerchunk.tiff import tiff_to_zarr
 
         drop_variables, loadable_variables = check_for_collisions(

@@ -24,9 +24,15 @@ class NetCDF3VirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         from kerchunk.netCDF3 import NetCDF3ToZarr
+
+        if reader_kwargs:
+            raise NotImplementedError(
+                "netcdf3 reader does not understand any reader_kwargs"
+            )
 
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,

@@ -20,9 +20,15 @@ class KerchunkVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        reader_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         """Reads existing kerchunk references (in JSON or parquet) format."""
+
+        if reader_kwargs:
+            raise NotImplementedError(
+                "Kerchunk reader does not understand any reader_kwargs"
+            )
 
         if group:
             raise NotImplementedError()
