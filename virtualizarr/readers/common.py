@@ -21,10 +21,13 @@ from xarray import (
 )
 from xarray.backends import AbstractDataStore
 from xarray.core.indexes import PandasIndex
+from xarray.core.types import ReadBuffer
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
-XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
+XArrayOpenT = (
+    str | os.PathLike[Any] | ReadBuffer[Any] | BufferedIOBase | AbstractDataStore
+)
 
 
 def open_loadable_vars_and_indexes(
