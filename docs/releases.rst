@@ -14,6 +14,10 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- File paths in chunk manifests must now be absolute paths, relative paths are now forbidden.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added a depedency on cloudpathlib.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -47,6 +51,8 @@ Internal Changes
   (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+- File paths in chunk manifests are now always stored as abolute URIs.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.1.0:
 
