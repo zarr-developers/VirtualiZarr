@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
@@ -39,9 +40,7 @@ class HDF5VirtualBackend(VirtualBackend):
         refs = extract_group(refs, group)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
-            refs,
-            loadable_variables,
-            drop_variables,
+            refs, loadable_variables, drop_variables, fs_root=Path.cwd().as_uri()
         )
 
         loadable_vars, indexes = open_loadable_vars_and_indexes(
