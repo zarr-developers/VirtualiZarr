@@ -252,4 +252,30 @@ class TestRenamePaths:
         manifest = ChunkManifest(entries=chunks)
 
         with pytest.raises(TypeError):
+            # list is an invalid arg type
             manifest.rename_paths(["file1.nc", "file2.nc"])
+
+    def test_normalize_paths_to_uris(self):
+        chunks = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+
+        renamed = manifest.rename_paths("/home/directory/bar.nc")
+        assert renamed.dict() == {
+            "0.0.0": {
+                "path": "file:///home/directory/bar.nc",
+                "offset": 100,
+                "length": 100,
+            },
+        }
+
+    def test_catch_malformed_paths(self):
+        chunks = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+
+        with pytest.raises(ValueError):
+            # list is an invalid arg type
+            manifest.rename_paths("./foo.nc")
