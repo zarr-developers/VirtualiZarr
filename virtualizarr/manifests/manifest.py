@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Iterable, Iterator, ItemsView, KeysView, ValuesView
+from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
 from pathlib import Path
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
@@ -39,33 +39,7 @@ class ChunkEntry(TypedDict):
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
 
         path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
-
-        if isinstance(offset, np.integer):
-            _offset = int(offset)
-        elif isinstance(offset, int):
-            _offset = offset
-        else:
-            raise TypeError(
-                f"chunk entry byte offset must of type int, but got type {type(offset)}"
-            )
-        if _offset < 0:
-            raise ValueError(
-                f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
-            )
-
-        if isinstance(length, np.integer):
-            _length = int(length)
-        elif isinstance(length, int):
-            _length = length
-        else:
-            raise TypeError(
-                f"chunk entry byte offset must of type int, but got type {type(length)}"
-            )
-        if _length < 0:
-            raise ValueError(
-                f"chunk entry byte offset must be a positive integer, but got offset={_length}"
-            )
-
+        validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 
 
@@ -132,6 +106,36 @@ def convert_relative_path_to_absolute(path: AnyPath, fs_root: str) -> AnyPath:
         )
 
     return _fs_root / path
+
+
+def validate_byte_range(*, offset: Any, length: Any) -> None:
+    """Raise if byte offset or length has invalid type or value"""
+
+    if isinstance(offset, np.integer):
+        _offset = int(offset)
+    elif isinstance(offset, int):
+        _offset = offset
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(offset)}"
+        )
+    if _offset < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
+        )
+
+    if isinstance(length, np.integer):
+        _length = int(length)
+    elif isinstance(length, int):
+        _length = length
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(length)}"
+        )
+    if _length < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_length}"
+        )
 
 
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
@@ -225,7 +229,7 @@ class ChunkManifest:
         paths: np.ndarray[Any, np.dtypes.StringDType],
         offsets: np.ndarray[Any, np.dtype[np.uint64]],
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
-        validate_entries: bool = True,
+        validate_paths: bool = True,
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -238,7 +242,7 @@ class ChunkManifest:
         paths: np.ndarray
         offsets: np.ndarray
         lengths: np.ndarray
-        validate_entries: bool
+        validate_paths: bool
             Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
             Set to False to skip validation for performance reasons.
         """
@@ -279,14 +283,17 @@ class ChunkManifest:
             raise ValueError(
                 f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
             )
-        
-        if validate_entries:
-            ...
 
         obj = object.__new__(cls)
         obj._paths = paths
         obj._offsets = offsets
         obj._lengths = lengths
+
+        # TODO would be better to iterate before creating obj
+        if validate_paths:
+            for entry in obj.values():
+                validate_and_normalize_path_to_uri(entry["path"])
+                # don't need to validate byte range offsets and lengths because if they are the correct dtype they must be valid values
 
         return obj
 
@@ -325,7 +332,7 @@ class ChunkManifest:
 
     def __len__(self) -> int:
         return self._paths.size
-    
+
     def keys(self) -> KeysView:
         return self.dict().keys()
 
@@ -334,7 +341,7 @@ class ChunkManifest:
 
     def items(self) -> ItemsView:
         return self.dict().items()
-    
+
     def dict(self) -> ChunkDict:  # type: ignore[override]
         """
         Convert the entire manifest to a nested dictionary.
@@ -354,6 +361,7 @@ class ChunkManifest:
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
 
+        # TODO consolidate each occurrence of this np.nditer pattern
         d = {
             join(inds): dict(
                 path=path.item(), offset=offset.item(), length=length.item()
@@ -443,7 +451,7 @@ class ChunkManifest:
             paths=renamed_paths,
             offsets=self._offsets,
             lengths=self._lengths,
-            validate_entries=True,
+            validate_paths=True,
         )
 
 

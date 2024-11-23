@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkEntry, ChunkManifest
@@ -76,7 +77,7 @@ class TestConvertingRelativePathsUsingFSRoot:
                 "https://site.com/",
                 "https://site.com/file.nc",
                 marks=pytest.mark.xfail(
-                    reason="passing a http url to fs_root is    not yet implemented",
+                    reason="passing a http url to fs_root is not yet implemented",
                 ),
             ),
         ],
@@ -141,6 +142,25 @@ class TestCreateManifest:
         }
         manifest = ChunkManifest(entries=chunks)
         assert len(manifest.dict()) == 1
+
+
+class TestCreateFromArrays:
+    def test_create_from_arrays(self): ...
+
+    def test_validate_paths(self):
+        bad_paths = np.asarray(["./foo.nc"], dtype=np.dtypes.StringDType)
+        offsets = np.asarray([100], dtype=np.uint64)
+        lengths = np.asarray([100], dtype=np.uint64)
+
+        with pytest.raises(ValueError, match="must be absolute"):
+            ChunkManifest.from_arrays(
+                paths=bad_paths, offsets=offsets, lengths=lengths, validate_paths=True
+            )
+
+        # no error when validation skipped
+        ChunkManifest.from_arrays(
+            paths=bad_paths, offsets=offsets, lengths=lengths, validate_paths=False
+        )
 
 
 class TestProperties:
