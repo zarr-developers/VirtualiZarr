@@ -69,22 +69,28 @@ class TestConvertingRelativePathsUsingFSRoot:
             )
 
     @pytest.mark.parametrize(
-        "fs_root, expected_path",
+        "fs_root, relative_path, expected_path",
         [
-            ("file:///tom/home/", "file:///tom/home/directory/file.nc"),
-            ("s3://bucket/", "s3://bucket/directory/file.nc"),
+            (
+                "file:///tom/home/",
+                "directory/file.nc",
+                "file:///tom/home/directory/file.nc",
+            ),
+            ("file:///tom/home/", "../file.nc", "file:///tom/file.nc"),
+            ("s3://bucket/", "directory/file.nc", "s3://bucket/directory/file.nc"),
             pytest.param(
                 "https://site.com/",
-                "https://site.com/file.nc",
+                "directory/file.nc",
+                "https://site.com/directory/file.nc",
                 marks=pytest.mark.xfail(
                     reason="passing a http url to fs_root is not yet implemented",
                 ),
             ),
         ],
     )
-    def test_convert_to_absolute_uri(self, fs_root, expected_path):
+    def test_convert_to_absolute_uri(self, fs_root, relative_path, expected_path):
         chunkentry = ChunkEntry.with_validation(
-            path="directory/file.nc", offset=100, length=100, fs_root=fs_root
+            path=relative_path, offset=100, length=100, fs_root=fs_root
         )
         assert chunkentry["path"] == expected_path
 

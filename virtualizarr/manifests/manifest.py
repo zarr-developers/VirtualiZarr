@@ -105,7 +105,7 @@ def convert_relative_path_to_absolute(path: AnyPath, fs_root: str) -> AnyPath:
             f"fs_root must be an absolute path to a directory or bucket prefix, but got {fs_root}"
         )
 
-    return _fs_root / path
+    return (_fs_root / path).resolve()
 
 
 def validate_byte_range(*, offset: Any, length: Any) -> None:
