@@ -160,6 +160,7 @@ def write_manifest_virtual_refs(
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
+    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
