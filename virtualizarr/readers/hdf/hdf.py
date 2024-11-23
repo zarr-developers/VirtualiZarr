@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
@@ -10,6 +11,7 @@ from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
 )
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -47,6 +49,10 @@ class HDFVirtualBackend(VirtualBackend):
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,
+        )
+
+        filepath = validate_and_normalize_path_to_uri(
+            filepath, fs_root=Path.cwd().as_uri()
         )
 
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
