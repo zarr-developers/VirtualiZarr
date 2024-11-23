@@ -284,16 +284,16 @@ class ChunkManifest:
                 f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
             )
 
+        if validate_paths:
+            vectorized_validation_fn = np.vectorize(
+                validate_and_normalize_path_to_uri, otypes=[np.dtypes.StringDType()]
+            )  # type: ignore[attr-defined]
+            paths = vectorized_validation_fn(paths)
+
         obj = object.__new__(cls)
         obj._paths = paths
         obj._offsets = offsets
         obj._lengths = lengths
-
-        # TODO would be better to iterate before creating obj
-        if validate_paths:
-            for entry in obj.values():
-                validate_and_normalize_path_to_uri(entry["path"])
-                # don't need to validate byte range offsets and lengths because if they are the correct dtype they must be valid values
 
         return obj
 
@@ -323,6 +323,7 @@ class ChunkManifest:
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
+        # TODO fix bug here - types of path, offset, length shoudl be coerced
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:

@@ -144,8 +144,35 @@ class TestCreateManifest:
         assert len(manifest.dict()) == 1
 
 
+class TestProperties:
+    def test_chunk_grid_info(self):
+        chunks = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert manifest.ndim_chunk_grid == 3
+        assert manifest.shape_chunk_grid == (1, 2, 2)
+
+
 class TestCreateFromArrays:
-    def test_create_from_arrays(self): ...
+    def test_create_from_arrays(self):
+        paths = np.asarray(["/foo1.nc", "/foo2.nc"], dtype=np.dtypes.StringDType)
+        offsets = np.asarray([100, 200], dtype=np.uint64)
+        lengths = np.asarray([100, 100], dtype=np.uint64)
+
+        chunkmanifest = ChunkManifest.from_arrays(
+            paths=paths, offsets=offsets, lengths=lengths, validate_paths=True
+        )
+        assert chunkmanifest.ndim_chunk_grid == 1
+        assert chunkmanifest.shape_chunk_grid == (2,)
+        expected_d = {
+            "0": {"path": "file:///foo1.nc", "offset": 100, "length": 100},
+            "1": {"path": "file:///foo2.nc", "offset": 200, "length": 100},
+        }
+        assert chunkmanifest.dict() == expected_d
 
     def test_validate_paths(self):
         bad_paths = np.asarray(["./foo.nc"], dtype=np.dtypes.StringDType)
@@ -161,19 +188,6 @@ class TestCreateFromArrays:
         ChunkManifest.from_arrays(
             paths=bad_paths, offsets=offsets, lengths=lengths, validate_paths=False
         )
-
-
-class TestProperties:
-    def test_chunk_grid_info(self):
-        chunks = {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-        }
-        manifest = ChunkManifest(entries=chunks)
-        assert manifest.ndim_chunk_grid == 3
-        assert manifest.shape_chunk_grid == (1, 2, 2)
 
 
 class TestEquals:
