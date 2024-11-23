@@ -325,7 +325,16 @@ class ChunkManifest:
 
     def __len__(self) -> int:
         return self._paths.size
+    
+    def keys(self) -> KeysView:
+        return self.dict().keys()
 
+    def values(self) -> ValuesView:
+        return self.dict().values()
+
+    def items(self) -> ItemsView:
+        return self.dict().items()
+    
     def dict(self) -> ChunkDict:  # type: ignore[override]
         """
         Convert the entire manifest to a nested dictionary.
