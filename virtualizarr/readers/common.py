@@ -29,9 +29,7 @@ from virtualizarr.utils import _FsspecFSFromFilepath
 if version("xarray") > "2024.10.0":
     from xarray.core.types import ReadBuffer
 
-    XArrayOpenT = (
-        str | os.PathLike[Any] | ReadBuffer[Any] | BufferedIOBase | AbstractDataStore
-    )
+    XArrayOpenT = str | os.PathLike[Any] | ReadBuffer[Any] | AbstractDataStore
 else:
     XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
