@@ -22,7 +22,7 @@ urls = [
 
 
 @pytest.fixture
-def basic_dmrpp() -> DMRParser:
+def basic_dmrpp_xml_str() -> str:
     xml_str = """\
     <?xml version="1.0" encoding="ISO-8859-1"?>
     <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
@@ -111,11 +111,11 @@ def basic_dmrpp() -> DMRParser:
         </Attribute>
     </Dataset>
     """
-    return DMRParser(root=ET.fromstring(textwrap.dedent(xml_str)))
+    return textwrap.dedent(xml_str)
 
 
 @pytest.fixture
-def nested_groups_dmrpp() -> DMRParser:
+def nested_groups_dmrpp_xml_str() -> str:
     xml_str = """\
     <?xml version="1.0" encoding="ISO-8859-1"?>
     <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
@@ -166,7 +166,24 @@ def nested_groups_dmrpp() -> DMRParser:
         </Group>
     </Dataset>
     """
-    return DMRParser(root=ET.fromstring(textwrap.dedent(xml_str)))
+    return textwrap.dedent(xml_str)
+
+
+@pytest.fixture
+def basic_dmrpp_temp_filepath(basic_dmrpp_xml_str, tmp_path) -> Path:
+    dmrpp_path = tmp_path / "basic.nc.dmrpp"
+    dmrpp_path.write_text(basic_dmrpp_xml_str)
+    return dmrpp_path
+
+
+@pytest.fixture
+def basic_dmrpp(basic_dmrpp_xml_str) -> DMRParser:
+    return DMRParser(root=ET.fromstring(basic_dmrpp_xml_str))
+
+
+@pytest.fixture
+def nested_groups_dmrpp(nested_groups_dmrpp_xml_str) -> DMRParser:
+    return DMRParser(root=ET.fromstring(nested_groups_dmrpp_xml_str))
 
 
 @network
@@ -176,6 +193,13 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
     result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
     expected = open_virtual_dataset(data_url, indexes={})
     xr.testing.assert_identical(result, expected)
+
+
+def test_relative_path(basic_dmrpp_temp_filepath):
+    vds = open_virtual_dataset(
+        str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
+    )
+    assert vds["x"].data.manifest["0"].path.endswith("basic.nc")
 
 
 @pytest.mark.parametrize(
