@@ -707,7 +707,7 @@ class TestAppend:
         )
         with pytest.raises(
             ValueError,
-            match="append_dim='z' does not match any existing dataset dimensions",
+            match="append_dim z does not match any existing dataset dimensions",
         ):
             dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="z")
 

@@ -69,7 +69,7 @@ def dataset_to_icechunk(
             )
         if append_dim not in ds.dims:
             raise ValueError(
-                f"append_dim {append_dim} not found in dataset dimensions {ds.dims}"
+                f"append_dim {append_dim} does not match any existing dataset dimensions"
             )
         root_group = Group.open(store=store, zarr_format=3)
     else:
