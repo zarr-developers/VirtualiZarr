@@ -135,10 +135,11 @@ def num_chunks(
 
 def resize_array(
     arr: "Array",
+    manifest_array: "ManifestArray",
     append_axis: int,
 ) -> None:
     new_shape = list(arr.shape)
-    new_shape[append_axis] += arr.shape[append_axis]
+    new_shape[append_axis] += manifest_array.shape[append_axis]
     arr.resize(tuple(new_shape))
 
 
@@ -199,6 +200,7 @@ def write_virtual_variable_to_icechunk(
         # resize the array
         resize_array(
             group[name],
+            manifest_array=ma,
             append_axis=append_axis,
         )
     else:
