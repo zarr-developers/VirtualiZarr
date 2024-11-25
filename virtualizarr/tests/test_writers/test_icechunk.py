@@ -433,10 +433,13 @@ class TestAppend:
             storage=icechunk_storage, mode="a"
         )
         dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
+        icechunk_filestore_append.commit("appended data")
+        dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
+        icechunk_filestore_append.commit("appended data again")
         array = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
 
         expected_ds = open_dataset(simple_netcdf4)
-        expected_array = concat([expected_ds, expected_ds], dim="x")
+        expected_array = concat([expected_ds, expected_ds, expected_ds], dim="x")
         xrt.assert_identical(array, expected_array)
 
     ## When appending to a virtual ref with encoding, it succeeds
