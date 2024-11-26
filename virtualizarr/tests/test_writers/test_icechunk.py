@@ -430,7 +430,7 @@ class TestAppend:
 
         # Append the same dataset to the same store
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
         icechunk_filestore_append.commit("appended data")
@@ -486,7 +486,7 @@ class TestAppend:
 
         # Append the same dataset to the same store
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
         new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
@@ -500,7 +500,7 @@ class TestAppend:
         # but encoded it is [185.16000366210935, 322.1000061035156]
         xrt.assert_equal(new_ds, expected_ds)
 
-    ## When appending to a virtual ref with compression, it succeeds
+    # When appending to a virtual ref with compression, it succeeds
     @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_append_with_compression_succeeds(
         self,
@@ -555,7 +555,7 @@ class TestAppend:
 
         # Append another dataset with compatible compression
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
         icechunk_filestore_append.commit("appended data")
@@ -587,7 +587,7 @@ class TestAppend:
             file_uri=simple_netcdf4, chunk_shape=(1, 1)
         )
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         with pytest.raises(
             ValueError, match="Cannot concatenate arrays with inconsistent chunk shapes"
@@ -617,7 +617,7 @@ class TestAppend:
 
         # Try to append with different encoding, expect failure
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         with pytest.raises(
             ValueError,
@@ -649,41 +649,10 @@ class TestAppend:
 
         # Attempt to append dataset with different length in non-append dimension, expect failure
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         with pytest.raises(ValueError, match="Cannot concatenate arrays with shapes"):
             dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="y")
-
-    def test_no_append_dim_in_append_mode_it_fails(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
-    ):
-        """
-        Test case to validate that appending without specifying an append dimension fails.
-        This test is expected to fail until appropriate handling for missing append dimension is implemented.
-        """
-        from icechunk import IcechunkStore
-
-        # Generate a virtual dataset
-        vds = gen_virtual_dataset(
-            file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4)
-        )
-
-        # Create the icechunk store and commit the initial virtual dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds, icechunk_filestore)
-        icechunk_filestore.commit("initial commit")
-
-        # Attempt to append the same dataset without specifying an append dimension
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
-        )
-
-        with pytest.raises(
-            ValueError,
-            match="append_dim must be provided when opening store in append mode",
-        ):
-            # This should raise a ValueError because append_dim is not provided
-            dataset_to_icechunk(vds, icechunk_filestore_append)
 
     def test_append_dim_not_in_dims_raises_error(
         self, icechunk_storage: "StorageConfig", simple_netcdf4: str
@@ -703,7 +672,7 @@ class TestAppend:
 
         # Attempt to append using a non-existent append_dim "z"
         icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, mode="a"
+            storage=icechunk_storage, read_only=False
         )
         with pytest.raises(
             ValueError,

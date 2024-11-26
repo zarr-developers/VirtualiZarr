@@ -62,11 +62,7 @@ def dataset_to_icechunk(
 
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?
-    if store.mode.str == "a":
-        if append_dim is None:
-            raise ValueError(
-                "append_dim must be provided when opening store in append mode"
-            )
+    if append_dim is not None:
         if append_dim not in ds.dims:
             raise ValueError(
                 f"append_dim {append_dim} does not match any existing dataset dimensions"
@@ -176,11 +172,10 @@ def write_virtual_variable_to_icechunk(
 
     ma = cast(ManifestArray, var.data)
     zarray = ma.zarray
-    mode = store.mode.str
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
-    if mode == "a" and append_dim in dims:
+    if append_dim and append_dim in dims:
         # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
         # for example, if you resize an array, it resizes the array but not the bound variable.
         if not isinstance(group[name], Array):
