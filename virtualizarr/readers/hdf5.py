@@ -23,9 +23,15 @@ class HDF5VirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         from kerchunk.hdf import SingleHdf5ToZarr
+
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "HDF5 reader does not understand any virtual_backend_kwargs"
+            )
 
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,

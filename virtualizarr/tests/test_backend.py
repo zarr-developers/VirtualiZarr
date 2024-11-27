@@ -11,9 +11,10 @@ from xarray.core.indexes import Index
 from virtualizarr import open_virtual_dataset
 from virtualizarr.backend import FileType, automatically_determine_filetype
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.readers import HDF5VirtualBackend
+from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    has_tifffile,
     network,
     requires_kerchunk,
     requires_s3fs,
@@ -82,14 +83,15 @@ def test_FileType():
 
 
 @requires_kerchunk
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 class TestOpenVirtualDatasetIndexes:
-    def test_no_indexes(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+    def test_no_indexes(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert vds.indexes == {}
 
-    def test_create_default_indexes(self, netcdf4_file):
+    def test_create_default_indexes(self, netcdf4_file, hdf_backend):
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds = open_virtual_dataset(netcdf4_file, indexes=None)
+            vds = open_virtual_dataset(netcdf4_file, indexes=None, backend=hdf_backend)
         ds = open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
@@ -113,7 +115,8 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
 
 
 @requires_kerchunk
-def test_cftime_index(tmpdir):
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+def test_cftime_index(tmpdir, hdf_backend):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
     ds = xr.Dataset(
@@ -129,7 +132,10 @@ def test_cftime_index(tmpdir):
     )
     ds.to_netcdf(f"{tmpdir}/tmp.nc")
     vds = open_virtual_dataset(
-        f"{tmpdir}/tmp.nc", loadable_variables=["time", "lat", "lon"], indexes={}
+        f"{tmpdir}/tmp.nc",
+        loadable_variables=["time", "lat", "lon"],
+        indexes={},
+        backend=hdf_backend,
     )
     # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
     assert index_mappings_equal(vds.xindexes, ds.xindexes)
@@ -139,15 +145,16 @@ def test_cftime_index(tmpdir):
 
 
 @requires_kerchunk
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 class TestOpenVirtualDatasetAttrs:
-    def test_drop_array_dimensions(self, netcdf4_file):
+    def test_drop_array_dimensions(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #150
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
 
-    def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
+    def test_coordinate_variable_attrs_preserved(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #155
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert vds["lat"].attrs == {
             "standard_name": "latitude",
             "long_name": "Latitude",
@@ -182,20 +189,18 @@ class TestDetermineCoords:
 @requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
-        "filetype", ["netcdf4", None], ids=["netcdf4 filetype", "None filetype"]
-    )
-    @pytest.mark.parametrize(
         "indexes", [None, {}], ids=["None index", "empty dict index"]
     )
-    def test_anon_read_s3(self, filetype, indexes):
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_anon_read_s3(self, indexes, hdf_backend):
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
         fpath = "s3://carbonplan-share/virtualizarr/local.nc"
         vds = open_virtual_dataset(
             fpath,
-            filetype=filetype,
             indexes=indexes,
             reader_options={"storage_options": {"anon": True}},
+            backend=hdf_backend,
         )
 
         assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
@@ -204,6 +209,7 @@ class TestReadFromS3:
 
 
 @network
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 class TestReadFromURL:
     @pytest.mark.parametrize(
         "filetype, url",
@@ -233,9 +239,7 @@ class TestReadFromURL:
             pytest.param(
                 "tiff",
                 "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-                marks=pytest.mark.skipif(
-                    not has_tifffile, reason="package tifffile is not available"
-                ),
+                marks=pytest.mark.xfail(reason="not yet implemented"),
             ),
             pytest.param(
                 "fits",
@@ -250,10 +254,14 @@ class TestReadFromURL:
             ),
         ],
     )
-    def test_read_from_url(self, filetype, url):
+    def test_read_from_url(self, hdf_backend, filetype, url):
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
-                vds = open_virtual_dataset(url, reader_options={}, indexes={})
+                vds = open_virtual_dataset(
+                    url,
+                    reader_options={},
+                    indexes={},
+                )
         elif filetype == "hdf5":
             vds = open_virtual_dataset(
                 url,
@@ -261,13 +269,14 @@ class TestReadFromURL:
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
                 indexes={},
                 reader_options={},
+                backend=hdf_backend,
             )
             assert isinstance(vds, xr.Dataset)
         else:
             vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
-    def test_virtualizarr_vs_local_nisar(self):
+    def test_virtualizarr_vs_local_nisar(self, hdf_backend):
         import fsspec
 
         # Open group directly from locally cached file with xarray
@@ -290,6 +299,7 @@ class TestReadFromURL:
             group=hdf_group,
             indexes={},
             drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+            backend=hdf_backend,
         )
         tmpref = "/tmp/cmip6.json"
         vds.virtualize.to_kerchunk(tmpref, format="json")
@@ -301,10 +311,14 @@ class TestReadFromURL:
 
 @requires_kerchunk
 class TestLoadVirtualDataset:
-    def test_loadable_variables(self, netcdf4_file):
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_loadable_variables(self, netcdf4_file, hdf_backend):
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
-            netcdf4_file, loadable_variables=vars_to_load, indexes={}
+            netcdf4_file,
+            loadable_variables=vars_to_load,
+            indexes={},
+            backend=hdf_backend,
         )
 
         for name in vds.variables:
@@ -326,11 +340,26 @@ class TestLoadVirtualDataset:
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
-    def test_group_kwarg(self, hdf5_groups_file):
-        with pytest.raises(ValueError, match="Multiple HDF Groups found"):
-            open_virtual_dataset(hdf5_groups_file)
-        with pytest.raises(ValueError, match="not found in"):
-            open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
+    def test_explicit_filetype_and_backend(self, netcdf4_file):
+        with pytest.raises(ValueError):
+            open_virtual_dataset(
+                netcdf4_file, filetype="hdf", backend=HDFVirtualBackend
+            )
+
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_group_kwarg(self, hdf5_groups_file, hdf_backend):
+        if hdf_backend == HDFVirtualBackend:
+            with pytest.raises(NotImplementedError, match="Nested groups"):
+                open_virtual_dataset(hdf5_groups_file, backend=hdf_backend)
+            with pytest.raises(KeyError, match="doesn't exist"):
+                open_virtual_dataset(
+                    hdf5_groups_file, group="doesnt_exist", backend=hdf_backend
+                )
+        if hdf_backend == HDF5VirtualBackend:
+            with pytest.raises(ValueError, match="Multiple HDF Groups found"):
+                open_virtual_dataset(hdf5_groups_file)
+            with pytest.raises(ValueError, match="not found in"):
+                open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
 
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
@@ -338,6 +367,7 @@ class TestLoadVirtualDataset:
             group="test/group",
             loadable_variables=vars_to_load,
             indexes={},
+            backend=hdf_backend,
         )
         full_ds = xr.open_dataset(
             hdf5_groups_file,
@@ -362,13 +392,15 @@ class TestLoadVirtualDataset:
         }
         mock_read_kerchunk.assert_called_once_with(**args)
 
-    def test_open_dataset_with_empty(self, hdf5_empty, tmpdir):
-        vds = open_virtual_dataset(hdf5_empty)
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_open_dataset_with_empty(self, hdf5_empty, tmpdir, hdf_backend):
+        vds = open_virtual_dataset(hdf5_empty, backend=hdf_backend)
         assert vds.empty.dims == ()
         assert vds.empty.attrs == {"empty": "true"}
 
-    def test_open_dataset_with_scalar(self, hdf5_scalar, tmpdir):
-        vds = open_virtual_dataset(hdf5_scalar)
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_open_dataset_with_scalar(self, hdf5_scalar, tmpdir, hdf_backend):
+        vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
 

@@ -23,9 +23,15 @@ class FITSVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         from kerchunk.fits import process_file
+
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "FITS reader does not understand any virtual_backend_kwargs"
+            )
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})

@@ -3,7 +3,6 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - h5netcdf
   - h5py
   - hdf5
   - netcdf4

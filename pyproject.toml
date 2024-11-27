@@ -30,15 +30,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+hdf_reader = [
+    "fsspec",
+    "h5py",
+    "hdf5plugin",
+    "imagecodecs",
+    "imagecodecs-numcodecs==2024.6.1",
+    "numcodecs"
+]
 test = [
     "codecov",
     "fastparquet",
     "fsspec",
-    "h5netcdf",
     "h5py",
     "kerchunk>=0.2.5",
     "mypy",
     "netcdf4",
+    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -48,6 +56,7 @@ test = [
     "ruff",
     "s3fs",
     "scipy",
+    "virtualizarr[hdf_reader]"
 ]
 
 
