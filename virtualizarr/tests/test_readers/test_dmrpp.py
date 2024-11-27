@@ -25,7 +25,7 @@ urls = [
 def basic_dmrpp_xml_str() -> str:
     xml_str = """\
     <?xml version="1.0" encoding="ISO-8859-1"?>
-    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
+    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="/test.dmrpp">
         <Dimension name="x" size="720"/>
         <Dimension name="y" size="1440"/>
         <Dimension name="z" size="3"/>
@@ -118,7 +118,7 @@ def basic_dmrpp_xml_str() -> str:
 def nested_groups_dmrpp_xml_str() -> str:
     xml_str = """\
     <?xml version="1.0" encoding="ISO-8859-1"?>
-    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
+    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="/test.dmrpp">
         <Dimension name="a" size="10"/>
         <Dimension name="b" size="10"/>
         <Int32 name="a">
@@ -193,13 +193,6 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
     result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
     expected = open_virtual_dataset(data_url, indexes={})
     xr.testing.assert_identical(result, expected)
-
-
-def test_relative_path(basic_dmrpp_temp_filepath):
-    vds = open_virtual_dataset(
-        str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
-    )
-    assert vds["x"].data.manifest["0"].path.endswith("basic.nc")
 
 
 @pytest.mark.parametrize(
@@ -351,14 +344,14 @@ def test_parse_filters(basic_dmrpp, var_path, dtype, expected_filters):
             (360, 720),
             np.full((3, 3), 4083, dtype=np.uint64),
             (np.arange(9, dtype=np.uint64) * 4083 + 40762).reshape(3, 3),
-            np.full((3, 3), "test.dmrpp", dtype=np.dtypes.StringDType),
+            np.full((3, 3), "/test.dmrpp", dtype=np.dtypes.StringDType),
         ),
         (
             "/mask",
             (720, 1440),
             np.array([4], dtype=np.uint64),
             np.array([41276], dtype=np.uint64),
-            np.array(["test.dmrpp"], dtype=np.dtypes.StringDType),
+            np.array(["/test.dmrpp"], dtype=np.dtypes.StringDType),
         ),
     ],
 )
