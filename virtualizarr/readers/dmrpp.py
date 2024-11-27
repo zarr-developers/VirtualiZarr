@@ -8,6 +8,7 @@ import numpy as np
 from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -40,6 +41,10 @@ class DMRPPVirtualBackend(VirtualBackend):
             raise NotImplementedError(
                 "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
             )
+
+        filepath = validate_and_normalize_path_to_uri(
+            filepath, fs_root=Path.cwd().as_uri()
+        )
 
         fpath = _FsspecFSFromFilepath(
             filepath=filepath, reader_options=reader_options
@@ -90,6 +95,8 @@ class DMRParser:
     _DEFAULT_ZLIB_VALUE = 6
     # Encoding keys that should be removed from attributes and placed in xarray encoding dict
     _ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+    root: ET.Element
+    data_filepath: str
 
     def __init__(self, root: ET.Element, data_filepath: Optional[str] = None):
         """
@@ -97,9 +104,8 @@ class DMRParser:
 
         Parameters
         ----------
-        dmrpp_str : str
-            The dmrpp file contents as a string.
-
+        root: xml.ElementTree.Element
+            Root of the xml tree struture of a DMR++ file.
         data_filepath : str, optional
             The path to the actual data file that will be set in the chunk manifests.
             If None, the data file path is taken from the DMR++ file.

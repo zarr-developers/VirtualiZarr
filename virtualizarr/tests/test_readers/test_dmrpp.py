@@ -1,3 +1,4 @@
+import os
 import textwrap
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -379,6 +380,22 @@ def test_absolute_path_to_dmrpp_file_containing_relative_path(
     vds = open_virtual_dataset(
         str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
     )
+    path = vds["x"].data.manifest["0"]["path"]
+
+    # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+    expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
+        ".dmrpp"
+    )
+    assert path == expected_datafile_path_uri
+
+
+def test_relative_path_to_dmrpp_file(basic_dmrpp_temp_filepath: Path):
+    # test that if a user supplies a relative path to a DMR++ file we still get an absolute path in the manifest
+    relative_dmrpp_filepath = os.path.relpath(
+        str(basic_dmrpp_temp_filepath), start=os.getcwd()
+    )
+
+    vds = open_virtual_dataset(relative_dmrpp_filepath, indexes={}, filetype="dmrpp")
     path = vds["x"].data.manifest["0"]["path"]
 
     # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
