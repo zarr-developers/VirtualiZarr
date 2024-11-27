@@ -113,7 +113,7 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    reader_kwargs: Optional[dict] = None,
+    virtual_backend_kwargs: Optional[dict] = None,
     reader_options: Optional[dict] = None,
     backend: Optional[VirtualBackend] = None,
 ) -> Dataset:
@@ -148,7 +148,7 @@ def open_virtual_dataset(
     virtual_array_class
         Virtual array class to use to represent the references to the chunks in each on-disk array.
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    reader_kwargs: dict, default is None
+    virtual_backend_kwargs: dict, default is None
         Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
     reader_options: dict, default {}
         Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
@@ -204,7 +204,7 @@ def open_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
         indexes=indexes,
-        reader_kwargs=reader_kwargs,
+        virtual_backend_kwargs=virtual_backend_kwargs,
         reader_options=reader_options,
     )
 

@@ -20,7 +20,7 @@ class ZarrV3VirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
-        reader_kwargs: Optional[dict] = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         """
@@ -28,9 +28,9 @@ class ZarrV3VirtualBackend(VirtualBackend):
 
         This is experimental - chunk manifests are not part of the Zarr v3 Spec.
         """
-        if reader_kwargs:
+        if virtual_backend_kwargs:
             raise NotImplementedError(
-                "Zarr_v3 reader does not understand any reader_kwargs"
+                "Zarr_v3 reader does not understand any virtual_backend_kwargs"
             )
 
         storepath = Path(filepath)
