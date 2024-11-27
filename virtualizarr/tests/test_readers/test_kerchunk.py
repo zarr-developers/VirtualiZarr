@@ -137,17 +137,25 @@ def test_handle_relative_paths(refs_file_factory):
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a directory"
     ):
-        open_virtual_dataset(refs_file, filetype="kerchunk", fs_root="some_directory/")
+        open_virtual_dataset(
+            refs_file,
+            filetype="kerchunk",
+            virtual_backend_kwargs={"fs_root": "some_directory/"},
+        )
 
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a directory"
     ):
         open_virtual_dataset(
-            refs_file, filetype="kerchunk", fs_root="/some_directory/file.nc"
+            refs_file,
+            filetype="kerchunk",
+            virtual_backend_kwargs={"fs_root": "/some_directory/file.nc"},
         )
 
     vds = open_virtual_dataset(
-        refs_file, filetype="kerchunk", fs_root="/some_directory/"
+        refs_file,
+        filetype="kerchunk",
+        virtual_backend_kwargs={"fs_root": "/some_directory/"},
     )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
@@ -155,7 +163,9 @@ def test_handle_relative_paths(refs_file_factory):
     }
 
     vds = open_virtual_dataset(
-        refs_file, filetype="kerchunk", fs_root="file:///some_directory/"
+        refs_file,
+        filetype="kerchunk",
+        virtual_backend_kwargs={"fs_root": "file:///some_directory/"},
     )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
