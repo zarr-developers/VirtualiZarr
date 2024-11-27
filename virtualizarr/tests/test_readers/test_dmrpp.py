@@ -371,3 +371,18 @@ def test_parse_chunks(
         lengths=expected_lengths, offsets=expected_offsets, paths=expected_paths
     )
     assert result == expected
+
+
+def test_absolute_path_to_dmrpp_file_containing_relative_path(
+    basic_dmrpp_temp_filepath: Path,
+):
+    vds = open_virtual_dataset(
+        str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
+    )
+    path = vds["x"].data.manifest["0"]["path"]
+
+    # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+    expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
+        ".dmrpp"
+    )
+    assert path == expected_datafile_path_uri
