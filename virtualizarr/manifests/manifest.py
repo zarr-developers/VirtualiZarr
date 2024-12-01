@@ -1,12 +1,11 @@
 import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
-from pathlib import Path
+from pathlib import PosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 
 import numpy as np
-from cloudpathlib import AnyPath
 
 from virtualizarr.types import ChunkKey
 
@@ -67,21 +66,52 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # should raise if given a malformed URL
         components = urlparse(path)
 
-        _path = Path(components.path)
+        # TODO consolidate this with same check for other types?
+        _path = PosixPath(components.path)
         if not _path.suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
 
         return urlunparse(components)
+
+    # TODO generalize the allowed S3-like prefixes
+    elif path.startswith("s3://"):
+        # TODO we need to handle this case without cloudpathlib dependency
+
+        if not uripath_has_suffix(path):
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        # TODO use a regex to check that cloud paths are not malformed?
+        # Ideally cloudpathlib would do this but see https://github.com/drivendataorg/cloudpathlib/issues/489
+
+        # s3 path is already in URI form
+        return path
+
+    # TODO merge this into the case above?
+    elif path.startswith("file:///"):
+        # absolute file URI
+
+        if not uripath_has_suffix(path):
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        return path
     else:
-        _path = AnyPath(path)
+        # must be a posix filesystem path (absolute or relative)
+
+        # Using PosixPath instead of Path or PurePosixPath here ensures we fail in an obvious way on Windows
+        _path = PosixPath(path)
 
         if not _path.suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
 
+        # only posix paths can possibly not be absolute
         if not _path.is_absolute():
             if fs_root is None:
                 raise ValueError(
@@ -90,14 +120,15 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
             else:
                 _path = convert_relative_path_to_absolute(_path, fs_root)
 
-        # TODO use a regex to check that cloud paths are not malformed?
-        # Ideally cloudpathlib would do this but see https://github.com/drivendataorg/cloudpathlib/issues/489
-
         return _path.as_uri()
 
 
-def convert_relative_path_to_absolute(path: AnyPath, fs_root: str) -> AnyPath:
-    _fs_root = AnyPath(fs_root)
+def uripath_has_suffix(path: str) -> bool:
+    return bool(PosixPath(path).suffix)
+
+
+def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> PosixPath:
+    _fs_root = PosixPath(fs_root)
 
     if not _fs_root.is_absolute() or _fs_root.suffix:
         # TODO handle http url roots using urllib.parse.urljoin? (or ideally cloudpathlib)
