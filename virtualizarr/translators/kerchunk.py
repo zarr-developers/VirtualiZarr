@@ -213,7 +213,7 @@ def chunkentry_from_kerchunk(
         length = UPath(path).stat().st_size
     else:
         path, offset, length = path_and_byte_range_info
-    return ChunkEntry.with_validation(
+    return ChunkEntry.with_validation(  # type: ignore[attr-defined]
         path=path, offset=offset, length=length, fs_root=fs_root
     )
 

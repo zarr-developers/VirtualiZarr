@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
-from pathlib import PosixPath, PurePosixPath
+from pathlib import PosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 
@@ -33,7 +33,7 @@ class ChunkEntry(TypedDict):
     offset: int
     length: int
 
-    @classmethod
+    @classmethod  # type: ignore[misc]
     def with_validation(
         cls, *, path: str, offset: int, length: int, fs_root: str | None = None
     ) -> "ChunkEntry":
@@ -76,7 +76,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # hopefully would raise if given a malformed URL
         components = urlparse(path)
 
-        if not PurePosixPath(components.path).suffix:
+        if not PosixPath(components.path).suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -84,7 +84,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PurePosixPath(path).suffix:
+        if not PosixPath(path).suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -93,7 +93,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
 
     else:
         # must be a posix filesystem path (absolute or relative)
-        _path = PurePosixPath(path)
+        # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
+        _path = PosixPath(path)
 
         if not _path.suffix:
             raise ValueError(
@@ -249,7 +250,7 @@ class ChunkManifest:
                 raise ValueError(msg)
 
             path, offset, length = entry.values()
-            entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)
+            entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
             split_key = split(key)
             paths[split_key] = entry["path"]
