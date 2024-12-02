@@ -25,7 +25,6 @@ dependencies = [
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
-    "cloudpathlib",
     "numcodecs",
     "ujson",
 ]
