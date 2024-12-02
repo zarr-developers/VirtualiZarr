@@ -16,6 +16,17 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
+VALID_URI_PREFIXES = {
+    "s3://",
+    "gs://",
+    "azure://",
+    "r2://",
+    "cos://",
+    "minio://",
+    "file:///",
+}
+
+
 class ChunkEntry(TypedDict):
     path: str
     offset: int
@@ -58,9 +69,9 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         return path
 
-    if path.startswith("http://") or path.startswith("https://"):
-        # TODO if cloudpathlib supported HttpPaths then we wouldn't need this separate logic branch (https://github.com/drivendataorg/cloudpathlib/issues/455)
+    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra depedencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
 
+    if path.startswith("http://") or path.startswith("https://"):
         # should raise if given a malformed URL
         components = urlparse(path)
 
@@ -73,31 +84,15 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
 
         return urlunparse(components)
 
-    # TODO generalize the allowed S3-like prefixes
-    elif path.startswith("s3://"):
-        # TODO we need to handle this case without cloudpathlib dependency
-
+    elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
         if not uripath_has_suffix(path):
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
 
-        # TODO use a regex to check that cloud paths are not malformed?
-        # Ideally cloudpathlib would do this but see https://github.com/drivendataorg/cloudpathlib/issues/489
-
-        # s3 path is already in URI form
+        # path is already in URI form
         return path
 
-    # TODO merge this into the case above?
-    elif path.startswith("file:///"):
-        # absolute file URI
-
-        if not uripath_has_suffix(path):
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
-
-        return path
     else:
         # must be a posix filesystem path (absolute or relative)
         _path = PurePosixPath(path)
@@ -135,7 +130,7 @@ def posixpath_maybe_from_uri(path: str) -> PosixPath:
     This is needed otherwise pathlib thinks the URI is a relative path.
     """
     if path.startswith("file:///"):
-        # TODO in python 3.13 we could probably use Path.from_uri() instead 
+        # TODO in python 3.13 we could probably use Path.from_uri() instead
         return PosixPath(path.removeprefix("file://"))
     else:
         return PosixPath(path)
