@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
-from pathlib import Path, PosixPath, PurePosixPath
+from pathlib import PosixPath, PurePosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 
@@ -16,6 +16,7 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
+# doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
     "s3://",
     "gs://",
@@ -72,12 +73,10 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra depedencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
 
     if path.startswith("http://") or path.startswith("https://"):
-        # should raise if given a malformed URL
+        # hopefully would raise if given a malformed URL
         components = urlparse(path)
 
-        # TODO consolidate this with same check for other types?
-        _path = Path(components.path)
-        if not _path.suffix:
+        if not PurePosixPath(components.path).suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -85,13 +84,12 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not uripath_has_suffix(path):
+        if not PurePosixPath(path).suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
 
-        # path is already in URI form
-        return path
+        return path  # path is already in URI form
 
     else:
         # must be a posix filesystem path (absolute or relative)
@@ -116,16 +114,16 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
 
 def posixpath_maybe_from_uri(path: str) -> PosixPath:
     """
-    Handles file URIs like cloudpathpib.AnyPath does, i.e.
+    Handles file URIs like cloudpathlib.AnyPath does, i.e.
 
-    In[25]: pathlib.PosixPath('file:///dir/file.nc')
-    Out[25]: pathlib.PosixPath('file:/dir/file.nc')
+    In[1]: pathlib.PosixPath('file:///dir/file.nc')
+    Out[1]: pathlib.PosixPath('file:/dir/file.nc')
 
-    In [24]: cloudpathlib.AnyPath('file:///dir/file.nc')
-    Out[24]: pathlib.PosixPath('/dir/file.nc')
+    In [2]: cloudpathlib.AnyPath('file:///dir/file.nc')
+    Out[2]: pathlib.PosixPath('/dir/file.nc')
 
-    In [24]: posixpath_maybe_from_uri('file:///dir/file.nc')
-    Out[24]: pathlib.PosixPath('/dir/file.nc')
+    In [3]: posixpath_maybe_from_uri('file:///dir/file.nc')
+    Out[3]: pathlib.PosixPath('/dir/file.nc')
 
     This is needed otherwise pathlib thinks the URI is a relative path.
     """
@@ -136,15 +134,11 @@ def posixpath_maybe_from_uri(path: str) -> PosixPath:
         return PosixPath(path)
 
 
-def uripath_has_suffix(path: str) -> bool:
-    return bool(PurePosixPath(path).suffix)
-
-
 def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> PosixPath:
     _fs_root = posixpath_maybe_from_uri(fs_root)
 
     if not _fs_root.is_absolute() or _fs_root.suffix:
-        # TODO handle http url roots using urllib.parse.urljoin? (or ideally cloudpathlib)
+        # TODO handle http url roots and bucket prefix roots? (ideally through cloudpathlib)
         raise ValueError(
             f"fs_root must be an absolute path to a filesystem directory, but got {fs_root}"
         )
