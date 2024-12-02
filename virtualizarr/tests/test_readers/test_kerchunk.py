@@ -135,7 +135,7 @@ def test_handle_relative_paths(refs_file_factory):
         open_virtual_dataset(refs_file, filetype="kerchunk")
 
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a directory"
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
         open_virtual_dataset(
             refs_file,
@@ -144,7 +144,7 @@ def test_handle_relative_paths(refs_file_factory):
         )
 
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a directory"
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
         open_virtual_dataset(
             refs_file,

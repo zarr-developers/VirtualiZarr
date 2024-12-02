@@ -1,7 +1,7 @@
 import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
-from pathlib import PosixPath
+from pathlib import Path, PosixPath, PurePosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 
@@ -48,8 +48,6 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
 
     See https://en.wikipedia.org/wiki/File_URI_scheme
 
-    Uses cloudpathlib, so currently only understands local filepaths, S3, GCP, and Azure bucket URLs.
-
     Parameters
     ----------
     fs_root
@@ -67,7 +65,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         components = urlparse(path)
 
         # TODO consolidate this with same check for other types?
-        _path = PosixPath(components.path)
+        _path = Path(components.path)
         if not _path.suffix:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
@@ -102,9 +100,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return path
     else:
         # must be a posix filesystem path (absolute or relative)
-
-        # Using PosixPath instead of Path or PurePosixPath here ensures we fail in an obvious way on Windows
-        _path = PosixPath(path)
+        _path = PurePosixPath(path)
 
         if not _path.suffix:
             raise ValueError(
@@ -123,17 +119,39 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return _path.as_uri()
 
 
+def posixpath_maybe_from_uri(path: str) -> PosixPath:
+    """
+    Handles file URIs like cloudpathpib.AnyPath does, i.e.
+
+    In[25]: pathlib.PosixPath('file:///dir/file.nc')
+    Out[25]: pathlib.PosixPath('file:/dir/file.nc')
+
+    In [24]: cloudpathlib.AnyPath('file:///dir/file.nc')
+    Out[24]: pathlib.PosixPath('/dir/file.nc')
+
+    In [24]: posixpath_maybe_from_uri('file:///dir/file.nc')
+    Out[24]: pathlib.PosixPath('/dir/file.nc')
+
+    This is needed otherwise pathlib thinks the URI is a relative path.
+    """
+    if path.startswith("file:///"):
+        # TODO in python 3.13 we could probably use Path.from_uri() instead 
+        return PosixPath(path.removeprefix("file://"))
+    else:
+        return PosixPath(path)
+
+
 def uripath_has_suffix(path: str) -> bool:
-    return bool(PosixPath(path).suffix)
+    return bool(PurePosixPath(path).suffix)
 
 
 def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> PosixPath:
-    _fs_root = PosixPath(fs_root)
+    _fs_root = posixpath_maybe_from_uri(fs_root)
 
     if not _fs_root.is_absolute() or _fs_root.suffix:
         # TODO handle http url roots using urllib.parse.urljoin? (or ideally cloudpathlib)
         raise ValueError(
-            f"fs_root must be an absolute path to a directory or bucket prefix, but got {fs_root}"
+            f"fs_root must be an absolute path to a filesystem directory, but got {fs_root}"
         )
 
     return (_fs_root / path).resolve()

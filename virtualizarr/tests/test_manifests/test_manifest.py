@@ -77,7 +77,14 @@ class TestConvertingRelativePathsUsingFSRoot:
                 "file:///tom/home/directory/file.nc",
             ),
             ("file:///tom/home/", "../file.nc", "file:///tom/file.nc"),
-            ("s3://bucket/", "directory/file.nc", "s3://bucket/directory/file.nc"),
+            pytest.param(
+                "s3://bucket/",
+                "directory/file.nc",
+                "s3://bucket/directory/file.nc",
+                marks=pytest.mark.xfail(
+                    reason="passing an s3 url to fs_root is not yet implemented",
+                ),
+            ),
             pytest.param(
                 "https://site.com/",
                 "directory/file.nc",
