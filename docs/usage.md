@@ -446,7 +446,7 @@ vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
 
 One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
 
-You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``,
+You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``.
 
 ```python
 # file `relative_refs.json` contains a path like './file.nc'
@@ -461,7 +461,7 @@ vds = open_virtual_dataset(
 # the path in the virtual dataset will now be 'file:///some_directory/file.nc'
 ```
 
-Note that as the virtualizarr ``.virtualize.to_kerchunk`` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone. Remember that if you want to change your manifest to point to different paths, you can use the ``.virtualize.rename_paths`` method.
+Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
 
 ## Rewriting existing manifests
 
@@ -469,7 +469,7 @@ Sometimes it can be useful to rewrite the contents of an already-generated manif
 
 ### Rewriting file paths
 
-You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`ds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
+You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`vds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
 
 For example, you may want to rename file paths according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
 
