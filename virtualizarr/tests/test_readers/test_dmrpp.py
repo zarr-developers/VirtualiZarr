@@ -1,6 +1,5 @@
 import textwrap
 from pathlib import Path
-from typing import Callable, Generator
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -167,22 +166,13 @@ DMRPP_XML_STRINGS = {
 }
 
 
-@pytest.fixture
-def dmrparser_factory(
-    tmp_path: Path,
-) -> Generator[
-    Callable[[str], DMRParser],
-    None,
-    None,
-]:
-    def _dmrparser(dmrpp_xml_str: str) -> DMRParser:
-        # TODO should we actually create then read a dmrpp file in this temporary directory?
-        # seems a bit pointless if all we're returning is the DMRParser object
+def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRParser:
+    # TODO we should actually create a dmrpp file in a temporary directory
+    # this would avoid the need to pass tmp_path separately
 
-        # TODO do we need to adjust the data_filepath, e.g. to end with .nc?
-        return DMRParser(root=ET.fromstring(dmrpp_xml_str), data_filepath=tmp_path)
-
-    yield _dmrparser
+    return DMRParser(
+        root=ET.fromstring(dmrpp_xml_str), data_filepath=tmp_path / filename
+    )
 
 
 @network
@@ -207,8 +197,8 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         ),
     ],
 )
-def test_find_node_fqn(dmrparser_factory, dmrpp_xml_str_key, fqn_path, expected_xpath):
-    parser_instance = dmrparser_factory(DMRPP_XML_STRINGS[dmrpp_xml_str_key])
+def test_find_node_fqn(tmp_path, dmrpp_xml_str_key, fqn_path, expected_xpath):
+    parser_instance = dmrparser(DMRPP_XML_STRINGS[dmrpp_xml_str_key], tmp_path=tmp_path)
     result = parser_instance.find_node_fqn(fqn_path)
     expected = parser_instance.root.find(expected_xpath, parser_instance._NS)
     assert result == expected
@@ -223,8 +213,8 @@ def test_find_node_fqn(dmrparser_factory, dmrpp_xml_str_key, fqn_path, expected_
         ("nested_groups", "/group1/group2"),
     ],
 )
-def test_split_groups(dmrparser_factory, dmrpp_xml_str_key, group_path):
-    dmrpp_instance = dmrparser_factory(DMRPP_XML_STRINGS[dmrpp_xml_str_key])
+def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
+    dmrpp_instance = dmrparser(DMRPP_XML_STRINGS[dmrpp_xml_str_key], tmp_path=tmp_path)
 
     # get all tags in a dataset (so all tags excluding nested groups)
     dataset_tags = lambda x: [
@@ -238,8 +228,8 @@ def test_split_groups(dmrparser_factory, dmrpp_xml_str_key, group_path):
     assert result_tags == expected_tags
 
 
-def test_parse_dataset(dmrparser_factory):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+def test_parse_dataset(tmp_path):
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     vds = basic_dmrpp.parse_dataset()
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
@@ -248,7 +238,9 @@ def test_parse_dataset(dmrparser_factory):
     assert vds.attrs == {"Conventions": "CF-1.6", "title": "Sample Dataset"}
     assert vds.coords.keys() == {"x", "y", "z"}
 
-    nested_groups_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["nested_groups"])
+    nested_groups_dmrpp = dmrparser(
+        DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
+    )
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset()
     vds_root = nested_groups_dmrpp.parse_dataset(group="/")
@@ -273,16 +265,18 @@ def test_parse_dataset(dmrparser_factory):
         ("/group1/x", {"x": 720}),
     ],
 )
-def test_parse_dim(dmrparser_factory, dim_path, expected):
-    nested_groups_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["nested_groups"])
+def test_parse_dim(tmp_path, dim_path, expected):
+    nested_groups_dmrpp = dmrparser(
+        DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
+    )
 
     result = nested_groups_dmrpp._parse_dim(nested_groups_dmrpp.find_node_fqn(dim_path))
     assert result == expected
 
 
 @pytest.mark.parametrize("dim_path", ["/", "/mask"])
-def test_find_dimension_tags(dmrparser_factory, dim_path):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+def test_find_dimension_tags(tmp_path, dim_path):
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     # Check that Dimension tags match Dimension tags from the root
     # Check that Dim tags reference the same Dimension tags from the root
@@ -291,8 +285,8 @@ def test_find_dimension_tags(dmrparser_factory, dim_path):
     ) == basic_dmrpp.root.findall("dap:Dimension", basic_dmrpp._NS)
 
 
-def test_parse_variable(dmrparser_factory):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+def test_parse_variable(tmp_path):
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     var = basic_dmrpp._parse_variable(basic_dmrpp.find_node_fqn("/data"))
     assert var.dtype == "float32"
@@ -318,8 +312,8 @@ def test_parse_variable(dmrparser_factory):
         ("data/_FillValue", {"_FillValue": -32768}),
     ],
 )
-def test_parse_attribute(dmrparser_factory, attr_path, expected):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+def test_parse_attribute(tmp_path, attr_path, expected):
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     result = basic_dmrpp._parse_attribute(basic_dmrpp.find_node_fqn(attr_path))
     assert result == expected
@@ -343,8 +337,8 @@ def test_parse_attribute(dmrparser_factory, attr_path, expected):
         ),
     ],
 )
-def test_parse_filters(dmrparser_factory, var_path, dtype, expected_filters):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+def test_parse_filters(tmp_path, var_path, dtype, expected_filters):
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     chunks_tag = basic_dmrpp.find_node_fqn(var_path).find(
         "dmrpp:chunks", basic_dmrpp._NS
@@ -353,40 +347,45 @@ def test_parse_filters(dmrparser_factory, var_path, dtype, expected_filters):
     assert result == expected_filters
 
 
-@pytest.mark.xfail(reason="probably failing because of hardcoded data file path")
 @pytest.mark.parametrize(
-    "var_path, chunk_shape, expected_lengths, expected_offsets, expected_paths",
+    "var_path, chunk_shape, chunk_grid_shape, expected_lengths, expected_offsets",
     [
         (
             "/data",
             (360, 720),
+            (3, 3),
             np.full((3, 3), 4083, dtype=np.uint64),
             (np.arange(9, dtype=np.uint64) * 4083 + 40762).reshape(3, 3),
-            np.full((3, 3), "test.dmrpp", dtype=np.dtypes.StringDType),
         ),
         (
             "/mask",
             (720, 1440),
+            (1,),
             np.array([4], dtype=np.uint64),
             np.array([41276], dtype=np.uint64),
-            np.array(["test.dmrpp"], dtype=np.dtypes.StringDType),
         ),
     ],
 )
 def test_parse_chunks(
-    dmrparser_factory,
+    tmp_path,
     var_path,
     chunk_shape,
+    chunk_grid_shape,
     expected_lengths,
     expected_offsets,
-    expected_paths,
 ):
-    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
+    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     chunks_tag = basic_dmrpp.find_node_fqn(var_path).find(
         "dmrpp:chunks", basic_dmrpp._NS
     )
     result = basic_dmrpp._parse_chunks(chunks_tag, chunk_shape)
+
+    expected_paths = np.full(
+        shape=chunk_grid_shape,
+        fill_value=str(tmp_path / "test.nc"),
+        dtype=np.dtypes.StringDType,
+    )
     expected = ChunkManifest.from_arrays(
         lengths=expected_lengths, offsets=expected_offsets, paths=expected_paths
     )
