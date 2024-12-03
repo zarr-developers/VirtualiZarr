@@ -44,6 +44,8 @@ Documentation
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - More minor improvements to the Contributing Guide.
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Correct some links to the API.
+  (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.  
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
