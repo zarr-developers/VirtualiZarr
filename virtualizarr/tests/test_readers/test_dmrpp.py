@@ -21,151 +21,150 @@ urls = [
     # TODO: later add MUR, SWOT, TEMPO and others by using kerchunk JSON to read refs (rather than reading the whole netcdf file)
 ]
 
-
-BASIC_DMRPP_XML_STR = textwrap.dedent(
-    """\
-    <?xml version="1.0" encoding="ISO-8859-1"?>
-    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
-        <Dimension name="x" size="720"/>
-        <Dimension name="y" size="1440"/>
-        <Dimension name="z" size="3"/>
-        <Int32 name="x">
-            <Dim name="/x"/>
-            <Attribute name="long_name" type="String">
-                <Value>grid x-axis</Value>
-            </Attribute>
-            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41268" nBytes="4"/>
-            </dmrpp:chunks>
-        </Int32>
-        <Int32 name="y">
-            <Dim name="/y"/>
-            <Attribute name="long_name" type="String">
-                <Value>grid y-axis</Value>
-            </Attribute>
-            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41272" nBytes="4"/>
-            </dmrpp:chunks>
-        </Int32>
-        <Int32 name="z">
-            <Dim name="/z"/>
-            <Attribute name="long_name" type="String">
-                <Value>grid z-axis</Value>
-            </Attribute>
-            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41276" nBytes="4"/>
-            </dmrpp:chunks>
-        </Int32>
-        <Float32 name="data">
-            <Dim name="/x"/>
-            <Dim name="/y"/>
-            <Attribute name="long_name" type="String">
-                <Value>analysed sea surface temperature</Value>
-            </Attribute>
-            <Attribute name="items" type="Int16">
-                <Value>1</Value>
-                <Value>2</Value>
-                <Value>3</Value>
-            </Attribute>
-            <Attribute name="_FillValue" type="Int16">
-                <Value>-32768</Value>
-            </Attribute>
-            <Attribute name="add_offset" type="Float64">
-                <Value>298.14999999999998</Value>
-            </Attribute>
-            <Attribute name="scale_factor" type="Float64">
-                <Value>0.001</Value>
-            </Attribute>
-            <Attribute name="coordinates" type="String">
-                <Value>x y z</Value>
-            </Attribute>
-            <dmrpp:chunks compressionType="shuffle deflate" deflateLevel="5" fillValue="-32768" byteOrder="LE">
-                <dmrpp:chunkDimensionSizes>360 720</dmrpp:chunkDimensionSizes>
-                <dmrpp:chunk offset="40762" nBytes="4083" chunkPositionInArray="[0,0]"/>
-                <dmrpp:chunk offset="44845" nBytes="4083" chunkPositionInArray="[0,720]"/>
-                <dmrpp:chunk offset="48928" nBytes="4083" chunkPositionInArray="[0,1440]"/>
-                <dmrpp:chunk offset="53011" nBytes="4083" chunkPositionInArray="[360, 0]"/>
-                <dmrpp:chunk offset="57094" nBytes="4083" chunkPositionInArray="[360, 720]"/>
-                <dmrpp:chunk offset="61177" nBytes="4083" chunkPositionInArray="[360, 1440]"/>
-                <dmrpp:chunk offset="65260" nBytes="4083" chunkPositionInArray="[720, 0]"/>
-                <dmrpp:chunk offset="69343" nBytes="4083" chunkPositionInArray="[720, 720]"/>
-                <dmrpp:chunk offset="73426" nBytes="4083" chunkPositionInArray="[720, 1440]"/>
-            </dmrpp:chunks>
-        </Float32>
-        <Float32 name="mask">
-            <Dim name="/x"/>
-            <Dim name="/y"/>
-            <Dim name="/z"/>
-            <Attribute name="long_name" type="String">
-                <Value>mask</Value>
-            </Attribute>
-            <dmrpp:chunks compressionType="shuffle" fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41276" nBytes="4"/>
-            </dmrpp:chunks>
-        </Float32>
-        <Attribute name="Conventions" type="String">
-            <Value>CF-1.6</Value>
-        </Attribute>
-        <Attribute name="title" type="String">
-            <Value>Sample Dataset</Value>
-        </Attribute>
-    </Dataset>
-    """
-)
-
-
-NESTED_GROUPS_DMRPP_XML_STR = textwrap.dedent(
-    """\
-    <?xml version="1.0" encoding="ISO-8859-1"?>
-    <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
-        <Dimension name="a" size="10"/>
-        <Dimension name="b" size="10"/>
-        <Int32 name="a">
-            <Dim name="/a"/>
-            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41268" nBytes="4"/>
-            </dmrpp:chunks>
-        </Int32>
-        <Int32 name="b">
-            <Dim name="/b"/>
-            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                <dmrpp:chunk offset="41268" nBytes="4"/>
-            </dmrpp:chunks>
-        </Int32>
-        <Group name="group1">
+DMRPP_XML_STRINGS = {
+    "basic": textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
             <Dimension name="x" size="720"/>
             <Dimension name="y" size="1440"/>
+            <Dimension name="z" size="3"/>
             <Int32 name="x">
-                <Dim name="/group1/x"/>
-                <Attribute name="test" type="String">
-                    <Value>test</Value>
+                <Dim name="/x"/>
+                <Attribute name="long_name" type="String">
+                    <Value>grid x-axis</Value>
                 </Attribute>
                 <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
                     <dmrpp:chunk offset="41268" nBytes="4"/>
                 </dmrpp:chunks>
             </Int32>
             <Int32 name="y">
-                <Dim name="/group1/y"/>
-                <Attribute name="test" type="String">
-                    <Value>test</Value>
+                <Dim name="/y"/>
+                <Attribute name="long_name" type="String">
+                    <Value>grid y-axis</Value>
                 </Attribute>
                 <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
-                    <dmrpp:chunk offset="41268" nBytes="4"/>
+                    <dmrpp:chunk offset="41272" nBytes="4"/>
                 </dmrpp:chunks>
             </Int32>
-            <Group name="group2">
-                <Int32 name="area">
-                    <Dim name="/group1/x"/>
-                    <Dim name="/group1/y"/>
+            <Int32 name="z">
+                <Dim name="/z"/>
+                <Attribute name="long_name" type="String">
+                    <Value>grid z-axis</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
+                    <dmrpp:chunk offset="41276" nBytes="4"/>
+                </dmrpp:chunks>
+            </Int32>
+            <Float32 name="data">
+                <Dim name="/x"/>
+                <Dim name="/y"/>
+                <Attribute name="long_name" type="String">
+                    <Value>analysed sea surface temperature</Value>
+                </Attribute>
+                <Attribute name="items" type="Int16">
+                    <Value>1</Value>
+                    <Value>2</Value>
+                    <Value>3</Value>
+                </Attribute>
+                <Attribute name="_FillValue" type="Int16">
+                    <Value>-32768</Value>
+                </Attribute>
+                <Attribute name="add_offset" type="Float64">
+                    <Value>298.14999999999998</Value>
+                </Attribute>
+                <Attribute name="scale_factor" type="Float64">
+                    <Value>0.001</Value>
+                </Attribute>
+                <Attribute name="coordinates" type="String">
+                    <Value>x y z</Value>
+                </Attribute>
+                <dmrpp:chunks compressionType="shuffle deflate" deflateLevel="5" fillValue="-32768" byteOrder="LE">
+                    <dmrpp:chunkDimensionSizes>360 720</dmrpp:chunkDimensionSizes>
+                    <dmrpp:chunk offset="40762" nBytes="4083" chunkPositionInArray="[0,0]"/>
+                    <dmrpp:chunk offset="44845" nBytes="4083" chunkPositionInArray="[0,720]"/>
+                    <dmrpp:chunk offset="48928" nBytes="4083" chunkPositionInArray="[0,1440]"/>
+                    <dmrpp:chunk offset="53011" nBytes="4083" chunkPositionInArray="[360, 0]"/>
+                    <dmrpp:chunk offset="57094" nBytes="4083" chunkPositionInArray="[360, 720]"/>
+                    <dmrpp:chunk offset="61177" nBytes="4083" chunkPositionInArray="[360, 1440]"/>
+                    <dmrpp:chunk offset="65260" nBytes="4083" chunkPositionInArray="[720, 0]"/>
+                    <dmrpp:chunk offset="69343" nBytes="4083" chunkPositionInArray="[720, 720]"/>
+                    <dmrpp:chunk offset="73426" nBytes="4083" chunkPositionInArray="[720, 1440]"/>
+                </dmrpp:chunks>
+            </Float32>
+            <Float32 name="mask">
+                <Dim name="/x"/>
+                <Dim name="/y"/>
+                <Dim name="/z"/>
+                <Attribute name="long_name" type="String">
+                    <Value>mask</Value>
+                </Attribute>
+                <dmrpp:chunks compressionType="shuffle" fillValue="-2147483647" byteOrder="LE">
+                    <dmrpp:chunk offset="41276" nBytes="4"/>
+                </dmrpp:chunks>
+            </Float32>
+            <Attribute name="Conventions" type="String">
+                <Value>CF-1.6</Value>
+            </Attribute>
+            <Attribute name="title" type="String">
+                <Value>Sample Dataset</Value>
+            </Attribute>
+        </Dataset>
+        """
+    ),
+    "nested_groups": textwrap.dedent(
+        """\
+            <?xml version="1.0" encoding="ISO-8859-1"?>
+            <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.dmrpp">
+                <Dimension name="a" size="10"/>
+                <Dimension name="b" size="10"/>
+                <Int32 name="a">
+                    <Dim name="/a"/>
                     <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
                         <dmrpp:chunk offset="41268" nBytes="4"/>
                     </dmrpp:chunks>
                 </Int32>
-            </Group>
-        </Group>
-    </Dataset>
-    """
-)
+                <Int32 name="b">
+                    <Dim name="/b"/>
+                    <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
+                        <dmrpp:chunk offset="41268" nBytes="4"/>
+                    </dmrpp:chunks>
+                </Int32>
+                <Group name="group1">
+                    <Dimension name="x" size="720"/>
+                    <Dimension name="y" size="1440"/>
+                    <Int32 name="x">
+                        <Dim name="/group1/x"/>
+                        <Attribute name="test" type="String">
+                            <Value>test</Value>
+                        </Attribute>
+                        <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
+                            <dmrpp:chunk offset="41268" nBytes="4"/>
+                        </dmrpp:chunks>
+                    </Int32>
+                    <Int32 name="y">
+                        <Dim name="/group1/y"/>
+                        <Attribute name="test" type="String">
+                            <Value>test</Value>
+                        </Attribute>
+                        <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
+                            <dmrpp:chunk offset="41268" nBytes="4"/>
+                        </dmrpp:chunks>
+                    </Int32>
+                    <Group name="group2">
+                        <Int32 name="area">
+                            <Dim name="/group1/x"/>
+                            <Dim name="/group1/y"/>
+                            <dmrpp:chunks fillValue="-2147483647" byteOrder="LE">
+                                <dmrpp:chunk offset="41268" nBytes="4"/>
+                            </dmrpp:chunks>
+                        </Int32>
+                    </Group>
+                </Group>
+            </Dataset>
+            """
+    ),
+}
 
 
 @pytest.fixture
@@ -196,37 +195,36 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
 
 
 @pytest.mark.parametrize(
-    "dmrpp_xml_str, fqn_path, expected_xpath",
+    "dmrpp_xml_str_key, fqn_path, expected_xpath",
     [
-        (BASIC_DMRPP_XML_STR, "/", "."),
-        (BASIC_DMRPP_XML_STR, "/data", "./*[@name='data']"),
-        (BASIC_DMRPP_XML_STR, "/data/items", "./*[@name='data']/*[@name='items']"),
+        ("basic", "/", "."),
+        ("basic", "/data", "./*[@name='data']"),
+        ("basic", "/data/items", "./*[@name='data']/*[@name='items']"),
         (
-            NESTED_GROUPS_DMRPP_XML_STR,
+            "nested_groups",
             "/group1/group2/area",
             "./*[@name='group1']/*[@name='group2']/*[@name='area']",
         ),
     ],
 )
-def test_find_node_fqn(dmrparser_factory, dmrpp_xml_str, fqn_path, expected_xpath):
-    parser_instance = dmrparser_factory(dmrpp_xml_str)
+def test_find_node_fqn(dmrparser_factory, dmrpp_xml_str_key, fqn_path, expected_xpath):
+    parser_instance = dmrparser_factory(DMRPP_XML_STRINGS[dmrpp_xml_str_key])
     result = parser_instance.find_node_fqn(fqn_path)
     expected = parser_instance.root.find(expected_xpath, parser_instance._NS)
     assert result == expected
 
 
-# TODO change how this is parametrized to only use a string name not the entire DMRPP XML string
 @pytest.mark.parametrize(
-    "dmrpp_xml_str, group_path",
+    "dmrpp_xml_str_key, group_path",
     [
-        (BASIC_DMRPP_XML_STR, "/"),
-        (NESTED_GROUPS_DMRPP_XML_STR, "/"),
-        (NESTED_GROUPS_DMRPP_XML_STR, "/group1"),
-        (NESTED_GROUPS_DMRPP_XML_STR, "/group1/group2"),
+        ("basic", "/"),
+        ("nested_groups", "/"),
+        ("nested_groups", "/group1"),
+        ("nested_groups", "/group1/group2"),
     ],
 )
-def test_split_groups(dmrparser_factory, dmrpp_xml_str, group_path):
-    dmrpp_instance = dmrparser_factory(dmrpp_xml_str)
+def test_split_groups(dmrparser_factory, dmrpp_xml_str_key, group_path):
+    dmrpp_instance = dmrparser_factory(DMRPP_XML_STRINGS[dmrpp_xml_str_key])
 
     # get all tags in a dataset (so all tags excluding nested groups)
     dataset_tags = lambda x: [
@@ -241,7 +239,7 @@ def test_split_groups(dmrparser_factory, dmrpp_xml_str, group_path):
 
 
 def test_parse_dataset(dmrparser_factory):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     vds = basic_dmrpp.parse_dataset()
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
@@ -250,7 +248,7 @@ def test_parse_dataset(dmrparser_factory):
     assert vds.attrs == {"Conventions": "CF-1.6", "title": "Sample Dataset"}
     assert vds.coords.keys() == {"x", "y", "z"}
 
-    nested_groups_dmrpp = dmrparser_factory(NESTED_GROUPS_DMRPP_XML_STR)
+    nested_groups_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["nested_groups"])
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset()
     vds_root = nested_groups_dmrpp.parse_dataset(group="/")
@@ -276,7 +274,7 @@ def test_parse_dataset(dmrparser_factory):
     ],
 )
 def test_parse_dim(dmrparser_factory, dim_path, expected):
-    nested_groups_dmrpp = dmrparser_factory(NESTED_GROUPS_DMRPP_XML_STR)
+    nested_groups_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["nested_groups"])
 
     result = nested_groups_dmrpp._parse_dim(nested_groups_dmrpp.find_node_fqn(dim_path))
     assert result == expected
@@ -284,7 +282,7 @@ def test_parse_dim(dmrparser_factory, dim_path, expected):
 
 @pytest.mark.parametrize("dim_path", ["/", "/mask"])
 def test_find_dimension_tags(dmrparser_factory, dim_path):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     # Check that Dimension tags match Dimension tags from the root
     # Check that Dim tags reference the same Dimension tags from the root
@@ -294,7 +292,7 @@ def test_find_dimension_tags(dmrparser_factory, dim_path):
 
 
 def test_parse_variable(dmrparser_factory):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     var = basic_dmrpp._parse_variable(basic_dmrpp.find_node_fqn("/data"))
     assert var.dtype == "float32"
@@ -321,7 +319,7 @@ def test_parse_variable(dmrparser_factory):
     ],
 )
 def test_parse_attribute(dmrparser_factory, attr_path, expected):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     result = basic_dmrpp._parse_attribute(basic_dmrpp.find_node_fqn(attr_path))
     assert result == expected
@@ -346,7 +344,7 @@ def test_parse_attribute(dmrparser_factory, attr_path, expected):
     ],
 )
 def test_parse_filters(dmrparser_factory, var_path, dtype, expected_filters):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     chunks_tag = basic_dmrpp.find_node_fqn(var_path).find(
         "dmrpp:chunks", basic_dmrpp._NS
@@ -383,7 +381,7 @@ def test_parse_chunks(
     expected_offsets,
     expected_paths,
 ):
-    basic_dmrpp = dmrparser_factory(BASIC_DMRPP_XML_STR)
+    basic_dmrpp = dmrparser_factory(DMRPP_XML_STRINGS["basic"])
 
     chunks_tag = basic_dmrpp.find_node_fqn(var_path).find(
         "dmrpp:chunks", basic_dmrpp._NS
