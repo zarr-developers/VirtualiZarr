@@ -171,7 +171,7 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
     # this would avoid the need to pass tmp_path separately
 
     return DMRParser(
-        root=ET.fromstring(dmrpp_xml_str), data_filepath=tmp_path / filename
+        root=ET.fromstring(dmrpp_xml_str), data_filepath=str(tmp_path / filename)
     )
 
 
