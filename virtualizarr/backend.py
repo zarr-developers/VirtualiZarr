@@ -105,7 +105,7 @@ def automatically_determine_filetype(
 def open_virtual_dataset(
     filepath: str,
     *,
-    filetype: FileType | None = None,
+    filetype: FileType | str | None = None,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
