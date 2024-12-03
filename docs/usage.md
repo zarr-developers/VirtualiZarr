@@ -461,7 +461,7 @@ vds = open_virtual_dataset(
 # the path in the virtual dataset will now be 'file:///some_directory/file.nc'
 ```
 
-Note that as the virtualizarr ``.virtualize.to_kerchunk`` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
+Note that as the virtualizarr ``.virtualize.to_kerchunk`` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone. Remember that if you want to change your manifest to point to different paths, you can use the ``.virtualize.rename_paths`` method.
 
 ## Rewriting existing manifests
 
