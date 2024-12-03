@@ -106,10 +106,10 @@ manifest = marr.manifest
 manifest.dict()
 ```
 ```python
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
-In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `air.nc` file at the location given by the `'offset'` and `'length'` attributes.
+In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
 
 The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
 
@@ -153,8 +153,8 @@ ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 concatenated.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000},
- '1.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
+ '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
@@ -254,8 +254,8 @@ We can see that the resulting combined manifest has two chunks, as expected.
 combined_vds['air'].data.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air1.nc', 'offset': 15419, 'length': 3869000},
- '1.0.0': {'path': 'air2.nc', 'offset': 15419, 'length': 3869000}}
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
 ```{note}
@@ -327,8 +327,6 @@ Loading variables can be useful in a few scenarios:
 
 To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
 
-
-
 ```python
 vds = open_virtual_dataset(
     'air.nc',
@@ -353,8 +351,6 @@ Attributes:
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
 ```
-
-
 
 ## Writing virtual stores to disk
 
