@@ -5,6 +5,7 @@ from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -18,15 +19,23 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     loadable_variables,
     drop_variables,
     virtual_array_class=ManifestArray,
+    fs_root: str | None = None,
 ) -> tuple[Mapping[str, Variable], dict[str, Any], list[str]]:
     """
     Parses all useful information from a set kerchunk references (for a single group).
+
+    Parameters
+    ----------
+    fs_root
+        The root of the fsspec filesystem on which these references were generated.
+        Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     """
 
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
         drop_variables=drop_variables + loadable_variables,
         virtual_array_class=virtual_array_class,
+        fs_root=fs_root,
     )
     ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
@@ -76,6 +85,7 @@ def virtual_vars_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] | None = None,
     virtual_array_class=ManifestArray,
+    fs_root: str | None = None,
 ) -> dict[str, Variable]:
     """
     Translate a store-level kerchunk reference dict into aaset of xarray Variables containing virtualized arrays.
@@ -97,7 +107,9 @@ def virtual_vars_from_kerchunk_refs(
     ]
 
     vars = {
-        var_name: variable_from_kerchunk_refs(refs, var_name, virtual_array_class)
+        var_name: variable_from_kerchunk_refs(
+            refs, var_name, virtual_array_class, fs_root=fs_root
+        )
         for var_name in var_names_to_keep
     }
     return vars
@@ -108,6 +120,7 @@ def dataset_from_kerchunk_refs(
     drop_variables: list[str] = [],
     virtual_array_class: type = ManifestArray,
     indexes: MutableMapping[str, Index] | None = None,
+    fs_root: str | None = None,
 ) -> Dataset:
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
@@ -119,7 +132,9 @@ def dataset_from_kerchunk_refs(
         Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
-    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, virtual_array_class)
+    vars = virtual_vars_from_kerchunk_refs(
+        refs, drop_variables, virtual_array_class, fs_root=fs_root
+    )
     ds_attrs = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
 
@@ -138,7 +153,10 @@ def dataset_from_kerchunk_refs(
 
 
 def variable_from_kerchunk_refs(
-    refs: KerchunkStoreRefs, var_name: str, virtual_array_class
+    refs: KerchunkStoreRefs,
+    var_name: str,
+    virtual_array_class,
+    fs_root: str | None = None,
 ) -> Variable:
     """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
 
@@ -147,7 +165,7 @@ def variable_from_kerchunk_refs(
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
-        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
+        manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
         varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
     elif len(zarray.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
@@ -162,6 +180,42 @@ def variable_from_kerchunk_refs(
         varr = zarray.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
+
+
+def manifest_from_kerchunk_chunk_dict(
+    kerchunk_chunk_dict: dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+    fs_root: str | None = None,
+) -> ChunkManifest:
+    """Create a single ChunkManifest from the mapping of keys to chunk information stored inside kerchunk array refs."""
+
+    chunk_entries: dict[ChunkKey, ChunkEntry] = {}
+    for k, v in kerchunk_chunk_dict.items():
+        if isinstance(v, (str, bytes)):
+            raise NotImplementedError(
+                "Reading inlined reference data is currently not supported. [ToDo]"
+            )
+        elif not isinstance(v, (tuple, list)):
+            raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
+    return ChunkManifest(entries=chunk_entries)
+
+
+def chunkentry_from_kerchunk(
+    path_and_byte_range_info: tuple[str] | tuple[str, int, int],
+    fs_root: str | None = None,
+) -> ChunkEntry:
+    """Create a single validated ChunkEntry object from whatever kerchunk contains under that chunk key."""
+    from upath import UPath
+
+    if len(path_and_byte_range_info) == 1:
+        path = path_and_byte_range_info[0]
+        offset = 0
+        length = UPath(path).stat().st_size
+    else:
+        path, offset, length = path_and_byte_range_info
+    return ChunkEntry.with_validation(  # type: ignore[attr-defined]
+        path=path, offset=offset, length=length, fs_root=fs_root
+    )
 
 
 def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:

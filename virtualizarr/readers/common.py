@@ -1,15 +1,13 @@
-import os
 import warnings
 from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
-from io import BufferedIOBase
 from typing import (
     Any,
     Hashable,
     Optional,
-    cast,
 )
 
+import xarray  # noqa
 from xarray import (
     Coordinates,
     Dataset,
@@ -19,12 +17,9 @@ from xarray import (
     Variable,
     open_dataset,
 )
-from xarray.backends import AbstractDataStore
 from xarray.core.indexes import PandasIndex
 
 from virtualizarr.utils import _FsspecFSFromFilepath
-
-XArrayOpenT = str | os.PathLike[Any] | BufferedIOBase | AbstractDataStore
 
 
 def open_loadable_vars_and_indexes(
@@ -52,10 +47,8 @@ def open_loadable_vars_and_indexes(
         ).open_file()
 
         # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
-        # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
-
         ds = open_dataset(
-            cast(XArrayOpenT, fpath),
+            fpath,  # type: ignore[arg-type]
             drop_variables=drop_variables,
             group=group,
             decode_times=decode_times,
@@ -175,6 +168,7 @@ class VirtualBackend(ABC):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         raise NotImplementedError()
@@ -187,6 +181,7 @@ class VirtualBackend(ABC):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> DataTree:
         raise NotImplementedError()

@@ -11,12 +11,16 @@ New Features
 
 - Optional dependencies can now be installed in groups via pip. See the installation docs.
   (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
+  (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -42,6 +46,8 @@ Documentation
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - More minor improvements to the Contributing Guide.
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Added links to recorded presentations on VirtualiZarr.
+  (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -50,6 +56,8 @@ Internal Changes
   (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+- File paths in chunk manifests are now always stored as abolute URIs.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.1.0:
 

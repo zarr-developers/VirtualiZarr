@@ -106,10 +106,10 @@ manifest = marr.manifest
 manifest.dict()
 ```
 ```python
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
-In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `air.nc` file at the location given by the `'offset'` and `'length'` attributes.
+In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
 
 The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
 
@@ -153,8 +153,8 @@ ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 concatenated.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000},
- '1.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
+ '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
@@ -254,8 +254,8 @@ We can see that the resulting combined manifest has two chunks, as expected.
 combined_vds['air'].data.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air1.nc', 'offset': 15419, 'length': 3869000},
- '1.0.0': {'path': 'air2.nc', 'offset': 15419, 'length': 3869000}}
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
 ```{note}
@@ -327,8 +327,6 @@ Loading variables can be useful in a few scenarios:
 
 To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
 
-
-
 ```python
 vds = open_virtual_dataset(
     'air.nc',
@@ -353,8 +351,6 @@ Attributes:
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
 ```
-
-
 
 ## Writing virtual stores to disk
 
@@ -443,12 +439,29 @@ This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_da
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
 
 ```python
-
 vds = open_virtual_dataset('combined.json', filetype='kerchunk', indexes={})
 # or
 vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
-
 ```
+
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
+
+You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``.
+
+```python
+# file `relative_refs.json` contains a path like './file.nc'
+
+vds = open_virtual_dataset(
+    'relative_refs.json',
+    filetype='kerchunk',
+    indexes={},
+    virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
+)
+
+# the path in the virtual dataset will now be 'file:///some_directory/file.nc'
+```
+
+Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
 
 ## Rewriting existing manifests
 
@@ -456,7 +469,7 @@ Sometimes it can be useful to rewrite the contents of an already-generated manif
 
 ### Rewriting file paths
 
-You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`ds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
+You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`vds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
 
 For example, you may want to rename file paths according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
 

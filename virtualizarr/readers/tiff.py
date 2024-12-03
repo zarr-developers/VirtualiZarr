@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
@@ -25,8 +26,14 @@ class TIFFVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "TIFF reader does not understand any virtual_backend_kwargs"
+            )
+
         from kerchunk.tiff import tiff_to_zarr
 
         drop_variables, loadable_variables = check_for_collisions(
@@ -51,6 +58,7 @@ class TIFFVirtualBackend(VirtualBackend):
             refs,
             loadable_variables,
             drop_variables,
+            fs_root=Path.cwd().as_uri(),
         )
 
         loadable_vars, indexes = open_loadable_vars_and_indexes(
