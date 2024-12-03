@@ -17,9 +17,7 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
-- File paths in chunk manifests must now be absolute paths, relative paths are now forbidden.
-  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
-- Added a depedency on cloudpathlib.
+- Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
