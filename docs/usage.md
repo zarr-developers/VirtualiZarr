@@ -443,12 +443,29 @@ This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_da
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
 
 ```python
-
 vds = open_virtual_dataset('combined.json', filetype='kerchunk', indexes={})
 # or
 vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
-
 ```
+
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
+
+You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``,
+
+```python
+# file `relative_refs.json` contains a path like './file.nc'
+
+vds = open_virtual_dataset(
+    'relative_refs.json',
+    filetype='kerchunk',
+    indexes={},
+    virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
+)
+
+# the path in the virtual dataset will now be 'file:///some_directory/file.nc'
+```
+
+Note that as the virtualizarr ``.virtualize.to_kerchunk`` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
 
 ## Rewriting existing manifests
 
