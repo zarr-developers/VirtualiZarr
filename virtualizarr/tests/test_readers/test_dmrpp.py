@@ -394,6 +394,21 @@ def test_parse_chunks(
     assert result == expected
 
 
+@pytest.fixture
+def basic_dmrpp_temp_filepath(tmp_path: Path) -> Path:
+    # TODO generalize key here? Would require the factory pattern
+    # (https://docs.pytest.org/en/stable/how-to/fixtures.html#factories-as-fixtures)
+    drmpp_xml_str = DMRPP_XML_STRINGS["basic"]
+
+    # TODO generalize filename here?
+    filepath = tmp_path / "test.nc.dmrpp"
+
+    with open(filepath, "w") as f:
+        f.write(drmpp_xml_str)
+
+    return filepath
+
+
 class TestRelativePaths:
     def test_absolute_path_to_dmrpp_file_containing_relative_path(
         self,
