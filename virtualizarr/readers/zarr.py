@@ -27,34 +27,36 @@ if TYPE_CHECKING:
 class ZarrVirtualBackend(VirtualBackend):
     @staticmethod
     def open_virtual_dataset(
-        filepath: str,
+        path: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         """
         Create a virtual dataset from an existing Zarr store
         """
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "Zarr reader does not understand any virtual_backend_kwargs"
+            )
 
-        # check that Zarr is V3
-        # 1a
         import zarr
         from packaging import version
 
         if version.parse(zarr.__version__).major < 3:
             raise ImportError("Zarr V3 is required")
 
-        # check_for_collisions will convert them to an empty list
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,
         )
 
         return virtual_dataset_from_zarr_group(
-            filepath=filepath,
+            filepath=path,
             group=group,
             drop_variables=drop_variables,
             loadable_variables=loadable_variables,
