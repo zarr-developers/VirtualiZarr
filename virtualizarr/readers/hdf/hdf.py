@@ -1,11 +1,17 @@
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
 import xarray as xr
-from xarray import Index, Variable
+from xarray import Dataset, Index, Variable
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkEntry,
+    ChunkManifest,
+    ManifestArray,
+)
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -49,6 +55,10 @@ class HDFVirtualBackend(VirtualBackend):
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,
+        )
+
+        filepath = validate_and_normalize_path_to_uri(
+            filepath, fs_root=Path.cwd().as_uri()
         )
 
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
@@ -105,11 +115,12 @@ class HDFVirtualBackend(VirtualBackend):
             else:
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
-                chunk_entry = ChunkEntry(
+
+                chunk_entry = ChunkEntry.with_validation(
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)
-                chunk_entries = {chunk_key: chunk_entry.dict()}
+                chunk_entries = {chunk_key: chunk_entry}
                 chunk_manifest = ChunkManifest(entries=chunk_entries)
                 return chunk_manifest
         else:

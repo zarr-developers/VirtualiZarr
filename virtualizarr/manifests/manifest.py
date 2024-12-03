@@ -1,8 +1,9 @@
-import dataclasses
 import json
 import re
-from collections.abc import Iterable, Iterator
-from typing import Any, Callable, Dict, NewType, Tuple, TypedDict, cast
+from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
+from pathlib import PosixPath
+from typing import Any, Callable, NewType, Tuple, TypedDict, cast
+from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 
@@ -15,51 +16,168 @@ _SEPARATOR = r"\."
 _CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
 
 
-class ChunkDictEntry(TypedDict):
+# doesn't guarantee that writers actually handle these
+VALID_URI_PREFIXES = {
+    "s3://",
+    "gs://",
+    "azure://",
+    "r2://",
+    "cos://",
+    "minio://",
+    "file:///",
+}
+
+
+class ChunkEntry(TypedDict):
     path: str
     offset: int
     length: int
 
-
-ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkDictEntry])
-
-
-@dataclasses.dataclass(frozen=True)
-class ChunkEntry:
-    """
-    Information for a single chunk in the manifest.
-
-    Stored in the form `{"path": "s3://bucket/foo.nc", "offset": 100, "length": 100}`.
-    """
-
-    path: str  # TODO stricter typing/validation of possible local / remote paths?
-    offset: int
-    length: int
-
-    @classmethod
-    def from_kerchunk(
-        cls, path_and_byte_range_info: tuple[str] | tuple[str, int, int]
+    @classmethod  # type: ignore[misc]
+    def with_validation(
+        cls, *, path: str, offset: int, length: int, fs_root: str | None = None
     ) -> "ChunkEntry":
-        from upath import UPath
+        """
+        Constructor which validates each part of the chunk entry.
 
-        if len(path_and_byte_range_info) == 1:
-            path = path_and_byte_range_info[0]
-            offset = 0
-            length = UPath(path).stat().st_size
-        else:
-            path, offset, length = path_and_byte_range_info
+        Parameters
+        ----------
+        fs_root
+            The root of the filesystem on which these references were generated.
+            Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+        """
+
+        # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
+
+        path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+        validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 
-    def to_kerchunk(self) -> tuple[str, int, int]:
-        """Write out in the format that kerchunk uses for chunk entries."""
-        return (self.path, self.offset, self.length)
 
-    def dict(self) -> ChunkDictEntry:
-        return ChunkDictEntry(
-            path=self.path,
-            offset=self.offset,
-            length=self.length,
+def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) -> str:
+    """
+    Makes all paths into fully-qualified absolute URIs, or raises.
+
+    See https://en.wikipedia.org/wiki/File_URI_scheme
+
+    Parameters
+    ----------
+    fs_root
+        The root of the filesystem on which these references were generated.
+        Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+    """
+    if path == "":
+        # (empty paths are allowed through as they represent missing chunks)
+        return path
+
+    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra depedencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
+
+    if path.startswith("http://") or path.startswith("https://"):
+        # hopefully would raise if given a malformed URL
+        components = urlparse(path)
+
+        if not PosixPath(components.path).suffix:
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        return urlunparse(components)
+
+    elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
+        if not PosixPath(path).suffix:
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        return path  # path is already in URI form
+
+    else:
+        # must be a posix filesystem path (absolute or relative)
+        # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
+        _path = PosixPath(path)
+
+        if not _path.suffix:
+            raise ValueError(
+                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
+            )
+
+        # only posix paths can possibly not be absolute
+        if not _path.is_absolute():
+            if fs_root is None:
+                raise ValueError(
+                    f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
+                )
+            else:
+                _path = convert_relative_path_to_absolute(_path, fs_root)
+
+        return _path.as_uri()
+
+
+def posixpath_maybe_from_uri(path: str) -> PosixPath:
+    """
+    Handles file URIs like cloudpathlib.AnyPath does, i.e.
+
+    In[1]: pathlib.PosixPath('file:///dir/file.nc')
+    Out[1]: pathlib.PosixPath('file:/dir/file.nc')
+
+    In [2]: cloudpathlib.AnyPath('file:///dir/file.nc')
+    Out[2]: pathlib.PosixPath('/dir/file.nc')
+
+    In [3]: posixpath_maybe_from_uri('file:///dir/file.nc')
+    Out[3]: pathlib.PosixPath('/dir/file.nc')
+
+    This is needed otherwise pathlib thinks the URI is a relative path.
+    """
+    if path.startswith("file:///"):
+        # TODO in python 3.13 we could probably use Path.from_uri() instead
+        return PosixPath(path.removeprefix("file://"))
+    else:
+        return PosixPath(path)
+
+
+def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> PosixPath:
+    _fs_root = posixpath_maybe_from_uri(fs_root)
+
+    if not _fs_root.is_absolute() or _fs_root.suffix:
+        # TODO handle http url roots and bucket prefix roots? (ideally through cloudpathlib)
+        raise ValueError(
+            f"fs_root must be an absolute path to a filesystem directory, but got {fs_root}"
         )
+
+    return (_fs_root / path).resolve()
+
+
+def validate_byte_range(*, offset: Any, length: Any) -> None:
+    """Raise if byte offset or length has invalid type or value"""
+
+    if isinstance(offset, np.integer):
+        _offset = int(offset)
+    elif isinstance(offset, int):
+        _offset = offset
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(offset)}"
+        )
+    if _offset < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_offset}"
+        )
+
+    if isinstance(length, np.integer):
+        _length = int(length)
+    elif isinstance(length, int):
+        _length = length
+    else:
+        raise TypeError(
+            f"chunk entry byte offset must of type int, but got type {type(length)}"
+        )
+    if _length < 0:
+        raise ValueError(
+            f"chunk entry byte offset must be a positive integer, but got offset={_length}"
+        )
+
+
+ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
 
 
 class ChunkManifest:
@@ -124,20 +242,20 @@ class ChunkManifest:
 
         # populate the arrays
         for key, entry in entries.items():
-            try:
-                path, offset, length = entry.values()
-                entry = ChunkEntry(path=path, offset=offset, length=length)
-            except (ValueError, TypeError) as e:
+            if not isinstance(entry, dict) or len(entry) != 3:
                 msg = (
                     "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>), "
                     f"but got {entry}"
                 )
-                raise ValueError(msg) from e
+                raise ValueError(msg)
+
+            path, offset, length = entry.values()
+            entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
             split_key = split(key)
-            paths[split_key] = entry.path
-            offsets[split_key] = entry.offset
-            lengths[split_key] = entry.length
+            paths[split_key] = entry["path"]
+            offsets[split_key] = entry["offset"]
+            lengths[split_key] = entry["length"]
 
         self._paths = paths
         self._offsets = offsets
@@ -146,9 +264,11 @@ class ChunkManifest:
     @classmethod
     def from_arrays(
         cls,
+        *,
         paths: np.ndarray[Any, np.dtypes.StringDType],
         offsets: np.ndarray[Any, np.dtype[np.uint64]],
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
+        validate_paths: bool = True,
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -161,6 +281,9 @@ class ChunkManifest:
         paths: np.ndarray
         offsets: np.ndarray
         lengths: np.ndarray
+        validate_paths: bool
+            Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
+            Set to False to skip validation for performance reasons.
         """
 
         # check types
@@ -200,6 +323,12 @@ class ChunkManifest:
                 f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
             )
 
+        if validate_paths:
+            vectorized_validation_fn = np.vectorize(
+                validate_and_normalize_path_to_uri, otypes=[np.dtypes.StringDType()]
+            )  # type: ignore[attr-defined]
+            paths = vectorized_validation_fn(paths)
+
         obj = object.__new__(cls)
         obj._paths = paths
         obj._offsets = offsets
@@ -233,6 +362,7 @@ class ChunkManifest:
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
+        # TODO fix bug here - types of path, offset, length shoudl be coerced
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:
@@ -243,26 +373,35 @@ class ChunkManifest:
     def __len__(self) -> int:
         return self._paths.size
 
+    def keys(self) -> KeysView:
+        return self.dict().keys()
+
+    def values(self) -> ValuesView:
+        return self.dict().values()
+
+    def items(self) -> ItemsView:
+        return self.dict().items()
+
     def dict(self) -> ChunkDict:  # type: ignore[override]
         """
         Convert the entire manifest to a nested dictionary.
 
         The returned dict will be of the form
 
-        {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-        }
+        |    {
+        |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+        |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+        |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        |    }
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
-
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
 
+        # TODO consolidate each occurrence of this np.nditer pattern
         d = {
             join(inds): dict(
                 path=path.item(), offset=offset.item(), length=length.item()
@@ -300,24 +439,6 @@ class ChunkManifest:
         entries = self.dict()
         with open(filepath, "w") as json_file:
             json.dump(entries, json_file, indent=4, separators=(", ", ": "))
-
-    @classmethod
-    def _from_kerchunk_chunk_dict(
-        cls,
-        # The type hint requires `Dict` instead of `dict` due to
-        # the conflicting ChunkManifest.dict method.
-        kerchunk_chunk_dict: Dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
-    ) -> "ChunkManifest":
-        chunk_entries: dict[ChunkKey, ChunkDictEntry] = {}
-        for k, v in kerchunk_chunk_dict.items():
-            if isinstance(v, (str, bytes)):
-                raise NotImplementedError(
-                    "Reading inlined reference data is currently not supported. [ToDo]"
-                )
-            elif not isinstance(v, (tuple, list)):
-                raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
-            chunk_entries[k] = ChunkEntry.from_kerchunk(v).dict()
-        return ChunkManifest(entries=chunk_entries)
 
     def rename_paths(
         self,
@@ -370,6 +491,7 @@ class ChunkManifest:
             paths=renamed_paths,
             offsets=self._offsets,
             lengths=self._lengths,
+            validate_paths=True,
         )
 
 

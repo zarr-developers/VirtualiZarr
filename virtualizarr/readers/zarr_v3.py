@@ -28,6 +28,7 @@ class ZarrV3VirtualBackend(VirtualBackend):
 
         This is experimental - chunk manifests are not part of the Zarr v3 Spec.
         """
+
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "Zarr_v3 reader does not understand any virtual_backend_kwargs"
