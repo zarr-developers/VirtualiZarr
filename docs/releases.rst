@@ -39,6 +39,8 @@ Documentation
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - More minor improvements to the Contributing Guide.
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Added links to recorded presentations on VirtualiZarr.
+  (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
