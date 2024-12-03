@@ -46,6 +46,8 @@ Documentation
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
 - Correct some links to the API.
   (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.  
+- Added links to recorded presentations on VirtualiZarr.
+  (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
