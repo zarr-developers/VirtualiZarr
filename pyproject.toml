@@ -39,7 +39,7 @@ hdf_reader = [
     "numcodecs"
 ]
 icechunk = [
-    "icechunk==0.1.0a5",
+    "icechunk==0.1.0a6",
 ]
 test = [
     "codecov",
