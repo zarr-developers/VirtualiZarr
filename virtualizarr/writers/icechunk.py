@@ -22,20 +22,7 @@ if TYPE_CHECKING:
     from zarr import Array, Group  # type: ignore
 
 
-VALID_URI_PREFIXES = {
-    "s3://",
-    # "gs://",  # https://github.com/earth-mover/icechunk/issues/265
-    # "azure://",  # https://github.com/earth-mover/icechunk/issues/266
-    # "r2://",
-    # "cos://",
-    # "minio://",
-    "file:///",
-}
-
-
-def dataset_to_icechunk(
-    ds: Dataset, store: "IcechunkStore", append_dim: Optional[str] = None
-) -> None:
+def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore", append_dim: Optional[str] = None) -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
 
@@ -263,6 +250,7 @@ def write_manifest_virtual_refs(
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
+    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
@@ -282,16 +270,7 @@ def write_manifest_virtual_refs(
         store.set_virtual_ref(
             # TODO it would be marginally neater if I could pass the group and name as separate args
             key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
-            location=as_file_uri(path.item()),
+            location=path.item(),
             offset=offset.item(),
             length=length.item(),
         )
-
-
-def as_file_uri(path):
-    # TODO a more robust solution to this requirement exists in https://github.com/zarr-developers/VirtualiZarr/pull/243
-    if not any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES) and path != "":
-        # assume path is local
-        return f"file://{path}"
-    else:
-        return path

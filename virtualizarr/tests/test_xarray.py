@@ -27,8 +27,8 @@ def test_wrapping():
     )
 
     chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
@@ -57,8 +57,8 @@ class TestEquals:
         )
 
         chunks_dict1 = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
@@ -69,8 +69,8 @@ class TestEquals:
         assert ds1.equals(ds2)
 
         chunks_dict3 = {
-            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest3 = ChunkManifest(entries=chunks_dict3)
         marr3 = ManifestArray(zarray=zarray, chunkmanifest=manifest3)
@@ -94,16 +94,16 @@ class TestConcat:
         )
 
         chunks_dict1 = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
 
         chunks_dict2 = {
-            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
@@ -115,10 +115,10 @@ class TestConcat:
         assert result.shape == (2, 20)
         assert result.chunks == (1, 10)
         assert result.data.manifest.dict() == {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
-            "1.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "1.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
+            "1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
+            "1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
         assert result.data.zarray.compressor == zarray.compressor
         assert result.data.zarray.filters == zarray.filters
@@ -141,16 +141,16 @@ class TestConcat:
         )
 
         chunks_dict1 = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
         ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
 
         chunks_dict2 = {
-            "0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
@@ -163,10 +163,10 @@ class TestConcat:
         assert result.shape == (2, 5, 20)
         assert result.chunks == (1, 5, 10)
         assert result.data.manifest.dict() == {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.0.1": {"path": "foo.nc", "offset": 200, "length": 100},
-            "1.0.0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "1.0.1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0.0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
+            "1.0.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
+            "1.0.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
         assert result.data.zarray.compressor == zarray.compressor
         assert result.data.zarray.filters == zarray.filters
@@ -191,8 +191,8 @@ class TestConcat:
         )
 
         chunks_dict1 = {
-            "0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0": {"path": "/foo.nc", "offset": 100, "length": 100},
+            "1": {"path": "/foo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
@@ -200,8 +200,8 @@ class TestConcat:
         ds1 = xr.Dataset(coords=coords)
 
         chunks_dict2 = {
-            "0": {"path": "foo.nc", "offset": 300, "length": 100},
-            "1": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
@@ -214,10 +214,10 @@ class TestConcat:
         assert result.shape == (40,)
         assert result.chunks == (10,)
         assert result.data.manifest.dict() == {
-            "0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "1": {"path": "foo.nc", "offset": 200, "length": 100},
-            "2": {"path": "foo.nc", "offset": 300, "length": 100},
-            "3": {"path": "foo.nc", "offset": 400, "length": 100},
+            "0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
+            "1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
+            "2": {"path": "file:///foo.nc", "offset": 300, "length": 100},
+            "3": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
         assert result.data.zarray.compressor == zarray.compressor
         assert result.data.zarray.filters == zarray.filters

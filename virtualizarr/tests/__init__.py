@@ -85,7 +85,7 @@ def create_manifestarray(
 def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
     """Generate a (somewhat) unique manifest entry from a given chunk key"""
     entry = {
-        "path": f"file.{str(join(ind))}.nc",
+        "path": f"/foo.{str(join(ind))}.nc",
         "offset": offset_from_chunk_key(ind),
         "length": length_from_chunk_key(ind),
     }

@@ -1,3 +1,6 @@
+from os.path import relpath
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -18,8 +21,8 @@ from virtualizarr.zarr import ZArray
 def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
@@ -239,7 +242,7 @@ class TestKerchunkRoundtrip:
 
     def test_datetime64_dtype_fill_value(self, tmpdir, format):
         chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)
@@ -292,3 +295,28 @@ def test_open_scalar_variable(tmpdir, hdf_backend):
 
     vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={}, backend=hdf_backend)
     assert vds["a"].shape == ()
+
+
+class TestPathsToURIs:
+    @requires_kerchunk
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+
+        expected_path = Path(netcdf4_file).as_uri()
+
+        manifest = vds["air"].data.manifest.dict()
+        path = manifest["0.0.0"]["path"]
+        assert path == expected_path
+
+    @requires_kerchunk
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
+        relative_path = relpath(netcdf4_file)
+        vds = open_virtual_dataset(relative_path, indexes={}, backend=hdf_backend)
+
+        expected_path = Path(netcdf4_file).as_uri()
+
+        manifest = vds["air"].data.manifest.dict()
+        path = manifest["0.0.0"]["path"]
+        assert path == expected_path

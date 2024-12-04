@@ -10,7 +10,7 @@ from virtualizarr.tests import requires_kerchunk
 class TestAccessor:
     def test_accessor_to_kerchunk_dict(self):
         manifest = ChunkManifest(
-            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
         )
         arr = ManifestArray(
             chunkmanifest=manifest,
@@ -33,7 +33,7 @@ class TestAccessor:
                 ".zattrs": "{}",
                 "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
-                "a/0.0": ["test.nc", 6144, 48],
+                "a/0.0": ["/test.nc", 6144, 48],
             },
         }
 
@@ -73,7 +73,7 @@ class TestAccessor:
         import ujson
 
         manifest = ChunkManifest(
-            entries={"0.0": dict(path="test.nc", offset=6144, length=48)}
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
         )
         arr = ManifestArray(
             chunkmanifest=manifest,
@@ -103,7 +103,7 @@ class TestAccessor:
                 ".zattrs": "{}",
                 "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
-                "a/0.0": ["test.nc", 6144, 48],
+                "a/0.0": ["/test.nc", 6144, 48],
             },
         }
         assert loaded_refs == expected_ds_refs
@@ -112,8 +112,8 @@ class TestAccessor:
         import ujson
 
         chunks_dict = {
-            "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-            "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+            "0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
+            "0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         arr = ManifestArray(
@@ -144,8 +144,8 @@ class TestAccessor:
         assert df0.to_dict() == {
             "offset": {0: 100, 1: 200},
             "path": {
-                0: "foo.nc",
-                1: "foo.nc",
+                0: "/foo.nc",
+                1: "/foo.nc",
             },
             "size": {0: 100, 1: 100},
             "raw": {0: None, 1: None},
