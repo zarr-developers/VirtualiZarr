@@ -22,7 +22,9 @@ if TYPE_CHECKING:
     from zarr import Array, Group  # type: ignore
 
 
-def dataset_to_icechunk(ds: Dataset, store: "IcechunkStore", append_dim: Optional[str] = None) -> None:
+def dataset_to_icechunk(
+    ds: Dataset, store: "IcechunkStore", append_dim: Optional[str] = None
+) -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
 
