@@ -14,6 +14,7 @@ from zarr import Array, Group, group  # type: ignore
 from zarr.core.metadata import ArrayV3Metadata  # type: ignore
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers.common import separate_coords
 from virtualizarr.writers.icechunk import dataset_to_icechunk, generate_chunk_key
 from virtualizarr.zarr import ZArray
 
@@ -339,12 +340,12 @@ def generate_chunk_manifest(
     netcdf4_file: str,
     shape: Tuple[int, ...],
     chunks: Tuple[int, ...],
-    base_offset=6144,
+    offset=6144,
     length=48,
 ) -> ChunkManifest:
     chunk_dict = {}
     num_chunks = [shape[i] // chunks[i] for i in range(len(shape))]
-    offset = base_offset
+    offset = offset
 
     # Generate all possible chunk indices using Cartesian product
     for chunk_indices in product(*[range(n) for n in num_chunks]):
@@ -359,7 +360,7 @@ def generate_chunk_manifest(
     return ChunkManifest(chunk_dict)
 
 
-def gen_virtual_dataset(
+def gen_virtual_variable(
     file_uri: str,
     shape: tuple[int, ...] = (3, 4),
     chunk_shape: tuple[int, ...] = (3, 4),
@@ -368,17 +369,17 @@ def gen_virtual_dataset(
     filters: Optional[list[dict[Any, Any]]] = None,
     fill_value: Optional[str] = None,
     encoding: Optional[dict] = None,
-    variable_name: str = "foo",
-    base_offset: int = 6144,
+    offset: int = 6144,
     length: int = 48,
-    dims: Optional[list[str]] = None,
+    dims: list[str] = [],
     zarr_format: Literal[2, 3] = 2,
-):
+    attrs: dict[str, Any] = {},
+) -> tuple[Variable, Dataset]:
     manifest = generate_chunk_manifest(
         file_uri,
         shape=shape,
         chunks=chunk_shape,
-        base_offset=base_offset,
+        offset=offset,
         length=length,
     )
     zarray = ZArray(
@@ -391,17 +392,51 @@ def gen_virtual_dataset(
         zarr_format=zarr_format,
     )
     ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
-    ds = open_dataset(file_uri)
-    ds_dims: list[str] = cast(list[str], list(ds.dims))
-    dims = dims or ds_dims
-    var = Variable(
+    return Variable(
         data=ma,
         dims=dims,
         encoding=encoding,
+        attrs=attrs,
+    )
+
+
+def gen_virtual_dataset(
+    file_uri: str,
+    shape: tuple[int, ...] = (3, 4),
+    chunk_shape: tuple[int, ...] = (3, 4),
+    dtype: np.dtype = np.dtype("int32"),
+    compressor: Optional[dict] = None,
+    filters: Optional[list[dict[Any, Any]]] = None,
+    fill_value: Optional[str] = None,
+    encoding: Optional[dict] = None,
+    variable_name: str = "foo",
+    offset: int = 6144,
+    length: int = 48,
+    dims: Optional[list[str]] = None,
+    zarr_format: Literal[2, 3] = 2,
+    coords: Optional[dict[str, Variable]] = None,
+) -> Dataset:
+    ds = open_dataset(file_uri)
+    ds_dims: list[str] = cast(list[str], list(ds.dims))
+    dims = dims or ds_dims
+    var = gen_virtual_variable(
+        file_uri,
+        shape=shape,
+        chunk_shape=chunk_shape,
+        dtype=dtype,
+        compressor=compressor,
+        filters=filters,
+        fill_value=fill_value,
+        encoding=encoding,
+        offset=offset,
+        length=length,
+        dims=dims,
+        zarr_format=zarr_format,
         attrs=ds[variable_name].attrs,
     )
     return Dataset(
         {variable_name: var},
+        coords=coords,
         attrs=ds.attrs,
     )
 
@@ -443,7 +478,8 @@ class TestAppend:
         xrt.assert_identical(array, expected_array)
 
     ## When appending to a virtual ref with encoding, it succeeds
-    def test_append_virtual_ref_with_encoding(
+    @pytest.mark.asyncio
+    async def test_append_virtual_ref_with_encoding(
         self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
@@ -452,6 +488,52 @@ class TestAppend:
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
+
+        lon_manifest = gen_virtual_variable(
+            filepath1,
+            shape=(53,),
+            chunk_shape=(53,),
+            dtype=np.dtype("float32"),
+            offset=5279,
+            length=212,
+            dims=["lon"],
+        )
+        lat_manifest = gen_virtual_variable(
+            filepath1,
+            shape=(25,),
+            chunk_shape=(25,),
+            dtype=np.dtype("float32"),
+            offset=5179,
+            length=100,
+            dims=["lat"],
+        )
+        time_attrs = {
+            "standard_name": "time",
+            "long_name": "Time",
+            "units": "hours since 1800-01-01",
+            "calendar": "standard",
+        }
+        time_manifest1, time_manifest2 = [
+            gen_virtual_variable(
+                filepath,
+                shape=(1460,),
+                chunk_shape=(1460,),
+                dtype=np.dtype("float32"),
+                offset=15495515,
+                length=5840,
+                dims=["time"],
+                attrs=time_attrs,
+            )
+            for filepath in [filepath1, filepath2]
+        ]
+        [[_, coords1], [_, coords2]] = [
+            separate_coords(
+                vars={"time": time_manifest, "lat": lat_manifest, "lon": lon_manifest},
+                indexes={},
+                coord_names=[],
+            )
+            for time_manifest in [time_manifest1, time_manifest2]
+        ]
         vds1, vds2 = (
             gen_virtual_dataset(
                 file_uri=filepath1,
@@ -461,8 +543,9 @@ class TestAppend:
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=15419,
+                offset=15419,
                 length=15476000,
+                coords=coords1,
             ),
             gen_virtual_dataset(
                 file_uri=filepath2,
@@ -472,8 +555,9 @@ class TestAppend:
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 encoding={"scale_factor": scale_factor},
-                base_offset=15419,
+                offset=15419,
                 length=15476000,
+                coords=coords2,
             ),
         )
 
@@ -483,18 +567,23 @@ class TestAppend:
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
+        new_ds = open_zarr(icechunk_filestore, consolidated=False, zarr_format=3)
+        first_time_chunk_before_append = await icechunk_filestore._store.get("time/c/0")
 
         # Append the same dataset to the same store
         icechunk_filestore_append = IcechunkStore.open_existing(
             storage=icechunk_storage, read_only=False
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        icechunk_filestore_append.commit("appended data")
+        # chunks = [chunk async for chunk in icechunk_filestore_append._store.list_dir('/')]
+        assert (
+            await icechunk_filestore_append._store.get("time/c/0")
+        ) == first_time_chunk_before_append
         new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
 
         expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
-        expected_ds = concat([expected_ds1, expected_ds2], dim="time").drop_vars(
-            ["lon", "lat", "time"], errors="ignore"
-        )
+        expected_ds = concat([expected_ds1, expected_ds2], dim="time")
         # Because we encode attributes, attributes may differ, for example
         # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
         # but encoded it is [185.16000366210935, 322.1000061035156]
@@ -530,7 +619,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                base_offset=18043,
+                offset=18043,
                 length=3936114,
                 zarr_format=zarr_format,
             ),
@@ -542,7 +631,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                base_offset=18043,
+                offset=18043,
                 length=3938672,
                 zarr_format=zarr_format,
             ),
