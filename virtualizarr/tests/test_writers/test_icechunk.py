@@ -576,7 +576,6 @@ class TestAppend:
         )
         dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
         icechunk_filestore_append.commit("appended data")
-        # chunks = [chunk async for chunk in icechunk_filestore_append._store.list_dir('/')]
         assert (
             await icechunk_filestore_append._store.get("time/c/0")
         ) == first_time_chunk_before_append
