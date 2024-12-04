@@ -8,7 +8,7 @@ pytest.importorskip("icechunk")
 
 import numpy as np
 import numpy.testing as npt
-from xarray import Dataset, concat, open_dataset, open_zarr
+from xarray import Coordinates, Dataset, concat, open_dataset, open_zarr
 from xarray.core.variable import Variable
 from zarr import Array, Group, group  # type: ignore
 from zarr.core.metadata import ArrayV3Metadata  # type: ignore
@@ -374,7 +374,7 @@ def gen_virtual_variable(
     dims: list[str] = [],
     zarr_format: Literal[2, 3] = 2,
     attrs: dict[str, Any] = {},
-) -> tuple[Variable, Dataset]:
+) -> Variable:
     manifest = generate_chunk_manifest(
         file_uri,
         shape=shape,
@@ -414,7 +414,7 @@ def gen_virtual_dataset(
     length: int = 48,
     dims: Optional[list[str]] = None,
     zarr_format: Literal[2, 3] = 2,
-    coords: Optional[dict[str, Variable]] = None,
+    coords: Optional[Coordinates] = None,
 ) -> Dataset:
     ds = open_dataset(file_uri)
     ds_dims: list[str] = cast(list[str], list(ds.dims))

@@ -183,7 +183,7 @@ def write_virtual_variable_to_icechunk(
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
-        check_compatible_arrays(ma, group[name], append_axis)
+        check_compatible_arrays(ma, group[name], append_axis)  # type: ignore[arg-type]
         check_compatible_encodings(var.encoding, group[name].attrs)
 
         # determine number of existing chunks along the append axis
@@ -194,7 +194,7 @@ def write_virtual_variable_to_icechunk(
 
         # resize the array
         resize_array(
-            group[name],
+            group[name],  # type: ignore[arg-type]
             manifest_array=ma,
             append_axis=append_axis,
         )
