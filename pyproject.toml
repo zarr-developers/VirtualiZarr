@@ -38,6 +38,9 @@ hdf_reader = [
     "imagecodecs-numcodecs==2024.6.1",
     "numcodecs"
 ]
+icechunk = [
+    "icechunk>=0.1.0a7",
+]
 test = [
     "codecov",
     "fastparquet",

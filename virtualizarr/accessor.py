@@ -1,10 +1,5 @@
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Literal,
-    overload,
-)
+from typing import TYPE_CHECKING, Callable, Literal, Optional, overload
 
 from xarray import Dataset, register_dataset_accessor
 
@@ -43,19 +38,24 @@ class VirtualiZarrDatasetAccessor:
         """
         dataset_to_zarr(self.ds, storepath)
 
-    def to_icechunk(self, store: "IcechunkStore") -> None:
+    def to_icechunk(
+        self, store: "IcechunkStore", append_dim: Optional[str] = None
+    ) -> None:
         """
         Write an xarray dataset to an Icechunk store.
 
         Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
 
+        If `append_dim` is provided, the virtual dataset will be appended to the existing IcechunkStore along the `append_dim` dimension.
+
         Parameters
         ----------
         store: IcechunkStore
+        append_dim: str, optional
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
-        dataset_to_icechunk(self.ds, store)
+        dataset_to_icechunk(self.ds, store, append_dim=append_dim)
 
     @overload
     def to_kerchunk(

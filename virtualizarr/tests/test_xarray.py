@@ -1,3 +1,5 @@
+from typing import Callable
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -227,8 +229,8 @@ class TestConcat:
 @requires_kerchunk
 @pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
 class TestCombineUsingIndexes:
-    def test_combine_by_coords(self, netcdf4_files, hdf_backend):
-        filepath1, filepath2 = netcdf4_files
+    def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
+        filepath1, filepath2 = netcdf4_files_factory()
 
         with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
             vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
