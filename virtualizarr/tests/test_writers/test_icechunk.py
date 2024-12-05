@@ -1,6 +1,6 @@
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, cast
 
 import pytest
 
