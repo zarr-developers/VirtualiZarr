@@ -477,9 +477,7 @@ class TestAppend:
         expected_array = concat([expected_ds, expected_ds, expected_ds], dim="x")
         xrt.assert_identical(array, expected_array)
 
-    ## When appending to a virtual ref with encoding, it succeeds
-    @pytest.mark.asyncio
-    async def test_append_virtual_ref_with_encoding(
+    def test_append_virtual_ref_with_encoding(
         self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
@@ -488,6 +486,67 @@ class TestAppend:
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
+
+        vds1, vds2 = (
+            gen_virtual_dataset(
+                file_uri=filepath1,
+                shape=(1460, 25, 53),
+                chunk_shape=(1460, 25, 53),
+                dims=["time", "lat", "lon"],
+                dtype=np.dtype("float64"),
+                variable_name="air",
+                encoding={"scale_factor": scale_factor},
+                offset=15419,
+                length=15476000,
+            ),
+            gen_virtual_dataset(
+                file_uri=filepath2,
+                shape=(1460, 25, 53),
+                chunk_shape=(1460, 25, 53),
+                dims=["time", "lat", "lon"],
+                dtype=np.dtype("float64"),
+                variable_name="air",
+                encoding={"scale_factor": scale_factor},
+                offset=15419,
+                length=15476000,
+            ),
+        )
+
+        # create the icechunk store and commit the first virtual dataset
+        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
+        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_filestore.commit(
+            "test commit"
+        )  # need to commit it in order to append to it in the next lines
+
+        # Append the same dataset to the same store
+        icechunk_filestore_append = IcechunkStore.open_existing(
+            storage=icechunk_storage, read_only=False
+        )
+        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        icechunk_filestore_append.commit("appended data")
+        new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
+
+        expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
+        expected_ds = concat([expected_ds1, expected_ds2], dim="time").drop_vars(
+            ["time", "lat", "lon"], errors="ignore"
+        )
+        # Because we encode attributes, attributes may differ, for example
+        # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
+        # but encoded it is [185.16000366210935, 322.1000061035156]
+        xrt.assert_equal(new_ds, expected_ds)
+
+    ## When appending to a virtual ref with encoding, it succeeds
+    @pytest.mark.asyncio
+    async def test_append_with_multiple_root_arrays(
+        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
+    ):
+        import xarray.testing as xrt
+        from icechunk import IcechunkStore
+
+        filepath1, filepath2 = netcdf4_files_factory(
+            encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
+        )
 
         lon_manifest = gen_virtual_variable(
             filepath1,
@@ -519,7 +578,7 @@ class TestAppend:
                 shape=(1460,),
                 chunk_shape=(1460,),
                 dtype=np.dtype("float32"),
-                offset=15495515,
+                offset=15498221,
                 length=5840,
                 dims=["time"],
                 attrs=time_attrs,
@@ -542,8 +601,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                encoding={"scale_factor": scale_factor},
-                offset=15419,
+                offset=18043,
                 length=15476000,
                 coords=coords1,
             ),
@@ -554,8 +612,7 @@ class TestAppend:
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
-                encoding={"scale_factor": scale_factor},
-                offset=15419,
+                offset=18043,
                 length=15476000,
                 coords=coords2,
             ),
@@ -583,9 +640,6 @@ class TestAppend:
 
         expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
         expected_ds = concat([expected_ds1, expected_ds2], dim="time")
-        # Because we encode attributes, attributes may differ, for example
-        # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
-        # but encoded it is [185.16000366210935, 322.1000061035156]
         xrt.assert_equal(new_ds, expected_ds)
 
     # When appending to a virtual ref with compression, it succeeds
