@@ -28,11 +28,11 @@ if TYPE_CHECKING:
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if h5py:
-    Dataset = h5py.Dataset
-    Group = h5py.Group
+    Dataset = h5py.Dataset  # type: ignore
+    Group = h5py.Group  # type: ignore
 else:
-    Dataset = dict()
-    Group = dict()
+    Dataset = dict()  # type: ignore
+    Group = dict()  # type: ignore
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -183,14 +183,14 @@ class HDFVirtualBackend(VirtualBackend):
         rank = len(dataset.shape)
         if rank:
             for n in range(rank):
-                num_scales = len(dataset.dims[n])
+                num_scales = len(dataset.dims[n])  # type: ignore
                 if num_scales == 1:
-                    dims.append(dataset.dims[n][0].name[1:])
+                    dims.append(dataset.dims[n][0].name[1:])  # type: ignore
                 elif h5py.h5ds.is_scale(dataset.id):
                     dims.append(dataset.name[1:])
                 elif num_scales > 1:
                     raise ValueError(
-                        f"{dataset.name}: {len(dataset.dims[n])} "
+                        f"{dataset.name}: {len(dataset.dims[n])} "  # type: ignore
                         f"dimension scales attached to dimension #{n}"
                     )
                 elif num_scales == 0:
@@ -287,7 +287,7 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = fill_value.item()
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
-            chunks=chunks,
+            chunks=chunks,  # type: ignore
             compressor=None,
             dtype=dtype,
             fill_value=fill_value,

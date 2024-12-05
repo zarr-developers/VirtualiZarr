@@ -1,6 +1,6 @@
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, cast
 
 import pytest
 
@@ -338,8 +338,8 @@ def icechunk_storage(tmpdir) -> "StorageConfig":
 
 def generate_chunk_manifest(
     netcdf4_file: str,
-    shape: Tuple[int, ...],
-    chunks: Tuple[int, ...],
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
     offset=6144,
     length=48,
 ) -> ChunkManifest:
