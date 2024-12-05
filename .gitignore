@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 virtualizarr/_version.py
 docs/generated/
-examples/
+#examples/
