@@ -9,6 +9,8 @@ v1.1.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Optional dependencies can now be installed in groups via pip. See the installation docs.
+  (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
   (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 

@@ -23,30 +23,65 @@ dynamic = ["version"]
 dependencies = [
     "xarray>=2024.10.0",
     "numpy>=2.0.0",
-    "packaging",
     "universal-pathlib",
     "numcodecs",
     "ujson",
+    "packaging",
 ]
 
 [project.optional-dependencies]
-hdf_reader = [
+# non-kerchunk-based readers
+hdf = [
     "fsspec",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "numcodecs"
+]
+# kerchunk-based readers
+hdf5 = [
+    "kerchunk>=0.25.0",
+    "h5py",
+]
+netcdf3 = [
+    "kerchunk>=0.25.0",
+    "scipy",
+]
+fits = [
+    "kerchunk>=0.25.0",
+    "astropy",
+]
+# un-implemented readers
+# tiff = [
+#     "kerchunk>=0.25.0",
+#     "tifffile",
+# ]
+# grib = ["kerchunk>=0.25.0"]
+# zarr = ["zarr==3.0.0b2"]
+all_readers = [
+    "virtualizarr[hdf]",
+    "virtualizarr[hdf5]",
+    "virtualizarr[netcdf3]",
+    "virtualizarr[fits]",
+#    "virtualizarr[tiff]",
+#    "virtualizarr[grib]",
+#    "virtualizarr[zarr]",
+]
+# writers
+icechunk = ["icechunk"]
+# technically also a reader, as fastparquet is also required to read parquet-formatted kerchunk references
+kerchunk = ["fastparquet"]
+all_writers = [
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+]
+all = [
+    "virtualizarr[all_readers]",
+    "virtualizarr[all_writers]",
 ]
 test = [
     "codecov",
-    "fastparquet",
-    "fsspec",
-    "h5py",
-    "kerchunk>=0.2.5",
     "mypy",
-    "netcdf4",
-    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -55,8 +90,7 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "scipy",
-    "virtualizarr[hdf_reader]"
+    "virtualizarr[all]"
 ]
 
 [project.urls]
