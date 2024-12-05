@@ -78,6 +78,7 @@ Apache 2.0
 self
 installation
 usage
+examples
 faq
 api
 releases
