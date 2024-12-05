@@ -49,6 +49,8 @@ Documentation
   (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added links to recorded presentations on VirtualiZarr.
   (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to existing example notebooks.
+  (:issue:`329`, :pull:`331`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
