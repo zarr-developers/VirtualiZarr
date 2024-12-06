@@ -1,6 +1,29 @@
 Release notes
 =============
 
+.. _v1.2.1:
+
+v1.2.1 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
 .. _v1.2.0:
 
 v1.2.0 (5th Dec 2024)
