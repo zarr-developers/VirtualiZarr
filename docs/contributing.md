@@ -49,5 +49,6 @@ Anyone with commit privileges to the repository can issue a release.
 6. Enter the name for the new tag (i.e. the release version number).
 7. Click 'Generate Release Notes' to draft notes based on merged pull requests, and paste the same release summary you wrote earlier at the top.
 8. Edit the draft release notes for consistency.
-9. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
-10. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
+9. Select 'Publish' to publish the release. This should automatically upload the new release to [PyPI](https://pypi.org/project/virtualizarr/) and [conda-forge](https://anaconda.org/conda-forge/virtualizarr).
+10. Check that this has run successfully (PyPI should show the new version number very quickly, but conda-forge might take several hours).
+11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
