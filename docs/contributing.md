@@ -41,11 +41,13 @@ Open `docs/_build/html/index.html` in a web browser (on MacOS you can do this fr
 
 Anyone with commit privileges to the repository can issue a release.
 
-1. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
-2. Select draft a new release.
-3. Select 'Choose a tag', then 'create a new tag'
-4. Enter the name for the new tag following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
-4. Click 'Generate Release Notes' to draft notes based on merged pull requests.
-5. Edit the draft release notes for consistency.
-6. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
-7. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
+1. Decide on the release version number for the new release, following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
+2. Write a high-level summary of the changes in this release, and write it into the release notes in `docs/releases.rst`. Create and merge a PR which adds the summary and also changes the release notes to say today's date and the version number of the new release. Don't add the blank template for future releases yet.
+3. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
+4. Select 'Draft a new release'.
+5. Select 'Choose a tag', then 'Create a new tag'
+6. Enter the name for the new tag (i.e. the release version number).
+7. Click 'Generate Release Notes' to draft notes based on merged pull requests, and paste the same release summary you wrote earlier at the top.
+8. Edit the draft release notes for consistency.
+9. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
+10. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
