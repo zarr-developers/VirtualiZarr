@@ -1,10 +1,16 @@
 Release notes
 =============
 
-.. _v1.1.1:
+.. _v1.2.0:
 
-v1.1.1 (unreleased)
--------------------
+v1.2.0 (5th Dec 2024)
+---------------------
+
+This release brings a stricter internal model for manifest paths,
+support for appending to existing icechunk stores,
+an experimental non-kerchunk-based HDF5 reader,
+handling of nested groups in DMR++ files,
+as well as many other bugfixes and documentation improvements.
 
 New Features
 ~~~~~~~~~~~~
