@@ -310,22 +310,28 @@ class TestReadFromURL:
 
 
 class TestOpenVirtualDatasetHDFGroup:
-    def test_open_group(self, hdf5_groups_file, netcdf4_file):
-        vds = open_virtual_dataset(hdf5_groups_file, group="test/group", indexes={})
-        vds_expected = open_virtual_dataset(netcdf4_file, indexes={})
-        xrt.assert_identical(vds, vds_expected)
+    def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
+        vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, group="subgroup", indexes={})
+        assert list(vds.variables) == ['bar']
+        assert isinstance(vds['bar'].data, ManifestArray)
+        assert vds['bar'].shape == (2, 1)
 
-    def test_open_root_group_manually(self, hdf5_groups_file):
-        vds = open_virtual_dataset(hdf5_groups_file, group='', indexes={})
-        vds_expected = xr.Dataset()  # should be nothing in root group
-        xrt.assert_identical(vds, vds_expected)
+    def test_open_root_group_manually(self, netcdf4_file_with_data_in_multiple_groups):
+        vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, group="", indexes={})
+        assert list(vds.variables) == ['foo']
+        assert isinstance(vds['foo'].data, ManifestArray)
+        assert vds['foo'].shape == (3, 1)
 
-    def test_open_root_group_by_default(self, hdf5_groups_file):
-        vds = open_virtual_dataset(hdf5_groups_file, indexes={})
-        vds_expected = xr.Dataset()  # should be nothing in root group
-        xrt.assert_identical(vds, vds_expected)
+    def test_open_root_group_by_default(self, netcdf4_file_with_data_in_multiple_groups):
+        vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, indexes={})
+        assert list(vds.variables) == ['foo']
+        assert isinstance(vds['foo'].data, ManifestArray)
+        assert vds['foo'].shape == (3, 1)
 
     def test_raise_on_nonexistent_group(self): ...
+
+    def test_open_empty_group(self):
+        ...
 
 
 @requires_kerchunk
