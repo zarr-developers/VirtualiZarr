@@ -1,6 +1,6 @@
 # VirtualiZarr
 
-## Create virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.
+**Create virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
 
 The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in legacy pre-Cloud file formats such as netCDF.
 
