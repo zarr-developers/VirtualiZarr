@@ -315,7 +315,15 @@ class TestOpenVirtualDatasetHDFGroup:
         vds_expected = open_virtual_dataset(netcdf4_file, indexes={})
         xrt.assert_identical(vds, vds_expected)
 
-    def test_open_root_group_by_default(self): ...
+    def test_open_root_group_manually(self, hdf5_groups_file):
+        vds = open_virtual_dataset(hdf5_groups_file, group='', indexes={})
+        vds_expected = xr.Dataset()  # should be nothing in root group
+        xrt.assert_identical(vds, vds_expected)
+
+    def test_open_root_group_by_default(self, hdf5_groups_file):
+        vds = open_virtual_dataset(hdf5_groups_file, indexes={})
+        vds_expected = xr.Dataset()  # should be nothing in root group
+        xrt.assert_identical(vds, vds_expected)
 
     def test_raise_on_nonexistent_group(self): ...
 
