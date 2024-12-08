@@ -39,7 +39,7 @@ You can create the virtual store once (e.g. as soon as your HPC simulation finis
 
 Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
 
-In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates and version controlled history.
+In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates, version controlled history, and faster access speeds.
 
 ### I already have Kerchunked data, do I have to redo that work?
 
@@ -54,11 +54,17 @@ vds = open_virtual_dataset('refs.json')
 vds.virtualize.to_icechunk(icechunkstore)
 ```
 
+### I already have some data in Zarr, do I have to resave it?
+
+No! VirtualiZarr can (well, [soon will be able to](https://github.com/zarr-developers/VirtualiZarr/issues/262)) create virtual references pointing to existing Zarr stores in the same way as for other file formats.
+
 ### Can I add a new reader for my custom file format?
 
-There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
+There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). 
+VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
 
-VirtualiZarr is designed in a way to make this as straightforward as possible. If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
+VirtualiZarr is designed in a way to make this as straightforward as possible. 
+If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
 ) will be helpful.
 
 You can also use this approach to write a reader that starts from a kerchunk-formatted virtual references dict.
