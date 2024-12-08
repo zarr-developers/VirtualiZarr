@@ -6,13 +6,13 @@ The best way to distribute large scientific datasets is via the Cloud, in [Cloud
 
 **VirtualiZarr[^2] makes it easy to create "Virtual" Zarr stores, allowing performant access to legacy data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
 
-### Motivation
+## Motivation
 
 "Virtualized data" solves an incredibly important problem: accessing big archival datasets via a cloud-optimized pattern, but without copying or modifying the original data in any way. This is a win-win-win for users, data engineers, and data providers. Users see fast-opening zarr-compliant stores that work performantly with libraries like xarray and dask, data engineers can provide this speed by adding a lightweight virtualization layer on top of existing data (without having to ask anyone's permission), and data providers don't have to change anything about their legacy files for them to be used in a cloud-optimized way.
 
 VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data from existing scientific data as easy as possible.
 
-### Features
+## Features
 
 * Create virtual references pointing to bytes inside a legacy file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
 * Supports a [range of legacy file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
@@ -20,13 +20,13 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
 
-### Inspired by Kerchunk
+## Inspired by Kerchunk
 
 VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [Kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk but in a zarr-native way, and with a familiar array-like API.
 
 You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
 
-### Usage
+## Usage
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
@@ -55,14 +55,14 @@ No data has been loaded or copied in this process, we have merely created an on-
 
 See the [Usage docs page](#usage) for more details.
 
-### Talks and Presentations
+## Talks and Presentations
 
 - 2024/11/21 - MET Office Architecture Guild - Tom Nicholas - [Slides](https://speakerdeck.com/tomnicholas/virtualizarr-talk-at-met-office)
 - 2024/11/13 - Cloud-Native Geospatial conference - Raphael Hagen - [Slides](https://decks.carbonplan.org/cloud-native-geo/11-13-24)
 - 2024/07/24 - ESIP Meeting - Sean Harkins - [Event](https://2024julyesipmeeting.sched.com/event/1eVP6) / [Recording](https://youtu.be/T6QAwJIwI3Q?t=3689)
 - 2024/05/15 - Pangeo showcase - Tom Nicholas - [Event](https://discourse.pangeo.io/t/pangeo-showcase-virtualizarr-create-virtual-zarr-stores-using-xarray-syntax/4127/2) / [Recording](https://youtu.be/ioxgzhDaYiE) / [Slides](https://speakerdeck.com/tomnicholas/virtualizarr-create-virtual-zarr-stores-using-xarray-syntax)
 
-### Credits
+## Credits
 
 This package was originally developed by [Tom Nicholas](https://github.com/TomNicholas) whilst working at [[C]Worthy](https://cworthy.org), who deserve credit for allowing him to prioritise a generalizable open-source solution to the dataset virtualization problem. VirtualiZarr is now a community-owned multi-stakeholder project.
 
@@ -70,7 +70,7 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 
 Apache 2.0
 
-### References
+## References
 
 [^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
 
