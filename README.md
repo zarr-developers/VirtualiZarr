@@ -18,7 +18,7 @@
 
 The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in legacy pre-Cloud file formats such as netCDF.
 
-**VirtualiZarr makes it easy to create "Virtual" Zarr stores, allowing access to data in legacy formats as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating the data_.**
+**VirtualiZarr makes it easy to create "Virtual" Zarr stores, allowing access to data in legacy formats as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
 
 VirtualiZarr (pronounced like "virtualizer" but more piratey) grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk in a zarr-native way, and with a familiar array-like API.
 
@@ -27,6 +27,14 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 **Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/index.html)**
 
 [^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
+
+### Features
+
+* Create virtual references pointing to bytes inside a legacy file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
+* Supports a [range of legacy file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
+* Combine the data from multiple files into one larger store using [simple functions like `xarray.concat`](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets),
+* Commit the virtual references to storage either using the [Kerchunk references specification](https://fsspec.github.io/kerchunk/spec.html) or the [Icechunk transactional storage engine](https://icechunk.io/).
+* Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
 
 ### Development Status and Roadmap
 
@@ -58,3 +66,5 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 ### Licence
 
 Apache 2.0
+
+### References
