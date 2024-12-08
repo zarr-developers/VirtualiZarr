@@ -48,19 +48,22 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkSto
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
     ]
+
+    print(hdf_groups)
+    print(group)
+
     if len(hdf_groups) == 1:
         return vds_refs
     else:
         if group is None:
-            raise ValueError(
-                f"Multiple HDF Groups found. Must specify group= keyword to select one of {hdf_groups}"
-            )
-        else:
-            # Ensure supplied group kwarg is consistent with kerchunk keys
-            if not group.endswith("/"):
-                group += "/"
-            if group.startswith("/"):
-                group = group.removeprefix("/")
+            # open root group by default
+            group = ''
+
+        # Ensure supplied group kwarg is consistent with kerchunk keys
+        if not group.endswith("/"):
+            group += "/"
+        if group.startswith("/"):
+            group = group.removeprefix("/")
 
         if group not in hdf_groups:
             raise ValueError(f'Group "{group}" not found in {hdf_groups}')
