@@ -309,6 +309,17 @@ class TestReadFromURL:
         xrt.assert_equal(dsXR, dsV)
 
 
+class TestOpenVirtualDatasetHDFGroup:
+    def test_open_group(self, hdf5_groups_file, netcdf4_file):
+        vds = open_virtual_dataset(hdf5_groups_file, group="test/group", indexes={})
+        vds_expected = open_virtual_dataset(netcdf4_file, indexes={})
+        xrt.assert_identical(vds, vds_expected)
+
+    def test_open_root_group_by_default(self): ...
+
+    def test_raise_on_nonexistent_group(self): ...
+
+
 @requires_kerchunk
 class TestLoadVirtualDataset:
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
