@@ -1,6 +1,8 @@
 # FAQ
 
-## I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
+## Usage questions
+
+### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
 Potentially yes.
 
@@ -19,15 +21,45 @@ ds  # the complete lazy xarray dataset
 ```
 
 However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive. 
-Instead you would prefer to just be able to open a single pre-saved virtual zarr store (i.e. `xr.open_dataset('my_virtual_store.zarr')`), as that would open instantly, but still give access to the same data underneath.
+Instead you would prefer to just be able to open a single pre-saved virtual store that points to all your data, as that would open instantly (using `xr.open_dataset('my_virtual_store.zarr')`), but still give access to the same data underneath.
 
 **`VirtualiZarr` aims to allow you to use the same xarray incantation you would normally use to open and combine all your files, but cache that result as a virtual Zarr store.**
 
-We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. 
+You can think of this as effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. 
 Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
 As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud. 
 You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
+
+### Is this compatible with Icechunk?
+
+Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
+
+In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates and version controlled history.
+
+### I already have Kerchunked data, do I have to redo that work?
+
+No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can re-save them into a new format, e.g. [Icechunk](https://icechunk.io/) like so:
+
+```python
+from virtualizarr import open_virtual_dataset
+
+vds = open_virtual_dataset('refs.json')
+# vds = open_virtual_dataset('refs.parq')  # kerchunk parquet files are supported too
+
+vds.virtualize.to_icechunk(icechunkstore)
+```
+
+### Can I add a new reader for my custom file format?
+
+There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
+
+VirtualiZarr is designed in a way to make this as straightforward as possible. If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
+) will be helpful.
+
+You can also use this approach to write a reader that starts from a kerchunk-formatted virtual references dict.
+
+Currently if you want to call your new reader from `virtualizarr.open_virtual_dataset` you would need to open a PR to this repository, but we plan to generalize this system to allow 3rd party libraries to plug in via an entrypoint (see [issue #245](https://github.com/zarr-developers/VirtualiZarr/issues/245)).
 
 ## How does this actually work?
 
@@ -86,7 +118,9 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Zarr v3 store with `manifest.json` files                                 | ❌                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
 | [Icechunk](https://icechunk.io/) store                          | ❌                                                                                                                                 | `ds.virtualize.to_icechunk()`, then read back via xarray (requires zarr-python v3).                                |
 
-## Why a new project?
+## Development
+
+### Why a new project?
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
 - Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself.
@@ -94,7 +128,7 @@ The reasons why VirtualiZarr has been developed as separate project rather than 
 - The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality.
 - Refactoring Kerchunk's existing API to maintain backwards compatibility would have been [challenging](https://github.com/fsspec/kerchunk/issues/434).
 
-## What is the Development Status and Roadmap?
+### What is the Development Status and Roadmap?
 
 VirtualiZarr version 1 (mostly) achieves [feature parity](#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
@@ -109,33 +143,3 @@ We have a lot of ideas, including:
 - [Generating references without kerchunk](https://github.com/zarr-developers/VirtualiZarr/issues/78)
 
 If you see other opportunities then we would love to hear your ideas!
-
-## Is this compatible with Icechunk?
-
-Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
-
-In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates and version controlled history.
-
-## I already have Kerchunked data, do I have to redo that work?
-
-No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can re-save them into a new format, e.g. [Icechunk](https://icechunk.io/) like so:
-
-```python
-from virtualizarr import open_virtual_dataset
-
-vds = open_virtual_dataset('refs.json')
-# vds = open_virtual_dataset('refs.parq')  # kerchunk parquet files are supported too
-
-vds.virtualize.to_icechunk(icechunkstore)
-```
-
-## Can I add a new reader for my custom file format?
-
-There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
-
-VirtualiZarr is designed in a way to make this as straightforward as possible. If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
-) will be helpful.
-
-You can also use this approach to write a reader that starts from a kerchunk-formatted virtual references dict.
-
-Currently if you want to call your new reader from `virtualizarr.open_virtual_dataset` you would need to open a PR to this repository, but we plan to generalize this system to allow 3rd party libraries to plug in via an entrypoint (see [issue #245](https://github.com/zarr-developers/VirtualiZarr/issues/245)).
