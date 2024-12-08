@@ -70,13 +70,7 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 
 Apache 2.0
 
-## References
-
-[^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
-
-[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
-
-## Site Contents
+## Pages
 
 ```{toctree}
 :maxdepth: 2
@@ -90,3 +84,9 @@ api
 releases
 contributing
 ```
+
+## References
+
+[^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
+
+[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
