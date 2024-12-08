@@ -1,6 +1,35 @@
 # FAQ
 
-## How does this work?
+## I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
+
+Potentially yes.
+
+Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along one or more dimensions to form a large dataset. 
+Let's also imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. 
+(If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
+
+```python
+# open_mfdataset does a lot of checks, so can take a while
+ds = xr.open_mfdataset(
+    '/my/files*.nc',
+    engine='h5netcdf',
+    combine='nested',
+)
+ds  # the complete lazy xarray dataset
+```
+
+However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive. 
+Instead you would prefer to just be able to open a single pre-saved virtual zarr store (i.e. `xr.open_dataset('my_virtual_store.zarr')`), as that would open instantly, but still give access to the same data underneath.
+
+**`VirtualiZarr` aims to allow you to use the same xarray incantation you would normally use to open and combine all your files, but cache that result as a virtual Zarr store.**
+
+We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. 
+Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
+
+As Zarr can read data on filesystems too, this can be useful even if you don't plan to put your data in the cloud. 
+You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
+
+## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of legacy files in some other format as a series of steps:
 
@@ -16,9 +45,9 @@ The above steps could also be performed using the `kerchunk` library alone, but 
 
 ## How do VirtualiZarr and Kerchunk compare?
 
-You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides almost all the same features as Kerchunk.
+You have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides almost all the same features as Kerchunk.
 
-Users of kerchunk may find the following comparison table useful, which shows which features of kerchunk map on to which features of VirtualiZarr.
+Users of Kerchunk may find the following comparison table useful, which shows which features of Kerchunk map on to which features of VirtualiZarr.
 
 | Component / Feature                                                      | Kerchunk                                                                                                                            | VirtualiZarr                                                                                                                                     |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -61,7 +90,7 @@ Users of kerchunk may find the following comparison table useful, which shows wh
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
 - Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself,
-- Once the VirtualiZarr feature list above is complete, it will likely not share any code with the Kerchunk library, nor import it,
+- The VirtualiZarr roadmap means that it will likely at some point not share any code with the Kerchunk library, nor require importing it,
 - The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality,
 - Refactoring Kerchunk's existing API to maintain backwards compatibility would have been [challenging](https://github.com/fsspec/kerchunk/issues/434).
 

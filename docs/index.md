@@ -30,25 +30,6 @@ VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues
 
 You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
 
-### Xarray
-
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along a dimension to form a large dataset. Let's imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
-
-```python
-ds = xr.open_mfdataset(
-    '/my/files*.nc',
-    engine='h5netcdf',
-    combine='nested',
-)
-ds  # the complete lazy xarray dataset
-```
-
-However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive. Instead you would prefer to just be able to open a virtualized Zarr store (i.e. `xr.open_dataset('my_virtual_store.zarr')`), as that would open instantly, but still give access to the same data underneath.
-
-**`VirtualiZarr` aims to allow you to use the same xarray incantation you would normally use to open and combine all your files, but cache that result as a virtual Zarr store.**
-
-What's being cached here, you ask? We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
-
 ### Usage
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
