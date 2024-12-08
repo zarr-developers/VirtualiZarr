@@ -41,9 +41,9 @@ Very much so! VirtualiZarr allows you to ingest data as virtual references and w
 
 In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates, version controlled history, and faster access speeds.
 
-### I already have Kerchunked data, do I have to redo that work?
+### I have already Kerchunked my data, do I have to redo that?
 
-No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can re-save them into a new format, e.g. [Icechunk](https://icechunk.io/) like so:
+No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can manipulate them, or re-save them into a new format, such as  [Icechunk](https://icechunk.io/):
 
 ```python
 from virtualizarr import open_virtual_dataset
