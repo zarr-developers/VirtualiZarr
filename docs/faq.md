@@ -26,7 +26,7 @@ Instead you would prefer to just be able to open a single pre-saved virtual zarr
 We're effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. 
 Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
-As Zarr can read data on filesystems too, this can be useful even if you don't plan to put your data in the cloud. 
+As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud. 
 You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
 
 ## How does this actually work?
@@ -89,9 +89,9 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 ## Why a new project?
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
-- Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself,
-- The VirtualiZarr roadmap means that it will likely at some point not share any code with the Kerchunk library, nor require importing it,
-- The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality,
+- Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself.
+- Whilst some features of VirtualiZarr currently require importing Kerchunk, Kerchunk is an optional dependency, and the VirtualiZarr roadmap aims to at some point not share any code with the Kerchunk library, nor ever require importing it. (You would nevertheless still be able to write out references in the Kerchunk format though!)
+- The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality.
 - Refactoring Kerchunk's existing API to maintain backwards compatibility would have been [challenging](https://github.com/fsspec/kerchunk/issues/434).
 
 ## What is the Development Status and Roadmap?
@@ -112,7 +112,9 @@ If you see other opportunities then we would love to hear your ideas!
 
 ## Is this compatible with Icechunk?
 
-Yes! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets.](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr)
+Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
+
+In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates and version controlled history.
 
 ## I already have Kerchunked data, do I have to redo that work?
 
@@ -129,7 +131,7 @@ vds.virtualize.to_icechunk(icechunkstore)
 
 ## Can I add a new reader for my custom file format?
 
-There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) for some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
+There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
 
 VirtualiZarr is designed in a way to make this as straightforward as possible. If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
 ) will be helpful.
