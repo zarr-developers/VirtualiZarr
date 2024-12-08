@@ -6,8 +6,8 @@
 
 Potentially yes.
 
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along one or more dimensions to form a large dataset. 
-Let's also imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset. 
+Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along one or more dimensions to form a large dataset.
+Let's also imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset.
 (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 
 ```python
@@ -20,19 +20,19 @@ ds = xr.open_mfdataset(
 ds  # the complete lazy xarray dataset
 ```
 
-However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive. 
+However, you don't want to run this set of xarray operations every time you open this dataset, as running commands like `xr.open_mfdataset` can be expensive.
 Instead you would prefer to just be able to open a single pre-saved virtual store that points to all your data, as that would open instantly (using `xr.open_dataset('my_virtual_store.zarr')`), but still give access to the same data underneath.
 
 **`VirtualiZarr` aims to allow you to use the same xarray incantation you would normally use to open and combine all your files, but cache that result as a virtual Zarr store.**
 
-You can think of this as effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together. 
+You can think of this as effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together.
 Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
 ```{note}
 This means you should not change or add to any of the files comprising the store once created. If you want to make changes or add new data, you should look into using [Icechunk](https://icechunk.io/) instead.
 ```
 
-As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud. 
+As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud.
 You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
 
 ### Is this compatible with Icechunk?
@@ -60,10 +60,10 @@ No! VirtualiZarr can (well, [soon will be able to](https://github.com/zarr-devel
 
 ### Can I add a new reader for my custom file format?
 
-There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples). 
+There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples).
 VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
 
-VirtualiZarr is designed in a way to make this as straightforward as possible. 
+VirtualiZarr is designed in a way to make this as straightforward as possible.
 If you want to do this then [this comment](https://github.com/zarr-developers/VirtualiZarr/issues/262#issuecomment-2429968244
 ) will be helpful.
 
