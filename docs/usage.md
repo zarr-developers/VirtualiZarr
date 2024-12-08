@@ -7,7 +7,7 @@ This page explains how to use VirtualiZarr today, by introducing the key concept
 
 VirtualiZarr is for manipulating "virtual" references to pre-existing data stored on disk in a variety of formats, by representing it in terms of the [Zarr data model](https://zarr-specs.readthedocs.io/en/latest/specs.html) of chunked N-dimensional arrays.
 
-If we have a pre-existing netCDF file on disk,
+If we have a pre-existing netCDF file on disk:
 
 ```python
 import xarray as xr

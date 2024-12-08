@@ -22,10 +22,6 @@ The best way to distribute large scientific datasets is via the Cloud, in [Cloud
 
 Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/index.html).
 
-[^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
-
-[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
-
 ### Features
 
 * Create virtual references pointing to bytes inside a legacy file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
@@ -70,3 +66,9 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 ### Licence
 
 Apache 2.0
+
+### References
+
+[^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
+
+[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
