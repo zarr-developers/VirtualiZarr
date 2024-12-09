@@ -103,7 +103,6 @@ def virtual_vars_from_kerchunk_refs(
     var_names_to_keep = [
         var_name for var_name in var_names if var_name not in drop_variables
     ]
-    print(var_names_to_keep)
 
     vars = {
         var_name: variable_from_kerchunk_refs(
