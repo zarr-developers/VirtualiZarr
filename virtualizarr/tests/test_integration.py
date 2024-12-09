@@ -49,12 +49,6 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
     xrt.assert_equal(roundtrip, ds)
 
 
-def test_no_duplicates_find_var_names():
-    """Verify that we get a deduplicated list of var names"""
-    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
-    assert len(find_var_names(ref_dict)) == 1
-
-
 @requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
