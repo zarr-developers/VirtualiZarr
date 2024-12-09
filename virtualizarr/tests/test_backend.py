@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from xarray import open_dataset
+from xarray import open_dataset, Dataset
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
@@ -307,6 +307,13 @@ class TestReadFromURL:
 
         # xrt.assert_identical(dsXR, dsV) #Attribute order changes
         xrt.assert_equal(dsXR, dsV)
+
+
+def test_open_empty_group(empty_netcdf4_file):
+    vds = open_virtual_dataset(empty_netcdf4_file, indexes={})
+    assert isinstance(vds, xr.Dataset)
+    expected = Dataset()
+    xrt.assert_identical(vds, expected)
 
 
 class TestOpenVirtualDatasetHDFGroup:

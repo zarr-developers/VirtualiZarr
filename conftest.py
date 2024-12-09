@@ -25,6 +25,17 @@ def pytest_runtest_setup(item):
 
 
 @pytest.fixture
+def empty_netcdf4_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.Dataset()    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/empty.nc"
+    ds.to_netcdf(filepath, format="NETCDF4")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_file(tmpdir):
     # Set up example xarray dataset
     ds = xr.tutorial.open_dataset("air_temperature")
