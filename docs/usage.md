@@ -321,7 +321,15 @@ You can see that the dataset contains a mixture of virtual variables backed by `
 Loading variables can be useful in a few scenarios:
 1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
-3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
+4. You have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data), and you want to be able to concatenate them together.
+
+### Loading low-dimensional coordinates
+
+In general, it is recommended to load all of your low-dimensional coordinates.
+This will slow down your initial opening of the individual virtual datasets, but by loading your coordinates into memory, they can be inlined in the reference file for fast reads of the virtualized store.
+However, doing this for coordinates that are N-dimensional might use a lot of storage duplicating them.
+Also, anything duplicated could become out of sync with the referenced original files, especially if not using a transactional storage engine like `Icechunk`.
 
 ### CF-encoded time variables
 
