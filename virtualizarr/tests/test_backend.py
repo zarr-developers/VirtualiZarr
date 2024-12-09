@@ -314,19 +314,19 @@ class TestOpenVirtualDatasetHDFGroup:
         vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, group="subgroup", indexes={})
         assert list(vds.variables) == ['bar']
         assert isinstance(vds['bar'].data, ManifestArray)
-        assert vds['bar'].shape == (2, 1)
+        assert vds['bar'].shape == (2,)
 
     def test_open_root_group_manually(self, netcdf4_file_with_data_in_multiple_groups):
         vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, group="", indexes={})
         assert list(vds.variables) == ['foo']
         assert isinstance(vds['foo'].data, ManifestArray)
-        assert vds['foo'].shape == (3, 1)
+        assert vds['foo'].shape == (3,)
 
     def test_open_root_group_by_default(self, netcdf4_file_with_data_in_multiple_groups):
         vds = open_virtual_dataset(netcdf4_file_with_data_in_multiple_groups, indexes={})
         assert list(vds.variables) == ['foo']
         assert isinstance(vds['foo'].data, ManifestArray)
-        assert vds['foo'].shape == (3, 1)
+        assert vds['foo'].shape == (3,)
 
     def test_raise_on_nonexistent_group(self): ...
 

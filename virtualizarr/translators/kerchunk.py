@@ -43,7 +43,7 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     return virtual_vars, ds_attrs, coord_names
 
 
-def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
+def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
     """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
@@ -52,43 +52,29 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkSto
     print(hdf_groups)
     print(group)
 
-    if len(hdf_groups) == 1:
-        return vds_refs
-    else:
-        if group is None:
-            # open root group by default
-            group = ''
+    # Ensure supplied group kwarg is consistent with kerchunk keys
+    if not group.endswith("/"):
+        group += "/"
+    if group.startswith("/"):
+        group = group.removeprefix("/")
 
-        print(hdf_groups)
-        print(vds_refs)
+    if group not in hdf_groups:
+        raise ValueError(f'Group "{group}" not found in {hdf_groups}')
 
-        if group is '':
-            # don't need to remove any group prefixes from keys
-            return KerchunkStoreRefs(vds_refs)
-        else:
-            # Ensure supplied group kwarg is consistent with kerchunk keys
-            if not group.endswith("/"):
-                group += "/"
-            if group.startswith("/"):
-                group = group.removeprefix("/")
+    # Filter by group prefix and remove prefix from all keys
+    groupdict = {
+        k.removeprefix(group): v
+        for k, v in vds_refs["refs"].items()
+        if k.startswith(group)
+    }
+    # Also remove group prefix from _ARRAY_DIMENSIONS
+    for k, v in groupdict.items():
+        if isinstance(v, str):
+            groupdict[k] = v.replace("\\/", "/").replace(group, "")
 
-            if group not in hdf_groups:
-                raise ValueError(f'Group "{group}" not found in {hdf_groups}')
+    vds_refs["refs"] = groupdict
 
-            # Filter by group prefix and remove prefix from all keys
-            groupdict = {
-                k.removeprefix(group): v
-                for k, v in vds_refs["refs"].items()
-                if k.startswith(group)
-            }
-            # Also remove group prefix from _ARRAY_DIMENSIONS
-            for k, v in groupdict.items():
-                if isinstance(v, str):
-                    groupdict[k] = v.replace("\\/", "/").replace(group, "")
-
-            vds_refs["refs"] = groupdict
-
-        return KerchunkStoreRefs(vds_refs)
+    return KerchunkStoreRefs(vds_refs)
 
 
 def virtual_vars_from_kerchunk_refs(

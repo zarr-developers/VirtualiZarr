@@ -43,7 +43,9 @@ class HDF5VirtualBackend(VirtualBackend):
             filepath, inline_threshold=0, **reader_options
         ).translate()
 
-        refs = extract_group(refs, group)
+        # both group=None and group='' mean to read root group
+        if group:
+            refs = extract_group(refs, group)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
