@@ -1,11 +1,17 @@
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
 
 import numpy as np
 import xarray as xr
-from xarray import Index, Variable
+from xarray import Dataset, Index, Variable
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkEntry,
+    ChunkManifest,
+    ManifestArray,
+)
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -22,11 +28,11 @@ if TYPE_CHECKING:
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if h5py:
-    Dataset = h5py.Dataset
-    Group = h5py.Group
+    Dataset = h5py.Dataset  # type: ignore
+    Group = h5py.Group  # type: ignore
 else:
-    Dataset = dict()
-    Group = dict()
+    Dataset = dict()  # type: ignore
+    Group = dict()  # type: ignore
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -49,6 +55,10 @@ class HDFVirtualBackend(VirtualBackend):
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
             loadable_variables,
+        )
+
+        filepath = validate_and_normalize_path_to_uri(
+            filepath, fs_root=Path.cwd().as_uri()
         )
 
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
@@ -105,11 +115,12 @@ class HDFVirtualBackend(VirtualBackend):
             else:
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
-                chunk_entry = ChunkEntry(
+
+                chunk_entry = ChunkEntry.with_validation(
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)
-                chunk_entries = {chunk_key: chunk_entry.dict()}
+                chunk_entries = {chunk_key: chunk_entry}
                 chunk_manifest = ChunkManifest(entries=chunk_entries)
                 return chunk_manifest
         else:
@@ -172,14 +183,14 @@ class HDFVirtualBackend(VirtualBackend):
         rank = len(dataset.shape)
         if rank:
             for n in range(rank):
-                num_scales = len(dataset.dims[n])
+                num_scales = len(dataset.dims[n])  # type: ignore
                 if num_scales == 1:
-                    dims.append(dataset.dims[n][0].name[1:])
+                    dims.append(dataset.dims[n][0].name[1:])  # type: ignore
                 elif h5py.h5ds.is_scale(dataset.id):
                     dims.append(dataset.name[1:])
                 elif num_scales > 1:
                     raise ValueError(
-                        f"{dataset.name}: {len(dataset.dims[n])} "
+                        f"{dataset.name}: {len(dataset.dims[n])} "  # type: ignore
                         f"dimension scales attached to dimension #{n}"
                     )
                 elif num_scales == 0:
@@ -276,7 +287,7 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = fill_value.item()
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
-            chunks=chunks,
+            chunks=chunks,  # type: ignore
             compressor=None,
             dtype=dtype,
             fill_value=fill_value,

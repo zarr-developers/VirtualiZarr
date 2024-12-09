@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
@@ -46,6 +47,7 @@ class NetCDF3VirtualBackend(VirtualBackend):
             refs,
             loadable_variables,
             drop_variables,
+            fs_root=Path.cwd().as_uri(),
         )
 
         loadable_vars, indexes = open_loadable_vars_and_indexes(

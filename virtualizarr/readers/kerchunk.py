@@ -25,9 +25,14 @@ class KerchunkVirtualBackend(VirtualBackend):
     ) -> Dataset:
         """Reads existing kerchunk references (in JSON or parquet) format."""
 
+        if virtual_backend_kwargs is None:
+            virtual_backend_kwargs = {}
+
+        fs_root = virtual_backend_kwargs.pop("fs_root", None)
+
         if virtual_backend_kwargs:
             raise NotImplementedError(
-                "Kerchunk reader does not understand any virtual_backend_kwargs"
+                f"Kerchunk reader does not understand any of the virtual_backend_kwargs {virtual_backend_kwargs}"
             )
 
         if group:
@@ -57,7 +62,9 @@ class KerchunkVirtualBackend(VirtualBackend):
 
             full_reference = {"refs": array_refs}
 
-            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(full_reference))
+            vds = dataset_from_kerchunk_refs(
+                KerchunkStoreRefs(full_reference), fs_root=fs_root
+            )
 
         # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
         # https://fsspec.github.io/kerchunk/spec.html
@@ -65,7 +72,7 @@ class KerchunkVirtualBackend(VirtualBackend):
             with fs.open_file() as of:
                 refs = ujson.load(of)
 
-            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(refs))
+            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(refs), fs_root=fs_root)
 
         else:
             raise ValueError(

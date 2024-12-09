@@ -1,22 +1,57 @@
 Release notes
 =============
 
-.. _v1.1.1:
+.. _v1.2.1:
 
-v1.1.1 (unreleased)
+v1.2.1 (unreleased)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+- Change intro text in readme and docs landing page to be clearer, less about the relationship to Kerchunk, and more about why you would want virtual datasets in the first place.
+  (:pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.2.0:
+
+v1.2.0 (5th Dec 2024)
+---------------------
+
+This release brings a stricter internal model for manifest paths,
+support for appending to existing icechunk stores,
+an experimental non-kerchunk-based HDF5 reader,
+handling of nested groups in DMR++ files,
+as well as many other bugfixes and documentation improvements.
 
 New Features
 ~~~~~~~~~~~~
 
 - Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
   (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added append functionality to `to_icechunk` (:pull:`272`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -42,6 +77,12 @@ Documentation
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - More minor improvements to the Contributing Guide.
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Correct some links to the API.
+  (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to recorded presentations on VirtualiZarr.
+  (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to existing example notebooks.
+  (:issue:`329`, :pull:`331`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -50,6 +91,8 @@ Internal Changes
   (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+- File paths in chunk manifests are now always stored as abolute URIs.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.1.0:
 

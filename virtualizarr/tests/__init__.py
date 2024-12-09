@@ -40,6 +40,8 @@ has_tifffile, requires_tifffile = _importorskip("tifffile")
 has_zarrV3, requires_zarrV3 = _importorskip("zarr", minversion="2.99.0")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
+has_zarr_python, requires_zarr_python = _importorskip("zarr")
+has_zarr_python_v3, requires_zarr_python_v3 = _importorskip("zarr", "3.0.0b")
 
 
 def create_manifestarray(
@@ -84,7 +86,7 @@ def create_manifestarray(
 def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
     """Generate a (somewhat) unique manifest entry from a given chunk key"""
     entry = {
-        "path": f"file.{str(join(ind))}.nc",
+        "path": f"/foo.{str(join(ind))}.nc",
         "offset": offset_from_chunk_key(ind),
         "length": length_from_chunk_key(ind),
     }

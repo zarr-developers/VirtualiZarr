@@ -22,7 +22,7 @@ def gen_ds_refs(
     if zattrs is None:
         zattrs = '{"_ARRAY_DIMENSIONS":["x","y"]}'
     if chunks is None:
-        chunks = {"a/0.0": ["test1.nc", 6144, 48]}
+        chunks = {"a/0.0": ["/test1.nc", 6144, 48]}
 
     return {
         "version": 1,
@@ -78,7 +78,7 @@ def test_dataset_from_df_refs(refs_file_factory):
     assert vda.data.zarray.order == "C"
 
     assert vda.data.manifest.dict() == {
-        "0.0": {"path": "test1.nc", "offset": 6144, "length": 48}
+        "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
     }
 
 
@@ -121,3 +121,53 @@ def test_empty_chunk_manifest(refs_file_factory):
     assert isinstance(vds["a"].data, ManifestArray)
     assert vds["a"].sizes == {"x": 100, "y": 200}
     assert vds["a"].chunksizes == {"x": 50, "y": 100}
+
+
+def test_handle_relative_paths(refs_file_factory):
+    # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
+    refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
+
+    with pytest.raises(ValueError, match="must be absolute posix paths"):
+        open_virtual_dataset(refs_file, filetype="kerchunk")
+
+    refs_file = refs_file_factory(chunks={"a/0.0": ["./test1.nc", 6144, 48]})
+    with pytest.raises(ValueError, match="must be absolute posix paths"):
+        open_virtual_dataset(refs_file, filetype="kerchunk")
+
+    with pytest.raises(
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+    ):
+        open_virtual_dataset(
+            refs_file,
+            filetype="kerchunk",
+            virtual_backend_kwargs={"fs_root": "some_directory/"},
+        )
+
+    with pytest.raises(
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+    ):
+        open_virtual_dataset(
+            refs_file,
+            filetype="kerchunk",
+            virtual_backend_kwargs={"fs_root": "/some_directory/file.nc"},
+        )
+
+    vds = open_virtual_dataset(
+        refs_file,
+        filetype="kerchunk",
+        virtual_backend_kwargs={"fs_root": "/some_directory/"},
+    )
+    vda = vds["a"]
+    assert vda.data.manifest.dict() == {
+        "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
+    }
+
+    vds = open_virtual_dataset(
+        refs_file,
+        filetype="kerchunk",
+        virtual_backend_kwargs={"fs_root": "file:///some_directory/"},
+    )
+    vda = vds["a"]
+    assert vda.data.manifest.dict() == {
+        "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
+    }

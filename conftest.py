@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 import h5py
 import numpy as np
 import pytest
@@ -36,6 +38,32 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def netcdf4_files_factory(tmpdir) -> callable:
+    def create_netcdf4_files(
+        encoding: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> tuple[str, str]:
+        ds = xr.tutorial.open_dataset("air_temperature")
+
+        # Split dataset into two parts
+        ds1 = ds.isel(time=slice(None, 1460))
+        ds2 = ds.isel(time=slice(1460, None))
+
+        # Save datasets to disk as NetCDF in the temporary directory with the provided encoding
+        filepath1 = f"{tmpdir}/air1.nc"
+        filepath2 = f"{tmpdir}/air2.nc"
+        ds1.to_netcdf(filepath1, encoding=encoding)
+        ds2.to_netcdf(filepath2, encoding=encoding)
+
+        # Close datasets
+        ds1.close()
+        ds2.close()
+
+        return filepath1, filepath2
+
+    return create_netcdf4_files
+
+
+@pytest.fixture
 def netcdf4_file_with_2d_coords(tmpdir):
     ds = xr.tutorial.open_dataset("ROMS_example")
     filepath = f"{tmpdir}/ROMS_example.nc"
@@ -69,26 +97,6 @@ def hdf5_groups_file(tmpdir):
     ds.close()
 
     return filepath
-
-
-@pytest.fixture
-def netcdf4_files(tmpdir):
-    # Set up example xarray dataset
-    ds = xr.tutorial.open_dataset("air_temperature")
-
-    # split inrto equal chunks so we can concatenate them back together later
-    ds1 = ds.isel(time=slice(None, 1460))
-    ds2 = ds.isel(time=slice(1460, None))
-
-    # Save it to disk as netCDF (in temporary directory)
-    filepath1 = f"{tmpdir}/air1.nc"
-    filepath2 = f"{tmpdir}/air2.nc"
-    ds1.to_netcdf(filepath1)
-    ds2.to_netcdf(filepath2)
-    ds1.close()
-    ds2.close()
-
-    return filepath1, filepath2
 
 
 @pytest.fixture
