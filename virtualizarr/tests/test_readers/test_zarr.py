@@ -73,15 +73,18 @@ class TestOpenVirtualDatasetZarr:
         ]
         for array in arrays:
             for attr in zarray_checks:
-                import ipdb; ipdb.set_trace()
+                import ipdb
+
+                ipdb.set_trace()
 
                 # for v3:
-                # schema is diff for 
+                # schema is diff for
                 # chunks: zg_metadata_dict["consolidated_metadata"]["metadata"][array]['chunk_grid']['configuration']['chunk_shape']
-                # 
+                #
 
-                
                 assert (
                     getattr(vds[array].data.zarray, attr)
-                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][attr]
+                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
+                        attr
+                    ]
                 )

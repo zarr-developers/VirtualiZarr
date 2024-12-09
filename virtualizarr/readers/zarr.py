@@ -220,7 +220,9 @@ async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> boo
     return await zarr_group.store.exists(chunk_key)
 
 
-async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str, zarr_version: int) -> dict:
+async def get_chunk_paths(
+    zarr_group: zarr.core.group, array_name: str, zarr_version: int
+) -> dict:
     chunk_paths = {}
     # Is there a way to call `zarr_group.store.list()` per array?
 
@@ -230,15 +232,16 @@ async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str, zarr_ver
             and item.startswith(array_name)
             and await chunk_exists(zarr_group=zarr_group, chunk_key=item)
         ):
-                
             if zarr_version == 2:
                 # split on array name + trailing slash
                 chunk_key = item.split(array_name + "/")[-1]
             elif zarr_version == 3:
                 # In v3 we remove the /c/ 'chunks' part of the key and
                 # replace trailing slashes with '.' to conform to ChunkManifest validation
-                chunk_key = item.split(array_name + "/")[-1].split('c/')[-1].replace('/','.')
-                
+                chunk_key = (
+                    item.split(array_name + "/")[-1].split("c/")[-1].replace("/", ".")
+                )
+
             else:
                 raise NotImplementedError(f"{zarr_version} not 2 or 3.")
             chunk_paths[chunk_key] = {
@@ -254,18 +257,22 @@ async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str, zarr_ver
     return chunk_paths
 
 
-def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str, zarr_version: int) -> dict:
+def construct_chunk_key_mapping(
+    zarr_group: zarr.core.group, array_name: str, zarr_version: int
+) -> dict:
     import asyncio
 
-    return asyncio.run(get_chunk_paths(zarr_group=zarr_group, array_name=array_name, zarr_version=zarr_version))
+    return asyncio.run(
+        get_chunk_paths(
+            zarr_group=zarr_group, array_name=array_name, zarr_version=zarr_version
+        )
+    )
 
 
 def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     zarr_array = zarr_group[var_name]
 
     attrs = zarr_array.metadata.attributes
-
-
 
     if zarr_array.metadata.zarr_format == 2:
         array_zarray = _parse_zarr_v2_metadata(zarr_array=zarr_array)
@@ -277,7 +284,9 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
-    array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name, zarr_version=zarr_array.metadata.zarr_format)
+    array_chunk_sizes = construct_chunk_key_mapping(
+        zarr_group, array_name=var_name, zarr_version=zarr_array.metadata.zarr_format
+    )
 
     array_chunkmanifest = ChunkManifest(array_chunk_sizes)
 
