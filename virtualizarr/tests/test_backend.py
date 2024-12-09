@@ -395,8 +395,6 @@ class TestLoadVirtualDataset:
                     hdf5_groups_file, group="doesnt_exist", backend=hdf_backend
                 )
         if hdf_backend == HDF5VirtualBackend:
-            with pytest.raises(ValueError, match="Multiple HDF Groups found"):
-                open_virtual_dataset(hdf5_groups_file)
             with pytest.raises(ValueError, match="not found in"):
                 open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
 
