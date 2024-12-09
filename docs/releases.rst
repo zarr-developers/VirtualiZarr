@@ -21,6 +21,9 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Change intro text in readme and docs landing page to be clearer, less about the relationship to Kerchunk, and more about why you would want virtual datasets in the first place.
+  (:pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
