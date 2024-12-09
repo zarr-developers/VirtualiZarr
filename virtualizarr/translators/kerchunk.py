@@ -226,7 +226,7 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     for key in refs.keys():
         # has to capture "foo/.zarray", but ignore ".zgroup", ".zattrs", and "subgroup/bar/.zarray"
         # TODO this might be a sign that we should introduce a KerchunkGroupRefs type and cut down the references before getting to this point...
-        if key not in (".zgroup", ".zattrs"):
+        if key not in (".zgroup", ".zattrs", ".zmetadata"):
             first_part, second_part, *_ = key.split("/")
             if second_part == ".zarray":
                 found_var_names.append(first_part)
