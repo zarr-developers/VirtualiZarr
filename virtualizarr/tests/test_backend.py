@@ -309,6 +309,7 @@ class TestReadFromURL:
         xrt.assert_equal(dsXR, dsV)
 
 
+@requires_kerchunk
 def test_open_empty_group(empty_netcdf4_file):
     vds = open_virtual_dataset(empty_netcdf4_file, indexes={})
     assert isinstance(vds, xr.Dataset)
@@ -316,6 +317,7 @@ def test_open_empty_group(empty_netcdf4_file):
     xrt.assert_identical(vds, expected)
 
 
+@requires_kerchunk
 class TestOpenVirtualDatasetHDFGroup:
     def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
         vds = open_virtual_dataset(
@@ -342,10 +344,6 @@ class TestOpenVirtualDatasetHDFGroup:
         assert list(vds.variables) == ["foo"]
         assert isinstance(vds["foo"].data, ManifestArray)
         assert vds["foo"].shape == (3,)
-
-    def test_raise_on_nonexistent_group(self): ...
-
-    def test_open_empty_group(self): ...
 
 
 @requires_kerchunk
