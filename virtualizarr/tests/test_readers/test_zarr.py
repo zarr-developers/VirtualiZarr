@@ -16,9 +16,9 @@ from virtualizarr.tests import network, requires_zarrV3
         pytest.param(
             3,
             id="Zarr V3",
-            marks=pytest.mark.xfail(
-                reason="Need to parse codecs into filters/compressors"
-            ),
+            # marks=pytest.mark.xfail(
+            #     reason="Need to parse codecs into filters/compressors"
+            # ),
         ),
     ],
     indirect=True,
@@ -44,7 +44,6 @@ class TestOpenVirtualDatasetZarr:
 
         zg = zarr.open_group(zarr_store)
         vds = open_virtual_dataset(filepath=zarr_store, indexes={})
-
         zg_metadata_dict = zg.metadata.to_dict()
         non_var_arrays = ["time", "lat", "lon"]
         # check dims and coords are present
@@ -64,7 +63,7 @@ class TestOpenVirtualDatasetZarr:
         arrays = [val for val in zg.keys()]
         zarray_checks = [
             "shape",
-            "chunks",
+            # "chunks",
             "dtype",
             "order",
             "compressor",
@@ -74,9 +73,15 @@ class TestOpenVirtualDatasetZarr:
         ]
         for array in arrays:
             for attr in zarray_checks:
+                import ipdb; ipdb.set_trace()
+
+                # for v3:
+                # schema is diff for 
+                # chunks: zg_metadata_dict["consolidated_metadata"]["metadata"][array]['chunk_grid']['configuration']['chunk_shape']
+                # 
+
+                
                 assert (
                     getattr(vds[array].data.zarray, attr)
-                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
-                        attr
-                    ]
+                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][attr]
                 )

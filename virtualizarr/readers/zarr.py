@@ -212,6 +212,7 @@ def virtual_dataset_from_zarr_group(
 
 async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> int:
     # async get chunk size of a chunk key
+
     return await zarr_group.store.getsize(chunk_key)
 
 
@@ -219,48 +220,64 @@ async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> boo
     return await zarr_group.store.exists(chunk_key)
 
 
-async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str) -> dict:
+async def get_chunk_paths(zarr_group: zarr.core.group, array_name: str, zarr_version: int) -> dict:
     chunk_paths = {}
     # Is there a way to call `zarr_group.store.list()` per array?
+
     async for item in zarr_group.store.list():
         if (
-            not item.endswith((".zarray", ".zattrs", ".zgroup", ".zmetadata"))
+            not item.endswith((".zarray", ".zattrs", ".zgroup", ".zmetadata", ".json"))
             and item.startswith(array_name)
             and await chunk_exists(zarr_group=zarr_group, chunk_key=item)
         ):
-            chunk_paths[item.split(array_name + "/")[-1]] = {
+                
+            if zarr_version == 2:
+                # split on array name + trailing slash
+                chunk_key = item.split(array_name + "/")[-1]
+            elif zarr_version == 3:
+                # In v3 we remove the /c/ 'chunks' part of the key and
+                # replace trailing slashes with '.' to conform to ChunkManifest validation
+                chunk_key = item.split(array_name + "/")[-1].split('c/')[-1].replace('/','.')
+                
+            else:
+                raise NotImplementedError(f"{zarr_version} not 2 or 3.")
+            chunk_paths[chunk_key] = {
                 "path": (
                     zarr_group.store.root / item
                 ).as_uri(),  # as_uri to comply with https://github.com/zarr-developers/VirtualiZarr/pull/243
                 "offset": 0,
                 "length": await get_chunk_size(zarr_group, item),
             }
+
             # This won't work for sharded stores: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844487578
 
     return chunk_paths
 
 
-def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str) -> dict:
+def construct_chunk_key_mapping(zarr_group: zarr.core.group, array_name: str, zarr_version: int) -> dict:
     import asyncio
 
-    return asyncio.run(get_chunk_paths(zarr_group, array_name))
+    return asyncio.run(get_chunk_paths(zarr_group=zarr_group, array_name=array_name, zarr_version=zarr_version))
 
 
 def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
-    array_metadata = zarr_group[var_name].metadata
-    attrs = array_metadata.attributes
+    zarr_array = zarr_group[var_name]
 
-    if array_metadata.zarr_format == 2:
-        array_zarray = _parse_zarr_v2_metadata(metadata=array_metadata)
+    attrs = zarr_array.metadata.attributes
+
+
+
+    if zarr_array.metadata.zarr_format == 2:
+        array_zarray = _parse_zarr_v2_metadata(zarr_array=zarr_array)
         array_dims = attrs["_ARRAY_DIMENSIONS"]
-    elif array_metadata.zarr_format == 3:
-        array_zarray = _parse_zarr_v3_metadata(metadata=array_metadata)
-        array_dims = array_metadata.dimension_names
+    elif zarr_array.metadata.zarr_format == 3:
+        array_zarray = _parse_zarr_v3_metadata(zarr_array=zarr_array)
+        array_dims = zarr_array.metadata.dimension_names
 
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
-    array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name)
+    array_chunk_sizes = construct_chunk_key_mapping(zarr_group, array_name=var_name, zarr_version=zarr_array.metadata.zarr_format)
 
     array_chunkmanifest = ChunkManifest(array_chunk_sizes)
 
@@ -277,43 +294,46 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     return array_variable
 
 
-def _parse_zarr_v2_metadata(metadata: zarr.core.group.GroupMetadata) -> ZArray:
+def _parse_zarr_v2_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
     return ZArray(
-        shape=metadata.shape,
-        chunks=metadata.chunks,
-        dtype=metadata.dtype,
-        fill_value=metadata.fill_value,
+        shape=zarr_array.metadata.shape,
+        chunks=zarr_array.metadata.chunks,
+        dtype=zarr_array.metadata.dtype,
+        fill_value=zarr_array.metadata.fill_value,
         order="C",
-        compressor=metadata.compressor,
-        filters=metadata.filters,
-        zarr_format=metadata.zarr_format,
+        compressor=zarr_array.metadata.compressor,
+        filters=zarr_array.metadata.filters,
+        zarr_format=zarr_array.metadata.zarr_format,
     )
 
 
-def _parse_zarr_v3_metadata(metadata: zarr.core.group.GroupMetadata) -> ZArray:
-    if metadata.fill_value is None:
+def _parse_zarr_v3_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
+    from virtualizarr.codecs import get_codecs
+
+    if zarr_array.metadata.fill_value is None:
         raise ValueError(
             "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
         )
     else:
-        fill_value = metadata.fill_value
-    all_codecs = [
-        codec
-        for codec in metadata.to_dict()["codecs"]
-        if codec["configuration"]["endian"] not in ("transpose", "bytes")
-    ]
-    compressor, *filters = [
-        _configurable_to_num_codec_config(_filter) for _filter in all_codecs
-    ]
+        fill_value = zarr_array.metadata.fill_value
+
+    # Codecs from test looks like: (BytesCodec(endian=<Endian.little: 'little'>),)
+    # Questions: What do we do with endian info?
+    codecs = get_codecs(zarr_array)
+
+    # Q: Are these ever in codecs?
+    compressor = getattr(codecs[0], "compressor", None)
+    filters = getattr(codecs[0], "filters", None)
+
     return ZArray(
-        chunks=metadata.chunk_grid.chunk_shape,
+        chunks=zarr_array.metadata.chunk_grid.chunk_shape,
         compressor=compressor,
-        dtype=np.dtype(metadata.data_type),
+        dtype=zarr_array.metadata.data_type.name,
         fill_value=fill_value,
-        filters=filters or None,
+        filters=filters,
         order="C",
-        shape=metadata.shape,
-        zarr_format=metadata.zarr_format,
+        shape=zarr_array.metadata.shape,
+        zarr_format=zarr_array.metadata.zarr_format,
     )
 
 
