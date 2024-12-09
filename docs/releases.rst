@@ -18,6 +18,10 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Fix bug preventing generating references for the root group of a file when a subgroup exists.
+  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+
 Documentation
 ~~~~~~~~~~~~~
 
