@@ -43,9 +43,15 @@ class HDF5VirtualBackend(VirtualBackend):
             filepath, inline_threshold=0, **reader_options
         ).translate()
 
+        from pprint import pprint
+
+        pprint(refs)
+
         # both group=None and group='' mean to read root group
         if group:
             refs = extract_group(refs, group)
+
+        pprint(refs)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,

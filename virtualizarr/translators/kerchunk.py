@@ -44,13 +44,15 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
-    """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
+    """
+    Extract only the part of the kerchunk reference dict that is relevant to a single HDF group.
+
+    group : str
+        Should be a non-empty string
+    """
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
     ]
-
-    print(hdf_groups)
-    print(group)
 
     # Ensure supplied group kwarg is consistent with kerchunk keys
     if not group.endswith("/"):
@@ -101,6 +103,7 @@ def virtual_vars_from_kerchunk_refs(
     var_names_to_keep = [
         var_name for var_name in var_names if var_name not in drop_variables
     ]
+    print(var_names_to_keep)
 
     vars = {
         var_name: variable_from_kerchunk_refs(
@@ -218,9 +221,17 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     """Find the names of zarr variables in this store/group."""
 
     refs = ds_reference_dict["refs"]
-    found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
 
-    return list(found_var_names)
+    found_var_names = []
+    for key in refs.keys():
+        # has to capture "foo/.zarray", but ignore ".zgroup", ".zattrs", and "subgroup/bar/.zarray"
+        # TODO this might be a sign that we should introduce a KerchunkGroupRefs type and cut down the references before getting to this point...
+        if key not in (".zgroup", ".zattrs"):
+            first_part, second_part, *_ = key.split("/")
+            if second_part == ".zarray":
+                found_var_names.append(first_part)
+
+    return found_var_names
 
 
 def extract_array_refs(
