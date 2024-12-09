@@ -43,42 +43,43 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     return virtual_vars, ds_attrs, coord_names
 
 
-def extract_group(vds_refs: KerchunkStoreRefs, group: str | None) -> KerchunkStoreRefs:
-    """Extract only the part of the kerchunk reference dict that is relevant to a single HDF group"""
+def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
+    """
+    Extract only the part of the kerchunk reference dict that is relevant to a single HDF group.
+
+    Parameters
+    ----------
+    vds_refs : KerchunkStoreRefs
+    group : str
+        Should be a non-empty string
+    """
     hdf_groups = [
         k.removesuffix(".zgroup") for k in vds_refs["refs"].keys() if ".zgroup" in k
     ]
-    if len(hdf_groups) == 1:
-        return vds_refs
-    else:
-        if group is None:
-            raise ValueError(
-                f"Multiple HDF Groups found. Must specify group= keyword to select one of {hdf_groups}"
-            )
-        else:
-            # Ensure supplied group kwarg is consistent with kerchunk keys
-            if not group.endswith("/"):
-                group += "/"
-            if group.startswith("/"):
-                group = group.removeprefix("/")
 
-        if group not in hdf_groups:
-            raise ValueError(f'Group "{group}" not found in {hdf_groups}')
+    # Ensure supplied group kwarg is consistent with kerchunk keys
+    if not group.endswith("/"):
+        group += "/"
+    if group.startswith("/"):
+        group = group.removeprefix("/")
 
-        # Filter by group prefix and remove prefix from all keys
-        groupdict = {
-            k.removeprefix(group): v
-            for k, v in vds_refs["refs"].items()
-            if k.startswith(group)
-        }
-        # Also remove group prefix from _ARRAY_DIMENSIONS
-        for k, v in groupdict.items():
-            if isinstance(v, str):
-                groupdict[k] = v.replace("\\/", "/").replace(group, "")
+    if group not in hdf_groups:
+        raise ValueError(f'Group "{group}" not found in {hdf_groups}')
 
-        vds_refs["refs"] = groupdict
+    # Filter by group prefix and remove prefix from all keys
+    groupdict = {
+        k.removeprefix(group): v
+        for k, v in vds_refs["refs"].items()
+        if k.startswith(group)
+    }
+    # Also remove group prefix from _ARRAY_DIMENSIONS
+    for k, v in groupdict.items():
+        if isinstance(v, str):
+            groupdict[k] = v.replace("\\/", "/").replace(group, "")
 
-        return KerchunkStoreRefs(vds_refs)
+    vds_refs["refs"] = groupdict
+
+    return KerchunkStoreRefs(vds_refs)
 
 
 def virtual_vars_from_kerchunk_refs(
@@ -222,9 +223,17 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     """Find the names of zarr variables in this store/group."""
 
     refs = ds_reference_dict["refs"]
-    found_var_names = {key.split("/")[0] for key in refs.keys() if "/" in key}
 
-    return list(found_var_names)
+    found_var_names = []
+    for key in refs.keys():
+        # has to capture "foo/.zarray", but ignore ".zgroup", ".zattrs", and "subgroup/bar/.zarray"
+        # TODO this might be a sign that we should introduce a KerchunkGroupRefs type and cut down the references before getting to this point...
+        if key not in (".zgroup", ".zattrs", ".zmetadata"):
+            first_part, second_part, *_ = key.split("/")
+            if second_part == ".zarray":
+                found_var_names.append(first_part)
+
+    return found_var_names
 
 
 def extract_array_refs(

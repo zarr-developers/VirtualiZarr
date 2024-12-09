@@ -9,7 +9,6 @@ from virtualizarr.readers.common import (
     open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
-    extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.utils import check_for_collisions
@@ -41,7 +40,11 @@ class NetCDF3VirtualBackend(VirtualBackend):
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
-        refs = extract_group(refs, group)
+        # both group=None and group='' mean to read root group
+        if group:
+            raise ValueError(
+                "group kwarg passed, but netCDF3 files can't have multiple groups!"
+            )
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,

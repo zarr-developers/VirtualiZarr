@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from xarray import open_dataset
+from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
@@ -310,6 +310,43 @@ class TestReadFromURL:
 
 
 @requires_kerchunk
+def test_open_empty_group(empty_netcdf4_file):
+    vds = open_virtual_dataset(empty_netcdf4_file, indexes={})
+    assert isinstance(vds, xr.Dataset)
+    expected = Dataset()
+    xrt.assert_identical(vds, expected)
+
+
+@requires_kerchunk
+class TestOpenVirtualDatasetHDFGroup:
+    def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_data_in_multiple_groups, group="subgroup", indexes={}
+        )
+        assert list(vds.variables) == ["bar"]
+        assert isinstance(vds["bar"].data, ManifestArray)
+        assert vds["bar"].shape == (2,)
+
+    def test_open_root_group_manually(self, netcdf4_file_with_data_in_multiple_groups):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_data_in_multiple_groups, group="", indexes={}
+        )
+        assert list(vds.variables) == ["foo"]
+        assert isinstance(vds["foo"].data, ManifestArray)
+        assert vds["foo"].shape == (3,)
+
+    def test_open_root_group_by_default(
+        self, netcdf4_file_with_data_in_multiple_groups
+    ):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_data_in_multiple_groups, indexes={}
+        )
+        assert list(vds.variables) == ["foo"]
+        assert isinstance(vds["foo"].data, ManifestArray)
+        assert vds["foo"].shape == (3,)
+
+
+@requires_kerchunk
 class TestLoadVirtualDataset:
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
     def test_loadable_variables(self, netcdf4_file, hdf_backend):
@@ -356,8 +393,6 @@ class TestLoadVirtualDataset:
                     hdf5_groups_file, group="doesnt_exist", backend=hdf_backend
                 )
         if hdf_backend == HDF5VirtualBackend:
-            with pytest.raises(ValueError, match="Multiple HDF Groups found"):
-                open_virtual_dataset(hdf5_groups_file)
             with pytest.raises(ValueError, match="not found in"):
                 open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
 
