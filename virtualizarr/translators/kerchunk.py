@@ -47,6 +47,9 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
     """
     Extract only the part of the kerchunk reference dict that is relevant to a single HDF group.
 
+    Parameters
+    ----------
+    vds_refs : KerchunkStoreRefs
     group : str
         Should be a non-empty string
     """
