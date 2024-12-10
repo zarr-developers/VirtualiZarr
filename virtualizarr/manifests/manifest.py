@@ -84,7 +84,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PosixPath(path).suffix:
+        # this feels fragile, is there a better way to ID a Zarr
+        if not PosixPath(path).suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )

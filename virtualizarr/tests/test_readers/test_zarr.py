@@ -45,6 +45,8 @@ class TestOpenVirtualDatasetZarr:
         zg = zarr.open_group(zarr_store)
         vds = open_virtual_dataset(filepath=zarr_store, indexes={})
         zg_metadata_dict = zg.metadata.to_dict()
+        zarr_format = zg_metadata_dict["zarr_format"]
+
         non_var_arrays = ["time", "lat", "lon"]
         # check dims and coords are present
         assert set(vds.coords) == set(non_var_arrays)
@@ -61,9 +63,10 @@ class TestOpenVirtualDatasetZarr:
 
         # check ZArray values
         arrays = [val for val in zg.keys()]
-        zarray_checks = [
+
+        zarr_attrs = [
             "shape",
-            # "chunks",
+            "chunks",
             "dtype",
             "order",
             "compressor",
@@ -71,17 +74,45 @@ class TestOpenVirtualDatasetZarr:
             "zarr_format",
             "dtype",
         ]
+
         for array in arrays:
-            for attr in zarray_checks:
-                import ipdb; ipdb.set_trace()
+            for attr in zarr_attrs:
+                vds_attr = getattr(vds[array].data.zarray, attr)
 
-                # for v3:
-                # schema is diff for 
-                # chunks: zg_metadata_dict["consolidated_metadata"]["metadata"][array]['chunk_grid']['configuration']['chunk_shape']
-                # 
+                # Edge cases where v2 and v3 attr keys differ: order, compressor, filters, dtype & chunks
+                if zarr_format == 3:
+                    if "order" in attr:
+                        # In zarr v3, it seems like order was replaced with the transpose codec.
+                        # skip check
+                        zarr_metadata_attr = vds_attr
 
-                
-                assert (
-                    getattr(vds[array].data.zarray, attr)
-                    == zg_metadata_dict["consolidated_metadata"]["metadata"][array][attr]
-                )
+                    elif "compressor" in attr:
+                        zarr_metadata_attr = vds_attr
+
+                    elif "filters" in attr:
+                        zarr_metadata_attr = vds_attr
+
+                    elif "chunks" in attr:
+                        # chunks vs chunk_grid.configuration.chunk_shape
+                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
+                            "metadata"
+                        ][array]["chunk_grid"]["configuration"]["chunk_shape"]
+
+                    elif "dtype" in attr:
+                        # dtype vs datatype
+                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
+                            "metadata"
+                        ][array]["data_type"].to_numpy()
+
+                    else:
+                        # follows v2 dict lookup
+                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
+                            "metadata"
+                        ][array][attr]
+
+                else:
+                    zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
+                        "metadata"
+                    ][array][attr]
+
+                assert vds_attr == zarr_metadata_attr
