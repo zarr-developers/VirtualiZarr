@@ -39,9 +39,7 @@ class TestOpenVirtualDatasetZarr:
         )
         assert len(vds.data_vars) == 0
 
-    def test_virtual_dataset_from_zarr_group(self, zarr_store):
-        # check that loadable variables works
-
+    def test_virtual_dataset_zarr_attrs(self, zarr_store):
         zg = zarr.open_group(zarr_store)
         vds = open_virtual_dataset(filepath=zarr_store, indexes={})
         zg_metadata_dict = zg.metadata.to_dict()
@@ -64,55 +62,59 @@ class TestOpenVirtualDatasetZarr:
         # check ZArray values
         arrays = [val for val in zg.keys()]
 
-        zarr_attrs = [
+        shared_v2_v3_attrs = [
             "shape",
-            "chunks",
-            "dtype",
-            "order",
-            "compressor",
-            "filters",
             "zarr_format",
-            "dtype",
         ]
+        v2_attrs = ["chunks", "dtype", "order", "compressor", "filters"]
 
-        for array in arrays:
-            for attr in zarr_attrs:
-                vds_attr = getattr(vds[array].data.zarray, attr)
-
-                # Edge cases where v2 and v3 attr keys differ: order, compressor, filters, dtype & chunks
-                if zarr_format == 3:
-                    if "order" in attr:
-                        # In zarr v3, it seems like order was replaced with the transpose codec.
-                        # skip check
-                        zarr_metadata_attr = vds_attr
-
-                    elif "compressor" in attr:
-                        zarr_metadata_attr = vds_attr
-
-                    elif "filters" in attr:
-                        zarr_metadata_attr = vds_attr
-
-                    elif "chunks" in attr:
-                        # chunks vs chunk_grid.configuration.chunk_shape
-                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
-                            "metadata"
-                        ][array]["chunk_grid"]["configuration"]["chunk_shape"]
-
-                    elif "dtype" in attr:
-                        # dtype vs datatype
-                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
-                            "metadata"
-                        ][array]["data_type"].to_numpy()
-
-                    else:
-                        # follows v2 dict lookup
-                        zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
-                            "metadata"
-                        ][array][attr]
-
-                else:
+        def _validate_v2(attrs: list[str]):
+            for array in arrays:
+                for attr in attrs:
+                    vds_attr = getattr(vds[array].data.zarray, attr)
                     zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
                         "metadata"
                     ][array][attr]
+                    assert vds_attr == zarr_metadata_attr
 
-                assert vds_attr == zarr_metadata_attr
+        def _validate_v3(attrs: list[str]):
+
+            # check v2, v3 shared attrs
+            for array in arrays:
+                for attr in attrs:
+                    zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
+                        "metadata"
+                    ][array][attr]
+                    vds_attr = getattr(vds[array].data.zarray, attr)
+                    assert vds_attr == zarr_metadata_attr
+
+            # Cases where v2 and v3 attr keys differ: order, compressor, filters, dtype & chunks
+
+            # chunks vs chunk_grid.configuration.chunk_shape
+            assert (
+                getattr(vds[array].data.zarray, "chunks")
+                == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
+                    "chunk_grid"
+                ]["configuration"]["chunk_shape"]
+            )
+
+            # dtype vs datatype
+            assert (
+                getattr(vds[array].data.zarray, "dtype")
+                == zg_metadata_dict["consolidated_metadata"]["metadata"][array][
+                    "data_type"
+                ].to_numpy()
+            )
+
+            # order: In zarr v3, it seems like order was replaced with the transpose codec.
+            # compressor: removed in v3 and built into codecs
+            # filters: removed in v3 and built into codecs
+
+        if zarr_format == 2:
+            _validate_v2(shared_v2_v3_attrs + v2_attrs)
+
+        elif zarr_format == 3:
+            _validate_v3(shared_v2_v3_attrs)
+
+        else:
+            raise NotImplementedError(f'Zarr format {zarr_format} not in [2,3]')
