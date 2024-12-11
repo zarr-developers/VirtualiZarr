@@ -6,7 +6,7 @@ Welcome, new core team member!  We appreciate the quality of your work, and enjo
 Thank you for your numerous contributions to the project so far.
 
 By accepting the invitation to become a core team member you are **not required to commit to doing any more work** -
-xarray is a volunteer project, and we value the contributions you have made already.
+VirtualiZarr is a volunteer project, and we value the contributions you have made already.
 
 You can see a list of all the current core team members on our
 [@zarr-developers/virtualizarr](https://github.com/orgs/zarr-developers/teams/virtualizarr-core-devs)
@@ -36,7 +36,6 @@ Rather, the tasks that follow are general descriptions of what it might mean to 
 - Key project contact (represent VirtualiZarr's perspective within key related projects like Xarray, Zarr, Icechunk, or Kerchunk),
 - Project fundraising (help write and administrate grants that will support VirtualiZarr),
 - Improve documentation or tutorials,
-- Presenting or running tutorials (such as those we have given at the SciPy conference),
 - Attend the bi-weekly coordination meeting ([see Zarr community calendar](https://zarr.dev/community-calls/)),
 - Contribute to the VirtualiZarr codebase.
 
@@ -107,8 +106,7 @@ Here’s a typical workflow for triaging a newly opened issue or discussion:
 
    Apply the relevant labels. This is a bit of an art, and comes with experience. Look at similar issues to get a feel for how things are labeled.
 
-   If the issue is clearly defined and the fix seems relatively straightforward, label the issue as `contrib-good-first-issue`.
-   You can also remove the `needs triage` label that is automatically applied to all newly-opened issues.
+   If the issue is clearly defined and the fix seems relatively straightforward, label the issue as `good-first-issue`.
 
 8. **Where should the poster look to fix the issue?**
 
@@ -136,7 +134,6 @@ complex changes, wait until at least one other core team member has approved.
 It should also be considered best practice to leave a reasonable (24hr) time window
 after approval before merge to ensure that other core team members have a reasonable
 chance to weigh in.
-Adding the `plan-to-merge` label notifies developers of the imminent merge.
 
 We are also an international community, with contributors from many different time zones,
 some of whom will only contribute during their working hours, others who might only be able
