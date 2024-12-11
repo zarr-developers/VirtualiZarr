@@ -149,7 +149,7 @@ When merging, we automatically use GitHub's
 to ensure a clean git history.
 
 You should also continue to make your own pull requests as before and in accordance
-with the [general contributing guide](https://docs.xarray.dev/en/stable/contributing.html). These pull requests still
+with the [general contributing guide](https://virtualizarr.readthedocs.io/en/latest/contributing.html). These pull requests still
 require the approval of another core team member before they can be merged.
 
 ### How to conduct a good review
