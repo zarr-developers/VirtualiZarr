@@ -10,7 +10,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import network, requires_kerchunk, requires_zarrV3
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
     find_var_names,
@@ -94,41 +94,30 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
-# @pytest.mark.parametrize(
-#     "input_params",
-#     [inputs for inputs in ZARR_V2_PARAMS],
-# )
-# def test_zarrV2_roundtrip(zarr_v2_store, input_params):
-#     ds = open_virtual_dataset(
-#         zarr_v2_store,
-#         loadable_variables=input_params.loadable_variables,
-#         drop_variables=input_params.drop_variables,
-#         indexes={},
-#     )
+@requires_zarrV3
+@network
+@pytest.mark.parametrize(
+    "zarr_store",
+    [
+        pytest.param(2, id="Zarr V2"),
+        pytest.param(
+            3,
+            id="Zarr V3",
+        ),
+    ],
+    indirect=True,
+)
+def test_zarrV2_roundtrip(zarr_store):
+    ds = open_virtual_dataset(
+        zarr_store,
+        indexes={},
+    )
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
 
-#     # THIS FAILS! TypeError: np.float32(nan) is not JSON serializable
-#     # Question: How do we handle this fill value: fill_value=np.float32(nan)
-#     ds_refs = ds.virtualize.to_kerchunk(format="dict")
+    roundtrip = dataset_from_kerchunk_refs(ds_refs)
 
-#     # tmp fix if you want to override the fill vals!
-#     ds.lat.data.zarray.fill_value = float("nan")
-#     ds.time.data.zarray.fill_value = float("nan")
-#     ds.lon.data.zarray.fill_value = float("nan")
-
-#     # Use dataset_from_kerchunk_refs to reconstruct the dataset
-#     roundtrip = dataset_from_kerchunk_refs(ds_refs)
-
-#     # Assert equal to original dataset
-#     xrt.assert_equal(roundtrip, ds)
-
-#     # assert vds has:
-#     # loadable vars are np arrays?
-#     # drop vars are not present
-#     # virtual vars are manifest arrays, not loaded arrays
-
-#     # Do we have a good way in XRT to compare virtual datasets to xarray datasets? assert_duckarray_allclose? or just roundtrip it.
-#     # from xarray.testing import assert_duckarray_allclose
-#     # xrt.assert_allclose(ds, vds)
+    # Assert equal to original dataset
+    xrt.assert_equal(roundtrip, ds)
 
 
 @requires_kerchunk

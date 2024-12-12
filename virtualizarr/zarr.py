@@ -61,8 +61,12 @@ class ZArray:
             # Convert dtype string to numpy.dtype
             self.dtype = np.dtype(self.dtype)
 
-        if self.fill_value is None:
-            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
+        # Question: Why is this applied only to fill values of None?
+        # It was skipping np dtypes such np.float32(nan) and np.int16(0)
+        # which causes serialization issues when writing to Kerchunk
+
+        # if self.fill_value is None:
+        self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
 
     @property
     def codec(self) -> Codec:
@@ -106,6 +110,7 @@ class ZArray:
         zarray_dict = self.dict()
         if zarray_dict["fill_value"] is np.nan:
             zarray_dict["fill_value"] = None
+
         return ujson.dumps(zarray_dict)
 
     # ZArray.dict seems to shadow "dict", so we need the type ignore in

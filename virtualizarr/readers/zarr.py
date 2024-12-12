@@ -9,6 +9,7 @@ import numpy as np
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -153,14 +154,13 @@ def virtual_dataset_from_zarr_group(
 ) -> Dataset:
     import zarr
 
-    # filepath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
+    vfpath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
     # This currently fails: *** TypeError: Filesystem needs to support async operations.
+    # https://github.com/zarr-developers/zarr-python/issues/2554
 
-    filepath = _FsspecFSFromFilepath(
-        filepath=filepath, reader_options=reader_options
-    ).filepath
+    fss = _FsspecFSFromFilepath(filepath=vfpath, reader_options=reader_options)
 
-    zg = zarr.open_group(filepath, mode="r")
+    zg = zarr.open_group(fss.get_mapper(), mode="r")
 
     zarr_arrays = [val for val in zg.keys()]
 
@@ -219,7 +219,6 @@ def virtual_dataset_from_zarr_group(
 
 async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> int:
     # async get chunk size of a chunk key
-
     return await zarr_group.store.getsize(chunk_key)
 
 
@@ -251,6 +250,7 @@ async def get_chunk_paths(
 
             else:
                 raise NotImplementedError(f"{zarr_version} not 2 or 3.")
+
             chunk_paths[chunk_key] = {
                 "path": (
                     zarr_group.store.root / item

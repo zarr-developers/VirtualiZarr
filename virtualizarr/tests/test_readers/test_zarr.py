@@ -16,9 +16,6 @@ from virtualizarr.tests import network, requires_zarrV3
         pytest.param(
             3,
             id="Zarr V3",
-            # marks=pytest.mark.xfail(
-            #     reason="Need to parse codecs into filters/compressors"
-            # ),
         ),
     ],
     indirect=True,
@@ -78,7 +75,6 @@ class TestOpenVirtualDatasetZarr:
                     assert vds_attr == zarr_metadata_attr
 
         def _validate_v3(attrs: list[str]):
-
             # check v2, v3 shared attrs
             for array in arrays:
                 for attr in attrs:
@@ -117,4 +113,4 @@ class TestOpenVirtualDatasetZarr:
             _validate_v3(shared_v2_v3_attrs)
 
         else:
-            raise NotImplementedError(f'Zarr format {zarr_format} not in [2,3]')
+            raise NotImplementedError(f"Zarr format {zarr_format} not in [2,3]")
