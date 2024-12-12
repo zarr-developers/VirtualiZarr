@@ -71,4 +71,4 @@ Apache 2.0
 
 [^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
 
-[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
+[^2]: (Pronounced "Virtual-Eye-Zarr" - like "virtualizer" but more piratey 🦜)
