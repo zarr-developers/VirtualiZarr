@@ -182,11 +182,11 @@ You also cannot currently index into a `ManifestArray`, as arbitrary indexing wo
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
 
-The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
 ## Combining virtual datasets
 
-In general we should be able to combine all the datasets from our legacy files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
+In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
 Let's create two new netCDF files, which we would need to open and concatenate in a specific order to represent our entire dataset.
 
@@ -206,7 +206,7 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the legacy files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
+We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the archival files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
 
 You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
 
@@ -354,7 +354,7 @@ Attributes:
 
 ## Writing virtual stores to disk
 
-Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
+Once we've combined references to all the chunks of all our archival files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
 ### Writing to Kerchunk's format and reading data via fsspec
 
