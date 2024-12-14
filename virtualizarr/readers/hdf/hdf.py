@@ -248,6 +248,20 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
+    def _extract_fill_value(
+        fill_value: Union[np.ndarray, np.nan, np.generic, None],
+    ) -> Union[int, float, None]:
+        if not fill_value:
+            return fill_value
+        if isinstance(fill_value, np.ndarray):
+            fillvalue = fill_value[0]
+        if np.isnan(fill_value):
+            fillvalue = float("nan")
+        if isinstance(fill_value, np.generic):
+            fillvalue = fill_value.item()
+        return fillvalue
+
+    @staticmethod
     def _dataset_to_variable(path: str, dataset: Dataset) -> Optional[Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
@@ -278,13 +292,11 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = cfcodec["codec"].decode(dataset.fillvalue)
         else:
             dtype = dataset.dtype
-            fill_value = dataset.fillvalue
-        if isinstance(fill_value, np.ndarray):
-            fill_value = fill_value[0]
-        if np.isnan(fill_value):
-            fill_value = float("nan")
-        if isinstance(fill_value, np.generic):
-            fill_value = fill_value.item()
+            try:
+                fill_value = dataset.fillvalue
+            except Exception:
+                fill_value = None
+        fill_value = HDFVirtualBackend._extract_fill_value(fill_value=fill_value)
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,  # type: ignore
