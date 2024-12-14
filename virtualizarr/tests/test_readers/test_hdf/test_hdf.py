@@ -82,6 +82,12 @@ class TestDatasetDims:
         dims = HDFVirtualBackend._dataset_dims(ds)
         assert dims == ["phony_dim_0", "phony_dim_1"]
 
+    def test_dimension_scales_in_group(self, group_dims_hdf5_file):
+        f = h5py.File(group_dims_hdf5_file)
+        ds = f["group"]["data"]
+        dims = HDFVirtualBackend._dataset_dims(ds)
+        assert all("group" not in dim for dim in dims)
+
 
 @requires_hdf5plugin
 @requires_imagecodecs

@@ -199,6 +199,7 @@ class HDFVirtualBackend(VirtualBackend):
                     # In this case, we mimic netCDF4 and assign phony dimension names.
                     # See https://github.com/fsspec/kerchunk/issues/41
                     dims.append(f"phony_dim_{n}")
+        dims = [d.split("/")[-1] for d in dims]
         return dims
 
     @staticmethod

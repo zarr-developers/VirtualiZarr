@@ -322,3 +322,16 @@ def root_coordinates_hdf5_file(tmpdir, np_uncompressed_int16):
     f.create_dataset(name="lon", data=data)
     f.attrs.create(name="coordinates", data="lat lon")
     return filepath
+
+
+@pytest.fixture
+def group_dims_hdf5_file(tmpdir):
+    filepath = f"{tmpdir}/group_dims.nc"
+    f = h5py.File(filepath, "w")
+    group = f.create_group("group")
+    data = np.random.random((10, 10))
+    dim1 = group.create_dataset("dim1", data=np.arange(10))
+    dset = group.create_dataset(name="data", data=data, chunks=True)
+    dset.dims[0].label = "dim1"
+    dset.dims[0].attach_scale(dim1)
+    return filepath
