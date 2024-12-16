@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping, MutableMapping
 from typing import (
     Any,
     Hashable,
+    Literal,
     Optional,
 )
 
@@ -92,7 +93,7 @@ def construct_virtual_dataset(
     coord_names,
     attrs,
 ) -> Dataset:
-    """Construct a virtual Datset from consistuent parts."""
+    """Construct a virtual Dataset from constituent parts."""
 
     vars = {**virtual_vars, **loadable_vars}
 
@@ -165,7 +166,9 @@ class VirtualBackend(ABC):
         filepath: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
+        loadable_variables: Literal["1d_coords"]
+        | Literal["all_coords"]
+        | Iterable[str] = "1d_coords",
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
@@ -178,7 +181,9 @@ class VirtualBackend(ABC):
         path: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
+        loadable_variables: Literal["1d_coords"]
+        | Literal["all_coords"]
+        | Iterable[str] = "1d_coords",
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
