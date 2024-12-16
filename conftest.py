@@ -49,6 +49,19 @@ def netcdf4_file(tmpdir):
 
 
 @pytest.fixture
+def chunked_netcdf4_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.tutorial.open_dataset("air_temperature")
+
+    # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/air.nc"
+    ds.chunk(time=1460).to_netcdf(filepath, format="NETCDF4")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_file_with_data_in_multiple_groups(tmpdir):
     filepath = str(tmpdir / "test.nc")
 

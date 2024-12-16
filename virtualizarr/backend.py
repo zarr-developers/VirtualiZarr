@@ -255,7 +255,7 @@ def open_virtual_mfdataset(
     combine_attrs: "CombineAttrsOptions" = "override",
     **kwargs,
 ) -> Dataset:
-    """Open multiple files as a single virtual dataset
+    """Open multiple files as a single virtual dataset.
 
     If combine='by_coords' then the function ``combine_by_coords`` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
@@ -307,7 +307,7 @@ def open_virtual_mfdataset(
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?
 
-    # TODO add options passed to open_virtual_dataset explicitly?
+    # TODO list kwargs passed to open_virtual_dataset explicitly?
 
     paths = _find_absolute_paths(paths)
 

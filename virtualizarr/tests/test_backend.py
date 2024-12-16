@@ -8,7 +8,7 @@ import xarray.testing as xrt
 from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
-from virtualizarr import open_virtual_dataset
+from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.backend import FileType, automatically_determine_filetype
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
@@ -438,6 +438,41 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
+
+
+class TestOpenVirtualMFDataset:
+    def test_serial(self, netcdf4_files_factory, chunked_netcdf4_file):
+        filepath1, filepath2 = netcdf4_files_factory()
+
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="nested",
+            concat_dim="time",
+            coords="minimal",
+            compat="override",
+            indexes={},
+        )
+        expected_vds = open_virtual_dataset(chunked_netcdf4_file, indexes={})
+        print(combined_vds["air"].data)
+        print(expected_vds["air"].data)
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2], combine="by_coords"
+        )
+        expected_vds = open_virtual_dataset(chunked_netcdf4_file)
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        file_glob = filepath1.parent.with_suffix("air*.nc")
+        combined_vds = open_virtual_mfdataset(file_glob, combine="by_coords")
+        expected_vds = open_virtual_dataset(chunked_netcdf4_file)
+        xrt.assert_identical(combined_vds, expected_vds)
+
+    # @requires_dask
+    def test_dask(self, netcdf4_files_factory): ...
+
+    # @requires_lithops
+    def test_lithops(self, netcdf4_files_factory): ...
 
 
 @requires_kerchunk
