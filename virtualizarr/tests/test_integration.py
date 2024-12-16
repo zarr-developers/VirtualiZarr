@@ -107,11 +107,14 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     ],
     indirect=True,
 )
-def test_zarrV2_roundtrip(zarr_store):
+def test_zarr_roundtrip(zarr_store):
     ds = open_virtual_dataset(
         zarr_store,
         indexes={},
     )
+    import ipdb
+
+    ipdb.set_trace()
     ds_refs = ds.virtualize.to_kerchunk(format="dict")
 
     roundtrip = dataset_from_kerchunk_refs(ds_refs)

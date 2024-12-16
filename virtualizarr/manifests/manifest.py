@@ -49,7 +49,8 @@ class ChunkEntry(TypedDict):
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
 
-        path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+        # commenting out for now: https://github.com/zarr-developers/zarr-python/issues/2554
+        # path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 

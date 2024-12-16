@@ -9,14 +9,13 @@ import numpy as np
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
     open_loadable_vars_and_indexes,
     separate_coords,
 )
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import check_for_collisions
 from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
@@ -154,13 +153,15 @@ def virtual_dataset_from_zarr_group(
 ) -> Dataset:
     import zarr
 
-    vfpath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
+    # vfpath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
     # This currently fails: *** TypeError: Filesystem needs to support async operations.
     # https://github.com/zarr-developers/zarr-python/issues/2554
 
-    fss = _FsspecFSFromFilepath(filepath=vfpath, reader_options=reader_options)
+    # import ipdb; ipdb.set_trace()
 
-    zg = zarr.open_group(fss.get_mapper(), mode="r")
+    zg = zarr.open_group(
+        filepath, storage_options=reader_options.get("storage_options"), mode="r"
+    )
 
     zarr_arrays = [val for val in zg.keys()]
 
