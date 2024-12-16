@@ -361,14 +361,14 @@ def open_virtual_mfdataset(
         getattr_ = getattr
 
     if parallel == "dask":
-        datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in datasets]
+        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
+        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
         if preprocess is not None:
-            datasets = [preprocess(ds) for ds in datasets]
+            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
 
         # calling compute here will return the datasets/file_objs lists,
         # the underlying datasets will still be stored as dask arrays
-        datasets, closers = dask.compute(datasets, closers)
+        virtual_datasets, closers = dask.compute(virtual_datasets, closers)
     elif parallel == "lithops":
 
         def generate_refs(path):
@@ -383,17 +383,17 @@ def open_virtual_mfdataset(
         completed_futures, _ = fn_exec.wait(futures, download_results=True)
         virtual_datasets = [future.get_result() for future in completed_futures]
     elif parallel is False:
-        datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in datasets]
+        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
+        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
         if preprocess is not None:
-            datasets = [preprocess(ds) for ds in datasets]
+            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
 
     # Combine all datasets, closing them in case of a ValueError
     try:
         if combine == "nested":
             # Combined nested list by successive concat and merge operations
             # along each dimension, using structure given by "ids"
-            combined = _nested_combine(
+            combined_vds = _nested_combine(
                 virtual_datasets,
                 concat_dims=concat_dim,
                 compat=compat,
@@ -406,7 +406,7 @@ def open_virtual_mfdataset(
         elif combine == "by_coords":
             # Redo ordering from coordinates, ignoring how they were ordered
             # previously
-            combined = combine_by_coords(
+            combined_vds = combine_by_coords(
                 virtual_datasets,
                 compat=compat,
                 data_vars=data_vars,
@@ -420,19 +420,19 @@ def open_virtual_mfdataset(
                 " ``combine``"
             )
     except ValueError:
-        for ds in virtual_datasets:
-            ds.close()
+        for vds in virtual_datasets:
+            vds.close()
         raise
 
-    combined.set_close(partial(_multi_file_closer, closers))
+    combined_vds.set_close(partial(_multi_file_closer, closers))
 
     # read global attributes from the attrs_file or from the first dataset
     if attrs_file is not None:
         if isinstance(attrs_file, os.PathLike):
             attrs_file = cast(str, os.fspath(attrs_file))
-        combined.attrs = virtual_datasets[paths1d.index(attrs_file)].attrs
+        combined_vds.attrs = virtual_datasets[paths1d.index(attrs_file)].attrs
 
     # TODO should we just immediately close everything?
     # TODO We should have already read everything we're ever going to read into memory at this point
 
-    return combined
+    return combined_vds
