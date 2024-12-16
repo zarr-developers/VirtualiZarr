@@ -231,7 +231,10 @@ def open_virtual_dataset(
 
 
 def open_virtual_mfdataset(
-    paths: str | Sequence[str | os.PathLike] | NestedSequence[str | os.PathLike],
+    paths: str
+    | os.PathLike
+    | Sequence[str | os.PathLike]
+    | "NestedSequence[str | os.PathLike]",
     concat_dim: (
         str
         | DataArray
@@ -241,15 +244,15 @@ def open_virtual_mfdataset(
         | Sequence[Index]
         | None
     ) = None,
-    compat: CompatOptions = "no_conflicts",
+    compat: "CompatOptions" = "no_conflicts",
     preprocess: Callable[[Dataset], Dataset] | None = None,
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
     parallel: Literal["lithops", "dask", False] = False,
-    join: JoinOptions = "outer",
+    join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
-    combine_attrs: CombineAttrsOptions = "override",
+    combine_attrs: "CombineAttrsOptions" = "override",
     **kwargs,
 ) -> Dataset:
     """Open multiple files as a single virtual dataset
