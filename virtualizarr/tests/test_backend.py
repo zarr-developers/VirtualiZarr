@@ -349,17 +349,27 @@ class TestOpenVirtualDatasetHDFGroup:
 @requires_kerchunk
 class TestLoadVirtualDataset:
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
-    def test_loadable_variables(self, netcdf4_file, hdf_backend):
-        vars_to_load = ["air", "time"]
+    @pytest.mark.parametrize(
+        "loadable_variables, expected_loaded_variables",
+        [
+            (["air", "time"], ["air", "time"]),
+            ([], []),
+            ("1d_coords", ["time"]),
+            ("all_coords", ["lat", "lon", "time"]),
+        ],
+    )
+    def test_loadable_variables(
+        self, netcdf4_file, hdf_backend, loadable_variables, expected_loaded_variables
+    ):
         vds = open_virtual_dataset(
             netcdf4_file,
-            loadable_variables=vars_to_load,
+            loadable_variables=loadable_variables,
             indexes={},
             backend=hdf_backend,
         )
 
         for name in vds.variables:
-            if name in vars_to_load:
+            if name in expected_loaded_variables:
                 assert isinstance(vds[name].data, np.ndarray), name
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
@@ -367,7 +377,7 @@ class TestLoadVirtualDataset:
         full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
 
         for name in full_ds.variables:
-            if name in vars_to_load:
+            if name in expected_loaded_variables:
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
     def test_explicit_filetype(self, netcdf4_file):
@@ -438,7 +448,3 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
-
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
-    def test_loadable_vars_options(self, hdf5_scalar, hdf_backend):
-        ...
