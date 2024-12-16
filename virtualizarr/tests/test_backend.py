@@ -368,17 +368,13 @@ class TestLoadVirtualDataset:
             backend=hdf_backend,
         )
 
-        for name in vds.variables:
-            if name in expected_loaded_variables:
-                assert isinstance(vds[name].data, np.ndarray), name
-            else:
-                assert isinstance(vds[name].data, ManifestArray), name
-
         full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
-
         for name in full_ds.variables:
             if name in expected_loaded_variables:
+                assert isinstance(vds[name].data, np.ndarray), name
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+            else:
+                assert isinstance(vds[name].data, ManifestArray), name
 
     def test_explicit_filetype(self, netcdf4_file):
         with pytest.raises(ValueError):
