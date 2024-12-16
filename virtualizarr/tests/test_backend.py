@@ -438,3 +438,7 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
+
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_loadable_vars_options(self, hdf5_scalar, hdf_backend):
+        ...
