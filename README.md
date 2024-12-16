@@ -16,16 +16,16 @@
 
 ## Cloud-Optimize your Scientific Data as Virtual Zarr stores, using xarray syntax.
 
-The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in legacy pre-Cloud file formats such as netCDF.
+The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in archival pre-Cloud file formats such as netCDF.
 
-**VirtualiZarr[^2] makes it easy to create "Virtual" Zarr stores, allowing performant access to legacy data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
+**VirtualiZarr[^2] makes it easy to create "Virtual" Zarr stores, allowing performant access to archival data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
 
 Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/index.html).
 
 ### Features
 
-* Create virtual references pointing to bytes inside a legacy file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
-* Supports a [range of legacy file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
+* Create virtual references pointing to bytes inside a archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
+* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
 * [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger store using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html),
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
@@ -71,4 +71,4 @@ Apache 2.0
 
 [^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
 
-[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
+[^2]: (Pronounced "Virtual-Eye-Zarr" - like "virtualizer" but more piratey 🦜)

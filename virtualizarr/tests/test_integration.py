@@ -13,7 +13,6 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import network, requires_kerchunk, requires_zarrV3
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
-    find_var_names,
 )
 from virtualizarr.zarr import ZArray
 
@@ -47,12 +46,6 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
 
     # Assert equal to original dataset
     xrt.assert_equal(roundtrip, ds)
-
-
-def test_no_duplicates_find_var_names():
-    """Verify that we get a deduplicated list of var names"""
-    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
-    assert len(find_var_names(ref_dict)) == 1
 
 
 @requires_kerchunk

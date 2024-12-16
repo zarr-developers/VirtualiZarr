@@ -41,6 +41,17 @@ def zarr_store(tmpdir, request):
 
 
 @pytest.fixture
+def empty_netcdf4_file(tmpdir):
+    # Set up example xarray dataset
+    ds = xr.Dataset()  # Save it to disk as netCDF (in temporary directory)
+    filepath = f"{tmpdir}/empty.nc"
+    ds.to_netcdf(filepath, format="NETCDF4")
+    ds.close()
+
+    return filepath
+
+
+@pytest.fixture
 def netcdf4_file(tmpdir):
     # Set up example xarray dataset
     ds = xr.tutorial.open_dataset("air_temperature")
@@ -49,6 +60,18 @@ def netcdf4_file(tmpdir):
     filepath = f"{tmpdir}/air.nc"
     ds.to_netcdf(filepath, format="NETCDF4")
     ds.close()
+
+    return filepath
+
+
+@pytest.fixture
+def netcdf4_file_with_data_in_multiple_groups(tmpdir):
+    filepath = str(tmpdir / "test.nc")
+
+    ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
+    ds1.to_netcdf(filepath)
+    ds2 = xr.DataArray([4, 5], name="bar").to_dataset()
+    ds2.to_netcdf(filepath, group="subgroup", mode="a")
 
     return filepath
 
