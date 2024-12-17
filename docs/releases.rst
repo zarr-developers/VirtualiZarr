@@ -9,6 +9,9 @@ v1.2.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V2 and V3 stores as virtual datasets.
+  (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
@@ -47,6 +50,7 @@ as well as many other bugfixes and documentation improvements.
 
 New Features
 ~~~~~~~~~~~~
+
 
 - Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
   (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
