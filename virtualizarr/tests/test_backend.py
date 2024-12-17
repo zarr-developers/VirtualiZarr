@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -441,9 +442,10 @@ class TestLoadVirtualDataset:
 
 
 class TestOpenVirtualMFDataset:
-    def test_serial(self, netcdf4_files_factory, chunked_netcdf4_file):
+    def test_serial(self, netcdf4_files_factory):
         filepath1, filepath2 = netcdf4_files_factory()
 
+        # test combine nested without in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
             combine="nested",
@@ -452,20 +454,29 @@ class TestOpenVirtualMFDataset:
             compat="override",
             indexes={},
         )
-        expected_vds = open_virtual_dataset(chunked_netcdf4_file, indexes={})
-        print(combined_vds["air"].data)
-        print(expected_vds["air"].data)
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2], combine="by_coords"
+        vds1 = open_virtual_dataset(filepath1, indexes={})
+        vds2 = open_virtual_dataset(filepath2, indexes={})
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
         )
-        expected_vds = open_virtual_dataset(chunked_netcdf4_file)
         xrt.assert_identical(combined_vds, expected_vds)
 
-        file_glob = filepath1.parent.with_suffix("air*.nc")
-        combined_vds = open_virtual_mfdataset(file_glob, combine="by_coords")
-        expected_vds = open_virtual_dataset(chunked_netcdf4_file)
+        # test combine by coords using in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2], combine="by_coords", loadable_variables=["time"]
+        )
+        vds1 = open_virtual_dataset(filepath1, loadable_variables=["time"])
+        vds2 = open_virtual_dataset(filepath2, loadable_variables=["time"])
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords again using in-memory indexes but for a glob
+        file_glob = Path(filepath1).parent.glob("air*.nc")
+        combined_vds = open_virtual_mfdataset(
+            file_glob, combine="by_coords", loadable_variables=["time"]
+        )
         xrt.assert_identical(combined_vds, expected_vds)
 
     # @requires_dask
