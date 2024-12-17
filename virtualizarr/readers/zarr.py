@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path, PosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
+import zarr
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import (
+    validate_and_normalize_path_to_uri,
+)
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -153,11 +157,9 @@ def virtual_dataset_from_zarr_group(
 ) -> Dataset:
     import zarr
 
-    # vfpath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
+    filepath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
     # This currently fails: *** TypeError: Filesystem needs to support async operations.
     # https://github.com/zarr-developers/zarr-python/issues/2554
-
-    # import ipdb; ipdb.set_trace()
 
     zg = zarr.open_group(
         filepath, storage_options=reader_options.get("storage_options"), mode="r"
@@ -175,9 +177,10 @@ def virtual_dataset_from_zarr_group(
     virtual_vars = list(
         set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
     )
-
     virtual_variable_mapping = {
-        f"{var}": construct_virtual_array(zarr_group=zg, var_name=var)
+        f"{var}": construct_virtual_array(
+            zarr_group=zg, var_name=var, filepath=filepath
+        )
         for var in virtual_vars
     }
 
@@ -227,22 +230,37 @@ async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> boo
     return await zarr_group.store.exists(chunk_key)
 
 
-async def get_chunk_paths(
-    zarr_group: zarr.core.group, array_name: str, zarr_version: int
-) -> dict:
-    chunk_paths = {}
-    # Is there a way to call `zarr_group.store.list()` per array?
+async def list_store_keys(zarr_group: zarr.core.group) -> list[str]:
+    return [item async for item in zarr_group.store.list()]
 
-    async for item in zarr_group.store.list():
+
+async def get_chunk_paths(
+    zarr_group: zarr.core.group,
+    array_name: str,
+    store_path: str,  # should this be UPath or?
+) -> dict:
+    # use UPath to for combining store path + chunk key
+    from upath import UPath
+
+    store_path = UPath(store_path)
+
+    chunk_paths = {}
+
+    # can we call list() on an array?
+    store_keys = zarr.core.sync.sync(list_store_keys(zarr_group))
+
+    for item in store_keys:
+        # should we move these filters/checks into list_store_keys?
         if (
             not item.endswith((".zarray", ".zattrs", ".zgroup", ".zmetadata", ".json"))
             and item.startswith(array_name)
-            and await chunk_exists(zarr_group=zarr_group, chunk_key=item)
+            and zarr.core.sync.sync(chunk_exists(zarr_group=zarr_group, chunk_key=item))
         ):
-            if zarr_version == 2:
+            if zarr_group.metadata.zarr_format == 2:
                 # split on array name + trailing slash
                 chunk_key = item.split(array_name + "/")[-1]
-            elif zarr_version == 3:
+
+            elif zarr_group.metadata.zarr_format == 3:
                 # In v3 we remove the /c/ 'chunks' part of the key and
                 # replace trailing slashes with '.' to conform to ChunkManifest validation
                 chunk_key = (
@@ -250,14 +268,19 @@ async def get_chunk_paths(
                 )
 
             else:
-                raise NotImplementedError(f"{zarr_version} not 2 or 3.")
+                raise NotImplementedError(
+                    f"{zarr_group.metadata.zarr_format} not 2 or 3."
+                )
+
+            # Can we ask Zarr-python for the path and protocol?
+            # zarr_group.store.path
 
             chunk_paths[chunk_key] = {
                 "path": (
-                    zarr_group.store.root / item
-                ).as_uri(),  # as_uri to comply with https://github.com/zarr-developers/VirtualiZarr/pull/243
+                    (store_path / item).as_uri()
+                ),  # as_uri to comply with https://github.com/zarr-developers/VirtualiZarr/pull/243
                 "offset": 0,
-                "length": await get_chunk_size(zarr_group, item),
+                "length": zarr.core.sync.sync(get_chunk_size(zarr_group, item)),
             }
 
             # This won't work for sharded stores: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844487578
@@ -265,19 +288,9 @@ async def get_chunk_paths(
     return chunk_paths
 
 
-def construct_chunk_key_mapping(
-    zarr_group: zarr.core.group, array_name: str, zarr_version: int
-) -> dict:
-    import asyncio
-
-    return asyncio.run(
-        get_chunk_paths(
-            zarr_group=zarr_group, array_name=array_name, zarr_version=zarr_version
-        )
-    )
-
-
-def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
+def construct_virtual_array(
+    zarr_group: zarr.core.group.Group, var_name: str, filepath: str
+):
     zarr_array = zarr_group[var_name]
 
     attrs = zarr_array.metadata.attributes
@@ -285,6 +298,7 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     if zarr_array.metadata.zarr_format == 2:
         array_zarray = _parse_zarr_v2_metadata(zarr_array=zarr_array)
         array_dims = attrs["_ARRAY_DIMENSIONS"]
+
     elif zarr_array.metadata.zarr_format == 3:
         array_zarray = _parse_zarr_v3_metadata(zarr_array=zarr_array)
         array_dims = zarr_array.metadata.dimension_names
@@ -292,8 +306,10 @@ def construct_virtual_array(zarr_group: zarr.core.group.Group, var_name: str):
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
-    array_chunk_sizes = construct_chunk_key_mapping(
-        zarr_group, array_name=var_name, zarr_version=zarr_array.metadata.zarr_format
+    import asyncio
+
+    array_chunk_sizes = asyncio.run(
+        get_chunk_paths(zarr_group=zarr_group, array_name=var_name, store_path=filepath)
     )
 
     array_chunkmanifest = ChunkManifest(array_chunk_sizes)
