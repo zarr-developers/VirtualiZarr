@@ -2,7 +2,6 @@ import os
 import warnings
 from collections.abc import Iterable, Mapping
 from enum import Enum, auto
-from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -15,7 +14,6 @@ from typing import (
 )
 
 from xarray import DataArray, Dataset, Index, combine_by_coords
-from xarray.backends.api import _multi_file_closer
 from xarray.backends.common import _find_absolute_paths
 from xarray.core.combine import _infer_concat_order_from_positions, _nested_combine
 
@@ -383,8 +381,9 @@ def open_virtual_mfdataset(
         futures = fn_exec.map(generate_refs, paths1d)
 
         # wait for all the serverless workers to finish, and send their resulting virtual datasets back to the client
+        # TODO do we need download_results?
         completed_futures, _ = fn_exec.wait(futures, download_results=True)
-        virtual_datasets = [future.get_result() for future in completed_futures]
+        virtual_datasets = completed_futures.get_result()
     elif parallel is False:
         virtual_datasets = [open_(p, **kwargs) for p in paths1d]
         closers = [getattr_(ds, "_close") for ds in virtual_datasets]
@@ -427,7 +426,7 @@ def open_virtual_mfdataset(
             vds.close()
         raise
 
-    combined_vds.set_close(partial(_multi_file_closer, closers))
+    # combined_vds.set_close(partial(_multi_file_closer, closers))
 
     # read global attributes from the attrs_file or from the first dataset
     if attrs_file is not None:
