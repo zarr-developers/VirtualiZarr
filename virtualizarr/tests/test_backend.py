@@ -485,6 +485,8 @@ class TestOpenVirtualMFDataset:
 
     # @requires_lithops
     def test_lithops(self, netcdf4_files_factory):
+        # by default this will use the lithops LocalHost executor
+
         filepath1, filepath2 = netcdf4_files_factory()
 
         # test combine nested without in-memory indexes
@@ -502,6 +504,26 @@ class TestOpenVirtualMFDataset:
         expected_vds = xr.concat(
             [vds1, vds2], dim="time", coords="minimal", compat="override"
         )
+
+        print(combined_vds)
+        print(expected_vds)
+        print(combined_vds.indexes)
+        print(combined_vds.indexes)
+        print(combined_vds["lat"].attrs)
+        print(expected_vds["lat"].attrs)
+        print(combined_vds["lat"].encoding)
+        print(expected_vds["lat"].encoding)
+        print(combined_vds["lat"].data)
+        print(expected_vds["lat"].data)
+        print(combined_vds["lat"].data.zarray)
+        print(expected_vds["lat"].data.zarray)
+        print(combined_vds["lat"].data.manifest.dict())
+        print(expected_vds["lat"].data.manifest.dict())
+
+        # TODO this assertion unintentially triggers loading, see issue #354
+        # xrt.assert_identical(combined_vds.coords.variables['lat'], expected_vds.coords.variables['lat'])
+
+        # TODO I have no idea why this assertion fails for all the coords - everything about the coords looks identical
         # xrt.assert_identical(combined_vds, expected_vds)
 
         # test combine by coords using in-memory indexes
