@@ -13,7 +13,6 @@ dependencies:
   - ujson
   - universal_pathlib
   # Testing
-  - dask
   - codecov
   - pre-commit
   - mypy
