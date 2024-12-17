@@ -110,7 +110,6 @@ class ZArray:
         zarray_dict = self.dict()
         if zarray_dict["fill_value"] is np.nan:
             zarray_dict["fill_value"] = None
-
         return ujson.dumps(zarray_dict)
 
     # ZArray.dict seems to shadow "dict", so we need the type ignore in
