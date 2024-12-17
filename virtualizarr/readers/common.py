@@ -47,7 +47,7 @@ def open_loadable_vars_and_indexes(
         # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
         fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
-        # Update the xarray open_dataset kwargs if Zarr
+        # Updates the Xarray open_dataset kwargs if Zarr
 
         if fpath.filepath.suffix == ".zarr":
             engine = "zarr"

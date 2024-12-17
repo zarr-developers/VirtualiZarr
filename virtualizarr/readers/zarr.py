@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 import numcodecs
 import numpy as np
-import zarr
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -25,6 +24,7 @@ from virtualizarr.zarr import ZArray
 if TYPE_CHECKING:
     from pathlib import PosixPath
 
+    import upath
     import zarr
 
 
@@ -40,9 +40,7 @@ class ZarrVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        """
-        Create a virtual dataset from an existing Zarr store
-        """
+        # Question: Is this something we want to pass through?
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "Zarr reader does not understand any virtual_backend_kwargs"
@@ -156,10 +154,15 @@ def virtual_dataset_from_zarr_group(
     reader_options: Optional[dict] = None,
 ) -> Dataset:
     import zarr
+    from upath import UPath
 
     filepath = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
-    # This currently fails: *** TypeError: Filesystem needs to support async operations.
+    # This currently fails for local filepaths (ie. tests):
+    # *** TypeError: Filesystem needs to support async operations.
     # https://github.com/zarr-developers/zarr-python/issues/2554
+
+    # use UPath for combining store path + chunk key when building chunk manifests
+    store_path = UPath(filepath)
 
     zg = zarr.open_group(
         filepath, storage_options=reader_options.get("storage_options"), mode="r"
@@ -173,18 +176,17 @@ def virtual_dataset_from_zarr_group(
             f"Some loadable variables specified are not present in this zarr store: {missing_vars}"
         )
 
-    # virtual variables are available variables minus drop variables & loadable variables
     virtual_vars = list(
         set(zarr_arrays) - set(loadable_variables) - set(drop_variables)
     )
+
     virtual_variable_mapping = {
         f"{var}": construct_virtual_array(
-            zarr_group=zg, var_name=var, filepath=filepath
+            zarr_group=zg, var_name=var, filepath=store_path
         )
         for var in virtual_vars
     }
 
-    # list comp hell
     coord_names = list(
         set(
             item
@@ -195,12 +197,8 @@ def virtual_dataset_from_zarr_group(
         )
     )
 
-    # 4 Get the loadable_variables by just using xr.open_zarr on the same store (should use drop_variables to avoid handling the virtual variables that we already have).
-    # We want to drop 'drop_variables' but also virtual variables since we already **manifested** them.
-
     non_loadable_variables = list(set(virtual_vars).union(set(drop_variables)))
 
-    # pre made func for this?! Woohoo
     loadable_vars, indexes = open_loadable_vars_and_indexes(
         filepath,
         loadable_variables=loadable_variables,
@@ -211,7 +209,6 @@ def virtual_dataset_from_zarr_group(
         decode_times=decode_times,
     )
 
-    # 6 Merge all the variables into one xr.Dataset and return it.
     return construct_virtual_dataset(
         virtual_vars=virtual_variable_mapping,
         loadable_vars=loadable_vars,
@@ -222,31 +219,26 @@ def virtual_dataset_from_zarr_group(
 
 
 async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> int:
-    # async get chunk size of a chunk key
+    # User zarr-pythons `getsize` method to get bytes per chunk
     return await zarr_group.store.getsize(chunk_key)
 
 
 async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> bool:
+    # calls zarr-pythons `exists` to check for a chunk
     return await zarr_group.store.exists(chunk_key)
 
 
 async def list_store_keys(zarr_group: zarr.core.group) -> list[str]:
+    # Lists all keys in a store
     return [item async for item in zarr_group.store.list()]
 
 
 async def get_chunk_paths(
-    zarr_group: zarr.core.group,
-    array_name: str,
-    store_path: str,  # should this be UPath or?
+    zarr_group: zarr.core.group, array_name: str, store_path: upath.core.UPath
 ) -> dict:
-    # use UPath to for combining store path + chunk key
-    from upath import UPath
-
-    store_path = UPath(store_path)
-
     chunk_paths = {}
 
-    # can we call list() on an array?
+    # Can we call list() on an array instead of the entire store?
     store_keys = zarr.core.sync.sync(list_store_keys(zarr_group))
 
     for item in store_keys:
@@ -273,23 +265,21 @@ async def get_chunk_paths(
                 )
 
             # Can we ask Zarr-python for the path and protocol?
-            # zarr_group.store.path
+            # This gives path, but no protocol: zarr_group.store.path
 
             chunk_paths[chunk_key] = {
-                "path": (
-                    (store_path / item).as_uri()
-                ),  # as_uri to comply with https://github.com/zarr-developers/VirtualiZarr/pull/243
+                "path": ((store_path / item).as_uri()),
                 "offset": 0,
                 "length": zarr.core.sync.sync(get_chunk_size(zarr_group, item)),
             }
 
-            # This won't work for sharded stores: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844487578
+            # Note: This won't work for sharded stores: https://github.com/zarr-developers/VirtualiZarr/pull/271#discussion_r1844487578
 
     return chunk_paths
 
 
 def construct_virtual_array(
-    zarr_group: zarr.core.group.Group, var_name: str, filepath: str
+    zarr_group: zarr.core.group.Group, var_name: str, store_path: upath.core.UPath
 ):
     zarr_array = zarr_group[var_name]
 
@@ -309,7 +299,9 @@ def construct_virtual_array(
     import asyncio
 
     array_chunk_sizes = asyncio.run(
-        get_chunk_paths(zarr_group=zarr_group, array_name=var_name, store_path=filepath)
+        get_chunk_paths(
+            zarr_group=zarr_group, array_name=var_name, store_path=store_path
+        )
     )
 
     array_chunkmanifest = ChunkManifest(array_chunk_sizes)
@@ -354,7 +346,6 @@ def _parse_zarr_v3_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
     # Questions: What do we do with endian info?
     codecs = get_codecs(zarr_array)
 
-    # Q: Are these ever in codecs?
     compressor = getattr(codecs[0], "compressor", None)
     filters = getattr(codecs[0], "filters", None)
 
