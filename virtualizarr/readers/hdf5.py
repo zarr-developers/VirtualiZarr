@@ -51,8 +51,7 @@ class HDF5VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
+            drop_variables=drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 

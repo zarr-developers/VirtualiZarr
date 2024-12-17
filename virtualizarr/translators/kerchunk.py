@@ -16,7 +16,6 @@ from virtualizarr.zarr import ZArray, ZAttrs, determine_chunk_grid_shape
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
     vds_refs: KerchunkStoreRefs,
-    loadable_variables,
     drop_variables,
     virtual_array_class=ManifestArray,
     fs_root: str | None = None,
@@ -33,7 +32,7 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
-        drop_variables=drop_variables + loadable_variables,
+        drop_variables=drop_variables,
         virtual_array_class=virtual_array_class,
         fs_root=fs_root,
     )
