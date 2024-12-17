@@ -1,6 +1,15 @@
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Union,
+)
 
 import numpy as np
 import xarray as xr
@@ -41,7 +50,9 @@ class HDFVirtualBackend(VirtualBackend):
         filepath: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
+        loadable_variables: Literal["1d_coord_dims"]
+        | Literal["all_coords"]
+        | Iterable[str] = "1d_coord_dims",
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
@@ -64,9 +75,14 @@ class HDFVirtualBackend(VirtualBackend):
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
             path=filepath,
             group=group,
-            drop_variables=drop_variables + loadable_variables,
+            # TODO loadable_variables could also be dropped here, which would avoid reading then dropping loadable variables.
+            # TODO however an explicit list of loadable_variables isn't always known at this point, so that logic would need to live deeper.
+            drop_variables=drop_variables,
             reader_options=reader_options,
         )
+
+        print("virtual_vars")
+        print(virtual_vars)
 
         loadable_vars, indexes = open_loadable_vars_and_indexes(
             filepath,
@@ -83,13 +99,15 @@ class HDFVirtualBackend(VirtualBackend):
         )
         coordinates_attr = attrs.pop("coordinates", "")
         coord_names = coordinates_attr.split()
-        return construct_virtual_dataset(
+        vds = construct_virtual_dataset(
             virtual_vars=virtual_vars,
             loadable_vars=loadable_vars,
             indexes=indexes,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        return vds
 
     @staticmethod
     def _dataset_chunk_manifest(path: str, dataset: Dataset) -> Optional[ChunkManifest]:

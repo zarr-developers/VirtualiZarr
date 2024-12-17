@@ -21,7 +21,7 @@ from virtualizarr.readers import (
     ZarrV3VirtualBackend,
 )
 from virtualizarr.readers.common import VirtualBackend
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
@@ -109,9 +109,9 @@ def open_virtual_dataset(
     filetype: FileType | str | None = None,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
-    loadable_variables: Literal["1d_coords"]
+    loadable_variables: Literal["1d_coord_dims"]
     | Literal["all_coords"]
-    | Iterable[str] = "1d_coords",
+    | Iterable[str] = "1d_coord_dims",
     decode_times: bool | None = None,
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
@@ -139,12 +139,12 @@ def open_virtual_dataset(
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    loadable_variables: '1d_coords', 'all_coords', or list[str], default is '1d_coords'
+    loadable_variables: '1d_coord_dims', 'all_coords', or list[str], default is '1d_coord_dims'
         Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
         Passing an empty list will turn this feature off entirely, i.e. open all variables as virtual arrays (i.e. ManifestArray).
-        ``1d_coords`` will load only one-dimensional coordinate variables with the same name as their only dimension (what xarray sometimes calls "dimension coordinates").
+        ``1d_coord_dims`` will load only one-dimensional coordinate variables with the same name as their only dimension (what xarray sometimes calls "dimension coordinates").
         ``all_coords`` will load all coordinate variables.
-        Default is '1d_coords', to be similar to the default behaviour of ``xarray.open_dataset``.
+        Default is '1d_coord_dims', to be similar to the default behaviour of ``xarray.open_dataset``.
     decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     indexes : Mapping[str, Index], default is None
@@ -176,10 +176,10 @@ def open_virtual_dataset(
 
     # TODO this won't work without an explicit list of loadable_variables
     # TODO so it probably has to be moved inside the backends
-    drop_variables, loadable_variables = check_for_collisions(
-        drop_variables,
-        loadable_variables,
-    )
+    # drop_variables, loadable_variables = check_for_collisions(
+    #     drop_variables,
+    #     loadable_variables,
+    # )
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()

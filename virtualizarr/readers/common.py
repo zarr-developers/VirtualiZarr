@@ -25,7 +25,9 @@ from virtualizarr.utils import _FsspecFSFromFilepath
 
 def open_loadable_vars_and_indexes(
     filepath: str,
-    loadable_variables,
+    loadable_variables: Literal["1d_coord_dims"]
+    | Literal["all_coords"]
+    | Iterable[str],
     reader_options,
     drop_variables,
     indexes,
@@ -38,8 +40,10 @@ def open_loadable_vars_and_indexes(
     Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
     """
 
+    print(indexes)
+
     # TODO get rid of this if?
-    if indexes is None or len(loadable_variables) > 0:
+    if indexes is None or loadable_variables != []:
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
         # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
@@ -55,11 +59,40 @@ def open_loadable_vars_and_indexes(
             decode_times=decode_times,
         )
 
+        print(loadable_variables)
+
+        # TODO we should drop these earlier by using drop_variables
+        # TODO add an extra option "0d_and_1d_coords" ?
+        if loadable_variables == "all_coords":
+            loadable_vars = dict(ds.coords.variables)
+        elif loadable_variables == "1d_coord_dims":
+            print("here")
+            loadable_vars = {
+                str(name): var
+                for name, var in ds.coords.variables.items()
+                if len(var.dims) == 1 and var.dims[0] == name
+            }
+            print(loadable_vars)
+        elif isinstance(loadable_variables, list):
+            # TODO raise if any loadable variables not present
+            # TODO implement just by using __getitem__
+            loadable_vars = {
+                str(name): var
+                for name, var in ds.variables.items()
+                if name in loadable_variables
+            }
+        else:
+            raise ValueError(
+                "loadable_vars must be either a list of variable names, or one of ['1d_coord_dims', 'all_coords']"
+            )
+
         if indexes is None:
             warnings.warn(
                 "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
                 "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
             )
+
+            print(ds.xindexes.keys())
 
             # add default indexes by reading data from file
             indexes = {name: index for name, index in ds.xindexes.items()}
@@ -68,14 +101,12 @@ def open_loadable_vars_and_indexes(
             raise NotImplementedError()
         else:
             indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-        # TODO we should drop these earlier by using drop_variables
         loadable_vars = {
-            str(name): var
-            for name, var in ds.variables.items()
-            if name in loadable_variables
+            name: var.to_index_variable() if name in indexes else var
+            for name, var in loadable_vars.items()
         }
 
+        # TODO should this still be here?
         # if we only read the indexes we can just close the file right away as nothing is lazy
         if loadable_vars == {}:
             ds.close()
@@ -97,7 +128,13 @@ def construct_virtual_dataset(
 
     vars = {**virtual_vars, **loadable_vars}
 
+    print("loadable_vars")
+    print(loadable_vars)
+
     data_vars, coords = separate_coords(vars, indexes, coord_names)
+
+    print("data_vars")
+    print(data_vars)
 
     vds = Dataset(
         data_vars,

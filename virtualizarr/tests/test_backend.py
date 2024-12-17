@@ -354,27 +354,38 @@ class TestLoadVirtualDataset:
         [
             (["air", "time"], ["air", "time"]),
             ([], []),
-            ("1d_coords", ["time"]),
+            ("1d_coord_dims", ["lat", "lon", "time"]),
             ("all_coords", ["lat", "lon", "time"]),
         ],
     )
     def test_loadable_variables(
         self, netcdf4_file, hdf_backend, loadable_variables, expected_loaded_variables
     ):
+        print(loadable_variables)
         vds = open_virtual_dataset(
             netcdf4_file,
             loadable_variables=loadable_variables,
-            indexes={},
+            indexes=None,
             backend=hdf_backend,
         )
 
+        print(vds)
+
         full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
+        print(full_ds)
+
         for name in full_ds.variables:
+            assert name in list(vds.variables.keys())
             if name in expected_loaded_variables:
                 assert isinstance(vds[name].data, np.ndarray), name
+                print(vds.variables[name])
+                print(full_ds.variables[name])
                 xrt.assert_identical(vds.variables[name], full_ds.variables[name])
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
+
+    # TODO test raises when passing ['1d_coord_dims']
+    # TODO test raises if any of loadable_variables not present
 
     def test_explicit_filetype(self, netcdf4_file):
         with pytest.raises(ValueError):
