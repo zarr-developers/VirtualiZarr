@@ -18,6 +18,7 @@ from virtualizarr.tests import (
     has_astropy,
     network,
     requires_kerchunk,
+    requires_lithops,
     requires_s3fs,
     requires_scipy,
 )
@@ -441,8 +442,9 @@ class TestLoadVirtualDataset:
         assert vds.scalar.attrs == {"scalar": "true"}
 
 
+# TODO consolidate these by parameterizing over parallel kwarg once they all work
+@requires_kerchunk
 class TestOpenVirtualMFDataset:
-    @requires_kerchunk
     def test_serial(self, netcdf4_files_factory):
         filepath1, filepath2 = netcdf4_files_factory()
 
@@ -483,7 +485,7 @@ class TestOpenVirtualMFDataset:
     # @requires_dask
     def test_dask(self, netcdf4_files_factory): ...
 
-    # @requires_lithops
+    @requires_lithops
     def test_lithops(self, netcdf4_files_factory):
         # by default this will use the lithops LocalHost executor
 

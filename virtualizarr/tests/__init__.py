@@ -35,6 +35,7 @@ def _importorskip(
 has_astropy, requires_astropy = _importorskip("astropy")
 has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
+has_lithops, requires_lithops = _importorskip("lithops")
 has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
