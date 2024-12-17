@@ -49,13 +49,13 @@ def open_loadable_vars_and_indexes(
 
         # Updates the Xarray open_dataset kwargs if Zarr
 
-        if fpath.filepath.suffix == ".zarr":
+        if fpath.filepath.suffix == ".zarr":  # type: ignore
             engine = "zarr"
             xr_input = fpath.filepath
 
         else:
             engine = None
-            xr_input = fpath.open_file()
+            xr_input = fpath.open_file()  # type: ignore
 
         ds = open_dataset(
             xr_input,  # type: ignore[arg-type]

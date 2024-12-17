@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Iterable, Optional, Union
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
+    import upath
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[
@@ -32,7 +33,7 @@ class _FsspecFSFromFilepath:
 
     """
 
-    filepath: str
+    filepath: str | upath.core.UPath
     reader_options: Optional[dict] = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
 
@@ -59,7 +60,9 @@ class _FsspecFSFromFilepath:
         import fsspec
         from upath import UPath
 
-        self.filepath = UPath(self.filepath)
+        if not isinstance(self.filepath, UPath):
+            self.filepath = UPath(self.filepath)
+
         protocol = self.filepath.protocol
 
         self.reader_options = self.reader_options or {}

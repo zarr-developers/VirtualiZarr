@@ -77,6 +77,7 @@ class ZarrV3ChunkManifestVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         """
@@ -84,7 +85,10 @@ class ZarrV3ChunkManifestVirtualBackend(VirtualBackend):
 
         This is experimental - chunk manifests are not part of the Zarr v3 Spec.
         """
-
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "Zarr V3 Chunk Manifest reader does not understand any virtual_backend_kwargs"
+            )
         storepath = Path(filepath)
 
         if group:
@@ -164,11 +168,21 @@ def virtual_dataset_from_zarr_group(
     # use UPath for combining store path + chunk key when building chunk manifests
     store_path = UPath(filepath)
 
+    if reader_options is None:
+        reader_options = {}
+
     zg = zarr.open_group(
         filepath, storage_options=reader_options.get("storage_options"), mode="r"
     )
 
     zarr_arrays = [val for val in zg.keys()]
+
+    # mypy typing
+    if loadable_variables is None:
+        loadable_variables = set()
+
+    if drop_variables is None:
+        drop_variables = set()
 
     missing_vars = set(loadable_variables) - set(zarr_arrays)
     if missing_vars:
@@ -182,7 +196,7 @@ def virtual_dataset_from_zarr_group(
 
     virtual_variable_mapping = {
         f"{var}": construct_virtual_array(
-            zarr_group=zg, var_name=var, filepath=store_path
+            zarr_group=zg, var_name=var, store_path=store_path
         )
         for var in virtual_vars
     }
@@ -218,23 +232,23 @@ def virtual_dataset_from_zarr_group(
     )
 
 
-async def get_chunk_size(zarr_group: zarr.core.group, chunk_key: PosixPath) -> int:
+async def get_chunk_size(zarr_group: zarr.Group, chunk_key: PosixPath) -> int:
     # User zarr-pythons `getsize` method to get bytes per chunk
     return await zarr_group.store.getsize(chunk_key)
 
 
-async def chunk_exists(zarr_group: zarr.core.group, chunk_key: PosixPath) -> bool:
+async def chunk_exists(zarr_group: zarr.Group, chunk_key: PosixPath) -> bool:
     # calls zarr-pythons `exists` to check for a chunk
     return await zarr_group.store.exists(chunk_key)
 
 
-async def list_store_keys(zarr_group: zarr.core.group) -> list[str]:
+async def list_store_keys(zarr_group: zarr.Group) -> list[str]:
     # Lists all keys in a store
     return [item async for item in zarr_group.store.list()]
 
 
 async def get_chunk_paths(
-    zarr_group: zarr.core.group, array_name: str, store_path: upath.core.UPath
+    zarr_group: zarr.Group, array_name: str, store_path: upath.core.UPath
 ) -> dict:
     chunk_paths = {}
 
@@ -279,7 +293,7 @@ async def get_chunk_paths(
 
 
 def construct_virtual_array(
-    zarr_group: zarr.core.group.Group, var_name: str, store_path: upath.core.UPath
+    zarr_group: zarr.Group, var_name: str, store_path: upath.core.UPath
 ):
     zarr_array = zarr_group[var_name]
 
