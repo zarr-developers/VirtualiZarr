@@ -442,6 +442,7 @@ class TestLoadVirtualDataset:
 
 
 class TestOpenVirtualMFDataset:
+    @requires_kerchunk
     def test_serial(self, netcdf4_files_factory):
         filepath1, filepath2 = netcdf4_files_factory()
 
