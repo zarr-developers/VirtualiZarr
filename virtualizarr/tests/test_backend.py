@@ -349,26 +349,43 @@ class TestOpenVirtualDatasetHDFGroup:
 @requires_kerchunk
 class TestLoadVirtualDataset:
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
-    def test_loadable_variables(self, netcdf4_file, hdf_backend):
-        vars_to_load = ["air", "time"]
+    @pytest.mark.parametrize(
+        "loadable_variables, expected_loaded_variables",
+        [
+            (["air", "time"], ["air", "time"]),
+            ([], []),
+            ("1d_coord_dims", ["lat", "lon", "time"]),
+            ("all_coords", ["lat", "lon", "time"]),
+        ],
+    )
+    def test_loadable_variables(
+        self, netcdf4_file, hdf_backend, loadable_variables, expected_loaded_variables
+    ):
+        print(loadable_variables)
         vds = open_virtual_dataset(
             netcdf4_file,
-            loadable_variables=vars_to_load,
-            indexes={},
+            loadable_variables=loadable_variables,
+            indexes=None,
             backend=hdf_backend,
         )
 
-        for name in vds.variables:
-            if name in vars_to_load:
+        print(vds)
+
+        full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
+        print(full_ds)
+
+        for name in full_ds.variables:
+            assert name in list(vds.variables.keys())
+            if name in expected_loaded_variables:
                 assert isinstance(vds[name].data, np.ndarray), name
+                print(vds.variables[name])
+                print(full_ds.variables[name])
+                xrt.assert_identical(vds.variables[name], full_ds.variables[name])
             else:
                 assert isinstance(vds[name].data, ManifestArray), name
 
-        full_ds = xr.open_dataset(netcdf4_file, decode_times=True)
-
-        for name in full_ds.variables:
-            if name in vars_to_load:
-                xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+    # TODO test raises when passing ['1d_coord_dims']
+    # TODO test raises if any of loadable_variables not present
 
     def test_explicit_filetype(self, netcdf4_file):
         with pytest.raises(ValueError):

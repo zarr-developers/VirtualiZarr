@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import io
-from typing import TYPE_CHECKING, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Iterable, Literal, Optional, Union
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -64,27 +64,29 @@ class _FsspecFSFromFilepath:
         self.fs = fsspec.filesystem(protocol, **storage_options)
 
 
+# TODO move this to backends/common.py
 def check_for_collisions(
     drop_variables: Iterable[str] | None,
-    loadable_variables: Iterable[str] | None,
-) -> tuple[list[str], list[str]]:
+    loadable_variables: Literal["1d_coord_dims"]
+    | Literal["all_coords"]
+    | Iterable[str],
+) -> tuple[list[str], list[str] | Literal["1d_coord_dims"] | Literal["all_coords"]]:
+    """Coerce input types and check for obvious inconsistencies."""
+
     if drop_variables is None:
         drop_variables = []
-    elif isinstance(drop_variables, str):
-        drop_variables = [drop_variables]
     else:
         drop_variables = list(drop_variables)
 
-    if loadable_variables is None:
-        loadable_variables = []
-    elif isinstance(loadable_variables, str):
-        loadable_variables = [loadable_variables]
+    if loadable_variables == "1d_coord_dims" or loadable_variables == "all_coords":
+        pass
     else:
         loadable_variables = list(loadable_variables)
 
-    common = set(drop_variables).intersection(set(loadable_variables))
-    if common:
-        raise ValueError(f"Cannot both load and drop variables {common}")
+        # note: this won't catch case that user tries to drop a variable in 1d_coord_dims or all_coords, but it's better than nothing
+        common = set(drop_variables).intersection(set(loadable_variables))
+        if common:
+            raise ValueError(f"Cannot both load and drop variables {common}")
 
     return drop_variables, loadable_variables
 

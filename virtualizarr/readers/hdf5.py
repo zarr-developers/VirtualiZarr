@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Literal, Mapping, Optional
 
 from xarray import Dataset, Index
 
@@ -21,7 +21,9 @@ class HDF5VirtualBackend(VirtualBackend):
         filepath: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
+        loadable_variables: Literal["1d_coord_dims"]
+        | Literal["all_coords"]
+        | Iterable[str] = "1d_coord_dims",
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
@@ -49,8 +51,7 @@ class HDF5VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
+            drop_variables=drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
