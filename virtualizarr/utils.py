@@ -33,9 +33,10 @@ class _FsspecFSFromFilepath:
 
     """
 
-    filepath: str | upath.core.UPath
+    filepath: str
     reader_options: Optional[dict] = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
+    upath: upath.core.UPath = field(init=False)
 
     def open_file(self) -> OpenFileType:
         """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
@@ -61,14 +62,16 @@ class _FsspecFSFromFilepath:
         from upath import UPath
 
         if not isinstance(self.filepath, UPath):
-            self.filepath = UPath(self.filepath)
+            upath = UPath(self.filepath)
 
-        protocol = self.filepath.protocol
+        self.upath = upath
+        self.protocol = upath.protocol
+        self.filepath = upath.as_uri()
 
         self.reader_options = self.reader_options or {}
         storage_options = self.reader_options.get("storage_options", {})  # type: ignore
 
-        self.fs = fsspec.filesystem(protocol, **storage_options)
+        self.fs = fsspec.filesystem(self.protocol, **storage_options)
 
 
 def check_for_collisions(

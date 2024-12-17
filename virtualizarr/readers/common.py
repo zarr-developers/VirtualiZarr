@@ -49,7 +49,7 @@ def open_loadable_vars_and_indexes(
 
         # Updates the Xarray open_dataset kwargs if Zarr
 
-        if fpath.filepath.suffix == ".zarr":  # type: ignore
+        if fpath.upath.suffix == ".zarr":
             engine = "zarr"
             xr_input = fpath.filepath
 

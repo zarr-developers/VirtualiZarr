@@ -22,8 +22,6 @@ from virtualizarr.utils import check_for_collisions
 from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
-    from pathlib import PosixPath
-
     import upath
     import zarr
 
@@ -232,12 +230,12 @@ def virtual_dataset_from_zarr_group(
     )
 
 
-async def get_chunk_size(zarr_group: zarr.Group, chunk_key: PosixPath) -> int:
+async def get_chunk_size(zarr_group: zarr.Group, chunk_key: str) -> int:
     # User zarr-pythons `getsize` method to get bytes per chunk
     return await zarr_group.store.getsize(chunk_key)
 
 
-async def chunk_exists(zarr_group: zarr.Group, chunk_key: PosixPath) -> bool:
+async def chunk_exists(zarr_group: zarr.Group, chunk_key: str) -> bool:
     # calls zarr-pythons `exists` to check for a chunk
     return await zarr_group.store.exists(chunk_key)
 
@@ -300,12 +298,12 @@ def construct_virtual_array(
     attrs = zarr_array.metadata.attributes
 
     if zarr_array.metadata.zarr_format == 2:
-        array_zarray = _parse_zarr_v2_metadata(zarr_array=zarr_array)
+        array_zarray = _parse_zarr_v2_metadata(zarr_array=zarr_array)  # type: ignore[arg-type]
         array_dims = attrs["_ARRAY_DIMENSIONS"]
 
     elif zarr_array.metadata.zarr_format == 3:
-        array_zarray = _parse_zarr_v3_metadata(zarr_array=zarr_array)
-        array_dims = zarr_array.metadata.dimension_names
+        array_zarray = _parse_zarr_v3_metadata(zarr_array=zarr_array)  # type: ignore[arg-type]
+        array_dims = zarr_array.metadata.dimension_names  # type: ignore[union-attr]
 
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
@@ -333,20 +331,20 @@ def construct_virtual_array(
     return array_variable
 
 
-def _parse_zarr_v2_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
+def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
     return ZArray(
         shape=zarr_array.metadata.shape,
-        chunks=zarr_array.metadata.chunks,
+        chunks=zarr_array.metadata.chunks,  # type: ignore[union-attr]
         dtype=zarr_array.metadata.dtype,
-        fill_value=zarr_array.metadata.fill_value,
+        fill_value=zarr_array.metadata.fill_value,  # type: ignore[arg-type]
         order="C",
-        compressor=zarr_array.metadata.compressor,
-        filters=zarr_array.metadata.filters,
+        compressor=zarr_array.metadata.compressor,  # type: ignore[union-attr]
+        filters=zarr_array.metadata.filters,  # type: ignore
         zarr_format=zarr_array.metadata.zarr_format,
     )
 
 
-def _parse_zarr_v3_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
+def _parse_zarr_v3_metadata(zarr_array: zarr.Array) -> ZArray:
     from virtualizarr.codecs import get_codecs
 
     if zarr_array.metadata.fill_value is None:
@@ -360,14 +358,18 @@ def _parse_zarr_v3_metadata(zarr_array: zarr.core.array.Array) -> ZArray:
     # Questions: What do we do with endian info?
     codecs = get_codecs(zarr_array)
 
-    compressor = getattr(codecs[0], "compressor", None)
-    filters = getattr(codecs[0], "filters", None)
+    # Question: How should we parse the values from get_codecs?
+    # typing: Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]
+    # mypy:  ... is not indexable  [index]
+    # added tmp bypyass for mypy
+    compressor = getattr(codecs[0], "compressor", None)  # type: ignore
+    filters = getattr(codecs[0], "filters", None)  # type: ignore
 
     return ZArray(
-        chunks=zarr_array.metadata.chunk_grid.chunk_shape,
+        chunks=zarr_array.metadata.chunk_grid.chunk_shape,  # type: ignore[attr-defined]
         compressor=compressor,
-        dtype=zarr_array.metadata.data_type.name,
-        fill_value=fill_value,
+        dtype=zarr_array.metadata.data_type.name,  # type: ignore
+        fill_value=fill_value,  # type: ignore[arg-type]
         filters=filters,
         order="C",
         shape=zarr_array.metadata.shape,
