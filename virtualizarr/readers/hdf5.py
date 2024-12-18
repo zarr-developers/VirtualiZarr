@@ -6,7 +6,7 @@ from xarray import Dataset, Index
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
-    open_loadable_vars_and_indexes,
+    maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,
@@ -54,7 +54,7 @@ class HDF5VirtualBackend(VirtualBackend):
             fs_root=Path.cwd().as_uri(),
         )
 
-        loadable_vars, indexes = open_loadable_vars_and_indexes(
+        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
             filepath,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
