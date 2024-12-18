@@ -1,4 +1,3 @@
-import warnings
 from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
 from typing import (
@@ -55,13 +54,13 @@ def open_loadable_vars_and_indexes(
         )
 
         if indexes is None:
-            warnings.warn(
-                "Specifying `indexes=None` will create in-memory pandas indexes for each 1D coordinate, but concatenation of ManifestArrays backed by pandas indexes is not yet supported (see issue #18)."
-                "You almost certainly want to pass `indexes={}` to `open_virtual_dataset` instead."
-            )
-
             # add default indexes by reading data from file
-            indexes = {name: index for name, index in ds.xindexes.items()}
+            # virtual variables should never be backed by an in-memory index
+            indexes = {
+                name: index
+                for name, index in ds.xindexes.items()
+                if name in loadable_variables
+            }
         elif indexes != {}:
             # TODO allow manual specification of index objects
             raise NotImplementedError()
