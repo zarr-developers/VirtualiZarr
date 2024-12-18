@@ -21,7 +21,7 @@ Breaking changes
 - Indexes are now created by default for any loadable one-dimensional coordinate variables.
   Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
   This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
-  (:issue:`18`, :pull:`357`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`18`, :pull:`357`, :pull:`358`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
