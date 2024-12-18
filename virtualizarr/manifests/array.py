@@ -94,7 +94,7 @@ class ManifestArray:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
 
     @property
-    def nbytes(self) -> int:
+    def nbytes_virtual(self) -> int:
         """
         Size required to hold these references in memory in bytes.
 
@@ -102,6 +102,7 @@ class ManifestArray:
         this is only the size of the pointers to the chunk locations.
         If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
         """
+        # note: we don't name this method `.nbytes` as we don't want xarray's repr to use it
         return self.manifest.nbytes
 
     def __array_function__(self, func, types, args, kwargs) -> Any:

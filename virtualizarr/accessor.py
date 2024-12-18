@@ -195,4 +195,9 @@ class VirtualiZarrDatasetAccessor:
 
         In-memory (loadable) variables are included in the total using xarray's normal ``.nbytes`` method.
         """
-        return sum(var.nbytes for var in self.variables.values())
+        return sum(
+            var.data.nbytes_virtual
+            if isinstance(var.data, ManifestArray)
+            else var.nbytes
+            for var in self.ds.variables.values()
+        )

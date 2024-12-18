@@ -3,6 +3,7 @@ from typing import Callable
 import numpy as np
 import pytest
 import xarray as xr
+from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -312,7 +313,14 @@ class TestRenamePaths:
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
 
 
-@pytest.mark.parametrize("loadable_vars, size", [([], 32), (["foo"], 48)])
-def test_nbytes(simple_netcdf4, loadable_vars, size):
-    vds = open_virtual_dataset(simple_netcdf4, loadable_variables=loadable_vars)
-    assert vds.nbytes == size
+@requires_kerchunk
+def test_nbytes(simple_netcdf4):
+    vds = open_virtual_dataset(simple_netcdf4)
+    assert vds.virtualize.nbytes == 32
+    assert vds.nbytes == 48
+
+    vds = open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"])
+    assert vds.virtualize.nbytes == 48
+
+    ds = open_dataset(simple_netcdf4)
+    assert ds.virtualize.nbytes == ds.nbytes
