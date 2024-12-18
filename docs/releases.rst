@@ -9,6 +9,9 @@ v1.2.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
+  (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 

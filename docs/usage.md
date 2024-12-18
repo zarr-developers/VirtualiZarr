@@ -60,10 +60,24 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-
 Generally a "virtual dataset" is any `xarray.Dataset` which wraps one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 These particular {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+As the manifest contains only addresses at which to find large binary chunks, the virtual dataset takes up far less space in memory than the original dataset does:
+
+```python
+ds.nbytes
+```
+```
+30975672
+```
+```python
+vds.virtualize.nbytes
+```
+```
+128
+```
 
 ```{important} Virtual datasets are not normal xarray datasets!
 
