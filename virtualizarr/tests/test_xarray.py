@@ -6,7 +6,7 @@ import xarray as xr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.hdf import HDFVirtualBackend
+from virtualizarr.readers import HDF5VirtualBackend, HDFVirtualBackend
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.zarr import ZArray
 
@@ -227,15 +227,17 @@ class TestConcat:
 
 
 @requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
         filepath1, filepath2 = netcdf4_files_factory()
 
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        vds1 = open_virtual_dataset(
+            filepath1, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
+        )
+        vds2 = open_virtual_dataset(
+            filepath2, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
+        )
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
@@ -247,10 +249,8 @@ class TestCombineUsingIndexes:
     def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files, hdf_backend):
         filepath1, filepath2 = netcdf4_files
 
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
+        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],

@@ -91,13 +91,21 @@ class TestOpenVirtualDatasetIndexes:
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert vds.indexes == {}
 
-    def test_create_default_indexes(self, netcdf4_file, hdf_backend):
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds = open_virtual_dataset(netcdf4_file, indexes=None, backend=hdf_backend)
+    def test_create_default_indexes_for_loadable_variables(
+        self, netcdf4_file, hdf_backend
+    ):
+        loadable_variables = ["time", "lat"]
+
+        vds = open_virtual_dataset(
+            netcdf4_file,
+            indexes=None,
+            backend=hdf_backend,
+            loadable_variables=loadable_variables,
+        )
         ds = open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
-        assert index_mappings_equal(vds.xindexes, ds.xindexes)
+        assert index_mappings_equal(vds.xindexes, ds[loadable_variables].xindexes)
 
 
 def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, Index]):
