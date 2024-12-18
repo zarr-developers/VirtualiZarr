@@ -266,25 +266,6 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
-
-You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
-
-```python
-vds1 = open_virtual_dataset('air1.nc', indexes={})
-vds2 = open_virtual_dataset('air2.nc', indexes={})
-```
-
-We can see that the datasets have no indexes.
-
-```python
-vds1.indexes
-```
-```
-Indexes:
-    *empty*
-```
-
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
 
 ```
@@ -343,6 +324,12 @@ In future we would like for it to be possible to just use `xr.open_mfdataset` to
     )
 
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
+```
+
+```{note}
+For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
+
+By default indexes are created for 1-dimensional ``loadable_variables`` whose name matches their only dimension (i.e. "dimension coordinates"), but if you wish you can load variables without creating any indexes by passing ``indexes={}`` to ``open_virtual_dataset``.
 ```
 
 ### Automatic ordering using coordinate data
@@ -440,9 +427,9 @@ This store can however be read by {py:func}`~virtualizarr.open_virtual_dataset`,
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
 
 ```python
-vds = open_virtual_dataset('combined.json', filetype='kerchunk', indexes={})
+vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 # or
-vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
+vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
 
 One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
@@ -455,7 +442,6 @@ You can dis-ambuiguate kerchunk references containing relative paths by passing 
 vds = open_virtual_dataset(
     'relative_refs.json',
     filetype='kerchunk',
-
     virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
 )
 
