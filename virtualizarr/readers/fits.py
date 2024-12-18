@@ -47,7 +47,7 @@ class FITSVirtualBackend(VirtualBackend):
                 "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
             )
         loadable_vars: dict[str, Variable] = {}
-        indexes: dict[str, Index] = {}
+        indexes = {}
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
