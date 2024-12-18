@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from xarray import Dataset, Index
+from xarray import Dataset, Index, Variable
 
 from virtualizarr.readers.common import (
     VirtualBackend,
@@ -46,8 +46,8 @@ class FITSVirtualBackend(VirtualBackend):
             raise NotImplementedError(
                 "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
             )
-        loadable_vars = {}
-        indexes = {}
+        loadable_vars: dict[str, Variable] = {}
+        indexes: dict[str, Index] = {}
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
