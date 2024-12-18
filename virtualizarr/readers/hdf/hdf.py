@@ -15,7 +15,7 @@ from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
-    open_loadable_vars_and_indexes,
+    maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
@@ -68,7 +68,7 @@ class HDFVirtualBackend(VirtualBackend):
             reader_options=reader_options,
         )
 
-        loadable_vars, indexes = open_loadable_vars_and_indexes(
+        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
             filepath,
             loadable_variables=loadable_variables,
             reader_options=reader_options,

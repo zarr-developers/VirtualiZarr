@@ -21,7 +21,7 @@ from xarray.core.indexes import PandasIndex
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 
-def open_loadable_vars_and_indexes(
+def maybe_open_loadable_vars_and_indexes(
     filepath: str,
     loadable_variables,
     reader_options,
@@ -35,6 +35,10 @@ def open_loadable_vars_and_indexes(
 
     Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
     """
+
+    if loadable_variables == [] and indexes == {}:
+        # no need to even attempt to open the file using xarray
+        return {}, {}
 
     # TODO We are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
     # TODO It would also be nice if we could somehow consolidate this with the reading of the kerchunk references
