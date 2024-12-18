@@ -184,6 +184,66 @@ The full Zarr model (for a single group) includes multiple arrays, array names, 
 
 The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
+## Loading variables
+
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
+
+```python
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+  Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
+
+Loading variables can be useful in a few scenarios:
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
+2. You want in-memory indexes to use with ``xr.combine_by_coords``,
+3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
+4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+
+### CF-encoded time variables
+
+To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
+
+```python
+vds = open_virtual_dataset(
+    'air.nc',
+    loadable_variables=['air', 'time'],
+    decode_times=True,
+    indexes={},
+)
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
+Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+
 ## Combining virtual datasets
 
 In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
@@ -292,65 +352,6 @@ TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/Tom
 ### Automatic ordering using metadata
 
 TODO: Use preprocess to create a new index from the metadata
-
-## Loading variables
-
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
-
-```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
-```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
-  Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
-```
-You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
-
-Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
-3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
-
-### CF-encoded time variables
-
-To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
-
-```python
-vds = open_virtual_dataset(
-    'air.nc',
-    loadable_variables=['air', 'time'],
-    decode_times=True,
-    indexes={},
-)
-```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
-Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
-```
 
 ## Writing virtual stores to disk
 
