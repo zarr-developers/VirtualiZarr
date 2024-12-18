@@ -8,7 +8,6 @@ from virtualizarr.manifests.array_api import (
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.types.kerchunk import KerchunkArrRefs
 from virtualizarr.zarr import ZArray
 
 
@@ -61,24 +60,6 @@ class ManifestArray:
 
         self._zarray = _zarray
         self._manifest = _chunkmanifest
-
-    @classmethod
-    def _from_kerchunk_refs(cls, arr_refs: KerchunkArrRefs) -> "ManifestArray":
-        from virtualizarr.translators.kerchunk import (
-            fully_decode_arr_refs,
-            parse_array_refs,
-        )
-
-        decoded_arr_refs = fully_decode_arr_refs(arr_refs)
-
-        chunk_dict, zarray, _zattrs = parse_array_refs(decoded_arr_refs)
-        manifest = ChunkManifest._from_kerchunk_chunk_dict(chunk_dict)
-
-        obj = object.__new__(cls)
-        obj._manifest = manifest
-        obj._zarray = zarray
-
-        return obj
 
     @property
     def manifest(self) -> ChunkManifest:

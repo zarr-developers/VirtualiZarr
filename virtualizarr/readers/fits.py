@@ -1,7 +1,7 @@
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.readers.common import (
     VirtualBackend,
@@ -24,19 +24,28 @@ class FITSVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         from kerchunk.fits import process_file
 
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "FITS reader does not understand any virtual_backend_kwargs"
+            )
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 
-        refs = extract_group(refs, group)
+        # both group=None and group='' mean to read root group
+        if group:
+            refs = extract_group(refs, group)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
             loadable_variables,
             drop_variables,
+            fs_root=Path.cwd().as_uri(),
         )
 
         # TODO this wouldn't work until you had an xarray backend for FITS installed

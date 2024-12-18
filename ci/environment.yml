@@ -7,12 +7,14 @@ dependencies:
   - h5py
   - hdf5
   - netcdf4
-  - xarray>=2024.6.0
+  - xarray>=2024.10.0
   - kerchunk>=0.2.5
   - numpy>=2.0.0
   - ujson
   - packaging
   - universal_pathlib
+  - hdf5plugin
+  - numcodecs
   # Testing
   - codecov
   - pre-commit
@@ -27,7 +29,11 @@ dependencies:
   - fsspec
   - s3fs
   - fastparquet
+  - imagecodecs>=2024.6.1
   # for opening tiff files
   - tifffile
   # for opening FITS files
   - astropy
+  - pip
+  - pip:
+    - imagecodecs-numcodecs==2024.6.1

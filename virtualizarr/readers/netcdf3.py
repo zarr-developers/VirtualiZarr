@@ -1,7 +1,7 @@
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from xarray import Dataset
-from xarray.core.indexes import Index
+from xarray import Dataset, Index
 
 from virtualizarr.readers.common import (
     VirtualBackend,
@@ -9,7 +9,6 @@ from virtualizarr.readers.common import (
     open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
-    extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.utils import check_for_collisions
@@ -24,9 +23,15 @@ class NetCDF3VirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
         from kerchunk.netCDF3 import NetCDF3ToZarr
+
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "netcdf3 reader does not understand any virtual_backend_kwargs"
+            )
 
         drop_variables, loadable_variables = check_for_collisions(
             drop_variables,
@@ -35,12 +40,17 @@ class NetCDF3VirtualBackend(VirtualBackend):
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
-        refs = extract_group(refs, group)
+        # both group=None and group='' mean to read root group
+        if group:
+            raise ValueError(
+                "group kwarg passed, but netCDF3 files can't have multiple groups!"
+            )
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
             loadable_variables,
             drop_variables,
+            fs_root=Path.cwd().as_uri(),
         )
 
         loadable_vars, indexes = open_loadable_vars_and_indexes(

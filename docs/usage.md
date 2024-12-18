@@ -7,7 +7,7 @@ This page explains how to use VirtualiZarr today, by introducing the key concept
 
 VirtualiZarr is for manipulating "virtual" references to pre-existing data stored on disk in a variety of formats, by representing it in terms of the [Zarr data model](https://zarr-specs.readthedocs.io/en/latest/specs.html) of chunked N-dimensional arrays.
 
-If we have a pre-existing netCDF file on disk,
+If we have a pre-existing netCDF file on disk:
 
 ```python
 import xarray as xr
@@ -17,7 +17,7 @@ ds = xr.tutorial.open_dataset('air_temperature')
 ds.to_netcdf('air.nc')
 ```
 
-We can open a virtual representation of this file using {py:func}`open_virtual_dataset <virtualizarr.xarray.open_virtual_dataset>`.
+We can open a virtual representation of this file using {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>`.
 
 ```python
 from virtualizarr import open_virtual_dataset
@@ -25,7 +25,7 @@ from virtualizarr import open_virtual_dataset
 vds = open_virtual_dataset('air.nc')
 ```
 
-(Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.xarray.open_virtual_dataset>` will attempt to automatically infer it.)
+(Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.)
 
 
 ```{note}
@@ -106,10 +106,10 @@ manifest = marr.manifest
 manifest.dict()
 ```
 ```python
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
-In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `air.nc` file at the location given by the `'offset'` and `'length'` attributes.
+In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
 
 The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
 
@@ -153,8 +153,8 @@ ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 concatenated.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000},
- '1.0.0': {'path': 'air.nc', 'offset': 15419, 'length': 7738000}}
+{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
+ '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
 
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
@@ -182,11 +182,73 @@ You also cannot currently index into a `ManifestArray`, as arbitrary indexing wo
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
 
-The problem of combining many legacy format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+
+But before we combine our data, we might want to consider loading some variables into memory.
+
+## Loading variables
+
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
+
+```python
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+  Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
+
+Loading variables can be useful in a few scenarios:
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
+2. You want in-memory indexes to use with ``xr.combine_by_coords``,
+3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
+4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+
+### CF-encoded time variables
+
+To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
+
+```python
+vds = open_virtual_dataset(
+    'air.nc',
+    loadable_variables=['air', 'time'],
+    decode_times=True,
+    indexes={},
+)
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
+Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
 
 ## Combining virtual datasets
 
-In general we should be able to combine all the datasets from our legacy files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
+In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
 Let's create two new netCDF files, which we would need to open and concatenate in a specific order to represent our entire dataset.
 
@@ -206,23 +268,9 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the legacy files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
-
-You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
-
 ```python
-vds1 = open_virtual_dataset('air1.nc', indexes={})
-vds2 = open_virtual_dataset('air2.nc', indexes={})
-```
-
-We can see that the datasets have no indexes.
-
-```python
-vds1.indexes
-```
-```
-Indexes:
-    *empty*
+vds1 = open_virtual_dataset('air1.nc')
+vds2 = open_virtual_dataset('air2.nc')
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
@@ -254,8 +302,8 @@ We can see that the resulting combined manifest has two chunks, as expected.
 combined_vds['air'].data.manifest.dict()
 ```
 ```
-{'0.0.0': {'path': 'air1.nc', 'offset': 15419, 'length': 3869000},
- '1.0.0': {'path': 'air2.nc', 'offset': 15419, 'length': 3869000}}
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
 ```{note}
@@ -285,86 +333,46 @@ In future we would like for it to be possible to just use `xr.open_mfdataset` to
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
 ```
 
-### Automatic ordering using coordinate data
+```{note}
+For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 
-TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/TomNicholas/VirtualiZarr/issues/18#issuecomment-2023955860) is properly closed.
-
-### Automatic ordering using metadata
-
-TODO: Use preprocess to create a new index from the metadata
-
-## Loading variables
-
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
-
-```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
-```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
-  Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
-```
-You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
-
-Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
-3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
-
-### CF-encoded time variables
-
-To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
-
-
-
-```python
-vds = open_virtual_dataset(
-    'air.nc',
-    loadable_variables=['air', 'time'],
-    decode_times=True,
-    indexes={},
-)
-```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
-Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
+By default indexes are created for 1-dimensional ``loadable_variables`` whose name matches their only dimension (i.e. "dimension coordinates"), but if you wish you can load variables without creating any indexes by passing ``indexes={}`` to ``open_virtual_dataset``.
 ```
 
+### Ordering by coordinate values
 
+If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
+
+```python
+vds1 = open_virtual_dataset('air1.nc', loadable_variables=['time', 'lat', 'lon'])
+vds2 = open_virtual_dataset('air2.nc', loadable_variables=['time', 'lat', 'lon'])
+
+combined_vds = xr.combine_by_coords([vds2, vds1], coords='minimal', compat='override')
+```
+
+Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional ``time`` coordinate has ascending values:
+
+```python
+combined_vds['air'].data.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
+```
+
+### Ordering using metadata
+
+TODO: Use preprocess to create a new index from the metadata. Requires ``open_virtual_mfdataset`` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
 
 ## Writing virtual stores to disk
 
-Once we've combined references to all the chunks of all our legacy files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
+Once we've combined references to all the chunks of all our archival files into one virtual xarray dataset, we still need to write these references out to disk so that they can be read by our analysis code later.
 
 ### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for how byte range references should be serialized (either as a JSON or parquet file).
 
-To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the {py:meth}`ds.virtualize.to_kerchunk <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk>` accessor method.
 
 ```python
 combined_vds.virtualize.to_kerchunk('combined.json', format='json')
@@ -385,20 +393,37 @@ Currently you can only serialize in-memory variables to kerchunk references if t
 When you have many chunks, the reference file can get large enough to be unwieldy as json. In that case the references can be instead stored as parquet. Again this uses kerchunk internally.
 
 ```python
-combined_vds.virtualize.to_kerchunk('combined.parq', format='parquet')
+combined_vds.virtualize.to_kerchunk('combined.parquet', format='parquet')
 ```
 
 And again we can read these references using the "kerchunk" backend as if it were a regular Zarr store
 
 ```python
-combined_ds = xr.open_dataset('combined.parq', engine="kerchunk")
+combined_ds = xr.open_dataset('combined.parquet', engine="kerchunk")
 ```
 
 By default references are placed in separate parquet file when the total number of references exceeds `record_size`. If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
 
+### Writing to an Icechunk Store
+
+We can also write these references out as an [IcechunkStore](https://icechunk.io/). `Icechunk` is a Open-source, cloud-native transactional tensor storage engine that is compatible with zarr version 3. To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`vds.virtualize.to_icechunk <virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
+
+```python
+# create an icechunk store
+from icechunk import IcechunkStore, StorageConfig, StoreConfig, VirtualRefConfig
+storage = StorageConfig.filesystem(str('combined'))
+store = IcechunkStore.create(storage=storage, mode="w", config=StoreConfig(
+    virtual_ref_config=VirtualRefConfig.s3_anonymous(region='us-east-1'),
+))
+
+combined_vds.virtualize.to_icechunk(store)
+```
+
+See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
+
 ### Writing as Zarr
 
-Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`ds.virtualize.to_zarr <virtualizarr.xarray.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
+Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`vds.virtualize.to_zarr <virtualizarr.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
 
 ```python
 combined_vds.virtualize.to_zarr('combined.zarr')
@@ -418,7 +443,7 @@ The advantage of this format is that any zarr v3 reader that understands the chu
 ```{note}
 Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
 
-This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
+This store can however be read by {py:func}`~virtualizarr.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
 ```
 
 ## Opening Kerchunk references as virtual datasets
@@ -426,12 +451,28 @@ This store can however be read by {py:func}`~virtualizarr.xarray.open_virtual_da
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
 
 ```python
-
-vds = open_virtual_dataset('combined.json', format='kerchunk')
+vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 # or
-vds = open_virtual_dataset('combined.parquet', format='kerchunk')
-
+vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
+
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
+
+You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``.
+
+```python
+# file `relative_refs.json` contains a path like './file.nc'
+
+vds = open_virtual_dataset(
+    'relative_refs.json',
+    filetype='kerchunk',
+    virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
+)
+
+# the path in the virtual dataset will now be 'file:///some_directory/file.nc'
+```
+
+Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
 
 ## Rewriting existing manifests
 
@@ -439,7 +480,7 @@ Sometimes it can be useful to rewrite the contents of an already-generated manif
 
 ### Rewriting file paths
 
-You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`ds.virtualize.rename_paths <virtualizarr.xarray.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
+You can rewrite the file paths stored in a manifest or virtual dataset without changing the byte range information using the {py:meth}`vds.virtualize.rename_paths <virtualizarr.VirtualiZarrDatasetAccessor.rename_paths>` accessor method.
 
 For example, you may want to rename file paths according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
 

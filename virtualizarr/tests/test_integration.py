@@ -1,3 +1,6 @@
+from os.path import relpath
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -5,10 +8,11 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.readers import HDF5VirtualBackend
+from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
-    find_var_names,
 )
 from virtualizarr.zarr import ZArray
 
@@ -16,8 +20,8 @@ from virtualizarr.zarr import ZArray
 def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
-        "0.0": {"path": "foo.nc", "offset": 100, "length": 100},
-        "0.1": {"path": "foo.nc", "offset": 200, "length": 100},
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
@@ -27,7 +31,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
             chunks=(2, 2),
             compressor=None,
             filters=None,
-            fill_value=np.nan,
+            fill_value=None,
             order="C",
         ),
         chunkmanifest=manifest,
@@ -44,12 +48,6 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
     xrt.assert_equal(roundtrip, ds)
 
 
-def test_no_duplicates_find_var_names():
-    """Verify that we get a deduplicated list of var names"""
-    ref_dict = {"refs": {"x/something": {}, "x/otherthing": {}}}
-    assert len(find_var_names(ref_dict)) == 1
-
-
 @requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
@@ -63,8 +61,9 @@ def test_no_duplicates_find_var_names():
         ),
     ],
 )
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 def test_numpy_arrays_to_inlined_kerchunk_refs(
-    netcdf4_file, inline_threshold, vars_to_inline
+    netcdf4_file, inline_threshold, vars_to_inline, hdf_backend
 ):
     from kerchunk.hdf import SingleHdf5ToZarr
 
@@ -75,7 +74,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
     # loading the variables should produce same result as inlining them using kerchunk
     vds = open_virtual_dataset(
-        netcdf4_file, loadable_variables=vars_to_inline, indexes={}
+        netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
     )
     refs = vds.virtualize.to_kerchunk(format="dict")
 
@@ -90,7 +89,8 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 @requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
-    def test_kerchunk_roundtrip_no_concat(self, tmpdir, format):
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_kerchunk_roundtrip_no_concat(self, tmpdir, format, hdf_backend):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
 
@@ -98,7 +98,7 @@ class TestKerchunkRoundtrip:
         ds.to_netcdf(f"{tmpdir}/air.nc")
 
         # use open_dataset_via_kerchunk to read it as references
-        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={})
+        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={}, backend=hdf_backend)
 
         if format == "dict":
             # write those references to an in-memory kerchunk-formatted references dictionary
@@ -115,11 +115,18 @@ class TestKerchunkRoundtrip:
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=False
             )
 
-        # assert identical to original dataset
-        xrt.assert_identical(roundtrip, ds)
+        # assert all_close to original dataset
+        xrt.assert_allclose(roundtrip, ds)
 
+        # assert coordinate attributes are maintained
+        for coord in ds.coords:
+            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
-    def test_kerchunk_roundtrip_concat(self, tmpdir, format, decode_times, time_vars):
+    def test_kerchunk_roundtrip_concat(
+        self, tmpdir, format, hdf_backend, decode_times, time_vars
+    ):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
 
@@ -135,11 +142,13 @@ class TestKerchunkRoundtrip:
             f"{tmpdir}/air1.nc",
             indexes={},
             loadable_variables=time_vars,
+            backend=hdf_backend,
         )
         vds2 = open_virtual_dataset(
             f"{tmpdir}/air2.nc",
             indexes={},
             loadable_variables=time_vars,
+            backend=hdf_backend,
         )
 
         if decode_times is False:
@@ -168,9 +177,14 @@ class TestKerchunkRoundtrip:
             roundtrip = xr.open_dataset(
                 f"{tmpdir}/refs.{format}", engine="kerchunk", decode_times=decode_times
             )
+
         if decode_times is False:
-            # assert identical to original dataset
-            xrt.assert_identical(roundtrip, ds)
+            # assert all_close to original dataset
+            xrt.assert_allclose(roundtrip, ds)
+
+            # assert coordinate attributes are maintained
+            for coord in ds.coords:
+                assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
         else:
             # they are very very close! But assert_allclose doesn't seem to work on datetimes
             assert (roundtrip.time - ds.time).sum() == 0
@@ -178,8 +192,12 @@ class TestKerchunkRoundtrip:
             assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
             assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
 
-    def test_non_dimension_coordinates(self, tmpdir, format):
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_non_dimension_coordinates(self, tmpdir, format, hdf_backend):
         # regression test for GH issue #105
+
+        if hdf_backend:
+            pytest.xfail("To fix coordinate behavior with HDF reader")
 
         # set up example xarray dataset containing non-dimension coordinate variables
         ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6.0).reshape(2, 3))})
@@ -187,8 +205,9 @@ class TestKerchunkRoundtrip:
         # save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")
 
-        vds = open_virtual_dataset(f"{tmpdir}/non_dim_coords.nc", indexes={})
-
+        vds = open_virtual_dataset(
+            f"{tmpdir}/non_dim_coords.nc", indexes={}, backend=hdf_backend
+        )
         assert "lat" in vds.coords
         assert "coordinates" not in vds.attrs
 
@@ -208,11 +227,15 @@ class TestKerchunkRoundtrip:
             )
 
         # assert equal to original dataset
-        xrt.assert_identical(roundtrip, ds)
+        xrt.assert_allclose(roundtrip, ds)
+
+        # assert coordinate attributes are maintained
+        for coord in ds.coords:
+            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_datetime64_dtype_fill_value(self, tmpdir, format):
         chunks_dict = {
-            "0.0.0": {"path": "foo.nc", "offset": 100, "length": 100},
+            "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)
@@ -256,11 +279,37 @@ class TestKerchunkRoundtrip:
 
 
 @requires_kerchunk
-def test_open_scalar_variable(tmpdir):
+@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+def test_open_scalar_variable(tmpdir, hdf_backend):
     # regression test for GH issue #100
 
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(f"{tmpdir}/scalar.nc")
 
-    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={})
+    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={}, backend=hdf_backend)
     assert vds["a"].shape == ()
+
+
+class TestPathsToURIs:
+    @requires_kerchunk
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+
+        expected_path = Path(netcdf4_file).as_uri()
+
+        manifest = vds["air"].data.manifest.dict()
+        path = manifest["0.0.0"]["path"]
+        assert path == expected_path
+
+    @requires_kerchunk
+    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
+        relative_path = relpath(netcdf4_file)
+        vds = open_virtual_dataset(relative_path, indexes={}, backend=hdf_backend)
+
+        expected_path = Path(netcdf4_file).as_uri()
+
+        manifest = vds["air"].data.manifest.dict()
+        path = manifest["0.0.0"]["path"]
+        assert path == expected_path

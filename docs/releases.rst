@@ -1,35 +1,134 @@
 Release notes
 =============
 
-.. _v1.0.1:
+.. _v1.2.1:
 
-v1.0.1 (unreleased)
+v1.2.1 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Passing ``group=None`` (the default) to ``open_virtual_dataset`` for a file with multiple groups no longer raises an error, instead it gives you the root group.
+  This new behaviour is more consistent with ``xarray.open_dataset``.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Indexes are now created by default for any loadable one-dimensional coordinate variables.
+  Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
+  This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
+  (:issue:`18`, :pull:`357`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Fix bug preventing generating references for the root group of a file when a subgroup exists.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+- Change intro text in readme and docs landing page to be clearer, less about the relationship to Kerchunk, and more about why you would want virtual datasets in the first place.
+  (:pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.2.0:
+
+v1.2.0 (5th Dec 2024)
+---------------------
+
+This release brings a stricter internal model for manifest paths,
+support for appending to existing icechunk stores,
+an experimental non-kerchunk-based HDF5 reader,
+handling of nested groups in DMR++ files,
+as well as many other bugfixes and documentation improvements.
+
+New Features
+~~~~~~~~~~~~
+
+- Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
+  (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added append functionality to `to_icechunk` (:pull:`272`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Minimum required version of Xarray is now v2024.10.0.
+  (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Handle root and nested groups with ``dmrpp`` backend (:pull:`265`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
+- Fixed bug with writing of `dimension_names` into zarr metadata.
+  (:pull:`286`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fixed bug causing CF-compliant variables not to be identified as coordinates (:pull:`191`)
+  By `Ayush Nag <https://github.com/ayushnag>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+- FAQ answers on Icechunk compatibility, converting from existing Kerchunk references to Icechunk, and how to add a new reader for a custom file format.
+  (:pull:`266`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Clarify which readers actually currently work in FAQ, and temporarily remove tiff from the auto-detection.
+  (:issue:`291`, :pull:`296`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minor improvements to the Contributing Guide.
+  (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- More minor improvements to the Contributing Guide.
+  (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Correct some links to the API.
+  (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to recorded presentations on VirtualiZarr.
+  (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to existing example notebooks.
+  (:issue:`329`, :pull:`331`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Added experimental new HDF file reader which doesn't use kerchunk, accessible by importing ``virtualizarr.readers.hdf.HDFVirtualBackend``.
+  (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
+- Support downstream type checking by adding py.typed marker file.
+  (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
+- File paths in chunk manifests are now always stored as abolute URIs.
+  (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+.. _v1.1.0:
+
+v1.1.0 (22nd Oct 2024)
+----------------------
+
+New Features
+~~~~~~~~~~~~
 
 - Can open `kerchunk` reference files with ``open_virtual_dataset``.
   (:pull:`251`, :pull:`186`) By `Raphael Hagen <https://github.com/norlandrhagen>`_ & `Kristen Thyng <https://github.com/kthyng>`_.
-
 - Adds defaults for `open_virtual_dataset_from_v3_store` in (:pull:`234`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - New ``group`` option on ``open_virtual_dataset`` enables extracting specific HDF Groups.
   (:pull:`165`) By `Scott Henderson <https://github.com/scottyhq>`_.
-
 - Adds `decode_times` to open_virtual_dataset (:pull:`232`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 - Add parser for the OPeNDAP DMR++ XML format and integration with open_virtual_dataset (:pull:`113`)
   By `Ayush Nag <https://github.com/ayushnag>`_.
-
 - Load scalar variables by default. (:pull:`205`)
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
-
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
+- Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
+  By `Matt Iannucci <https://github.com/mpiannucci>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -60,7 +159,6 @@ Documentation
 
 - Adds virtualizarr + coiled serverless example notebook (:pull:`223`)
   By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
