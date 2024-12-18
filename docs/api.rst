@@ -20,7 +20,6 @@ Reading
 
     open_virtual_dataset
 
-
 Serialization
 -------------
 
