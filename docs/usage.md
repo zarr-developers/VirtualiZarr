@@ -360,7 +360,7 @@ combined_vds['air'].data.manifest.dict()
 
 ### Ordering using metadata
 
-TODO: Use preprocess to create a new index from the metadata
+TODO: Use preprocess to create a new index from the metadata. Requires ``open_virtual_mfdataset`` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
 
 ## Writing virtual stores to disk
 
