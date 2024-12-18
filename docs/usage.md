@@ -184,6 +184,8 @@ The full Zarr model (for a single group) includes multiple arrays, array names, 
 
 The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
+But before we combine our data, we might want to consider loading some variables into memory.
+
 ## Loading variables
 
 Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
