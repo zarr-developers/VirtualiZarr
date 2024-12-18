@@ -14,7 +14,7 @@ Breaking changes
 
 - Passing ``group=None`` (the default) to ``open_virtual_dataset`` for a file with multiple groups no longer raises an error, instead it gives you the root group.
   This new behaviour is more consistent with ``xarray.open_dataset``.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Indexes are now created by default for any loadable one-dimensional coordinate variables. 
   Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
   (:pull:`357`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
@@ -26,7 +26,7 @@ Bug fixes
 ~~~~~~~~~
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
