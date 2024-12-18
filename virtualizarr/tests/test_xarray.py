@@ -310,3 +310,9 @@ class TestRenamePaths:
             == "s3://bucket/air.nc"
         )
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
+
+
+@pytest.mark.parametrize("loadable_vars, size", [([], 32), (["foo"], 48)])
+def test_nbytes(simple_netcdf4, loadable_vars, size):
+    vds = open_virtual_dataset(simple_netcdf4, loadable_variables=loadable_vars)
+    assert vds.nbytes == size
