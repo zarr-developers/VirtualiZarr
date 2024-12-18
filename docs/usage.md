@@ -266,7 +266,7 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the archival files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
+For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
 
 You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
 
@@ -455,7 +455,7 @@ You can dis-ambuiguate kerchunk references containing relative paths by passing 
 vds = open_virtual_dataset(
     'relative_refs.json',
     filetype='kerchunk',
-    indexes={},
+
     virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
 )
 
