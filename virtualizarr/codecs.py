@@ -65,9 +65,9 @@ def _get_manifestarray_codecs(
 def _is_zarr_array(array: object) -> bool:
     """Check if the array is an instance of Zarr Array."""
     try:
-        from zarr import Array
+        from zarr import Array, AsyncArray
 
-        return isinstance(array, Array)
+        return isinstance(array, (Array, AsyncArray))
     except ImportError:
         return False
 
