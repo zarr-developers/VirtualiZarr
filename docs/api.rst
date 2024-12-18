@@ -33,6 +33,16 @@ Serialization
     VirtualiZarrDatasetAccessor.to_zarr
     VirtualiZarrDatasetAccessor.to_icechunk
 
+Information
+-----------
+
+.. currentmodule:: virtualizarr.accessor
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    VirtualiZarrDatasetAccessor.nbytes
+
 Rewriting
 ---------
 

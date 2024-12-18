@@ -183,3 +183,21 @@ class VirtualiZarrDatasetAccessor:
                 new_ds[var_name].data = data.rename_paths(new=new)
 
         return new_ds
+
+    @property
+    def nbytes(self) -> int:
+        """
+        Size required to hold these references in memory in bytes.
+
+        Note this is not the size of the referenced chunks if they were actually loaded into memory,
+        this is only the size of the pointers to the chunk locations.
+        If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
+
+        In-memory (loadable) variables are included in the total using xarray's normal ``.nbytes`` method.
+        """
+        return sum(
+            var.data.nbytes_virtual
+            if isinstance(var.data, ManifestArray)
+            else var.nbytes
+            for var in self.ds.variables.values()
+        )
