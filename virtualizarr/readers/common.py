@@ -55,7 +55,7 @@ def open_loadable_vars_and_indexes(
 
         if indexes is None:
             # add default indexes by reading data from file
-            # virtual variables should never be backed by an in-memory index
+            # but avoid creating an in-memory index for virtual variables by default
             indexes = {
                 name: index
                 for name, index in ds.xindexes.items()
