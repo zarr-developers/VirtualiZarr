@@ -266,6 +266,11 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
+```python
+vds1 = open_virtual_dataset('air1.nc')
+vds2 = open_virtual_dataset('air2.nc')
+```
+
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
 
 ```
@@ -332,11 +337,28 @@ For manual concatenation we can actually avoid creating any xarray indexes, as w
 By default indexes are created for 1-dimensional ``loadable_variables`` whose name matches their only dimension (i.e. "dimension coordinates"), but if you wish you can load variables without creating any indexes by passing ``indexes={}`` to ``open_virtual_dataset``.
 ```
 
-### Automatic ordering using coordinate data
+### Ordering by coordinate values
 
-TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/TomNicholas/VirtualiZarr/issues/18#issuecomment-2023955860) is properly closed.
+If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
 
-### Automatic ordering using metadata
+```python
+vds1 = open_virtual_dataset('air1.nc', loadable_variables=['time', 'lat', 'lon'])
+vds2 = open_virtual_dataset('air2.nc', loadable_variables=['time', 'lat', 'lon'])
+
+combined_vds = xr.combine_by_coords([vds2, vds1], coords='minimal', compat='override')
+```
+
+Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional ``time`` coordinate has ascending values:
+
+```python
+combined_vds['air'].data.manifest.dict()
+```
+```
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
+```
+
+### Ordering using metadata
 
 TODO: Use preprocess to create a new index from the metadata
 
