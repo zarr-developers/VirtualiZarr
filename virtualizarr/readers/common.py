@@ -36,50 +36,47 @@ def open_loadable_vars_and_indexes(
     Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
     """
 
-    # TODO get rid of this if?
-    if indexes is None or len(loadable_variables) > 0:
-        # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-        # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-        # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
-        ).open_file()
+    # TODO We are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
+    # TODO It would also be nice if we could somehow consolidate this with the reading of the kerchunk references
+    # TODO Really we probably want a dedicated backend that iterates over all variables only once
+    # TODO See issue #124 for a suggestion of how to avoid calling xarray here.
 
-        # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
-        ds = open_dataset(
-            fpath,  # type: ignore[arg-type]
-            drop_variables=drop_variables,
-            group=group,
-            decode_times=decode_times,
-        )
+    fpath = _FsspecFSFromFilepath(
+        filepath=filepath, reader_options=reader_options
+    ).open_file()
 
-        if indexes is None:
-            # add default indexes by reading data from file
-            # but avoid creating an in-memory index for virtual variables by default
-            indexes = {
-                name: index
-                for name, index in ds.xindexes.items()
-                if name in loadable_variables
-            }
-        elif indexes != {}:
-            # TODO allow manual specification of index objects
-            raise NotImplementedError()
-        else:
-            indexes = dict(**indexes)  # for type hinting: to allow mutation
+    # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
+    ds = open_dataset(
+        fpath,  # type: ignore[arg-type]
+        drop_variables=drop_variables,
+        group=group,
+        decode_times=decode_times,
+    )
 
-        # TODO we should drop these earlier by using drop_variables
-        loadable_vars = {
-            str(name): var
-            for name, var in ds.variables.items()
+    if indexes is None:
+        # add default indexes by reading data from file
+        # but avoid creating an in-memory index for virtual variables by default
+        indexes = {
+            name: index
+            for name, index in ds.xindexes.items()
             if name in loadable_variables
         }
-
-        # if we only read the indexes we can just close the file right away as nothing is lazy
-        if loadable_vars == {}:
-            ds.close()
+    elif indexes != {}:
+        # TODO allow manual specification of index objects
+        raise NotImplementedError()
     else:
-        loadable_vars = {}
-        indexes = {}
+        indexes = dict(**indexes)  # for type hinting: to allow mutation
+
+    # TODO we should drop these earlier by using drop_variables
+    loadable_vars = {
+        str(name): var
+        for name, var in ds.variables.items()
+        if name in loadable_variables
+    }
+
+    # if we only read the indexes we can just close the file right away as nothing is lazy
+    if loadable_vars == {}:
+        ds.close()
 
     return loadable_vars, indexes
 
