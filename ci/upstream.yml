@@ -26,6 +26,7 @@ dependencies:
   - pytest
   - pooch
   - fsspec
+  - dask
   - pip
   - pip:
       - icechunk>=0.1.0a7 # Installs zarr v3 as dependency

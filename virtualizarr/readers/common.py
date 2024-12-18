@@ -41,16 +41,27 @@ def open_loadable_vars_and_indexes(
         # TODO we are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
         # TODO it would also be nice if we could somehow consolidate this with the reading of the kerchunk references
         # TODO really we probably want a dedicated xarray backend that iterates over all variables only once
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
-        ).open_file()
 
         # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
+        # We'll (hopefully safely) cast it to what xarray is expecting, but this might let errors through.
+        fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
+
+        # Updates the Xarray open_dataset kwargs if Zarr
+
+        if fpath.upath.suffix == ".zarr":
+            engine = "zarr"
+            xr_input = fpath.filepath
+
+        else:
+            engine = None
+            xr_input = fpath.open_file()  # type: ignore
+
         ds = open_dataset(
-            fpath,  # type: ignore[arg-type]
+            xr_input,  # type: ignore[arg-type]
             drop_variables=drop_variables,
             group=group,
             decode_times=decode_times,
+            engine=engine,
         )
 
         if indexes is None:
@@ -66,7 +77,6 @@ def open_loadable_vars_and_indexes(
             raise NotImplementedError()
         else:
             indexes = dict(**indexes)  # for type hinting: to allow mutation
-
         # TODO we should drop these earlier by using drop_variables
         loadable_vars = {
             str(name): var
