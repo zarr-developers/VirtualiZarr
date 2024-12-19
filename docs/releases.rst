@@ -9,13 +9,11 @@ v1.2.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-<<<<<<< HEAD
 - Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V2 and V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-=======
+
 - Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
   (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
->>>>>>> main
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
