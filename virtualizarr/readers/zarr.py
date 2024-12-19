@@ -217,7 +217,6 @@ class ZarrVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        # Question: Is this something we want to pass through?
         import asyncio
 
         import zarr
@@ -249,7 +248,7 @@ class ZarrVirtualBackend(VirtualBackend):
             filepath = validate_and_normalize_path_to_uri(
                 filepath, fs_root=Path.cwd().as_uri()
             )
-            # This currently fails for local filepaths (ie. tests):
+            # This currently fails for local filepaths (ie. tests) but works for s3:
             # *** TypeError: Filesystem needs to support async operations.
             # https://github.com/zarr-developers/zarr-python/issues/2554
 
@@ -273,7 +272,6 @@ class ZarrVirtualBackend(VirtualBackend):
                 set(zarr_array_keys) - set(loadable_variables) - set(drop_variables)
             )
 
-            # How does this asyncio.run call interact with zarr-pythons async event loop?
             return await virtual_dataset_from_zarr_group(
                 zarr_group=zg,
                 filepath=filepath,
@@ -286,4 +284,5 @@ class ZarrVirtualBackend(VirtualBackend):
                 reader_options=reader_options,
             )
 
+        # How does this asyncio.run call interact with zarr-pythons async event loop?
         return asyncio.run(_open_virtual_dataset())
