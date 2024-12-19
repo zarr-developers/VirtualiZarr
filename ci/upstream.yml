@@ -1,4 +1,4 @@
-name: virtualizarr-min-deps
+name: virtualizarr-upstream
 channels:
   - conda-forge
   - nodefaults

@@ -60,10 +60,24 @@ Attributes:
     title:        4x daily NMC reanalysis (1948)
 ```
 
-
 Generally a "virtual dataset" is any `xarray.Dataset` which wraps one or more {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 These particular {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects are each a virtual reference to some data in the `air.nc` netCDF file, with the references stored in the form of "Chunk Manifests".
+
+As the manifest contains only addresses at which to find large binary chunks, the virtual dataset takes up far less space in memory than the original dataset does:
+
+```python
+ds.nbytes
+```
+```
+30975672
+```
+```python
+vds.virtualize.nbytes
+```
+```
+128
+```
 
 ```{important} Virtual datasets are not normal xarray datasets!
 
@@ -184,6 +198,67 @@ The full Zarr model (for a single group) includes multiple arrays, array names, 
 
 The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 
+But before we combine our data, we might want to consider loading some variables into memory.
+
+## Loading variables
+
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
+
+```python
+vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
+  Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
+
+Loading variables can be useful in a few scenarios:
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
+2. You want in-memory indexes to use with ``xr.combine_by_coords``,
+3. Storing a variable on-disk as a set of references would be inefficient, e.g. because each chunk is very small (saving the values like this is similar to kerchunk's concept of "inlining" data),
+4. The variable has complicated encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+
+### CF-encoded time variables
+
+To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
+
+```python
+vds = open_virtual_dataset(
+    'air.nc',
+    loadable_variables=['air', 'time'],
+    decode_times=True,
+)
+```
+```python
+<xarray.Dataset> Size: 31MB
+Dimensions:  (time: 2920, lat: 25, lon: 53)
+Coordinates:
+    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
+    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
+    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
+Data variables:
+    air      (time, lat, lon) float64 31MB ...
+Attributes:
+    Conventions:  COARDS
+    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
+    platform:     Model
+    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
+    title:        4x daily NMC reanalysis (1948)
+```
+
 ## Combining virtual datasets
 
 In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
@@ -206,23 +281,9 @@ TODO: Note about variable-length chunking?
 
 The simplest case of concatenation is when you have a set of files and you know which order they should be concatenated in, _without looking inside the files_. In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
-We can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files, making our opening and combining much faster than it normally would be. **Therefore if you can do your combining manually you should.** However, you should first be confident that the archival files actually do have compatible data, as only the array shapes and dimension names will be checked for consistency.
-
-You can specify that you don't want any indexes to be created by passing `indexes={}` to `open_virtual_dataset`.
-
 ```python
-vds1 = open_virtual_dataset('air1.nc', indexes={})
-vds2 = open_virtual_dataset('air2.nc', indexes={})
-```
-
-We can see that the datasets have no indexes.
-
-```python
-vds1.indexes
-```
-```
-Indexes:
-    *empty*
+vds1 = open_virtual_dataset('air1.nc')
+vds2 = open_virtual_dataset('air2.nc')
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
@@ -279,78 +340,41 @@ In future we would like for it to be possible to just use `xr.open_mfdataset` to
         concat_dim=['time'],
         coords='minimal',
         compat='override',
-        indexes={},
     )
 
 but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
 ```
 
-### Automatic ordering using coordinate data
+```{note}
+For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 
-TODO: Reinstate this part of the docs once [GH issue #18](https://github.com/TomNicholas/VirtualiZarr/issues/18#issuecomment-2023955860) is properly closed.
+By default indexes are created for 1-dimensional ``loadable_variables`` whose name matches their only dimension (i.e. "dimension coordinates"), but if you wish you can load variables without creating any indexes by passing ``indexes={}`` to ``open_virtual_dataset``.
+```
 
-### Automatic ordering using metadata
+### Ordering by coordinate values
 
-TODO: Use preprocess to create a new index from the metadata
-
-## Loading variables
-
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. These variables are specified using the `loadable_variables` argument:
+If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
 
 ```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'], indexes={})
+vds1 = open_virtual_dataset('air1.nc', loadable_variables=['time', 'lat', 'lon'])
+vds2 = open_virtual_dataset('air2.nc', loadable_variables=['time', 'lat', 'lon'])
+
+combined_vds = xr.combine_by_coords([vds2, vds1], coords='minimal', compat='override')
 ```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-  * time     (time) datetime64[ns] 23kB 2013-01-01 ... 2014-12-31T18:00:00
-  Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
-```
-You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
 
-Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
-3. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
-
-### CF-encoded time variables
-
-To correctly decode time variables according to the CF conventions, you need to pass `time` to `loadable_variables` and ensure the `decode_times` argument of `open_virtual_dataset` is set to True (`decode_times` defaults to None).
+Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional ``time`` coordinate has ascending values:
 
 ```python
-vds = open_virtual_dataset(
-    'air.nc',
-    loadable_variables=['air', 'time'],
-    decode_times=True,
-    indexes={},
-)
+combined_vds['air'].data.manifest.dict()
 ```
-```python
-<xarray.Dataset> Size: 31MB
-Dimensions:  (time: 2920, lat: 25, lon: 53)
-Coordinates:
-    lat      (lat) float32 100B ManifestArray<shape=(25,), dtype=float32, chu...
-    lon      (lon) float32 212B ManifestArray<shape=(53,), dtype=float32, chu...
-    time     (time) datetime64[ns] 23kB 2013-01-01T00:02:06.757437440 ... 201...
-Data variables:
-    air      (time, lat, lon) float64 31MB ...
-Attributes:
-    Conventions:  COARDS
-    description:  Data is from NMC initialized reanalysis\n(4x/day).  These a...
-    platform:     Model
-    references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
-    title:        4x daily NMC reanalysis (1948)
 ```
+{'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
+ '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
+```
+
+### Ordering using metadata
+
+TODO: Use preprocess to create a new index from the metadata. Requires ``open_virtual_mfdataset`` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
 
 ## Writing virtual stores to disk
 
@@ -439,9 +463,9 @@ This store can however be read by {py:func}`~virtualizarr.open_virtual_dataset`,
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
 
 ```python
-vds = open_virtual_dataset('combined.json', filetype='kerchunk', indexes={})
+vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 # or
-vds = open_virtual_dataset('combined.parquet', filetype='kerchunk', indexes={})
+vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
 
 One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
@@ -454,7 +478,6 @@ You can dis-ambuiguate kerchunk references containing relative paths by passing 
 vds = open_virtual_dataset(
     'relative_refs.json',
     filetype='kerchunk',
-    indexes={},
     virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
 )
 

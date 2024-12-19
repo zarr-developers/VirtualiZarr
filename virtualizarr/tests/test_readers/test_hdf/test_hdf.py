@@ -168,13 +168,13 @@ class TestVirtualVarsFromHDF:
 @requires_imagecodecs
 class TestOpenVirtualDataset:
     @patch("virtualizarr.readers.hdf.hdf.construct_virtual_dataset")
-    @patch("virtualizarr.readers.hdf.hdf.open_loadable_vars_and_indexes")
+    @patch("virtualizarr.readers.hdf.hdf.maybe_open_loadable_vars_and_indexes")
     def test_coord_names(
         self,
-        open_loadable_vars_and_indexes,
+        maybe_open_loadable_vars_and_indexes,
         construct_virtual_dataset,
         root_coordinates_hdf5_file,
     ):
-        open_loadable_vars_and_indexes.return_value = (0, 0)
+        maybe_open_loadable_vars_and_indexes.return_value = (0, 0)
         HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
         assert construct_virtual_dataset.call_args[1]["coord_names"] == ["lat", "lon"]
