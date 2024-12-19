@@ -6,7 +6,6 @@ from virtualizarr.readers.kerchunk import KerchunkVirtualBackend
 from virtualizarr.readers.netcdf3 import NetCDF3VirtualBackend
 from virtualizarr.readers.tiff import TIFFVirtualBackend
 from virtualizarr.readers.zarr import (
-    ZarrV3ChunkManifestVirtualBackend,
     ZarrVirtualBackend,
 )
 
@@ -19,5 +18,4 @@ __all__ = [
     "NetCDF3VirtualBackend",
     "TIFFVirtualBackend",
     "ZarrVirtualBackend",
-    "ZarrV3ChunkManifestVirtualBackend",
 ]
