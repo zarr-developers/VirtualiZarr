@@ -382,6 +382,9 @@ class TestLoadVirtualDataset:
         with pytest.raises(ValueError):
             open_virtual_dataset(netcdf4_file, filetype="unknown")
 
+        with pytest.raises(ValueError):
+            open_virtual_dataset(netcdf4_file, filetype=ManifestArray)
+
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
