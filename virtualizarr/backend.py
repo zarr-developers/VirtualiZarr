@@ -184,7 +184,7 @@ def open_virtual_dataset(
 
     if filetype is not None:
         # if filetype is user defined, convert to FileType
-        filetype = FileType(filetype)
+        filetype = FileType(filetype.lower())
     else:
         filetype = automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options

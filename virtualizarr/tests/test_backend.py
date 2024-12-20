@@ -385,6 +385,8 @@ class TestLoadVirtualDataset:
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
 
+        open_virtual_dataset(netcdf4_file, filetype="netCDF4")
+
     def test_explicit_filetype_and_backend(self, netcdf4_file):
         with pytest.raises(ValueError):
             open_virtual_dataset(
