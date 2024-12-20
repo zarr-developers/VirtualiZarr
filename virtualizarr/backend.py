@@ -182,8 +182,8 @@ def open_virtual_dataset(
     if backend and filetype:
         raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
 
-    if filetype is not None:
-        # if filetype is user defined, convert to FileType
+    if isinstance(filetype, str):
+        # if filetype is a user defined string, convert to FileType
         filetype = FileType(filetype.lower())
     else:
         filetype = automatically_determine_filetype(
