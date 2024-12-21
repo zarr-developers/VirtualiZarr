@@ -12,10 +12,19 @@ from virtualizarr.tests import network, requires_zarrV3
 @pytest.mark.parametrize(
     "zarr_store",
     [
-        pytest.param(2, id="Zarr V2"),
+        pytest.param(
+            2,
+            id="Zarr V2",
+            marks=pytest.mark.xfail(
+                reason="https://github.com/zarr-developers/zarr-python/issues/2554"
+            ),
+        ),
         pytest.param(
             3,
             id="Zarr V3",
+            marks=pytest.mark.xfail(
+                reason="https://github.com/zarr-developers/zarr-python/issues/2554"
+            ),
         ),
     ],
     indirect=True,
