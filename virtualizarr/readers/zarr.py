@@ -91,42 +91,36 @@ async def build_chunk_manifest_from_dict_mapping(
 async def build_chunk_manifest(
     zarr_array: zarr.AsyncArray, prefix: str, filepath: str
 ) -> ChunkManifest:
-    """Build a ChunkManifest from arrays
-    keys will be chunks
-    add in filepath to chunks to make '_paths'
-    offsets are array of 0 of length (len(keys)) or len(paths)) np.ndarray[Any, np.dtype[np.uint64]]
-    sizes are '_lengths'
-
-    """
+    """Build a ChunkManifest with the from_arrays method"""
     import numpy as np
 
-    keys = [x async for x in zarr_array.store.list_prefix(prefix)]
-    filepath_list = [filepath] * len(keys)
+    # import pdb; pdb.set_trace()
+    key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+
+    filepath_list = [filepath] * len(key_tuples)
 
     # can this be lambda'ed?
     # stolen from manifest.py
     def combine_path_chunk(filepath: str, chunk_key: str):
-        return filepath + chunk_key
+        return filepath + "/" + chunk_key
 
     vectorized_chunk_path_combine_func = np.vectorize(
         combine_path_chunk, otypes=[np.dtypes.StringDType()]
     )
 
     # _paths: np.ndarray[Any, np.dtypes.StringDType]
-    _paths = vectorized_chunk_path_combine_func(filepath_list, keys)
+    # turn the tuples of chunks to a flattened list with :list(sum(key_tuples, ()))
+    _paths = vectorized_chunk_path_combine_func(
+        filepath_list, list(sum(key_tuples, ()))
+    )
 
     # _offsets: np.ndarray[Any, np.dtype[np.uint64]]
-    # this seems like a very overly complicated way to make a list of len n of 0s with a
-    # certain dtype... I might have gotten carried away on the np.vectorize hypetrain
-    _offsets = np.vectorize(lambda x: [x] * len(_paths), otypes=[np.uint64])(0)
+    _offsets = np.array([0] * len(_paths), dtype=np.uint64)
 
     # _lengths: np.ndarray[Any, np.dtype[np.uint64]]
-    # maybe concurrent_map isn't the way to go, I think it expects tuples...
-    _lengths = await concurrent_map((keys), zarr_array.store.getsize)
+    lengths = await concurrent_map((key_tuples), zarr_array.store.getsize)
+    _lengths = np.array(lengths, dtype=np.uint64)
 
-    import ipdb
-
-    ipdb.set_trace()
     return ChunkManifest.from_arrays(
         paths=_paths,  # type: ignore
         offsets=_offsets,
@@ -140,7 +134,6 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, prefix: str) -> 
     keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
     sizes = await concurrent_map(keys, zarr_array.store.getsize)
-
     return {key[0]: size for key, size in zip(keys, sizes)}
 
 
@@ -166,31 +159,34 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
 
 
 async def virtual_variable_from_zarr_array(zarr_array: zarr.AsyncArray, filepath: str):
-    array_name = zarr_array.basename
+    # zarr_prefix = "/"+zarr_array.basename
+    zarr_prefix = zarr_array.basename
+
+    if zarr_array.metadata.zarr_format == 3:
+        # if we have zarr_v3, we add /c/ to that chunk paths
+        zarr_prefix = f"{zarr_prefix}/c"
+
     zarray_array = await build_zarray_metadata(zarr_array=zarr_array)
 
-    ## TEST - build chunk manifest from arrays
-    chunk_manifest = await build_chunk_manifest(
-        zarr_array, prefix=f"{array_name}/c", filepath=filepath
-    )
-
     # build mapping between chunks and # of bytes (size)
-    # FIXME!!!!: This is hardcoded for v3!
-    chunk_map = await get_chunk_mapping_prefix(zarr_array, prefix=f"{array_name}/c")
-
-    # transform chunk_map into ChunkManifest that fits into ManifestArray
-    chunk_manifest = await build_chunk_manifest_from_dict_mapping(
-        store_path=filepath,
-        chunk_mapping_dict=chunk_map,
-        array_name=array_name,
-        zarr_format=zarray_array["zarray_array"].zarr_format,
+    chunk_manifest = await build_chunk_manifest(
+        zarr_array, prefix=zarr_prefix, filepath=filepath
     )
+
+    # old method -> building chunk manifests from dicts
+    # chunk_map = await get_chunk_mapping_prefix(zarr_array, prefix=f"{array_name}/c")
+    # # transform chunk_map into ChunkManifest that fits into ManifestArray
+    # chunk_manifest = await build_chunk_manifest_from_dict_mapping(
+    #     store_path=filepath,
+    #     chunk_mapping_dict=chunk_map,
+    #     array_name=array_name,
+    #     zarr_format=zarray_array["zarray_array"].zarr_format,
+    # )
 
     # build ManifestArray from dict
     manifest_array = ManifestArray(
         zarray=zarray_array["zarray_array"], chunkmanifest=chunk_manifest
     )
-
     return Variable(
         dims=zarray_array["array_dims"],
         data=manifest_array,
