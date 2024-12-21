@@ -31,6 +31,8 @@ Bug fixes
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
   (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug passing arguments to FITS reader, and test it on Hubble Space Telescope data.
+  (:pull:`363`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
