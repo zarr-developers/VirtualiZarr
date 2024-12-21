@@ -48,7 +48,6 @@ class ChunkEntry(TypedDict):
         """
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
-
         path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
@@ -84,7 +83,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PosixPath(path).suffix:
+        # Question: This feels fragile, is there a better way to ID a Zarr
+        if not PosixPath(path).suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -356,17 +356,6 @@ class ChunkManifest:
 
     def __repr__(self) -> str:
         return f"ChunkManifest<shape={self.shape_chunk_grid}>"
-
-    @property
-    def nbytes(self) -> int:
-        """
-        Size required to hold these references in memory in bytes.
-
-        Note this is not the size of the referenced chunks if they were actually loaded into memory,
-        this is only the size of the pointers to the chunk locations.
-        If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
-        """
-        return self._paths.nbytes + self._offsets.nbytes + self._lengths.nbytes
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
         indices = split(key)

@@ -45,16 +45,24 @@ def maybe_open_loadable_vars_and_indexes(
     # TODO Really we probably want a dedicated backend that iterates over all variables only once
     # TODO See issue #124 for a suggestion of how to avoid calling xarray here.
 
-    fpath = _FsspecFSFromFilepath(
-        filepath=filepath, reader_options=reader_options
-    ).open_file()
+    fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
-    # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
+    # Updates the Xarray open_dataset kwargs if Zarr
+
+    if fpath.upath.suffix == ".zarr":
+        engine = "zarr"
+        xr_input = fpath.filepath
+
+    else:
+        engine = None
+        xr_input = fpath.open_file()  # type: ignore
+
     ds = open_dataset(
-        fpath,  # type: ignore[arg-type]
+        xr_input,  # type: ignore[arg-type]
         drop_variables=drop_variables,
         group=group,
         decode_times=decode_times,
+        engine=engine,
     )
 
     if indexes is None:
