@@ -9,7 +9,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.zarr import ZArray, ceildiv
 
-network = pytest.mark.network
+requires_network = pytest.mark.network
 
 
 def _importorskip(

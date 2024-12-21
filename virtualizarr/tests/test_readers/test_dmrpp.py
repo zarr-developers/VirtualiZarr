@@ -11,7 +11,7 @@ import xarray.testing as xrt
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.readers.dmrpp import DMRParser
-from virtualizarr.tests import network
+from virtualizarr.tests import requires_network
 
 urls = [
     (
@@ -177,7 +177,7 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
     )
 
 
-@network
+@requires_network
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 @pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
