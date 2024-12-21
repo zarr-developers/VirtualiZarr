@@ -159,31 +159,18 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
 
 
 async def virtual_variable_from_zarr_array(zarr_array: zarr.AsyncArray, filepath: str):
-    # zarr_prefix = "/"+zarr_array.basename
     zarr_prefix = zarr_array.basename
 
     if zarr_array.metadata.zarr_format == 3:
-        # if we have zarr_v3, we add /c/ to that chunk paths
+        # if we have Zarr format/version 3, we add /c/ to the chunk paths
         zarr_prefix = f"{zarr_prefix}/c"
 
     zarray_array = await build_zarray_metadata(zarr_array=zarr_array)
 
-    # build mapping between chunks and # of bytes (size)
     chunk_manifest = await build_chunk_manifest(
         zarr_array, prefix=zarr_prefix, filepath=filepath
     )
 
-    # old method -> building chunk manifests from dicts
-    # chunk_map = await get_chunk_mapping_prefix(zarr_array, prefix=f"{array_name}/c")
-    # # transform chunk_map into ChunkManifest that fits into ManifestArray
-    # chunk_manifest = await build_chunk_manifest_from_dict_mapping(
-    #     store_path=filepath,
-    #     chunk_mapping_dict=chunk_map,
-    #     array_name=array_name,
-    #     zarr_format=zarray_array["zarray_array"].zarr_format,
-    # )
-
-    # build ManifestArray from dict
     manifest_array = ManifestArray(
         zarray=zarray_array["zarray_array"], chunkmanifest=chunk_manifest
     )
