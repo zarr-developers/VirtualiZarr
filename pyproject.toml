@@ -59,6 +59,7 @@ test = [
     "ruff",
     "s3fs",
     "scipy",
+    "lithops",
     "virtualizarr[hdf_reader]"
 ]
 
