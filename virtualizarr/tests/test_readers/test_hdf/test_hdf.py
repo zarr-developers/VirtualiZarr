@@ -3,6 +3,7 @@ from unittest.mock import patch
 import h5py  # type: ignore
 import pytest
 
+from virtualizarr import open_virtual_dataset
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -178,3 +179,16 @@ class TestOpenVirtualDataset:
         maybe_open_loadable_vars_and_indexes.return_value = (0, 0)
         HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
         assert construct_virtual_dataset.call_args[1]["coord_names"] == ["lat", "lon"]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+@pytest.mark.parametrize("group", ["subgroup", "subgroup/"])
+def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
+    # regression test for GH issue #364
+    vds = open_virtual_dataset(
+        netcdf4_file_with_data_in_multiple_groups,
+        group=group,
+        backend=HDFVirtualBackend,
+    )
+    assert list(vds.dims) == ["dim_0"]

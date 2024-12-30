@@ -160,7 +160,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(dataset: Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(group: str, dataset: Dataset) -> Union[List[str], List[None]]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -199,7 +199,14 @@ class HDFVirtualBackend(VirtualBackend):
                     # In this case, we mimic netCDF4 and assign phony dimension names.
                     # See https://github.com/fsspec/kerchunk/issues/41
                     dims.append(f"phony_dim_{n}")
-        return dims
+
+        print(group)
+        print(dims)
+
+        if not group.endswith("/"):
+            group += "/"
+
+        return [dim.removeprefix(group) for dim in dims]
 
     @staticmethod
     def _extract_attrs(h5obj: Union[Dataset, Group]):
@@ -248,7 +255,9 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
-    def _dataset_to_variable(path: str, dataset: Dataset) -> Optional[Variable]:
+    def _dataset_to_variable(
+        group: str, path: str, dataset: Dataset
+    ) -> Optional[Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
@@ -296,7 +305,7 @@ class HDFVirtualBackend(VirtualBackend):
             shape=dataset.shape,
             zarr_format=2,
         )
-        dims = HDFVirtualBackend._dataset_dims(dataset)
+        dims = HDFVirtualBackend._dataset_dims(group, dataset)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         if manifest:
             marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
@@ -351,7 +360,9 @@ class HDFVirtualBackend(VirtualBackend):
         for key in g.keys():
             if key not in drop_variables:
                 if isinstance(g[key], Dataset):
-                    variable = HDFVirtualBackend._dataset_to_variable(path, g[key])
+                    variable = HDFVirtualBackend._dataset_to_variable(
+                        group=group, path=path, dataset=g[key]
+                    )
                     if variable is not None:
                         variables[key] = variable
                 else:
