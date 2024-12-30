@@ -91,7 +91,7 @@ class TestDatasetToVariable:
         f = h5py.File(chunked_dimensions_netcdf4_file)
         ds = f["data"]
         var = HDFVirtualBackend._dataset_to_variable(
-            chunked_dimensions_netcdf4_file, ds
+            chunked_dimensions_netcdf4_file, ds, group=""
         )
         assert var.chunks == (50, 50)
 
@@ -99,14 +99,16 @@ class TestDatasetToVariable:
         f = h5py.File(single_dimension_scale_hdf5_file)
         ds = f["data"]
         var = HDFVirtualBackend._dataset_to_variable(
-            single_dimension_scale_hdf5_file, ds
+            single_dimension_scale_hdf5_file, ds, group=""
         )
         assert var.chunks == (2,)
 
     def test_dataset_attributes(self, string_attributes_hdf5_file):
         f = h5py.File(string_attributes_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(string_attributes_hdf5_file, ds)
+        var = HDFVirtualBackend._dataset_to_variable(
+            string_attributes_hdf5_file, ds, group=""
+        )
         assert var.attrs["attribute_name"] == "attribute_name"
 
 
