@@ -160,7 +160,9 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(group: str, dataset: Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(
+        dataset: Dataset, group: str = ""
+    ) -> Union[List[str], List[None]]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -172,6 +174,8 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
         Returns
         -------
@@ -199,9 +203,6 @@ class HDFVirtualBackend(VirtualBackend):
                     # In this case, we mimic netCDF4 and assign phony dimension names.
                     # See https://github.com/fsspec/kerchunk/issues/41
                     dims.append(f"phony_dim_{n}")
-
-        print(group)
-        print(dims)
 
         if not group.endswith("/"):
             group += "/"
@@ -256,7 +257,9 @@ class HDFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _dataset_to_variable(
-        group: str, path: str, dataset: Dataset
+        path: str,
+        dataset: Dataset,
+        group: str,
     ) -> Optional[Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
@@ -265,6 +268,8 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group containing this h5py.Dataset.
 
         Returns
         -------
@@ -305,7 +310,7 @@ class HDFVirtualBackend(VirtualBackend):
             shape=dataset.shape,
             zarr_format=2,
         )
-        dims = HDFVirtualBackend._dataset_dims(group, dataset)
+        dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         if manifest:
             marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
@@ -350,18 +355,22 @@ class HDFVirtualBackend(VirtualBackend):
             filepath=path, reader_options=reader_options
         ).open_file()
         f = h5py.File(open_file, mode="r")
-        if group:
+        if group is not None:
             g = f[group]
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
+            group_name = group
         else:
             g = f
+            group_name = ""
         variables = {}
         for key in g.keys():
             if key not in drop_variables:
                 if isinstance(g[key], Dataset):
                     variable = HDFVirtualBackend._dataset_to_variable(
-                        group=group, path=path, dataset=g[key]
+                        path=path,
+                        dataset=g[key],
+                        group=group_name,
                     )
                     if variable is not None:
                         variables[key] = variable
