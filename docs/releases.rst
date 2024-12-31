@@ -31,6 +31,8 @@ Bug fixes
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
   (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in HDF reader where dimension names of dimensions in a subgroup would be incorrect.
+  (:issue:`364`, :pull:`366`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
