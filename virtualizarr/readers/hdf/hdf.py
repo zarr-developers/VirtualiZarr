@@ -160,9 +160,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(
-        dataset: Dataset, group: str = ""
-    ) -> Union[List[str], List[None]]:
+    def _dataset_dims(dataset: Dataset, group: str = "") -> List[str]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -175,11 +173,11 @@ class HDFVirtualBackend(VirtualBackend):
         dataset : h5py.Dataset
             An h5py dataset.
         group : str
-            Name of the group are pulling these dimensions from. Required for potentially removing subgroup prefixes.
+            Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
         Returns
         -------
-        list
+        list[str]
             List with HDF5 path names of dimension scales attached to input
             dataset.
         """
