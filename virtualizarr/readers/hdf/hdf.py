@@ -275,7 +275,6 @@ class HDFVirtualBackend(VirtualBackend):
         -------
         list: xarray.Variable
             A list of xarray variables.
-
         """
         # This chunk determination logic mirrors zarr-python's create
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
@@ -335,34 +334,35 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         path: str
             The path of the hdf5 file.
-        group: str
-            The name of the group for which to extract variables.
+        group: str, optional
+            The name of the group for which to extract variables. None refers to the root group.
         drop_variables: list of str
             A list of variable names to skip extracting.
         reader_options: dict
-            A dictionary of reader options passed to fsspec when opening the
-            file.
+            A dictionary of reader options passed to fsspec when opening the file.
 
         Returns
         -------
         dict
             A dictionary of Xarray Variables with the variable names as keys.
-
         """
         if drop_variables is None:
             drop_variables = []
+
         open_file = _FsspecFSFromFilepath(
             filepath=path, reader_options=reader_options
         ).open_file()
         f = h5py.File(open_file, mode="r")
+
         if group is not None:
             g = f[group]
+            group_name = group
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
-            group_name = group
         else:
             g = f
             group_name = ""
+
         variables = {}
         for key in g.keys():
             if key not in drop_variables:
