@@ -194,3 +194,17 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+def test_nested_groups(hdf5_groups_file):
+    # try to open an empty group
+    with pytest.raises(
+        NotImplementedError, match="Nested groups are not yet supported"
+    ):
+        open_virtual_dataset(
+            hdf5_groups_file,
+            group="/",
+            backend=HDFVirtualBackend,
+        )
