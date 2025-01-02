@@ -46,8 +46,8 @@ def dataset_to_icechunk(
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
 
-    if not store.supports_writes:
-        raise ValueError("supplied store does not support writes")
+    if store.read_only:
+        raise ValueError("supplied store is read-only")
 
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?

@@ -19,21 +19,16 @@ from virtualizarr.writers.icechunk import dataset_to_icechunk, generate_chunk_ke
 from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
-    from icechunk import IcechunkStore, StorageConfig  # type: ignore[import-not-found]
+    from icechunk import IcechunkStore, Storage  # type: ignore[import-not-found]
 
 
 @pytest.fixture(scope="function")
 def icechunk_filestore(tmpdir) -> "IcechunkStore":
-    from icechunk import IcechunkStore, StorageConfig
+    from icechunk import Repository, Storage
 
-    storage = StorageConfig.filesystem(str(tmpdir))
-
-    # TODO if icechunk exposed a synchronous version of .open then we wouldn't need to use asyncio.run here
-    # TODO is this the correct mode to use?
-    store = IcechunkStore.create(storage=storage, mode="w")
-
-    # TODO instead yield store then store.close() ??
-    return store
+    repo = Repository.create(storage=Storage.new_local_filesystem(str(tmpdir)))
+    session = repo.writable_session("main")
+    return session.store
 
 
 def test_write_new_virtual_variable(
@@ -327,13 +322,10 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
 
 
 @pytest.fixture(scope="function")
-def icechunk_storage(tmpdir) -> "StorageConfig":
-    from icechunk import StorageConfig
+def icechunk_storage(tmpdir) -> "Storage":
+    from icechunk import Storage
 
-    storage = StorageConfig.filesystem(str(tmpdir))
-
-    # TODO instead yield store then store.close() ??
-    return storage
+    return Storage.new_local_filesystem(str(tmpdir))
 
 
 def generate_chunk_manifest(
@@ -449,39 +441,42 @@ class TestAppend:
     # Success cases
     ## When appending to a single virtual ref without encoding, it succeeds
     def test_append_virtual_ref_without_encoding(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+        self, icechunk_storage: "Storage", simple_netcdf4: str
     ):
         import xarray.testing as xrt
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         # generate virtual dataset
         vds = gen_virtual_dataset(file_uri=simple_netcdf4)
         # create the icechunk store and commit the first virtual dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds, icechunk_filestore)
-        icechunk_filestore.commit(
+        repo = Repository.create(storage=icechunk_storage)
+        session = repo.writable_session("main")
+        dataset_to_icechunk(vds, session.store)
+        session.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
 
         # Append the same dataset to the same store
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
-        dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
+        icechunk_filestore_append = repo.writable_session("main")
+        dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data")
-        dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="x")
+
+        icechunk_filestore_append = repo.writable_session("main")
+        dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data again")
-        array = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
+        array = open_zarr(
+            icechunk_filestore_append.store, consolidated=False, zarr_format=3
+        )
 
         expected_ds = open_dataset(simple_netcdf4)
         expected_array = concat([expected_ds, expected_ds, expected_ds], dim="x")
         xrt.assert_identical(array, expected_array)
 
     def test_append_virtual_ref_with_encoding(
-        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
+        self, icechunk_storage: "Storage", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor}}
@@ -513,19 +508,20 @@ class TestAppend:
         )
 
         # create the icechunk store and commit the first virtual dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds1, icechunk_filestore.store)
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
 
         # Append the same dataset to the same store
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
-        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
-        new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
+        new_ds = open_zarr(
+            icechunk_filestore_append.store, consolidated=False, zarr_format=3
+        )
 
         expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
         expected_ds = concat([expected_ds1, expected_ds2], dim="time").drop_vars(
@@ -539,10 +535,10 @@ class TestAppend:
     ## When appending to a virtual ref with encoding, it succeeds
     @pytest.mark.asyncio
     async def test_append_with_multiple_root_arrays(
-        self, icechunk_storage: "StorageConfig", netcdf4_files_factory: Callable
+        self, icechunk_storage: "Storage", netcdf4_files_factory: Callable
     ):
         import xarray.testing as xrt
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         filepath1, filepath2 = netcdf4_files_factory(
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
@@ -619,19 +615,18 @@ class TestAppend:
         )
 
         # create the icechunk store and commit the first virtual dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds1, icechunk_filestore.store)
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
-        new_ds = open_zarr(icechunk_filestore, consolidated=False, zarr_format=3)
+        new_ds = open_zarr(icechunk_filestore.store, consolidated=False, zarr_format=3)
         first_time_chunk_before_append = await icechunk_filestore._store.get("time/c/0")
 
         # Append the same dataset to the same store
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
-        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
         assert (
             await icechunk_filestore_append._store.get("time/c/0")
@@ -646,12 +641,12 @@ class TestAppend:
     @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_append_with_compression_succeeds(
         self,
-        icechunk_storage: "StorageConfig",
+        icechunk_storage: "Storage",
         netcdf4_files_factory: Callable,
         zarr_format: Literal[2, 3],
     ):
         import xarray.testing as xrt
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         encoding = {
             "air": {
@@ -691,18 +686,17 @@ class TestAppend:
         )
 
         # Create icechunk store and commit the compressed dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds1, icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Append another dataset with compatible compression
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
-        dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="time")
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
         updated_ds = open_zarr(
-            store=icechunk_filestore_append, consolidated=False, zarr_format=3
+            store=icechunk_filestore_append.store, consolidated=False, zarr_format=3
         )
 
         expected_ds1, expected_ds2 = open_dataset(file1), open_dataset(file2)
@@ -712,37 +706,36 @@ class TestAppend:
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+        self, icechunk_storage: "Storage", simple_netcdf4: str
     ):
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         # Generate a virtual dataset with specific chunking
         vds = gen_virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
 
         # Create icechunk store and commit the dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds, icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Try to append dataset with different chunking, expect failure
         vds_different_chunking = gen_virtual_dataset(
             file_uri=simple_netcdf4, chunk_shape=(1, 1)
         )
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(
             ValueError, match="Cannot concatenate arrays with inconsistent chunk shapes"
         ):
             dataset_to_icechunk(
-                vds_different_chunking, icechunk_filestore_append, append_dim="x"
+                vds_different_chunking, icechunk_filestore_append.store, append_dim="x"
             )
 
     ## When encoding is different it fails
     def test_append_with_different_encoding_fails(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+        self, icechunk_storage: "Storage", simple_netcdf4: str
     ):
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         # Generate datasets with different encoding
         vds1 = gen_virtual_dataset(
@@ -753,24 +746,23 @@ class TestAppend:
         )
 
         # Create icechunk store and commit the first dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds1, icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Try to append with different encoding, expect failure
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(
             ValueError,
             match="Cannot concatenate arrays with different values for encoding",
         ):
-            dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="x")
+            dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="x")
 
     def test_dimensions_do_not_align(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+        self, icechunk_storage: "Storage", simple_netcdf4: str
     ):
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         # Generate datasets with different lengths on the non-append dimension (x)
         vds1 = gen_virtual_dataset(
@@ -785,42 +777,40 @@ class TestAppend:
         )
 
         # Create icechunk store and commit the first dataset
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds1, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds1, icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Attempt to append dataset with different length in non-append dimension, expect failure
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(ValueError, match="Cannot concatenate arrays with shapes"):
-            dataset_to_icechunk(vds2, icechunk_filestore_append, append_dim="y")
+            dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="y")
 
     def test_append_dim_not_in_dims_raises_error(
-        self, icechunk_storage: "StorageConfig", simple_netcdf4: str
+        self, icechunk_storage: "Storage", simple_netcdf4: str
     ):
         """
         Test that attempting to append with an append_dim not present in dims raises a ValueError.
         """
-        from icechunk import IcechunkStore
+        from icechunk import Repository
 
         vds = gen_virtual_dataset(
             file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
         )
 
-        icechunk_filestore = IcechunkStore.create(storage=icechunk_storage)
-        dataset_to_icechunk(vds, icechunk_filestore)
+        icechunk_repo = Repository.create(storage=icechunk_storage)
+        icechunk_filestore = icechunk_repo.writable_session("main")
+        dataset_to_icechunk(vds, icechunk_filestore.store)
         icechunk_filestore.commit("initial commit")
 
         # Attempt to append using a non-existent append_dim "z"
-        icechunk_filestore_append = IcechunkStore.open_existing(
-            storage=icechunk_storage, read_only=False
-        )
+        icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(
             ValueError,
             match="append_dim z does not match any existing dataset dimensions",
         ):
-            dataset_to_icechunk(vds, icechunk_filestore_append, append_dim="z")
+            dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="z")
 
 
 # TODO test writing to a group that isn't the root group
