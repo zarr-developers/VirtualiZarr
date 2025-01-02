@@ -412,7 +412,7 @@ class DMRParser:
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         # Fill value is placed in encoding and thus removed from attributes
-        fill_value = attrs.pop("_FillValue", None)
+        fill_value = attrs.get("_FillValue", None)
         # create ManifestArray and ZArray
         zarray = ZArray(
             chunks=chunks_shape,
