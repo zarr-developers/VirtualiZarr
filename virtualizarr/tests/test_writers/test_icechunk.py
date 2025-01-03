@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, cast
 
 import pytest
-from icechunk import IcechunkError
 
 pytest.importorskip("icechunk")
 
@@ -241,6 +240,8 @@ def test_write_loadable_variable(
     icechunk_filestore: "IcechunkStore",
     tmpdir: Path,
 ):
+    from icechunk import IcechunkError
+
     netcdf_path = tmpdir / "test.nc"
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
     var = Variable(data=arr, dims=["x", "y"])
