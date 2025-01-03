@@ -1,8 +1,10 @@
+from datetime import datetime, timedelta, timezone
 from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, cast
 
 import pytest
+from icechunk import IcechunkError
 
 pytest.importorskip("icechunk")
 
@@ -235,11 +237,18 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
 
 
 def test_write_loadable_variable(
-    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
+    icechunk_filestore: "IcechunkStore",
+    tmpdir: Path,
 ):
+    netcdf_path = tmpdir / "test.nc"
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
+    var = Variable(data=arr, dims=["x", "y"])
+    ds = Dataset({"foo": var})
+    ds.to_netcdf(netcdf_path)
+
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
-        {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
+        {"0.0": {"path": str(netcdf_path), "offset": 6144, "length": 48}}
     )
     zarray = ZArray(
         shape=(3, 4),
@@ -263,7 +272,8 @@ def test_write_loadable_variable(
     )
     vds = Dataset({"air": la_v}, {"pres": ma_v})
 
-    dataset_to_icechunk(vds, icechunk_filestore)
+    checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
+    dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
 
     root_group = group(store=icechunk_filestore)
     air_array = root_group["air"]
@@ -277,9 +287,22 @@ def test_write_loadable_variable(
     assert isinstance(pres_array, Array)
     assert pres_array.shape == (3, 4)
     assert pres_array.dtype == np.dtype("int32")
-    expected_ds = open_dataset(simple_netcdf4)
+    expected_ds = open_dataset(netcdf_path)
     expected_array = expected_ds["foo"].to_numpy()
     npt.assert_equal(pres_array, expected_array)
+    expected_ds.close()
+
+    # Now we can overwrite the simple_netcdf4 file with new data to make sure that
+    # the checksum_date is being used to determine if the data is valid
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
+    var = Variable(data=arr, dims=["x", "y"])
+    ds = Dataset({"foo": var})
+    ds.to_netcdf(netcdf_path)
+
+    # Now if we try to read the data back in, it should fail because the checksum_date
+    # is newer than the last_updated_at
+    with pytest.raises(IcechunkError):
+        pres_array = root_group["pres"]
 
 
 def test_generate_chunk_key_no_offset():
