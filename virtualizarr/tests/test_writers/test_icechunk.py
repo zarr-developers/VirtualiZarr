@@ -238,19 +238,11 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
 
 def test_write_loadable_variable(
     icechunk_filestore: "IcechunkStore",
-    tmpdir: Path,
+    simple_netcdf4: Path,
 ):
-    from icechunk import IcechunkError
-
-    netcdf_path = tmpdir / "test.nc"
-    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
-    var = Variable(data=arr, dims=["x", "y"])
-    ds = Dataset({"foo": var})
-    ds.to_netcdf(netcdf_path)
-
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
-        {"0.0": {"path": str(netcdf_path), "offset": 6144, "length": 48}}
+        {"0.0": {"path": str(simple_netcdf4), "offset": 6144, "length": 48}}
     )
     zarray = ZArray(
         shape=(3, 4),
@@ -287,6 +279,54 @@ def test_write_loadable_variable(
     assert air_array.attrs["units"] == "km"
     npt.assert_equal(air_array[:], la_v[:])
 
+    pres_array = root_group["pres"]
+    assert isinstance(pres_array, Array)
+    assert pres_array.shape == (3, 4)
+    assert pres_array.dtype == np.dtype("int32")
+    expected_ds = open_dataset(simple_netcdf4)
+    expected_array = expected_ds["foo"].to_numpy()
+    npt.assert_equal(pres_array, expected_array)
+
+
+def test_checksum(
+    icechunk_filestore: "IcechunkStore",
+    tmpdir: Path,
+):
+    from icechunk import IcechunkError
+
+    netcdf_path = tmpdir / "test.nc"
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
+    var = Variable(data=arr, dims=["x", "y"])
+    ds = Dataset({"foo": var})
+    ds.to_netcdf(netcdf_path)
+
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0": {"path": str(netcdf_path), "offset": 6144, "length": 48}}
+    )
+    zarray = ZArray(
+        shape=(3, 4),
+        chunks=(3, 4),
+        dtype=np.dtype("int32"),
+        compressor=None,
+        filters=None,
+        fill_value=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        zarray=zarray,
+    )
+
+    ma_v = Variable(data=ma, dims=["x", "y"])
+
+    vds = Dataset({"pres": ma_v})
+
+    # Icechunk checksums currently store with second precision, so we need to make sure
+    # the checksum_date is at least one second in the future
+    checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
+    dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
+
+    root_group = group(store=icechunk_filestore)
     pres_array = root_group["pres"]
     assert isinstance(pres_array, Array)
     assert pres_array.shape == (3, 4)
