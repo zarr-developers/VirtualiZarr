@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, Optional, overload
 
@@ -39,7 +40,10 @@ class VirtualiZarrDatasetAccessor:
         dataset_to_zarr(self.ds, storepath)
 
     def to_icechunk(
-        self, store: "IcechunkStore", append_dim: Optional[str] = None
+        self,
+        store: "IcechunkStore",
+        append_dim: Optional[str] = None,
+        last_updated_at: Optional[datetime] = None,
     ) -> None:
         """
         Write an xarray dataset to an Icechunk store.
@@ -48,10 +52,17 @@ class VirtualiZarrDatasetAccessor:
 
         If `append_dim` is provided, the virtual dataset will be appended to the existing IcechunkStore along the `append_dim` dimension.
 
+        If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation. At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
+            This protects against reading outdated virtual chunks that have been updated since the last read.
+
         Parameters
         ----------
         store: IcechunkStore
         append_dim: str, optional
+            When provided, specifies the dimension along which to append the virtual dataset.
+        last_updated_at: datetime, optional
+            When provided, uses provided datetime as a checksum for any virtual chunks written to the store with this operation.
+
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
