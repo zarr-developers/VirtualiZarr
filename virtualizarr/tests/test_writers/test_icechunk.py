@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta, timezone
 from itertools import product
 from pathlib import Path
@@ -272,6 +273,8 @@ def test_write_loadable_variable(
     )
     vds = Dataset({"air": la_v}, {"pres": ma_v})
 
+    # Icechunk checksums currently store with second precision, so we need to make sure
+    # the checksum_date is at least one second in the future
     checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
     dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
 
@@ -297,12 +300,15 @@ def test_write_loadable_variable(
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
     var = Variable(data=arr, dims=["x", "y"])
     ds = Dataset({"foo": var})
+    time.sleep(1)  # Make sure the checksum_date is at least one second in the future
     ds.to_netcdf(netcdf_path)
 
     # Now if we try to read the data back in, it should fail because the checksum_date
     # is newer than the last_updated_at
     with pytest.raises(IcechunkError):
         pres_array = root_group["pres"]
+        assert isinstance(pres_array, Array)
+        npt.assert_equal(pres_array, arr)
 
 
 def test_generate_chunk_key_no_offset():
