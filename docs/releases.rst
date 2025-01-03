@@ -9,12 +9,19 @@ v1.2.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
+  (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
 - Passing ``group=None`` (the default) to ``open_virtual_dataset`` for a file with multiple groups no longer raises an error, instead it gives you the root group.
   This new behaviour is more consistent with ``xarray.open_dataset``.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Indexes are now created by default for any loadable one-dimensional coordinate variables.
+  Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
+  This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
+  (:issue:`18`, :pull:`357`, :pull:`358`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -23,7 +30,7 @@ Bug fixes
 ~~~~~~~~~
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Fix bug in dmrpp reader so _FillValue is passed to variables' encodings.
   (:pull:`369`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 
