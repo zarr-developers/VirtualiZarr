@@ -284,6 +284,7 @@ class TestReadFromURL:
             vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
+    @pytest.mark.xfail(reason="often times out, as nisar file is 200MB")
     def test_virtualizarr_vs_local_nisar(self, hdf_backend):
         import fsspec
 
