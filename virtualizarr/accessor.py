@@ -52,8 +52,9 @@ class VirtualiZarrDatasetAccessor:
 
         If `append_dim` is provided, the virtual dataset will be appended to the existing IcechunkStore along the `append_dim` dimension.
 
-        If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation. At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
-            This protects against reading outdated virtual chunks that have been updated since the last read.
+        If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation.
+        At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
+        This protects against reading outdated virtual chunks that have been updated since the last read. When not provided, no check is performed.
 
         Parameters
         ----------
@@ -62,6 +63,7 @@ class VirtualiZarrDatasetAccessor:
             When provided, specifies the dimension along which to append the virtual dataset.
         last_updated_at: datetime, optional
             When provided, uses provided datetime as a checksum for any virtual chunks written to the store with this operation.
+            When not provided (default), no check is performed.
 
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk

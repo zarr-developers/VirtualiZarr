@@ -43,7 +43,7 @@ def dataset_to_icechunk(
     last_updated_at: Optional[datetime]
         The time at which the virtual dataset was last updated. When specified, if any of the virtual chunks written in this
         session are modified in storage after this time, icechunk will raise an error at runtime when trying to read the
-        virtual chunk
+        virtual chunk. When not specified, icechunk will not check for modifications to the virtual chunks at runtime.
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
