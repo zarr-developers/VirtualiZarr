@@ -421,18 +421,12 @@ By default references are placed in separate parquet file when the total number 
 We can also write these references out as an [IcechunkStore](https://icechunk.io/). `Icechunk` is a Open-source, cloud-native transactional tensor storage engine that is compatible with zarr version 3. To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`vds.virtualize.to_icechunk <virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
 
 ```python
-# create an icechunk repository, with access to s3 for virtual data
-from icechunk import Repository, Storage, VirtualChunkContainer, local_filesystem_storage, s3_credentials, s3_store
+# create an icechunk repository, session and write the virtual dataset to the session
+from icechunk import Repository, Storage, VirtualChunkContainer, local_filesystem_storage
 storage = local_filesystem_storage(str('combined'))
-config = RepositoryConfig.default()
-container = VirtualChunkContainer("s3", "s3://", s3_store(
-    region="us-east-1",
-))
-config.set_virtual_chunk_container(container)
-credentials = containers_credentials(
-        s3=s3_credentials(anonymous=True)
-    )
-repo = Repository.create(storage=storage, config=config, credentials=credentials)
+
+# By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
+repo = Repository.create(storage=storage)
 session = repo.writeable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
