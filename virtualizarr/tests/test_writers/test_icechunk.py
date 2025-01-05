@@ -613,9 +613,7 @@ class TestAppend:
     ):
         import xarray.testing as xrt
         from icechunk import Repository
-        from zarr.core.buffer import (
-            default_buffer_prototype,  # type: ignore[import-untyped]
-        )
+        from zarr.core.buffer import default_buffer_prototype
 
         filepath1, filepath2 = netcdf4_files_factory(
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}

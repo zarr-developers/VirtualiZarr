@@ -103,6 +103,10 @@ ignore_missing_imports = true
 module = "ujson.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "zarr.*"
+ignore_missing_imports = true
+
 [tool.ruff]
 # Same as Black.
 line-length = 88
