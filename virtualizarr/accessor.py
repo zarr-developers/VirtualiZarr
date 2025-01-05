@@ -46,35 +46,35 @@ class VirtualiZarrDatasetAccessor:
         last_updated_at: Optional[datetime] = None,
     ) -> None:
         """
-        Write an xarray dataset to an Icechunk store.
+                Write an xarray dataset to an Icechunk store.
 
-        Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
+                Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
 
-        If `append_dim` is provided, the virtual dataset will be appended to the existing IcechunkStore along the `append_dim` dimension.
+                If `append_dim` is provided, the virtual dataset will be appended to the existing IcechunkStore along the `append_dim` dimension.
 
-        If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation.
-        At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
-        This protects against reading outdated virtual chunks that have been updated since the last read. When not provided, no check is performed.
+                If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation.
+                At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
+                This protects against reading outdated virtual chunks that have been updated since the last read. When not provided, no check is performed.
 
-        Parameters
-        ----------
-        store: IcechunkStore
-        append_dim: str, optional
-            When provided, specifies the dimension along which to append the virtual dataset.
-        last_updated_at: datetime, optional
-            When provided, uses provided datetime as a checksum for any virtual chunks written to the store with this operation.
-            When not provided (default), no check is performed.
+                Parameters
+                ----------
+                store: IcechunkStore
+                append_dim: str, optional
+                    When provided, specifies the dimension along which to append the virtual dataset.
+                last_updated_at: datetime, optional
+                    When provided, uses provided datetime as a checksum for any virtual chunks written to the store with this operation.
+                    When not provided (default), no check is performed.
 
-Examples
---------
-To ensure an error is raised if the files containing referenced virtual chunks are modified at any time from now on, pass the current time to ``last_updated_at``.
+        Examples
+        --------
+        To ensure an error is raised if the files containing referenced virtual chunks are modified at any time from now on, pass the current time to ``last_updated_at``.
 
->>> from datetime import datetime
->>>
->>> vds.virtualize.to_icechunk(
-...     icechunkstore,
-...     last_updated_at=datetime.now(),
-... )
+        >>> from datetime import datetime
+        >>>
+        >>> vds.virtualize.to_icechunk(
+        ...     icechunkstore,
+        ...     last_updated_at=datetime.now(),
+        ... )
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
