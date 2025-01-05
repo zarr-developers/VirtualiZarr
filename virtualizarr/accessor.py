@@ -65,6 +65,16 @@ class VirtualiZarrDatasetAccessor:
             When provided, uses provided datetime as a checksum for any virtual chunks written to the store with this operation.
             When not provided (default), no check is performed.
 
+Examples
+--------
+To ensure an error is raised if the files containing referenced virtual chunks are modified at any time from now on, pass the current time to ``last_updated_at``.
+
+>>> from datetime import datetime
+>>>
+>>> vds.virtualize.to_icechunk(
+...     icechunkstore,
+...     last_updated_at=datetime.now(),
+... )
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
