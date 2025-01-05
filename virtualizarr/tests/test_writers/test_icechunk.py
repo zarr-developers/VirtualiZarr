@@ -335,7 +335,7 @@ def test_checksum(
 
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
-        dataset_to_icechunk(vds, icechunk_filestore, last_updated_at="not a datetime")
+        dataset_to_icechunk(vds, icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
 
     root_group = group(store=icechunk_filestore)
     pres_array = root_group["pres"]
@@ -613,6 +613,7 @@ class TestAppend:
     ):
         import xarray.testing as xrt
         from icechunk import Repository
+        from zarr.core.buffer import default_buffer_prototype
 
         filepath1, filepath2 = netcdf4_files_factory(
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
@@ -696,14 +697,18 @@ class TestAppend:
             "test commit"
         )  # need to commit it in order to append to it in the next lines
         new_ds = open_zarr(icechunk_filestore.store, consolidated=False, zarr_format=3)
-        first_time_chunk_before_append = await icechunk_filestore._store.get("time/c/0")
+        first_time_chunk_before_append = await icechunk_filestore.store.get(
+            "time/c/0", prototype=default_buffer_prototype()
+        )
 
         # Append the same dataset to the same store
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
         assert (
-            await icechunk_filestore_append._store.get("time/c/0")
+            await icechunk_filestore_append.store.get(
+                "time/c/0", prototype=default_buffer_prototype()
+            )
         ) == first_time_chunk_before_append
         new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
 
