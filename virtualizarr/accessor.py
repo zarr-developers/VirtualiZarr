@@ -55,6 +55,7 @@ class VirtualiZarrDatasetAccessor:
                 If `last_updated_at` is provided, it will be used as a checksum for any virtual chunks written to the store with this operation.
                 At read time, if any of the virtual chunks have been updated since this provided datetime, an error will be raised.
                 This protects against reading outdated virtual chunks that have been updated since the last read. When not provided, no check is performed.
+                This value is stored in Icechunk with seconds precision, so be sure to take that into account when providing this value.
 
                 Parameters
                 ----------
