@@ -55,6 +55,10 @@ def dataset_to_icechunk(
 
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
+    elif not isinstance(last_updated_at, (type(None), datetime)):
+        raise TypeError(
+            f"expected type Optional[datetime], but got type {type(last_updated_at)}"
+        )
 
     if store.read_only:
         raise ValueError("supplied store is read-only")

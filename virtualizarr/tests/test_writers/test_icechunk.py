@@ -25,10 +25,17 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="function")
-def icechunk_filestore(tmpdir) -> "IcechunkStore":
-    from icechunk import Repository, Storage
+def icechunk_storage(tmpdir) -> "Storage":
+    from icechunk import Storage
 
-    repo = Repository.create(storage=Storage.new_local_filesystem(str(tmpdir)))
+    return Storage.new_local_filesystem(str(tmpdir))
+
+
+@pytest.fixture(scope="function")
+def icechunk_filestore(icechunk_storage: "Storage") -> "IcechunkStore":
+    from icechunk import Repository
+
+    repo = Repository.create(storage=icechunk_storage)
     session = repo.writable_session("main")
     return session.store
 
@@ -326,6 +333,10 @@ def test_checksum(
     checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
     dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
 
+    # Fail if anything but None or a datetime is passed to last_updated_at
+    with pytest.raises(TypeError):
+        dataset_to_icechunk(vds, icechunk_filestore, last_updated_at="not a datetime")
+
     root_group = group(store=icechunk_filestore)
     pres_array = root_group["pres"]
     assert isinstance(pres_array, Array)
@@ -389,13 +400,6 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
     append_axis = 2  # This is out of bounds for a 2D index
     with pytest.raises(ValueError):
         generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
-
-
-@pytest.fixture(scope="function")
-def icechunk_storage(tmpdir) -> "Storage":
-    from icechunk import Storage
-
-    return Storage.new_local_filesystem(str(tmpdir))
 
 
 def generate_chunk_manifest(
