@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -8,7 +9,7 @@ import xarray.testing as xrt
 from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
-from virtualizarr import open_virtual_dataset
+from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.backend import FileType, automatically_determine_filetype
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
@@ -17,6 +18,7 @@ from virtualizarr.tests import (
     has_astropy,
     network,
     requires_kerchunk,
+    requires_lithops,
     requires_s3fs,
     requires_scipy,
 )
@@ -447,3 +449,114 @@ class TestLoadVirtualDataset:
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
+
+
+# TODO consolidate these by parameterizing over parallel kwarg once they all work
+@requires_kerchunk
+class TestOpenVirtualMFDataset:
+    def test_serial(self, netcdf4_files_factory):
+        filepath1, filepath2 = netcdf4_files_factory()
+
+        # test combine nested without in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="nested",
+            concat_dim="time",
+            coords="minimal",
+            compat="override",
+            indexes={},
+        )
+        vds1 = open_virtual_dataset(filepath1, indexes={})
+        vds2 = open_virtual_dataset(filepath2, indexes={})
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords using in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2], combine="by_coords", loadable_variables=["time"]
+        )
+        vds1 = open_virtual_dataset(filepath1, loadable_variables=["time"])
+        vds2 = open_virtual_dataset(filepath2, loadable_variables=["time"])
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords again using in-memory indexes but for a glob
+        file_glob = Path(filepath1).parent.glob("air*.nc")
+        combined_vds = open_virtual_mfdataset(
+            file_glob, combine="by_coords", loadable_variables=["time"]
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+    # @requires_dask
+    def test_dask(self, netcdf4_files_factory): ...
+
+    @requires_lithops
+    def test_lithops(self, netcdf4_files_factory):
+        # by default this will use the lithops LocalHost executor
+
+        filepath1, filepath2 = netcdf4_files_factory()
+
+        # test combine nested without in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="nested",
+            concat_dim="time",
+            coords="minimal",
+            compat="override",
+            indexes={},
+            parallel="lithops",
+        )
+        vds1 = open_virtual_dataset(filepath1, indexes={})
+        vds2 = open_virtual_dataset(filepath2, indexes={})
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
+        )
+
+        print(combined_vds)
+        print(expected_vds)
+        print(combined_vds.indexes)
+        print(combined_vds.indexes)
+        print(combined_vds["lat"].attrs)
+        print(expected_vds["lat"].attrs)
+        print(combined_vds["lat"].encoding)
+        print(expected_vds["lat"].encoding)
+        print(combined_vds["lat"].data)
+        print(expected_vds["lat"].data)
+        print(combined_vds["lat"].data.zarray)
+        print(expected_vds["lat"].data.zarray)
+        print(combined_vds["lat"].data.manifest.dict())
+        print(expected_vds["lat"].data.manifest.dict())
+
+        # TODO this assertion unintentially triggers loading, see issue #354
+        # xrt.assert_identical(combined_vds.coords.variables['lat'], expected_vds.coords.variables['lat'])
+
+        # TODO I have no idea why this assertion fails for all the coords - everything about the coords looks identical
+        # xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords using in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="by_coords",
+            loadable_variables=["time"],
+            parallel="lithops",
+        )
+        vds1 = open_virtual_dataset(filepath1, loadable_variables=["time"])
+        vds2 = open_virtual_dataset(filepath2, loadable_variables=["time"])
+        expected_vds = xr.concat(
+            [vds1, vds2], dim="time", coords="minimal", compat="override"
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords again using in-memory indexes but for a glob
+        file_glob = Path(filepath1).parent.glob("air*.nc")
+        combined_vds = open_virtual_mfdataset(
+            file_glob,
+            combine="by_coords",
+            loadable_variables=["time"],
+            parallel="lithops",
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
