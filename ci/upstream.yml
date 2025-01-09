@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - xarray>=2025.1.1
   - h5netcdf
   - h5py
   - hdf5
@@ -29,8 +30,6 @@ dependencies:
   - zarr>=3.0.0
   - pip
   - pip:
-      - xarray>=2025.1.1
-
-      - icechunk>=0.1.0a9  # Installs zarr v3 as dependency
+      - icechunk>=0.1.0a10 # Installs zarr v3 as dependency
       # - git+https://github.com/fsspec/kerchunk@main  # kerchunk is currently incompatible with zarr-python v3 (https://github.com/fsspec/kerchunk/pull/516)
       - imagecodecs-numcodecs==2024.6.1
