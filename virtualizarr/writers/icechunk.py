@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
@@ -23,7 +24,10 @@ if TYPE_CHECKING:
 
 
 def dataset_to_icechunk(
-    ds: Dataset, store: "IcechunkStore", append_dim: Optional[str] = None
+    ds: Dataset,
+    store: "IcechunkStore",
+    append_dim: Optional[str] = None,
+    last_updated_at: Optional[datetime] = None,
 ) -> None:
     """
     Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
@@ -34,6 +38,12 @@ def dataset_to_icechunk(
     ----------
     ds: xr.Dataset
     store: IcechunkStore
+    append_dim: Optional[str]
+        Name of the dimension along which to append data. If provided, the dataset must have a dimension with this name.
+    last_updated_at: Optional[datetime]
+        The time at which the virtual dataset was last updated. When specified, if any of the virtual chunks written in this
+        session are modified in storage after this time, icechunk will raise an error at runtime when trying to read the
+        virtual chunk. When not specified, icechunk will not check for modifications to the virtual chunks at runtime.
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -45,9 +55,13 @@ def dataset_to_icechunk(
 
     if not isinstance(store, IcechunkStore):
         raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
+    elif not isinstance(last_updated_at, (type(None), datetime)):
+        raise TypeError(
+            f"expected type Optional[datetime], but got type {type(last_updated_at)}"
+        )
 
-    if not store.supports_writes:
-        raise ValueError("supplied store does not support writes")
+    if store.read_only:
+        raise ValueError("supplied store is read-only")
 
     # TODO only supports writing to the root group currently
     # TODO pass zarr_format kwarg?
@@ -71,6 +85,7 @@ def dataset_to_icechunk(
         store=store,
         group=root_group,
         append_dim=append_dim,
+        last_updated_at=last_updated_at,
     )
 
 
@@ -80,6 +95,7 @@ def write_variables_to_icechunk_group(
     store,
     group,
     append_dim: Optional[str] = None,
+    last_updated_at: Optional[datetime] = None,
 ):
     virtual_variables = {
         name: var
@@ -108,6 +124,7 @@ def write_variables_to_icechunk_group(
             name=name,
             var=var,
             append_dim=append_dim,
+            last_updated_at=last_updated_at,
         )
 
 
@@ -155,6 +172,7 @@ def write_virtual_variable_to_icechunk(
     name: str,
     var: Variable,
     append_dim: Optional[str] = None,
+    last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
@@ -217,6 +235,7 @@ def write_virtual_variable_to_icechunk(
         manifest=ma.manifest,
         append_axis=append_axis,
         existing_num_chunks=existing_num_chunks,
+        last_updated_at=last_updated_at,
     )
 
 
@@ -244,6 +263,7 @@ def write_manifest_virtual_refs(
     manifest: ChunkManifest,
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
+    last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
@@ -275,4 +295,5 @@ def write_manifest_virtual_refs(
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
+            checksum=last_updated_at,
         )

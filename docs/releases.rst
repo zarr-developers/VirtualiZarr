@@ -11,6 +11,10 @@ New Features
 
 - Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
   (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Sync with Icechunk v0.1.0a8  (:pull:`368`) By `Matthew Iannucci <https://github.com/mpiannucci>`. This also adds support
+  for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
+  is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
+  underlying data has changed since the virtual references were written.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
