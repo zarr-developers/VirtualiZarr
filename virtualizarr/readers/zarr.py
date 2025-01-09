@@ -165,6 +165,12 @@ async def virtual_dataset_from_zarr_group(
     indexes: Mapping[str, Index] | None = None,
     reader_options: dict = {},
 ):
+    # appease the mypy gods
+    if virtual_variables is None:
+        virtual_variables = []
+    if drop_variables is None:
+        drop_variables = []
+
     virtual_zarr_arrays = await asyncio.gather(
         *[zarr_group.getitem(var) for var in virtual_variables]
     )
