@@ -4,27 +4,30 @@ import zarr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.tests import network, requires_zarrV3
+from virtualizarr.tests import requires_network, requires_zarrV3
+
+# It seems like this PR: https://github.com/zarr-developers/zarr-python/pull/2533
+# might fix this issue: https://github.com/zarr-developers/zarr-python/issues/2554
 
 
 @requires_zarrV3
-@network
+@requires_network
 @pytest.mark.parametrize(
     "zarr_store",
     [
         pytest.param(
             2,
             id="Zarr V2",
-            marks=pytest.mark.xfail(
-                reason="https://github.com/zarr-developers/zarr-python/issues/2554"
-            ),
+            # marks=pytest.mark.xfail(
+            #     reason="https://github.com/zarr-developers/zarr-python/issues/2554"
+            # ),
         ),
         pytest.param(
             3,
             id="Zarr V3",
-            marks=pytest.mark.xfail(
-                reason="https://github.com/zarr-developers/zarr-python/issues/2554"
-            ),
+            # marks=pytest.mark.xfail(
+            #     reason="https://github.com/zarr-developers/zarr-python/issues/2554"
+            # ),
         ),
     ],
     indirect=True,

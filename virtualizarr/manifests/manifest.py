@@ -96,7 +96,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
         _path = PosixPath(path)
 
-        if not _path.suffix:
+        if not _path.suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )

@@ -94,7 +94,6 @@ async def build_chunk_manifest(
     """Build a ChunkManifest with the from_arrays method"""
     import numpy as np
 
-    # import pdb; pdb.set_trace()
     key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
     filepath_list = [filepath] * len(key_tuples)
@@ -281,13 +280,12 @@ class ZarrVirtualBackend(VirtualBackend):
                 loadable_variables,
             )
 
-            filepath = validate_and_normalize_path_to_uri(
-                filepath, fs_root=Path.cwd().as_uri()
-            )
+            # filepath = validate_and_normalize_path_to_uri(
+            #     filepath, fs_root=Path.cwd().as_uri()
+            # )
             # This currently fails for local filepaths (ie. tests) but works for s3:
             # *** TypeError: Filesystem needs to support async operations.
             # https://github.com/zarr-developers/zarr-python/issues/2554
-
             if reader_options is None:
                 reader_options = {}
 

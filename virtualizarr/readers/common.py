@@ -51,7 +51,7 @@ def maybe_open_loadable_vars_and_indexes(
 
     if fpath.upath.suffix == ".zarr":
         engine = "zarr"
-        xr_input = fpath.filepath
+        xr_input = fpath.upath
 
     else:
         engine = None
