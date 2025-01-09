@@ -160,7 +160,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(dataset: Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(dataset: Dataset, group: str = "") -> List[str]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -172,10 +172,12 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
         Returns
         -------
-        list
+        list[str]
             List with HDF5 path names of dimension scales attached to input
             dataset.
         """
@@ -199,7 +201,11 @@ class HDFVirtualBackend(VirtualBackend):
                     # In this case, we mimic netCDF4 and assign phony dimension names.
                     # See https://github.com/fsspec/kerchunk/issues/41
                     dims.append(f"phony_dim_{n}")
-        return dims
+
+        if not group.endswith("/"):
+            group += "/"
+
+        return [dim.removeprefix(group) for dim in dims]
 
     @staticmethod
     def _extract_attrs(h5obj: Union[Dataset, Group]):
@@ -248,7 +254,11 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
-    def _dataset_to_variable(path: str, dataset: Dataset) -> Optional[Variable]:
+    def _dataset_to_variable(
+        path: str,
+        dataset: Dataset,
+        group: str,
+    ) -> Optional[Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
@@ -256,12 +266,13 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group containing this h5py.Dataset.
 
         Returns
         -------
         list: xarray.Variable
             A list of xarray variables.
-
         """
         # This chunk determination logic mirrors zarr-python's create
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
@@ -296,7 +307,7 @@ class HDFVirtualBackend(VirtualBackend):
             shape=dataset.shape,
             zarr_format=2,
         )
-        dims = HDFVirtualBackend._dataset_dims(dataset)
+        dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         if manifest:
             marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
@@ -321,37 +332,44 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         path: str
             The path of the hdf5 file.
-        group: str
-            The name of the group for which to extract variables.
+        group: str, optional
+            The name of the group for which to extract variables. None refers to the root group.
         drop_variables: list of str
             A list of variable names to skip extracting.
         reader_options: dict
-            A dictionary of reader options passed to fsspec when opening the
-            file.
+            A dictionary of reader options passed to fsspec when opening the file.
 
         Returns
         -------
         dict
             A dictionary of Xarray Variables with the variable names as keys.
-
         """
         if drop_variables is None:
             drop_variables = []
+
         open_file = _FsspecFSFromFilepath(
             filepath=path, reader_options=reader_options
         ).open_file()
         f = h5py.File(open_file, mode="r")
-        if group:
+
+        if group is not None:
             g = f[group]
+            group_name = group
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
         else:
             g = f
+            group_name = ""
+
         variables = {}
         for key in g.keys():
             if key not in drop_variables:
                 if isinstance(g[key], Dataset):
-                    variable = HDFVirtualBackend._dataset_to_variable(path, g[key])
+                    variable = HDFVirtualBackend._dataset_to_variable(
+                        path=path,
+                        dataset=g[key],
+                        group=group_name,
+                    )
                     if variable is not None:
                         variables[key] = variable
                 else:
