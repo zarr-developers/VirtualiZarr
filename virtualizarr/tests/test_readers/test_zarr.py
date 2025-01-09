@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-import zarr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
@@ -49,6 +48,8 @@ class TestOpenVirtualDatasetZarr:
         assert len(vds.data_vars) == 0
 
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
+        import zarr
+
         zg = zarr.open_group(zarr_store)
         vds = open_virtual_dataset(filepath=zarr_store, indexes={})
         zg_metadata_dict = zg.metadata.to_dict()
