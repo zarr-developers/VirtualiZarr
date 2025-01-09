@@ -5,7 +5,6 @@ from pathlib import Path  # noqa
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index, Variable
-from zarr.core.common import concurrent_map
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
@@ -19,6 +18,7 @@ from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     import zarr
+    from zarr.core.common import concurrent_map
 
 
 async def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
