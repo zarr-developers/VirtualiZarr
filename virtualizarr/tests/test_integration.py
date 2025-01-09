@@ -10,7 +10,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import network, requires_kerchunk, requires_zarrV3
+from virtualizarr.tests import network, requires_kerchunk, requires_zarr_python_v3
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
@@ -87,7 +87,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
-@requires_zarrV3
+@requires_zarr_python_v3
 @network
 @pytest.mark.skip(reason="Kerchunk & zarr-python v3 incompatibility")
 @pytest.mark.parametrize(
