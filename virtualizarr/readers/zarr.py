@@ -62,32 +62,6 @@ async def _parse_zarr_v3_metadata(zarr_array: zarr.Array) -> ZArray:
     )
 
 
-async def build_chunk_manifest_from_dict_mapping(
-    store_path: str, chunk_mapping_dict: dict, array_name: str, zarr_format: int
-) -> ChunkManifest:
-    chunk_manifest_dict = {}
-    # ToDo: We could skip the dict creation and built the Manifest from arrays directly
-    for key, value in chunk_mapping_dict.items():
-        if zarr_format == 2:
-            # split on array name + trailing slash
-            chunk_key = key.split(array_name + "/")[-1]
-
-        elif zarr_format == 3:
-            # In v3 we remove the /c/ 'chunks' part of the key and
-            # replace trailing slashes with '.' to conform to ChunkManifest validation
-            chunk_key = (
-                key.split(array_name + "/")[-1].split("c/")[-1].replace("/", ".")
-            )
-
-        chunk_manifest_dict[chunk_key] = {
-            "path": store_path + "/" + key,
-            "offset": 0,
-            "length": value,
-        }
-
-    return ChunkManifest(chunk_manifest_dict)
-
-
 async def build_chunk_manifest(
     zarr_array: zarr.AsyncArray, prefix: str, filepath: str
 ) -> ChunkManifest:
