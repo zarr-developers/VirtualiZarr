@@ -15,8 +15,8 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    network,
     requires_kerchunk,
+    requires_network,
     requires_s3fs,
     requires_scipy,
 )
@@ -193,7 +193,7 @@ class TestDetermineCoords:
         assert set(vds.coords) == set(expected_coords)
 
 
-@network
+@requires_network
 @requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ class TestReadFromS3:
             assert isinstance(vds[var].data, ManifestArray), var
 
 
-@network
+@requires_network
 @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
 class TestReadFromURL:
     @pytest.mark.parametrize(
@@ -383,8 +383,13 @@ class TestLoadVirtualDataset:
         with pytest.raises(ValueError):
             open_virtual_dataset(netcdf4_file, filetype="unknown")
 
+        with pytest.raises(ValueError):
+            open_virtual_dataset(netcdf4_file, filetype=ManifestArray)
+
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
+
+        open_virtual_dataset(netcdf4_file, filetype="netCDF4")
 
     def test_explicit_filetype_and_backend(self, netcdf4_file):
         with pytest.raises(ValueError):
