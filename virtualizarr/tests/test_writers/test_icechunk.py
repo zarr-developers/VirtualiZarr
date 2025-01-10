@@ -710,7 +710,9 @@ class TestAppend:
                 "time/c/0", prototype=default_buffer_prototype()
             )
         ) == first_time_chunk_before_append
-        new_ds = open_zarr(icechunk_filestore_append, consolidated=False, zarr_format=3)
+        new_ds = open_zarr(
+            icechunk_filestore_append.store, consolidated=False, zarr_format=3
+        )
 
         expected_ds1, expected_ds2 = open_dataset(filepath1), open_dataset(filepath2)
         expected_ds = concat([expected_ds1, expected_ds2], dim="time")
