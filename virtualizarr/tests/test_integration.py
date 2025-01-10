@@ -10,7 +10,11 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import (
+    requires_kerchunk,
+    requires_network,
+    requires_zarr_python_v3,
+)
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
@@ -76,6 +80,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     vds = open_virtual_dataset(
         netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
     )
+
     refs = vds.virtualize.to_kerchunk(format="dict")
 
     # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
@@ -84,6 +89,44 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
     assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
+
+
+@requires_zarr_python_v3
+@requires_network
+@pytest.mark.skip(reason="Kerchunk & zarr-python v3 incompatibility")
+@pytest.mark.parametrize(
+    "zarr_store",
+    [
+        pytest.param(2, id="Zarr V2"),
+        pytest.param(3, id="Zarr V3"),
+    ],
+    indirect=True,
+)
+def test_zarr_roundtrip(zarr_store):
+    ds = open_virtual_dataset(
+        zarr_store,
+        indexes={},
+    )
+
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+
+    roundtrip = dataset_from_kerchunk_refs(ds_refs)
+
+    # This won't work right now b/c of the Kerchunk zarr-v3 incompatibility
+    # roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+
+    def add_prefix(file_path: str) -> str:
+        return "file://" + file_path
+
+    for array in ["lat", "lon", "time", "air"]:
+        # V2: What should the behavior here be? Should the RT dataset have _ARRAY_DIMS?
+        ds[array].attrs.pop("_ARRAY_DIMENSIONS", None)
+
+        # temp workaround b/c of the zarr-python-v3 filepath issue: https://github.com/zarr-developers/zarr-python/issues/2554
+        roundtrip[array].data = roundtrip[array].data.rename_paths(add_prefix)
+
+    # Assert equal to original dataset - ManifestArrays
+    xrt.assert_equal(roundtrip, ds)
 
 
 @requires_kerchunk

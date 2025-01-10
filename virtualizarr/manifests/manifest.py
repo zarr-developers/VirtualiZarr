@@ -48,7 +48,6 @@ class ChunkEntry(TypedDict):
         """
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
-
         path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
@@ -84,7 +83,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PosixPath(path).suffix:
+        # Question: This feels fragile, is there a better way to ID a Zarr
+        if not PosixPath(path).suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -96,7 +96,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
         _path = PosixPath(path)
 
-        if not _path.suffix:
+        if not _path.suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
