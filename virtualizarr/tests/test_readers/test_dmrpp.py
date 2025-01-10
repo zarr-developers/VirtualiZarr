@@ -307,7 +307,6 @@ def test_parse_variable(tmp_path):
         "coordinates": "x y z",
         "add_offset": 298.15,
         "scale_factor": 0.001,
-        "_FillValue": -32768,
     }
 
 
