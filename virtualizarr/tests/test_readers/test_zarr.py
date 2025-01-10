@@ -17,16 +17,10 @@ from virtualizarr.tests import requires_network, requires_zarr_python_v3
         pytest.param(
             2,
             id="Zarr V2",
-            # marks=pytest.mark.xfail(
-            #     reason="https://github.com/zarr-developers/zarr-python/issues/2554"
-            # ),
         ),
         pytest.param(
             3,
             id="Zarr V3",
-            # marks=pytest.mark.xfail(
-            #     reason="https://github.com/zarr-developers/zarr-python/issues/2554"
-            # ),
         ),
     ],
     indirect=True,

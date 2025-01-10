@@ -18,7 +18,6 @@ from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     import zarr
-    from zarr.core.common import concurrent_map
 
 
 async def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
@@ -67,7 +66,7 @@ async def build_chunk_manifest(
 ) -> ChunkManifest:
     """Build a ChunkManifest with the from_arrays method"""
     import numpy as np
-
+    from zarr.core.common import concurrent_map
     key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
     filepath_list = [filepath] * len(key_tuples)
@@ -103,7 +102,7 @@ async def build_chunk_manifest(
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, prefix: str) -> dict:
     """Create a chunk map"""
-
+    from zarr.core.common import concurrent_map
     keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
     sizes = await concurrent_map(keys, zarr_array.store.getsize)
