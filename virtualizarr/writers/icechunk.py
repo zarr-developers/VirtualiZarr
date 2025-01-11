@@ -211,6 +211,7 @@ def write_virtual_variable_to_icechunk(
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
+    from zarr.core.metadata.v3 import parse_codecs
 
     ma = cast(ManifestArray, var.data)
     zarray = ma.zarray
@@ -241,15 +242,29 @@ def write_virtual_variable_to_icechunk(
             append_axis=append_axis,
         )
     else:
-        append_axis = None
+        append_axis, compressors = None, None
         # create array if it doesn't already exist
+
+        # review https://github.com/zarr-developers/zarr-python/blob/0e1fde44b2ff3904bbe88fc4d1424d61d769dfe2/docs/user-guide/arrays.rst#compressors
+        # this should create a custom compressor with numcodecs, not try and replace zlib with gzip...
+        if zarray.compressor:
+            compressor = zarray.compressor.copy()
+            compressor["configuration"] = {}
+            for k, v in zarray.compressor.items():
+                if k == "id":
+                    v = "gzip" if v == "zlib" else v
+                    compressor["name"] = v
+                else:
+                    compressor["configuration"][k] = v
+                compressor.pop(k)
+            compressors = parse_codecs([compressor])
 
         arr = group.require_array(
             name=name,
             shape=zarray.shape,
-            chunk_shape=zarray.chunks,
+            chunks=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
-            codecs=zarray._v3_codec_pipeline(),
+            compressors=compressors,
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
         )
