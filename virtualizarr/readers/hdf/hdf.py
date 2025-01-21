@@ -1,6 +1,15 @@
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Union,
+)
 
 import numpy as np
 import xarray as xr
@@ -21,10 +30,15 @@ from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
 from virtualizarr.zarr import ZArray
 
-if TYPE_CHECKING:
-    import h5py  # type: ignore
-
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
+
+
+if TYPE_CHECKING:
+    from h5py import Dataset as H5Dataset  # type: ignore[import-untyped]
+    from h5py import Group as H5Group  # type: ignore[import-untyped]
+else:
+    H5Dataset: Any = None
+    H5Group: Any = None
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -85,7 +99,8 @@ class HDFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _dataset_chunk_manifest(
-        path: str, dataset: h5py.Dataset
+        path: str,
+        dataset: H5Dataset,
     ) -> Optional[ChunkManifest]:
         """
         Generate ChunkManifest for HDF5 dataset.
@@ -154,7 +169,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(dataset: h5py.Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(dataset: H5Dataset) -> Union[List[str], List[None]]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -196,7 +211,7 @@ class HDFVirtualBackend(VirtualBackend):
         return dims
 
     @staticmethod
-    def _extract_attrs(h5obj: Union[h5py.Dataset, h5py.Group]):
+    def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
         """
         Extract attributes from an HDF5 group or dataset.
 
@@ -242,7 +257,7 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
-    def _dataset_to_variable(path: str, dataset: h5py.Dataset) -> Optional[xr.Variable]:
+    def _dataset_to_variable(path: str, dataset: H5Dataset) -> Optional[xr.Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
