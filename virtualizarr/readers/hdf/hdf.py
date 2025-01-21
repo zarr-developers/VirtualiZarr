@@ -125,7 +125,7 @@ class HDFVirtualBackend(VirtualBackend):
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
 
-                chunk_entry = ChunkEntry.with_validation(
+                chunk_entry: ChunkEntry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)
