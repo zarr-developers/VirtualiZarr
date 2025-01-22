@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0",
+    "xarray>=2024.10.0,<2025.0.0",
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
@@ -39,7 +39,7 @@ hdf_reader = [
     "numcodecs"
 ]
 icechunk = [
-    "icechunk>=0.1.0a7",
+    "icechunk==0.1.0a8",
 ]
 test = [
     "codecov",
@@ -101,6 +101,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "ujson.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "zarr.*"
 ignore_missing_imports = true
 
 [tool.ruff]
