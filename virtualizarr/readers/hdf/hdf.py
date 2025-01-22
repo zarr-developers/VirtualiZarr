@@ -267,7 +267,7 @@ class HDFVirtualBackend(VirtualBackend):
         path: str,
         dataset: H5Dataset,
         group: str,
-    ) -> Optional[Variable]:
+    ) -> Optional[xr.Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
