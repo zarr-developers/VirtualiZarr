@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 def dataset_to_icechunk(
     ds: Dataset,
     store: "IcechunkStore",
+    *,
+    group: Optional[str] = None,
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -38,52 +40,67 @@ def dataset_to_icechunk(
     ----------
     ds: xr.Dataset
     store: IcechunkStore
+    group: Optional[str]
+        Path to the group in which to store the dataset, defaulting to the root group.
     append_dim: Optional[str]
-        Name of the dimension along which to append data. If provided, the dataset must have a dimension with this name.
+        Name of the dimension along which to append data. If provided, the dataset must
+        have a dimension with this name.
     last_updated_at: Optional[datetime]
-        The time at which the virtual dataset was last updated. When specified, if any of the virtual chunks written in this
-        session are modified in storage after this time, icechunk will raise an error at runtime when trying to read the
-        virtual chunk. When not specified, icechunk will not check for modifications to the virtual chunks at runtime.
+        The time at which the virtual dataset was last updated. When specified, if any
+        of the virtual chunks written in this session are modified in storage after this
+        time, icechunk will raise an error at runtime when trying to read the virtual
+        chunk. When not specified, icechunk will not check for modifications to the
+        virtual chunks at runtime.
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
         from zarr import Group  # type: ignore[import-untyped]
+        from zarr.storage import StorePath
     except ImportError:
         raise ImportError(
             "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
-        )
+        ) from None
 
     if not isinstance(store, IcechunkStore):
-        raise TypeError(f"expected type IcechunkStore, but got type {type(store)}")
-    elif not isinstance(last_updated_at, (type(None), datetime)):
         raise TypeError(
-            f"expected type Optional[datetime], but got type {type(last_updated_at)}"
+            f"store: expected type IcechunkStore, but got type {type(store)}"
+        )
+
+    if not isinstance(group, (type(None), str)):
+        raise TypeError(
+            f"group: expected type Optional[str], but got type {type(group)}"
+        )
+
+    if not isinstance(last_updated_at, (type(None), datetime)):
+        raise TypeError(
+            "last_updated_at: expected type Optional[datetime],"
+            f" but got type {type(last_updated_at)}"
         )
 
     if store.read_only:
         raise ValueError("supplied store is read-only")
 
-    # TODO only supports writing to the root group currently
-    # TODO pass zarr_format kwarg?
-    if append_dim is not None:
-        if append_dim not in ds.dims:
-            raise ValueError(
-                f"append_dim {append_dim} does not match any existing dataset dimensions"
-            )
-        root_group = Group.open(store=store, zarr_format=3)
-    else:
-        root_group = Group.from_store(store=store)
+    if append_dim and append_dim not in ds.dims:
+        raise ValueError(
+            f"append_dim {append_dim!r} does not match any existing dataset dimensions"
+        )
 
-    # TODO this is Frozen, the API for setting attributes must be something else
-    # root_group.attrs = ds.attrs
-    # for k, v in ds.attrs.items():
-    #     root_group.attrs[k] = encode_zarr_attr_value(v)
+    store_path = StorePath(store, path=group or "")
+
+    if append_dim:
+        group_object = Group.open(store=store_path, zarr_format=3)
+    else:
+        group_object = Group.from_store(store=store_path, zarr_format=3)
+
+    group_object.update_attributes(
+        {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
+    )
 
     return write_variables_to_icechunk_group(
         ds.variables,
         ds.attrs,
         store=store,
-        group=root_group,
+        group=group_object,
         append_dim=append_dim,
         last_updated_at=last_updated_at,
     )
@@ -93,7 +110,7 @@ def write_variables_to_icechunk_group(
     variables,
     attrs,
     store,
-    group,
+    group: "Group",
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ):
@@ -113,7 +130,12 @@ def write_variables_to_icechunk_group(
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
     ds = Dataset(loadable_variables, attrs=attrs)
     ds.to_zarr(
-        store, zarr_format=3, consolidated=False, mode="a", append_dim=append_dim
+        store,
+        group=group.name,
+        zarr_format=3,
+        consolidated=False,
+        mode="a",
+        append_dim=append_dim,
     )
 
     # Then finish by writing the virtual variables to the same group
@@ -219,9 +241,9 @@ def write_virtual_variable_to_icechunk(
             fill_value=zarray.fill_value,
         )
 
-        # TODO it would be nice if we could assign directly to the .attrs property
-        for k, v in var.attrs.items():
-            arr.attrs[k] = encode_zarr_attr_value(v)
+        arr.update_attributes(
+            {k: encode_zarr_attr_value(v) for k, v in var.attrs.items()}
+        )
 
         _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
         for k, v in var.encoding.items():
@@ -267,7 +289,7 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    key_prefix = f"{group.name}{arr_name}"
+    key_prefix = f"{group.name}/{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
