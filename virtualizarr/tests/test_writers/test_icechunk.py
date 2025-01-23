@@ -25,10 +25,10 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="function")
-def icechunk_storage(tmpdir) -> "Storage":
+def icechunk_storage(tmp_path: Path) -> "Storage":
     from icechunk import Storage
 
-    return Storage.new_local_filesystem(str(tmpdir))
+    return Storage.new_local_filesystem(str(tmp_path))
 
 
 @pytest.fixture(scope="function")
@@ -60,8 +60,7 @@ def test_write_new_virtual_variable(
     assert isinstance(arr, Array)
 
     # check array metadata
-    # TODO why doesn't a .zarr_format or .version attribute exist on zarr.Array?
-    # assert arr.zarr_format == 3
+    assert arr.metadata.zarr_format == 3
     assert arr.shape == (2, 3)
     assert arr.chunks == (2, 3)
     assert arr.dtype == np.dtype("<i8")
@@ -389,9 +388,9 @@ def test_generate_chunk_key_zero_offset():
     result = generate_chunk_key(
         index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
     )
-    assert (
-        result == "4/5/6"
-    ), "No offset should be applied when existing_num_chunks is 0."
+    assert result == "4/5/6", (
+        "No offset should be applied when existing_num_chunks is 0."
+    )
 
 
 def test_generate_chunk_key_append_axis_out_of_bounds():
@@ -889,7 +888,7 @@ class TestAppend:
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(
             ValueError,
-            match="append_dim z does not match any existing dataset dimensions",
+            match="append_dim 'z' does not match any existing dataset dimensions",
         ):
             dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="z")
 
