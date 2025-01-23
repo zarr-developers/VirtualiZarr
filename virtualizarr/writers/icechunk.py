@@ -80,22 +80,21 @@ def dataset_to_icechunk(
     if store.read_only:
         raise ValueError("supplied store is read-only")
 
-    store_path = StorePath(store, path=group or "")
-
-    if not append_dim:
-        # TODO pass zarr_format kwarg?
-        group_object = Group.from_store(store=store_path)
-    elif append_dim not in ds.dims:
+    if append_dim and append_dim not in ds.dims:
         raise ValueError(
             f"append_dim {append_dim!r} does not match any existing dataset dimensions"
         )
-    else:
-        group_object = Group.open(store=store_path, zarr_format=3)
 
-    # TODO this is Frozen, the API for setting attributes must be something else
-    # group_object.attrs = ds.attrs
-    # for k, v in ds.attrs.items():
-    #     group_object.attrs[k] = encode_zarr_attr_value(v)
+    store_path = StorePath(store, path=group or "")
+
+    if append_dim:
+        group_object = Group.open(store=store_path, zarr_format=3)
+    else:
+        group_object = Group.from_store(store=store_path, zarr_format=3)
+
+    group_object.update_attributes(
+        {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
+    )
 
     return write_variables_to_icechunk_group(
         ds.variables,
@@ -131,7 +130,12 @@ def write_variables_to_icechunk_group(
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
     ds = Dataset(loadable_variables, attrs=attrs)
     ds.to_zarr(
-        store, zarr_format=3, consolidated=False, mode="a", append_dim=append_dim
+        store,
+        group=group.name,
+        zarr_format=3,
+        consolidated=False,
+        mode="a",
+        append_dim=append_dim,
     )
 
     # Then finish by writing the virtual variables to the same group
@@ -237,9 +241,9 @@ def write_virtual_variable_to_icechunk(
             fill_value=zarray.fill_value,
         )
 
-        # TODO it would be nice if we could assign directly to the .attrs property
-        for k, v in var.attrs.items():
-            arr.attrs[k] = encode_zarr_attr_value(v)
+        arr.update_attributes(
+            {k: encode_zarr_attr_value(v) for k, v in var.attrs.items()}
+        )
 
         _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
         for k, v in var.encoding.items():
@@ -285,7 +289,7 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    key_prefix = f"{group.name}{arr_name}"
+    key_prefix = f"{group.name}/{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
