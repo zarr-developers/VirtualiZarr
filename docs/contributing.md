@@ -12,10 +12,10 @@ mamba activate virtualizarr-tests
 pre-commit install
 # git checkout -b new-feature
 python -m pip install -e . --no-deps
-python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+python -m pytest --run-network-tests
 ```
 
-The `--run-network-tests` argument is optional - it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
+The `--run-network-tests` argument is optional -- it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
 
 ## Contributing documentation
 

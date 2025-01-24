@@ -3,7 +3,8 @@ coverage:
     project:
       default:
         target: 75
-        threshold: 0.1
+        # See https://json.schemastore.org/codecov.json
+        threshold: "0.1%"
     patch:
       default:
         target: 75
