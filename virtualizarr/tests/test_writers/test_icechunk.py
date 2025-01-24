@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
 
 import pytest
 
@@ -37,6 +37,19 @@ def icechunk_filestore(icechunk_storage: "Storage") -> "IcechunkStore":
     repo = Repository.create(storage=icechunk_storage)
     session = repo.writable_session("main")
     return session.store
+
+
+@pytest.mark.parametrize("kwarg", [("group", {}), ("append_dim", {})])
+def test_invalid_kwarg_type(
+    icechunk_filestore: "IcechunkStore",
+    vds_with_manifest_arrays: xr.Dataset,
+    kwarg: tuple[str, Any],
+):
+    name, value = kwarg
+    with pytest.raises(TypeError, match=name):
+        dataset_to_icechunk(
+            vds_with_manifest_arrays, icechunk_filestore, **{name: value}
+        )
 
 
 @pytest.mark.parametrize("group_path", [None, "", "/a", "a", "/a/b", "a/b", "a/b/"])
@@ -114,15 +127,16 @@ def test_set_single_virtual_ref_without_encoding(
     array = root_group["foo"]
 
     # check chunk references
-    # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+    # TODO we can't explicitly check that the path/offset/length is correct because
+    # icechunk doesn't yet expose any get_virtual_refs method
 
-    expected_ds = xr.open_dataset(simple_netcdf4)
-    expected_array = expected_ds["foo"].to_numpy()
-    npt.assert_equal(array, expected_array)
-
-    ds = xr.open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
-    # TODO: Check using xarray.testing.assert_identical
-    xrt.assert_identical(ds.foo, expected_ds.foo)
+    with (
+        xr.open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False) as ds,
+        xr.open_dataset(simple_netcdf4) as expected_ds,
+    ):
+        expected_array = expected_ds["foo"].to_numpy()
+        npt.assert_equal(array, expected_array)
+        xrt.assert_identical(ds.foo, expected_ds.foo)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
@@ -133,61 +147,68 @@ def test_set_single_virtual_ref_with_encoding(
 ):
     import xarray.testing as xrt
 
-    expected_ds = xr.open_dataset(netcdf4_file).drop_vars(["lon", "lat", "time"])
-    # these attributes encode floats different and I am not sure why, but its not important enough to block everything
-    expected_ds.air.attrs.pop("actual_range")
+    with xr.open_dataset(netcdf4_file) as ds:
+        # We drop the coordinates because we don't have them in the zarr test case
+        expected_ds = ds.drop_vars(["lon", "lat", "time"])
 
-    # instead for now just write out byte ranges explicitly
-    manifest = ChunkManifest(
-        {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
-    )
-    zarray = ZArray(
-        shape=(2920, 25, 53),
-        chunks=(2920, 25, 53),
-        dtype=np.dtype("int16"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        zarray=zarray,
-    )
-    air = xr.Variable(
-        data=ma,
-        dims=["time", "lat", "lon"],
-        encoding={"scale_factor": 0.01},
-        attrs=expected_ds.air.attrs,
-    )
-    vds = xr.Dataset({"air": air}, attrs=expected_ds.attrs)
+        # instead, for now just write out byte ranges explicitly
+        manifest = ChunkManifest(
+            {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
+        )
+        zarray = ZArray(
+            shape=(2920, 25, 53),
+            chunks=(2920, 25, 53),
+            dtype=np.dtype("int16"),
+            compressor=None,
+            filters=None,
+            fill_value=None,
+        )
+        ma = ManifestArray(
+            chunkmanifest=manifest,
+            zarray=zarray,
+        )
+        air = xr.Variable(
+            data=ma,
+            dims=["time", "lat", "lon"],
+            encoding={"scale_factor": 0.01},
+            attrs=expected_ds["air"].attrs,
+        )
+        vds = xr.Dataset({"air": air}, attrs=expected_ds.attrs)
 
-    dataset_to_icechunk(vds, icechunk_filestore)
+        dataset_to_icechunk(vds, icechunk_filestore)
 
-    root_group = zarr.group(store=icechunk_filestore)
-    air_array = root_group["air"]
-    assert isinstance(air_array, zarr.Array)
+        root_group = zarr.group(store=icechunk_filestore)
+        air_array = root_group["air"]
+        assert isinstance(air_array, zarr.Array)
 
-    # check array metadata
-    assert air_array.shape == (2920, 25, 53)
-    assert air_array.chunks == (2920, 25, 53)
-    assert air_array.dtype == np.dtype("int16")
-    assert air_array.attrs["scale_factor"] == 0.01
+        # check array metadata
+        assert air_array.shape == (2920, 25, 53)
+        assert air_array.chunks == (2920, 25, 53)
+        assert air_array.dtype == np.dtype("int16")
+        assert air_array.attrs["scale_factor"] == 0.01
 
-    # check chunk references
-    # TODO we can't explicitly check that the path/offset/length is correct because icechunk doesn't yet expose any get_virtual_refs method
+        # check chunk references
+        # TODO we can't explicitly check that the path/offset/length is correct because
+        # icechunk doesn't yet expose any get_virtual_refs method
 
-    # Load in the dataset, we drop the coordinates because we don't have them in the zarr test case
-    # Check with xarray
-    ds = xr.open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False)
-    xrt.assert_identical(ds, expected_ds)
+        # check the data
+        with xr.open_zarr(
+            store=icechunk_filestore, zarr_format=3, consolidated=False
+        ) as actual_ds:
+            # Because we encode attributes, attributes may differ, for example
+            # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
+            # but encoded it is [185.16000366210935, 322.1000061035156]
+            xrt.assert_allclose(actual_ds, expected_ds)
 
     # note: we don't need to test that committing works, because now we have confirmed
-    # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
+    # the refs are in the store (even uncommitted) it's icechunk's problem to manage
+    # them now.
 
 
 def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file: Path):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
+
     with open(netcdf4_file, "rb") as f:
         f.seek(200)
         actual_data = f.read(64)
@@ -291,9 +312,10 @@ def test_write_loadable_variable(
     assert isinstance(pres_array, zarr.Array)
     assert pres_array.shape == (3, 4)
     assert pres_array.dtype == np.dtype("int32")
-    expected_ds = xr.open_dataset(simple_netcdf4)
-    expected_array = expected_ds["foo"].to_numpy()
-    npt.assert_equal(pres_array, expected_array)
+
+    with xr.open_dataset(simple_netcdf4) as expected_ds:
+        expected_array = expected_ds["foo"].to_numpy()
+        npt.assert_equal(pres_array, expected_array)
 
 
 def test_checksum(
@@ -343,10 +365,10 @@ def test_checksum(
     assert isinstance(pres_array, zarr.Array)
     assert pres_array.shape == (3, 4)
     assert pres_array.dtype == np.dtype("int32")
-    expected_ds = xr.open_dataset(netcdf_path)
-    expected_array = expected_ds["foo"].to_numpy()
-    npt.assert_equal(pres_array, expected_array)
-    expected_ds.close()
+
+    with xr.open_dataset(netcdf_path) as expected_ds:
+        expected_array = expected_ds["foo"].to_numpy()
+        npt.assert_equal(pres_array, expected_array)
 
     # Now we can overwrite the simple_netcdf4 file with new data to make sure that
     # the checksum_date is being used to determine if the data is valid
@@ -483,29 +505,28 @@ def gen_virtual_dataset(
     zarr_format: Literal[2, 3] = 2,
     coords: Optional[xr.Coordinates] = None,
 ) -> xr.Dataset:
-    ds = xr.open_dataset(file_uri)
-    ds_dims: list[str] = cast(list[str], list(ds.dims))
-    dims = dims or ds_dims
-    var = gen_virtual_variable(
-        file_uri,
-        shape=shape,
-        chunk_shape=chunk_shape,
-        dtype=dtype,
-        compressor=compressor,
-        filters=filters,
-        fill_value=fill_value,
-        encoding=encoding,
-        offset=offset,
-        length=length,
-        dims=dims,
-        zarr_format=zarr_format,
-        attrs=ds[variable_name].attrs,
-    )
-    return xr.Dataset(
-        {variable_name: var},
-        coords=coords,
-        attrs=ds.attrs,
-    )
+    with xr.open_dataset(file_uri) as ds:
+        var = gen_virtual_variable(
+            file_uri,
+            shape=shape,
+            chunk_shape=chunk_shape,
+            dtype=dtype,
+            compressor=compressor,
+            filters=filters,
+            fill_value=fill_value,
+            encoding=encoding,
+            offset=offset,
+            length=length,
+            dims=dims or [str(name) for name in ds.dims],
+            zarr_format=zarr_format,
+            attrs=ds[variable_name].attrs,
+        )
+
+        return xr.Dataset(
+            {variable_name: var},
+            coords=coords,
+            attrs=ds.attrs,
+        )
 
 
 class TestAppend:
@@ -539,13 +560,15 @@ class TestAppend:
         icechunk_filestore_append = repo.writable_session("main")
         dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data again")
-        array = xr.open_zarr(
-            icechunk_filestore_append.store, consolidated=False, zarr_format=3
-        )
 
-        expected_ds = xr.open_dataset(simple_netcdf4)
-        expected_array = xr.concat([expected_ds, expected_ds, expected_ds], dim="x")
-        xrt.assert_identical(array, expected_array)
+        with (
+            xr.open_zarr(
+                icechunk_filestore_append.store, consolidated=False, zarr_format=3
+            ) as array,
+            xr.open_dataset(simple_netcdf4) as expected_ds,
+        ):
+            expected_array = xr.concat([expected_ds, expected_ds, expected_ds], dim="x")
+            xrt.assert_identical(array, expected_array)
 
     def test_append_virtual_ref_with_encoding(
         self, icechunk_storage: "Storage", netcdf4_files_factory: Callable
@@ -594,21 +617,18 @@ class TestAppend:
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
-        new_ds = xr.open_zarr(
-            icechunk_filestore_append.store, consolidated=False, zarr_format=3
-        )
 
-        expected_ds1, expected_ds2 = (
-            xr.open_dataset(filepath1),
-            xr.open_dataset(filepath2),
-        )
-        expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time").drop_vars(
-            ["time", "lat", "lon"], errors="ignore"
-        )
-        # Because we encode attributes, attributes may differ, for example
-        # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
-        # but encoded it is [185.16000366210935, 322.1000061035156]
-        xrt.assert_equal(new_ds, expected_ds)
+        with (
+            xr.open_dataset(filepath1) as expected_ds1,
+            xr.open_dataset(filepath2) as expected_ds2,
+            xr.open_zarr(
+                icechunk_filestore_append.store, consolidated=False, zarr_format=3
+            ) as new_ds,
+        ):
+            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time").drop_vars(
+                ["time", "lat", "lon"], errors="ignore"
+            )
+            xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with encoding, it succeeds
     @pytest.mark.asyncio
@@ -700,9 +720,6 @@ class TestAppend:
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
-        new_ds = xr.open_zarr(
-            icechunk_filestore.store, consolidated=False, zarr_format=3
-        )
         first_time_chunk_before_append = await icechunk_filestore.store.get(
             "time/c/0", prototype=default_buffer_prototype()
         )
@@ -716,16 +733,16 @@ class TestAppend:
                 "time/c/0", prototype=default_buffer_prototype()
             )
         ) == first_time_chunk_before_append
-        new_ds = xr.open_zarr(
-            icechunk_filestore_append.store, consolidated=False, zarr_format=3
-        )
 
-        expected_ds1, expected_ds2 = (
-            xr.open_dataset(filepath1),
-            xr.open_dataset(filepath2),
-        )
-        expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
-        xrt.assert_equal(new_ds, expected_ds)
+        with (
+            xr.open_zarr(
+                icechunk_filestore_append.store, consolidated=False, zarr_format=3
+            ) as ds,
+            xr.open_dataset(filepath1) as expected_ds1,
+            xr.open_dataset(filepath2) as expected_ds2,
+        ):
+            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
+            xrt.assert_equal(ds, expected_ds)
 
     # When appending to a virtual ref with compression, it succeeds
     @pytest.mark.parametrize("zarr_format", [2, 3])
@@ -785,14 +802,16 @@ class TestAppend:
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
-        updated_ds = xr.open_zarr(
-            store=icechunk_filestore_append.store, consolidated=False, zarr_format=3
-        )
-
-        expected_ds1, expected_ds2 = xr.open_dataset(file1), xr.open_dataset(file2)
-        expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
-        expected_ds = expected_ds.drop_vars(["lon", "lat", "time"], errors="ignore")
-        xrt.assert_equal(updated_ds, expected_ds)
+        with (
+            xr.open_zarr(
+                store=icechunk_filestore_append.store, consolidated=False, zarr_format=3
+            ) as ds,
+            xr.open_dataset(file1) as expected_ds1,
+            xr.open_dataset(file2) as expected_ds2,
+        ):
+            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
+            expected_ds = expected_ds.drop_vars(["lon", "lat", "time"], errors="ignore")
+            xrt.assert_equal(ds, expected_ds)
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
