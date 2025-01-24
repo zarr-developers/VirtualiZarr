@@ -32,14 +32,17 @@ def dataset_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """
-    Write an xarray dataset whose variables wrap ManifestArrays to an Icechunk store.
+    Write an xarray dataset to an Icechunk store.
 
-    Currently requires all variables to be backed by ManifestArray objects.
+    Both `icechunk` and `zarr` (v3) must be installed.
 
     Parameters
     ----------
     ds: xr.Dataset
+        Dataset to write to an Icechunk store. All variables must be backed by
+        ManifestArray objects.
     store: IcechunkStore
+        Store to write the dataset to, which must not be read-only.
     group: Optional[str]
         Path to the group in which to store the dataset, defaulting to the root group.
     append_dim: Optional[str]
@@ -51,11 +54,16 @@ def dataset_to_icechunk(
         time, icechunk will raise an error at runtime when trying to read the virtual
         chunk. When not specified, icechunk will not check for modifications to the
         virtual chunks at runtime.
+
+    Raises
+    ------
+    ValueError
+        If the store is read-only.
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
         from zarr import Group  # type: ignore[import-untyped]
-        from zarr.storage import StorePath
+        from zarr.storage import StorePath  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError(
             "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
@@ -69,6 +77,11 @@ def dataset_to_icechunk(
     if not isinstance(group, (type(None), str)):
         raise TypeError(
             f"group: expected type Optional[str], but got type {type(group)}"
+        )
+
+    if not isinstance(append_dim, (type(None), str)):
+        raise TypeError(
+            f"append_dim: expected type Optional[str], but got type {type(append_dim)}"
         )
 
     if not isinstance(last_updated_at, (type(None), datetime)):
