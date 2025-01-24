@@ -161,5 +161,10 @@ known-first-party = ["virtualizarr"]
 #
 asyncio_default_fixture_loop_scope = "session"
 markers = [
+    # Although we may not use pytest.mark.flaky, some of our test modules import
+    # from xarray.tests, and xarray.tests.__init__.py references pytest.mark.flaky.
+    # Therefore, without the "flaky" marker below, during test execution, we see
+    # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
+    "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
 ]
