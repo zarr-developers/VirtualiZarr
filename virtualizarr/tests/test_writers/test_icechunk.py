@@ -16,7 +16,7 @@ from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import separate_coords
-from virtualizarr.writers.icechunk import dataset_to_icechunk, generate_chunk_key
+from virtualizarr.writers.icechunk import generate_chunk_key
 from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
@@ -47,8 +47,8 @@ def test_invalid_kwarg_type(
 ):
     name, value = kwarg
     with pytest.raises(TypeError, match=name):
-        dataset_to_icechunk(
-            vds_with_manifest_arrays, icechunk_filestore, **{name: value}
+        vds_with_manifest_arrays.virtualize.to_icechunk(
+            icechunk_filestore, **{name: value}
         )
 
 
@@ -60,7 +60,7 @@ def test_write_new_virtual_variable(
 ):
     vds = vds_with_manifest_arrays
 
-    dataset_to_icechunk(vds, icechunk_filestore, group=group_path)
+    vds.virtualize.to_icechunk(icechunk_filestore, group=group_path)
 
     # check attrs
     group = zarr.group(store=icechunk_filestore, path=group_path)
@@ -121,7 +121,7 @@ def test_set_single_virtual_ref_without_encoding(
         {"foo": foo},
     )
 
-    dataset_to_icechunk(vds, icechunk_filestore)
+    vds.virtualize.to_icechunk(icechunk_filestore)
 
     root_group = zarr.group(store=icechunk_filestore)
     array = root_group["foo"]
@@ -175,7 +175,7 @@ def test_set_single_virtual_ref_with_encoding(
         )
         vds = xr.Dataset({"air": air}, attrs=expected_ds.attrs)
 
-        dataset_to_icechunk(vds, icechunk_filestore)
+        vds.virtualize.to_icechunk(icechunk_filestore)
 
         root_group = zarr.group(store=icechunk_filestore)
         air_array = root_group["air"]
@@ -239,7 +239,7 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
         {"air": air},
     )
 
-    dataset_to_icechunk(vds, icechunk_filestore)
+    vds.virtualize.to_icechunk(icechunk_filestore)
 
     root_group = zarr.group(store=icechunk_filestore)
     air_array = root_group["air"]
@@ -298,7 +298,7 @@ def test_write_loadable_variable(
     # Icechunk checksums currently store with second precision, so we need to make sure
     # the checksum_date is at least one second in the future
     checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
-    dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
+    vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at=checksum_date)
 
     root_group = zarr.group(store=icechunk_filestore)
     air_array = root_group["air"]
@@ -354,11 +354,11 @@ def test_checksum(
     # Icechunk checksums currently store with second precision, so we need to make sure
     # the checksum_date is at least one second in the future
     checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
-    dataset_to_icechunk(vds, icechunk_filestore, last_updated_at=checksum_date)
+    vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at=checksum_date)
 
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
-        dataset_to_icechunk(vds, icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
+        vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
 
     root_group = zarr.group(store=icechunk_filestore)
     pres_array = root_group["pres"]
@@ -547,18 +547,18 @@ class TestAppend:
         # create the icechunk store and commit the first virtual dataset
         repo = Repository.create(storage=icechunk_storage)
         session = repo.writable_session("main")
-        dataset_to_icechunk(vds, session.store)
+        vds.virtualize.to_icechunk(session.store)
         session.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
 
         # Append the same dataset to the same store
         icechunk_filestore_append = repo.writable_session("main")
-        dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="x")
+        vds.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data")
 
         icechunk_filestore_append = repo.writable_session("main")
-        dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="x")
+        vds.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data again")
 
         with (
@@ -608,14 +608,14 @@ class TestAppend:
         # create the icechunk store and commit the first virtual dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds1, icechunk_filestore.store)
+        vds1.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
 
         # Append the same dataset to the same store
         icechunk_filestore_append = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
+        vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
 
         with (
@@ -716,7 +716,7 @@ class TestAppend:
         # create the icechunk store and commit the first virtual dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds1, icechunk_filestore.store)
+        vds1.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
@@ -726,7 +726,7 @@ class TestAppend:
 
         # Append the same dataset to the same store
         icechunk_filestore_append = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
+        vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
         assert (
             await icechunk_filestore_append.store.get(
@@ -795,12 +795,12 @@ class TestAppend:
         # Create icechunk store and commit the compressed dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds1, icechunk_filestore.store)
+        vds1.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Append another dataset with compatible compression
         icechunk_filestore_append = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="time")
+        vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="time")
         icechunk_filestore_append.commit("appended data")
         with (
             xr.open_zarr(
@@ -825,7 +825,7 @@ class TestAppend:
         # Create icechunk store and commit the dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds, icechunk_filestore.store)
+        vds.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Try to append dataset with different chunking, expect failure
@@ -836,8 +836,8 @@ class TestAppend:
         with pytest.raises(
             ValueError, match="Cannot concatenate arrays with inconsistent chunk shapes"
         ):
-            dataset_to_icechunk(
-                vds_different_chunking, icechunk_filestore_append.store, append_dim="x"
+            vds_different_chunking.virtualize.to_icechunk(
+                icechunk_filestore_append.store, append_dim="x"
             )
 
     ## When encoding is different it fails
@@ -857,7 +857,7 @@ class TestAppend:
         # Create icechunk store and commit the first dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds1, icechunk_filestore.store)
+        vds1.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Try to append with different encoding, expect failure
@@ -866,7 +866,7 @@ class TestAppend:
             ValueError,
             match="Cannot concatenate arrays with different values for encoding",
         ):
-            dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="x")
+            vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="x")
 
     def test_dimensions_do_not_align(
         self, icechunk_storage: "Storage", simple_netcdf4: str
@@ -888,13 +888,13 @@ class TestAppend:
         # Create icechunk store and commit the first dataset
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds1, icechunk_filestore.store)
+        vds1.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit("test commit")
 
         # Attempt to append dataset with different length in non-append dimension, expect failure
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(ValueError, match="Cannot concatenate arrays with shapes"):
-            dataset_to_icechunk(vds2, icechunk_filestore_append.store, append_dim="y")
+            vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="y")
 
     def test_append_dim_not_in_dims_raises_error(
         self, icechunk_storage: "Storage", simple_netcdf4: str
@@ -910,7 +910,7 @@ class TestAppend:
 
         icechunk_repo = Repository.create(storage=icechunk_storage)
         icechunk_filestore = icechunk_repo.writable_session("main")
-        dataset_to_icechunk(vds, icechunk_filestore.store)
+        vds.virtualize.to_icechunk(icechunk_filestore.store)
         icechunk_filestore.commit("initial commit")
 
         # Attempt to append using a non-existent append_dim "z"
@@ -920,7 +920,7 @@ class TestAppend:
             ValueError,
             match="append_dim 'z' does not match any existing dataset dimensions",
         ):
-            dataset_to_icechunk(vds, icechunk_filestore_append.store, append_dim="z")
+            vds.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="z")
 
 
 # TODO test with S3 / minio
