@@ -306,7 +306,7 @@ def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
 
     from random import randint
 
-    filepath = f"{tmpdir}/{request.param}_{randint(0,100)}_cf_roundtrip.nc"
+    filepath = f"{tmpdir}/{request.param}_{randint(0, 100)}_cf_roundtrip.nc"
     ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
 
     return filepath

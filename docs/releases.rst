@@ -18,6 +18,10 @@ New Features
   for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
   is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
   underlying data has changed since the virtual references were written.
+- Add ``group=None`` keyword-only parameter to the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method to allow writing to a nested group
+  at a specified group path (rather than defaulting to the root group, when no group is
+  specified).  (:issue:`341`) By `Chuck Daniels <https://github.com/chuckwondo>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -29,6 +33,11 @@ Breaking changes
   Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
   This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
   (:issue:`18`, :pull:`357`, :pull:`358`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- The ``append_dim`` and ``last_updated_at`` parameters of the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method are now keyword-only parameters,
+  rather than positional or keyword.  This change is breaking _only_ where arguments for
+  these parameters are currently given positionally.  (:issue:`341`) By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -38,6 +47,10 @@ Bug fixes
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
   (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in HDF reader where dimension names of dimensions in a subgroup would be incorrect.
+  (:issue:`364`, :pull:`366`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in dmrpp reader so _FillValue is included in variables' encodings.
+  (:pull:`369`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 - Fix bug passing arguments to FITS reader, and test it on Hubble Space Telescope data.
   (:pull:`363`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 

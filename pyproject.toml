@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0",
+    "xarray>=2024.10.0,<2025.0.0",
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
@@ -39,7 +39,7 @@ hdf_reader = [
     "numcodecs"
 ]
 icechunk = [
-    "icechunk>=0.1.0a8",
+    "icechunk==0.1.0a8",
 ]
 test = [
     "codecov",
@@ -111,14 +111,15 @@ ignore_missing_imports = true
 # Same as Black.
 line-length = 88
 indent-width = 4
-target-version = "py39"
+target-version = "py310"
 
 exclude = [
     "docs",
-    ".eggs"]
+    ".eggs"
+]
 
 [tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
 select = ["E4", "E7", "E9", "F", "I"]
@@ -148,6 +149,22 @@ line-ending = "auto"
 known-first-party = ["virtualizarr"]
 
 [tool.pytest.ini_options]
+# See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
+# Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
+#
+#    PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope"
+#    is unset. The event loop scope for asynchronous fixtures will default to the fixture
+#    caching scope. Future versions of pytest-asyncio will default the loop scope for
+#    asynchronous fixtures to function scope. Set the default fixture loop scope
+#    explicitly in order to avoid unexpected behavior in the future. Valid fixture loop
+#    scopes are: "function", "class", "module", "package", "session"
+#
+asyncio_default_fixture_loop_scope = "session"
 markers = [
+    # Although we may not use pytest.mark.flaky, some of our test modules import
+    # from xarray.tests, and xarray.tests.__init__.py references pytest.mark.flaky.
+    # Therefore, without the "flaky" marker below, during test execution, we see
+    # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
+    "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
 ]

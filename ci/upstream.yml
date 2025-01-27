@@ -21,6 +21,7 @@ dependencies:
   - mypy
   - ruff
   - pandas-stubs
+  - pytest-asyncio
   - pytest-mypy
   - pytest-cov
   - pytest

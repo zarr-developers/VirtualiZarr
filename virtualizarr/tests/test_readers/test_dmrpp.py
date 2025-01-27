@@ -296,7 +296,11 @@ def test_parse_variable(tmp_path):
     assert var.shape == (720, 1440)
     assert var.data.zarray.chunks == (360, 720)
     assert var.data.zarray.fill_value == -32768
-    assert var.encoding == {"add_offset": 298.15, "scale_factor": 0.001}
+    assert var.encoding == {
+        "add_offset": 298.15,
+        "scale_factor": 0.001,
+        "_FillValue": -32768,
+    }
     assert var.attrs == {
         "long_name": "analysed sea surface temperature",
         "items": [1, 2, 3],
