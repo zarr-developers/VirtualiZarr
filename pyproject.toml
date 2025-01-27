@@ -148,6 +148,9 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 known-first-party = ["virtualizarr"]
 
+[tool.coverage.run]
+omit = ["virtualizarr/tests/*"]
+
 [tool.pytest.ini_options]
 addopts = [
     "--cov=virtualizarr",
