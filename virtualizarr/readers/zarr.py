@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path  # noqa
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional
-
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Callable, Awaitable, TypeVar, Any
+from itertools import starmap
+import numpy as np 
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -18,6 +19,28 @@ from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     import zarr
+
+# Vendored directly from Zarr-python V3's private API
+# https://github.com/zarr-developers/zarr-python/blob/458299857141a5470ba3956d8a1607f52ac33857/src/zarr/core/common.py#L53
+T = TypeVar("T", bound=tuple[Any, ...])
+V = TypeVar("V")
+async def _concurrent_map(
+    items: Iterable[T],
+    func: Callable[..., Awaitable[V]],
+    limit: int | None = None,
+) -> list[V]:
+    if limit is None:
+        return await asyncio.gather(*list(starmap(func, items)))
+
+    else:
+        sem = asyncio.Semaphore(limit)
+
+        async def run(item: tuple[Any]) -> V:
+            async with sem:
+                return await func(*item)
+
+        return await asyncio.gather(*[asyncio.ensure_future(run(item)) for item in items])
+
 
 
 async def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
@@ -65,8 +88,7 @@ async def build_chunk_manifest(
     zarr_array: zarr.AsyncArray, prefix: str, filepath: str
 ) -> ChunkManifest:
     """Build a ChunkManifest with the from_arrays method"""
-    import numpy as np
-    from zarr.core.common import concurrent_map
+
 
     key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
@@ -91,7 +113,7 @@ async def build_chunk_manifest(
     _offsets = np.array([0] * len(_paths), dtype=np.uint64)
 
     # _lengths: np.ndarray[Any, np.dtype[np.uint64]]
-    lengths = await concurrent_map((key_tuples), zarr_array.store.getsize)
+    lengths = await _concurrent_map((key_tuples), zarr_array.store.getsize)
     _lengths = np.array(lengths, dtype=np.uint64)
 
     return ChunkManifest.from_arrays(
@@ -103,11 +125,10 @@ async def build_chunk_manifest(
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, prefix: str) -> dict:
     """Create a chunk map"""
-    from zarr.core.common import concurrent_map
 
     keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
-    sizes = await concurrent_map(keys, zarr_array.store.getsize)
+    sizes = await _concurrent_map(keys, zarr_array.store.getsize)
     return {key[0]: size for key, size in zip(keys, sizes)}
 
 
@@ -261,12 +282,10 @@ class ZarrVirtualBackend(VirtualBackend):
                 loadable_variables,
             )
 
-            # filepath = validate_and_normalize_path_to_uri(
-            #     filepath, fs_root=Path.cwd().as_uri()
-            # )
-            # This currently fails for local filepaths (ie. tests) but works for s3:
-            # *** TypeError: Filesystem needs to support async operations.
-            # https://github.com/zarr-developers/zarr-python/issues/2554
+            filepath = validate_and_normalize_path_to_uri(
+                filepath, fs_root=Path.cwd().as_uri()
+            )
+
             if reader_options is None:
                 reader_options = {}
 
