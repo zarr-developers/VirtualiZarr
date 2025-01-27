@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path  # noqa
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Callable, Awaitable, TypeVar, Any
 from itertools import starmap
-import numpy as np 
+from pathlib import Path  # noqa
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    Optional,
+    TypeVar,
+)
+
+import numpy as np
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -24,6 +34,8 @@ if TYPE_CHECKING:
 # https://github.com/zarr-developers/zarr-python/blob/458299857141a5470ba3956d8a1607f52ac33857/src/zarr/core/common.py#L53
 T = TypeVar("T", bound=tuple[Any, ...])
 V = TypeVar("V")
+
+
 async def _concurrent_map(
     items: Iterable[T],
     func: Callable[..., Awaitable[V]],
@@ -39,8 +51,9 @@ async def _concurrent_map(
             async with sem:
                 return await func(*item)
 
-        return await asyncio.gather(*[asyncio.ensure_future(run(item)) for item in items])
-
+        return await asyncio.gather(
+            *[asyncio.ensure_future(run(item)) for item in items]
+        )
 
 
 async def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
@@ -88,7 +101,6 @@ async def build_chunk_manifest(
     zarr_array: zarr.AsyncArray, prefix: str, filepath: str
 ) -> ChunkManifest:
     """Build a ChunkManifest with the from_arrays method"""
-
 
     key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
