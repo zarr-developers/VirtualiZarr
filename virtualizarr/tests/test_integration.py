@@ -93,7 +93,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
 @requires_zarr_python_v3
 @requires_network
-@pytest.mark.skip(reason="Kerchunk & zarr-python v3 incompatibility")
+@pytest.mark.skip(reason="WIP on icechunk round-trip/")
 @pytest.mark.parametrize(
     "zarr_store",
     [
@@ -103,30 +103,27 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     indirect=True,
 )
 def test_zarr_roundtrip(zarr_store):
+    import icechunk
+
+    # open zarr store with Xarray for comparison
+    comparion_ds = xr.open_zarr(zarr_store)
+
     ds = open_virtual_dataset(
         zarr_store,
         indexes={},
     )
 
-    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+    # Note: this was done with icechunk 0.1.0a15 - syntax could be incorrect
+    storage = icechunk.storage.in_memory_storage()
+    repo = icechunk.Repository.open_or_create(storage=storage)
+    session = repo.writable_session("main")
 
-    roundtrip = dataset_from_kerchunk_refs(ds_refs)
+    # Write the virtual dataset to icechunk
+    ds.virtualize.to_icechunk(session.store)
 
-    # This won't work right now b/c of the Kerchunk zarr-v3 incompatibility
-    # roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+    rtds = xr.open_zarr(session.store)
 
-    def add_prefix(file_path: str) -> str:
-        return "file://" + file_path
-
-    for array in ["lat", "lon", "time", "air"]:
-        # V2: What should the behavior here be? Should the RT dataset have _ARRAY_DIMS?
-        ds[array].attrs.pop("_ARRAY_DIMENSIONS", None)
-
-        # temp workaround b/c of the zarr-python-v3 filepath issue: https://github.com/zarr-developers/zarr-python/issues/2554
-        roundtrip[array].data = roundtrip[array].data.rename_paths(add_prefix)
-
-    # Assert equal to original dataset - ManifestArrays
-    xrt.assert_equal(roundtrip, ds)
+    xrt.assert_equal(comparion_ds, rtds)
 
 
 @requires_kerchunk
