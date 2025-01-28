@@ -20,13 +20,20 @@ that require downloading files over the network.  Skip this if you want the test
 faster or you have no internet access:
 
 ```bash
-pytest -m pytest --run-network-tests
+python -m pytest --run-network-tests
 ```
 
-Further, we use the `pytest-cov` plugin to generate a test coverage report.  By default,
-a report showing lines missing coverage will be printed to the terminal.  You may supply
-additional options to `pytest` to generate other outputs, such as an HTML report (via
-`--cov-report=html`).  For all available options added by the `pytest-cov` plugin, run
+Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
+coverage report locally, if you wish (CI will automatically do so).  Here are some
+examples:
+
+```bash
+python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
+python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
+python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
+```
+
+To see all available `pytest` options added by the `pytest-cov` plugin, run
 `python -m pytest -h`, or see the
 [pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/readme.html).
 

@@ -51,7 +51,7 @@ jobs:
 
       - name: Running Tests
         run: |
-          python -m pytest --run-network-tests --cov-report=xml --verbose virtualizarr
+          python -m pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4

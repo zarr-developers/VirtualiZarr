@@ -15,4 +15,5 @@ comment:
   branches:               # branch names that can post comment
     - "main"
 ignore:
+  - "conftest.py"
   - "virtualizarr/tests"  # ignore folders and all its contents

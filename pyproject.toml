@@ -149,13 +149,10 @@ line-ending = "auto"
 known-first-party = ["virtualizarr"]
 
 [tool.coverage.run]
-omit = ["virtualizarr/tests/*"]
+include = ["virtualizarr/"]
+omit = ["conftest.py", "virtualizarr/tests/*"]
 
 [tool.pytest.ini_options]
-addopts = [
-    "--cov=virtualizarr",
-    "--cov-report=term-missing",
-]
 # See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
 # Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
 #
