@@ -106,8 +106,6 @@ async def build_chunk_manifest(
 
     filepath_list = [filepath] * len(key_tuples)
 
-    # can this be lambda'ed?
-    # stolen from manifest.py
     def combine_path_chunk(filepath: str, chunk_key: str):
         return filepath + "/" + chunk_key
 
@@ -115,7 +113,6 @@ async def build_chunk_manifest(
         combine_path_chunk, otypes=[np.dtypes.StringDType()]
     )
 
-    # _paths: np.ndarray[Any, np.dtypes.StringDType]
     # turn the tuples of chunks to a flattened list with :list(sum(key_tuples, ()))
     _paths = vectorized_chunk_path_combine_func(
         filepath_list, list(sum(key_tuples, ()))
@@ -330,5 +327,4 @@ class ZarrVirtualBackend(VirtualBackend):
                 reader_options=reader_options,
             )
 
-        # How does this asyncio.run call interact with zarr-pythons async event loop?
         return asyncio.run(_open_virtual_dataset())
