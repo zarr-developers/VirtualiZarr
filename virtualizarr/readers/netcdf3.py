@@ -26,7 +26,7 @@ class NetCDF3VirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        from kerchunk.netCDF3 import NetCDF3ToZarr
+        from virtualizarr.vendor.kerchunk.netCDF3 import NetCDF3ToZarr
 
         if virtual_backend_kwargs:
             raise NotImplementedError(
