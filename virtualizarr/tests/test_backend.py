@@ -189,7 +189,7 @@ class TestDetermineCoords:
             + expected_2d_coords
             + expected_1d_non_dimension_coords
             + expected_scalar_coords
-            + ["xi_rho", "eta_rho"]
+            + (["xi_rho", "eta_rho"] if hdf_backend == HDFVirtualBackend else [])
         )
         assert set(vds.coords) == set(expected_coords)
 
