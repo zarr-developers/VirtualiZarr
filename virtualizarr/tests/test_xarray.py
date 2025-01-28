@@ -7,8 +7,7 @@ from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers import HDF5VirtualBackend, HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import hdf_backend
 from virtualizarr.zarr import ZArray
 
 
@@ -227,8 +226,7 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+@hdf_backend
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
         filepath1, filepath2 = netcdf4_files_factory()
@@ -262,8 +260,7 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+@hdf_backend
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
@@ -313,14 +310,13 @@ class TestRenamePaths:
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
 
 
-@requires_kerchunk
 def test_nbytes(simple_netcdf4):
     vds = open_virtual_dataset(simple_netcdf4)
-    assert vds.virtualize.nbytes == 32
-    assert vds.nbytes == 48
+    assert vds.virtualize.nbytes == 88
+    assert vds.nbytes == 104
 
     vds = open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"])
-    assert vds.virtualize.nbytes == 48
+    assert vds.virtualize.nbytes == 104
 
     ds = open_dataset(simple_netcdf4)
     assert ds.virtualize.nbytes == ds.nbytes

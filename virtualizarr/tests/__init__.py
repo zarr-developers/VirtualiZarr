@@ -7,6 +7,8 @@ from packaging.version import Version
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
+from virtualizarr.readers import HDF5VirtualBackend
+from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.zarr import ZArray, ceildiv
 
 requires_network = pytest.mark.network
@@ -41,6 +43,11 @@ has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_zarr_python, requires_zarr_python = _importorskip("zarr")
 has_zarr_python_v3, requires_zarr_python_v3 = _importorskip("zarr", "3.0.0b")
+
+hdf_backend = pytest.mark.parametrize(
+    "hdf_backend",
+    [HDF5VirtualBackend, HDFVirtualBackend] if has_kerchunk else [HDFVirtualBackend],
+)
 
 
 def create_manifestarray(
