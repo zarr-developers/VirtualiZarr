@@ -41,6 +41,9 @@ hdf_reader = [
 icechunk = [
     "icechunk==0.1.0a8",
 ]
+kerchunk_readers = [
+    "astropy",
+]
 test = [
     "codecov",
     "fastparquet",
@@ -53,6 +56,7 @@ test = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
+    "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
     "pytest",
@@ -86,6 +90,10 @@ datatree = ["py.typed"]
 [tool.mypy]
 files = "virtualizarr/**/*.py"
 show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "astropy.*"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "fsspec.*"

@@ -10,13 +10,13 @@ from fsspec.implementations.reference import LazyReferenceMapper
 from virtualizarr.vendor.kerchunk.codecs import AsciiTableCodec, VarArrCodec
 
 try:
-    from astropy.io import fits
-    from astropy.wcs import WCS
+    from astropy.io import fits  # noqa: F401
+    from astropy.wcs import WCS  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover
     raise ImportError(
         "astropy is required for kerchunking FITS files. Please install with "
         "`pip/conda install astropy`."
-    )
+    ) from None
 
 logger = logging.getLogger("fits-to-zarr")
 
@@ -162,7 +162,12 @@ def process_file(
             # TODO: we could sub-chunk on biggest dimension
             name = hdu.name or str(ext)
             arr = g.empty(
-                name, dtype=dtype, shape=shape, chunks=shape, compression=None, **kwargs
+                name=name,
+                dtype=dtype,
+                shape=shape,
+                chunks=shape,
+                compression=None,
+                **kwargs,
             )
             arr.attrs.update(
                 {

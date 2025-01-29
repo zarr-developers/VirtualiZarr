@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 from xarray import Dataset, Index, Variable
 
@@ -23,10 +23,10 @@ class FITSVirtualBackend(VirtualBackend):
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
+        virtual_backend_kwargs: Mapping[str, Any] | None = None,
+        reader_options: Mapping[str, Any] | None = None,
     ) -> Dataset:
-        from kerchunk.fits import process_file
+        from virtualizarr.vendor.kerchunk.fits import process_file
 
         if virtual_backend_kwargs:
             raise NotImplementedError(
@@ -34,7 +34,9 @@ class FITSVirtualBackend(VirtualBackend):
             )
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
+        refs = KerchunkStoreRefs(
+            {"refs": process_file(filepath, **(reader_options or {}))}
+        )
 
         # both group=None and group='' mean to read root group
         if group:
