@@ -110,8 +110,6 @@ class TestOpenVirtualDatasetZarr:
             )
 
             # order: In zarr v3, it seems like order was replaced with the transpose codec.
-            # compressor: removed in v3 and built into codecs
-            # filters: removed in v3 and built into codecs
 
         if zarr_format == 2:
             _validate_v2(shared_v2_v3_attrs + v2_attrs)
