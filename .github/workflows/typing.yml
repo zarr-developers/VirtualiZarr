@@ -16,6 +16,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PIP_ROOT_USER_ACTION: ignore
+
 jobs:
   mypy:
     name: mypy

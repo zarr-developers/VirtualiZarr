@@ -248,3 +248,14 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
         open_virtual_dataset(
             filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
+
+
+@pytest.mark.parametrize("drop_variables", ["a", ["a"]])
+def test_drop_variables(refs_file_factory, drop_variables):
+    refs_file = refs_file_factory()
+
+    vds = open_virtual_dataset(
+        refs_file, filetype="kerchunk", drop_variables=drop_variables
+    )
+
+    assert all(var not in vds for var in drop_variables)
