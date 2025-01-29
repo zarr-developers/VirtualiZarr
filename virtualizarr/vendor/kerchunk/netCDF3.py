@@ -1,14 +1,14 @@
 from functools import reduce
 from operator import mul
 
+import fsspec
 import numpy as np
 from fsspec.implementations.reference import LazyReferenceMapper
-import fsspec
 
 from virtualizarr.vendor.kerchunk.utils import _encode_for_JSON, inline_array
 
 try:
-    from scipy.io._netcdf import ZERO, NC_VARIABLE, netcdf_file, netcdf_variable
+    from scipy.io._netcdf import NC_VARIABLE, ZERO, netcdf_file, netcdf_variable
 except ModuleNotFoundError:  # pragma: no cover
     raise ImportError(
         "Scipy is required for kerchunking NetCDF3 files. Please install with "
