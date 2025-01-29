@@ -7,7 +7,7 @@ from xarray import Dataset, Index
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
-    open_loadable_vars_and_indexes,
+    maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,
@@ -52,7 +52,9 @@ class TIFFVirtualBackend(VirtualBackend):
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
 
-        refs = extract_group(refs, group)
+        # both group=None and group='' mean to read root group
+        if group:
+            refs = extract_group(refs, group)
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
@@ -61,7 +63,7 @@ class TIFFVirtualBackend(VirtualBackend):
             fs_root=Path.cwd().as_uri(),
         )
 
-        loadable_vars, indexes = open_loadable_vars_and_indexes(
+        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
             filepath,
             loadable_variables=loadable_variables,
             reader_options=reader_options,

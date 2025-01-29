@@ -1,4 +1,5 @@
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional
 
 import h5py
 import numpy as np
@@ -25,51 +26,70 @@ def pytest_runtest_setup(item):
 
 
 @pytest.fixture
-def netcdf4_file(tmpdir):
+def empty_netcdf4_file(tmp_path: Path) -> str:
+    filepath = tmp_path / "empty.nc"
+
     # Set up example xarray dataset
-    ds = xr.tutorial.open_dataset("air_temperature")
+    with xr.Dataset() as ds:  # Save it to disk as netCDF (in temporary directory)
+        ds.to_netcdf(filepath, format="NETCDF4")
 
-    # Save it to disk as netCDF (in temporary directory)
-    filepath = f"{tmpdir}/air.nc"
-    ds.to_netcdf(filepath, format="NETCDF4")
-    ds.close()
-
-    return filepath
+    return str(filepath)
 
 
 @pytest.fixture
-def netcdf4_files_factory(tmpdir) -> callable:
+def netcdf4_file(tmp_path: Path) -> str:
+    filepath = tmp_path / "air.nc"
+
+    # Set up example xarray dataset
+    with xr.tutorial.open_dataset("air_temperature") as ds:
+        # Save it to disk as netCDF (in temporary directory)
+        ds.to_netcdf(filepath, format="NETCDF4")
+
+    return str(filepath)
+
+
+@pytest.fixture
+def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
+    filepath = tmp_path / "test.nc"
+
+    ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
+    ds1.to_netcdf(filepath)
+    ds2 = xr.DataArray([4, 5], name="bar").to_dataset()
+    ds2.to_netcdf(filepath, group="subgroup", mode="a")
+
+    return str(filepath)
+
+
+@pytest.fixture
+def netcdf4_files_factory(tmp_path: Path) -> Callable:
     def create_netcdf4_files(
-        encoding: Optional[Dict[str, Dict[str, Any]]] = None,
+        encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> tuple[str, str]:
-        ds = xr.tutorial.open_dataset("air_temperature")
+        filepath1 = tmp_path / "air1.nc"
+        filepath2 = tmp_path / "air2.nc"
 
-        # Split dataset into two parts
-        ds1 = ds.isel(time=slice(None, 1460))
-        ds2 = ds.isel(time=slice(1460, None))
+        with xr.tutorial.open_dataset("air_temperature") as ds:
+            # Split dataset into two parts
+            ds1 = ds.isel(time=slice(None, 1460))
+            ds2 = ds.isel(time=slice(1460, None))
 
-        # Save datasets to disk as NetCDF in the temporary directory with the provided encoding
-        filepath1 = f"{tmpdir}/air1.nc"
-        filepath2 = f"{tmpdir}/air2.nc"
-        ds1.to_netcdf(filepath1, encoding=encoding)
-        ds2.to_netcdf(filepath2, encoding=encoding)
+            # Save datasets to disk as NetCDF in the temporary directory with the provided encoding
+            ds1.to_netcdf(filepath1, encoding=encoding)
+            ds2.to_netcdf(filepath2, encoding=encoding)
 
-        # Close datasets
-        ds1.close()
-        ds2.close()
-
-        return filepath1, filepath2
+        return str(filepath1), str(filepath2)
 
     return create_netcdf4_files
 
 
 @pytest.fixture
-def netcdf4_file_with_2d_coords(tmpdir):
-    ds = xr.tutorial.open_dataset("ROMS_example")
-    filepath = f"{tmpdir}/ROMS_example.nc"
-    ds.to_netcdf(filepath, format="NETCDF4")
-    ds.close()
-    return filepath
+def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
+    filepath = tmp_path / "ROMS_example.nc"
+
+    with xr.tutorial.open_dataset("ROMS_example") as ds:
+        ds.to_netcdf(filepath, format="NETCDF4")
+
+    return str(filepath)
 
 
 @pytest.fixture
@@ -87,44 +107,46 @@ def netcdf4_inlined_ref(netcdf4_file):
 
 
 @pytest.fixture
-def hdf5_groups_file(tmpdir):
+def hdf5_groups_file(tmp_path: Path) -> str:
+    filepath = tmp_path / "air.nc"
+
     # Set up example xarray dataset
-    ds = xr.tutorial.open_dataset("air_temperature")
+    with xr.tutorial.open_dataset("air_temperature") as ds:
+        # Save it to disk as netCDF (in temporary directory)
+        ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
 
-    # Save it to disk as netCDF (in temporary directory)
-    filepath = f"{tmpdir}/air.nc"
-    ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
-    ds.close()
-
-    return filepath
+    return str(filepath)
 
 
 @pytest.fixture
-def hdf5_empty(tmpdir):
-    filepath = f"{tmpdir}/empty.nc"
-    f = h5py.File(filepath, "w")
-    dataset = f.create_dataset("empty", shape=(), dtype="float32")
-    dataset.attrs["empty"] = "true"
-    return filepath
+def hdf5_empty(tmp_path: Path) -> str:
+    filepath = tmp_path / "empty.nc"
+
+    with h5py.File(filepath, "w") as f:
+        dataset = f.create_dataset("empty", shape=(), dtype="float32")
+        dataset.attrs["empty"] = "true"
+
+    return str(filepath)
 
 
 @pytest.fixture
-def hdf5_scalar(tmpdir):
-    filepath = f"{tmpdir}/scalar.nc"
-    f = h5py.File(filepath, "w")
-    dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
-    dataset.attrs["scalar"] = "true"
-    return filepath
+def hdf5_scalar(tmp_path: Path) -> str:
+    filepath = tmp_path / "scalar.nc"
+
+    with h5py.File(filepath, "w") as f:
+        dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
+        dataset.attrs["scalar"] = "true"
+
+    return str(filepath)
 
 
 @pytest.fixture
-def simple_netcdf4(tmpdir):
-    filepath = f"{tmpdir}/simple.nc"
+def simple_netcdf4(tmp_path: Path) -> str:
+    filepath = tmp_path / "simple.nc"
 
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4)
     var = Variable(data=arr, dims=["x", "y"])
     ds = xr.Dataset({"foo": var})
-
     ds.to_netcdf(filepath)
 
-    return filepath
+    return str(filepath)

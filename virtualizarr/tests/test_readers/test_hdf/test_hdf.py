@@ -3,6 +3,7 @@ from unittest.mock import patch
 import h5py  # type: ignore
 import pytest
 
+from virtualizarr import open_virtual_dataset
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -90,7 +91,7 @@ class TestDatasetToVariable:
         f = h5py.File(chunked_dimensions_netcdf4_file)
         ds = f["data"]
         var = HDFVirtualBackend._dataset_to_variable(
-            chunked_dimensions_netcdf4_file, ds
+            chunked_dimensions_netcdf4_file, ds, group=""
         )
         assert var.chunks == (50, 50)
 
@@ -98,14 +99,16 @@ class TestDatasetToVariable:
         f = h5py.File(single_dimension_scale_hdf5_file)
         ds = f["data"]
         var = HDFVirtualBackend._dataset_to_variable(
-            single_dimension_scale_hdf5_file, ds
+            single_dimension_scale_hdf5_file, ds, group=""
         )
         assert var.chunks == (2,)
 
     def test_dataset_attributes(self, string_attributes_hdf5_file):
         f = h5py.File(string_attributes_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(string_attributes_hdf5_file, ds)
+        var = HDFVirtualBackend._dataset_to_variable(
+            string_attributes_hdf5_file, ds, group=""
+        )
         assert var.attrs["attribute_name"] == "attribute_name"
 
 
@@ -168,13 +171,40 @@ class TestVirtualVarsFromHDF:
 @requires_imagecodecs
 class TestOpenVirtualDataset:
     @patch("virtualizarr.readers.hdf.hdf.construct_virtual_dataset")
-    @patch("virtualizarr.readers.hdf.hdf.open_loadable_vars_and_indexes")
+    @patch("virtualizarr.readers.hdf.hdf.maybe_open_loadable_vars_and_indexes")
     def test_coord_names(
         self,
-        open_loadable_vars_and_indexes,
+        maybe_open_loadable_vars_and_indexes,
         construct_virtual_dataset,
         root_coordinates_hdf5_file,
     ):
-        open_loadable_vars_and_indexes.return_value = (0, 0)
+        maybe_open_loadable_vars_and_indexes.return_value = (0, 0)
         HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
         assert construct_virtual_dataset.call_args[1]["coord_names"] == ["lat", "lon"]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+@pytest.mark.parametrize("group", ["subgroup", "subgroup/"])
+def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
+    # regression test for GH issue #364
+    vds = open_virtual_dataset(
+        netcdf4_file_with_data_in_multiple_groups,
+        group=group,
+        backend=HDFVirtualBackend,
+    )
+    assert list(vds.dims) == ["dim_0"]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+def test_nested_groups(hdf5_groups_file):
+    # try to open an empty group
+    with pytest.raises(
+        NotImplementedError, match="Nested groups are not yet supported"
+    ):
+        open_virtual_dataset(
+            hdf5_groups_file,
+            group="/",
+            backend=HDFVirtualBackend,
+        )

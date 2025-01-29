@@ -27,7 +27,7 @@ class DMRPPVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        loadable_variables, drop_variables = check_for_collisions(
+        drop_variables, loadable_variables = check_for_collisions(
             drop_variables=drop_variables,
             loadable_variables=loadable_variables,
         )
@@ -411,7 +411,8 @@ class DMRParser:
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
-        # Fill value is placed in encoding and thus removed from attributes
+        # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
+        encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
         # create ManifestArray and ZArray
         zarray = ZArray(
@@ -423,7 +424,6 @@ class DMRParser:
             shape=shape,
         )
         marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
-        encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
