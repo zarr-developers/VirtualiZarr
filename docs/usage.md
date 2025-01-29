@@ -228,12 +228,6 @@ You can see that the dataset contains a mixture of virtual variables backed by `
 Loading variables can be useful in a few scenarios:
 1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. You want in-memory indexes to use with ``xr.combine_by_coords``,
-3. Storing a variable on-disk as a set of references would be inefficient, e.g. because each chunk is very small (saving the values like this is similar to kerchunk's concept of "inlining" data),
-4. The variable has complicated encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
-
-Loading variables can be useful in a few scenarios:
-1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. You want in-memory indexes to use with ``xr.combine_by_coords``,
 3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data).
