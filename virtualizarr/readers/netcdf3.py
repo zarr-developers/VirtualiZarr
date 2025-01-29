@@ -38,6 +38,9 @@ class NetCDF3VirtualBackend(VirtualBackend):
             loadable_variables,
         )
 
+        if reader_options is None:
+            reader_options = {}
+
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
         # both group=None and group='' mean to read root group
