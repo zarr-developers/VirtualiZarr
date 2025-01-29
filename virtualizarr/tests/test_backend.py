@@ -408,8 +408,6 @@ class TestLoadVirtualDataset:
     @parametrize_over_hdf_backends
     def test_group_kwarg(self, hdf5_groups_file, hdf_backend):
         if hdf_backend == HDFVirtualBackend:
-            with pytest.raises(NotImplementedError, match="Nested groups"):
-                open_virtual_dataset(hdf5_groups_file, backend=hdf_backend)
             with pytest.raises(KeyError, match="doesn't exist"):
                 open_virtual_dataset(
                     hdf5_groups_file, group="doesnt_exist", backend=hdf_backend

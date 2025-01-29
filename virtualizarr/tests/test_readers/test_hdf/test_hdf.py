@@ -142,11 +142,11 @@ class TestVirtualVarsFromHDF:
         )
         assert len(variables) == 3
 
-    def test_nested_groups_not_implemented(self, nested_group_hdf5_file):
-        with pytest.raises(NotImplementedError):
-            HDFVirtualBackend._virtual_vars_from_hdf(
-                path=nested_group_hdf5_file, group="group"
-            )
+    def test_nested_groups_are_ignored(self, nested_group_hdf5_file):
+        variables = HDFVirtualBackend._virtual_vars_from_hdf(
+            path=nested_group_hdf5_file, group="group"
+        )
+        assert len(variables) == 1
 
     def test_drop_variables(self, multiple_datasets_hdf5_file):
         variables = HDFVirtualBackend._virtual_vars_from_hdf(
@@ -185,7 +185,7 @@ class TestOpenVirtualDataset:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-@pytest.mark.parametrize("group", ["subgroup", "subgroup/"])
+@pytest.mark.parametrize("group", [None, "subgroup", "subgroup/"])
 def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
     # regression test for GH issue #364
     vds = open_virtual_dataset(
@@ -194,17 +194,3 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
-
-
-@requires_hdf5plugin
-@requires_imagecodecs
-def test_nested_groups(hdf5_groups_file):
-    # try to open an empty group
-    with pytest.raises(
-        NotImplementedError, match="Nested groups are not yet supported"
-    ):
-        open_virtual_dataset(
-            hdf5_groups_file,
-            group="/",
-            backend=HDFVirtualBackend,
-        )
