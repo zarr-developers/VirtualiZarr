@@ -16,6 +16,8 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
     parametrize_over_hdf_backends,
+    requires_hdf5plugin,
+    requires_imagecodecs,
     requires_network,
     requires_s3fs,
     requires_scipy,
@@ -88,6 +90,8 @@ class TestOpenVirtualDatasetIndexes:
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert vds.indexes == {}
 
+    @requires_hdf5plugin
+    @requires_imagecodecs
     def test_create_default_indexes_for_loadable_variables(
         self, netcdf4_file, hdf_backend
     ):
@@ -121,6 +125,8 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 @parametrize_over_hdf_backends
 def test_cftime_index(tmpdir, hdf_backend):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
@@ -377,6 +383,8 @@ class TestOpenVirtualDatasetHDFGroup:
         assert vds["foo"].shape == (3,)
 
 
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestLoadVirtualDataset:
     @parametrize_over_hdf_backends
     def test_loadable_variables(self, netcdf4_file, hdf_backend):
