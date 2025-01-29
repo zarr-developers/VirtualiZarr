@@ -1,5 +1,6 @@
-import fsspec
 import logging
+
+import fsspec
 import numcodecs
 import numcodecs.abc
 import numpy as np
@@ -9,8 +10,8 @@ from fsspec.implementations.reference import LazyReferenceMapper
 from virtualizarr.vendor.kerchunk.codecs import AsciiTableCodec, VarArrCodec
 
 try:
-    from astropy.wcs import WCS
     from astropy.io import fits
+    from astropy.wcs import WCS
 except ModuleNotFoundError:  # pragma: no cover
     raise ImportError(
         "astropy is required for kerchunking FITS files. Please install with "

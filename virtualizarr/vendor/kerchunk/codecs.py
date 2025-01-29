@@ -55,7 +55,6 @@ class VarArrCodec(numcodecs.abc.Codec):
         arr2 = np.empty((self.nrow,), dtype=dt_out)
         heap = buf[arr.nbytes :]
         for name in dt_out.names:
-
             if dt_out[name] == "O":
                 dt = np.dtype(self.ftypes[self.types[name]])
                 counts = arr[name][:, 0]
