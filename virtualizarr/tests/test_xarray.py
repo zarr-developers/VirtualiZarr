@@ -7,7 +7,7 @@ from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import hdf_backend
+from virtualizarr.tests import parametrize_over_hdf_backends
 from virtualizarr.zarr import ZArray
 
 
@@ -226,7 +226,7 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestCombineUsingIndexes:
     def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
         filepath1, filepath2 = netcdf4_files_factory()
@@ -260,7 +260,7 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)

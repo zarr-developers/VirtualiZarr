@@ -15,7 +15,7 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    hdf_backend,
+    parametrize_over_hdf_backends,
     requires_kerchunk,
     requires_network,
     requires_s3fs,
@@ -83,7 +83,7 @@ def test_FileType():
         FileType(None)
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
@@ -122,7 +122,7 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 def test_cftime_index(tmpdir, hdf_backend):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
@@ -151,7 +151,7 @@ def test_cftime_index(tmpdir, hdf_backend):
     assert vds.attrs == ds.attrs
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #150
@@ -169,7 +169,7 @@ class TestOpenVirtualDatasetAttrs:
         }
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
@@ -200,7 +200,7 @@ class TestReadFromS3:
     @pytest.mark.parametrize(
         "indexes", [None, {}], ids=["None index", "empty dict index"]
     )
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_anon_read_s3(self, indexes, hdf_backend):
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
@@ -218,7 +218,7 @@ class TestReadFromS3:
 
 
 @requires_network
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestReadFromURL:
     @pytest.mark.parametrize(
         "filetype, url",
@@ -319,7 +319,7 @@ class TestReadFromURL:
         xrt.assert_equal(dsXR, dsV)
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 def test_open_empty_group(empty_netcdf4_file, hdf_backend):
     vds = open_virtual_dataset(empty_netcdf4_file, indexes={}, backend=hdf_backend)
     assert isinstance(vds, xr.Dataset)
@@ -365,7 +365,7 @@ class TestOpenVirtualDatasetHDFGroup:
 
 
 class TestLoadVirtualDataset:
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_loadable_variables(self, netcdf4_file, hdf_backend):
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
@@ -405,7 +405,7 @@ class TestLoadVirtualDataset:
                 netcdf4_file, filetype="hdf", backend=HDFVirtualBackend
             )
 
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_group_kwarg(self, hdf5_groups_file, hdf_backend):
         if hdf_backend == HDFVirtualBackend:
             with pytest.raises(NotImplementedError, match="Nested groups"):
@@ -451,13 +451,13 @@ class TestLoadVirtualDataset:
         }
         mock_read_kerchunk.assert_called_once_with(**args)
 
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_open_dataset_with_empty(self, hdf5_empty, hdf_backend):
         vds = open_virtual_dataset(hdf5_empty, backend=hdf_backend)
         assert vds.empty.dims == ()
         assert vds.empty.attrs == {"empty": "true"}
 
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_open_dataset_with_scalar(self, hdf5_scalar, hdf_backend):
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()

@@ -8,7 +8,7 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import hdf_backend, requires_kerchunk
+from virtualizarr.tests import parametrize_over_hdf_backends, requires_kerchunk
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
@@ -59,7 +59,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
         ),
     ],
 )
-@hdf_backend
+@parametrize_over_hdf_backends
 def test_numpy_arrays_to_inlined_kerchunk_refs(
     netcdf4_file, inline_threshold, vars_to_inline, hdf_backend
 ):
@@ -87,7 +87,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 @requires_kerchunk
 @pytest.mark.parametrize("format", ["dict", "json", "parquet"])
 class TestKerchunkRoundtrip:
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_kerchunk_roundtrip_no_concat(self, tmpdir, format, hdf_backend):
         # set up example xarray dataset
         ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
@@ -120,7 +120,7 @@ class TestKerchunkRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    @hdf_backend
+    @parametrize_over_hdf_backends
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
     def test_kerchunk_roundtrip_concat(
         self, tmpdir, format, hdf_backend, decode_times, time_vars
@@ -190,7 +190,7 @@ class TestKerchunkRoundtrip:
             assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
             assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
 
-    @hdf_backend
+    @parametrize_over_hdf_backends
     def test_non_dimension_coordinates(self, tmpdir, format, hdf_backend):
         # regression test for GH issue #105
 
@@ -276,7 +276,7 @@ class TestKerchunkRoundtrip:
         assert roundtrip.a.attrs == ds.a.attrs
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 def test_open_scalar_variable(tmpdir, hdf_backend):
     # regression test for GH issue #100
 
@@ -287,7 +287,7 @@ def test_open_scalar_variable(tmpdir, hdf_backend):
     assert vds["a"].shape == ()
 
 
-@hdf_backend
+@parametrize_over_hdf_backends
 class TestPathsToURIs:
     def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
