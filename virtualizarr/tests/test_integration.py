@@ -1,4 +1,3 @@
-from os.path import relpath
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +9,11 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import (
+    requires_kerchunk,
+    requires_network,
+    requires_zarr_python_v3,
+)
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
@@ -76,6 +79,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     vds = open_virtual_dataset(
         netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
     )
+
     refs = vds.virtualize.to_kerchunk(format="dict")
 
     # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
@@ -84,6 +88,67 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
     assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
+
+
+@requires_zarr_python_v3
+@requires_network
+@requires_kerchunk
+@pytest.mark.skip(
+    reason="WIP on kerchunk v3 RT- fails in RT: RuntimeError: 'error during blosc decompression: -1' for Zarr v3 + kerchunk v3 branch"
+)
+@pytest.mark.parametrize(
+    "zarr_store",
+    [
+        pytest.param(2, id="Zarr V2"),
+        pytest.param(3, id="Zarr V3"),
+    ],
+    indirect=True,
+)
+def test_zarr_roundtrip_kerchunk(zarr_store):
+    comparion_ds = xr.open_zarr(zarr_store)
+
+    ds = open_virtual_dataset(
+        zarr_store,
+        indexes={},
+    )
+    ds_refs = ds.virtualize.to_kerchunk(format="dict")
+    roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+
+    xrt.assert_equal(comparion_ds, roundtrip)
+
+
+@requires_zarr_python_v3
+@requires_network
+@pytest.mark.skip(reason="WIP on icechunk round-trip/")
+@pytest.mark.parametrize(
+    "zarr_store",
+    [
+        pytest.param(2, id="Zarr V2"),
+        pytest.param(3, id="Zarr V3"),
+    ],
+    indirect=True,
+)
+def test_zarr_roundtrip_icechunk(zarr_store):
+    import icechunk  # type: ignore[import-not-found]
+
+    # open zarr store with Xarray for comparison
+    comparion_ds = xr.open_zarr(zarr_store)
+
+    ds = open_virtual_dataset(
+        zarr_store,
+        indexes={},
+    )
+
+    # Note: this was done with icechunk 0.1.0a15 - syntax could be incorrect
+    storage = icechunk.storage.in_memory_storage()
+    repo = icechunk.Repository.open_or_create(storage=storage)
+    session = repo.writable_session("main")
+
+    # Write the virtual dataset to icechunk
+    ds.virtualize.to_icechunk(session.store)
+
+    rtds = xr.open_zarr(session.store)
+    xrt.assert_equal(comparion_ds, rtds)
 
 
 @requires_kerchunk
@@ -305,8 +370,7 @@ class TestPathsToURIs:
     @requires_kerchunk
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
     def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
-        relative_path = relpath(netcdf4_file)
-        vds = open_virtual_dataset(relative_path, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
 
         expected_path = Path(netcdf4_file).as_uri()
 
