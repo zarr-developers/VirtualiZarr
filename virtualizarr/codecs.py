@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Union
 from virtualizarr.zarr import Codec
 
 if TYPE_CHECKING:
-    from zarr import Array  # type: ignore
+    from zarr import Array, AsyncArray  # type: ignore
     from zarr.core.abc.codec import (  # type: ignore
         ArrayArrayCodec,
         ArrayBytesCodec,
@@ -14,14 +14,14 @@ if TYPE_CHECKING:
 
 
 def get_codecs(
-    array: Union["ManifestArray", "Array"],
+    array: Union["ManifestArray", "Array", "AsyncArray"],
     normalize_to_zarr_v3: bool = False,
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """
-    Get the codecs for either a ManifestArray or a Zarr Array.
+    Get the codecs for either a ManifestArray, a Zarr Array or an Async Zarr Array.
 
     Parameters:
-        array (Union[ManifestArray, ZarrArray]): The input array, either ManifestArray or Zarr Array.
+        array (Union[ManifestArray, Array, AsyncArray]): The input array, either ManifestArray or Zarr Array.
 
     Returns:
         List[Optional[Codec]]: A list of codecs or an empty list if no codecs are found.
@@ -30,6 +30,7 @@ def get_codecs(
         ImportError: If `zarr` is required but not installed.
         ValueError: If the array type is unsupported.
     """
+
     if _is_manifest_array(array):
         return _get_manifestarray_codecs(array, normalize_to_zarr_v3)  # type: ignore[arg-type]
 

@@ -7,7 +7,6 @@ from numcodecs import Blosc, Delta
 from virtualizarr import ChunkManifest, ManifestArray
 from virtualizarr.codecs import get_codecs
 from virtualizarr.tests import (
-    requires_zarr_python,
     requires_zarr_python_v3,
 )
 from virtualizarr.zarr import Codec
@@ -147,7 +146,7 @@ class TestCodecs:
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
 
-    @requires_zarr_python
+    @requires_zarr_python_v3
     def test_unsupported_zarr_python(self):
         zarr_array = self.create_zarr_array()
         unsupported_zarr_version = "2.18.3"
