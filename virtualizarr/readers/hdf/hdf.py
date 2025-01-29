@@ -361,7 +361,7 @@ class HDFVirtualBackend(VirtualBackend):
         ).open_file()
         f = h5py.File(open_file, mode="r")
 
-        if group not in [None, ""]:
+        if group is not None and group != "":
             g = f[group]
             group_name = group
             if not isinstance(g, h5py.Group):
