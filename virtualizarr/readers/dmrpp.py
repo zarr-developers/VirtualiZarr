@@ -27,7 +27,7 @@ class DMRPPVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        loadable_variables, drop_variables = check_for_collisions(
+        drop_variables, loadable_variables = check_for_collisions(
             drop_variables=drop_variables,
             loadable_variables=loadable_variables,
         )
