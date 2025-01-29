@@ -35,6 +35,9 @@ Breaking changes
   rather than positional or keyword.  This change is breaking _only_ where arguments for
   these parameters are currently given positionally.  (:issue:`341`) By
   `Chuck Daniels <https://github.com/chuckwondo>`_.
+- The default backend for netCDF4 and HDF5 is now the custom ``HDFVirtualBackend`` replacing
+  the previous default which was a wrapper around the kerchunk backend.
+  (:issue:`374`, :pull:`395`) By `Julia Signell <https://github.com/jsignell>`_.
 
 Deprecations
 ~~~~~~~~~~~~
