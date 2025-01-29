@@ -1,4 +1,3 @@
-from os.path import relpath
 from pathlib import Path
 
 import numpy as np
@@ -371,8 +370,7 @@ class TestPathsToURIs:
     @requires_kerchunk
     @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
     def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
-        relative_path = relpath(netcdf4_file)
-        vds = open_virtual_dataset(relative_path, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
 
         expected_path = Path(netcdf4_file).as_uri()
 

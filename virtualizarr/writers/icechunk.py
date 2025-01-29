@@ -108,7 +108,6 @@ def dataset_to_icechunk(
     group_object.update_attributes(
         {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
     )
-
     return write_variables_to_icechunk_group(
         ds.variables,
         ds.attrs,
@@ -142,6 +141,7 @@ def write_variables_to_icechunk_group(
     # will overwrite the root group's attributes with the dataset's attributes. We take advantage
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
     ds = Dataset(loadable_variables, attrs=attrs)
+
     ds.to_zarr(
         store,
         group=group.name,
@@ -243,16 +243,28 @@ def write_virtual_variable_to_icechunk(
     else:
         append_axis = None
         # create array if it doesn't already exist
-
+        # import ipdb; ipdb.set_trace()
+        # https://github.com/zarr-developers/zarr-python/blob/458299857141a5470ba3956d8a1607f52ac33857/src/zarr/core/group.py#L1004
         arr = group.require_array(
             name=name,
             shape=zarray.shape,
-            chunk_shape=zarray.chunks,
+            chunks=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
-            codecs=zarray._v3_codec_pipeline(),
+            # filters=zarray._v3_codec_pipeline()[0],
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
         )
+        # import ipdb; ipdb.set_trace()
+
+        # arr = group.require_array(
+        #     name=name,
+        #     shape=zarray.shape,
+        #     chunks=zarray.chunks,
+        #     dtype=encode_dtype(zarray.dtype),
+        #     codecs=zarray._v3_codec_pipeline(),
+        #     dimension_names=var.dims,
+        #     fill_value=zarray.fill_value,
+        # )
 
         arr.update_attributes(
             {k: encode_zarr_attr_value(v) for k, v in var.attrs.items()}
