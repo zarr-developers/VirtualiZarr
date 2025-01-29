@@ -446,3 +446,15 @@ class TestRelativePaths:
             ".dmrpp"
         )
         assert path == expected_datafile_path_uri
+
+
+@pytest.mark.parametrize("drop_variables", ["mask", ["data", "mask"]])
+def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
+    vds = open_virtual_dataset(
+        str(basic_dmrpp_temp_filepath),
+        indexes={},
+        filetype="dmrpp",
+        drop_variables=drop_variables,
+    )
+
+    assert all(var not in vds for var in drop_variables)
