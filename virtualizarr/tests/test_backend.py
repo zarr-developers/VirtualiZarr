@@ -16,7 +16,6 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
     parametrize_over_hdf_backends,
-    requires_kerchunk,
     requires_network,
     requires_s3fs,
     requires_scipy,
@@ -320,44 +319,46 @@ class TestReadFromURL:
 
 
 @parametrize_over_hdf_backends
-def test_open_empty_group(empty_netcdf4_file, hdf_backend):
-    vds = open_virtual_dataset(empty_netcdf4_file, indexes={}, backend=hdf_backend)
-    assert isinstance(vds, xr.Dataset)
-    expected = Dataset()
-    xrt.assert_identical(vds, expected)
-
-
-@requires_kerchunk
 class TestOpenVirtualDatasetHDFGroup:
-    def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
+    def test_open_empty_group(self, empty_netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(empty_netcdf4_file, indexes={}, backend=hdf_backend)
+        assert isinstance(vds, xr.Dataset)
+        expected = Dataset()
+        xrt.assert_identical(vds, expected)
+
+    def test_open_subgroup(
+        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
+    ):
         vds = open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group="subgroup",
             indexes={},
-            backend=HDF5VirtualBackend,
+            backend=hdf_backend,
         )
         assert list(vds.variables) == ["bar"]
         assert isinstance(vds["bar"].data, ManifestArray)
         assert vds["bar"].shape == (2,)
 
-    def test_open_root_group_manually(self, netcdf4_file_with_data_in_multiple_groups):
+    def test_open_root_group_manually(
+        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
+    ):
         vds = open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group="",
             indexes={},
-            backend=HDF5VirtualBackend,
+            backend=hdf_backend,
         )
         assert list(vds.variables) == ["foo"]
         assert isinstance(vds["foo"].data, ManifestArray)
         assert vds["foo"].shape == (3,)
 
     def test_open_root_group_by_default(
-        self, netcdf4_file_with_data_in_multiple_groups
+        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
     ):
         vds = open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             indexes={},
-            backend=HDF5VirtualBackend,
+            backend=hdf_backend,
         )
         assert list(vds.variables) == ["foo"]
         assert isinstance(vds["foo"].data, ManifestArray)
