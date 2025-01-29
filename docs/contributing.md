@@ -12,10 +12,30 @@ mamba activate virtualizarr-tests
 pre-commit install
 # git checkout -b new-feature
 python -m pip install -e . --no-deps
-python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+python -m pytest
 ```
 
-The `--run-network-tests` argument is optional - it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
+You may also add the `--run-network-tests` option, which will run additional tests
+that require downloading files over the network.  Skip this if you want the tests to run
+faster or you have no internet access:
+
+```bash
+python -m pytest --run-network-tests
+```
+
+Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
+coverage report locally, if you wish (CI will automatically do so).  Here are some
+examples:
+
+```bash
+python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
+python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
+python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
+```
+
+To see all available `pytest` options added by the `pytest-cov` plugin, run
+`python -m pytest -h`, or see the
+[pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/readme.html).
 
 ## Contributing documentation
 

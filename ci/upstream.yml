@@ -16,11 +16,12 @@ dependencies:
   - numcodecs
   - imagecodecs>=2024.6.1
   # Testing
-  - codecov
+  - codecov[toml]
   - pre-commit
   - mypy
   - ruff
   - pandas-stubs
+  - pytest-asyncio
   - pytest-mypy
   - pytest-cov
   - pytest

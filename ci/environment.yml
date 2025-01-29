@@ -16,7 +16,7 @@ dependencies:
   - hdf5plugin
   - numcodecs
   # Testing
-  - codecov
+  - codecov[toml]
   - pre-commit
   - mypy
   - ruff
