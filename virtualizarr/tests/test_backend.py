@@ -234,13 +234,15 @@ class TestReadFromURL:
                 "netcdf4",
                 "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
             ),
-            (
+            pytest.param(
                 "hdf4",
                 "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+                marks=pytest.mark.skip(reason="often times out"),
             ),
-            (
+            pytest.param(
                 "hdf5",
                 "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
+                marks=pytest.mark.skip(reason="often times out"),
             ),
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
             # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
@@ -284,7 +286,7 @@ class TestReadFromURL:
             vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
-    @pytest.mark.xfail(reason="often times out, as nisar file is 200MB")
+    @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
     def test_virtualizarr_vs_local_nisar(self, hdf_backend):
         import fsspec
 
