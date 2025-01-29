@@ -130,7 +130,7 @@ def test_zarr_roundtrip_kerchunk(zarr_store):
     indirect=True,
 )
 def test_zarr_roundtrip_icechunk(zarr_store):
-    import icechunk
+    import icechunk  # type: ignore[import-not-found]
 
     # open zarr store with Xarray for comparison
     comparion_ds = xr.open_zarr(zarr_store)

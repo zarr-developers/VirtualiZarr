@@ -125,7 +125,7 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
         fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
 
     if zarr_array.metadata.zarr_format == 2:
-        if codecs.filters == []:
+        if filters == []:
             filters = None
         # Zarr-python gives us the compressor object. Ex: Blosc(cname='lz4', clevel=5, shuffle=SHUFFLE, blocksize=0)
         # This won't serialize into a Kerchunk ref, so we can use the .get_config to retrieve a dict.
