@@ -25,7 +25,7 @@ from virtualizarr.readers.common import (
     maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.utils import check_for_collisions
-from virtualizarr.zarr import ZArray
+from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
 
 if TYPE_CHECKING:
     import zarr
@@ -57,14 +57,29 @@ async def _concurrent_map(
 
 
 async def _parse_zarr_v2_metadata(zarr_array: zarr.Array) -> ZArray:
+    from virtualizarr.codecs import get_codecs
+
+    codecs = get_codecs(zarr_array)
+    if codecs.filters == []:
+        filters = None
+
+    fill_value = zarr_array.metadata.fill_value
+
+    if fill_value is not None:
+        fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
+
+    # Zarr-python gives us the compressor object. Ex: Blosc(cname='lz4', clevel=5, shuffle=SHUFFLE, blocksize=0)
+    # This won't serialize into a Kerchunk ref, so we use the .get_config to retrieve a dict.
+    compressor_dict = codecs.compressor.get_config()
+
     return ZArray(
         shape=zarr_array.metadata.shape,
         chunks=zarr_array.metadata.chunks,  # type: ignore[union-attr]
         dtype=zarr_array.metadata.dtype,
-        fill_value=zarr_array.metadata.fill_value,  # type: ignore[arg-type]
+        fill_value=fill_value,  # type: ignore[arg-type]
         order="C",
-        compressor=zarr_array.metadata.compressor,  # type: ignore[union-attr]
-        filters=zarr_array.metadata.filters,  # type: ignore
+        compressor=compressor_dict,  # type: ignore[union-attr]
+        filters=filters,  # type: ignore
         zarr_format=zarr_array.metadata.zarr_format,
     )
 
@@ -77,7 +92,7 @@ async def _parse_zarr_v3_metadata(zarr_array: zarr.Array) -> ZArray:
             "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
         )
     else:
-        fill_value = zarr_array.metadata.fill_value
+        fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
 
     codecs = get_codecs(zarr_array)
 
@@ -146,6 +161,7 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
 
     if zarr_array.metadata.zarr_format == 2:
         array_zarray = await _parse_zarr_v2_metadata(zarr_array=zarr_array)  # type: ignore[arg-type]
+
         array_dims = attrs["_ARRAY_DIMENSIONS"]
 
     elif zarr_array.metadata.zarr_format == 3:

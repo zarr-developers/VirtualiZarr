@@ -91,6 +91,33 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
+
+@requires_zarr_python_v3
+@requires_network
+@requires_kerchunk
+@pytest.mark.skip(reason="WIP on kerchunk v3 RT- fails in RT: RuntimeError: 'error during blosc decompression: -1' for Zarr v3 + kerchunk v3 branch")
+@pytest.mark.parametrize(
+    "zarr_store",
+    [
+        pytest.param(2, id="Zarr V2"),
+        pytest.param(3, id="Zarr V3"),
+    ],
+    indirect=True,
+)
+def test_zarr_roundtrip_kerchunk(zarr_store):
+
+    comparion_ds = xr.open_zarr(zarr_store)
+
+    ds = open_virtual_dataset(
+        zarr_store,
+        indexes={},
+    )
+    ds_refs = ds.virtualize.to_kerchunk(format='dict')
+    roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
+
+    xrt.assert_equal(comparion_ds, roundtrip)
+
+
 @requires_zarr_python_v3
 @requires_network
 @pytest.mark.skip(reason="WIP on icechunk round-trip/")
@@ -102,7 +129,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     ],
     indirect=True,
 )
-def test_zarr_roundtrip(zarr_store):
+def test_zarr_roundtrip_icechunk(zarr_store):
     import icechunk
 
     # open zarr store with Xarray for comparison
@@ -122,7 +149,6 @@ def test_zarr_roundtrip(zarr_store):
     ds.virtualize.to_icechunk(session.store)
 
     rtds = xr.open_zarr(session.store)
-
     xrt.assert_equal(comparion_ds, rtds)
 
 
