@@ -37,6 +37,7 @@ def _importorskip(
 
 
 has_astropy, requires_astropy = _importorskip("astropy")
+has_icechunk, requires_icechunk = _importorskip("icechunk")
 has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_scipy, requires_scipy = _importorskip("scipy")
@@ -119,3 +120,11 @@ def open_dataset_kerchunk(
         "reference", fo=filename_or_obj, **(storage_options or {})
     ).get_mapper()
     return xr.open_dataset(m, engine="zarr", consolidated=False, **kwargs)
+
+
+def in_memory_icechunk_session():
+    from icechunk import Repository, Storage
+
+    repo = Repository.create(storage=Storage.new_in_memory())
+    session = repo.writable_session("main")
+    return session
