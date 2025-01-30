@@ -21,34 +21,47 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0,<2025.0.0",
+    "xarray>=2024.10.0",
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
     "numcodecs",
     "ujson",
+    "zarr"
 ]
 
 [project.optional-dependencies]
-hdf_reader = [
+remote = [
     "fsspec",
+    "requests",
+    "aiohttp",
+    "s3fs",
+]
+hdf_reader = [
+    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "numcodecs"
+
 ]
 icechunk = [
     "icechunk==0.1.0a8",
 ]
+kerchunk = [
+    "virtualizarr[remote]",
+    "fastparquet",
+    "h5py",
+    "kerchunk @ git+https://github.com/fsspec/kerchunk@main",
+    "netcdf4",
+    "scipy",
+    "tifffile",
+    "astropy",
+
+]
 test = [
     "codecov",
-    "fastparquet",
-    "fsspec",
-    "h5py",
-    "kerchunk>=0.2.5",
     "mypy",
-    "netcdf4",
     "numcodecs",
     "pandas-stubs",
     "pooch",
@@ -57,14 +70,24 @@ test = [
     "pytest-mypy",
     "pytest",
     "ruff",
-    "s3fs",
-    "scipy",
-    "virtualizarr[hdf_reader]"
+    "virtualizarr[hdf_reader]",
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+    "virtualizarr[remote]"
+]
+docs = [
+    "sphinx",
+    "myst_nb",
+    "pydata_sphinx_theme",
+    "sphinx_copybutton",
+    "sphinx_design",
+    "sphinx_togglebutton",
+    "sphinx-autodoc-typehints",
 ]
 
 [project.urls]
-Home = "https://github.com/TomNicholas/VirtualiZarr"
-Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+Home = "https://github.com/zarr-developers/VirtualiZarr"
+Documentation = "https://github.com/zarr-developers/VirtualiZarr/blob/main/README.md"
 
 [build-system]
 requires = [
@@ -73,6 +96,39 @@ requires = [
     "setuptools_scm[toml]>=7.0",
     "check-manifest"
 ]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.environments]
+test = { features = ["test", "remote", "hdf_reader", "kerchunk"], solve-group = "default" }
+hdf-reader = { features = ["hdf_reader"], solve-group = "default" }
+kerchunk = { features = ["kerchunk"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+
+[tool.pixi.feature.hdf_reader.dependencies]
+netcdf4 = ">=1.7.2,<2"
+hdf5 = ">=1.14.4,<2"
+h5netcdf = ">=1.5.0,<2"
+
+[tool.pixi.feature.kerchunk.dependencies]
+netcdf4 = ">=1.7.2,<2"
+hdf5 = ">=1.14.4,<2"
+h5netcdf = ">=1.5.0,<2"
+
+[tool.pixi.pypi-dependencies]
+virtualizarr = { path = ".", editable = true }
+
+[tool.pixi.feature.test.tasks]
+test = { cmd = "pytest --run-network-tests" }
+test-no-network = { cmd = "pytest" }
+test-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
+test-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
+test-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+
+[tool.pixi.feature.docs.tasks]
+build-docs = { cmd = "make html", cwd = "docs" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
