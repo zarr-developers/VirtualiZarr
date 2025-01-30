@@ -63,6 +63,8 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 .. _v1.2.0:
 
 v1.2.0 (5th Dec 2024)
