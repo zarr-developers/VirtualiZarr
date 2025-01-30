@@ -1,10 +1,8 @@
 import importlib
 import itertools
 
-import fsspec
 import numpy as np
 import pytest
-import xarray as xr
 from packaging.version import Version
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -39,6 +37,7 @@ def _importorskip(
 has_astropy, requires_astropy = _importorskip("astropy")
 has_icechunk, requires_icechunk = _importorskip("icechunk")
 has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
+has_fastparquet, requires_fastparquet = _importorskip("fastparquet")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
@@ -108,18 +107,6 @@ def offset_from_chunk_key(ind: tuple[int, ...]) -> int:
 
 def length_from_chunk_key(ind: tuple[int, ...]) -> int:
     return sum(ind) + 5
-
-
-def open_dataset_kerchunk(
-    filename_or_obj: str, *, storage_options=None, **kwargs
-) -> xr.Dataset:
-    """Equivalent to ``xr.open_dataset(..., engine="kerchunk")`` but without depending on
-    kerchunk library
-    """
-    m = fsspec.filesystem(
-        "reference", fo=filename_or_obj, **(storage_options or {})
-    ).get_mapper()
-    return xr.open_dataset(m, engine="zarr", consolidated=False, **kwargs)
 
 
 def in_memory_icechunk_session():

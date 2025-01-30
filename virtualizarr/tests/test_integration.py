@@ -9,10 +9,10 @@ import xarray.testing as xrt
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
+    has_fastparquet,
     has_icechunk,
     has_kerchunk,
     in_memory_icechunk_session,
-    open_dataset_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
     requires_zarr_python,
@@ -97,7 +97,7 @@ def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
     ds_refs = vds.virtualize.to_kerchunk(format="dict")
 
     # use fsspec to read the dataset from the kerchunk references dict
-    return open_dataset_kerchunk(ds_refs, **kwargs)
+    return xr.open_dataset(ds_refs, engine="kerchunk", **kwargs)
 
 
 def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
@@ -105,7 +105,7 @@ def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
     vds.virtualize.to_kerchunk(f"{tmpdir}/refs.json", format="json")
 
     # use fsspec to read the dataset from disk via the kerchunk references
-    return open_dataset_kerchunk(f"{tmpdir}/refs.json", **kwargs)
+    return xr.open_dataset(f"{tmpdir}/refs.json", engine="kerchunk", **kwargs)
 
 
 def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
@@ -113,7 +113,7 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     vds.virtualize.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
 
     # use fsspec to read the dataset from disk via the kerchunk references
-    return open_dataset_kerchunk(f"{tmpdir}/refs.parquet", **kwargs)
+    return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
 
 
 def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
@@ -132,9 +132,12 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
 @pytest.mark.parametrize(
     "roundtrip_func",
     [
-        roundtrip_as_kerchunk_dict,
-        roundtrip_as_kerchunk_json,
-        *([roundtrip_as_kerchunk_parquet] if has_kerchunk else []),
+        *(
+            [roundtrip_as_kerchunk_dict, roundtrip_as_kerchunk_json]
+            if has_kerchunk
+            else []
+        ),
+        *([roundtrip_as_kerchunk_parquet] if has_kerchunk and has_fastparquet else []),
         *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
     ],
 )

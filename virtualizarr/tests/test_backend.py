@@ -15,7 +15,6 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    open_dataset_kerchunk,
     parametrize_over_hdf_backends,
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -322,7 +321,7 @@ class TestReadFromURL:
         )
         tmpref = "/tmp/cmip6.json"
         vds.virtualize.to_kerchunk(tmpref, format="json")
-        dsV = open_dataset_kerchunk(tmpref)
+        dsV = xr.open_dataset(tmpref, engine="kerchunk")
 
         # xrt.assert_identical(dsXR, dsV) #Attribute order changes
         xrt.assert_equal(dsXR, dsV)
