@@ -361,14 +361,14 @@ class HDFVirtualBackend(VirtualBackend):
         ).open_file()
         f = h5py.File(open_file, mode="r")
 
-        if group is not None:
+        if group is not None and group != "":
             g = f[group]
             group_name = group
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
         else:
-            g = f
-            group_name = ""
+            g = f["/"]
+            group_name = "/"
 
         variables = {}
         for key in g.keys():
@@ -381,9 +381,6 @@ class HDFVirtualBackend(VirtualBackend):
                     )
                     if variable is not None:
                         variables[key] = variable
-                else:
-                    raise NotImplementedError("Nested groups are not yet supported")
-
         return variables
 
     @staticmethod
