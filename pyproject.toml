@@ -102,7 +102,7 @@ channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [tool.pixi.environments]
-test = { features = ["test", "remote", "hdf_reader", "kerchunk"], solve-group = "default" }
+test = { features = ["test", "remote", "hdf_reader", "kerchunk", "icechunk"], solve-group = "default" }
 hdf-reader = { features = ["hdf_reader"], solve-group = "default" }
 kerchunk = { features = ["kerchunk"], solve-group = "default" }
 icechunk = { features = ["icechunk"], solve-group = "default" }
