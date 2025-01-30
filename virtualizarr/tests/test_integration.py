@@ -13,6 +13,7 @@ from virtualizarr.tests import (
     open_dataset_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
+    requires_zarr_python,
 )
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
@@ -89,6 +90,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
+@requires_zarr_python
 @pytest.mark.parametrize(
     "format", ["dict", "json", "parquet"] if has_kerchunk else ["dict", "json"]
 )
