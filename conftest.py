@@ -44,7 +44,7 @@ def netcdf4_file(tmp_path: Path) -> str:
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(
-            filepath, format="NETCDF4"
+            filepath, format="NETCDF4", encoding={"air": {"dtype": "float32"}}
         )  # , encoding={"air": {"dtype": "float32"}})
 
     return str(filepath)
@@ -117,7 +117,12 @@ def hdf5_groups_file(tmp_path: Path) -> str:
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
+        ds.to_netcdf(
+            filepath,
+            format="NETCDF4",
+            group="test/group",
+            encoding={"air": {"dtype": "float32"}},
+        )
 
     return str(filepath)
 
