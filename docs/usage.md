@@ -444,7 +444,7 @@ session.commit("Wrote first dataset")
 
 #### Append to an existing Icechunk Store
 
-You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument. This is especially useful for ongoing datasets. Note that Zarr does not currently support concatenating datasets with different codecs or chunk shapes.
+You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument. This is especially useful for datasets that grow over time. Note that Zarr does not currently support concatenating datasets with different codecs or chunk shapes.
 
 ```python
 session = repo.writeable_session("main")
