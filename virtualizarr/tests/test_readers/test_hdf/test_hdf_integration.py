@@ -4,16 +4,21 @@ import xarray.testing as xrt
 
 import virtualizarr
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import (
+    open_dataset_kerchunk,
+    requires_hdf5plugin,
+    requires_imagecodecs,
+)
 
 
-@requires_kerchunk
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestIntegration:
     @pytest.mark.xfail(
         reason="0 time start is being interpreted as fillvalue see issues/280"
     )
     def test_filters_h5netcdf_roundtrip(
-        self, tmpdir, filter_encoded_roundtrip_hdf5_file, backend=HDFVirtualBackend
+        self, tmpdir, filter_encoded_roundtrip_hdf5_file
     ):
         ds = xr.open_dataset(filter_encoded_roundtrip_hdf5_file, decode_times=True)
         vds = virtualizarr.open_virtual_dataset(
@@ -24,7 +29,7 @@ class TestIntegration:
         )
         kerchunk_file = f"{tmpdir}/kerchunk.json"
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk", decode_times=True)
+        roundtrip = open_dataset_kerchunk(kerchunk_file, decode_times=True)
         xrt.assert_allclose(ds, roundtrip)
 
     @pytest.mark.xfail(
@@ -37,8 +42,8 @@ class TestIntegration:
         ds = xr.open_dataset(filepath)
         vds = virtualizarr.open_virtual_dataset(filepath, backend=HDFVirtualBackend)
         kerchunk_file = f"{tmpdir}/kerchunk.json"
-        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        vds.virtualize.to_kerchunk(kerchunk_file, format="dict")
+        roundtrip = open_dataset_kerchunk(kerchunk_file)
         xrt.assert_equal(ds, roundtrip)
 
     def test_filter_and_cf_roundtrip(self, tmpdir, filter_and_cf_roundtrip_hdf5_file):
@@ -48,5 +53,5 @@ class TestIntegration:
         )
         kerchunk_file = f"{tmpdir}/filter_cf_kerchunk.json"
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        roundtrip = open_dataset_kerchunk(kerchunk_file)
         xrt.assert_allclose(ds, roundtrip)

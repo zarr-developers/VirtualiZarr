@@ -1,8 +1,10 @@
 import importlib
 import itertools
 
+import fsspec
 import numpy as np
 import pytest
+import xarray as xr
 from packaging.version import Version
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -105,3 +107,15 @@ def offset_from_chunk_key(ind: tuple[int, ...]) -> int:
 
 def length_from_chunk_key(ind: tuple[int, ...]) -> int:
     return sum(ind) + 5
+
+
+def open_dataset_kerchunk(
+    filename_or_obj: str, *, storage_options=None, **kwargs
+) -> xr.Dataset:
+    """Equivalent to ``xr.open_dataset(..., engine="kerchunk")`` but without depending on
+    kerchunk library
+    """
+    m = fsspec.filesystem(
+        "reference", fo=filename_or_obj, **(storage_options or {})
+    ).get_mapper()
+    return xr.open_dataset(m, engine="zarr", consolidated=False, **kwargs)
