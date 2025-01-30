@@ -107,11 +107,3 @@ def offset_from_chunk_key(ind: tuple[int, ...]) -> int:
 
 def length_from_chunk_key(ind: tuple[int, ...]) -> int:
     return sum(ind) + 5
-
-
-def in_memory_icechunk_session():
-    from icechunk import Repository, Storage
-
-    repo = Repository.create(storage=Storage.new_in_memory())
-    session = repo.writable_session("main")
-    return session
