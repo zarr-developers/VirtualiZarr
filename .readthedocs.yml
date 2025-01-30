@@ -9,7 +9,8 @@ build:
     python: mambaforge-latest
   commands:
     - mamba install -c conda-forge -c nodefaults pixi
-    - pixi install docs
+    - pixi install --environment docs
+    - pixi run build-docs
 
 # Build documentation in the doc/ directory with Sphinx
 sphinx:
