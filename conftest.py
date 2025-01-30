@@ -43,7 +43,9 @@ def netcdf4_file(tmp_path: Path) -> str:
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(filepath, format="NETCDF4")
+        ds.to_netcdf(
+            filepath, format="NETCDF4"
+        )  # , encoding={"air": {"dtype": "float32"}})
 
     return str(filepath)
 
@@ -63,7 +65,9 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 @pytest.fixture
 def netcdf4_files_factory(tmp_path: Path) -> Callable:
     def create_netcdf4_files(
-        encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        encoding: Optional[Mapping[str, Mapping[str, Any]]] = {
+            "air": {"dtype": "float32"}
+        },  # Store as float32 to address SerializationWarning: saving variable air with floating point data as an integer dtype without any _FillValue to use for NaNs
     ) -> tuple[str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
