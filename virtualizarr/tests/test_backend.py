@@ -351,27 +351,16 @@ class TestOpenVirtualDatasetHDFGroup:
         assert isinstance(vds["bar"].data, ManifestArray)
         assert vds["bar"].shape == (2,)
 
-    def test_open_root_group_manually(
-        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
+    @pytest.mark.parametrize("group", ["", None])
+    def test_open_root_group(
+        self,
+        netcdf4_file_with_data_in_multiple_groups,
+        hdf_backend,
+        group,
     ):
         vds = open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
-            group="",
-            indexes={},
-            backend=hdf_backend,
-        )
-        # This should just be ["foo"] see #401 for more information
-        assert list(vds.variables) == (
-            ["foo", "dim_0"] if hdf_backend == HDFVirtualBackend else ["foo"]
-        )
-        assert isinstance(vds["foo"].data, ManifestArray)
-        assert vds["foo"].shape == (3,)
-
-    def test_open_root_group_by_default(
-        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
-    ):
-        vds = open_virtual_dataset(
-            netcdf4_file_with_data_in_multiple_groups,
+            group=group,
             indexes={},
             backend=hdf_backend,
         )
