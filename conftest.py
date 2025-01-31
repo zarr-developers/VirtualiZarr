@@ -134,11 +134,13 @@ def hdf5_groups_file(tmp_path: Path) -> str:
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
+        air_encoding = ds["air"].encoding
+        air_encoding["_FillValue"] = -9999
         ds.to_netcdf(
             filepath,
             format="NETCDF4",
             group="test/group",
-            encoding={"air": {"dtype": "float32"}},
+            encoding={"air": air_encoding},
         )
 
     return str(filepath)
