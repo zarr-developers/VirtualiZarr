@@ -411,13 +411,13 @@ class HDFVirtualBackend(VirtualBackend):
     @staticmethod
     def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
         dimension_names = []
-        non_coordinate_dimesion_variables = []
+        non_coordinate_dimension_variables = []
         for name, obj in group.items():
             if "_Netcdf4Dimid" in obj.attrs:
                 dimension_names.append(name)
-            for name, obj in group.items():
-                if type(obj) is h5py.Dataset:
-                    if obj.id.get_storage_size() == 0 and name in dimension_names:
-                        non_coordinate_dimesion_variables.append(name)
+        for name, obj in group.items():
+            if type(obj) is h5py.Dataset:
+                if obj.id.get_storage_size() == 0 and name in dimension_names:
+                    non_coordinate_dimension_variables.append(name)
 
-        return non_coordinate_dimesion_variables
+        return non_coordinate_dimension_variables
