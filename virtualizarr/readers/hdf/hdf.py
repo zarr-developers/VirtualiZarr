@@ -409,7 +409,7 @@ class HDFVirtualBackend(VirtualBackend):
         return attrs
 
     @staticmethod
-    def _find_non_coord_dimension_vars(group: h5py.Group) -> List[str]:
+    def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
         dimension_names = []
         non_coordinate_dimesion_variables = []
         for name, obj in group.items():
