@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Union
 
+from zarr.core.array import create_codec_pipeline
+
 from virtualizarr.zarr import Codec
 
 if TYPE_CHECKING:
@@ -54,14 +56,7 @@ def _get_manifestarray_codecs(
     normalize_to_zarr_v3: bool = False,
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a ManifestArray based on its zarr_format."""
-    if normalize_to_zarr_v3 or array.zarray.zarr_format == 3:
-        return (array.zarray.serializer(),) + array.zarray._v3_codec_pipeline()
-    elif array.zarray.zarr_format == 2:
-        from zarr.core.array import create_codec_pipeline
-
-        return create_codec_pipeline(array.zarray)
-    else:
-        raise ValueError("Unsupported zarr_format for ManifestArray.")
+    return create_codec_pipeline(array.zarray)
 
 
 def _is_zarr_array(array: object) -> bool:
@@ -76,38 +71,8 @@ def _is_zarr_array(array: object) -> bool:
 
 def _get_zarr_array_codecs(
     array: "Array",
-    normalize_to_zarr_v3: bool = False,
+    # Q: Note sure if we need this anymore
+    # normalize_to_zarr_v3: bool = False,
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a Zarr Array based on its format."""
-    import zarr
-    from packaging import version
-
-    # Check that zarr-python v3 is installed
-    required_version = "3.0.0b"
-    installed_version = zarr.__version__
-    if version.parse(installed_version) < version.parse(required_version):
-        raise NotImplementedError(
-            f"zarr-python v3 or higher is required, but version {installed_version} is installed."
-        )
-    from zarr.core.metadata import (  # type: ignore[import-untyped]
-        ArrayV2Metadata,
-        ArrayV3Metadata,
-    )
-
-    # For zarr format v3
-    if isinstance(array.metadata, ArrayV3Metadata):
-        return tuple(array.metadata.codecs)
-    # For zarr format v2
-    elif isinstance(array.metadata, ArrayV2Metadata):
-        if normalize_to_zarr_v3:
-            # we could potentially normalize to v3 using ZArray._v3_codec_pipeline, but we don't have a use case for that.
-            raise NotImplementedError(
-                "Normalization to zarr v3 is not supported for zarr v2 array."
-            )
-        else:
-            return Codec(
-                compressor=array.metadata.compressor,
-                filters=list(array.metadata.filters or ()),
-            )
-    else:
-        raise ValueError("Unsupported zarr_format for Zarr Array.")
+    return create_codec_pipeline(array)

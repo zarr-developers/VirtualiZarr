@@ -1,15 +1,9 @@
-from unittest.mock import patch
-
 import numpy as np
 import pytest
 from numcodecs import Blosc, Delta
 
 from virtualizarr import ChunkManifest, ManifestArray
 from virtualizarr.codecs import get_codecs
-from virtualizarr.tests import (
-    requires_zarr_python,
-    requires_zarr_python_v3,
-)
 from virtualizarr.zarr import Codec
 
 
@@ -33,21 +27,25 @@ class TestCodecs:
 
     def test_manifest_array_zarr_v2(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
-        compressor = {"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}
-        filters = [{"id": "delta", "dtype": "<i8"}]
+        compressor = {
+            "id": "blosc",
+            "cname": "zstd",
+            "clevel": 5,
+            "shuffle": 1,
+            "blocksize": 0,
+        }
+        filters = [{"id": "delta", "dtype": "<i8", "astype": "<i8"}]
         manifest_array = self.create_manifest_array(
             zarr_format=2, compressor=compressor, filters=filters
         )
 
         # Get codecs and verify
         actual_codecs = get_codecs(manifest_array)
-        expected_codecs = Codec(
-            compressor={"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1},
-            filters=[{"id": "delta", "dtype": "<i8"}],
-        )
-        assert actual_codecs == expected_codecs
+        assert actual_codecs.array_bytes_codec.compressor.get_config() == compressor
+        assert [
+            f.get_config() for f in actual_codecs.array_bytes_codec.filters
+        ] == filters
 
-    @requires_zarr_python_v3
     def test_manifest_array_zarr_v2_normalized(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
         compressor = {"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}
@@ -63,7 +61,6 @@ class TestCodecs:
         ) + manifest_array.zarray._v3_codec_pipeline()
         assert actual_codecs == expected_codecs
 
-    @requires_zarr_python_v3
     def test_manifest_array_zarr_v3(self):
         """Test that get_codecs works for ManifestArray with Zarr v2 metadata."""
         from zarr.codecs import BytesCodec  # type: ignore[import-untyped]
@@ -104,7 +101,6 @@ class TestCodecs:
 
         return zarr_array
 
-    @requires_zarr_python_v3
     def test_zarr_v2(self):
         # Define your codecs (compressor and filters)
         compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
@@ -123,7 +119,6 @@ class TestCodecs:
         )
         assert actual_codecs == expected_codecs
 
-    @requires_zarr_python_v3
     def test_zarr_v2_normalized(self):
         # Define your codecs (compressor and filters)
         compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE)
@@ -136,7 +131,6 @@ class TestCodecs:
         ):
             get_codecs(zarr_array_v2, normalize_to_zarr_v3=True)
 
-    @requires_zarr_python_v3
     def test_zarr_v3(self):
         from zarr.codecs import BytesCodec  # type: ignore[import-untyped]
 
@@ -148,14 +142,3 @@ class TestCodecs:
         actual_codecs = get_codecs(zarr_array_v3)
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
-
-    @requires_zarr_python
-    def test_unsupported_zarr_python(self):
-        zarr_array = self.create_zarr_array()
-        unsupported_zarr_version = "2.18.3"
-        with patch("zarr.__version__", unsupported_zarr_version):
-            with pytest.raises(
-                NotImplementedError,
-                match=f"zarr-python v3 or higher is required, but version {unsupported_zarr_version} is installed.",
-            ):
-                get_codecs(zarr_array)
