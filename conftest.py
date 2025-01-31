@@ -37,31 +37,13 @@ def empty_netcdf4_file(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_file_with_scale(tmp_path: Path) -> str:
-    filepath = tmp_path / "air.nc"
-
-    # Set up example xarray dataset
-    with xr.tutorial.open_dataset("air_temperature") as ds:
-        # Save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(
-            filepath,
-            format="NETCDF4",
-            encoding={"air": {"dtype": "float32", "scale_factor": 0.01}},
-        )
-
-    return str(filepath)
-
-
-@pytest.fixture
 def netcdf4_file(tmp_path: Path) -> str:
     filepath = tmp_path / "air.nc"
 
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
-        air_encoding = ds["air"].encoding
-        air_encoding["_FillValue"] = -9999
-        ds.to_netcdf(filepath, format="NETCDF4", encoding={"air": air_encoding})
+        ds.to_netcdf(filepath, format="NETCDF4")
 
     return str(filepath)
 
@@ -87,9 +69,6 @@ def netcdf4_files_factory(tmp_path: Path) -> Callable:
         filepath2 = tmp_path / "air2.nc"
 
         with xr.tutorial.open_dataset("air_temperature") as ds:
-            if encoding is None:
-                encoding = {"air": ds["air"].encoding}
-                encoding["air"]["_FillValue"] = -9999
             # Split dataset into two parts
             ds1 = ds.isel(time=slice(None, 1460))
             ds2 = ds.isel(time=slice(1460, None))
@@ -134,14 +113,7 @@ def hdf5_groups_file(tmp_path: Path) -> str:
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
-        air_encoding = ds["air"].encoding
-        air_encoding["_FillValue"] = -9999
-        ds.to_netcdf(
-            filepath,
-            format="NETCDF4",
-            group="test/group",
-            encoding={"air": air_encoding},
-        )
+        ds.to_netcdf(filepath, format="NETCDF4", group="test/group")
 
     return str(filepath)
 
