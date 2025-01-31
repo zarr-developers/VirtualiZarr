@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - xarray>=2024.10.0,<2025.0.0
+  - xarray>=2025.1.1
   - h5netcdf
   - h5py
   - hdf5

@@ -37,15 +37,31 @@ def empty_netcdf4_file(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_file(tmp_path: Path) -> str:
+def netcdf4_file_with_scale(tmp_path: Path) -> str:
     filepath = tmp_path / "air.nc"
 
     # Set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature") as ds:
         # Save it to disk as netCDF (in temporary directory)
         ds.to_netcdf(
-            filepath, format="NETCDF4", encoding={"air": {"dtype": "float32"}}
-        )  # , encoding={"air": {"dtype": "float32"}})
+            filepath,
+            format="NETCDF4",
+            encoding={"air": {"dtype": "float32", "scale_factor": 0.01}},
+        )
+
+    return str(filepath)
+
+
+@pytest.fixture
+def netcdf4_file(tmp_path: Path) -> str:
+    filepath = tmp_path / "air.nc"
+
+    # Set up example xarray dataset
+    with xr.tutorial.open_dataset("air_temperature") as ds:
+        # Save it to disk as netCDF (in temporary directory)
+        air_encoding = ds["air"].encoding
+        air_encoding["_FillValue"] = -9999
+        ds.to_netcdf(filepath, format="NETCDF4", encoding={"air": air_encoding})
 
     return str(filepath)
 
@@ -65,14 +81,17 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 @pytest.fixture
 def netcdf4_files_factory(tmp_path: Path) -> Callable:
     def create_netcdf4_files(
-        encoding: Optional[Mapping[str, Mapping[str, Any]]] = {
-            "air": {"dtype": "float32"}
-        },  # Store as float32 to address SerializationWarning: saving variable air with floating point data as an integer dtype without any _FillValue to use for NaNs
+        encoding: Optional[
+            Mapping[str, Mapping[str, Any]]
+        ] = None,  # Store as float32 to address SerializationWarning: saving variable air with floating point data as an integer dtype without any _FillValue to use for NaNs
     ) -> tuple[str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
 
         with xr.tutorial.open_dataset("air_temperature") as ds:
+            if encoding is None:
+                encoding = {"air": ds["air"].encoding}
+                encoding["air"]["_FillValue"] = -9999
             # Split dataset into two parts
             ds1 = ds.isel(time=slice(None, 1460))
             ds2 = ds.isel(time=slice(1460, None))
