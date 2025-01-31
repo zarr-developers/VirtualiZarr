@@ -55,7 +55,7 @@ def _get_manifestarray_codecs(
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a ManifestArray based on its zarr_format."""
     if normalize_to_zarr_v3 or array.zarray.zarr_format == 3:
-        return array.zarray._v3_codec_pipeline()
+        return (array.zarray.serializer(),) + array.zarray._v3_codec_pipeline()
     elif array.zarray.zarr_format == 2:
         return array.zarray.codec
     else:

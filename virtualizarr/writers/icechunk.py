@@ -243,13 +243,13 @@ def write_virtual_variable_to_icechunk(
     else:
         append_axis = None
         # create array if it doesn't already exist
-
         arr = group.require_array(
             name=name,
             shape=zarray.shape,
-            chunk_shape=zarray.chunks,
+            chunks=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
-            codecs=zarray._v3_codec_pipeline(),
+            compressors=zarray._v3_codec_pipeline(),  # compressors,
+            serializer=zarray.serializer(),
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
         )

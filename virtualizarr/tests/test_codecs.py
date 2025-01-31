@@ -58,7 +58,9 @@ class TestCodecs:
 
         # Get codecs and verify
         actual_codecs = get_codecs(manifest_array, normalize_to_zarr_v3=True)
-        expected_codecs = manifest_array.zarray._v3_codec_pipeline()
+        expected_codecs = (
+            manifest_array.zarray.serializer(),
+        ) + manifest_array.zarray._v3_codec_pipeline()
         assert actual_codecs == expected_codecs
 
     @requires_zarr_python_v3

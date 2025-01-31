@@ -42,7 +42,7 @@ def test_zarr_v3_metadata_conformance(tmpdir, vds_with_manifest_arrays: Dataset)
     assert isinstance(metadata["fill_value"], (bool, int, float, str, list))
     assert (
         isinstance(metadata["codecs"], list)
-        and len(metadata["codecs"]) > 1
+        and len(metadata["codecs"]) == 1
         and all(isconfigurable(codec) for codec in metadata["codecs"])
     )
 

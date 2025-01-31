@@ -175,13 +175,6 @@ class ZArray:
             transpose = dict(name="transpose", configuration=dict(order=order))
             codec_configs.append(transpose)
 
-        # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
-        # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
-        bytes = dict(
-            name="bytes", configuration={}
-        )  # TODO need to handle endianess configuration
-        codec_configs.append(bytes)
-
         # Noting here that zarr v3 has very few codecs specificed in the official spec,
         # and that there are far more codecs in `numcodecs`. We take a gamble and assume
         # that the codec names and configuration are simply mapped into zarrv3 "configurables".
@@ -197,6 +190,23 @@ class ZArray:
         codec_pipeline = parse_codecs(codec_configs)
 
         return codec_pipeline
+
+    def serializer(self) -> Any:
+        """
+        testing
+        """
+        try:
+            from zarr.core.metadata.v3 import (  # type: ignore[import-untyped]
+                parse_codecs,
+            )
+        except ImportError:
+            raise ImportError("zarr v3 is required to generate v3 codec pipelines")
+        # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
+        # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
+        bytes = dict(
+            name="bytes", configuration={}
+        )  # TODO need to handle endianess configuration
+        return parse_codecs([bytes])[0]
 
 
 def encode_dtype(dtype: np.dtype) -> str:
