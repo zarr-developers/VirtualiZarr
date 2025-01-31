@@ -143,28 +143,22 @@ def test_set_single_virtual_ref_without_encoding(
 
 
 def test_set_single_virtual_ref_with_encoding(
-    icechunk_filestore: "IcechunkStore", netcdf4_file_with_scale: Path
+    icechunk_filestore: "IcechunkStore", netcdf4_file: Path
 ):
     import xarray.testing as xrt
 
-    with xr.open_dataset(netcdf4_file_with_scale) as ds:
+    with xr.open_dataset(netcdf4_file) as ds:
         # We drop the coordinates because we don't have them in the zarr test case
         expected_ds = ds.drop_vars(["lon", "lat", "time"])
 
         # instead, for now just write out byte ranges explicitly
         manifest = ChunkManifest(
-            {
-                "0.0.0": {
-                    "path": netcdf4_file_with_scale,
-                    "offset": 15419,
-                    "length": 15476000,
-                }
-            }
+            {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
         )
         zarray = ZArray(
             shape=(2920, 25, 53),
             chunks=(2920, 25, 53),
-            dtype=np.dtype("float32"),
+            dtype=np.dtype("int16"),
             compressor=None,
             filters=None,
             fill_value=None,
@@ -176,7 +170,7 @@ def test_set_single_virtual_ref_with_encoding(
         air = xr.Variable(
             data=ma,
             dims=["time", "lat", "lon"],
-            encoding={"scale_factor": 0.01, "dtype": "float32"},
+            encoding={"scale_factor": 0.01},
             attrs=expected_ds["air"].attrs,
         )
         vds = xr.Dataset({"air": air}, attrs=expected_ds.attrs)
@@ -190,7 +184,7 @@ def test_set_single_virtual_ref_with_encoding(
         # check array metadata
         assert air_array.shape == (2920, 25, 53)
         assert air_array.chunks == (2920, 25, 53)
-        assert air_array.dtype == np.dtype("float32")
+        assert air_array.dtype == np.dtype("int16")
         assert air_array.attrs["scale_factor"] == 0.01
 
         # check chunk references
