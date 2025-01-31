@@ -16,7 +16,7 @@ python -m pytest
 ```
 
 You may also add the `--run-network-tests` option, which will run additional tests
-that require downloading files over the network. Skip this if you want the tests to run
+that require downloading files over the network.  Skip this if you want the tests to run
 faster or you have no internet access:
 
 ```bash
@@ -24,15 +24,13 @@ python -m pytest --run-network-tests
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
-coverage report locally, if you wish (CI will automatically do so). Here are some
+coverage report locally, if you wish (CI will automatically do so).  Here are some
 examples:
 
-Note: `--cov` should not be needed since `include = ["virtualizarr/"]` is set in pyproject.toml `[tool.coverage.run]`.
-
 ```bash
-python -m pytest                     # Terminal (text) report (--cov=term)
-python -m pytest --cov=term-missing  # Terminal report showing missing coverage
-python -m pytest --cov=html          # HTML report written to htmlcov/index.html
+python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
+python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
+python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
 ```
 
 To see all available `pytest` options added by the `pytest-cov` plugin, run
