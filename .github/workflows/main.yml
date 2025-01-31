@@ -32,26 +32,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup micromamba
-        uses: mamba-org/setup-micromamba@v1
+      - uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          environment-file: ci/environment.yml
-          cache-environment: true
-          create-args: >-
-            python=${{matrix.python-version}}
+          pixi-version: v0.39.2
+          environments: ${{ matrix.environment }}
+          # we can freeze the environment and manually bump the dependencies to the
+          # latest version time to time.
+          frozen: true
 
       - name: Install virtualizarr
         run: |
            python -m pip install -e . --no-deps
 
-      - name: Conda list information
+      - name: List installed libraries
         run: |
-          micromamba env list
-          micromamba list
+          pixi list
 
       - name: Running Tests
         run: |
-          python -m pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml
+          pixi run test-xml-cov
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4
