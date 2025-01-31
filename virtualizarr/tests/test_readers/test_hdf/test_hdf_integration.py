@@ -27,9 +27,6 @@ class TestIntegration:
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk", decode_times=True)
         xrt.assert_allclose(ds, roundtrip)
 
-    @pytest.mark.xfail(
-        reason="Coordinate issue affecting only hdf reader see pull/#260"
-    )
     def test_filters_netcdf4_roundtrip(
         self, tmpdir, filter_encoded_roundtrip_netcdf4_file
     ):
@@ -50,3 +47,13 @@ class TestIntegration:
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_allclose(ds, roundtrip)
+
+    def test_non_coord_dim(self, tmpdir, non_coord_dim):
+        ds = xr.open_dataset(non_coord_dim)
+        vds = virtualizarr.open_virtual_dataset(
+            non_coord_dim, backend=HDFVirtualBackend
+        )
+        kerchunk_file = f"{tmpdir}/kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_equal(ds, roundtrip)
