@@ -2,13 +2,18 @@ import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
+from zarr.core.array import (
+    ArrayMetadata,
+    ArrayV2Metadata,
+    ArrayV3Metadata,
+    RegularChunkGrid,
+)
 
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.zarr import ZArray
 
 
 class ManifestArray:
@@ -24,11 +29,11 @@ class ManifestArray:
     """
 
     _manifest: ChunkManifest
-    _zarray: ZArray
+    _zarray: ArrayMetadata
 
     def __init__(
         self,
-        zarray: ZArray | dict,
+        zarray: ArrayMetadata | dict,
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
@@ -36,15 +41,19 @@ class ManifestArray:
 
         Parameters
         ----------
-        zarray : dict or ZArray
+        zarray : dict or zarr.array.ArrayMetadata
         chunkmanifest : dict or ChunkManifest
         """
-
-        if isinstance(zarray, ZArray):
+        # Q: is there a convenience function for returning either V2 or V3 metadata depending on the args?
+        if type(zarray) is ArrayV2Metadata or type(zarray) is ArrayV3Metadata:
             _zarray = zarray
         else:
-            # try unpacking the dict
-            _zarray = ZArray(**zarray)
+            # Q: should this fallback to 3 or 2?
+            zarr_format = zarray.pop("zarr_format", None)
+            if zarr_format == 3:
+                _zarray = ArrayV3Metadata(**zarray)
+            else:
+                _zarray = ArrayV2Metadata(**zarray)
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
@@ -66,12 +75,20 @@ class ManifestArray:
         return self._manifest
 
     @property
-    def zarray(self) -> ZArray:
+    def zarray(self) -> ArrayMetadata:
         return self._zarray
 
     @property
     def chunks(self) -> tuple[int, ...]:
-        return tuple(self.zarray.chunks)
+        """
+        Individual chunk size by number of elements.
+        """
+        if isinstance(self._zarray.chunk_grid, RegularChunkGrid):
+            return self._zarray.chunk_grid.chunk_shape
+        else:
+            raise NotImplementedError(
+                "Only RegularChunkGrid is currently supported for chunk size"
+            )
 
     @property
     def dtype(self) -> np.dtype:
@@ -80,6 +97,9 @@ class ManifestArray:
 
     @property
     def shape(self) -> tuple[int, ...]:
+        """
+        Array shape by number of elements along each dimension.
+        """
         return tuple(int(length) for length in list(self.zarray.shape))
 
     @property

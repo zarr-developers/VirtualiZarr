@@ -340,7 +340,8 @@ class TestStack:
 
     def test_stack_empty(self):
         # both manifest arrays in this example have the same zarray properties
-        zarray = ZArray(
+        zarr_format = 2
+        zarray = dict(
             chunks=(5, 10),
             compressor={"id": "zlib", "level": 1},
             dtype=np.dtype("int32"),
@@ -348,7 +349,7 @@ class TestStack:
             filters=None,
             order="C",
             shape=(5, 20),
-            zarr_format=2,
+            zarr_format=zarr_format,
         )
 
         chunks_dict1 = {}
@@ -370,11 +371,12 @@ class TestStack:
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
-        assert result.zarray.compressor == zarray.compressor
-        assert result.zarray.filters == zarray.filters
-        assert result.zarray.fill_value == zarray.fill_value
-        assert result.zarray.order == zarray.order
-        assert result.zarray.zarr_format == zarray.zarr_format
+
+        assert result.zarray.compressor.get_config() == zarray["compressor"]
+        assert result.zarray.filters == zarray["filters"]
+        assert result.zarray.fill_value == zarray["fill_value"]
+        assert result.zarray.order == zarray["order"]
+        assert result.zarray.zarr_format == zarr_format
 
 
 def test_refuse_combine():

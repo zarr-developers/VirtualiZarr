@@ -4,12 +4,13 @@ import itertools
 import numpy as np
 import pytest
 from packaging.version import Version
+from zarr.core.array import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.zarr import ZArray, ceildiv
+from virtualizarr.zarr import ceildiv
 
 requires_network = pytest.mark.network
 
@@ -61,7 +62,7 @@ def create_manifestarray(
     The manifest is populated with a (somewhat) unique path, offset, and length for each key.
     """
 
-    zarray = ZArray(
+    zarray = ArrayV2Metadata(
         chunks=chunks,
         compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
         dtype=np.dtype("float32"),
@@ -69,7 +70,6 @@ def create_manifestarray(
         filters=None,
         order="C",
         shape=shape,
-        zarr_format=2,
     )
 
     chunk_grid_shape = tuple(

@@ -170,10 +170,9 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
-        shape=tuple(new_shape),
-    )
+    new_zarray = first_arr.zarray.to_dict().copy()
+    new_zarray["chunks"] = tuple(new_chunks)
+    new_zarray["shape"] = tuple(new_shape)
 
     return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
 

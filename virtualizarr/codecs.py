@@ -57,7 +57,9 @@ def _get_manifestarray_codecs(
     if normalize_to_zarr_v3 or array.zarray.zarr_format == 3:
         return (array.zarray.serializer(),) + array.zarray._v3_codec_pipeline()
     elif array.zarray.zarr_format == 2:
-        return array.zarray.codec
+        from zarr.core.array import create_codec_pipeline
+
+        return create_codec_pipeline(array.zarray)
     else:
         raise ValueError("Unsupported zarr_format for ManifestArray.")
 
