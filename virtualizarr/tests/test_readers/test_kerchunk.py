@@ -7,7 +7,7 @@ import ujson
 
 from virtualizarr.backend import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import has_fastparquet, requires_kerchunk
 
 
 def gen_ds_refs(
@@ -177,7 +177,7 @@ def test_handle_relative_paths(refs_file_factory):
 @requires_kerchunk
 @pytest.mark.parametrize(
     "reference_format",
-    ["json", "parquet", "invalid"],
+    ["json", "invalid", *(["parquet"] if has_fastparquet else [])],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
