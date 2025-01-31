@@ -333,3 +333,12 @@ def netcdf3_file(tmp_path: pathlib.Path) -> pathlib.Path:
     ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
 
     return filepath
+
+
+@pytest.fixture
+def non_coord_dim(tmpdir):
+    filepath = f"{tmpdir}/non_coord_dim.nc"
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    ds = ds.drop_dims("dim3")
+    ds.to_netcdf(filepath, engine="netcdf4")
+    return filepath

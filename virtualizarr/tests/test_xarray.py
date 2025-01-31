@@ -322,11 +322,11 @@ class TestRenamePaths:
 @requires_imagecodecs
 def test_nbytes(simple_netcdf4):
     vds = open_virtual_dataset(simple_netcdf4)
-    assert vds.virtualize.nbytes == 88
-    assert vds.nbytes == 104
+    assert vds.virtualize.nbytes == 32
+    assert vds.nbytes == 48
 
     vds = open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"])
-    assert vds.virtualize.nbytes == 104
+    assert vds.virtualize.nbytes == 48
 
     ds = open_dataset(simple_netcdf4)
     assert ds.virtualize.nbytes == ds.nbytes
