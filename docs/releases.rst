@@ -63,7 +63,7 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
-- Vendor netCDF3 reader from kerchunk. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.2.0:
 
