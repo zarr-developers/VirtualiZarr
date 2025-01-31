@@ -50,3 +50,13 @@ class TestIntegration:
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_allclose(ds, roundtrip)
+
+    def test_non_coord_dim(self, tmpdir, non_coord_dim):
+        ds = xr.open_dataset(non_coord_dim)
+        vds = virtualizarr.open_virtual_dataset(
+            non_coord_dim, backend=HDFVirtualBackend
+        )
+        kerchunk_file = f"{tmpdir}/kerchunk.json"
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+        roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
+        xrt.assert_equal(ds, roundtrip)
