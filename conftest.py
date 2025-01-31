@@ -81,9 +81,7 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 @pytest.fixture
 def netcdf4_files_factory(tmp_path: Path) -> Callable:
     def create_netcdf4_files(
-        encoding: Optional[
-            Mapping[str, Mapping[str, Any]]
-        ] = None,  # Store as float32 to address SerializationWarning: saving variable air with floating point data as an integer dtype without any _FillValue to use for NaNs
+        encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> tuple[str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
