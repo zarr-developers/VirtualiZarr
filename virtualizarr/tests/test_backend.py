@@ -152,7 +152,7 @@ def test_cftime_index(tmpdir, hdf_backend):
     # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
     assert index_mappings_equal(vds.xindexes, ds.xindexes)
     assert list(ds.coords) == list(vds.coords)
-    assert vds.sizes == ds.sizes
+    assert vds.dims == ds.dims
     assert vds.attrs == ds.attrs
 
 
