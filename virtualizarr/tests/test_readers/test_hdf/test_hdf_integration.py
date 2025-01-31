@@ -27,9 +27,6 @@ class TestIntegration:
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk", decode_times=True)
         xrt.assert_allclose(ds, roundtrip)
 
-    @pytest.mark.xfail(
-        reason="Coordinate issue affecting only hdf reader see pull/#260"
-    )
     def test_filters_netcdf4_roundtrip(
         self, tmpdir, filter_encoded_roundtrip_netcdf4_file
     ):
