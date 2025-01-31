@@ -77,10 +77,6 @@ def maybe_open_loadable_vars_and_indexes(
             if name in loadable_variables
         }
 
-    # # if we only read the indexes we can just close the file right away as nothing is lazy
-    # if loadable_vars == {}:
-    #     ds.close()
-
     return loadable_vars, indexes
 
 
