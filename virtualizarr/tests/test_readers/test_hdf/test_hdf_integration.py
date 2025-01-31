@@ -43,7 +43,7 @@ class TestIntegration:
         ds = xr.open_dataset(filepath)
         vds = virtualizarr.open_virtual_dataset(filepath, backend=HDFVirtualBackend)
         kerchunk_file = f"{tmpdir}/kerchunk.json"
-        vds.virtualize.to_kerchunk(kerchunk_file, format="dict")
+        vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_equal(ds, roundtrip)
 
