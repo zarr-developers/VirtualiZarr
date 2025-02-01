@@ -46,7 +46,7 @@ test = [
     "fastparquet",
     "fsspec",
     "h5py",
-    "kerchunk>=0.2.5",
+    "kerchunk>=0.2.8",
     "mypy",
     "netcdf4",
     "numcodecs",
