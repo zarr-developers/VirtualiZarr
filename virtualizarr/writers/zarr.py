@@ -84,7 +84,6 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
 
     # adjust to match v3 spec
     metadata["zarr_format"] = 3
-    metadata["node_type"] = "array"
     metadata["data_type"] = str(np.dtype(metadata.pop("dtype")))
     metadata["chunk_grid"] = {
         "name": "regular",

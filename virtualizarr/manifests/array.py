@@ -3,8 +3,6 @@ from typing import Any, Callable, Union
 
 import numpy as np
 from zarr.core.array import (
-    ArrayMetadata,
-    ArrayV2Metadata,
     ArrayV3Metadata,
     RegularChunkGrid,
 )
@@ -14,6 +12,7 @@ from virtualizarr.manifests.array_api import (
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.zarr import ZArray
 
 
 class ManifestArray:
@@ -29,31 +28,31 @@ class ManifestArray:
     """
 
     _manifest: ChunkManifest
-    _zarray: ArrayMetadata
+    _metadata: ArrayV3Metadata | ZArray
 
     def __init__(
         self,
-        zarray: ArrayMetadata | dict,
+        metadata: ArrayV3Metadata | ZArray | dict,
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the .metadata information of a zarr array and the manifest of chunks.
 
         Parameters
         ----------
-        zarray : dict or zarr.array.ArrayMetadata
+        metadata : dict or zarr.array.ArrayMetadata
         chunkmanifest : dict or ChunkManifest
         """
-        # Q: is there a convenience function for returning either V2 or V3 metadata depending on the args?
-        if type(zarray) is ArrayV2Metadata or type(zarray) is ArrayV3Metadata:
-            _zarray = zarray
+        if type(metadata) is ArrayV3Metadata or type(metadata) is ZArray:
+            _metadata = metadata
         else:
-            # Q: should this fallback to 3 or 2?
-            zarr_format = zarray.pop("zarr_format", None)
+            zarr_format = metadata.pop("zarr_format", None)
             if zarr_format == 3:
-                _zarray = ArrayV3Metadata(**zarray)
-            else:
-                _zarray = ArrayV2Metadata(**zarray)
+                _metadata = ArrayV3Metadata(**metadata)
+            elif zarr_format == 2:
+                raise NotImplementedError(
+                    "Only Zarr format version 3 is supported for ManifestArrays"
+                )
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
@@ -67,7 +66,7 @@ class ManifestArray:
         # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
         # TODO also cover the special case of scalar arrays
 
-        self._zarray = _zarray
+        self._metadata = _metadata
         self._manifest = _chunkmanifest
 
     @property
@@ -75,16 +74,19 @@ class ManifestArray:
         return self._manifest
 
     @property
-    def zarray(self) -> ArrayMetadata:
-        return self._zarray
+    def metadata(self) -> ArrayV3Metadata | ZArray:
+        return self._metadata
 
     @property
     def chunks(self) -> tuple[int, ...]:
         """
         Individual chunk size by number of elements.
         """
-        if isinstance(self._zarray.chunk_grid, RegularChunkGrid):
-            return self._zarray.chunk_grid.chunk_shape
+        # To be removed once migration to zarr's ArrayV3Metadata is complete
+        if isinstance(self._metadata, ZArray):
+            return tuple(self._metadata.chunks)
+        if isinstance(self._metadata.chunk_grid, RegularChunkGrid):
+            return self._metadata.chunk_grid.chunk_shape
         else:
             raise NotImplementedError(
                 "Only RegularChunkGrid is currently supported for chunk size"
@@ -92,7 +94,7 @@ class ManifestArray:
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self.zarray.dtype
+        dtype_str = self.metadata.dtype
         return np.dtype(dtype_str)
 
     @property
@@ -100,7 +102,7 @@ class ManifestArray:
         """
         Array shape by number of elements along each dimension.
         """
-        return tuple(int(length) for length in list(self.zarray.shape))
+        return tuple(int(length) for length in list(self.metadata.shape))
 
     @property
     def ndim(self) -> int:
@@ -175,7 +177,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if self.zarray != other.zarray:
+        if self.metadata != other.metadata:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:
@@ -283,7 +285,7 @@ class ManifestArray:
         ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
-        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
+        return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):

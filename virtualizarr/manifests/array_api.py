@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
+from zarr.core.array import ArrayV3Metadata
 
-from virtualizarr.zarr import determine_chunk_grid_shape
+from virtualizarr.zarr import ZArray, determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 from .utils import (
@@ -170,11 +171,22 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.to_dict().copy()
-    new_zarray["chunks"] = tuple(new_chunks)
-    new_zarray["shape"] = tuple(new_shape)
+    # Conditional to be removed following https://github.com/zarr-developers/VirtualiZarr/issues/411
+    if type(first_arr.metadata) is ArrayV3Metadata:
+        new_zarray = first_arr.metadata.to_dict().copy()
+        chunk_grid = first_arr.metadata.chunk_grid.to_dict().copy()
+        chunk_grid["configuration"]["chunk_shape"] = tuple(new_chunks)
+        new_zarray["chunk_grid"] = chunk_grid
+        new_zarray["shape"] = tuple(new_shape)
+        new_zarray["dimension_names"] = None
+        new_zarray.pop("node_type", None)
+    elif type(first_arr.metadata) is ZArray:
+        new_zarray = first_arr.metadata.replace(
+            chunks=tuple(new_chunks),
+            shape=tuple(new_shape),
+        )
 
-    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_zarray)
 
 
 @implements(np.expand_dims)
@@ -235,12 +247,12 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
+    new_zarray = x.metadata.replace(
         chunks=new_chunk_shape,
         shape=new_shape,
     )
 
-    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_zarray)
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:
