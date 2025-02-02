@@ -57,6 +57,7 @@ def _get_manifestarray_codecs(
     from zarr.core.array import ArrayV3Metadata
 
     if normalize_to_zarr_v3 or array.metadata.zarr_format == 3:
+        # Remove conditional post https://github.com/zarr-developers/VirtualiZarr/issues/411
         if type(array.metadata) is ArrayV3Metadata:
             return array.metadata.codecs
         else:
