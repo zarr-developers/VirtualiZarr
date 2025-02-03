@@ -29,9 +29,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+remote = [
+    "fsspec",
+    "requests",
+    "aiohttp",
+    "s3fs",
+]
 # non-kerchunk-based readers
 hdf = [
-    "fsspec",
+    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
@@ -39,23 +45,30 @@ hdf = [
 ]
 # kerchunk-based readers
 hdf5 = [
+    "virtualizarr[remote]",
     "kerchunk>=0.25.0",
     "h5py",
 ]
 netcdf3 = [
+    "virtualizarr[remote]",
     "kerchunk>=0.2.8",
     "scipy",
 ]
 fits = [
+    "virtualizarr[remote]",
     "kerchunk>=0.2.8",
     "astropy",
 ]
 # un-implemented readers
 # tiff = [
+#     "virtualizarr[remote]",
 #     "kerchunk>=0.2.8",
 #     "tifffile",
 # ]
-# grib = ["kerchunk>=0.2.8",]
+# grib = [
+#     "virtualizarr[remote]",
+#     "kerchunk>=0.2.8",
+# ]
 # zarr = ["zarr==3.0.0b2"]
 all_readers = [
     "virtualizarr[hdf]",
