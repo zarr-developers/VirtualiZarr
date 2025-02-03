@@ -84,7 +84,6 @@ as well as many other bugfixes and documentation improvements.
 New Features
 ~~~~~~~~~~~~
 
->>>>>>> main
 - Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
   (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added append functionality to `to_icechunk` (:pull:`272`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
