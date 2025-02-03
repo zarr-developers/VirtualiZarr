@@ -1,3 +1,4 @@
+import pathlib
 import warnings
 
 import h5py  # type: ignore
@@ -321,4 +322,23 @@ def root_coordinates_hdf5_file(tmpdir, np_uncompressed_int16):
     f.create_dataset(name="lat", data=data)
     f.create_dataset(name="lon", data=data)
     f.attrs.create(name="coordinates", data="lat lon")
+    return filepath
+
+
+@pytest.fixture
+def netcdf3_file(tmp_path: pathlib.Path) -> pathlib.Path:
+    ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
+
+    filepath = tmp_path / "file.nc"
+    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+
+    return filepath
+
+
+@pytest.fixture
+def non_coord_dim(tmpdir):
+    filepath = f"{tmpdir}/non_coord_dim.nc"
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    ds = ds.drop_dims("dim3")
+    ds.to_netcdf(filepath, engine="netcdf4")
     return filepath

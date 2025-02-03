@@ -14,14 +14,13 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0,<2025.0.0",
+    "xarray>=2025.1.1",
     "numpy>=2.0.0",
     "packaging",
     "universal-pathlib",
@@ -38,15 +37,23 @@ hdf_reader = [
     "imagecodecs-numcodecs==2024.6.1",
     "numcodecs"
 ]
+netcdf3 = [
+    "kerchunk>=0.2.8",
+    "scipy",
+]
+fits = [
+    "kerchunk>=0.2.8",
+    "astropy",
+]
 icechunk = [
-    "icechunk==0.1.0a8",
+    "icechunk>=0.1.0a12",
 ]
 test = [
     "codecov",
     "fastparquet",
     "fsspec",
     "h5py",
-    "kerchunk>=0.2.5",
+    "kerchunk>=0.2.8",
     "mypy",
     "netcdf4",
     "numcodecs",

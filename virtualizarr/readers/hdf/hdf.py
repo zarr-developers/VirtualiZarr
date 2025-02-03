@@ -361,16 +361,20 @@ class HDFVirtualBackend(VirtualBackend):
         ).open_file()
         f = h5py.File(open_file, mode="r")
 
-        if group is not None:
+        if group is not None and group != "":
             g = f[group]
             group_name = group
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
         else:
-            g = f
-            group_name = ""
+            g = f["/"]
+            group_name = "/"
 
         variables = {}
+        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
+            group=g
+        )
+        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
         for key in g.keys():
             if key not in drop_variables:
                 if isinstance(g[key], h5py.Dataset):
@@ -381,9 +385,6 @@ class HDFVirtualBackend(VirtualBackend):
                     )
                     if variable is not None:
                         variables[key] = variable
-                else:
-                    raise NotImplementedError("Nested groups are not yet supported")
-
         return variables
 
     @staticmethod
@@ -406,3 +407,17 @@ class HDFVirtualBackend(VirtualBackend):
             g = f
         attrs = HDFVirtualBackend._extract_attrs(g)
         return attrs
+
+    @staticmethod
+    def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
+        dimension_names = []
+        non_coordinate_dimension_variables = []
+        for name, obj in group.items():
+            if "_Netcdf4Dimid" in obj.attrs:
+                dimension_names.append(name)
+        for name, obj in group.items():
+            if type(obj) is h5py.Dataset:
+                if obj.id.get_storage_size() == 0 and name in dimension_names:
+                    non_coordinate_dimension_variables.append(name)
+
+        return non_coordinate_dimension_variables

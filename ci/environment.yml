@@ -8,7 +8,7 @@ dependencies:
   - hdf5
   - netcdf4
   - xarray>=2024.10.0
-  - kerchunk>=0.2.5
+  - kerchunk>=0.2.8
   - numpy>=2.0.0
   - ujson
   - packaging

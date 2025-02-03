@@ -3,7 +3,7 @@ import pandas as pd
 from xarray import Dataset
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 
 
 @requires_kerchunk
@@ -108,6 +108,7 @@ class TestAccessor:
         }
         assert loaded_refs == expected_ds_refs
 
+    @requires_fastparquet
     def test_accessor_to_kerchunk_parquet(self, tmp_path):
         import ujson
 

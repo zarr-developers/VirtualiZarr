@@ -431,14 +431,27 @@ We can also write these references out as an [IcechunkStore](https://icechunk.io
 ```python
 # create an icechunk repository, session and write the virtual dataset to the session
 from icechunk import Repository, Storage, VirtualChunkContainer, local_filesystem_storage
-storage = local_filesystem_storage(str('combined'))
+storage = local_filesystem_storage("./local/icechunk/store")
 
 # By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
 repo = Repository.create(storage=storage)
 session = repo.writeable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
-combined_vds.virtualize.to_icechunk(session.store)
+vds1.virtualize.to_icechunk(session.store)
+session.commit("Wrote first dataset")
+```
+
+#### Append to an existing Icechunk Store
+
+You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument. This is especially useful for datasets that grow over time. Note that Zarr does not currently support concatenating datasets with different codecs or chunk shapes.
+
+```python
+session = repo.writeable_session("main")
+
+# write the virtual dataset to the session with the IcechunkStore
+vds2.virtualize.to_icechunk(session.store, append_dim="time")
+session.commit("Appended second dataset")
 ```
 
 See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.

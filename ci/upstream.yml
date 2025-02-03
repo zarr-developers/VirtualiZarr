@@ -33,3 +33,4 @@ dependencies:
       - icechunk>=0.1.0a15
       - git+https://github.com/zarr-developers/zarr-python # installing from source until >= 3.0.2
       - imagecodecs-numcodecs==2024.6.1
+      - git+https://github.com/fsspec/kerchunk.git@main

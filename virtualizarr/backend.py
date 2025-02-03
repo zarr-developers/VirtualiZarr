@@ -13,7 +13,7 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
-    HDF5VirtualBackend,
+    HDFVirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
@@ -27,9 +27,9 @@ VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
     "zarr": ZarrVirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
+    "hdf5": HDFVirtualBackend,
+    "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
-    "hdf5": HDF5VirtualBackend,
-    "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
     "netcdf3": NetCDF3VirtualBackend,
     "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,

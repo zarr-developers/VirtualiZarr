@@ -38,6 +38,12 @@ Breaking changes
   rather than positional or keyword.  This change is breaking _only_ where arguments for
   these parameters are currently given positionally.  (:issue:`341`) By
   `Chuck Daniels <https://github.com/chuckwondo>`_.
+- The default backend for netCDF4 and HDF5 is now the custom ``HDFVirtualBackend`` replacing
+  the previous default which was a wrapper around the kerchunk backend.
+  (:issue:`374`, :pull:`395`) By `Julia Signell <https://github.com/jsignell>`_.
+- Optional dependency on kerchunk is now the newly-released v0.2.8. This release of kerchunk is compatible with zarr-python v3,
+  which means a released version of kerchunk can now be used with both VirtualiZarr and Icechunk.
+  (:issue:`392`, :pull:`406`, :pull:`412``) By `Julia Signell <https://github.com/jsignell>`_ and `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -62,6 +68,8 @@ Documentation
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.2.0:
 
