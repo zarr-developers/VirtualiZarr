@@ -43,19 +43,19 @@ hdf5 = [
     "h5py",
 ]
 netcdf3 = [
-    "kerchunk>=0.25.0",
+    "kerchunk>=0.2.8",
     "scipy",
 ]
 fits = [
-    "kerchunk>=0.25.0",
+    "kerchunk>=0.2.8",
     "astropy",
 ]
 # un-implemented readers
 # tiff = [
-#     "kerchunk>=0.25.0",
+#     "kerchunk>=0.2.8",
 #     "tifffile",
 # ]
-# grib = ["kerchunk>=0.25.0"]
+# grib = ["kerchunk>=0.2.8",]
 # zarr = ["zarr==3.0.0b2"]
 all_readers = [
     "virtualizarr[hdf]",
@@ -67,7 +67,9 @@ all_readers = [
 #    "virtualizarr[zarr]",
 ]
 # writers
-icechunk = ["icechunk"]
+icechunk = [
+    "icechunk>=0.1.0a12",
+]
 # technically also a reader, as fastparquet is also required to read parquet-formatted kerchunk references
 kerchunk = ["fastparquet"]
 all_writers = [
@@ -77,17 +79,6 @@ all_writers = [
 all = [
     "virtualizarr[all_readers]",
     "virtualizarr[all_writers]",
-]
-netcdf3 = [
-    "kerchunk>=0.2.8",
-    "scipy",
-]
-fits = [
-    "kerchunk>=0.2.8",
-    "astropy",
-]
-icechunk = [
-    "icechunk>=0.1.0a12",
 ]
 test = [
     "codecov",
