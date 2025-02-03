@@ -12,10 +12,30 @@ mamba activate virtualizarr-tests
 pre-commit install
 # git checkout -b new-feature
 python -m pip install -e . --no-deps
-python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+python -m pytest
 ```
 
-The `--run-network-tests` argument is optional - it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
+You may also add the `--run-network-tests` option, which will run additional tests
+that require downloading files over the network.  Skip this if you want the tests to run
+faster or you have no internet access:
+
+```bash
+python -m pytest --run-network-tests
+```
+
+Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
+coverage report locally, if you wish (CI will automatically do so).  Here are some
+examples:
+
+```bash
+python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
+python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
+python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
+```
+
+To see all available `pytest` options added by the `pytest-cov` plugin, run
+`python -m pytest -h`, or see the
+[pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/readme.html).
 
 ## Contributing documentation
 
@@ -39,13 +59,17 @@ Open `docs/_build/html/index.html` in a web browser (on MacOS you can do this fr
 
 ## Making a release
 
-Anyone with commit privileges to the repository can issue a release.
+Anyone with commit privileges to the repository can issue a release, and you should feel free to issue a release at any point in time when all the CI tests on `main` are passing.
 
-1. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
-2. Select draft a new release.
-3. Select 'Choose a tag', then 'create a new tag'
-4. Enter the name for the new tag following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
-4. Click 'Generate Release Notes' to draft notes based on merged pull requests.
-5. Edit the draft release notes for consistency.
-6. Select 'Publish' to publish the release. This should automatically upload the new release to PyPI and Conda-Forge.
-7. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
+1. Decide on the release version number for the new release, following the [EffVer](https://jacobtomlinson.dev/effver/) versioning scheme (e.g., releasing v0.2.0 as the next release after v0.1.0 denotes that “some small effort may be required to make sure this version works for you”).
+2. Write a high-level summary of the changes in this release, and write it into the release notes in `docs/releases.rst`. Create and merge a PR which adds the summary and also changes the release notes to say today's date and the version number of the new release. Don't add the blank template for future releases yet.
+3. Navigate to the [https://github.com/zarr-developers/virtualizarr/releases](https://github.com/zarr-developers/virtualizarr/releases) releases page.
+4. Select 'Draft a new release'.
+5. Select 'Choose a tag', then 'Create a new tag'
+6. Enter the name for the new tag (i.e. the release version number).
+7. Click 'Generate Release Notes' to draft notes based on merged pull requests, and paste the same release summary you wrote earlier at the top.
+8. Edit the draft release notes for consistency.
+9. Select 'Publish' to publish the release. This should automatically upload the new release to [PyPI](https://pypi.org/project/virtualizarr/) and [conda-forge](https://anaconda.org/conda-forge/virtualizarr).
+10. Check that this has run successfully (PyPI should show the new version number very quickly, but conda-forge might take several hours).
+11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
+12. (Optional) Advertise the release on social media 📣

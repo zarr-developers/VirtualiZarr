@@ -7,6 +7,7 @@ import ujson
 
 from virtualizarr.backend import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.tests import has_fastparquet, requires_kerchunk
 
 
 def gen_ds_refs(
@@ -171,3 +172,90 @@ def test_handle_relative_paths(refs_file_factory):
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
     }
+
+
+@requires_kerchunk
+@pytest.mark.parametrize(
+    "reference_format",
+    ["json", "invalid", *(["parquet"] if has_fastparquet else [])],
+)
+def test_open_virtual_dataset_existing_kerchunk_refs(
+    tmp_path, netcdf4_virtual_dataset, reference_format
+):
+    example_reference_dict = netcdf4_virtual_dataset.virtualize.to_kerchunk(
+        format="dict"
+    )
+
+    if reference_format == "invalid":
+        # Test invalid file format leads to ValueError
+        ref_filepath = tmp_path / "ref.csv"
+        with open(ref_filepath.as_posix(), mode="w") as of:
+            of.write("tmp")
+
+        with pytest.raises(ValueError):
+            open_virtual_dataset(
+                filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+            )
+
+    else:
+        # Test valid json and parquet reference formats
+
+        if reference_format == "json":
+            ref_filepath = tmp_path / "ref.json"
+
+            import ujson
+
+            with open(ref_filepath, "w") as json_file:
+                ujson.dump(example_reference_dict, json_file)
+
+        if reference_format == "parquet":
+            from kerchunk.df import refs_to_dataframe
+
+            ref_filepath = tmp_path / "ref.parquet"
+            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+
+        vds = open_virtual_dataset(
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+        )
+
+        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
+        refs = vds.virtualize.to_kerchunk(format="dict")
+        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+        assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
+        assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
+        assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
+        assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
+
+        assert list(vds) == list(netcdf4_virtual_dataset)
+        assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
+        assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
+
+
+@requires_kerchunk
+def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
+    # For now, we raise a NotImplementedError if we read existing references that have inlined data
+    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
+
+    ref_filepath = tmp_path / "ref.json"
+
+    import ujson
+
+    with open(ref_filepath, "w") as json_file:
+        ujson.dump(netcdf4_inlined_ref, json_file)
+
+    with pytest.raises(NotImplementedError):
+        open_virtual_dataset(
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+        )
+
+
+@pytest.mark.parametrize("drop_variables", ["a", ["a"]])
+def test_drop_variables(refs_file_factory, drop_variables):
+    refs_file = refs_file_factory()
+
+    vds = open_virtual_dataset(
+        refs_file, filetype="kerchunk", drop_variables=drop_variables
+    )
+
+    assert all(var not in vds for var in drop_variables)

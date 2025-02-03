@@ -1,11 +1,17 @@
+from typing import Callable
+
 import numpy as np
 import pytest
 import xarray as xr
+from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import (
+    parametrize_over_hdf_backends,
+    requires_hdf5plugin,
+    requires_imagecodecs,
+)
 from virtualizarr.zarr import ZArray
 
 
@@ -224,16 +230,19 @@ class TestConcat:
         assert result.data.zarray.zarr_format == zarray.zarr_format
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+@requires_hdf5plugin
+@requires_imagecodecs
+@parametrize_over_hdf_backends
 class TestCombineUsingIndexes:
-    def test_combine_by_coords(self, netcdf4_files, hdf_backend):
-        filepath1, filepath2 = netcdf4_files
+    def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
+        filepath1, filepath2 = netcdf4_files_factory()
 
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        vds1 = open_virtual_dataset(
+            filepath1, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
+        )
+        vds2 = open_virtual_dataset(
+            filepath2, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
+        )
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
@@ -245,10 +254,8 @@ class TestCombineUsingIndexes:
     def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files, hdf_backend):
         filepath1, filepath2 = netcdf4_files
 
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
+        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
 
         combined_vds = xr.combine_by_coords(
             [vds2, vds1],
@@ -259,8 +266,7 @@ class TestCombineUsingIndexes:
         assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [None, HDFVirtualBackend])
+@parametrize_over_hdf_backends
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
@@ -293,6 +299,8 @@ class TestRenamePaths:
         with pytest.raises(TypeError):
             vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
+    @requires_hdf5plugin
+    @requires_imagecodecs
     def test_mixture_of_manifestarrays_and_numpy_arrays(
         self, netcdf4_file, hdf_backend
     ):
@@ -308,3 +316,17 @@ class TestRenamePaths:
             == "s3://bucket/air.nc"
         )
         assert isinstance(renamed_vds["lat"].data, np.ndarray)
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+def test_nbytes(simple_netcdf4):
+    vds = open_virtual_dataset(simple_netcdf4)
+    assert vds.virtualize.nbytes == 32
+    assert vds.nbytes == 48
+
+    vds = open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"])
+    assert vds.virtualize.nbytes == 48
+
+    ds = open_dataset(simple_netcdf4)
+    assert ds.virtualize.nbytes == ds.nbytes

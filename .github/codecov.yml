@@ -1,0 +1,19 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 75
+        # See https://json.schemastore.org/codecov.json
+        threshold: "0.1%"
+    patch:
+      default:
+        target: 75
+comment:
+  layout: "diff, files"
+  behavior: default
+  require_changes: true  # if true: only post the comment if coverage changes
+  branches:               # branch names that can post comment
+    - "main"
+ignore:
+  - "conftest.py"
+  - "virtualizarr/tests"  # ignore folders and all its contents

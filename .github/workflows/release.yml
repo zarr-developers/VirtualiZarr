@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PIP_ROOT_USER_ACTION: ignore
+
 jobs:
   build-artifacts:
     runs-on: ubuntu-latest

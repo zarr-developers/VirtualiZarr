@@ -1,9 +1,9 @@
 Release notes
 =============
 
-.. _v1.1.1:
+.. _v1.2.1:
 
-v1.1.1 (unreleased)
+v1.2.1 (unreleased)
 -------------------
 
 New Features
@@ -11,8 +11,83 @@ New Features
 
 - Optional dependencies can now be installed in groups via pip. See the installation docs.
   (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
+  (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Sync with Icechunk v0.1.0a8  (:pull:`368`) By `Matthew Iannucci <https://github.com/mpiannucci>`. This also adds support
+  for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
+  is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
+  underlying data has changed since the virtual references were written.
+- Add ``group=None`` keyword-only parameter to the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method to allow writing to a nested group
+  at a specified group path (rather than defaulting to the root group, when no group is
+  specified).  (:issue:`341`) By `Chuck Daniels <https://github.com/chuckwondo>`_.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Passing ``group=None`` (the default) to ``open_virtual_dataset`` for a file with multiple groups no longer raises an error, instead it gives you the root group.
+  This new behaviour is more consistent with ``xarray.open_dataset``.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Indexes are now created by default for any loadable one-dimensional coordinate variables.
+  Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
+  This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
+  (:issue:`18`, :pull:`357`, :pull:`358`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- The ``append_dim`` and ``last_updated_at`` parameters of the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method are now keyword-only parameters,
+  rather than positional or keyword.  This change is breaking _only_ where arguments for
+  these parameters are currently given positionally.  (:issue:`341`) By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
+- The default backend for netCDF4 and HDF5 is now the custom ``HDFVirtualBackend`` replacing
+  the previous default which was a wrapper around the kerchunk backend.
+  (:issue:`374`, :pull:`395`) By `Julia Signell <https://github.com/jsignell>`_.
+- Optional dependency on kerchunk is now the newly-released v0.2.8. This release of kerchunk is compatible with zarr-python v3,
+  which means a released version of kerchunk can now be used with both VirtualiZarr and Icechunk.
+  (:issue:`392`, :pull:`406`, :pull:`412``) By `Julia Signell <https://github.com/jsignell>`_ and `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Fix bug preventing generating references for the root group of a file when a subgroup exists.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in HDF reader where dimension names of dimensions in a subgroup would be incorrect.
+  (:issue:`364`, :pull:`366`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in dmrpp reader so _FillValue is included in variables' encodings.
+  (:pull:`369`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+- Fix bug passing arguments to FITS reader, and test it on Hubble Space Telescope data.
+  (:pull:`363`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+- Change intro text in readme and docs landing page to be clearer, less about the relationship to Kerchunk, and more about why you would want virtual datasets in the first place.
+  (:pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+.. _v1.2.0:
+
+v1.2.0 (5th Dec 2024)
+---------------------
+
+This release brings a stricter internal model for manifest paths,
+support for appending to existing icechunk stores,
+an experimental non-kerchunk-based HDF5 reader,
+handling of nested groups in DMR++ files,
+as well as many other bugfixes and documentation improvements.
+
+New Features
+~~~~~~~~~~~~
+
+>>>>>>> main
 - Add a ``virtual_backend_kwargs`` keyword argument to file readers and to ``open_virtual_dataset``, to allow reader-specific options to be passed down.
   (:pull:`315`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added append functionality to `to_icechunk` (:pull:`272`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -46,8 +121,12 @@ Documentation
   (:pull:`298`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - More minor improvements to the Contributing Guide.
   (:pull:`304`) By `Doug Latornell <https://github.com/DougLatornell>`_.
+- Correct some links to the API.
+  (:pull:`325`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added links to recorded presentations on VirtualiZarr.
   (:pull:`313`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added links to existing example notebooks.
+  (:issue:`329`, :pull:`331`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~

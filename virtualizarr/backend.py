@@ -13,7 +13,7 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
-    HDF5VirtualBackend,
+    HDFVirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
@@ -27,9 +27,9 @@ VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
     "zarr_v3": ZarrV3VirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
+    "hdf5": HDFVirtualBackend,
+    "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
-    "hdf5": HDF5VirtualBackend,
-    "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
     "netcdf3": NetCDF3VirtualBackend,
     "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,
@@ -128,7 +128,7 @@ def open_virtual_dataset(
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
-    filetype : FileType, default None
+    filetype : FileType or str, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'zarr_v3', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
@@ -182,13 +182,16 @@ def open_virtual_dataset(
     if backend and filetype:
         raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
 
-    if filetype is not None:
-        # if filetype is user defined, convert to FileType
-        filetype = FileType(filetype)
-    else:
+    if filetype is None:
         filetype = automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
+    elif isinstance(filetype, str):
+        # if filetype is a user defined string, convert to FileType
+        filetype = FileType(filetype.lower())
+    elif not isinstance(filetype, FileType):
+        raise ValueError("Filetype must be a valid string or FileType")
+
     if backend:
         backend_cls = backend
     else:

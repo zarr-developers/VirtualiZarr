@@ -1,10 +1,6 @@
+from datetime import datetime
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Literal,
-    overload,
-)
+from typing import TYPE_CHECKING, Callable, Literal, overload
 
 from xarray import Dataset, register_dataset_accessor
 
@@ -43,19 +39,70 @@ class VirtualiZarrDatasetAccessor:
         """
         dataset_to_zarr(self.ds, storepath)
 
-    def to_icechunk(self, store: "IcechunkStore") -> None:
+    def to_icechunk(
+        self,
+        store: "IcechunkStore",
+        *,
+        group: str | None = None,
+        append_dim: str | None = None,
+        last_updated_at: datetime | None = None,
+    ) -> None:
         """
         Write an xarray dataset to an Icechunk store.
 
-        Any variables backed by ManifestArray objects will be be written as virtual references, any other variables will be loaded into memory before their binary chunk data is written into the store.
+        Any variables backed by ManifestArray objects will be be written as virtual
+        references. Any other variables will be loaded into memory before their binary
+        chunk data is written into the store.
+
+        If `append_dim` is provided, the virtual dataset will be appended to the
+        existing IcechunkStore along the `append_dim` dimension.
+
+        If `last_updated_at` is provided, it will be used as a checksum for any virtual
+        chunks written to the store with this operation.  At read time, if any of the
+        virtual chunks have been updated since this provided datetime, an error will be
+        raised.  This protects against reading outdated virtual chunks that have been
+        updated since the last read.  When not provided, no check is performed.  This
+        value is stored in Icechunk with seconds precision, so be sure to take that into
+        account when providing this value.
 
         Parameters
         ----------
         store: IcechunkStore
+            Store to write dataset into.
+        group: str, optional
+            Path of the group to write the dataset into (default: the root group).
+        append_dim: str, optional
+            Dimension along which to append the virtual dataset.
+        last_updated_at: datetime, optional
+            Datetime to use as a checksum for any virtual chunks written to the store
+            with this operation.  When not provided, no check is performed.
+
+        Raises
+        ------
+        ValueError
+            If the store is read-only.
+
+        Examples
+        --------
+        To ensure an error is raised if the files containing referenced virtual chunks
+        are modified at any time from now on, pass the current time to
+        ``last_updated_at``.
+
+        >>> from datetime import datetime
+        >>> vds.virtualize.to_icechunk(  # doctest: +SKIP
+        ...     icechunkstore,
+        ...     last_updated_at=datetime.now(),
+        ... )
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
-        dataset_to_icechunk(self.ds, store)
+        dataset_to_icechunk(
+            self.ds,
+            store,
+            group=group,
+            append_dim=append_dim,
+            last_updated_at=last_updated_at,
+        )
 
     @overload
     def to_kerchunk(
@@ -183,3 +230,21 @@ class VirtualiZarrDatasetAccessor:
                 new_ds[var_name].data = data.rename_paths(new=new)
 
         return new_ds
+
+    @property
+    def nbytes(self) -> int:
+        """
+        Size required to hold these references in memory in bytes.
+
+        Note this is not the size of the referenced chunks if they were actually loaded into memory,
+        this is only the size of the pointers to the chunk locations.
+        If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
+
+        In-memory (loadable) variables are included in the total using xarray's normal ``.nbytes`` method.
+        """
+        return sum(
+            var.data.nbytes_virtual
+            if isinstance(var.data, ManifestArray)
+            else var.nbytes
+            for var in self.ds.variables.values()
+        )

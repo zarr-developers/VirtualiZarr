@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from xarray import open_dataset
+from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset
@@ -15,8 +15,10 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    network,
-    requires_kerchunk,
+    parametrize_over_hdf_backends,
+    requires_hdf5plugin,
+    requires_imagecodecs,
+    requires_network,
     requires_s3fs,
     requires_scipy,
 )
@@ -82,20 +84,29 @@ def test_FileType():
         FileType(None)
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+@parametrize_over_hdf_backends
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file, hdf_backend):
         vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert vds.indexes == {}
 
-    def test_create_default_indexes(self, netcdf4_file, hdf_backend):
-        with pytest.warns(UserWarning, match="will create in-memory pandas indexes"):
-            vds = open_virtual_dataset(netcdf4_file, indexes=None, backend=hdf_backend)
+    @requires_hdf5plugin
+    @requires_imagecodecs
+    def test_create_default_indexes_for_loadable_variables(
+        self, netcdf4_file, hdf_backend
+    ):
+        loadable_variables = ["time", "lat"]
+
+        vds = open_virtual_dataset(
+            netcdf4_file,
+            indexes=None,
+            backend=hdf_backend,
+            loadable_variables=loadable_variables,
+        )
         ds = open_dataset(netcdf4_file, decode_times=True)
 
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
-        assert index_mappings_equal(vds.xindexes, ds.xindexes)
+        assert index_mappings_equal(vds.xindexes, ds[loadable_variables].xindexes)
 
 
 def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, Index]):
@@ -114,8 +125,9 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+@requires_hdf5plugin
+@requires_imagecodecs
+@parametrize_over_hdf_backends
 def test_cftime_index(tmpdir, hdf_backend):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
@@ -144,8 +156,7 @@ def test_cftime_index(tmpdir, hdf_backend):
     assert vds.attrs == ds.attrs
 
 
-@requires_kerchunk
-@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+@parametrize_over_hdf_backends
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #150
@@ -163,14 +174,16 @@ class TestOpenVirtualDatasetAttrs:
         }
 
 
-@requires_kerchunk
+@parametrize_over_hdf_backends
 class TestDetermineCoords:
-    def test_infer_one_dimensional_coords(self, netcdf4_file):
-        vds = open_virtual_dataset(netcdf4_file, indexes={})
+    def test_infer_one_dimensional_coords(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
         assert set(vds.coords) == {"time", "lat", "lon"}
 
-    def test_var_attr_coords(self, netcdf4_file_with_2d_coords):
-        vds = open_virtual_dataset(netcdf4_file_with_2d_coords, indexes={})
+    def test_var_attr_coords(self, netcdf4_file_with_2d_coords, hdf_backend):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_2d_coords, indexes={}, backend=hdf_backend
+        )
 
         expected_dimension_coords = ["ocean_time", "s_rho"]
         expected_2d_coords = ["lon_rho", "lat_rho", "h"]
@@ -185,13 +198,13 @@ class TestDetermineCoords:
         assert set(vds.coords) == set(expected_coords)
 
 
-@network
+@requires_network
 @requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
         "indexes", [None, {}], ids=["None index", "empty dict index"]
     )
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    @parametrize_over_hdf_backends
     def test_anon_read_s3(self, indexes, hdf_backend):
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
@@ -208,8 +221,8 @@ class TestReadFromS3:
             assert isinstance(vds[var].data, ManifestArray), var
 
 
-@network
-@pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+@requires_network
+@parametrize_over_hdf_backends
 class TestReadFromURL:
     @pytest.mark.parametrize(
         "filetype, url",
@@ -226,13 +239,15 @@ class TestReadFromURL:
                 "netcdf4",
                 "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
             ),
-            (
+            pytest.param(
                 "hdf4",
                 "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
+                marks=pytest.mark.skip(reason="often times out"),
             ),
-            (
+            pytest.param(
                 "hdf5",
                 "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
+                marks=pytest.mark.skip(reason="often times out"),
             ),
             # https://github.com/zarr-developers/VirtualiZarr/issues/159
             # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
@@ -276,6 +291,7 @@ class TestReadFromURL:
             vds = open_virtual_dataset(url, indexes={})
             assert isinstance(vds, xr.Dataset)
 
+    @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
     def test_virtualizarr_vs_local_nisar(self, hdf_backend):
         import fsspec
 
@@ -309,9 +325,49 @@ class TestReadFromURL:
         xrt.assert_equal(dsXR, dsV)
 
 
-@requires_kerchunk
+@parametrize_over_hdf_backends
+class TestOpenVirtualDatasetHDFGroup:
+    def test_open_empty_group(self, empty_netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(empty_netcdf4_file, indexes={}, backend=hdf_backend)
+        assert isinstance(vds, xr.Dataset)
+        expected = Dataset()
+        xrt.assert_identical(vds, expected)
+
+    def test_open_subgroup(
+        self, netcdf4_file_with_data_in_multiple_groups, hdf_backend
+    ):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_data_in_multiple_groups,
+            group="subgroup",
+            indexes={},
+            backend=hdf_backend,
+        )
+        assert list(vds.variables) == ["bar"]
+        assert isinstance(vds["bar"].data, ManifestArray)
+        assert vds["bar"].shape == (2,)
+
+    @pytest.mark.parametrize("group", ["", None])
+    def test_open_root_group(
+        self,
+        netcdf4_file_with_data_in_multiple_groups,
+        hdf_backend,
+        group,
+    ):
+        vds = open_virtual_dataset(
+            netcdf4_file_with_data_in_multiple_groups,
+            group=group,
+            indexes={},
+            backend=hdf_backend,
+        )
+        assert list(vds.variables) == ["foo"]
+        assert isinstance(vds["foo"].data, ManifestArray)
+        assert vds["foo"].shape == (3,)
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestLoadVirtualDataset:
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    @parametrize_over_hdf_backends
     def test_loadable_variables(self, netcdf4_file, hdf_backend):
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
@@ -337,8 +393,13 @@ class TestLoadVirtualDataset:
         with pytest.raises(ValueError):
             open_virtual_dataset(netcdf4_file, filetype="unknown")
 
+        with pytest.raises(ValueError):
+            open_virtual_dataset(netcdf4_file, filetype=ManifestArray)
+
         with pytest.raises(NotImplementedError):
             open_virtual_dataset(netcdf4_file, filetype="grib")
+
+        open_virtual_dataset(netcdf4_file, filetype="netCDF4")
 
     def test_explicit_filetype_and_backend(self, netcdf4_file):
         with pytest.raises(ValueError):
@@ -346,20 +407,18 @@ class TestLoadVirtualDataset:
                 netcdf4_file, filetype="hdf", backend=HDFVirtualBackend
             )
 
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
+    @parametrize_over_hdf_backends
     def test_group_kwarg(self, hdf5_groups_file, hdf_backend):
         if hdf_backend == HDFVirtualBackend:
-            with pytest.raises(NotImplementedError, match="Nested groups"):
-                open_virtual_dataset(hdf5_groups_file, backend=hdf_backend)
             with pytest.raises(KeyError, match="doesn't exist"):
                 open_virtual_dataset(
                     hdf5_groups_file, group="doesnt_exist", backend=hdf_backend
                 )
         if hdf_backend == HDF5VirtualBackend:
-            with pytest.raises(ValueError, match="Multiple HDF Groups found"):
-                open_virtual_dataset(hdf5_groups_file)
             with pytest.raises(ValueError, match="not found in"):
-                open_virtual_dataset(hdf5_groups_file, group="doesnt_exist")
+                open_virtual_dataset(
+                    hdf5_groups_file, group="doesnt_exist", backend=hdf_backend
+                )
 
         vars_to_load = ["air", "time"]
         vds = open_virtual_dataset(
@@ -392,90 +451,14 @@ class TestLoadVirtualDataset:
         }
         mock_read_kerchunk.assert_called_once_with(**args)
 
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
-    def test_open_dataset_with_empty(self, hdf5_empty, tmpdir, hdf_backend):
+    @parametrize_over_hdf_backends
+    def test_open_dataset_with_empty(self, hdf5_empty, hdf_backend):
         vds = open_virtual_dataset(hdf5_empty, backend=hdf_backend)
         assert vds.empty.dims == ()
         assert vds.empty.attrs == {"empty": "true"}
 
-    @pytest.mark.parametrize("hdf_backend", [HDF5VirtualBackend, HDFVirtualBackend])
-    def test_open_dataset_with_scalar(self, hdf5_scalar, tmpdir, hdf_backend):
+    @parametrize_over_hdf_backends
+    def test_open_dataset_with_scalar(self, hdf5_scalar, hdf_backend):
         vds = open_virtual_dataset(hdf5_scalar, backend=hdf_backend)
         assert vds.scalar.dims == ()
         assert vds.scalar.attrs == {"scalar": "true"}
-
-
-@requires_kerchunk
-@pytest.mark.parametrize(
-    "reference_format",
-    ["json", "parquet", "invalid"],
-)
-def test_open_virtual_dataset_existing_kerchunk_refs(
-    tmp_path, netcdf4_virtual_dataset, reference_format
-):
-    example_reference_dict = netcdf4_virtual_dataset.virtualize.to_kerchunk(
-        format="dict"
-    )
-
-    if reference_format == "invalid":
-        # Test invalid file format leads to ValueError
-        ref_filepath = tmp_path / "ref.csv"
-        with open(ref_filepath.as_posix(), mode="w") as of:
-            of.write("tmp")
-
-        with pytest.raises(ValueError):
-            open_virtual_dataset(
-                filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
-            )
-
-    else:
-        # Test valid json and parquet reference formats
-
-        if reference_format == "json":
-            ref_filepath = tmp_path / "ref.json"
-
-            import ujson
-
-            with open(ref_filepath, "w") as json_file:
-                ujson.dump(example_reference_dict, json_file)
-
-        if reference_format == "parquet":
-            from kerchunk.df import refs_to_dataframe
-
-            ref_filepath = tmp_path / "ref.parquet"
-            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
-
-        vds = open_virtual_dataset(
-            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
-        )
-
-        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
-        # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
-        refs = vds.virtualize.to_kerchunk(format="dict")
-        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
-        assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
-        assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
-        assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
-        assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
-
-        assert list(vds) == list(netcdf4_virtual_dataset)
-        assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
-        assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
-
-
-@requires_kerchunk
-def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
-    # For now, we raise a NotImplementedError if we read existing references that have inlined data
-    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
-
-    ref_filepath = tmp_path / "ref.json"
-
-    import ujson
-
-    with open(ref_filepath, "w") as json_file:
-        ujson.dump(netcdf4_inlined_ref, json_file)
-
-    with pytest.raises(NotImplementedError):
-        open_virtual_dataset(
-            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
-        )
