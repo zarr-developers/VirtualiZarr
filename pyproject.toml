@@ -46,7 +46,7 @@ hdf = [
 # kerchunk-based readers
 hdf5 = [
     "virtualizarr[remote]",
-    "kerchunk>=0.2.5",
+    "kerchunk>=0.2.8",
     "h5py",
 ]
 netcdf3 = [
