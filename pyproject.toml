@@ -29,12 +29,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# for creating virtual datasets from objects on remote storage
 remote = [
     "fsspec",
     "requests",
     "aiohttp",
     "s3fs",
 ]
+
 # non-kerchunk-based readers
 hdf = [
     "virtualizarr[remote]",
@@ -43,6 +45,7 @@ hdf = [
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
 ]
+
 # kerchunk-based readers
 hdf5 = [
     "virtualizarr[remote]",
@@ -59,31 +62,17 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
-# un-implemented readers
-# tiff = [
-#     "virtualizarr[remote]",
-#     "kerchunk>=0.2.8",
-#     "tifffile",
-# ]
-# grib = [
-#     "virtualizarr[remote]",
-#     "kerchunk>=0.2.8",
-# ]
-# zarr = ["zarr==3.0.0b2"]
 all_readers = [
     "virtualizarr[hdf]",
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
-#    "virtualizarr[tiff]",
-#    "virtualizarr[grib]",
-#    "virtualizarr[zarr]",
 ]
+
 # writers
 icechunk = [
     "icechunk>=0.1.0a12",
 ]
-# technically also a reader, as fastparquet is also required to read parquet-formatted kerchunk references
 kerchunk = ["fastparquet"]
 all_writers = [
     "virtualizarr[icechunk]",
@@ -93,6 +82,7 @@ all = [
     "virtualizarr[all_readers]",
     "virtualizarr[all_writers]",
 ]
+
 test = [
     "codecov",
     "mypy",
