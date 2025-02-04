@@ -342,3 +342,13 @@ def non_coord_dim(tmpdir):
     ds = ds.drop_dims("dim3")
     ds.to_netcdf(filepath, engine="netcdf4")
     return filepath
+
+
+@pytest.fixture
+def scalar_fill_value_hdf5_file(tmpdir):
+    filepath = f"{tmpdir}/scalar_fill_value.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.randint(0, 10, size=(5))
+    fill_value = 42
+    f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
+    return filepath
