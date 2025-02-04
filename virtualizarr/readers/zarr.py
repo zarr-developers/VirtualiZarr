@@ -25,7 +25,7 @@ from virtualizarr.readers.common import (
     maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.utils import check_for_collisions
-from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, Codec, ZArray
+from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
 
 if TYPE_CHECKING:
     import zarr
@@ -101,68 +101,47 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, prefix: str) -> 
 
 
 async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
-    from virtualizarr.codecs import get_codecs
-
-    codecs = get_codecs(zarr_array)
-
-    # Mypy does not like the Tuple | Codec type from get_codecs
-    if isinstance(codecs, Codec):
-        filters = codecs.filters
-        compressor = codecs.compressor
-
-    elif isinstance(codecs, tuple):
-        # is this parsing right for v3?
-        compressor = getattr(codecs[0], "compressor", None)  # type: ignore
-        filters = getattr(codecs[0], "filters", None)  # type: ignore
-
-    else:
-        raise ValueError("codecs should be of dtype tuple or Codec")
-
     attrs = zarr_array.metadata.attributes
 
     fill_value = zarr_array.metadata.fill_value
     if fill_value is not None:
         fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
 
-    if zarr_array.metadata.zarr_format == 2:
-        if filters == []:
-            filters = None
-        # Zarr-python gives us the compressor object. Ex: Blosc(cname='lz4', clevel=5, shuffle=SHUFFLE, blocksize=0)
-        # This won't serialize into a Kerchunk ref, so we can use the .get_config to retrieve a dict.
-        # compressor_dict = codecs.compressor.get_config()
-
-        array_zarray = ZArray(
-            shape=zarr_array.metadata.shape,
-            chunks=zarr_array.metadata.chunks,  # type: ignore[union-attr]
-            dtype=zarr_array.metadata.dtype,
-            fill_value=fill_value,  # type: ignore[arg-type]
-            order="C",
-            compressor=codecs.compressor,  # type: ignore[union-attr]
-            filters=filters,  # type: ignore
-            zarr_format=zarr_array.metadata.zarr_format,
-        )
+    zarr_format = zarr_array.metadata.zarr_format
+    # set ZArray specific values depending on Zarr version
+    if zarr_format == 2:
+        compressors = zarr_array.compressors[0].get_config()
         array_dims = attrs["_ARRAY_DIMENSIONS"]
 
-    elif zarr_array.metadata.zarr_format == 3:
-        if zarr_array.metadata.fill_value is None:
+    elif zarr_format == 3:
+        serializer = zarr_array.serializer.to_dict()  # unused in ZArray?
+        compressors = zarr_array.compressors[
+            0
+        ].to_dict()  # ZArray expects a dict, not a list of dicts, so only the first val from the tuples?
+        array_dims = zarr_array.metadata.dimension_names  # type: ignore[union-attr]
+        if fill_value is None:
             raise ValueError(
                 "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
             )
 
-        array_zarray = ZArray(
-            chunks=zarr_array.metadata.chunk_grid.chunk_shape,  # type: ignore[attr-defined]
-            compressor=compressor,
-            dtype=zarr_array.metadata.data_type.name,  # type: ignore
-            fill_value=fill_value,  # type: ignore[arg-type]
-            filters=filters,
-            order="C",
-            shape=zarr_array.metadata.shape,
-            zarr_format=zarr_array.metadata.zarr_format,
-        )
-        array_dims = zarr_array.metadata.dimension_names  # type: ignore[union-attr]
-
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
+
+    filters = (
+        zarr_array.filters if zarr_array.filters else None
+    )  # if tuple is empty, assign filters to None
+    # import ipdb; ipdb.set_trace()
+
+    array_zarray = ZArray(
+        shape=zarr_array.shape,
+        chunks=zarr_array.chunks,  # type: ignore[attr-defined]
+        dtype=zarr_array.dtype.name,  # type: ignore
+        fill_value=fill_value,
+        order=zarr_array.order,
+        compressor=compressors,
+        filters=filters,
+        zarr_format=zarr_format,
+    )
 
     return {
         "zarray_array": array_zarray,
@@ -275,10 +254,14 @@ class ZarrVirtualBackend(VirtualBackend):
         import asyncio
 
         import zarr
+
+        #  We should remove this once zarr v3 is pinned!
+        # ---------------------------
         from packaging import version
 
         if version.parse(zarr.__version__).major < 3:
             raise ImportError("Zarr V3 is required")
+        # ---------------------------
 
         async def _open_virtual_dataset(
             filepath=filepath,

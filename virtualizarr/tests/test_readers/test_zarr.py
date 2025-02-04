@@ -79,6 +79,9 @@ class TestOpenVirtualDatasetZarr:
                     zarr_metadata_attr = zg_metadata_dict["consolidated_metadata"][
                         "metadata"
                     ][array][attr]
+                    import ipdb
+
+                    ipdb.set_trace()
                     assert vds_attr == zarr_metadata_attr
 
         def _validate_v3(attrs: list[str]):
