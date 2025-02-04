@@ -29,6 +29,6 @@ dependencies:
   - fsspec
   - pip
   - pip:
-      - icechunk>=0.1.0a12 # Installs python-zarr v3 as dependency
+      - icechunk>=0.1.0a12 # Installs zarr-python v3.0.0 as dependency
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1
