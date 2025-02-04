@@ -16,12 +16,7 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
-from virtualizarr.zarr import (
-    encode_dtype,
-    v3_codecs_to_compressors,
-    v3_codecs_to_filters,
-    v3_codecs_to_serializer,
-)
+from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -250,9 +245,6 @@ def write_virtual_variable_to_icechunk(
 
         # Get the codecs and convert them to zarr v3 format
         codecs = zarray._v3_codecs()
-        compressors = v3_codecs_to_compressors(codecs)
-        filters = v3_codecs_to_filters(codecs)
-        serializer = v3_codecs_to_serializer(codecs)
 
         # create array if it doesn't already exist
         arr = group.require_array(
@@ -260,9 +252,9 @@ def write_virtual_variable_to_icechunk(
             shape=zarray.shape,
             chunks=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
-            compressors=compressors,
-            serializer=serializer,
-            filters=filters,
+            compressors=codecs.compressors,
+            serializer=codecs.serializer,
+            filters=codecs.filters,
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
         )

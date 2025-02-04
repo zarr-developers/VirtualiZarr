@@ -85,7 +85,8 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
     # adjust to match v3 spec
     metadata["zarr_format"] = 3
     metadata["node_type"] = "array"
-    metadata["data_type"] = str(np.dtype(metadata.pop("dtype")))
+    dtype = np.dtype(metadata.pop("dtype"))
+    metadata["data_type"] = str(dtype)
     metadata["chunk_grid"] = {
         "name": "regular",
         "configuration": {"chunk_shape": metadata.pop("chunks")},
@@ -94,7 +95,9 @@ def zarr_v3_array_metadata(zarray: ZArray, dim_names: list[str], attrs: dict) ->
         "name": "default",
         "configuration": {"separator": "/"},
     }
-    metadata["codecs"] = tuple(c.to_dict() for c in zarray._v3_codecs())
+
+    codecs = zarray._v3_codecs().into_v3_codecs(dtype)
+    metadata["codecs"] = list(c.to_dict() for c in codecs)
     metadata.pop("filters")
     metadata.pop("compressor")
     metadata.pop("order")
