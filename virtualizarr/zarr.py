@@ -146,7 +146,7 @@ class ZArray:
             replacements["zarr_format"] = zarr_format
         return dataclasses.replace(self, **replacements)
 
-    def _v3_codec_pipeline(self) -> tuple["Codec", ...]:
+    def _v3_codecs(self) -> tuple["Codec", ...]:
         """
         VirtualiZarr internally uses the `filters`, `compressor`, and `order` attributes
         from zarr v2, but to create conformant zarr v3 metadata those 3 must be turned into `codecs` objects.
@@ -164,7 +164,7 @@ class ZArray:
                 parse_codecs,
             )
         except ImportError:
-            raise ImportError("zarr v3 is required to generate v3 codec pipelines")
+            raise ImportError("zarr v3 is required to generate v3 codecs")
 
         codec_configs = []
 
@@ -225,7 +225,7 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     return {"name": name, "configuration": num_codec_copy}
 
 
-def v3_codec_pipeline_to_compressors(
+def v3_codecs_to_compressors(
     codecs: tuple["Codec", ...],
 ) -> list["BytesBytesCodec"]:
     """
@@ -239,7 +239,7 @@ def v3_codec_pipeline_to_compressors(
     return compressors
 
 
-def v3_codec_pipeline_to_filters(
+def v3_codecs_to_filters(
     codecs: tuple["Codec", ...],
 ) -> list["ArrayArrayCodec"]:
     """
@@ -254,7 +254,7 @@ def v3_codec_pipeline_to_filters(
     return filters
 
 
-def v3_codec_pipeline_to_serializer(
+def v3_codecs_to_serializer(
     codecs: tuple["Codec", ...],
 ) -> "ArrayBytesCodec | Literal['auto']":
     """

@@ -18,9 +18,9 @@ from virtualizarr.manifests.utils import (
 )
 from virtualizarr.zarr import (
     encode_dtype,
-    v3_codec_pipeline_to_compressors,
-    v3_codec_pipeline_to_filters,
-    v3_codec_pipeline_to_serializer,
+    v3_codecs_to_compressors,
+    v3_codecs_to_filters,
+    v3_codecs_to_serializer,
 )
 
 if TYPE_CHECKING:
@@ -249,10 +249,10 @@ def write_virtual_variable_to_icechunk(
         append_axis = None
 
         # Get the codecs and convert them to zarr v3 format
-        codecs = zarray._v3_codec_pipeline()
-        compressors = v3_codec_pipeline_to_compressors(codecs)
-        filters = v3_codec_pipeline_to_filters(codecs)
-        serializer = v3_codec_pipeline_to_serializer(codecs)
+        codecs = zarray._v3_codecs()
+        compressors = v3_codecs_to_compressors(codecs)
+        filters = v3_codecs_to_filters(codecs)
+        serializer = v3_codecs_to_serializer(codecs)
 
         # create array if it doesn't already exist
         arr = group.require_array(
