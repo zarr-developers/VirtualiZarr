@@ -66,7 +66,7 @@ class TestOpenVirtualDatasetZarr:
         def _validate_attr_match(
             array: str, zarr_array: zarr.Array | zarr.AsyncArray, zarray: ZArray
         ):
-            zarr_array_fill_value = zarr_array.fill_value
+            zarr_array_fill_value = zarr_array.fill_value  # type: ignore[union-attr]
 
             if zarr_array_fill_value:
                 zarr_array_fill_value = ZARR_DEFAULT_FILL_VALUE[
@@ -101,7 +101,7 @@ class TestOpenVirtualDatasetZarr:
             )
 
             if zarr_array.metadata.zarr_format == 2:
-                zarr_array_compressor = zarr_array.compressor.get_config()
+                zarr_array_compressor = zarr_array.compressor.get_config()  # type: ignore[union-attr]
             elif zarr_array.metadata.zarr_format == 3:
                 zarr_array_compressor = zarr_array.compressors[0].to_dict()
             else:

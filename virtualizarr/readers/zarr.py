@@ -91,16 +91,7 @@ async def build_chunk_manifest(
     )
 
 
-async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, prefix: str) -> dict:
-    """Create a chunk map"""
-
-    keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-
-    sizes = await _concurrent_map(keys, zarr_array.store.getsize)
-    return {key[0]: size for key, size in zip(keys, sizes)}
-
-
-async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
+async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
     attrs = zarr_array.metadata.attributes
 
     fill_value = zarr_array.metadata.fill_value
@@ -110,11 +101,11 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
     zarr_format = zarr_array.metadata.zarr_format
     # set ZArray specific values depending on Zarr version
     if zarr_format == 2:
-        compressors = zarr_array.compressors[0].get_config()
+        compressors = zarr_array.compressors[0].get_config()  # type: ignore[union-attr]
         array_dims = attrs["_ARRAY_DIMENSIONS"]
 
     elif zarr_format == 3:
-        serializer = zarr_array.serializer.to_dict()  # noqa: F841
+        serializer = zarr_array.serializer.to_dict()  # type: ignore[union-attr] # noqa: F841
         # serializer is unused in ZArray. Maybe we will need this in the ZArray refactor
         # https://github.com/zarr-developers/VirtualiZarr/issues/411
         compressors = zarr_array.compressors[
@@ -140,7 +131,7 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
         fill_value=fill_value,
         order=zarr_array.order,
         compressor=compressors,
-        filters=filters,
+        filters=filters,  # type: ignore[arg-type]
         zarr_format=zarr_format,
     )
 
@@ -151,7 +142,9 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
     }
 
 
-async def virtual_variable_from_zarr_array(zarr_array: zarr.AsyncArray, filepath: str):
+async def virtual_variable_from_zarr_array(
+    zarr_array: zarr.AsyncArray[Any], filepath: str
+):
     zarr_prefix = zarr_array.basename
 
     if zarr_array.metadata.zarr_format == 3:
@@ -197,7 +190,7 @@ async def virtual_dataset_from_zarr_group(
 
     virtual_variable_arrays = await asyncio.gather(
         *[
-            virtual_variable_from_zarr_array(zarr_array=array, filepath=filepath)
+            virtual_variable_from_zarr_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
             for array in virtual_zarr_arrays
         ]
     )
