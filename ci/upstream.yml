@@ -29,6 +29,6 @@ dependencies:
   - fsspec
   - pip
   - pip:
-      - git+https://github.com/earthmover/icechunk.git@main # Installs zarr-python v3.0.0 as dependency
+      - git+https://github.com/earth-mover/icechunk.git@main # Installs zarr-python v3.0.0 as dependency
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1
