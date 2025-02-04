@@ -9,6 +9,8 @@ v1.2.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Optional dependencies can now be installed in groups via pip. See the installation docs.
+  (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
   (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Upgrade icechunk dependency to ``>=0.1.0a12``. (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
