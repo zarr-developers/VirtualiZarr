@@ -1,22 +1,46 @@
 Release notes
 =============
 
-.. _v1.2.1:
+.. _v1.3.1:
 
-v1.2.1 (unreleased)
+v1.3.1 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
-<<<<<<< HEAD
 - Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V2 and V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
-=======
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.0:
+
+v1.3.0 (3rd Feb 2025)
+---------------------
+
+This release stabilises our dependencies - you can now use released versions of VirtualiZarr, Kerchunk, and Icechunk all in the same environment!
+
+It also fixes a number of bugs, adds minor features, changes the default reader for HDF/netCDF4 files, and includes refactors to reduce code redundancy with zarr-python v3. You can also choose which sets of dependencies you want at installation time.
+
+New Features
+~~~~~~~~~~~~
+
 - Optional dependencies can now be installed in groups via pip. See the installation docs.
   (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
->>>>>>> main
 - Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
   (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Upgrade icechunk dependency to ``>=0.1.0a12``. (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
@@ -100,6 +124,10 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Icechunk is now v0.1.1.
+  (:pull:`419`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Kerchunk is now v0.2.8.
+  (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
 - Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
