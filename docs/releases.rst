@@ -94,6 +94,10 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Icechunk is now v0.1.1.
+  (:pull:`419`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Kerchunk is now v0.2.8.
+  (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
 - Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
