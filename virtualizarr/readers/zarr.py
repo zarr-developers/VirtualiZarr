@@ -114,7 +114,9 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
         array_dims = attrs["_ARRAY_DIMENSIONS"]
 
     elif zarr_format == 3:
-        serializer = zarr_array.serializer.to_dict()  # unused in ZArray?
+        serializer = zarr_array.serializer.to_dict()  # noqa: F841
+        # serializer is unused in ZArray. Maybe we will need this in the ZArray refactor
+        # https://github.com/zarr-developers/VirtualiZarr/issues/411
         compressors = zarr_array.compressors[
             0
         ].to_dict()  # ZArray expects a dict, not a list of dicts, so only the first val from the tuples?
@@ -130,7 +132,6 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray):
     filters = (
         zarr_array.filters if zarr_array.filters else None
     )  # if tuple is empty, assign filters to None
-    # import ipdb; ipdb.set_trace()
 
     array_zarray = ZArray(
         shape=zarr_array.shape,

@@ -147,18 +147,7 @@ def test_zarr_roundtrip_icechunk(zarr_store):
     session = repo.writable_session("main")
 
     # Write the virtual dataset to icechunk
-    import ipdb
 
-    ipdb.set_trace()
-
-    # ipdb> ds.air.data.zarray
-    # ZArray(shape=(10, 9, 18), chunks=(5, 9, 18), dtype=dtype('int16'), fill_value=0, order='C', compressor=Blosc(cname='lz4', clevel=5, shuffle=SHUFFLE, blocksize=0), filters=None, zarr_format=2)
-    # <Array file:///private/var/folders/mb/7d7yq_4j2qgdfm_j3j4tsyl40000gn/T/pytest-of-nrhagen/pytest-97/test_zarr_roundtrip_icechunk_Z0/air.zarr/air shape=(10, 9, 18) dtype=int16>
-    # zg['air'].compressor -> Blosc(cname='lz4', clevel=5, shuffle=SHUFFLE, blocksize=0)
-
-    # so we can't represent the compressor like that in ZArray, how is it supposed to look.
-    # is there a explicit test?
-    # what does, for ex, the hdf reader look like?
     ds.virtualize.to_icechunk(session.store)
 
     rtds = xr.open_zarr(session.store)

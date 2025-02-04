@@ -183,6 +183,8 @@ class ZArray:
                 [_num_codec_config_to_configurable(filter) for filter in self.filters]
             )
 
+        # compressor {'name': 'zstd', 'configuration': {'level': 0, 'checksum': False}}
+        # gives: *** KeyError: 'id' for zarr v3
         if self.compressor:
             codec_configs.append(_num_codec_config_to_configurable(self.compressor))
 
