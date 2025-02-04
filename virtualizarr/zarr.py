@@ -2,6 +2,7 @@ import dataclasses
 from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
 import numpy as np
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
     pass
@@ -157,39 +158,17 @@ class ZArray:
         ```
         """
         try:
-            from zarr.core.metadata.v3 import (  # type: ignore[import-untyped]
-                parse_codecs,
-            )
+            from zarr.abc.codec import Codec as ZarrCodec
+            from zarr.core.array import _parse_chunk_encoding_v3
         except ImportError:
-            raise ImportError("zarr v3 is required to generate v3 codec pipelines")
-
-        codec_configs = []
-
-        # https://zarr-specs.readthedocs.io/en/latest/v3/codecs/transpose/v1.0.html#transpose-codec-v1
-        # Either "C" or "F", defining the layout of bytes within each chunk of the array.
-        # "C" means row-major order, i.e., the last dimension varies fastest;
-        # "F" means column-major order, i.e., the first dimension varies fastest.
-        # For now, we only need transpose if the order is not "C"
-        if self.order == "F":
-            order = tuple(reversed(range(len(self.shape))))
-            transpose = dict(name="transpose", configuration=dict(order=order))
-            codec_configs.append(transpose)
-
-        # Noting here that zarr v3 has very few codecs specificed in the official spec,
-        # and that there are far more codecs in `numcodecs`. We take a gamble and assume
-        # that the codec names and configuration are simply mapped into zarrv3 "configurables".
-        if self.filters:
-            codec_configs.extend(
-                [_num_codec_config_to_configurable(filter) for filter in self.filters]
-            )
-
-        if self.compressor:
-            codec_configs.append(_num_codec_config_to_configurable(self.compressor))
-
-        # convert the pipeline repr into actual v3 codec objects
-        codec_pipeline = parse_codecs(codec_configs)
-
-        return codec_pipeline
+            raise ImportError("zarr v3 is required to generate v3 codecs")
+        codecs = _parse_chunk_encoding_v3(  # returns tuple[tuple[ArrayArrayCodec, ...], ArrayBytesCodec, tuple[BytesBytesCodec, ...]]
+            compressors=[_num_codec_config_to_configurable(self.compressor)],
+            filters=self.filters,
+            dtype=self.dtype,
+            serializer="auto",
+        )
+        return cast(tuple["ZarrCodec", ...], (*codecs[0], codecs[1], *codecs[2]))
 
     def serializer(self) -> Any:
         """
@@ -239,3 +218,20 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     num_codec_copy = num_codec.copy()
     name = "numcodecs." + num_codec_copy.pop("id")
     return {"name": name, "configuration": num_codec_copy}
+
+
+def zarray_to_v3metadata(zarray: ZArray) -> ArrayV3Metadata:
+    """
+    Convert a ZArray to a zarr v3 metadata object.
+    """
+    return ArrayV3Metadata(
+        shape=zarray.shape,
+        data_type=zarray.dtype,
+        chunk_grid={"name": "regular", "configuration": {"chunk_shape": zarray.chunks}},
+        chunk_key_encoding={"name": "default"},
+        fill_value=zarray.fill_value,
+        codecs=zarray._v3_codec_pipeline(),
+        attributes={},
+        dimension_names=None,
+        storage_transformers=None,
+    )
