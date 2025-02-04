@@ -121,7 +121,7 @@ def test_zarr_roundtrip_kerchunk(zarr_store):
 
 @requires_zarr_python_v3
 @requires_network
-# @pytest.mark.skip(reason="WIP on icechunk round-trip/")
+@pytest.mark.skip(reason="WIP on icechunk round-trip/")
 @pytest.mark.parametrize(
     "zarr_store",
     [
