@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
         IcechunkStore,
         Repository,
-        Session,
         Storage,
     )
 
@@ -36,7 +35,7 @@ def icechunk_storage(tmp_path: Path) -> "Storage":
 
 
 @pytest.fixture(scope="function")
-def icechunk_repo(icechunk_storage: "Storage") -> "Session":
+def icechunk_repo(icechunk_storage: "Storage") -> "Repository":
     from icechunk import Repository
 
     repo = Repository.create(storage=icechunk_storage)
