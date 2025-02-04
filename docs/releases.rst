@@ -1,10 +1,37 @@
 Release notes
 =============
 
-.. _v1.2.1:
+.. _v1.3.1:
 
-v1.2.1 (unreleased)
+v1.3.1 (unreleased)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.0:
+
+v1.3.0 (3rd Feb 2025)
+---------------------
+
+This release stabilises our dependencies - you can now use released versions of VirtualiZarr, Kerchunk, and Icechunk all in the same environment!
+
+It also fixes a number of bugs, adds minor features, changes the default reader for HDF/netCDF4 files, and includes refactors to reduce code redundancy with zarr-python v3. You can also choose which sets of dependencies you want at installation time.
 
 New Features
 ~~~~~~~~~~~~
