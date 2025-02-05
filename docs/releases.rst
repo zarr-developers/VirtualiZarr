@@ -16,6 +16,7 @@ Breaking changes
 ~~~~~~~~~~~~~~~~
 
 - `.to_zarr` writing method is no longer supported.
+- `zarr` reader method is no longer supported.
 
 
 Deprecations
