@@ -9,7 +9,7 @@ v1.3.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-- Removed Zarr chunk manifest format. :issue:`359`, :pull:`426`. By `Raphael Hagen 
+- Removed Zarr chunk manifest format. :issue:`359`, :pull:`426`. By `Raphael Hagen
  <https://github.com/norlandrhagen>`_.
 
 Breaking changes
