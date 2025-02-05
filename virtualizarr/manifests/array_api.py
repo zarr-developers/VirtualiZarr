@@ -100,12 +100,14 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    # chunk shape has not changed, there are just now more chunks along the concatenation axis
-    new_zarray = first_arr.zarray.replace(
-        shape=tuple(new_shape),
-    )
+    # FIXME(aimee): there is probably a more elegant way to do this
+    new_metadata = first_arr.metadata.to_dict().copy()
+    new_metadata["shape"] = tuple(new_shape)
+    new_metadata["dimension_names"] = new_metadata.get("dimension_names", None)
+    new_metadata.pop("zarr_format", None)
+    new_metadata.pop("node_type", None)
 
-    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 
 
 @implements(np.stack)

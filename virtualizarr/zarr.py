@@ -2,10 +2,11 @@ import dataclasses
 from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
 import numpy as np
+from zarr.abc.codec import Codec as ZarrCodec
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
-    pass
+    from zarr.core.array import CompressorsLike, FiltersLike, SerializerLike
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
@@ -144,31 +145,13 @@ class ZArray:
             replacements["zarr_format"] = zarr_format
         return dataclasses.replace(self, **replacements)
 
-    def _v3_codec_pipeline(self) -> Any:
+    def _v3_codec_pipeline(self) -> tuple["ZarrCodec", ...]:
         """
-        VirtualiZarr internally uses the `filters`, `compressor`, and `order` attributes
-        from zarr v2, but to create conformant zarr v3 metadata those 3 must be turned into `codecs` objects.
-        Not all codecs are created equal though: https://github.com/zarr-developers/zarr-python/issues/1943
-        An array _must_ declare a single ArrayBytes codec, and 0 or more ArrayArray, BytesBytes codecs.
-        Roughly, this is the mapping:
-        ```
-            filters: Iterable[ArrayArrayCodec] #optional
-            compressor: ArrayBytesCodec #mandatory
-            post_compressor: Iterable[BytesBytesCodec] #optional
-        ```
+        Convert the compressor, filters, and dtype to a pipeline of ZarrCodecs.
         """
-        try:
-            from zarr.abc.codec import Codec as ZarrCodec
-            from zarr.core.array import _parse_chunk_encoding_v3
-        except ImportError:
-            raise ImportError("zarr v3 is required to generate v3 codecs")
-        codecs = _parse_chunk_encoding_v3(  # returns tuple[tuple[ArrayArrayCodec, ...], ArrayBytesCodec, tuple[BytesBytesCodec, ...]]
-            compressors=[_num_codec_config_to_configurable(self.compressor)],
-            filters=self.filters,
-            dtype=self.dtype,
-            serializer="auto",
+        return convert_to_codec_pipeline(
+            compressor=self.compressor, filters=self.filters, dtype=self.dtype
         )
-        return cast(tuple["ZarrCodec", ...], (*codecs[0], codecs[1], *codecs[2]))
 
     def serializer(self) -> Any:
         """
@@ -235,3 +218,39 @@ def zarray_to_v3metadata(zarray: ZArray) -> ArrayV3Metadata:
         dimension_names=None,
         storage_transformers=None,
     )
+
+
+def convert_to_codec_pipeline(
+    compressor: "CompressorsLike",
+    dtype: np.dtype[Any],
+    filters: "FiltersLike" = None,
+    serializer: "SerializerLike" = "auto",
+) -> tuple[ZarrCodec, ...]:
+    """
+    Convert compressor, filters, serializer, and dtype to a pipeline of ZarrCodecs.
+
+    Parameters
+    ----------
+    compressor : Any
+        The compressor configuration.
+    filters : Any
+        The filters configuration.
+    dtype : Any
+        The data type.
+    serializer : str, optional
+        The serializer to use, by default "auto".
+
+    Returns
+    -------
+    Tuple[ZarrCodec, ...]
+        A tuple of ZarrCodecs.
+    """
+    from zarr.core.array import _parse_chunk_encoding_v3
+
+    codecs = _parse_chunk_encoding_v3(
+        compressors=[_num_codec_config_to_configurable(compressor)],
+        filters=filters,
+        dtype=dtype,
+        serializer=serializer,
+    )
+    return cast(tuple[ZarrCodec, ...], (*codecs[0], codecs[1], *codecs[2]))
