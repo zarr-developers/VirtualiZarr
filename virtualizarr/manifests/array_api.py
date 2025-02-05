@@ -53,6 +53,8 @@ def concatenate(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.concat`.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
+
     from .array import ManifestArray
 
     if axis is None:
@@ -100,12 +102,10 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    # FIXME(aimee): there is probably a more elegant way to do this
-    new_metadata = first_arr.metadata.to_dict().copy()
-    new_metadata["shape"] = tuple(new_shape)
-    new_metadata["dimension_names"] = new_metadata.get("dimension_names", None)
-    new_metadata.pop("zarr_format", None)
-    new_metadata.pop("node_type", None)
+    metadata_copy = first_arr.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
     return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 

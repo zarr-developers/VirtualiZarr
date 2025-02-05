@@ -291,12 +291,9 @@ class TestConcat:
 
     # FAILING: TypeError: no implementation found for 'numpy.concatenate' on types that implement __array_function__: [<class 'virtualizarr.manifests.array.ManifestArray'>, <class 'numpy.ndarray'>]
     def test_concat_empty(self):
-        chunks_dict1 = {
-            "0.0.0": {"path": "/foo1.nc", "offset": 100, "length": 100},
-        }
-        manifest1 = ChunkManifest(entries=chunks_dict1)
         chunks = (5, 1, 10)
-        shape = (5, 2, 20)
+        shape = (5, 1, 20)
+        compressor = {"id": "zlib", "level": 1}
         metadata = ArrayV3Metadata(
             shape=shape,
             data_type="int32",
@@ -304,7 +301,7 @@ class TestConcat:
             chunk_key_encoding={"name": "default"},
             fill_value=0,
             codecs=convert_to_codec_pipeline(
-                compressor={"id": "zlib", "level": 1},
+                compressor=compressor,
                 filters=None,
                 dtype=np.dtype("int32"),
             ),
@@ -312,15 +309,35 @@ class TestConcat:
             dimension_names=None,
             storage_transformers=None,
         )
+        empty_chunks_dict = {}
+        empty_chunk_manifest = ChunkManifest(entries=empty_chunks_dict, shape=(1, 1, 2))
+        manifest_array_with_empty_chunks = ManifestArray(
+            metadata=metadata, chunkmanifest=empty_chunk_manifest
+        )
 
-        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
+        chunks_dict = {
+            "0.0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "0.0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        manifest_array = ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
         # Concatenate with an empty array
-        concatenated = np.concatenate(
-            [marr1, np.empty((0, 2, 20), dtype="int32")], axis=0
+        result = np.concatenate(
+            [manifest_array_with_empty_chunks, manifest_array], axis=1
         )
-        assert concatenated.shape == (5, 2, 20)
-        assert concatenated.dtype == np.dtype("int32")
+        assert result.shape == (5, 2, 20)
+        assert result.chunks == (5, 1, 10)
+        assert result.manifest.dict() == {
+            "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
+        }
+        codec_dict = result.metadata.codecs[1].to_dict()
+        assert codec_dict["name"] == "numcodecs.zlib"
+        # Strange? The result.metadata.codecs[1].to_dict() adds "id": "zlib" to the configuration
+        # e.g. it's not present in the codec itself: Zlib(codec_name='numcodecs.zlib', codec_config={'level': 1})
+        assert codec_dict["configuration"] == compressor
+        assert result.metadata.fill_value == metadata.fill_value
 
 
 class TestStack:
