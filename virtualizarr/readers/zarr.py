@@ -1,0 +1,316 @@
+from __future__ import annotations
+
+import asyncio
+from itertools import starmap
+from pathlib import Path  # noqa
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    Optional,
+    TypeVar,
+)
+
+import numpy as np
+from xarray import Dataset, Index, Variable
+
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
+from virtualizarr.readers.common import (
+    VirtualBackend,
+    construct_virtual_dataset,
+    maybe_open_loadable_vars_and_indexes,
+)
+from virtualizarr.utils import check_for_collisions
+from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
+
+if TYPE_CHECKING:
+    import zarr
+
+# Vendored directly from Zarr-python V3's private API
+# https://github.com/zarr-developers/zarr-python/blob/458299857141a5470ba3956d8a1607f52ac33857/src/zarr/core/common.py#L53
+T = TypeVar("T", bound=tuple[Any, ...])
+V = TypeVar("V")
+
+
+async def _concurrent_map(
+    items: Iterable[T],
+    func: Callable[..., Awaitable[V]],
+    limit: int | None = None,
+) -> list[V]:
+    if limit is None:
+        return await asyncio.gather(*list(starmap(func, items)))
+
+    else:
+        sem = asyncio.Semaphore(limit)
+
+        async def run(item: tuple[Any]) -> V:
+            async with sem:
+                return await func(*item)
+
+        return await asyncio.gather(
+            *[asyncio.ensure_future(run(item)) for item in items]
+        )
+
+
+async def build_chunk_manifest(
+    zarr_array: zarr.AsyncArray, prefix: str, filepath: str
+) -> ChunkManifest:
+    """Build a ChunkManifest with the from_arrays method"""
+
+    key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+
+    filepath_list = [filepath] * len(key_tuples)
+
+    def combine_path_chunk(filepath: str, chunk_key: str):
+        return filepath + "/" + chunk_key
+
+    vectorized_chunk_path_combine_func = np.vectorize(
+        combine_path_chunk, otypes=[np.dtypes.StringDType()]
+    )
+
+    # turn the tuples of chunks to a flattened list with :list(sum(key_tuples, ()))
+    _paths = vectorized_chunk_path_combine_func(
+        filepath_list, list(sum(key_tuples, ()))
+    )
+
+    # _offsets: np.ndarray[Any, np.dtype[np.uint64]]
+    _offsets = np.array([0] * len(_paths), dtype=np.uint64)
+
+    # _lengths: np.ndarray[Any, np.dtype[np.uint64]]
+    lengths = await _concurrent_map((key_tuples), zarr_array.store.getsize)
+    _lengths = np.array(lengths, dtype=np.uint64)
+
+    return ChunkManifest.from_arrays(
+        paths=_paths,  # type: ignore
+        offsets=_offsets,
+        lengths=_lengths,
+    )
+
+
+async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
+    attrs = zarr_array.metadata.attributes
+
+    fill_value = zarr_array.metadata.fill_value
+    if fill_value is not None:
+        fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
+
+    zarr_format = zarr_array.metadata.zarr_format
+    # set ZArray specific values depending on Zarr version
+    if zarr_format == 2:
+        compressors = zarr_array.compressors[0].get_config()  # type: ignore[union-attr]
+        array_dims = attrs["_ARRAY_DIMENSIONS"]
+
+    elif zarr_format == 3:
+        serializer = zarr_array.serializer.to_dict()  # type: ignore[union-attr] # noqa: F841
+        # serializer is unused in ZArray. Maybe we will need this in the ZArray refactor
+        # https://github.com/zarr-developers/VirtualiZarr/issues/411
+        compressors = zarr_array.compressors[
+            0
+        ].to_dict()  # ZArray expects a dict, not a list of dicts, so only the first val from the tuples?
+        array_dims = zarr_array.metadata.dimension_names  # type: ignore[union-attr]
+        if fill_value is None:
+            raise ValueError(
+                "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
+            )
+
+    else:
+        raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
+
+    filters = (
+        zarr_array.filters if zarr_array.filters else None
+    )  # if tuple is empty, assign filters to None
+
+    array_zarray = ZArray(
+        shape=zarr_array.shape,
+        chunks=zarr_array.chunks,  # type: ignore[attr-defined]
+        dtype=zarr_array.dtype.name,  # type: ignore
+        fill_value=fill_value,
+        order=zarr_array.order,
+        compressor=compressors,
+        filters=filters,  # type: ignore[arg-type]
+        zarr_format=zarr_format,
+    )
+
+    return {
+        "zarray_array": array_zarray,
+        "array_dims": array_dims,
+        "array_metadata": attrs,
+    }
+
+
+async def virtual_variable_from_zarr_array(
+    zarr_array: zarr.AsyncArray[Any], filepath: str
+):
+    zarr_prefix = zarr_array.basename
+
+    if zarr_array.metadata.zarr_format == 3:
+        # if we have Zarr format/version 3, we add /c/ to the chunk paths
+        zarr_prefix = f"{zarr_prefix}/c"
+
+    zarray_array = await build_zarray_metadata(zarr_array=zarr_array)
+
+    chunk_manifest = await build_chunk_manifest(
+        zarr_array, prefix=zarr_prefix, filepath=filepath
+    )
+
+    manifest_array = ManifestArray(
+        zarray=zarray_array["zarray_array"], chunkmanifest=chunk_manifest
+    )
+    return Variable(
+        dims=zarray_array["array_dims"],
+        data=manifest_array,
+        attrs=zarray_array["array_metadata"],
+    )
+
+
+async def virtual_dataset_from_zarr_group(
+    zarr_group: zarr.AsyncGroup,
+    filepath: str,
+    group: str,
+    drop_variables: Iterable[str] | None = [],
+    virtual_variables: Iterable[str] | None = [],
+    loadable_variables: Iterable[str] | None = [],
+    decode_times: bool | None = None,
+    indexes: Mapping[str, Index] | None = None,
+    reader_options: dict = {},
+):
+    # appease the mypy gods
+    if virtual_variables is None:
+        virtual_variables = []
+    if drop_variables is None:
+        drop_variables = []
+
+    virtual_zarr_arrays = await asyncio.gather(
+        *[zarr_group.getitem(var) for var in virtual_variables]
+    )
+
+    virtual_variable_arrays = await asyncio.gather(
+        *[
+            virtual_variable_from_zarr_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
+            for array in virtual_zarr_arrays
+        ]
+    )
+
+    # build a dict mapping for use later in construct_virtual_dataset
+    virtual_variable_array_mapping = {
+        array.basename: result
+        for array, result in zip(virtual_zarr_arrays, virtual_variable_arrays)
+    }
+
+    # flatten nested tuples and get set -> list
+    coord_names = list(
+        set(
+            [
+                item
+                for tup in [val.dims for val in virtual_variable_arrays]
+                for item in tup
+            ]
+        )
+    )
+
+    non_loadable_variables = list(set(virtual_variables).union(set(drop_variables)))
+
+    loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
+        filepath,
+        loadable_variables=loadable_variables,
+        reader_options=reader_options,
+        drop_variables=non_loadable_variables,
+        indexes=indexes,
+        group=group,
+        decode_times=decode_times,
+    )
+
+    return construct_virtual_dataset(
+        virtual_vars=virtual_variable_array_mapping,
+        loadable_vars=loadable_vars,
+        indexes=indexes,
+        coord_names=coord_names,
+        attrs=zarr_group.attrs,
+    )
+
+
+class ZarrVirtualBackend(VirtualBackend):
+    @staticmethod
+    def open_virtual_dataset(
+        filepath: str,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, Index] | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
+        reader_options: Optional[dict] = None,
+    ) -> Dataset:
+        import asyncio
+
+        import zarr
+
+        #  We should remove this once zarr v3 is pinned!
+        # ---------------------------
+        from packaging import version
+
+        if version.parse(zarr.__version__).major < 3:
+            raise ImportError("Zarr V3 is required")
+        # ---------------------------
+
+        async def _open_virtual_dataset(
+            filepath=filepath,
+            group=group,
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+            decode_times=decode_times,
+            indexes=indexes,
+            virtual_backend_kwargs=virtual_backend_kwargs,
+            reader_options=reader_options,
+        ):
+            if virtual_backend_kwargs:
+                raise NotImplementedError(
+                    "Zarr reader does not understand any virtual_backend_kwargs"
+                )
+
+            drop_variables, loadable_variables = check_for_collisions(
+                drop_variables,
+                loadable_variables,
+            )
+
+            filepath = validate_and_normalize_path_to_uri(
+                filepath, fs_root=Path.cwd().as_uri()
+            )
+
+            if reader_options is None:
+                reader_options = {}
+
+            zg = await zarr.api.asynchronous.open_group(
+                filepath,
+                storage_options=reader_options.get("storage_options"),
+                mode="r",
+            )
+
+            zarr_array_keys = [key async for key in zg.array_keys()]
+
+            missing_vars = set(loadable_variables) - set(zarr_array_keys)
+            if missing_vars:
+                raise ValueError(
+                    f"Some loadable variables specified are not present in this zarr store: {missing_vars}"
+                )
+            virtual_vars = list(
+                set(zarr_array_keys) - set(loadable_variables) - set(drop_variables)
+            )
+
+            return await virtual_dataset_from_zarr_group(
+                zarr_group=zg,
+                filepath=filepath,
+                group=group,
+                virtual_variables=virtual_vars,
+                drop_variables=drop_variables,
+                loadable_variables=loadable_variables,
+                decode_times=decode_times,
+                indexes=indexes,
+                reader_options=reader_options,
+            )
+
+        return asyncio.run(_open_virtual_dataset())
