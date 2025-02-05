@@ -122,6 +122,8 @@ def stack(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.stack`.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
+
     from .array import ManifestArray
 
     if not isinstance(axis, int):
@@ -172,12 +174,13 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
-        shape=tuple(new_shape),
-    )
+    metadata_copy = first_arr.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    metadata_copy["chunk_grid"]["configuration"]["chunk_shape"] = tuple(new_chunks)
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
-    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
 
 
 @implements(np.expand_dims)

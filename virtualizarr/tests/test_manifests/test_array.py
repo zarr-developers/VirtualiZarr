@@ -7,8 +7,32 @@ from virtualizarr.tests import create_manifestarray
 from virtualizarr.zarr import ZArray, convert_to_codec_pipeline
 
 
+@pytest.fixture
+def array_v3_metadata():
+    def _create_metadata(
+        shape: tuple, chunks: tuple, compressor: dict = {"id": "zlib", "level": 1}
+    ):
+        return ArrayV3Metadata(
+            shape=shape,
+            data_type="int32",
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_key_encoding={"name": "default"},
+            fill_value=0,
+            codecs=convert_to_codec_pipeline(
+                compressor=compressor,
+                filters=None,
+                dtype=np.dtype("int32"),
+            ),
+            attributes={},
+            dimension_names=None,
+            storage_transformers=None,
+        )
+
+    return _create_metadata
+
+
 class TestManifestArray:
-    def test_create_manifestarray(self):
+    def test_create_manifestarray(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
@@ -18,21 +42,7 @@ class TestManifestArray:
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
-        metadata = ArrayV3Metadata(
-            shape=shape,
-            data_type="int32",
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
-            chunk_key_encoding={"name": "default"},
-            fill_value=0,
-            codecs=convert_to_codec_pipeline(
-                compressor={"id": "zlib", "level": 1},
-                filters=None,
-                dtype=np.dtype("int32"),
-            ),
-            attributes={},
-            dimension_names=None,
-            storage_transformers=None,
-        )
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
         assert marr.chunks == chunks
@@ -78,7 +88,7 @@ class TestManifestArray:
 
 
 class TestEquals:
-    def test_equals(self):
+    def test_equals(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
@@ -88,51 +98,35 @@ class TestEquals:
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
-        zarray = ZArray(
-            chunks=chunks,
-            compressor={"id": "zlib", "level": 1},
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=shape,
-            zarr_format=2,
-        )
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
-        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        marr1 = ManifestArray(zarray=metadata, chunkmanifest=manifest)
+        marr2 = ManifestArray(zarray=metadata, chunkmanifest=manifest)
         result = marr1 == marr2
         assert isinstance(result, np.ndarray)
         assert result.shape == shape
         assert result.dtype == np.dtype(bool)
         assert result.all()
 
-    def test_not_equal_chunk_entries(self):
+    def test_not_equal_chunk_entries(self, array_v3_metadata):
         # both manifest arrays in this example have the same zarray properties
-        zarray = ZArray(
-            chunks=(5, 1, 10),
-            compressor={"id": "zlib", "level": 1},
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=(5, 1, 20),
-            zarr_format=2,
-        )
+        chunks = (5, 1, 10)
+        shape = (5, 2, 20)
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
         chunks_dict1 = {
             "0.0.0": {"path": "/oo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "/oo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
-        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0.0": {"path": "/oo.nc", "offset": 300, "length": 100},
             "0.0.1": {"path": "/oo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
-        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest2)
         assert not (marr1 == marr2).all()
 
     @pytest.mark.skip(reason="Not Implemented")
@@ -253,7 +247,7 @@ class TestBroadcast:
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
 class TestConcat:
-    def test_concat(self):
+    def test_concat(self, array_v3_metadata):
         # both manifest arrays in this example have the same metadata properties
         chunks_dict1 = {
             "0.0.0": {"path": "/foo1.nc", "offset": 100, "length": 100},
@@ -265,21 +259,7 @@ class TestConcat:
         manifest2 = ChunkManifest(entries=chunks_dict2)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
-        metadata = ArrayV3Metadata(
-            shape=shape,
-            data_type="int32",
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
-            chunk_key_encoding={"name": "default"},
-            fill_value=0,
-            codecs=convert_to_codec_pipeline(
-                compressor={"id": "zlib", "level": 1},
-                filters=None,
-                dtype=np.dtype("int32"),
-            ),
-            attributes={},
-            dimension_names=None,
-            storage_transformers=None,
-        )
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
         marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
         marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest2)
@@ -341,32 +321,25 @@ class TestConcat:
 
 
 class TestStack:
-    def test_stack(self):
+    def test_stack(self, array_v3_metadata):
         # both manifest arrays in this example have the same zarray properties
-        zarray = ZArray(
-            chunks=(5, 10),
-            compressor={"id": "zlib", "level": 1},
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=(5, 20),
-            zarr_format=2,
-        )
-
+        chunks = (5, 10)
+        shape = (5, 20)
+        compressor = {"id": "zlib", "level": 1}
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, compressor=compressor)
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
-        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
-        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest2)
 
         result = np.stack([marr1, marr2], axis=1)
 
@@ -378,35 +351,28 @@ class TestStack:
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
-        assert result.zarray.compressor == zarray.compressor
-        assert result.zarray.filters == zarray.filters
-        assert result.zarray.fill_value == zarray.fill_value
-        assert result.zarray.order == zarray.order
-        assert result.zarray.zarr_format == zarray.zarr_format
+        codec_dict = result.metadata.codecs[1].to_dict()
+        assert codec_dict["name"] == "numcodecs.zlib"
+        assert codec_dict["configuration"] == compressor
+        assert result.metadata.fill_value == metadata.fill_value
 
-    def test_stack_empty(self):
-        # both manifest arrays in this example have the same zarray properties
-        zarray = ZArray(
-            chunks=(5, 10),
-            compressor={"id": "zlib", "level": 1},
-            dtype=np.dtype("int32"),
-            fill_value=0.0,
-            filters=None,
-            order="C",
-            shape=(5, 20),
-            zarr_format=2,
-        )
+    def test_stack_empty(self, array_v3_metadata):
+        # both manifest arrays in this example have the same metadata properties
+        chunks = (5, 10)
+        shape = (5, 20)
+        compressor = {"id": "zlib", "level": 1}
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, compressor=compressor)
 
         chunks_dict1 = {}
         manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
-        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
 
         chunks_dict2 = {
             "0.0": {"path": "/foo.nc", "offset": 300, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 400, "length": 100},
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
-        marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest2)
 
         result = np.stack([marr1, marr2], axis=1)
 
@@ -416,11 +382,10 @@ class TestStack:
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
         }
-        assert result.zarray.compressor == zarray.compressor
-        assert result.zarray.filters == zarray.filters
-        assert result.zarray.fill_value == zarray.fill_value
-        assert result.zarray.order == zarray.order
-        assert result.zarray.zarr_format == zarray.zarr_format
+        codec_dict = result.metadata.codecs[1].to_dict()
+        assert codec_dict["name"] == "numcodecs.zlib"
+        assert codec_dict["configuration"] == compressor
+        assert result.metadata.fill_value == metadata.fill_value
 
 
 def test_refuse_combine():
