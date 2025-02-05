@@ -9,14 +9,11 @@ v1.3.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-- Removed Zarr chunk manifest format. :issue:`359`, :pull:`426`. By `Raphael Hagen
- <https://github.com/norlandrhagen>`_.
-
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-- `.to_zarr` writing method is no longer supported.
-- `zarr` reader method is no longer supported.
+- Reading and writing Zarr chunk manifest formats are no longer supported.
+  (:issue:`359`), (:pull:`426`). By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 Deprecations
 ~~~~~~~~~~~~
