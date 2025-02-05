@@ -9,8 +9,14 @@ v1.3.1 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Removed Zarr chunk manifest format. Closes: https://github.com/zarr-developers/VirtualiZarr/issues/359
+  (:pull:`<>`) By `Raphael Hagen  <https://github.com/norlandrhagen>`_.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
+
+- `.to_zarr` writing method is no longer supported.
+
 
 Deprecations
 ~~~~~~~~~~~~

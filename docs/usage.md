@@ -456,30 +456,7 @@ session.commit("Appended second dataset")
 
 See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
 
-### Writing as Zarr
 
-Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`vds.virtualize.to_zarr <virtualizarr.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
-
-```python
-combined_vds.virtualize.to_zarr('combined.zarr')
-```
-
-The result is a zarr v3 store on disk which contains the chunk manifest information written out as `manifest.json` files, so the store looks like this:
-
-```
-combined/zarr.json  <- group metadata
-combined/air/zarr.json  <- array metadata
-combined/air/manifest.json <- array manifest
-...
-```
-
-The advantage of this format is that any zarr v3 reader that understands the chunk manifest ZEP could read from this store, no matter what language it is written in (e.g. via `zarr-python`, `zarr-js`, or rust). This reading would also not require `fsspec`.
-
-```{note}
-Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
-
-This store can however be read by {py:func}`~virtualizarr.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
-```
 
 ## Opening Kerchunk references as virtual datasets
 
