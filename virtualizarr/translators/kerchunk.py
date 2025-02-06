@@ -162,23 +162,26 @@ def variable_from_kerchunk_refs(
     """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
 
     arr_refs = extract_array_refs(refs, var_name)
-    chunk_dict, zarray, zattrs = parse_array_refs(arr_refs)
+    chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
-    elif len(zarray.shape) != 0:
+        varr = virtual_array_class(metadata=metadata, chunkmanifest=manifest)
+    elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
-        shape = determine_chunk_grid_shape(zarray.shape, zarray.chunks)
+        shape = determine_chunk_grid_shape(
+            metadata.shape,
+            metadata.to_dict()["chunk_grid"]["configuration"]["chunk_shape"],
+        )
         manifest = ChunkManifest(entries={}, shape=shape)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+        varr = virtual_array_class(metadata=metadata, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
         # is to communicate dataset attributes.
-        varr = zarray.fill_value
+        varr = metadata.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
 
@@ -264,11 +267,11 @@ def extract_array_refs(
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
 ) -> tuple[dict, ZArray, ZAttrs]:
-    zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
+    metadata = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
-    return chunk_dict, zarray, zattrs
+    return chunk_dict, metadata, zattrs
 
 
 def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:

@@ -72,7 +72,7 @@ class ZArray:
         return Codec(compressor=self.compressor, filters=self.filters)
 
     @classmethod
-    def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ZArray":
+    def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ArrayV3Metadata":
         # coerce type of fill_value as kerchunk can be inconsistent with this
         dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
         fill_value = decoded_arr_refs_zarray["fill_value"]
@@ -86,15 +86,25 @@ class ZArray:
         if zarr_format not in (2, 3):
             raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
 
-        return ZArray(
-            chunks=tuple(decoded_arr_refs_zarray["chunks"]),
-            compressor=compressor,
-            dtype=dtype,
+        return ArrayV3Metadata(
+            chunk_grid={
+                "name": "regular",
+                "configuration": {
+                    "chunk_shape": tuple(decoded_arr_refs_zarray["chunks"])
+                },
+            },
+            codecs=convert_to_codec_pipeline(
+                dtype=dtype,
+                compressors=compressor,
+                filters=decoded_arr_refs_zarray["filters"],
+                serializer="auto",
+            ),
+            data_type=dtype,
             fill_value=fill_value,
-            filters=decoded_arr_refs_zarray["filters"],
-            order=decoded_arr_refs_zarray["order"],
             shape=tuple(decoded_arr_refs_zarray["shape"]),
-            zarr_format=cast(ZARR_FORMAT, zarr_format),
+            chunk_key_encoding={"name": "default"},
+            attributes={},
+            dimension_names=None,
         )
 
     def dict(self) -> dict[str, Any]:

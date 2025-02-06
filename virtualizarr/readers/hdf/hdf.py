@@ -284,6 +284,9 @@ class HDFVirtualBackend(VirtualBackend):
         """
         # This chunk determination logic mirrors zarr-python's create
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
+        from zarr.core.metadata.v3 import ArrayV3Metadata
+
+        from virtualizarr.zarr import convert_to_codec_pipeline
 
         chunks = dataset.chunks if dataset.chunks else dataset.shape
         codecs = codecs_from_dataset(dataset)
@@ -305,9 +308,6 @@ class HDFVirtualBackend(VirtualBackend):
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
         compressors = [codec.get_config() for codec in codecs]
-        from zarr.core.metadata.v3 import ArrayV3Metadata
-
-        from virtualizarr.zarr import convert_to_codec_pipeline
 
         metadata = ArrayV3Metadata(
             shape=dataset.shape,
