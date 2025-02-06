@@ -294,8 +294,10 @@ def test_parse_variable(tmp_path):
     assert var.dtype == "float32"
     assert var.dims == ("x", "y")
     assert var.shape == (720, 1440)
-    assert var.data.zarray.chunks == (360, 720)
-    assert var.data.zarray.fill_value == -32768
+    assert var.data.metadata.to_dict()["chunk_grid"]["configuration"][
+        "chunk_shape"
+    ] == (360, 720)
+    assert var.data.metadata.fill_value == -32768
     assert var.encoding == {
         "add_offset": 298.15,
         "scale_factor": 0.001,

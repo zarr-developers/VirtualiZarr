@@ -12,7 +12,6 @@ from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
-from virtualizarr.zarr import ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -378,6 +377,10 @@ class DMRParser:
         -------
         xr.Variable
         """
+        from zarr.core.metadata.v3 import ArrayV3Metadata
+
+        from virtualizarr.zarr import convert_to_codec_pipeline
+
         # Dimension info
         dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
@@ -414,16 +417,27 @@ class DMRParser:
         # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
         encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
-        # create ManifestArray and ZArray
-        zarray = ZArray(
-            chunks=chunks_shape,
-            dtype=dtype,
-            fill_value=fill_value,
-            filters=filters,
-            order="C",
+        # create ManifestArray
+        metadata = ArrayV3Metadata(
             shape=shape,
+            data_type=dtype,
+            chunk_grid={
+                "name": "regular",
+                "configuration": {"chunk_shape": chunks_shape},
+            },
+            chunk_key_encoding={"name": "default"},
+            fill_value=fill_value,
+            codecs=convert_to_codec_pipeline(
+                compressors=filters,
+                dtype=dtype,
+                filters=None,
+                serializer="auto",
+            ),
+            attributes=attrs,
+            dimension_names=None,
+            storage_transformers=None,
         )
-        marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
+        marr = ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
         return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
