@@ -195,6 +195,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     """
     Broadcasts a ManifestArray to a specified shape, by either adjusting chunk keys or copying chunk manifest entries.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
 
     from .array import ManifestArray
 
@@ -241,12 +242,13 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
-        chunks=new_chunk_shape,
-        shape=new_shape,
-    )
+    metadata_copy = x.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    metadata_copy["chunk_grid"]["configuration"]["chunk_shape"] = tuple(new_chunk_shape)
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
-    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:

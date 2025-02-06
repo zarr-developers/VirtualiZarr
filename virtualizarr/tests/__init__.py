@@ -9,7 +9,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.zarr import ZArray, ceildiv
+from virtualizarr.zarr import ceildiv, convert_to_codec_pipeline
 
 requires_network = pytest.mark.network
 
@@ -60,16 +60,22 @@ def create_manifestarray(
 
     The manifest is populated with a (somewhat) unique path, offset, and length for each key.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
 
-    zarray = ZArray(
-        chunks=chunks,
-        compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
-        dtype=np.dtype("float32"),
+    metadata = ArrayV3Metadata(
+        chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+        chunk_key_encoding={"name": "default"},
+        codecs=convert_to_codec_pipeline(
+            compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
+            filters=None,
+            dtype=np.dtype("float32"),
+        ),
+        data_type=np.dtype("float32"),
         fill_value=0.0,
-        filters=None,
-        order="C",
         shape=shape,
-        zarr_format=2,
+        attributes={},
+        dimension_names=None,
+        # storage_transformers=None,
     )
 
     chunk_grid_shape = tuple(
@@ -88,7 +94,7 @@ def create_manifestarray(
 
     chunkmanifest = ChunkManifest(entries=d)
 
-    return ManifestArray(chunkmanifest=chunkmanifest, zarray=zarray)
+    return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
 
 
 def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
