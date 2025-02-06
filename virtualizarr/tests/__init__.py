@@ -66,7 +66,7 @@ def create_manifestarray(
         chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
         chunk_key_encoding={"name": "default"},
         codecs=convert_to_codec_pipeline(
-            compressor={"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1},
+            compressors=[{"id": "blosc", "clevel": 5, "cname": "lz4", "shuffle": 1}],
             filters=None,
             dtype=np.dtype("float32"),
         ),

@@ -21,7 +21,7 @@ def test_replace_total():
         dtype=np.dtype("<f8"),
         fill_value=-1.0,
         order="F",
-        compressor={"id": "zlib", "level": 1},
+        compressor=[{"id": "zlib", "level": 1}],
         filters=[{"id": "blosc", "clevel": 5}],
         zarr_format=3,
     )

@@ -33,7 +33,7 @@ https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
 
 @dataclasses.dataclass
 class Codec:
-    compressor: dict | None = None
+    compressors: list[dict] | None = None
     filters: list[dict] | None = None
 
 
@@ -150,7 +150,7 @@ class ZArray:
         Convert the compressor, filters, and dtype to a pipeline of ZarrCodecs.
         """
         return convert_to_codec_pipeline(
-            compressor=self.compressor, filters=self.filters, dtype=self.dtype
+            compressors=[self.compressor], filters=self.filters, dtype=self.dtype
         )
 
     def serializer(self) -> Any:
@@ -221,7 +221,7 @@ def zarray_to_v3metadata(zarray: ZArray) -> ArrayV3Metadata:
 
 
 def convert_to_codec_pipeline(
-    compressor: "CompressorsLike",
+    compressors: "CompressorsLike",
     dtype: np.dtype[Any],
     filters: "FiltersLike" = None,
     serializer: "SerializerLike" = "auto",
@@ -248,7 +248,9 @@ def convert_to_codec_pipeline(
     from zarr.core.array import _parse_chunk_encoding_v3
 
     codecs = _parse_chunk_encoding_v3(
-        compressors=[_num_codec_config_to_configurable(compressor)],
+        compressors=[
+            _num_codec_config_to_configurable(compressor) for compressor in compressors
+        ],
         filters=filters,
         dtype=dtype,
         serializer=serializer,

@@ -10,7 +10,9 @@ from virtualizarr.zarr import convert_to_codec_pipeline
 @pytest.fixture
 def array_v3_metadata():
     def _create_metadata(
-        shape: tuple, chunks: tuple, compressor: dict = {"id": "zlib", "level": 1}
+        shape: tuple,
+        chunks: tuple,
+        compressors: list[dict] = [{"id": "zlib", "level": 1}],
     ):
         return ArrayV3Metadata(
             shape=shape,
@@ -19,7 +21,7 @@ def array_v3_metadata():
             chunk_key_encoding={"name": "default"},
             fill_value=0,
             codecs=convert_to_codec_pipeline(
-                compressor=compressor,
+                compressors=compressors,
                 filters=None,
                 dtype=np.dtype("int32"),
             ),
@@ -275,24 +277,12 @@ class TestConcat:
         assert concatenated.dtype == np.dtype("int32")
 
     # FAILING: TypeError: no implementation found for 'numpy.concatenate' on types that implement __array_function__: [<class 'virtualizarr.manifests.array.ManifestArray'>, <class 'numpy.ndarray'>]
-    def test_concat_empty(self):
+    def test_concat_empty(self, array_v3_metadata):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
         compressor = {"id": "zlib", "level": 1}
-        metadata = ArrayV3Metadata(
-            shape=shape,
-            data_type="int32",
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
-            chunk_key_encoding={"name": "default"},
-            fill_value=0,
-            codecs=convert_to_codec_pipeline(
-                compressor=compressor,
-                filters=None,
-                dtype=np.dtype("int32"),
-            ),
-            attributes={},
-            dimension_names=None,
-            storage_transformers=None,
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, compressors=[compressor]
         )
         empty_chunks_dict = {}
         empty_chunk_manifest = ChunkManifest(entries=empty_chunks_dict, shape=(1, 1, 2))
@@ -331,7 +321,9 @@ class TestStack:
         chunks = (5, 10)
         shape = (5, 20)
         compressor = {"id": "zlib", "level": 1}
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, compressor=compressor)
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, compressors=[compressor]
+        )
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
@@ -366,7 +358,9 @@ class TestStack:
         chunks = (5, 10)
         shape = (5, 20)
         compressor = {"id": "zlib", "level": 1}
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, compressor=compressor)
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, compressors=[compressor]
+        )
 
         chunks_dict1 = {}
         manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
