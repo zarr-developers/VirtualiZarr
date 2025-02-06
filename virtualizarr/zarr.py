@@ -221,8 +221,8 @@ def zarray_to_v3metadata(zarray: ZArray) -> ArrayV3Metadata:
 
 
 def convert_to_codec_pipeline(
-    compressors: "CompressorsLike",
     dtype: np.dtype[Any],
+    compressors: "CompressorsLike" = None,
     filters: "FiltersLike" = None,
     serializer: "SerializerLike" = "auto",
 ) -> tuple[ZarrCodec, ...]:
@@ -231,7 +231,7 @@ def convert_to_codec_pipeline(
 
     Parameters
     ----------
-    compressor : Any
+    compressors : Any
         The compressor configuration.
     filters : Any
         The filters configuration.
@@ -250,7 +250,9 @@ def convert_to_codec_pipeline(
     codecs = _parse_chunk_encoding_v3(
         compressors=[
             _num_codec_config_to_configurable(compressor) for compressor in compressors
-        ],
+        ]
+        if compressors is not None
+        else None,
         filters=filters,
         dtype=dtype,
         serializer=serializer,
