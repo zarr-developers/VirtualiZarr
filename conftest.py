@@ -6,6 +6,9 @@ import numpy as np
 import pytest
 import xarray as xr
 from xarray.core.variable import Variable
+from zarr.core.metadata.v3 import ArrayV3Metadata
+
+from virtualizarr.zarr import convert_to_codec_pipeline
 
 
 def pytest_addoption(parser):
@@ -150,3 +153,57 @@ def simple_netcdf4(tmp_path: Path) -> str:
     ds.to_netcdf(filepath)
 
     return str(filepath)
+
+
+@pytest.fixture
+def array_v3_metadata():
+    def _create_metadata(
+        shape: tuple,
+        chunks: tuple,
+        compressors: list[dict] = [{"id": "zlib", "level": 1}],
+    ):
+        return ArrayV3Metadata(
+            shape=shape,
+            data_type="int32",
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_key_encoding={"name": "default"},
+            fill_value=0,
+            codecs=convert_to_codec_pipeline(
+                compressors=compressors,
+                filters=None,
+                dtype=np.dtype("int32"),
+            ),
+            attributes={},
+            dimension_names=None,
+            storage_transformers=None,
+        )
+
+    return _create_metadata
+
+
+@pytest.fixture
+def array_v3_metadata_dict():
+    def _create_metadata_dict(
+        shape: tuple,
+        chunks: tuple,
+        codecs: list[dict] = [
+            {"configuration": {"endian": "little"}, "name": "bytes"},
+            {
+                "name": "numcodecs.zlib",
+                "configuration": {"level": 1},
+            },
+        ],
+    ):
+        return {
+            "shape": shape,
+            "data_type": "int32",
+            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": chunks}},
+            "chunk_key_encoding": {"name": "default"},
+            "fill_value": 0,
+            "codecs": codecs,
+            "attributes": {},
+            "dimension_names": None,
+            "storage_transformers": None,
+        }
+
+    return _create_metadata_dict

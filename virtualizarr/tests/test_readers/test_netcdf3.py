@@ -1,3 +1,4 @@
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 
@@ -7,6 +8,7 @@ from virtualizarr.tests import requires_scipy
 
 
 @requires_scipy
+@pytest.mark.xfail(reason="zarr-python 3.0 does not support big endian")
 def test_read_netcdf3(netcdf3_file, array_v3_metadata):
     filepath = str(netcdf3_file)
     vds = open_virtual_dataset(filepath)
