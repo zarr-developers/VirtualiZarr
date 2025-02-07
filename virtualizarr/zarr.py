@@ -287,14 +287,21 @@ def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
     ArrayV2Metadata
         The metadata object in v2 format.
     """
+    import numcodecs
+
+    # there is no serializer in Zarr v2
+    filters, compressor = [
+        numcodecs.get_codec(codec.codec_config)
+        for codec in [v3_metadata.codecs[0], v3_metadata.codecs[2]]
+    ]
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
         chunks=v3_metadata.chunk_grid.chunk_shape,
         fill_value=v3_metadata.fill_value,
-        order="C",  # Assuming 'C' order as default
-        compressor=None,  # TODO(aimee): parse compressors
-        filters=None,  # TODO(aimee): parse filters
+        compressor=compressor,
+        filters=filters,
+        order="C",
         attributes=v3_metadata.attributes,
         dimension_separator=".",  # Assuming '.' as default dimension separator
     )

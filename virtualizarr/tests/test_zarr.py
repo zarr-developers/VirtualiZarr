@@ -61,3 +61,65 @@ def test_zarray_to_v3metadata():
     assert metadata.attributes == {}
     assert metadata.dimension_names is None
     assert metadata.storage_transformers == ()
+
+
+import pytest
+from zarr.core.metadata.v2 import ArrayV2Metadata
+
+from virtualizarr.zarr import convert_to_codec_pipeline, convert_v3_to_v2_metadata
+
+
+@pytest.fixture
+def array_v3_metadata():
+    def _create_metadata(
+        shape: tuple,
+        chunks: tuple,
+        compressors: list[dict] = [
+            {"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}
+        ],
+        filters: list[dict] = [{"id": "delta", "dtype": "<i8"}],
+    ):
+        return ArrayV3Metadata(
+            shape=shape,
+            data_type="int32",
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_key_encoding={"name": "default"},
+            fill_value=0,
+            codecs=convert_to_codec_pipeline(
+                compressors=compressors,
+                filters=filters,
+                dtype=np.dtype("int32"),
+            ),
+            attributes={},
+            dimension_names=None,
+            storage_transformers=None,
+        )
+
+    return _create_metadata
+
+
+def test_convert_v3_to_v2_metadata(array_v3_metadata):
+    shape = (5, 20)
+    chunks = (5, 10)
+    compressors = [{"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}]
+    filters = [{"id": "delta", "dtype": "<i8"}]
+
+    v3_metadata = array_v3_metadata(shape, chunks, compressors, filters)
+    v2_metadata = convert_v3_to_v2_metadata(v3_metadata)
+
+    assert isinstance(v2_metadata, ArrayV2Metadata)
+    assert v2_metadata.shape == shape
+    assert v2_metadata.dtype == np.dtype("int32")
+    assert v2_metadata.chunks == chunks
+    assert v2_metadata.fill_value == 0
+    compressor_config = v2_metadata.compressor.get_config()
+    assert compressor_config["id"] == "blosc"
+    assert compressor_config["cname"] == "zstd"
+    assert compressor_config["clevel"] == 5
+    assert compressor_config["shuffle"] == 1
+    assert compressor_config["blocksize"] == 0
+    filters_config = v2_metadata.filters[0].get_config()
+    assert filters_config["id"] == "delta"
+    assert filters_config["dtype"] == "<i8"
+    assert filters_config["astype"] == "<i8"
+    assert v2_metadata.attributes == {}
