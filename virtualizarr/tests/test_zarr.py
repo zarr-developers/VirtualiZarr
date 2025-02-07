@@ -1,7 +1,8 @@
 import numpy as np
+from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.zarr import ZArray, zarray_to_v3metadata
+from virtualizarr.zarr import ZArray, convert_v3_to_v2_metadata, zarray_to_v3metadata
 
 
 def test_replace_partial():
@@ -61,41 +62,6 @@ def test_zarray_to_v3metadata():
     assert metadata.attributes == {}
     assert metadata.dimension_names is None
     assert metadata.storage_transformers == ()
-
-
-import pytest
-from zarr.core.metadata.v2 import ArrayV2Metadata
-
-from virtualizarr.zarr import convert_to_codec_pipeline, convert_v3_to_v2_metadata
-
-
-@pytest.fixture
-def array_v3_metadata():
-    def _create_metadata(
-        shape: tuple,
-        chunks: tuple,
-        compressors: list[dict] = [
-            {"id": "blosc", "cname": "zstd", "clevel": 5, "shuffle": 1}
-        ],
-        filters: list[dict] = [{"id": "delta", "dtype": "<i8"}],
-    ):
-        return ArrayV3Metadata(
-            shape=shape,
-            data_type="int32",
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
-            chunk_key_encoding={"name": "default"},
-            fill_value=0,
-            codecs=convert_to_codec_pipeline(
-                compressors=compressors,
-                filters=filters,
-                dtype=np.dtype("int32"),
-            ),
-            attributes={},
-            dimension_names=None,
-            storage_transformers=None,
-        )
-
-    return _create_metadata
 
 
 def test_convert_v3_to_v2_metadata(array_v3_metadata):

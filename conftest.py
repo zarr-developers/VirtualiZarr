@@ -161,6 +161,7 @@ def array_v3_metadata():
         shape: tuple,
         chunks: tuple,
         compressors: list[dict] = [{"id": "zlib", "level": 1}],
+        filters: list[dict] | None = None,
     ):
         return ArrayV3Metadata(
             shape=shape,
@@ -170,7 +171,7 @@ def array_v3_metadata():
             fill_value=0,
             codecs=convert_to_codec_pipeline(
                 compressors=compressors,
-                filters=None,
+                filters=filters,
                 dtype=np.dtype("int32"),
             ),
             attributes={},
