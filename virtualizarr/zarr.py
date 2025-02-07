@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, NewType, cast
 
 import numpy as np
 from zarr.abc.codec import Codec as ZarrCodec
+from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
@@ -263,8 +264,47 @@ def convert_to_codec_pipeline(
         ]
         if compressors is not None
         else None,
-        filters=filters,
+        filters=[_num_codec_config_to_configurable(filter) for filter in filters]
+        if filters is not None
+        else None,
         dtype=dtype,
         serializer=serializer,
     )
     return cast(tuple[ZarrCodec, ...], (*codecs[0], codecs[1], *codecs[2]))
+
+
+def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
+    """
+    Convert ArrayV3Metadata to ArrayV2Metadata.
+
+    Parameters
+    ----------
+    v3_metadata : ArrayV3Metadata
+        The metadata object in v3 format.
+
+    Returns
+    -------
+    ArrayV2Metadata
+        The metadata object in v2 format.
+    """
+    v2_metadata = ArrayV2Metadata(
+        shape=v3_metadata.shape,
+        dtype=v3_metadata.data_type.to_numpy(),
+        chunks=v3_metadata.chunk_grid.chunk_shape,
+        fill_value=v3_metadata.fill_value,
+        order="C",  # Assuming 'C' order as default
+        compressor=None,  # TODO(aimee): parse compressors
+        filters=None,  # TODO(aimee): parse filters
+        attributes=v3_metadata.attributes,
+        dimension_separator=".",  # Assuming '.' as default dimension separator
+    )
+    return v2_metadata
+
+
+def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
+    import ujson
+
+    zarray_dict = v2_metadata.to_dict()
+    if np.isnan(zarray_dict["fill_value"]):
+        zarray_dict["fill_value"] = None
+    return ujson.dumps(zarray_dict)

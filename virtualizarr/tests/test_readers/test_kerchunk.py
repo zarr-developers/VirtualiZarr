@@ -85,13 +85,13 @@ def test_dataset_from_df_refs(refs_file_factory):
 
 
 def test_dataset_from_df_refs_with_filters(refs_file_factory):
-    filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
+    compressor = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
-        "compressor": None,
+        "compressor": compressor,
         "dtype": "<i8",
         "fill_value": None,
-        "filters": filters,
+        "filters": None,
         "order": "C",
         "shape": [2, 3],
         "zarr_format": 2,

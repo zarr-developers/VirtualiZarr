@@ -9,7 +9,7 @@ from xarray.core.variable import Variable
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
-from virtualizarr.zarr import ZArray
+from virtualizarr.zarr import convert_v3_to_v2_metadata, to_kerchunk_json
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -87,8 +87,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             for chunk_key, entry in marr.manifest.dict().items()
         }
 
-        zarray = marr.zarray.replace(zarr_format=2)
-
+        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
     else:
         try:
             np_arr = var.to_numpy()
@@ -118,7 +117,9 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         # TODO will this fail for a scalar?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
 
-        zarray = ZArray(
+        from zarr.core.metadata.v2 import ArrayV2Metadata
+
+        array_v2_metadata = ArrayV2Metadata(
             chunks=np_arr.shape,
             shape=np_arr.shape,
             dtype=np_arr.dtype,
@@ -126,7 +127,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             fill_value=None,
         )
 
-    zarray_dict = zarray.to_kerchunk_json()
+    zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
     zattrs = {**var.attrs, **var.encoding}

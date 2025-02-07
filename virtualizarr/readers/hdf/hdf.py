@@ -307,7 +307,7 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = float("nan")
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
-        compressors = [codec.get_config() for codec in codecs]
+        filters = [codec.get_config() for codec in codecs]
 
         metadata = ArrayV3Metadata(
             shape=dataset.shape,
@@ -316,9 +316,9 @@ class HDFVirtualBackend(VirtualBackend):
             chunk_key_encoding={"name": "default"},
             fill_value=fill_value,
             codecs=convert_to_codec_pipeline(
-                compressors=compressors,
+                compressors=None,
                 dtype=dtype,
-                filters=None,
+                filters=filters,
                 serializer="auto",
             ),
             attributes=attrs,
