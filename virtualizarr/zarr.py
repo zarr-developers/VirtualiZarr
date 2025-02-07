@@ -273,29 +273,31 @@ def convert_to_codec_pipeline(
     return cast(tuple[ZarrCodec, ...], (*codecs[0], codecs[1], *codecs[2]))
 
 
-import numcodecs
-from zarr.codecs.bytes import BytesCodec
+from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
+
+
+def identify_codec(codec):
+    if isinstance(codec, BytesBytesCodec):
+        return "compressor"
+    elif isinstance(codec, ArrayBytesCodec):
+        return "serializer"
+    elif isinstance(codec, ArrayArrayCodec):
+        return "filter"
+    else:
+        return "Unknown codec type"
 
 
 def extract_codecs(v3_metadata):
     """Extracts filters and compressor from Zarr v3 metadata."""
     codecs = v3_metadata.codecs or []  # Ensure it's a list, even if None
-
-    if not codecs:  # No codecs available
-        return None, None
-
-    first, *rest = codecs  # Unpack the first codec and the rest
-
-    if isinstance(first, BytesCodec):  # BytesCodec is first
-        filters = None
-        compressor = numcodecs.get_codec(rest[0].codec_config) if rest else None
-    else:  # First codec is a filter
-        filters = numcodecs.get_codec(first.codec_config)
-        compressor = (
-            numcodecs.get_codec(rest[1].codec_config) if len(rest) > 1 else None
-        )
-
-    return filters, compressor
+    compressors, filters = [], []
+    for codec in codecs:
+        codec_type = identify_codec(codec)
+        if codec_type == "compressor":
+            compressors.append(codec.codec_config)
+        elif codec_type == "filter":
+            filters.append(codec.codec_config)
+    return filters, compressors
 
 
 def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
@@ -312,8 +314,12 @@ def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
     ArrayV2Metadata
         The metadata object in v2 format.
     """
+    import warnings
 
-    filters, compressor = extract_codecs(v3_metadata)
+    filters, compressors = extract_codecs(v3_metadata)
+    compressor = compressors[0] if compressors else None
+    if len(compressors) > 1:
+        warnings.warn("Multiple compressors detected. Only the first one will be used.")
 
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
