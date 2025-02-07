@@ -273,6 +273,31 @@ def convert_to_codec_pipeline(
     return cast(tuple[ZarrCodec, ...], (*codecs[0], codecs[1], *codecs[2]))
 
 
+import numcodecs
+from zarr.codecs.bytes import BytesCodec
+
+
+def extract_codecs(v3_metadata):
+    """Extracts filters and compressor from Zarr v3 metadata."""
+    codecs = v3_metadata.codecs or []  # Ensure it's a list, even if None
+
+    if not codecs:  # No codecs available
+        return None, None
+
+    first, *rest = codecs  # Unpack the first codec and the rest
+
+    if isinstance(first, BytesCodec):  # BytesCodec is first
+        filters = None
+        compressor = numcodecs.get_codec(rest[0].codec_config) if rest else None
+    else:  # First codec is a filter
+        filters = numcodecs.get_codec(first.codec_config)
+        compressor = (
+            numcodecs.get_codec(rest[1].codec_config) if len(rest) > 1 else None
+        )
+
+    return filters, compressor
+
+
 def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
     """
     Convert ArrayV3Metadata to ArrayV2Metadata.
@@ -287,13 +312,9 @@ def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
     ArrayV2Metadata
         The metadata object in v2 format.
     """
-    import numcodecs
 
-    # there is no serializer in Zarr v2
-    filters, compressor = [
-        numcodecs.get_codec(codec.codec_config)
-        for codec in [v3_metadata.codecs[0], v3_metadata.codecs[2]]
-    ]
+    filters, compressor = extract_codecs(v3_metadata)
+
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
@@ -312,6 +333,12 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     import ujson
 
     zarray_dict = v2_metadata.to_dict()
+    if zarray_dict["filters"]:
+        zarray_dict["filters"] = [
+            codec.get_config() for codec in zarray_dict["filters"]
+        ]
+    if zarray_dict["compressor"]:
+        zarray_dict["compressor"] = zarray_dict["compressor"].get_config()
     if np.isnan(zarray_dict["fill_value"]):
         zarray_dict["fill_value"] = None
     return ujson.dumps(zarray_dict)
