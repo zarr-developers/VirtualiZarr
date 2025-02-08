@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import create_manifestarray
 
 
 class TestManifestArray:
@@ -92,7 +91,7 @@ class TestEquals:
 
 
 class TestBroadcast:
-    def test_broadcast_existing_axis(self):
+    def test_broadcast_existing_axis(self, create_manifestarray):
         marr = create_manifestarray(shape=(1, 2), chunks=(1, 2))
         expanded = np.broadcast_to(marr, shape=(3, 2))
         assert expanded.shape == (3, 2)
@@ -103,7 +102,7 @@ class TestBroadcast:
             "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
         }
 
-    def test_broadcast_new_axis(self):
+    def test_broadcast_new_axis(self, create_manifestarray):
         marr = create_manifestarray(shape=(3,), chunks=(1,))
         expanded = np.broadcast_to(marr, shape=(1, 3))
         assert expanded.shape == (1, 3)
@@ -114,7 +113,7 @@ class TestBroadcast:
             "0.2": {"path": "file:///foo.2.nc", "offset": 20, "length": 7},
         }
 
-    def test_broadcast_scalar(self):
+    def test_broadcast_scalar(self, create_manifestarray):
         # regression test
         marr = create_manifestarray(shape=(), chunks=())
         assert marr.shape == ()
@@ -139,7 +138,9 @@ class TestBroadcast:
             ((3, 2), (2, 2), (2, 3, 4)),
         ],
     )
-    def test_raise_on_invalid_broadcast_shapes(self, shape, chunks, target_shape):
+    def test_raise_on_invalid_broadcast_shapes(
+        self, shape, chunks, target_shape, create_manifestarray
+    ):
         marr = create_manifestarray(shape=shape, chunks=chunks)
         with pytest.raises(ValueError):
             np.broadcast_to(marr, shape=target_shape)
@@ -154,7 +155,9 @@ class TestBroadcast:
             ((3, 1), (2, 1), (2, 3, 4)),
         ],
     )
-    def test_broadcast_any_shape(self, shape, chunks, target_shape):
+    def test_broadcast_any_shape(
+        self, shape, chunks, target_shape, create_manifestarray
+    ):
         marr = create_manifestarray(shape=shape, chunks=chunks)
 
         # do the broadcasting

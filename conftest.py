@@ -1,3 +1,4 @@
+import itertools
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
@@ -8,7 +9,9 @@ import xarray as xr
 from xarray.core.variable import Variable
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.zarr import convert_to_codec_pipeline
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import join
+from virtualizarr.zarr import ceildiv, convert_to_codec_pipeline
 
 
 def pytest_addoption(parser):
@@ -153,6 +156,61 @@ def simple_netcdf4(tmp_path: Path) -> str:
     ds.to_netcdf(filepath)
 
     return str(filepath)
+
+
+def offset_from_chunk_key(ind: tuple[int, ...]) -> int:
+    return sum(ind) * 10
+
+
+def length_from_chunk_key(ind: tuple[int, ...]) -> int:
+    return sum(ind) + 5
+
+
+def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
+    """Generate a (somewhat) unique manifest entry from a given chunk key"""
+    entry = {
+        "path": f"/foo.{str(join(ind))}.nc",
+        "offset": offset_from_chunk_key(ind),
+        "length": length_from_chunk_key(ind),
+    }
+    return entry  # type: ignore[return-value]
+
+
+@pytest.fixture
+def create_manifestarray(array_v3_metadata):
+    """
+    Create an example ManifestArray with sensible defaults.
+
+    The manifest is populated with a (somewhat) unique path, offset, and length for each key.
+    """
+
+    def _create_manifestarray(
+        shape: tuple | None = (5, 5),
+        chunks: tuple | None = (5, 5),
+        codecs: list[dict] | None = [
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+        ],
+    ):
+        metadata = array_v3_metadata(shape, chunks, codecs)
+        chunk_grid_shape = tuple(
+            ceildiv(axis_length, chunk_length)
+            for axis_length, chunk_length in zip(shape, chunks)
+        )
+
+        if chunk_grid_shape == ():
+            d = {"0": entry_from_chunk_key((0,))}
+        else:
+            # create every possible combination of keys
+            all_possible_combos = itertools.product(
+                *[range(length) for length in chunk_grid_shape]
+            )
+            d = {join(ind): entry_from_chunk_key(ind) for ind in all_possible_combos}
+
+        chunkmanifest = ChunkManifest(entries=d)
+
+        return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
+
+    return _create_manifestarray
 
 
 @pytest.fixture

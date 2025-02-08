@@ -1,6 +1,4 @@
-from typing import TYPE_CHECKING, Union
-
-from virtualizarr.zarr import Codec
+from typing import TYPE_CHECKING, Tuple, Union
 
 if TYPE_CHECKING:
     from zarr import Array  # type: ignore
@@ -12,29 +10,39 @@ if TYPE_CHECKING:
 
     from .manifests.array import ManifestArray
 
+CodecPipeline = Tuple[
+    Union["ArrayArrayCodec", "ArrayBytesCodec", "BytesBytesCodec"], ...
+]
 
-def get_codecs(
-    array: Union["ManifestArray", "Array"],
-    normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
+
+def get_codecs(array: Union["ManifestArray", "Array"]) -> CodecPipeline:
     """
-    Get the codecs for either a ManifestArray or a Zarr Array.
+    Get the zarr v3 codec pipeline for either a ManifestArray or a Zarr Array.
 
-    Parameters:
-        array (Union[ManifestArray, ZarrArray]): The input array, either ManifestArray or Zarr Array.
+    Parameters
+    ----------
+    array : Union[ManifestArray, Array]
+        The input array, either ManifestArray or Zarr Array.
 
-    Returns:
-        List[Optional[Codec]]: A list of codecs or an empty list if no codecs are found.
+    Returns
+    -------
+    CodecPipeline
+        A tuple of zarr v3 codecs representing the codec pipeline.
 
-    Raises:
-        ImportError: If `zarr` is required but not installed.
-        ValueError: If the array type is unsupported.
+    Raises
+    ------
+    ImportError
+        If `zarr` is required but not installed.
+    ValueError
+        If the array type is unsupported or the array's metadata is not in zarr v3 format.
+    NotImplementedError
+        If zarr-python v3 is not installed.
     """
     if _is_manifest_array(array):
-        return _get_manifestarray_codecs(array, normalize_to_zarr_v3)  # type: ignore[arg-type]
+        return _get_manifestarray_codecs(array)  # type: ignore[arg-type]
 
     if _is_zarr_array(array):
-        return _get_zarr_array_codecs(array, normalize_to_zarr_v3)  # type: ignore[arg-type]
+        return _get_zarr_array_codecs(array)  # type: ignore[arg-type]
 
     raise ValueError("Unsupported array type or zarr is not installed.")
 
@@ -49,15 +57,13 @@ def _is_manifest_array(array: object) -> bool:
         return False
 
 
-def _get_manifestarray_codecs(
-    array: "ManifestArray",
-    normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
-    """Get codecs for a ManifestArray based on its zarr_format."""
-    if normalize_to_zarr_v3 or array.metadata.zarr_format == 3:
-        return array.metadata.codecs
-    else:
-        raise ValueError("Unsupported zarr_format for ManifestArray.")
+def _get_manifestarray_codecs(array: "ManifestArray") -> CodecPipeline:
+    """Get zarr v3 codec pipeline for a ManifestArray."""
+    if array.metadata.zarr_format != 3:
+        raise ValueError(
+            "Only zarr v3 format is supported. Please convert your array metadata to v3 format."
+        )
+    return array.metadata.codecs
 
 
 def _is_zarr_array(array: object) -> bool:
@@ -70,11 +76,8 @@ def _is_zarr_array(array: object) -> bool:
         return False
 
 
-def _get_zarr_array_codecs(
-    array: "Array",
-    normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
-    """Get codecs for a Zarr Array based on its format."""
+def _get_zarr_array_codecs(array: "Array") -> CodecPipeline:
+    """Get zarr v3 codec pipeline for a Zarr Array."""
     import zarr
     from packaging import version
 
@@ -85,25 +88,12 @@ def _get_zarr_array_codecs(
         raise NotImplementedError(
             f"zarr-python v3 or higher is required, but version {installed_version} is installed."
         )
-    from zarr.core.metadata import (  # type: ignore[import-untyped]
-        ArrayV2Metadata,
-        ArrayV3Metadata,
-    )
 
-    # For zarr format v3
-    if isinstance(array.metadata, ArrayV3Metadata):
-        return tuple(array.metadata.codecs)
-    # For zarr format v2
-    elif isinstance(array.metadata, ArrayV2Metadata):
-        if normalize_to_zarr_v3:
-            # we could potentially normalize to v3 using ZArray._v3_codec_pipeline, but we don't have a use case for that.
-            raise NotImplementedError(
-                "Normalization to zarr v3 is not supported for zarr v2 array."
-            )
-        else:
-            return Codec(
-                compressor=array.metadata.compressor,
-                filters=list(array.metadata.filters or ()),
-            )
-    else:
-        raise ValueError("Unsupported zarr_format for Zarr Array.")
+    from zarr.core.metadata import ArrayV3Metadata  # type: ignore[import-untyped]
+
+    if not isinstance(array.metadata, ArrayV3Metadata):
+        raise ValueError(
+            "Only zarr v3 format arrays are supported. Please convert your array to v3 format."
+        )
+
+    return tuple(array.metadata.codecs)
