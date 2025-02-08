@@ -328,4 +328,6 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
         zarray_dict["compressor"] = zarray_dict["compressor"].get_config()
     if np.isnan(zarray_dict["fill_value"]):
         zarray_dict["fill_value"] = None
+    if isinstance(zarray_dict["fill_value"], np.generic):
+        zarray_dict["fill_value"] = zarray_dict["fill_value"].item()
     return ujson.dumps(zarray_dict)
