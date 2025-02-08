@@ -1,7 +1,54 @@
 import numpy as np
+from zarr.codecs import BytesCodec
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from virtualizarr.zarr import ZArray, convert_v3_to_v2_metadata
+from virtualizarr.zarr import (
+    ZArray,
+    convert_to_codec_pipeline,
+    convert_v3_to_v2_metadata,
+)
+
+
+def test_convert_to_codec_pipeline():
+    expected_default_codecs = (BytesCodec(endian="little"),)
+    # Test with just dtype (default codec pipeline)
+    dtype = np.dtype("<i4")
+    int_codecs = convert_to_codec_pipeline(dtype=dtype)
+    assert int_codecs == expected_default_codecs
+
+    # Test with different dtype
+    float_dtype = np.dtype("<f8")
+    float_codecs = convert_to_codec_pipeline(dtype=float_dtype)
+    assert float_codecs == expected_default_codecs
+
+    # Test with empty codecs list
+    empty_codecs = convert_to_codec_pipeline(dtype=dtype, codecs=[])
+    assert empty_codecs == expected_default_codecs
+
+    # Test with filters and compressor
+    test_codecs = [
+        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {
+            "name": "numcodecs.blosc",
+            "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
+        },
+    ]
+
+    codecs = convert_to_codec_pipeline(dtype=dtype, codecs=test_codecs)
+    assert isinstance(codecs, tuple)
+    assert len(codecs) == 3  # At least delta, blosc, and default arraybytes codec
+
+    # Verify codec types and order
+    array_array_codecs = codecs[0]
+    assert array_array_codecs.codec_name == "numcodecs.delta"
+    array_bytes_codec = codecs[1]
+    assert isinstance(array_bytes_codec, BytesCodec)
+    bytes_bytes_codec = codecs[2]
+    assert bytes_bytes_codec.codec_name == "numcodecs.blosc"
+    config = bytes_bytes_codec.codec_config
+    assert config["cname"] == "zstd"
+    assert config["clevel"] == 5
+    assert config["shuffle"] == 1
 
 
 def test_replace_partial():
