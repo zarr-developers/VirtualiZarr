@@ -393,7 +393,6 @@ class DMRParser:
             self._DAP_NP_DTYPE[var_tag.tag.removeprefix("{" + self._NS["dap"] + "}")]
         )
         # Chunks and Filters
-        filters = None
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
@@ -409,7 +408,7 @@ class DMRParser:
                 chunks_shape = shape
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
-            filters = self._parse_filters(chunks_tag, dtype)
+            codecs = self._parse_filters(chunks_tag, dtype)
         # Attributes
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
@@ -428,10 +427,8 @@ class DMRParser:
             chunk_key_encoding={"name": "default"},
             fill_value=fill_value,
             codecs=convert_to_codec_pipeline(
-                compressors=filters,
+                codecs=codecs,
                 dtype=dtype,
-                filters=None,
-                serializer="auto",
             ),
             attributes=attrs,
             dimension_names=None,
@@ -504,16 +501,23 @@ class DMRParser:
             compression_types = chunks_tag.attrib["compressionType"].split(" ")
             for c in compression_types:
                 if c == "shuffle":
-                    filters.append({"id": "shuffle", "elementsize": dtype.itemsize})
+                    filters.append(
+                        {
+                            "name": "numcodecs.shuffle",
+                            "configuration": {"elementsize": dtype.itemsize},
+                        }
+                    )
                 elif c == "deflate":
                     filters.append(
                         {
-                            "id": "zlib",
-                            "level": int(
-                                chunks_tag.attrib.get(
-                                    "deflateLevel", self._DEFAULT_ZLIB_VALUE
-                                )
-                            ),
+                            "name": "numcodecs.zlib",
+                            "configuration": {
+                                "level": int(
+                                    chunks_tag.attrib.get(
+                                        "deflateLevel", self._DEFAULT_ZLIB_VALUE
+                                    )
+                                ),
+                            },
                         }
                     )
             return filters

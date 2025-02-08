@@ -224,10 +224,8 @@ class TestConcat:
     def test_concat_empty(self, array_v3_metadata):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
-        compressor = {"id": "zlib", "level": 1}
-        metadata = array_v3_metadata(
-            shape=shape, chunks=chunks, compressors=[compressor]
-        )
+        compressor = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=[compressor])
         empty_chunks_dict = {}
         empty_chunk_manifest = ChunkManifest(entries=empty_chunks_dict, shape=(1, 1, 2))
         manifest_array_with_empty_chunks = ManifestArray(
@@ -253,9 +251,7 @@ class TestConcat:
         }
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
-        # Strange? The result.metadata.codecs[1].to_dict() adds "id": "zlib" to the configuration
-        # e.g. it's not present in the codec itself: Zlib(codec_name='numcodecs.zlib', codec_config={'level': 1})
-        assert codec_dict["configuration"] == compressor
+        assert codec_dict["configuration"] == {"id": "zlib", "level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
 
@@ -264,10 +260,8 @@ class TestStack:
         # both manifest arrays in this example have the same zarray properties
         chunks = (5, 10)
         shape = (5, 20)
-        compressor = {"id": "zlib", "level": 1}
-        metadata = array_v3_metadata(
-            shape=shape, chunks=chunks, compressors=[compressor]
-        )
+        compressor = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=[compressor])
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
@@ -294,17 +288,14 @@ class TestStack:
         }
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
-        assert codec_dict["configuration"] == compressor
+        assert codec_dict["configuration"] == {"id": "zlib", "level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
     def test_stack_empty(self, array_v3_metadata):
         # both manifest arrays in this example have the same metadata properties
         chunks = (5, 10)
         shape = (5, 20)
-        compressor = {"id": "zlib", "level": 1}
-        metadata = array_v3_metadata(
-            shape=shape, chunks=chunks, compressors=[compressor]
-        )
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
         chunks_dict1 = {}
         manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
@@ -327,7 +318,6 @@ class TestStack:
         }
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
-        assert codec_dict["configuration"] == compressor
         assert result.metadata.fill_value == metadata.fill_value
 
 

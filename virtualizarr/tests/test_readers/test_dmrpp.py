@@ -334,14 +334,22 @@ def test_parse_attribute(tmp_path, attr_path, expected):
             "/data",
             np.dtype("float32"),
             [
-                {"elementsize": np.dtype("float32").itemsize, "id": "shuffle"},
-                {"id": "zlib", "level": 5},
+                {
+                    "configuration": {"elementsize": np.dtype("float32").itemsize},
+                    "name": "numcodecs.shuffle",
+                },
+                {"name": "numcodecs.zlib", "configuration": {"level": 5}},
             ],
         ),
         (
             "/mask",
             np.dtype("float32"),
-            [{"elementsize": np.dtype("float32").itemsize, "id": "shuffle"}],
+            [
+                {
+                    "configuration": {"elementsize": np.dtype("float32").itemsize},
+                    "name": "numcodecs.shuffle",
+                }
+            ],
         ),
     ],
 )

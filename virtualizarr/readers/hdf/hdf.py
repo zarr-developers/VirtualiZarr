@@ -286,7 +286,10 @@ class HDFVirtualBackend(VirtualBackend):
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
         from zarr.core.metadata.v3 import ArrayV3Metadata
 
-        from virtualizarr.zarr import convert_to_codec_pipeline
+        from virtualizarr.zarr import (
+            _num_codec_config_to_configurable,
+            convert_to_codec_pipeline,
+        )
 
         chunks = dataset.chunks if dataset.chunks else dataset.shape
         codecs = codecs_from_dataset(dataset)
@@ -307,7 +310,9 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = float("nan")
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
-        filters = [codec.get_config() for codec in codecs]
+        codec_configs = [
+            _num_codec_config_to_configurable(codec.get_config()) for codec in codecs
+        ]
 
         metadata = ArrayV3Metadata(
             shape=dataset.shape,
@@ -315,12 +320,7 @@ class HDFVirtualBackend(VirtualBackend):
             chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
             chunk_key_encoding={"name": "default"},
             fill_value=fill_value,
-            codecs=convert_to_codec_pipeline(
-                compressors=None,
-                dtype=dtype,
-                filters=filters,
-                serializer="auto",
-            ),
+            codecs=convert_to_codec_pipeline(codecs=codec_configs, dtype=dtype),
             attributes=attrs,
             dimension_names=None,
             storage_transformers=None,

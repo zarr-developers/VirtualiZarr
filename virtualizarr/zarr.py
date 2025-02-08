@@ -1,5 +1,5 @@
 import dataclasses
-from typing import TYPE_CHECKING, Any, Literal, NewType, cast
+from typing import TYPE_CHECKING, Any, Literal, NewType
 
 import numpy as np
 from zarr.abc.codec import Codec as ZarrCodec
@@ -7,7 +7,7 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
-    from zarr.core.array import CompressorsLike, FiltersLike, SerializerLike
+    pass
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
@@ -82,11 +82,19 @@ class ZArray:
         ):
             fill_value = np.nan
 
-        compressor = decoded_arr_refs_zarray["compressor"]
         zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
         if zarr_format not in (2, 3):
             raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+        filters = (
+            decoded_arr_refs_zarray.get("filters", []) or []
+        )  # Ensure filters is a list
+        compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
 
+        # Ensure compressor is a list before unpacking
+        codec_configs = [*filters, *(compressor if compressor is not None else [])]
+        numcodec_configs = [
+            _num_codec_config_to_configurable(config) for config in codec_configs
+        ]
         return ArrayV3Metadata(
             chunk_grid={
                 "name": "regular",
@@ -96,9 +104,7 @@ class ZArray:
             },
             codecs=convert_to_codec_pipeline(
                 dtype=dtype,
-                compressors=compressor,
-                filters=decoded_arr_refs_zarray["filters"],
-                serializer="auto",
+                codecs=numcodec_configs,
             ),
             data_type=dtype,
             fill_value=fill_value,
@@ -160,8 +166,9 @@ class ZArray:
         """
         Convert the compressor, filters, and dtype to a pipeline of ZarrCodecs.
         """
+        filters = self.filters or []
         return convert_to_codec_pipeline(
-            compressors=[self.compressor], filters=self.filters, dtype=self.dtype
+            codecs=[*filters, self.compressor], dtype=self.dtype
         )
 
     def serializer(self) -> Any:
@@ -211,93 +218,59 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
 
     num_codec_copy = num_codec.copy()
     name = "numcodecs." + num_codec_copy.pop("id")
+    # name = num_codec_copy.pop("id")
     return {"name": name, "configuration": num_codec_copy}
 
 
-def zarray_to_v3metadata(zarray: ZArray) -> ArrayV3Metadata:
-    """
-    Convert a ZArray to a zarr v3 metadata object.
-    """
-    return ArrayV3Metadata(
-        shape=zarray.shape,
-        data_type=zarray.dtype,
-        chunk_grid={"name": "regular", "configuration": {"chunk_shape": zarray.chunks}},
-        chunk_key_encoding={"name": "default"},
-        fill_value=zarray.fill_value,
-        codecs=zarray._v3_codec_pipeline(),
-        attributes={},
-        dimension_names=None,
-        storage_transformers=None,
-    )
+def extract_codecs(
+    codecs: list[ZarrCodec] | None = [],
+) -> tuple[list[dict], list[dict]]:
+    """Extracts filters and compressor from Zarr v3 metadata."""
+    from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
+
+    arrayarray_codecs, bytesbytes_codecs = [], []
+    for codec in codecs:
+        if isinstance(codec, ArrayArrayCodec):
+            arrayarray_codecs.append(codec)
+        if isinstance(codec, BytesBytesCodec):
+            bytesbytes_codecs.append(codec)
+    return arrayarray_codecs, bytesbytes_codecs
 
 
 def convert_to_codec_pipeline(
-    dtype: np.dtype[Any],
-    compressors: "CompressorsLike" = None,
-    filters: "FiltersLike" = None,
-    serializer: "SerializerLike" = "auto",
+    dtype: np.dtype,
+    codecs: list[dict] | None = [],
 ) -> tuple[ZarrCodec, ...]:
     """
     Convert compressor, filters, serializer, and dtype to a pipeline of ZarrCodecs.
 
     Parameters
     ----------
-    compressors : Any
-        The compressor configuration.
-    filters : Any
-        The filters configuration.
     dtype : Any
         The data type.
-    serializer : str, optional
-        The serializer to use, by default "auto".
+    codecs: list[ZarrCodec] | None
 
     Returns
     -------
     Tuple[ZarrCodec, ...]
         A tuple of ZarrCodecs.
     """
-    from zarr.core.array import _parse_chunk_encoding_v3
+    from zarr.core.array import _get_default_chunk_encoding_v3
+    from zarr.registry import get_codec_class
 
-    codecs = _parse_chunk_encoding_v3(
-        compressors=[
-            _num_codec_config_to_configurable(compressor) for compressor in compressors
+    if codecs and len(codecs) > 0:
+        zarr_codecs = [
+            get_codec_class(codec["name"]).from_dict(codec) for codec in codecs
         ]
-        if compressors is not None
-        else None,
-        filters=[_num_codec_config_to_configurable(filter) for filter in filters]
-        if filters is not None
-        else None,
-        dtype=dtype,
-        serializer=serializer,
-    )
-    return cast(tuple[ZarrCodec, ...], (*codecs[0], codecs[1], *codecs[2]))
-
-
-from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
-
-
-def identify_codec(codec):
-    if isinstance(codec, BytesBytesCodec):
-        return "compressor"
-    elif isinstance(codec, ArrayBytesCodec):
-        return "serializer"
-    elif isinstance(codec, ArrayArrayCodec):
-        return "filter"
+        arrayarray_codecs, bytesbytes_codecs = extract_codecs(zarr_codecs)
     else:
-        return "Unknown codec type"
+        arrayarray_codecs, bytesbytes_codecs = [], []
+    # FIXME: using private zarr-python function
+    # we can also use zarr_config.get("array.v3_default_serializer").get("numeric"), but requires rewriting a lot of this function
+    arraybytes_codecs = _get_default_chunk_encoding_v3(dtype)[1]
+    codec_pipeline = (*arrayarray_codecs, arraybytes_codecs, *bytesbytes_codecs)
 
-
-def extract_codecs(v3_metadata):
-    """Extracts filters and compressor from Zarr v3 metadata."""
-    codecs = v3_metadata.codecs or []  # Ensure it's a list, even if None
-    compressors, filters = [], []
-    for codec in codecs:
-        codec_type = identify_codec(codec)
-        if codec_type == "compressor":
-            compressors.append(codec.codec_config)
-        elif codec_type == "filter":
-            filters.append(codec.codec_config)
-    return filters, compressors
+    return codec_pipeline
 
 
 def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
@@ -316,18 +289,26 @@ def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
     """
     import warnings
 
-    filters, compressors = extract_codecs(v3_metadata)
-    compressor = compressors[0] if compressors else None
-    if len(compressors) > 1:
-        warnings.warn("Multiple compressors detected. Only the first one will be used.")
+    filters, compressors = extract_codecs(v3_metadata.codecs)
+    if compressors:
+        compressor = compressors[0]
+        compressor_config = compressor.codec_config
+        if len(compressors) > 1:
+            warnings.warn(
+                "Multiple compressors detected. Only the first one will be used."
+            )
+    else:
+        compressor_config = None
+
+    filter_configs = [filter.codec_config for filter in filters]
 
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
         chunks=v3_metadata.chunk_grid.chunk_shape,
         fill_value=v3_metadata.fill_value,
-        compressor=compressor,
-        filters=filters,
+        compressor=compressor_config,
+        filters=filter_configs,
         order="C",
         attributes=v3_metadata.attributes,
         dimension_separator=".",  # Assuming '.' as default dimension separator
