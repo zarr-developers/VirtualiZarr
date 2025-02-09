@@ -13,7 +13,17 @@ from virtualizarr.zarr import convert_v3_to_v2_metadata, to_kerchunk_json
 
 
 class NumpyEncoder(json.JSONEncoder):
-    # TODO I don't understand how kerchunk gets around this problem of encoding numpy types (in the zattrs) whilst only using ujson
+    """JSON encoder that handles common scientific Python types found in attributes.
+
+    This encoder converts various Python types to JSON-serializable formats:
+    - NumPy arrays and scalars to Python lists and native types
+    - NumPy dtypes to strings
+    - Sets to lists
+    - Other objects that implement __array__ to lists
+    - Objects with to_dict method (like pandas objects)
+    - Objects with __str__ method as fallback
+    """
+
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()  # Convert NumPy array to Python list
@@ -21,7 +31,19 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.item()  # Convert NumPy scalar to Python scalar
         elif isinstance(obj, np.dtype):
             return str(obj)
-        return json.JSONEncoder.default(self, obj)
+        elif isinstance(obj, set):
+            return list(obj)  # Convert sets to lists
+        elif hasattr(obj, "__array__"):
+            return np.asarray(obj).tolist()  # Handle array-like objects
+        elif hasattr(obj, "to_dict"):
+            return obj.to_dict()  # Handle objects with to_dict method
+
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except TypeError:
+            if hasattr(obj, "__str__"):
+                return str(obj)
+            raise
 
 
 def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
@@ -85,8 +107,12 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             ]
             for chunk_key, entry in marr.manifest.dict().items()
         }
-
-        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
+        # attrs = json.loads(json.dumps(var.attrs, cls=NumpyEncoder))
+        # marr.metadata.update_attributes(attrs)
+        # import pdb; pdb.set_trace()
+        array_v2_metadata = convert_v3_to_v2_metadata(
+            marr.metadata
+        )  # .update_attributes(attrs))
     else:
         try:
             np_arr = var.to_numpy()
@@ -123,8 +149,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
-            # TODO: should this be None?
-            fill_value=None,
+            fill_value=var.encoding.get("fill_value", None),
         )
 
     zarray_dict = to_kerchunk_json(array_v2_metadata)
