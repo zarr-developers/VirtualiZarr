@@ -217,8 +217,8 @@ def create_manifestarray(array_v3_metadata):
 @pytest.fixture
 def array_v3_metadata():
     def _create_metadata(
-        shape: tuple,
-        chunks: tuple,
+        shape: tuple = (5, 5),
+        chunks: tuple = (5, 5),
         data_type: str = "int32",
         codecs: list[dict] | None = None,
         fill_value: int = None,
