@@ -116,7 +116,6 @@ class ZArray:
 
     def dict(self) -> dict[str, Any]:
         zarray_dict = dataclasses.asdict(self)
-        zarray_dict["dtype"] = encode_dtype(zarray_dict["dtype"])
         return zarray_dict
 
     def to_kerchunk_json(self) -> str:
@@ -187,11 +186,6 @@ class ZArray:
             name="bytes", configuration={}
         )  # TODO need to handle endianess configuration
         return parse_codecs([bytes])[0]
-
-
-def encode_dtype(dtype: np.dtype) -> str:
-    # TODO not sure if there is a better way to get the '<i4' style representation of the dtype out
-    return dtype.descr[0][1]
 
 
 def ceildiv(a: int, b: int) -> int:
@@ -273,7 +267,9 @@ def convert_to_codec_pipeline(
     return codec_pipeline
 
 
-def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
+def convert_v3_to_v2_metadata(
+    v3_metadata: ArrayV3Metadata, fill_value: Any = None
+) -> ArrayV2Metadata:
     """
     Convert ArrayV3Metadata to ArrayV2Metadata.
 
@@ -306,7 +302,7 @@ def convert_v3_to_v2_metadata(v3_metadata: ArrayV3Metadata) -> ArrayV2Metadata:
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
         chunks=v3_metadata.chunk_grid.chunk_shape,
-        fill_value=v3_metadata.fill_value,
+        fill_value=fill_value or v3_metadata.fill_value,
         compressor=compressor_config,
         filters=filter_configs,
         order="C",
@@ -326,8 +322,10 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
         ]
     if zarray_dict["compressor"]:
         zarray_dict["compressor"] = zarray_dict["compressor"].get_config()
-    if np.isnan(zarray_dict["fill_value"]):
-        zarray_dict["fill_value"] = None
-    if isinstance(zarray_dict["fill_value"], np.generic):
-        zarray_dict["fill_value"] = zarray_dict["fill_value"].item()
+    fill_value = zarray_dict["fill_value"]
+    if fill_value is not None:
+        if np.isnan(fill_value):  # np.isnan returns False for non-float types
+            zarray_dict["fill_value"] = None
+        elif isinstance(fill_value, np.generic):
+            zarray_dict["fill_value"] = fill_value.item()
     return ujson.dumps(zarray_dict)

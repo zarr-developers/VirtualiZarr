@@ -38,7 +38,6 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
         }
-
         all_arr_refs.update(prepended_with_var_name)
 
     zattrs = ds.attrs
@@ -124,6 +123,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
+            # TODO: should this be None?
             fill_value=None,
         )
 

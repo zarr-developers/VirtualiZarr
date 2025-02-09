@@ -8,20 +8,18 @@ from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 
 @requires_kerchunk
 class TestAccessor:
-    def test_accessor_to_kerchunk_dict(self):
+    def test_accessor_to_kerchunk_dict(self, array_v3_metadata):
         manifest = ChunkManifest(
             entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
         )
         arr = ManifestArray(
             chunkmanifest=manifest,
-            zarray=dict(
+            metadata=array_v3_metadata(
                 shape=(2, 3),
-                dtype=np.dtype("<i8"),
+                data_type=np.dtype("<i8"),
                 chunks=(2, 3),
-                compressor=None,
-                filters=None,
-                fill_value=np.nan,
-                order="C",
+                codecs=[],
+                fill_value=None,
             ),
         )
         ds = Dataset({"a": (["x", "y"], arr)})
@@ -31,7 +29,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"fill_value":0,"order":"C","filters":[],"dimension_separator":".","compressor":null,"attributes":{},"zarr_format":2,"dtype":"<i8"}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["/test.nc", 6144, 48],
             },
@@ -40,18 +38,16 @@ class TestAccessor:
         result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
-    def test_accessor_to_kerchunk_dict_empty(self):
+    def test_accessor_to_kerchunk_dict_empty(self, array_v3_metadata):
         manifest = ChunkManifest(entries={}, shape=(1, 1))
         arr = ManifestArray(
             chunkmanifest=manifest,
-            zarray=dict(
+            metadata=array_v3_metadata(
                 shape=(2, 3),
-                dtype=np.dtype("<i8"),
+                data_type=np.dtype("<i8"),
                 chunks=(2, 3),
-                compressor=None,
-                filters=None,
-                fill_value=np.nan,
-                order="C",
+                codecs=[],
+                fill_value=None,
             ),
         )
         ds = Dataset({"a": (["x", "y"], arr)})
@@ -61,7 +57,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"fill_value":0,"order":"C","filters":[],"dimension_separator":".","compressor":null,"attributes":{},"zarr_format":2,"dtype":"<i8"}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
             },
         }
@@ -69,7 +65,7 @@ class TestAccessor:
         result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
-    def test_accessor_to_kerchunk_json(self, tmp_path):
+    def test_accessor_to_kerchunk_json(self, tmp_path, array_v3_metadata):
         import ujson
 
         manifest = ChunkManifest(
@@ -77,14 +73,12 @@ class TestAccessor:
         )
         arr = ManifestArray(
             chunkmanifest=manifest,
-            zarray=dict(
+            metadata=array_v3_metadata(
                 shape=(2, 3),
-                dtype=np.dtype("<i8"),
+                data_type=np.dtype("<i8"),
                 chunks=(2, 3),
-                compressor=None,
-                filters=None,
-                fill_value=np.nan,
-                order="C",
+                codecs=[],
+                fill_value=None,
             ),
         )
         ds = Dataset({"a": (["x", "y"], arr)})
@@ -101,7 +95,7 @@ class TestAccessor:
             "refs": {
                 ".zgroup": '{"zarr_format":2}',
                 ".zattrs": "{}",
-                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"dtype":"<i8","fill_value":null,"order":"C","compressor":null,"filters":null,"zarr_format":2}',
+                "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"fill_value":0,"order":"C","filters":[],"dimension_separator":".","compressor":null,"attributes":{},"zarr_format":2,"dtype":"<i8"}',
                 "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
                 "a/0.0": ["/test.nc", 6144, 48],
             },
@@ -109,7 +103,7 @@ class TestAccessor:
         assert loaded_refs == expected_ds_refs
 
     @requires_fastparquet
-    def test_accessor_to_kerchunk_parquet(self, tmp_path):
+    def test_accessor_to_kerchunk_parquet(self, tmp_path, array_v3_metadata):
         import ujson
 
         chunks_dict = {
@@ -119,14 +113,12 @@ class TestAccessor:
         manifest = ChunkManifest(entries=chunks_dict)
         arr = ManifestArray(
             chunkmanifest=manifest,
-            zarray=dict(
+            metadata=array_v3_metadata(
                 shape=(2, 4),
-                dtype=np.dtype("<i8"),
+                data_type=np.dtype("<i8"),
                 chunks=(2, 2),
-                compressor=None,
-                filters=None,
+                codecs=[],
                 fill_value=None,
-                order="C",
             ),
         )
         ds = Dataset({"a": (["x", "y"], arr)})

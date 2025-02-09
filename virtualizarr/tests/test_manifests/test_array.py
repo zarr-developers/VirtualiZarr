@@ -298,7 +298,11 @@ class TestStack:
         # both manifest arrays in this example have the same metadata properties
         chunks = (5, 10)
         shape = (5, 20)
-        metadata = array_v3_metadata(shape=shape, chunks=chunks)
+        metadata = array_v3_metadata(
+            shape=shape,
+            chunks=chunks,
+            codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 1}}],
+        )
 
         chunks_dict1 = {}
         manifest1 = ChunkManifest(entries=chunks_dict1, shape=(1, 2))
