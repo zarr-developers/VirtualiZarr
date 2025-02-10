@@ -55,7 +55,7 @@ def _get_manifestarray_codecs(
 ) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
     """Get codecs for a ManifestArray based on its zarr_format."""
     if normalize_to_zarr_v3 or array.zarray.zarr_format == 3:
-        return (array.zarray.serializer(),) + array.zarray._v3_codec_pipeline()
+        return (array.zarray.serializer(),) + array.zarray._v3_codecs()
     elif array.zarray.zarr_format == 2:
         return array.zarray.codec
     else:
@@ -98,7 +98,7 @@ def _get_zarr_array_codecs(
     # For zarr format v2
     elif isinstance(array.metadata, ArrayV2Metadata):
         if normalize_to_zarr_v3:
-            # we could potentially normalize to v3 using ZArray._v3_codec_pipeline, but we don't have a use case for that.
+            # we could potentially normalize to v3 using ZArray._v3_codecs, but we don't have a use case for that.
             raise NotImplementedError(
                 "Normalization to zarr v3 is not supported for zarr v2 array."
             )
