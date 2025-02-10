@@ -23,4 +23,3 @@ dependencies:
   - pytest
   - pooch
   - fsspec
-  - zarr>=3.0.2
