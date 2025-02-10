@@ -323,9 +323,9 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     if zarray_dict["compressor"]:
         zarray_dict["compressor"] = zarray_dict["compressor"].get_config()
 
-    # TODO: should we use NumpyEncoder here?
+    # TODO: Use NumpyEncoder here?
     fill_value = zarray_dict["fill_value"]
-    if np.isnan(fill_value):
+    if fill_value is not None and np.isnan(fill_value):
         zarray_dict["fill_value"] = None
     if isinstance(fill_value, np.generic):
         zarray_dict["fill_value"] = fill_value.item()

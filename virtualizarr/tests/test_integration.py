@@ -221,6 +221,7 @@ class TestRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
+    # In Zarr V3 we cannot use a data type of dat
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata
     ):
@@ -234,6 +235,8 @@ class TestRoundtrip:
             shape=shape,
             chunks=chunks,
             codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 1}}],
+            # Cannot do in Zarr v3
+            data_type=np.dtype("M8[ns]"),
         )
         marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
         vds = xr.Dataset(

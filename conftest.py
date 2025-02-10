@@ -219,7 +219,7 @@ def array_v3_metadata():
     def _create_metadata(
         shape: tuple = (5, 5),
         chunks: tuple = (5, 5),
-        data_type: str = "int32",
+        data_type: str = np.dtype("int32"),
         codecs: list[dict] | None = None,
         fill_value: int = None,
     ):
@@ -231,7 +231,7 @@ def array_v3_metadata():
             fill_value=fill_value,
             codecs=convert_to_codec_pipeline(
                 codecs=codecs,
-                dtype=np.dtype("int32"),
+                dtype=data_type,
             ),
             attributes={},
             dimension_names=None,
