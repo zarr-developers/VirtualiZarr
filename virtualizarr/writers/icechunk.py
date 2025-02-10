@@ -242,14 +242,19 @@ def write_virtual_variable_to_icechunk(
         )
     else:
         append_axis = None
+
+        # Get the codecs and convert them to zarr v3 format
+        codecs = zarray._v3_codecs()
+
         # create array if it doesn't already exist
         arr = group.require_array(
             name=name,
             shape=zarray.shape,
             chunks=zarray.chunks,
             dtype=encode_dtype(zarray.dtype),
-            compressors=zarray._v3_codec_pipeline(),  # compressors,
-            serializer=zarray.serializer(),
+            compressors=codecs.compressors,
+            serializer=codecs.serializer,
+            filters=codecs.filters,
             dimension_names=var.dims,
             fill_value=zarray.fill_value,
         )
