@@ -79,7 +79,6 @@ def test_FileType():
     assert "grib" == FileType("grib").name
     assert "tiff" == FileType("tiff").name
     assert "fits" == FileType("fits").name
-    assert "zarr" == FileType("zarr").name
     with pytest.raises(ValueError):
         FileType(None)
 

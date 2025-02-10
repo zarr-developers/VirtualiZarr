@@ -12,6 +12,9 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- Reading and writing Zarr chunk manifest formats are no longer supported.
+  (:issue:`359`), (:pull:`426`). By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 Deprecations
 ~~~~~~~~~~~~
 
