@@ -7,7 +7,11 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
-    pass
+    try:
+        from zarr.abc.codec import Codec as ZarrCodec
+        from zarr.core.array import CompressorLike, FiltersLike, SerializerLike
+    except ImportError:
+        pass
 
 # TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
 ZAttrs = NewType(
@@ -36,6 +40,28 @@ https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
 class Codec:
     compressors: list[dict] | None = None
     filters: list[dict] | None = None
+
+
+@dataclasses.dataclass
+class ZarrV3Codecs:
+    filters: "FiltersLike"
+    compressors: "CompressorLike"
+    serializer: "SerializerLike"
+
+    def into_v3_codecs(self, dtype: np.dtype) -> tuple["ZarrCodec", ...]:
+        try:
+            from zarr.core.array import _parse_chunk_encoding_v3
+        except ImportError:
+            raise ImportError("zarr v3 is required to generate v3 codecs")
+
+        codecs = _parse_chunk_encoding_v3(
+            serializer=self.serializer,
+            compressors=self.compressors,
+            filters=self.filters,
+            dtype=dtype,
+        )
+
+        return cast(tuple["ZarrCodec", ...], (*codecs[0], codecs[1], *codecs[2]))
 
 
 @dataclasses.dataclass

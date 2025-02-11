@@ -3,9 +3,7 @@ from typing import TYPE_CHECKING, Tuple, Union
 if TYPE_CHECKING:
     from zarr import Array  # type: ignore
     from zarr.core.abc.codec import (  # type: ignore
-        ArrayArrayCodec,
-        ArrayBytesCodec,
-        BytesBytesCodec,
+        Codec as ZarrCodec,
     )
 
     from .manifests.array import ManifestArray
@@ -13,7 +11,6 @@ if TYPE_CHECKING:
 CodecPipeline = Tuple[
     Union["ArrayArrayCodec", "ArrayBytesCodec", "BytesBytesCodec"], ...
 ]
-
 
 import zarr
 
@@ -59,7 +56,6 @@ def _is_manifest_array(array: object) -> bool:
     except ImportError:
         return False
 
-
 def _get_manifestarray_codecs(array: "ManifestArray") -> CodecPipeline:
     """Get zarr v3 codec pipeline for a ManifestArray."""
     if array.metadata.zarr_format != 3:
@@ -81,17 +77,6 @@ def _is_zarr_array(array: object) -> bool:
 
 def _get_zarr_array_codecs(array: "Array") -> CodecPipeline:
     """Get zarr v3 codec pipeline for a Zarr Array."""
-    import zarr
-    from packaging import version
-
-    # Check that zarr-python v3 is installed
-    required_version = "3.0.0b"
-    installed_version = zarr.__version__
-    if version.parse(installed_version) < version.parse(required_version):
-        raise NotImplementedError(
-            f"zarr-python v3 or higher is required, but version {installed_version} is installed."
-        )
-
     from zarr.core.metadata import ArrayV3Metadata  # type: ignore[import-untyped]
 
     if not isinstance(array.metadata, ArrayV3Metadata):

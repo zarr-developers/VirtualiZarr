@@ -17,7 +17,6 @@ bytesbytes_codec = {
     },
 }
 
-
 class TestCodecs:
     def create_zarr_array(self, codecs=None, zarr_format=3):
         """Create a test Zarr array with the specified codecs."""

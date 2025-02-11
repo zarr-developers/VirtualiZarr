@@ -10,6 +10,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
     has_fastparquet,
+    has_icechunk,
     has_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
@@ -105,6 +106,21 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
 
 
+def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
+    from icechunk import Repository, Storage
+
+    # create an in-memory icechunk store
+    storage = Storage.new_in_memory()
+    repo = Repository.create(storage=storage)
+    session = repo.writable_session("main")
+
+    # write those references to an icechunk store
+    vds.virtualize.to_icechunk(session.store)
+
+    # read the dataset from icechunk
+    return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
+
+
 @requires_zarr_python
 @pytest.mark.parametrize(
     "roundtrip_func",
@@ -115,6 +131,7 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
             else []
         ),
         *([roundtrip_as_kerchunk_parquet] if has_kerchunk and has_fastparquet else []),
+        *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
     ],
 )
 class TestRoundtrip:
