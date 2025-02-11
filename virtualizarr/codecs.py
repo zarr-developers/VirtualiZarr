@@ -5,9 +5,7 @@ from virtualizarr.zarr import Codec
 if TYPE_CHECKING:
     from zarr import Array  # type: ignore
     from zarr.core.abc.codec import (  # type: ignore
-        ArrayArrayCodec,
-        ArrayBytesCodec,
-        BytesBytesCodec,
+        Codec as ZarrCodec,
     )
 
     from .manifests.array import ManifestArray
@@ -16,7 +14,7 @@ if TYPE_CHECKING:
 def get_codecs(
     array: Union["ManifestArray", "Array"],
     normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
+) -> Union[Codec, tuple["ZarrCodec", ...]]:
     """
     Get the codecs for either a ManifestArray or a Zarr Array.
 
@@ -52,10 +50,10 @@ def _is_manifest_array(array: object) -> bool:
 def _get_manifestarray_codecs(
     array: "ManifestArray",
     normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
+) -> Union[Codec, tuple["ZarrCodec", ...]]:
     """Get codecs for a ManifestArray based on its zarr_format."""
     if normalize_to_zarr_v3 or array.zarray.zarr_format == 3:
-        return (array.zarray.serializer(),) + array.zarray._v3_codec_pipeline()
+        return array.zarray._v3_codecs().into_v3_codecs(array.zarray.dtype)
     elif array.zarray.zarr_format == 2:
         return array.zarray.codec
     else:
@@ -75,7 +73,7 @@ def _is_zarr_array(array: object) -> bool:
 def _get_zarr_array_codecs(
     array: "Array",
     normalize_to_zarr_v3: bool = False,
-) -> Union[Codec, tuple["ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec", ...]]:
+) -> Union[Codec, tuple["ZarrCodec", ...]]:
     """Get codecs for a Zarr Array based on its format."""
     import zarr
     from packaging import version
@@ -98,7 +96,7 @@ def _get_zarr_array_codecs(
     # For zarr format v2
     elif isinstance(array.metadata, ArrayV2Metadata):
         if normalize_to_zarr_v3:
-            # we could potentially normalize to v3 using ZArray._v3_codec_pipeline, but we don't have a use case for that.
+            # we could potentially normalize to v3 using ZArray._v3_codecs, but we don't have a use case for that.
             raise NotImplementedError(
                 "Normalization to zarr v3 is not supported for zarr v2 array."
             )
