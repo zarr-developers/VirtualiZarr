@@ -111,6 +111,14 @@ class TestDatasetToVariable:
         )
         assert var.attrs["attribute_name"] == "attribute_name"
 
+    def test_scalar_fill_value(self, scalar_fill_value_hdf5_file):
+        f = h5py.File(scalar_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            scalar_fill_value_hdf5_file, ds, group=""
+        )
+        assert var.data.zarray.fill_value == 42
+
 
 @requires_hdf5plugin
 @requires_imagecodecs

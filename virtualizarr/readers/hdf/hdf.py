@@ -295,16 +295,11 @@ class HDFVirtualBackend(VirtualBackend):
             dtype = cfcodec["target_dtype"]
             attrs.pop("scale_factor", None)
             attrs.pop("add_offset", None)
-            fill_value = cfcodec["codec"].decode(dataset.fillvalue)
         else:
             dtype = dataset.dtype
-            fill_value = dataset.fillvalue
-        if isinstance(fill_value, np.ndarray):
-            fill_value = fill_value[0]
-        if np.isnan(fill_value):
-            fill_value = float("nan")
-        if isinstance(fill_value, np.generic):
-            fill_value = fill_value.item()
+
+        fill_value = dataset.fillvalue.item()
+
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,  # type: ignore
