@@ -248,6 +248,12 @@ class TestRoundtrip:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_datetime64_dtype_fill_value(self, tmpdir, roundtrip_func):
+        if "icechunk" in roundtrip_func.__name__:
+            pytest.xfail(
+                "zarr 3 does not support datetimes yet "
+                "https://github.com/zarr-developers/zarr-python/issues/2616"
+            )
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
