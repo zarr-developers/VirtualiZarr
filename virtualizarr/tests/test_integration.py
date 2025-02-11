@@ -10,6 +10,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
     has_fastparquet,
+    has_icechunk,
     has_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
@@ -114,6 +115,21 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
 
 
+def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
+    from icechunk import Repository, Storage
+
+    # create an in-memory icechunk store
+    storage = Storage.new_in_memory()
+    repo = Repository.create(storage=storage)
+    session = repo.writable_session("main")
+
+    # write those references to an icechunk store
+    vds.virtualize.to_icechunk(session.store)
+
+    # read the dataset from icechunk
+    return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
+
+
 @requires_zarr_python
 @pytest.mark.parametrize(
     "roundtrip_func",
@@ -124,6 +140,7 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
             else []
         ),
         *([roundtrip_as_kerchunk_parquet] if has_kerchunk and has_fastparquet else []),
+        *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
     ],
 )
 class TestRoundtrip:
@@ -231,6 +248,12 @@ class TestRoundtrip:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_datetime64_dtype_fill_value(self, tmpdir, roundtrip_func):
+        if "icechunk" in roundtrip_func.__name__:
+            pytest.xfail(
+                "zarr 3 does not support datetimes yet "
+                "https://github.com/zarr-developers/zarr-python/issues/2616"
+            )
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
