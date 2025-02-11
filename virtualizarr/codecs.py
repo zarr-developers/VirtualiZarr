@@ -2,9 +2,6 @@ from typing import TYPE_CHECKING, Tuple, Union
 
 if TYPE_CHECKING:
     from zarr import Array  # type: ignore
-    from zarr.core.abc.codec import (  # type: ignore
-        Codec as ZarrCodec,
-    )
 
     from .manifests.array import ManifestArray
 
@@ -55,6 +52,7 @@ def _is_manifest_array(array: object) -> bool:
         return isinstance(array, ManifestArray)
     except ImportError:
         return False
+
 
 def _get_manifestarray_codecs(array: "ManifestArray") -> CodecPipeline:
     """Get zarr v3 codec pipeline for a ManifestArray."""
