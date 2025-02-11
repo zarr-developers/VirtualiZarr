@@ -103,7 +103,7 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     vda = vds["a"]
     assert vda.data.metadata.codecs[1].to_dict() == {
         "name": "numcodecs.shuffle",
-        "configuration": {"id": "shuffle", "elementsize": 8},
+        "configuration": {"elementsize": 4},
     }
 
 

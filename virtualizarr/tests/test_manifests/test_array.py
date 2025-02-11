@@ -254,7 +254,7 @@ class TestConcat:
         }
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
-        assert codec_dict["configuration"] == {"id": "zlib", "level": 1}
+        assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
 
@@ -291,7 +291,7 @@ class TestStack:
         }
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
-        assert codec_dict["configuration"] == {"id": "zlib", "level": 1}
+        assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
     def test_stack_empty(self, array_v3_metadata):
