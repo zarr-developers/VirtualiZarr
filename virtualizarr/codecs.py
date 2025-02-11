@@ -15,7 +15,10 @@ CodecPipeline = Tuple[
 ]
 
 
-def get_codecs(array: Union["ManifestArray", "Array"]) -> CodecPipeline:
+import zarr
+
+
+def get_codecs(array: Union["ManifestArray", "zarr.Array"]) -> CodecPipeline:
     """
     Get the zarr v3 codec pipeline for either a ManifestArray or a Zarr Array.
 
