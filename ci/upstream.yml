@@ -13,7 +13,7 @@ dependencies:
   - ujson
   - universal_pathlib
   - hdf5plugin
-  - numcodecs
+  - numcodecs>=0.15.1
   - imagecodecs>=2024.6.1
   # Testing
   - codecov[toml]
