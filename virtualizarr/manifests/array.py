@@ -91,7 +91,7 @@ class ManifestArray:
         """
         Array shape by number of elements along each dimension.
         """
-        return tuple(int(length) for length in list(self.metadata.shape))
+        return self.metadata.shape
 
     @property
     def ndim(self) -> int:
