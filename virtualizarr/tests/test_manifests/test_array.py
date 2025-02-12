@@ -43,6 +43,25 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
+    def test_manifestarray_notimplementederror(self, array_v3_metadata):
+        from zarr.core.chunk_grids import ChunkGrid
+
+        class IrregularChunkGrid(ChunkGrid):
+            pass
+
+        metadata = array_v3_metadata(chunk_grid=IrregularChunkGrid())
+
+        chunks_dict = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+
+        with pytest.raises(
+            NotImplementedError,
+            match="Only RegularChunkGrid is currently supported for chunk size",
+        ):
+            ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
 
 class TestEquals:
     def test_equals(self, array_v3_metadata):

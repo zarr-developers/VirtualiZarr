@@ -46,6 +46,11 @@ class ManifestArray:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
 
+        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
+            raise NotImplementedError(
+                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
+            )
+
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
@@ -74,12 +79,7 @@ class ManifestArray:
         """
         Individual chunk size by number of elements.
         """
-        if isinstance(self._metadata.chunk_grid, RegularChunkGrid):
-            return self._metadata.chunk_grid.chunk_shape
-        else:
-            raise NotImplementedError(
-                "Only RegularChunkGrid is currently supported for chunk size"
-            )
+        return self._metadata.chunk_grid.chunk_shape
 
     @property
     def dtype(self) -> np.dtype:

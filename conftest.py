@@ -219,14 +219,19 @@ def array_v3_metadata():
     def _create_metadata(
         shape: tuple = (5, 5),
         chunks: tuple = (5, 5),
+        chunk_grid: Any | None = None,
         data_type: str = np.dtype("int32"),
         codecs: list[dict] | None = None,
         fill_value: int = None,
     ):
+        chunk_grid = chunk_grid or {
+            "name": "regular",
+            "configuration": {"chunk_shape": chunks},
+        }
         return ArrayV3Metadata(
             shape=shape,
             data_type=data_type,
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_grid=chunk_grid,
             chunk_key_encoding={"name": "default"},
             fill_value=fill_value,
             codecs=convert_to_codec_pipeline(
