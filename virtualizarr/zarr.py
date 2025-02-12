@@ -1,4 +1,3 @@
-import dataclasses
 from typing import TYPE_CHECKING, Any, Literal, NewType
 
 import numpy as np
@@ -35,100 +34,6 @@ The value and format of the fill_value depend on the `data_type` of the array.
 See here for spec:
 https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
 """
-
-
-@dataclasses.dataclass
-class ZArray:
-    """Just the .zarray information"""
-
-    # TODO will this work for V3?
-
-    shape: tuple[int, ...]
-    chunks: tuple[int, ...]
-    dtype: np.dtype
-    fill_value: FillValueT = dataclasses.field(default=None)
-    order: Literal["C", "F"] = "C"
-    compressor: dict | None = None
-    filters: list[dict] | None = None
-    zarr_format: Literal[2, 3] = 2
-
-    def __post_init__(self) -> None:
-        if len(self.shape) != len(self.chunks):
-            raise ValueError(
-                "Dimension mismatch between array shape and chunk shape. "
-                f"Array shape {self.shape} has ndim={self.shape} but chunk shape {self.chunks} has ndim={len(self.chunks)}"
-            )
-
-        if isinstance(self.dtype, str):
-            # Convert dtype string to numpy.dtype
-            self.dtype = np.dtype(self.dtype)
-
-        if self.fill_value is None:
-            self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
-
-    def dict(self) -> dict[str, Any]:
-        zarray_dict = dataclasses.asdict(self)
-        return zarray_dict
-
-    def to_kerchunk_json(self) -> str:
-        import ujson
-
-        zarray_dict = self.dict()
-        if zarray_dict["fill_value"] is np.nan:
-            zarray_dict["fill_value"] = None
-        return ujson.dumps(zarray_dict)
-
-    # ZArray.dict seems to shadow "dict", so we need the type ignore in
-    # the signature below.
-    def replace(
-        self,
-        shape: tuple[int, ...] | None = None,
-        chunks: tuple[int, ...] | None = None,
-        dtype: np.dtype | str | None = None,
-        fill_value: FillValueT = None,
-        order: Literal["C", "F"] | None = None,
-        compressor: "dict | None" = None,  # type: ignore[valid-type]
-        filters: list[dict] | None = None,  # type: ignore[valid-type]
-        zarr_format: Literal[2, 3] | None = None,
-    ) -> "ZArray":
-        """
-        Convenience method to create a new ZArray from an existing one by altering only certain attributes.
-        """
-        replacements: dict[str, Any] = {}
-        if shape is not None:
-            replacements["shape"] = shape
-        if chunks is not None:
-            replacements["chunks"] = chunks
-        if dtype is not None:
-            replacements["dtype"] = dtype
-        if fill_value is not None:
-            replacements["fill_value"] = fill_value
-        if order is not None:
-            replacements["order"] = order
-        if compressor is not None:
-            replacements["compressor"] = compressor
-        if filters is not None:
-            replacements["filters"] = filters
-        if zarr_format is not None:
-            replacements["zarr_format"] = zarr_format
-        return dataclasses.replace(self, **replacements)
-
-    def serializer(self) -> Any:
-        """
-        testing
-        """
-        try:
-            from zarr.core.metadata.v3 import (  # type: ignore[import-untyped]
-                parse_codecs,
-            )
-        except ImportError:
-            raise ImportError("zarr v3 is required to generate v3 codec pipelines")
-        # https://github.com/zarr-developers/zarr-python/pull/1944#issuecomment-2151994097
-        # "If no ArrayBytesCodec is supplied, we can auto-add a BytesCodec"
-        bytes = dict(
-            name="bytes", configuration={}
-        )  # TODO need to handle endianess configuration
-        return parse_codecs([bytes])[0]
 
 
 def ceildiv(a: int, b: int) -> int:

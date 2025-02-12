@@ -107,12 +107,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             ]
             for chunk_key, entry in marr.manifest.dict().items()
         }
-        # attrs = json.loads(json.dumps(var.attrs, cls=NumpyEncoder))
-        # marr.metadata.update_attributes(attrs)
-        # import pdb; pdb.set_trace()
-        array_v2_metadata = convert_v3_to_v2_metadata(
-            marr.metadata
-        )  # .update_attributes(attrs))
+        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
     else:
         try:
             np_arr = var.to_numpy()

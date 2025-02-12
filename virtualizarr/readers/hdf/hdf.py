@@ -313,7 +313,6 @@ class HDFVirtualBackend(VirtualBackend):
         codec_configs = [
             _num_codec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-
         metadata = ArrayV3Metadata(
             shape=dataset.shape,
             data_type=dtype,
