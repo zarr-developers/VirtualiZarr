@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal, NewType
+from typing import Any
 
 import numpy as np
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
@@ -6,35 +6,9 @@ from zarr.abc.codec import Codec as ZarrCodec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.common import JSON
 from zarr.core.metadata.v2 import ArrayV2Metadata
-from zarr.core.metadata.v3 import ArrayV3Metadata
-
-if TYPE_CHECKING:
-    try:
-        from zarr.abc.codec import Codec as ZarrCodec
-    except ImportError:
-        pass
-
-# TODO replace these with classes imported directly from Zarr? (i.e. Zarr Object Models)
-ZAttrs = NewType(
-    "ZAttrs", dict[str, Any]
-)  # just the .zattrs (for one array or for the whole store/group)
-FillValueT = bool | str | float | int | list | None
-ZARR_FORMAT = Literal[2, 3]
-
-ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
-    # numpy dtypes's hierarchy lets us avoid checking for all the widths
-    # https://numpy.org/doc/stable/reference/arrays.scalars.html
-    np.dtype("bool").kind: False,
-    np.dtype("int").kind: 0,
-    np.dtype("float").kind: 0.0,
-    np.dtype("complex").kind: [0.0, 0.0],
-    np.dtype("datetime64").kind: 0,
-}
-"""
-The value and format of the fill_value depend on the `data_type` of the array.
-See here for spec:
-https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
-"""
+from zarr.core.metadata.v3 import (
+    ArrayV3Metadata,  # just the .zattrs (for one array or for the whole store/group)
+)
 
 
 def ceildiv(a: int, b: int) -> int:
@@ -228,9 +202,10 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
 
 def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     """
-    Convert a decoded Zarr array reference to an ArrayV3Metadata object.
+    Convert a decoded zarr array (.zarray) reference to an ArrayV3Metadata object.
     This function processes the given decoded Zarr array reference dictionary,
     to construct and return an ArrayV3Metadata object based on the provided information.
+
     Parameters:
     ----------
     decoded_arr_refs_zarray : dict

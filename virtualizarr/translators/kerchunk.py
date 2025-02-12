@@ -11,7 +11,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import ZAttrs, determine_chunk_grid_shape
+from virtualizarr.zarr import determine_chunk_grid_shape
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
@@ -265,6 +265,7 @@ def extract_array_refs(
         )
 
 
+from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.zarr import from_kerchunk_refs
@@ -272,7 +273,7 @@ from virtualizarr.zarr import from_kerchunk_refs
 
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> tuple[dict, ArrayV3Metadata, ZAttrs]:
+) -> tuple[dict, ArrayV3Metadata, dict[str, JSON]]:
     metadata = from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
