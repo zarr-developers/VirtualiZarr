@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, NewType
 import numpy as np
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
+from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.common import JSON
 from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
@@ -84,9 +85,6 @@ def extract_codecs(
         if isinstance(codec, BytesBytesCodec):
             bytesbytes_codecs += (codec,)
     return (arrayarray_codecs, arraybytes_codec, bytesbytes_codecs)
-
-
-from zarr.core.codec_pipeline import BatchedCodecPipeline
 
 
 def convert_to_codec_pipeline(
@@ -229,6 +227,24 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
 
 
 def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+    """
+    Convert a decoded Zarr array reference to an ArrayV3Metadata object.
+    This function processes the given decoded Zarr array reference dictionary,
+    to construct and return an ArrayV3Metadata object based on the provided information.
+    Parameters:
+    ----------
+    decoded_arr_refs_zarray : dict
+        A dictionary containing the decoded Zarr array reference information.
+        Expected keys include "dtype", "fill_value", "zarr_format", "filters",
+        "compressor", "chunks", and "shape".
+    Returns:
+    -------
+    ArrayV3Metadata
+    Raises:
+    ------
+    ValueError
+        If the Zarr format specified in the input dictionary is not 2 or 3.
+    """
     # coerce type of fill_value as kerchunk can be inconsistent with this
     dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
     fill_value = decoded_arr_refs_zarray["fill_value"]

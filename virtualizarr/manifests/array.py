@@ -79,7 +79,7 @@ class ManifestArray:
         """
         Individual chunk size by number of elements.
         """
-        return self._metadata.chunk_grid.chunk_shape
+        return self._metadata.chunks
 
     @property
     def dtype(self) -> np.dtype:
