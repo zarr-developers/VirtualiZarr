@@ -1,7 +1,10 @@
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING, Any, Tuple, Union
 
+import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
+from zarr.abc.codec import Codec as ZarrCodec
+from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 if TYPE_CHECKING:
@@ -10,6 +13,97 @@ if TYPE_CHECKING:
 CodecPipeline = Tuple[
     Union["ArrayArrayCodec", "ArrayBytesCodec", "BytesBytesCodec"], ...
 ]
+
+
+def num_codec_config_to_configurable(num_codec: dict) -> dict:
+    """
+    Convert a numcodecs codec into a zarr v3 configurable.
+    """
+    if num_codec["id"].startswith("numcodecs."):
+        return num_codec
+
+    num_codec_copy = num_codec.copy()
+    name = "numcodecs." + num_codec_copy.pop("id")
+    return {"name": name, "configuration": num_codec_copy}
+
+
+def extract_codecs(
+    codecs: CodecPipeline,
+) -> tuple[
+    tuple[ArrayArrayCodec, ...], ArrayBytesCodec | None, tuple[BytesBytesCodec, ...]
+]:
+    """Extracts various codec types."""
+    arrayarray_codecs: tuple[ArrayArrayCodec, ...] = ()
+    arraybytes_codec: ArrayBytesCodec | None = None
+    bytesbytes_codecs: tuple[BytesBytesCodec, ...] = ()
+    for codec in codecs:
+        if isinstance(codec, ArrayArrayCodec):
+            arrayarray_codecs += (codec,)
+        if isinstance(codec, ArrayBytesCodec):
+            arraybytes_codec = codec
+        if isinstance(codec, BytesBytesCodec):
+            bytesbytes_codecs += (codec,)
+    return (arrayarray_codecs, arraybytes_codec, bytesbytes_codecs)
+
+
+def convert_to_codec_pipeline(
+    dtype: np.dtype,
+    codecs: list[dict] | None = [],
+) -> BatchedCodecPipeline:
+    """
+    Convert compressor, filters, serializer, and dtype to a pipeline of ZarrCodecs.
+
+    Parameters
+    ----------
+    dtype : Any
+        The data type.
+    codecs: list[ZarrCodec] | None
+
+    Returns
+    -------
+    BatchedCodecPipeline
+    """
+    from zarr.core.array import _get_default_chunk_encoding_v3
+    from zarr.registry import get_codec_class
+
+    zarr_codecs: tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...] = ()
+    if codecs and len(codecs) > 0:
+        zarr_codecs = tuple(
+            get_codec_class(codec["name"]).from_dict(codec) for codec in codecs
+        )
+
+    arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
+
+    if arraybytes_codec is None:
+        arraybytes_codec = _get_default_chunk_encoding_v3(dtype)[1]
+
+    codec_pipeline = BatchedCodecPipeline(
+        array_array_codecs=arrayarray_codecs,
+        array_bytes_codec=arraybytes_codec,
+        bytes_bytes_codecs=bytesbytes_codecs,
+        batch_size=1,
+    )
+
+    return codec_pipeline
+
+
+def _get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
+    """
+    Extract configuration from a codec, handling both zarr-python and numcodecs codecs.
+    """
+    if hasattr(codec, "codec_config"):
+        return codec.codec_config
+    elif hasattr(codec, "get_config"):
+        return codec.get_config()
+    elif hasattr(codec, "codec_name"):
+        # If we can't get config, try to get the name and configuration directly
+        # This assumes the codec follows the v3 spec format
+        return {
+            "id": codec.codec_name.replace("numcodecs.", ""),
+            **getattr(codec, "configuration", {}),
+        }
+    else:
+        raise ValueError(f"Unable to parse codec configuration: {codec}")
 
 
 def get_codecs(array: Union["ManifestArray", "zarr.Array"]) -> CodecPipeline:

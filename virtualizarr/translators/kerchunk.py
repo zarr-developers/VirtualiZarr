@@ -1,11 +1,17 @@
 from typing import Any, Mapping, MutableMapping, cast
 
+import numpy as np
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata.v2 import ArrayV2Metadata
 
+from virtualizarr.codecs import (
+    convert_to_codec_pipeline,
+    num_codec_config_to_configurable,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.readers.common import separate_coords
@@ -13,7 +19,86 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import determine_chunk_grid_shape, from_kerchunk_refs
+from virtualizarr.utils import determine_chunk_grid_shape
+
+
+def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
+    """Convert V2 metadata to kerchunk JSON format."""
+    import json
+
+    from virtualizarr.writers.kerchunk import NumpyEncoder
+
+    zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
+    if v2_metadata.filters:
+        zarray_dict["filters"] = [
+            # we could also cast to json, but get_config is intended for serialization
+            codec.get_config()
+            for codec in v2_metadata.filters
+            if codec is not None
+        ]  # type: ignore[assignment]
+    if v2_metadata.compressor:
+        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore[assignment]
+
+    return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
+
+
+def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+    """
+    Convert a decoded zarr array (.zarray) reference to an ArrayV3Metadata object.
+    This function processes the given decoded Zarr array reference dictionary,
+    to construct and return an ArrayV3Metadata object based on the provided information.
+
+    Parameters:
+    ----------
+    decoded_arr_refs_zarray : dict
+        A dictionary containing the decoded Zarr array reference information.
+        Expected keys include "dtype", "fill_value", "zarr_format", "filters",
+        "compressor", "chunks", and "shape".
+    Returns:
+    -------
+    ArrayV3Metadata
+    Raises:
+    ------
+    ValueError
+        If the Zarr format specified in the input dictionary is not 2 or 3.
+    """
+    # coerce type of fill_value as kerchunk can be inconsistent with this
+    dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
+    fill_value = decoded_arr_refs_zarray["fill_value"]
+    if np.issubdtype(dtype, np.floating) and (
+        fill_value is None or fill_value == "NaN" or fill_value == "nan"
+    ):
+        fill_value = np.nan
+
+    zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
+    if zarr_format not in (2, 3):
+        raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+    filters = (
+        decoded_arr_refs_zarray.get("filters", []) or []
+    )  # Ensure filters is a list
+    compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
+
+    # Ensure compressor is a list before unpacking
+    codec_configs = [*filters, *(compressor if compressor is not None else [])]
+    numcodec_configs = [
+        num_codec_config_to_configurable(config) for config in codec_configs
+    ]
+    return ArrayV3Metadata(
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": tuple(decoded_arr_refs_zarray["chunks"])},
+        },
+        codecs=convert_to_codec_pipeline(
+            dtype=dtype,
+            codecs=numcodec_configs,
+        ),
+        data_type=dtype,
+        fill_value=fill_value,
+        shape=tuple(decoded_arr_refs_zarray["shape"]),
+        chunk_key_encoding={"name": "default"},
+        attributes={},
+        dimension_names=None,
+    )
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import numpy as np
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.zarr import determine_chunk_grid_shape
+from virtualizarr.utils import determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 from .utils import (

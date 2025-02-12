@@ -10,9 +10,10 @@ import xarray as xr
 from xarray.core.variable import Variable
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+from virtualizarr.codecs import convert_to_codec_pipeline
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
-from virtualizarr.zarr import ceildiv, convert_to_codec_pipeline
+from virtualizarr.utils import ceildiv
 
 
 def pytest_addoption(parser):

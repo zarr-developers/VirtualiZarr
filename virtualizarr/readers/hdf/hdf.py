@@ -15,6 +15,10 @@ import numpy as np
 import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+from virtualizarr.codecs import (
+    convert_to_codec_pipeline,
+    num_codec_config_to_configurable,
+)
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -29,10 +33,6 @@ from virtualizarr.readers.common import (
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
-from virtualizarr.zarr import (
-    _num_codec_config_to_configurable,
-    convert_to_codec_pipeline,
-)
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -307,7 +307,7 @@ class HDFVirtualBackend(VirtualBackend):
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
         codec_configs = [
-            _num_codec_config_to_configurable(codec.get_config()) for codec in codecs
+            num_codec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
         metadata = ArrayV3Metadata(
             shape=dataset.shape,

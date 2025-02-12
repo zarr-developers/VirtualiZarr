@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
 from xarray import Dataset
+from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
+from virtualizarr.writers.kerchunk import convert_v3_to_v2_metadata
 
 
 @requires_kerchunk
@@ -143,3 +145,35 @@ class TestAccessor:
             "size": {0: 100, 1: 100},
             "raw": {0: None, 1: None},
         }
+
+
+def testconvert_v3_to_v2_metadata(array_v3_metadata):
+    shape = (5, 20)
+    chunks = (5, 10)
+    codecs = [
+        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {
+            "name": "numcodecs.blosc",
+            "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
+        },
+    ]
+
+    v3_metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+    v2_metadata = convert_v3_to_v2_metadata(v3_metadata)
+
+    assert isinstance(v2_metadata, ArrayV2Metadata)
+    assert v2_metadata.shape == shape
+    assert v2_metadata.dtype == np.dtype("int32")
+    assert v2_metadata.chunks == chunks
+    assert v2_metadata.fill_value == 0
+    compressor_config = v2_metadata.compressor.get_config()
+    assert compressor_config["id"] == "blosc"
+    assert compressor_config["cname"] == "zstd"
+    assert compressor_config["clevel"] == 5
+    assert compressor_config["shuffle"] == 1
+    assert compressor_config["blocksize"] == 0
+    filters_config = v2_metadata.filters[0].get_config()
+    assert filters_config["id"] == "delta"
+    assert filters_config["dtype"] == "<i8"
+    assert filters_config["astype"] == "<i8"
+    assert v2_metadata.attributes == {}

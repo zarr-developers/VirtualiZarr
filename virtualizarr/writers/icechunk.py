@@ -211,7 +211,7 @@ def write_virtual_variable_to_icechunk(
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
 
-    from virtualizarr.zarr import extract_codecs
+    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata

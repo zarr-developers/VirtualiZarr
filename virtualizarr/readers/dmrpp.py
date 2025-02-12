@@ -379,7 +379,7 @@ class DMRParser:
         """
         from zarr.core.metadata.v3 import ArrayV3Metadata
 
-        from virtualizarr.zarr import convert_to_codec_pipeline
+        from virtualizarr.codecs import convert_to_codec_pipeline
 
         # Dimension info
         dims: dict[str, int] = {}

@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 from zarr.codecs import BytesCodec
+from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.registry import get_codec_class
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 arrayarray_codec = {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
 arraybytes_codec = {"name": "bytes", "configuration": {"endian": "little"}}
@@ -92,3 +93,49 @@ class TestCodecs:
             match="Only zarr v3 format arrays are supported. Please convert your array to v3 format.",
         ):
             get_codecs(zarr_array)
+
+
+def test_convert_to_codec_pipeline():
+    expected_default_codecs = BatchedCodecPipeline(
+        array_array_codecs=(),
+        array_bytes_codec=BytesCodec(endian="little"),
+        bytes_bytes_codecs=(),
+        batch_size=1,
+    )
+    # Test with just dtype (default codec pipeline)
+    dtype = np.dtype("<i4")
+    int_codecs = convert_to_codec_pipeline(dtype=dtype)
+    assert int_codecs == expected_default_codecs
+
+    # Test with different dtype
+    float_dtype = np.dtype("<f8")
+    float_codecs = convert_to_codec_pipeline(dtype=float_dtype)
+    assert float_codecs == expected_default_codecs
+
+    # Test with empty codecs list
+    empty_codecs = convert_to_codec_pipeline(dtype=dtype, codecs=[])
+    assert empty_codecs == expected_default_codecs
+
+    # Test with filters and compressor
+    test_codecs = [
+        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {
+            "name": "numcodecs.blosc",
+            "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
+        },
+    ]
+
+    codecs = convert_to_codec_pipeline(dtype=dtype, codecs=test_codecs)
+    assert isinstance(codecs, BatchedCodecPipeline)
+
+    # Verify codec types and order
+    array_array_codecs = codecs.array_array_codecs
+    assert array_array_codecs[0].codec_name == "numcodecs.delta"
+    array_bytes_codec = codecs.array_bytes_codec
+    assert isinstance(array_bytes_codec, BytesCodec)
+    bytes_bytes_codecs = codecs.bytes_bytes_codecs
+    assert bytes_bytes_codecs[0].codec_name == "numcodecs.blosc"
+    config = bytes_bytes_codecs[0].codec_config
+    assert config["cname"] == "zstd"
+    assert config["clevel"] == 5
+    assert config["shuffle"] == 1
