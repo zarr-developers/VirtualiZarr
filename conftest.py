@@ -1,3 +1,5 @@
+import itertools
+from itertools import product
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
@@ -6,6 +8,11 @@ import numpy as np
 import pytest
 import xarray as xr
 from xarray.core.variable import Variable
+from zarr.core.metadata.v3 import ArrayV3Metadata
+
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import join
+from virtualizarr.zarr import ceildiv, convert_to_codec_pipeline
 
 
 def pytest_addoption(parser):
@@ -150,3 +157,217 @@ def simple_netcdf4(tmp_path: Path) -> str:
     ds.to_netcdf(filepath)
 
     return str(filepath)
+
+
+def offset_from_chunk_key(ind: tuple[int, ...]) -> int:
+    return sum(ind) * 10
+
+
+def length_from_chunk_key(ind: tuple[int, ...]) -> int:
+    return sum(ind) + 5
+
+
+def entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
+    """Generate a (somewhat) unique manifest entry from a given chunk key"""
+    entry = {
+        "path": f"/foo.{str(join(ind))}.nc",
+        "offset": offset_from_chunk_key(ind),
+        "length": length_from_chunk_key(ind),
+    }
+    return entry  # type: ignore[return-value]
+
+
+@pytest.fixture
+def create_manifestarray(array_v3_metadata):
+    """
+    Create an example ManifestArray with sensible defaults.
+
+    The manifest is populated with a (somewhat) unique path, offset, and length for each key.
+    """
+
+    def _create_manifestarray(
+        shape: tuple | None = (5, 5),
+        chunks: tuple | None = (5, 5),
+        codecs: list[dict] | None = [
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+        ],
+    ):
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+        chunk_grid_shape = tuple(
+            ceildiv(axis_length, chunk_length)
+            for axis_length, chunk_length in zip(shape, chunks)
+        )
+
+        if chunk_grid_shape == ():
+            d = {"0": entry_from_chunk_key((0,))}
+        else:
+            # create every possible combination of keys
+            all_possible_combos = itertools.product(
+                *[range(length) for length in chunk_grid_shape]
+            )
+            d = {join(ind): entry_from_chunk_key(ind) for ind in all_possible_combos}
+
+        chunkmanifest = ChunkManifest(entries=d)
+
+        return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
+
+    return _create_manifestarray
+
+
+@pytest.fixture
+def array_v3_metadata():
+    def _create_metadata(
+        shape: tuple = (5, 5),
+        chunks: tuple = (5, 5),
+        data_type: str = np.dtype("int32"),
+        codecs: list[dict] | None = None,
+        fill_value: int = None,
+    ):
+        return ArrayV3Metadata(
+            shape=shape,
+            data_type=data_type,
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_key_encoding={"name": "default"},
+            fill_value=fill_value,
+            codecs=convert_to_codec_pipeline(
+                codecs=codecs,
+                dtype=data_type,
+            ),
+            attributes={},
+            dimension_names=None,
+            storage_transformers=None,
+        )
+
+    return _create_metadata
+
+
+@pytest.fixture
+def array_v3_metadata_dict():
+    def _create_metadata_dict(
+        shape: tuple,
+        chunks: tuple,
+        codecs: list[dict] = [
+            {"configuration": {"endian": "little"}, "name": "bytes"},
+            {
+                "name": "numcodecs.zlib",
+                "configuration": {"level": 1},
+            },
+        ],
+    ):
+        return {
+            "shape": shape,
+            "data_type": "int32",
+            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": chunks}},
+            "chunk_key_encoding": {"name": "default"},
+            "fill_value": 0,
+            "codecs": codecs,
+            "attributes": {},
+            "dimension_names": None,
+            "storage_transformers": None,
+        }
+
+    return _create_metadata_dict
+
+
+def generate_chunk_manifest(
+    netcdf4_file: str,
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
+    offset=6144,
+    length=48,
+) -> ChunkManifest:
+    chunk_dict = {}
+    num_chunks = [shape[i] // chunks[i] for i in range(len(shape))]
+    offset = offset
+
+    # Generate all possible chunk indices using Cartesian product
+    for chunk_indices in product(*[range(n) for n in num_chunks]):
+        chunk_index = ".".join(map(str, chunk_indices))
+        chunk_dict[chunk_index] = {
+            "path": netcdf4_file,
+            "offset": offset,
+            "length": length,
+        }
+        offset += length  # Increase offset for each chunk
+
+    return ChunkManifest(chunk_dict)
+
+
+@pytest.fixture
+def gen_virtual_variable(array_v3_metadata: Callable) -> Callable:
+    def _gen_virtual_variable(
+        file_uri: str,
+        shape: tuple[int, ...] = (3, 4),
+        chunk_shape: tuple[int, ...] = (3, 4),
+        dtype: np.dtype = np.dtype("int32"),
+        codecs: Optional[list[dict[Any, Any]]] = None,
+        fill_value: Optional[str] = None,
+        encoding: Optional[dict] = None,
+        offset: int = 6144,
+        length: int = 48,
+        dims: list[str] = [],
+        attrs: dict[str, Any] = {},
+    ) -> xr.Variable:
+        manifest = generate_chunk_manifest(
+            file_uri,
+            shape=shape,
+            chunks=chunk_shape,
+            offset=offset,
+            length=length,
+        )
+        metadata = array_v3_metadata(
+            shape=shape,
+            chunks=chunk_shape,
+            codecs=codecs,
+            data_type=dtype,
+            fill_value=fill_value,
+        )
+        ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+        return xr.Variable(
+            data=ma,
+            dims=dims,
+            encoding=encoding,
+            attrs=attrs,
+        )
+
+    return _gen_virtual_variable
+
+
+@pytest.fixture
+def gen_virtual_dataset(gen_virtual_variable: Callable) -> Callable:
+    def _gen_virtual_dataset(
+        file_uri: str,
+        shape: tuple[int, ...] = (3, 4),
+        chunk_shape: tuple[int, ...] = (3, 4),
+        dtype: np.dtype = np.dtype("int32"),
+        codecs: Optional[list[dict[Any, Any]]] = None,
+        fill_value: Optional[str] = None,
+        encoding: Optional[dict] = None,
+        variable_name: str = "foo",
+        offset: int = 6144,
+        length: int = 48,
+        dims: Optional[list[str]] = None,
+        coords: Optional[xr.Coordinates] = None,
+    ) -> xr.Dataset:
+        with xr.open_dataset(file_uri) as ds:
+            var = gen_virtual_variable(
+                file_uri=file_uri,
+                shape=shape,
+                chunk_shape=chunk_shape,
+                dtype=dtype,
+                codecs=codecs,
+                fill_value=fill_value,
+                encoding=encoding,
+                offset=offset,
+                length=length,
+                dims=dims or [str(name) for name in ds.dims],
+                attrs=ds[variable_name].attrs,
+            )
+
+            return xr.Dataset(
+                {variable_name: var},
+                coords=coords,
+                attrs=ds.attrs,
+            )
+
+    return _gen_virtual_dataset

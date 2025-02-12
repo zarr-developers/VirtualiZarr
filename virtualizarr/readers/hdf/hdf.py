@@ -28,7 +28,6 @@ from virtualizarr.readers.common import (
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
-from virtualizarr.zarr import ZArray
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -285,6 +284,12 @@ class HDFVirtualBackend(VirtualBackend):
         """
         # This chunk determination logic mirrors zarr-python's create
         # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
+        from zarr.core.metadata.v3 import ArrayV3Metadata
+
+        from virtualizarr.zarr import (
+            _num_codec_config_to_configurable,
+            convert_to_codec_pipeline,
+        )
 
         chunks = dataset.chunks if dataset.chunks else dataset.shape
         codecs = codecs_from_dataset(dataset)
@@ -305,21 +310,25 @@ class HDFVirtualBackend(VirtualBackend):
             fill_value = float("nan")
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
-        filters = [codec.get_config() for codec in codecs]
-        zarray = ZArray(
-            chunks=chunks,  # type: ignore
-            compressor=None,
-            dtype=dtype,
-            fill_value=fill_value,
-            filters=filters,
-            order="C",
+        codec_configs = [
+            _num_codec_config_to_configurable(codec.get_config()) for codec in codecs
+        ]
+
+        metadata = ArrayV3Metadata(
             shape=dataset.shape,
-            zarr_format=2,
+            data_type=dtype,
+            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
+            chunk_key_encoding={"name": "default"},
+            fill_value=fill_value,
+            codecs=convert_to_codec_pipeline(codecs=codec_configs, dtype=dtype),
+            attributes=attrs,
+            dimension_names=None,
+            storage_transformers=None,
         )
         dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         if manifest:
-            marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+            marray = ManifestArray(metadata=metadata, chunkmanifest=manifest)
             variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
         else:
             variable = xr.Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)

@@ -14,7 +14,6 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
-    has_astropy,
     parametrize_over_hdf_backends,
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -230,9 +229,10 @@ class TestReadFromURL:
                 "grib",
                 "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
             ),
-            (
+            pytest.param(
                 "netcdf3",
                 "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+                marks=pytest.mark.xfail(reason="Not supported by zarr-python 3.0"),
             ),
             (
                 "netcdf4",
@@ -258,9 +258,7 @@ class TestReadFromURL:
             pytest.param(
                 "fits",
                 "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-                marks=pytest.mark.skipif(
-                    not has_astropy, reason="package astropy is not available"
-                ),
+                marks=pytest.mark.xfail(reason="Not supported by zarr-python 3.0"),
             ),
             (
                 "jpg",

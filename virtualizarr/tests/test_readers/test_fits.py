@@ -9,6 +9,7 @@ pytest.importorskip("astropy")
 
 @requires_kerchunk
 @requires_network
+@pytest.mark.xfail(reason="zarr-python 3.0 does not yet support big endian")
 def test_open_hubble_data():
     # data from https://registry.opendata.aws/hst/
     vds = open_virtual_dataset(

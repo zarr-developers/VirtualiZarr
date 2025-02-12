@@ -53,6 +53,8 @@ def concatenate(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.concat`.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
+
     from .array import ManifestArray
 
     if axis is None:
@@ -100,12 +102,12 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    # chunk shape has not changed, there are just now more chunks along the concatenation axis
-    new_zarray = first_arr.zarray.replace(
-        shape=tuple(new_shape),
-    )
+    metadata_copy = first_arr.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
-    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 
 
 @implements(np.stack)
@@ -120,6 +122,8 @@ def stack(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.stack`.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
+
     from .array import ManifestArray
 
     if not isinstance(axis, int):
@@ -170,12 +174,16 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
-        shape=tuple(new_shape),
-    )
+    metadata_copy = first_arr.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    metadata_copy["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": tuple(new_chunks)},
+    }
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
-    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
 
 
 @implements(np.expand_dims)
@@ -190,6 +198,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     """
     Broadcasts a ManifestArray to a specified shape, by either adjusting chunk keys or copying chunk manifest entries.
     """
+    from zarr.core.metadata.v3 import ArrayV3Metadata
 
     from .array import ManifestArray
 
@@ -236,12 +245,16 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
-        chunks=new_chunk_shape,
-        shape=new_shape,
-    )
+    metadata_copy = x.metadata.to_dict().copy()
+    metadata_copy["shape"] = tuple(new_shape)
+    metadata_copy["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": tuple(new_chunk_shape)},
+    }
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
-    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:
