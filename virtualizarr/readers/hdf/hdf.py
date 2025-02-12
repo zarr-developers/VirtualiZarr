@@ -13,6 +13,7 @@ from typing import (
 
 import numpy as np
 import xarray as xr
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -28,6 +29,10 @@ from virtualizarr.readers.common import (
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
+from virtualizarr.zarr import (
+    _num_codec_config_to_configurable,
+    convert_to_codec_pipeline,
+)
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -282,15 +287,6 @@ class HDFVirtualBackend(VirtualBackend):
         list: xarray.Variable
             A list of xarray variables.
         """
-        # This chunk determination logic mirrors zarr-python's create
-        # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
-        from zarr.core.metadata.v3 import ArrayV3Metadata
-
-        from virtualizarr.zarr import (
-            _num_codec_config_to_configurable,
-            convert_to_codec_pipeline,
-        )
-
         chunks = dataset.chunks if dataset.chunks else dataset.shape
         codecs = codecs_from_dataset(dataset)
         cfcodec = cfcodec_from_dataset(dataset)

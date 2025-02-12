@@ -3,6 +3,8 @@ from typing import Any, Mapping, MutableMapping, cast
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
+from zarr.core.common import JSON
+from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
@@ -11,7 +13,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import determine_chunk_grid_shape
+from virtualizarr.zarr import determine_chunk_grid_shape, from_kerchunk_refs
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
@@ -263,12 +265,6 @@ def extract_array_refs(
         raise KeyError(
             f"Could not find zarr array variable name {var_name}, only {found_var_names}"
         )
-
-
-from zarr.core.common import JSON
-from zarr.core.metadata import ArrayV3Metadata
-
-from virtualizarr.zarr import from_kerchunk_refs
 
 
 def parse_array_refs(

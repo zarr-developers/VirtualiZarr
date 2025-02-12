@@ -102,7 +102,7 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    new_metadata = update_metadata(first_arr, new_shape=new_shape)
+    new_metadata = _update_metadata(first_arr, new_shape=new_shape)
 
     return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 
@@ -170,16 +170,19 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_metadata = update_metadata(
+    new_metadata = _update_metadata(
         first_arr, new_shape=new_shape, new_chunks=new_chunks
     )
 
     return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
 
 
-def update_metadata(
+def _update_metadata(
     first_arr, new_shape: list[int], new_chunks: list[int] | None = None
 ) -> ArrayV3Metadata:
+    """
+    Update the metadata of a ManifestArray to reflect a new shape and/or chunk shape.
+    """
     metadata_copy = first_arr.metadata.to_dict().copy()
     metadata_copy["shape"] = tuple(new_shape)
     if new_chunks is not None:
@@ -250,7 +253,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_metadata = update_metadata(
+    new_metadata = _update_metadata(
         x, new_shape=list(new_shape), new_chunks=list(new_chunk_shape)
     )
 
