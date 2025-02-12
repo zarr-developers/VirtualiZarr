@@ -178,7 +178,7 @@ def stack(
 
 
 def update_metadata(
-    first_arr, new_shape: tuple, new_chunks: tuple | None = None
+    first_arr, new_shape: list[int], new_chunks: list[int] | None = None
 ) -> ArrayV3Metadata:
     metadata_copy = first_arr.metadata.to_dict().copy()
     metadata_copy["shape"] = tuple(new_shape)
@@ -250,7 +250,9 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_metadata = update_metadata(x, new_shape=new_shape, new_chunks=new_chunk_shape)
+    new_metadata = update_metadata(
+        x, new_shape=list(new_shape), new_chunks=list(new_chunk_shape)
+    )
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 
