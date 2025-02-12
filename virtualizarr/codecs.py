@@ -1,15 +1,14 @@
 from typing import TYPE_CHECKING, Tuple, Union
 
-if TYPE_CHECKING:
-    from zarr import Array  # type: ignore
+import zarr
+from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 
+if TYPE_CHECKING:
     from .manifests.array import ManifestArray
 
 CodecPipeline = Tuple[
     Union["ArrayArrayCodec", "ArrayBytesCodec", "BytesBytesCodec"], ...
 ]
-
-import zarr
 
 
 def get_codecs(array: Union["ManifestArray", "zarr.Array"]) -> CodecPipeline:
@@ -73,7 +72,7 @@ def _is_zarr_array(array: object) -> bool:
         return False
 
 
-def _get_zarr_array_codecs(array: "Array") -> CodecPipeline:
+def _get_zarr_array_codecs(array: "zarr.Array") -> CodecPipeline:
     """Get zarr v3 codec pipeline for a Zarr Array."""
     from zarr.core.metadata import ArrayV3Metadata  # type: ignore[import-untyped]
 

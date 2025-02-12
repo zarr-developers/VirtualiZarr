@@ -176,7 +176,10 @@ def stack(
 
     metadata_copy = first_arr.metadata.to_dict().copy()
     metadata_copy["shape"] = tuple(new_shape)
-    metadata_copy["chunk_grid"]["configuration"]["chunk_shape"] = tuple(new_chunks)
+    metadata_copy["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": tuple(new_chunks)},
+    }
     # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
     new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 
@@ -244,7 +247,10 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     metadata_copy = x.metadata.to_dict().copy()
     metadata_copy["shape"] = tuple(new_shape)
-    metadata_copy["chunk_grid"]["configuration"]["chunk_shape"] = tuple(new_chunk_shape)
+    metadata_copy["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": tuple(new_chunk_shape)},
+    }
     # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
     new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
 

@@ -244,7 +244,7 @@ def write_virtual_variable_to_icechunk(
     else:
         append_axis = None
         # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
-        filters, compressors = extract_codecs(metadata.codecs)
+        filters, _, compressors = extract_codecs(metadata.codecs)
         arr = group.require_array(
             name=name,
             shape=metadata.shape,

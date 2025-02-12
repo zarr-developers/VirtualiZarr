@@ -2,6 +2,7 @@ import dataclasses
 from typing import TYPE_CHECKING, Any, Literal, NewType
 
 import numpy as np
+from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
 from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
@@ -9,7 +10,6 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 if TYPE_CHECKING:
     try:
         from zarr.abc.codec import Codec as ZarrCodec
-        from zarr.core.array import CompressorLike, FiltersLike, SerializerLike
     except ImportError:
         pass
 
@@ -34,34 +34,6 @@ The value and format of the fill_value depend on the `data_type` of the array.
 See here for spec:
 https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value
 """
-
-
-@dataclasses.dataclass
-class Codec:
-    compressors: list[dict] | None = None
-    filters: list[dict] | None = None
-
-
-@dataclasses.dataclass
-class ZarrV3Codecs:
-    filters: "FiltersLike"
-    compressors: "CompressorLike"
-    serializer: "SerializerLike"
-
-    def into_v3_codecs(self, dtype: np.dtype) -> tuple["ZarrCodec", ...]:
-        try:
-            from zarr.core.array import _parse_chunk_encoding_v3
-        except ImportError:
-            raise ImportError("zarr v3 is required to generate v3 codecs")
-
-        codecs = _parse_chunk_encoding_v3(
-            serializer=self.serializer,
-            compressors=self.compressors,
-            filters=self.filters,
-            dtype=dtype,
-        )
-
-        return cast(tuple["ZarrCodec", ...], (*codecs[0], codecs[1], *codecs[2]))
 
 
 @dataclasses.dataclass
@@ -92,53 +64,6 @@ class ZArray:
 
         if self.fill_value is None:
             self.fill_value = ZARR_DEFAULT_FILL_VALUE.get(self.dtype.kind, 0.0)
-
-    @property
-    def codec(self) -> Codec:
-        """For comparison against other arrays."""
-        return Codec(compressor=self.compressor, filters=self.filters)
-
-    @classmethod
-    def from_kerchunk_refs(cls, decoded_arr_refs_zarray) -> "ArrayV3Metadata":
-        # coerce type of fill_value as kerchunk can be inconsistent with this
-        dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
-        fill_value = decoded_arr_refs_zarray["fill_value"]
-        if np.issubdtype(dtype, np.floating) and (
-            fill_value is None or fill_value == "NaN" or fill_value == "nan"
-        ):
-            fill_value = np.nan
-
-        zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
-        if zarr_format not in (2, 3):
-            raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
-        filters = (
-            decoded_arr_refs_zarray.get("filters", []) or []
-        )  # Ensure filters is a list
-        compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
-
-        # Ensure compressor is a list before unpacking
-        codec_configs = [*filters, *(compressor if compressor is not None else [])]
-        numcodec_configs = [
-            _num_codec_config_to_configurable(config) for config in codec_configs
-        ]
-        return ArrayV3Metadata(
-            chunk_grid={
-                "name": "regular",
-                "configuration": {
-                    "chunk_shape": tuple(decoded_arr_refs_zarray["chunks"])
-                },
-            },
-            codecs=convert_to_codec_pipeline(
-                dtype=dtype,
-                codecs=numcodec_configs,
-            ),
-            data_type=dtype,
-            fill_value=fill_value,
-            shape=tuple(decoded_arr_refs_zarray["shape"]),
-            chunk_key_encoding={"name": "default"},
-            attributes={},
-            dimension_names=None,
-        )
 
     def dict(self) -> dict[str, Any]:
         zarray_dict = dataclasses.asdict(self)
@@ -187,15 +112,6 @@ class ZArray:
             replacements["zarr_format"] = zarr_format
         return dataclasses.replace(self, **replacements)
 
-    def _v3_codec_pipeline(self) -> tuple["ZarrCodec", ...]:
-        """
-        Convert the compressor, filters, and dtype to a pipeline of ZarrCodecs.
-        """
-        filters = self.filters or []
-        return convert_to_codec_pipeline(
-            codecs=[*filters, self.compressor], dtype=self.dtype
-        )
-
     def serializer(self) -> Any:
         """
         testing
@@ -242,19 +158,22 @@ def _num_codec_config_to_configurable(num_codec: dict) -> dict:
     return {"name": name, "configuration": num_codec_copy}
 
 
-def extract_codecs(
-    codecs: list[ZarrCodec] | None = [],
-) -> tuple[list[dict], list[dict]]:
-    """Extracts filters and compressor from Zarr v3 metadata."""
-    from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
+from virtualizarr.codecs import CodecPipeline
 
-    arrayarray_codecs, bytesbytes_codecs = [], []
+
+def extract_codecs(
+    codecs: CodecPipeline,
+) -> tuple[list[ArrayArrayCodec], ArrayBytesCodec | None, list[BytesBytesCodec]]:
+    """Extracts filters and compressor from Zarr v3 metadata."""
+    arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = [], None, []
     for codec in codecs:
         if isinstance(codec, ArrayArrayCodec):
             arrayarray_codecs.append(codec)
+        if isinstance(codec, ArrayBytesCodec):
+            arraybytes_codec = codec
         if isinstance(codec, BytesBytesCodec):
             bytesbytes_codecs.append(codec)
-    return arrayarray_codecs, bytesbytes_codecs
+    return arrayarray_codecs, arraybytes_codec, bytesbytes_codecs
 
 
 def convert_to_codec_pipeline(
@@ -278,16 +197,18 @@ def convert_to_codec_pipeline(
     from zarr.core.array import _get_default_chunk_encoding_v3
     from zarr.registry import get_codec_class
 
+    zarr_codecs = ()
     if codecs and len(codecs) > 0:
-        zarr_codecs = [
-            get_codec_class(codec["name"]).from_dict(codec) for codec in codecs
-        ]
-        arrayarray_codecs, bytesbytes_codecs = extract_codecs(zarr_codecs)
-    else:
-        arrayarray_codecs, bytesbytes_codecs = [], []
-    # FIXME: using private zarr-python function
-    # we can also use zarr_config.get("array.v3_default_serializer").get("numeric"), but requires rewriting a lot of this function
-    arraybytes_codecs = _get_default_chunk_encoding_v3(dtype)[1]
+        zarr_codecs = tuple(
+            [get_codec_class(codec["name"]).from_dict(codec) for codec in codecs]
+        )
+
+    arrayarray_codecs, arraybytes_codecs, bytesbytes_codecs = extract_codecs(
+        zarr_codecs
+    )
+
+    if arraybytes_codecs is None:
+        arraybytes_codecs = _get_default_chunk_encoding_v3(dtype)[1]
     codec_pipeline = (*arrayarray_codecs, arraybytes_codecs, *bytesbytes_codecs)
 
     return codec_pipeline
@@ -311,7 +232,7 @@ def convert_v3_to_v2_metadata(
     """
     import warnings
 
-    filters, compressors = extract_codecs(v3_metadata.codecs)
+    filters, _, compressors = extract_codecs(v3_metadata.codecs)
     if compressors:
         compressor = compressors[0]
         compressor_config = compressor.codec_config
@@ -323,11 +244,10 @@ def convert_v3_to_v2_metadata(
         compressor_config = None
 
     filter_configs = [filter.codec_config for filter in filters]
-
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
-        chunks=v3_metadata.chunk_grid.chunk_shape,
+        chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
         compressor=compressor_config,
         filters=filter_configs,
@@ -339,20 +259,56 @@ def convert_v3_to_v2_metadata(
 
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
-    import ujson
+    import json
+
+    from virtualizarr.writers.kerchunk import NumpyEncoder
 
     zarray_dict = v2_metadata.to_dict()
-    if zarray_dict["filters"]:
+    if v2_metadata.filters:
         zarray_dict["filters"] = [
-            codec.get_config() for codec in zarray_dict["filters"]
+            codec.get_config() for codec in v2_metadata.filters if codec is not None
         ]
-    if zarray_dict["compressor"]:
-        zarray_dict["compressor"] = zarray_dict["compressor"].get_config()
+    if v2_metadata.compressor:
+        zarray_dict["compressor"] = v2_metadata.compressor.get_config()
 
-    # TODO: Use NumpyEncoder here?
-    fill_value = zarray_dict["fill_value"]
-    if fill_value is not None and np.isnan(fill_value):
-        zarray_dict["fill_value"] = None
-    if isinstance(fill_value, np.generic):
-        zarray_dict["fill_value"] = fill_value.item()
-    return ujson.dumps(zarray_dict)
+    return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
+
+
+def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+    # coerce type of fill_value as kerchunk can be inconsistent with this
+    dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
+    fill_value = decoded_arr_refs_zarray["fill_value"]
+    if np.issubdtype(dtype, np.floating) and (
+        fill_value is None or fill_value == "NaN" or fill_value == "nan"
+    ):
+        fill_value = np.nan
+
+    zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
+    if zarr_format not in (2, 3):
+        raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+    filters = (
+        decoded_arr_refs_zarray.get("filters", []) or []
+    )  # Ensure filters is a list
+    compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
+
+    # Ensure compressor is a list before unpacking
+    codec_configs = [*filters, *(compressor if compressor is not None else [])]
+    numcodec_configs = [
+        _num_codec_config_to_configurable(config) for config in codec_configs
+    ]
+    return ArrayV3Metadata(
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": tuple(decoded_arr_refs_zarray["chunks"])},
+        },
+        codecs=convert_to_codec_pipeline(
+            dtype=dtype,
+            codecs=numcodec_configs,
+        ),
+        data_type=dtype,
+        fill_value=fill_value,
+        shape=tuple(decoded_arr_refs_zarray["shape"]),
+        chunk_key_encoding={"name": "default"},
+        attributes={},
+        dimension_names=None,
+    )

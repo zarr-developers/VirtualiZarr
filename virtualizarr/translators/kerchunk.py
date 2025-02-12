@@ -11,7 +11,7 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import ZArray, ZAttrs, determine_chunk_grid_shape
+from virtualizarr.zarr import ZAttrs, determine_chunk_grid_shape
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
@@ -171,9 +171,10 @@ def variable_from_kerchunk_refs(
     elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
+
         shape = determine_chunk_grid_shape(
             metadata.shape,
-            metadata.to_dict()["chunk_grid"]["configuration"]["chunk_shape"],
+            metadata.chunks,
         )
         manifest = ChunkManifest(entries={}, shape=shape)
         varr = virtual_array_class(metadata=metadata, chunkmanifest=manifest)
@@ -264,10 +265,15 @@ def extract_array_refs(
         )
 
 
+from zarr.core.metadata import ArrayV3Metadata
+
+from virtualizarr.zarr import from_kerchunk_refs
+
+
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> tuple[dict, ZArray, ZAttrs]:
-    metadata = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
+) -> tuple[dict, ArrayV3Metadata, ZAttrs]:
+    metadata = from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
