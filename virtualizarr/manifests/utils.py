@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING, Any, Iterable, Union
 
 import numpy as np
+from zarr import Array
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.codecs import get_codecs
 
 if TYPE_CHECKING:
-    from zarr import Array  # type: ignore
-
     from .array import ManifestArray
 
 
@@ -116,3 +116,23 @@ def check_compatible_arrays(
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+
+
+def copy_and_replace_metadata(
+    old_metadata: ArrayV3Metadata,
+    new_shape: list[int] | None = None,
+    new_chunks: list[int] | None = None,
+) -> ArrayV3Metadata:
+    """
+    Update metadata to reflect a new shape and/or chunk shape.
+    """
+    metadata_copy = old_metadata.to_dict().copy()
+    metadata_copy["shape"] = new_shape  # type: ignore[assignment]
+    if new_chunks is not None:
+        metadata_copy["chunk_grid"] = {
+            "name": "regular",
+            "configuration": {"chunk_shape": tuple(new_chunks)},
+        }
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
+    return new_metadata

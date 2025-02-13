@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
-from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.utils import determine_chunk_grid_shape
 
@@ -11,6 +10,7 @@ from .utils import (
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
+    copy_and_replace_metadata,
 )
 
 if TYPE_CHECKING:
@@ -102,7 +102,9 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    new_metadata = _update_metadata(first_arr, new_shape=new_shape)
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=first_arr.metadata, new_shape=new_shape
+    )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 
@@ -170,31 +172,11 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_metadata = _update_metadata(
-        first_arr, new_shape=new_shape, new_chunks=new_chunks
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
     )
 
     return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
-
-
-def copy_and_replace(
-    old_metadata: ArrayV3Metadata,
-    new_shape: list[int] | None = None,
-    new_chunks: list[int] | None = None,
-) -> ArrayV3Metadata:
-    """
-    Update metadata to reflect a new shape and/or chunk shape.
-    """
-    metadata_copy = first_arr.metadata.to_dict().copy()
-    metadata_copy["shape"] = tuple(new_shape)
-    if new_chunks is not None:
-        metadata_copy["chunk_grid"] = {
-            "name": "regular",
-            "configuration": {"chunk_shape": tuple(new_chunks)},
-        }
-    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
-    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
-    return new_metadata
 
 
 @implements(np.expand_dims)
@@ -255,8 +237,10 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_metadata = _update_metadata(
-        x, new_shape=list(new_shape), new_chunks=list(new_chunk_shape)
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=x.metadata,
+        new_shape=list(new_shape),
+        new_chunks=list(new_chunk_shape),
     )
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
