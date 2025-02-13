@@ -57,6 +57,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     Returns:
     -------
     ArrayV3Metadata
+    
     Raises:
     ------
     ValueError
