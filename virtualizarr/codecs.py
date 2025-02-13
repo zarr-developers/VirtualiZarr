@@ -74,6 +74,8 @@ def convert_to_codec_pipeline(
             get_codec_class(codec["name"]).from_dict(codec) for codec in codecs
         )
 
+    # It would be nice to use zarr.core.codec_pipeline.codecs_from_list here but that function requires
+    # array array codecs and array bytes codecs to already be present in the list and in the correct order.
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
