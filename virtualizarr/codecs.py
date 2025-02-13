@@ -53,7 +53,7 @@ def convert_to_codec_pipeline(
     codecs: list[dict] | None = [],
 ) -> BatchedCodecPipeline:
     """
-    Convert compressor, filters, serializer, and dtype to a pipeline of ZarrCodecs.
+    Convert list of codecs to valid BatchedCodecPipeline.
 
     Parameters
     ----------
