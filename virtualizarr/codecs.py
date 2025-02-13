@@ -87,7 +87,7 @@ def convert_to_codec_pipeline(
     return codec_pipeline
 
 
-def _get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
+def get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
     """
     Extract configuration from a codec, handling both zarr-python and numcodecs codecs.
     """

@@ -44,23 +44,11 @@ class TestManifestArray:
         assert marr.ndim == 3
 
     def test_manifestarray_notimplementederror(self, array_v3_metadata):
-        from zarr.core.chunk_grids import ChunkGrid
-
-        class IrregularChunkGrid(ChunkGrid):
-            pass
-
-        metadata = array_v3_metadata(chunk_grid=IrregularChunkGrid())
-
-        chunks_dict = {
-            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        }
-        manifest = ChunkManifest(entries=chunks_dict)
-
         with pytest.raises(
-            NotImplementedError,
-            match="Only RegularChunkGrid is currently supported for chunk size",
+            ValueError,
+            match="Unknown chunk grid. Got irregular.",
         ):
-            ManifestArray(metadata=metadata, chunkmanifest=manifest)
+            array_v3_metadata(chunk_grid={"name": "irregular", "configuration": {}})
 
 
 class TestEquals:
@@ -246,8 +234,11 @@ class TestConcat:
     def test_concat_empty(self, array_v3_metadata):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
-        compressor = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=[compressor])
+        codecs = [
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+        ]
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         empty_chunks_dict = {}
         empty_chunk_manifest = ChunkManifest(entries=empty_chunks_dict, shape=(1, 1, 2))
         manifest_array_with_empty_chunks = ManifestArray(
@@ -282,8 +273,11 @@ class TestStack:
         # both manifest arrays in this example have the same zarray properties
         chunks = (5, 10)
         shape = (5, 20)
-        compressor = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=[compressor])
+        codecs = [
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+        ]
+        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
@@ -320,7 +314,10 @@ class TestStack:
         metadata = array_v3_metadata(
             shape=shape,
             chunks=chunks,
-            codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 1}}],
+            codecs=[
+                {"name": "bytes", "configuration": {"endian": "little"}},
+                {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            ],
         )
 
         chunks_dict1 = {}

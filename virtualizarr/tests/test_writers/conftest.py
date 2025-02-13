@@ -16,7 +16,10 @@ def vds_with_manifest_arrays(array_v3_metadata) -> Dataset:
             shape=(2, 3),
             data_type=np.dtype("<i8"),
             chunks=(2, 3),
-            codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 1}}],
+            codecs=[
+                {"configuration": {"endian": "little"}, "name": "bytes"},
+                {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            ],
             fill_value=0,
         ),
     )

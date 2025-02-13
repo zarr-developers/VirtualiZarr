@@ -664,7 +664,10 @@ class TestAppend:
                 file_uri=file1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
-                codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 4}}],
+                codecs=[
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
+                ],
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
@@ -675,7 +678,10 @@ class TestAppend:
                 file_uri=file2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
-                codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 4}}],
+                codecs=[
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
+                ],
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",

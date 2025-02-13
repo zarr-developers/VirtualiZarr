@@ -10,7 +10,6 @@ import xarray as xr
 from xarray.core.variable import Variable
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.codecs import convert_to_codec_pipeline
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.utils import ceildiv
@@ -190,7 +189,8 @@ def create_manifestarray(array_v3_metadata):
         shape: tuple | None = (5, 5),
         chunks: tuple | None = (5, 5),
         codecs: list[dict] | None = [
-            {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+            {"configuration": {"endian": "little"}, "name": "bytes"},
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
         ],
     ):
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
@@ -216,7 +216,42 @@ def create_manifestarray(array_v3_metadata):
 
 
 @pytest.fixture
-def array_v3_metadata():
+def array_v3_metadata_dict():
+    def _create_metadata_dict(
+        shape: tuple = (5, 5),
+        chunks: tuple = (5, 5),
+        chunk_grid: dict | None = None,
+        codecs: list[dict] = [
+            {"configuration": {"endian": "little"}, "name": "bytes"},
+            {
+                "name": "numcodecs.zlib",
+                "configuration": {"level": 1},
+            },
+        ],
+        data_type: str = "int32",
+        fill_value: int = 0,
+    ):
+        chunk_grid = chunk_grid or {
+            "name": "regular",
+            "configuration": {"chunk_shape": chunks},
+        }
+        return {
+            "shape": shape,
+            "data_type": data_type,
+            "chunk_grid": chunk_grid,
+            "chunk_key_encoding": {"name": "default"},
+            "fill_value": fill_value,
+            "codecs": codecs,
+            "attributes": {},
+            "dimension_names": None,
+            "storage_transformers": None,
+        }
+
+    return _create_metadata_dict
+
+
+@pytest.fixture
+def array_v3_metadata(array_v3_metadata_dict):
     def _create_metadata(
         shape: tuple = (5, 5),
         chunks: tuple = (5, 5),
@@ -229,50 +264,19 @@ def array_v3_metadata():
             "name": "regular",
             "configuration": {"chunk_shape": chunks},
         }
-        return ArrayV3Metadata(
+        codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
+
+        metadata_dict = array_v3_metadata_dict(
             shape=shape,
-            data_type=data_type,
             chunk_grid=chunk_grid,
-            chunk_key_encoding={"name": "default"},
-            fill_value=fill_value,
-            codecs=convert_to_codec_pipeline(
-                codecs=codecs,
-                dtype=data_type,
-            ),
-            attributes={},
-            dimension_names=None,
-            storage_transformers=None,
+            chunks=chunks,
+            codecs=codecs,
+            data_type=data_type,
+            fill_value=fill_value or 0,
         )
+        return ArrayV3Metadata(**metadata_dict)
 
     return _create_metadata
-
-
-@pytest.fixture
-def array_v3_metadata_dict():
-    def _create_metadata_dict(
-        shape: tuple,
-        chunks: tuple,
-        codecs: list[dict] = [
-            {"configuration": {"endian": "little"}, "name": "bytes"},
-            {
-                "name": "numcodecs.zlib",
-                "configuration": {"level": 1},
-            },
-        ],
-    ):
-        return {
-            "shape": shape,
-            "data_type": "int32",
-            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": chunks}},
-            "chunk_key_encoding": {"name": "default"},
-            "fill_value": 0,
-            "codecs": codecs,
-            "attributes": {},
-            "dimension_names": None,
-            "storage_transformers": None,
-        }
-
-    return _create_metadata_dict
 
 
 def generate_chunk_manifest(

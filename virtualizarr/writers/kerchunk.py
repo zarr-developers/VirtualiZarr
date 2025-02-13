@@ -9,7 +9,7 @@ from xarray.core.variable import Variable
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
-from virtualizarr.codecs import _get_codec_config, extract_codecs
+from virtualizarr.codecs import extract_codecs, get_codec_config
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 
@@ -123,10 +123,10 @@ def convert_v3_to_v2_metadata(
                 "others will be ignored. This may affect data compatibility.",
                 UserWarning,
             )
-        compressor_config = _get_codec_config(bytes_compressors[0])
+        compressor_config = get_codec_config(bytes_compressors[0])
 
     # Handle filter configurations
-    filter_configs = [_get_codec_config(filter_) for filter_ in array_filters]
+    filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),

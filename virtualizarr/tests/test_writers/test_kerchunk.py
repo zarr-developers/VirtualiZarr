@@ -151,6 +151,7 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
     shape = (5, 20)
     chunks = (5, 10)
     codecs = [
+        {"configuration": {"endian": "little"}, "name": "bytes"},
         {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
         {
             "name": "numcodecs.blosc",
