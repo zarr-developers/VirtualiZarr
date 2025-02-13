@@ -12,6 +12,12 @@ if TYPE_CHECKING:
 
 CodecPipeline = Tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...]
 
+DeconstructedCodecPipeline = tuple[
+    tuple[ArrayArrayCodec, ...],  # Array-to-array transformations
+    ArrayBytesCodec | None,  # Array-to-bytes conversion
+    tuple[BytesBytesCodec, ...],  # Bytes-to-bytes transformations
+]
+
 
 def num_codec_config_to_configurable(num_codec: dict) -> dict:
     """
@@ -27,9 +33,7 @@ def num_codec_config_to_configurable(num_codec: dict) -> dict:
 
 def extract_codecs(
     codecs: CodecPipeline,
-) -> tuple[
-    tuple[ArrayArrayCodec, ...], ArrayBytesCodec | None, tuple[BytesBytesCodec, ...]
-]:
+) -> DeconstructedCodecPipeline:
     """Extracts various codec types."""
     arrayarray_codecs: tuple[ArrayArrayCodec, ...] = ()
     arraybytes_codec: ArrayBytesCodec | None = None
