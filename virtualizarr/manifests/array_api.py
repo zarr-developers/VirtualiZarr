@@ -178,7 +178,9 @@ def stack(
 
 
 def copy_and_replace(
-    old_metadata: ArrayV3Metadata, new_shape: list[int] | None = None, new_chunks: list[int] | None = None
+    old_metadata: ArrayV3Metadata,
+    new_shape: list[int] | None = None,
+    new_chunks: list[int] | None = None,
 ) -> ArrayV3Metadata:
     """
     Update metadata to reflect a new shape and/or chunk shape.
