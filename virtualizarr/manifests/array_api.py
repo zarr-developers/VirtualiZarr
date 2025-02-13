@@ -177,11 +177,11 @@ def stack(
     return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
 
 
-def _update_metadata(
-    first_arr, new_shape: list[int], new_chunks: list[int] | None = None
+def copy_and_replace(
+    old_metadata: ArrayV3Metadata, new_shape: list[int] | None = None, new_chunks: list[int] | None = None
 ) -> ArrayV3Metadata:
     """
-    Update the metadata of a ManifestArray to reflect a new shape and/or chunk shape.
+    Update metadata to reflect a new shape and/or chunk shape.
     """
     metadata_copy = first_arr.metadata.to_dict().copy()
     metadata_copy["shape"] = tuple(new_shape)
