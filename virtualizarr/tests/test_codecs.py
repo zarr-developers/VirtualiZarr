@@ -8,6 +8,7 @@ from conftest import (
     ARRAYBYTES_CODEC,
     BLOSC_CODEC,
     DELTA_CODEC,
+    ZLIB_CODEC,
 )
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
@@ -40,11 +41,9 @@ class TestCodecs:
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
 
-    def test_manifest_array_zarr_v3_with_codecs(
-        self, create_manifestarray, create_codec_pipeline
-    ):
+    def test_manifest_array_zarr_v3_with_codecs(self, create_manifestarray):
         """Test get_codecs with ManifestArray using multiple v3 codecs."""
-        test_codecs = create_codec_pipeline(DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC)
+        test_codecs = [DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC]
         manifest_array = create_manifestarray(codecs=test_codecs)
         actual_codecs = get_codecs(manifest_array)
         assert actual_codecs == tuple(
@@ -60,9 +59,9 @@ class TestCodecs:
         actual_codecs = get_codecs(zarr_array)
         assert isinstance(actual_codecs[0], BytesCodec)
 
-    def test_zarr_v3_with_codecs(self, create_codec_pipeline):
+    def test_zarr_v3_with_codecs(self):
         """Test get_codecs with Zarr array using multiple v3 codecs."""
-        test_codecs = create_codec_pipeline(DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC)
+        test_codecs = [DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC]
         zarr_array = self.create_zarr_array(codecs=test_codecs)
         actual_codecs = get_codecs(zarr_array)
         assert actual_codecs == tuple(
@@ -82,47 +81,53 @@ class TestCodecs:
             get_codecs(zarr_array)
 
 
-def test_convert_to_codec_pipeline():
-    expected_default_codecs = BatchedCodecPipeline(
-        array_array_codecs=(),
-        array_bytes_codec=BytesCodec(endian="little"),
-        bytes_bytes_codecs=(),
-        batch_size=1,
-    )
-    # Test with just dtype (default codec pipeline)
+@pytest.mark.parametrize(
+    "input_codecs,expected_pipeline",
+    [
+        # Case 1: No codecs - should result in just BytesCodec
+        (
+            None,
+            BatchedCodecPipeline(
+                array_array_codecs=(),
+                array_bytes_codec=BytesCodec(endian="little"),
+                bytes_bytes_codecs=(),
+                batch_size=1,
+            ),
+        ),
+        # Case 2: Delta codec - should result in DeltaCodec + BytesCodec
+        (
+            [DELTA_CODEC],
+            BatchedCodecPipeline(
+                array_array_codecs=(
+                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),
+                ),  # type: ignore[arg-type]
+                array_bytes_codec=BytesCodec(endian="little"),
+                bytes_bytes_codecs=(),
+                batch_size=1,
+            ),
+        ),
+        # Case 3: Delta + Blosc + Zlib - should result in all codecs + BytesCodec
+        (
+            [DELTA_CODEC, BLOSC_CODEC, ZLIB_CODEC],
+            BatchedCodecPipeline(
+                array_array_codecs=(
+                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),
+                ),  # type: ignore[arg-type]
+                array_bytes_codec=BytesCodec(endian="little"),
+                bytes_bytes_codecs=(
+                    get_codec_class(key="blosc").from_dict(BLOSC_CODEC),  # type: ignore[arg-type]
+                    get_codec_class("numcodecs.zlib").from_dict(ZLIB_CODEC),  # type: ignore[arg-type]
+                ),
+                batch_size=1,
+            ),
+        ),
+    ],
+)
+def test_convert_to_codec_pipeline_scenarios(input_codecs, expected_pipeline):
+    """Test different scenarios for convert_to_codec_pipeline function."""
     dtype = np.dtype("<i4")
-    int_codecs = convert_to_codec_pipeline(dtype=dtype)
-    assert int_codecs == expected_default_codecs
+    if input_codecs is not None:
+        input_codecs = list(input_codecs)
 
-    # Test with different dtype
-    float_dtype = np.dtype("<f8")
-    float_codecs = convert_to_codec_pipeline(dtype=float_dtype)
-    assert float_codecs == expected_default_codecs
-
-    # Test with empty codecs list
-    empty_codecs = convert_to_codec_pipeline(dtype=dtype, codecs=[])
-    assert empty_codecs == expected_default_codecs
-
-    # Test with filters and compressor
-    test_codecs = [
-        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
-        {
-            "name": "numcodecs.blosc",
-            "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
-        },
-    ]
-
-    codecs = convert_to_codec_pipeline(dtype=dtype, codecs=test_codecs)
-    assert isinstance(codecs, BatchedCodecPipeline)
-
-    # Verify codec types and order
-    array_array_codecs = codecs.array_array_codecs
-    assert array_array_codecs[0].codec_name == "numcodecs.delta"
-    array_bytes_codec = codecs.array_bytes_codec
-    assert isinstance(array_bytes_codec, BytesCodec)
-    bytes_bytes_codecs = codecs.bytes_bytes_codecs
-    assert bytes_bytes_codecs[0].codec_name == "numcodecs.blosc"
-    config = bytes_bytes_codecs[0].codec_config
-    assert config["cname"] == "zstd"
-    assert config["clevel"] == 5
-    assert config["shuffle"] == 1
+    result = convert_to_codec_pipeline(dtype=dtype, codecs=input_codecs)
+    assert result == expected_pipeline

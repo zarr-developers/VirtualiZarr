@@ -353,20 +353,3 @@ BLOSC_CODEC = {
     },
 }
 ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
-
-
-@pytest.fixture
-def create_codec_pipeline():
-    """Create a codec pipeline from one or more codecs."""
-
-    def _create_pipeline(*codecs):
-        """
-        Create a codec pipeline from the provided codecs.
-        Args:
-            *codecs: Variable number of codec configurations to include in the pipeline
-        Returns:
-            list: List of codec configurations in the correct order
-        """
-        return list(codecs) if codecs else [ARRAYBYTES_CODEC]
-
-    return _create_pipeline
