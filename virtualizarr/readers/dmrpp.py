@@ -9,7 +9,7 @@ from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.utils import create_array_metadata
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -415,7 +415,7 @@ class DMRParser:
         encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
         # create ManifestArray
-        metadata = create_array_metadata(
+        metadata = create_v3_array_metadata(
             shape=shape,
             data_type=dtype,
             chunk_shape=chunks_shape,

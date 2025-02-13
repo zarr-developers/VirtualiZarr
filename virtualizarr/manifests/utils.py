@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .array import ManifestArray
 
 
-def create_array_metadata(
+def create_v3_array_metadata(
     shape: tuple[int, ...],
     data_type: np.dtype,
     chunk_shape: tuple[int, ...],

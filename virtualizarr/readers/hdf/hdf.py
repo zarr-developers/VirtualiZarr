@@ -21,7 +21,7 @@ from virtualizarr.manifests import (
     ManifestArray,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.utils import create_array_metadata
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -306,7 +306,7 @@ class HDFVirtualBackend(VirtualBackend):
         codec_configs = [
             num_codec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-        metadata = create_array_metadata(
+        metadata = create_v3_array_metadata(
             shape=dataset.shape,
             data_type=dtype,
             chunk_shape=chunks,

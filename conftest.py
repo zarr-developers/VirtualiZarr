@@ -11,7 +11,7 @@ from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
-from virtualizarr.manifests.utils import create_array_metadata
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.utils import ceildiv
 
 
@@ -225,7 +225,7 @@ def array_v3_metadata():
         fill_value: int = None,
     ):
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
-        return create_array_metadata(
+        return create_v3_array_metadata(
             shape=shape,
             chunk_shape=chunks,
             data_type=data_type,
