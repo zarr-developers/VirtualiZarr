@@ -9,6 +9,7 @@ from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.utils import create_array_metadata
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -377,9 +378,6 @@ class DMRParser:
         -------
         xr.Variable
         """
-        from zarr.core.metadata.v3 import ArrayV3Metadata
-
-        from virtualizarr.codecs import convert_to_codec_pipeline
 
         # Dimension info
         dims: dict[str, int] = {}
@@ -417,22 +415,12 @@ class DMRParser:
         encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
         # create ManifestArray
-        metadata = ArrayV3Metadata(
+        metadata = create_array_metadata(
             shape=shape,
             data_type=dtype,
-            chunk_grid={
-                "name": "regular",
-                "configuration": {"chunk_shape": chunks_shape},
-            },
-            chunk_key_encoding={"name": "default"},
+            chunk_shape=chunks_shape,
             fill_value=fill_value,
-            codecs=convert_to_codec_pipeline(
-                codecs=codecs,
-                dtype=dtype,
-            ),
-            attributes=attrs,
-            dimension_names=None,
-            storage_transformers=None,
+            codecs=codecs,
         )
         marr = ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
         return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)

@@ -13,18 +13,15 @@ from typing import (
 
 import numpy as np
 import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.codecs import (
-    convert_to_codec_pipeline,
-    num_codec_config_to_configurable,
-)
+from virtualizarr.codecs import num_codec_config_to_configurable
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
     ManifestArray,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.utils import create_array_metadata
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -309,16 +306,12 @@ class HDFVirtualBackend(VirtualBackend):
         codec_configs = [
             num_codec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-        metadata = ArrayV3Metadata(
+        metadata = create_array_metadata(
             shape=dataset.shape,
             data_type=dtype,
-            chunk_grid={"name": "regular", "configuration": {"chunk_shape": chunks}},
-            chunk_key_encoding={"name": "default"},
+            chunk_shape=chunks,
             fill_value=fill_value,
-            codecs=convert_to_codec_pipeline(codecs=codec_configs, dtype=dtype),
-            attributes=attrs,
-            dimension_names=None,
-            storage_transformers=None,
+            codecs=codec_configs,
         )
         dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)

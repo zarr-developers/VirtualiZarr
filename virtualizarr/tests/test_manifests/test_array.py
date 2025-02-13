@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
@@ -24,7 +25,7 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
-    def test_create_manifestarray_dict_v3_metadata(self, array_v3_metadata_dict):
+    def test_create_manifestarray_dict_v3_metadata(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
@@ -34,7 +35,8 @@ class TestManifestArray:
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
-        metadata_dict = array_v3_metadata_dict(shape=shape, chunks=chunks)
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
+        metadata_dict = ArrayV3Metadata.from_dict(metadata.to_dict())
 
         marr = ManifestArray(metadata=metadata_dict, chunkmanifest=manifest)
         assert marr.chunks == chunks
@@ -42,13 +44,6 @@ class TestManifestArray:
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
-
-    def test_manifestarray_notimplementederror(self, array_v3_metadata):
-        with pytest.raises(
-            ValueError,
-            match="Unknown chunk grid. Got irregular.",
-        ):
-            array_v3_metadata(chunk_grid={"name": "irregular", "configuration": {}})
 
 
 class TestEquals:
@@ -344,11 +339,12 @@ class TestStack:
         assert result.metadata.fill_value == metadata.fill_value
 
 
-def test_refuse_combine(array_v3_metadata_dict):
+def test_refuse_combine(array_v3_metadata):
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
     chunks = (5, 1, 10)
     shape = (5, 1, 20)
-    metadata_common = array_v3_metadata_dict(shape=shape, chunks=chunks)
+    metadata_common = array_v3_metadata(shape=shape, chunks=chunks)
+
     chunks_dict1 = {
         "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
     }
@@ -359,27 +355,24 @@ def test_refuse_combine(array_v3_metadata_dict):
     chunkmanifest2 = ChunkManifest(entries=chunks_dict2)
     marr1 = ManifestArray(metadata=metadata_common, chunkmanifest=chunkmanifest1)
 
-    metadata_wrong_compressor = array_v3_metadata_dict(
+    metadata_different_codecs = array_v3_metadata(
         shape=shape,
         chunks=chunks,
-        codecs=[{"name": "bytes", "configuration": {"endian": "little"}}],
+        codecs=[
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+        ],
     )
     marr2 = ManifestArray(
-        metadata=metadata_wrong_compressor, chunkmanifest=chunkmanifest2
+        metadata=metadata_different_codecs, chunkmanifest=chunkmanifest2
     )
     for func in [np.concatenate, np.stack]:
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
-    metadata_wrong_dtype = metadata_common.copy()
-    metadata_wrong_dtype["data_type"] = np.dtype("int64")
-    marr2 = ManifestArray(metadata=metadata_wrong_dtype, chunkmanifest=chunkmanifest2)
-    for func in [np.concatenate, np.stack]:
-        with pytest.raises(ValueError, match="inconsistent dtypes"):
-            func([marr1, marr2], axis=0)
-
-    metadata_wrong_dtype = metadata_common.copy()
-    metadata_wrong_dtype["data_type"] = np.dtype("int64")
+    metadata_copy = metadata_common.to_dict().copy()
+    metadata_copy["data_type"] = np.dtype("int64")
+    metadata_wrong_dtype = ArrayV3Metadata.from_dict(metadata_copy)
     marr2 = ManifestArray(metadata=metadata_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):

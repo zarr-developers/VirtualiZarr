@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 import xarray as xr
 from xarray.core.variable import Variable
-from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
+from virtualizarr.manifests.utils import create_array_metadata
 from virtualizarr.utils import ceildiv
 
 
@@ -216,65 +216,22 @@ def create_manifestarray(array_v3_metadata):
 
 
 @pytest.fixture
-def array_v3_metadata_dict():
-    def _create_metadata_dict(
-        shape: tuple = (5, 5),
-        chunks: tuple = (5, 5),
-        chunk_grid: dict | None = None,
-        codecs: list[dict] = [
-            {"configuration": {"endian": "little"}, "name": "bytes"},
-            {
-                "name": "numcodecs.zlib",
-                "configuration": {"level": 1},
-            },
-        ],
-        data_type: str = "int32",
-        fill_value: int = 0,
-    ):
-        chunk_grid = chunk_grid or {
-            "name": "regular",
-            "configuration": {"chunk_shape": chunks},
-        }
-        return {
-            "shape": shape,
-            "data_type": data_type,
-            "chunk_grid": chunk_grid,
-            "chunk_key_encoding": {"name": "default"},
-            "fill_value": fill_value,
-            "codecs": codecs,
-            "attributes": {},
-            "dimension_names": None,
-            "storage_transformers": None,
-        }
-
-    return _create_metadata_dict
-
-
-@pytest.fixture
-def array_v3_metadata(array_v3_metadata_dict):
+def array_v3_metadata():
     def _create_metadata(
         shape: tuple = (5, 5),
         chunks: tuple = (5, 5),
-        chunk_grid: Any | None = None,
         data_type: str = np.dtype("int32"),
         codecs: list[dict] | None = None,
         fill_value: int = None,
     ):
-        chunk_grid = chunk_grid or {
-            "name": "regular",
-            "configuration": {"chunk_shape": chunks},
-        }
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
-
-        metadata_dict = array_v3_metadata_dict(
+        return create_array_metadata(
             shape=shape,
-            chunk_grid=chunk_grid,
-            chunks=chunks,
-            codecs=codecs,
+            chunk_shape=chunks,
             data_type=data_type,
+            codecs=codecs,
             fill_value=fill_value or 0,
         )
-        return ArrayV3Metadata(**metadata_dict)
 
     return _create_metadata
 

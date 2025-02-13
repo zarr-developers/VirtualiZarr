@@ -1,13 +1,64 @@
-from typing import TYPE_CHECKING, Any, Iterable, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 import numpy as np
 from zarr import Array
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 if TYPE_CHECKING:
     from .array import ManifestArray
+
+
+def create_array_metadata(
+    shape: tuple[int, ...],
+    data_type: np.dtype,
+    chunk_shape: tuple[int, ...],
+    fill_value: Any = None,
+    codecs: Optional[list[Dict[str, Any]]] = None,
+    attributes: Optional[Dict[str, Any]] = None,
+) -> ArrayV3Metadata:
+    """
+    Create an ArrayV3Metadata instance with standard configuration.
+    This function encapsulates common patterns used across different readers.
+
+    Parameters
+    ----------
+    shape : tuple[int, ...]
+        The shape of the array
+    data_type : np.dtype
+        The numpy dtype of the array
+    chunk_shape : tuple[int, ...]
+        The shape of each chunk
+    fill_value : Any, optional
+        The fill value for the array
+    codecs : list[Dict[str, Any]], optional
+        List of codec configurations
+    attributes : Dict[str, Any], optional
+        Additional attributes for the array
+
+    Returns
+    -------
+    ArrayV3Metadata
+        A configured ArrayV3Metadata instance with standard defaults
+    """
+    return ArrayV3Metadata(
+        shape=shape,
+        data_type=data_type,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": chunk_shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=fill_value,
+        codecs=convert_to_codec_pipeline(
+            codecs=codecs or [],
+            dtype=data_type,
+        ),
+        attributes=attributes or {},
+        dimension_names=None,
+        storage_transformers=None,
+    )
 
 
 def check_same_dtypes(dtypes: list[np.dtype]) -> None:
