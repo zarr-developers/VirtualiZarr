@@ -4,6 +4,11 @@ from zarr.codecs import BytesCodec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.registry import get_codec_class
 
+from conftest import (
+    ARRAYBYTES_CODEC,
+    BLOSC_CODEC,
+    DELTA_CODEC,
+)
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 
@@ -36,14 +41,10 @@ class TestCodecs:
         assert actual_codecs == expected_codecs
 
     def test_manifest_array_zarr_v3_with_codecs(
-        self, create_manifestarray, delta_codec, arraybytes_codec, blosc_codec
+        self, create_manifestarray, create_codec_pipeline
     ):
         """Test get_codecs with ManifestArray using multiple v3 codecs."""
-        test_codecs = [
-            delta_codec,
-            arraybytes_codec,
-            blosc_codec,
-        ]
+        test_codecs = create_codec_pipeline(DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC)
         manifest_array = create_manifestarray(codecs=test_codecs)
         actual_codecs = get_codecs(manifest_array)
         assert actual_codecs == tuple(
@@ -59,13 +60,9 @@ class TestCodecs:
         actual_codecs = get_codecs(zarr_array)
         assert isinstance(actual_codecs[0], BytesCodec)
 
-    def test_zarr_v3_with_codecs(self, delta_codec, arraybytes_codec, blosc_codec):
+    def test_zarr_v3_with_codecs(self, create_codec_pipeline):
         """Test get_codecs with Zarr array using multiple v3 codecs."""
-        test_codecs = [
-            delta_codec,
-            arraybytes_codec,
-            blosc_codec,
-        ]
+        test_codecs = create_codec_pipeline(DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC)
         zarr_array = self.create_zarr_array(codecs=test_codecs)
         actual_codecs = get_codecs(zarr_array)
         assert actual_codecs == tuple(

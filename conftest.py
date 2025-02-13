@@ -1,9 +1,9 @@
 import itertools
 from itertools import product
 from pathlib import Path
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
-import h5py
+import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
@@ -186,11 +186,11 @@ def create_manifestarray(array_v3_metadata):
     """
 
     def _create_manifestarray(
-        shape: tuple | None = (5, 5),
-        chunks: tuple | None = (5, 5),
+        shape: tuple = (5, 5),
+        chunks: tuple = (5, 5),
         codecs: list[dict] | None = [
-            {"configuration": {"endian": "little"}, "name": "bytes"},
-            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            ARRAYBYTES_CODEC,
+            ZLIB_CODEC,
         ],
     ):
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
@@ -220,9 +220,9 @@ def array_v3_metadata():
     def _create_metadata(
         shape: tuple = (5, 5),
         chunks: tuple = (5, 5),
-        data_type: str = np.dtype("int32"),
+        data_type: np.dtype = np.dtype("int32"),
         codecs: list[dict] | None = None,
-        fill_value: int = None,
+        fill_value: int | None = None,
     ):
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
         return create_v3_array_metadata(
@@ -340,34 +340,33 @@ def gen_virtual_dataset(gen_virtual_variable: Callable) -> Callable:
     return _gen_virtual_dataset
 
 
-# Common codec configurations used across tests
-@pytest.fixture
-def delta_codec() -> Dict[str, Any]:
-    """Delta codec configuration for array-to-array transformation."""
-    return {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
+# Common codec configurations as global variables
+DELTA_CODEC = {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
+ARRAYBYTES_CODEC = {"name": "bytes", "configuration": {"endian": "little"}}
+BLOSC_CODEC = {
+    "name": "blosc",
+    "configuration": {
+        "cname": "zstd",
+        "clevel": 5,
+        "shuffle": "shuffle",
+        "typesize": 4,
+    },
+}
+ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
 
 
 @pytest.fixture
-def arraybytes_codec() -> Dict[str, Any]:
-    """Bytes codec configuration for array-to-bytes transformation."""
-    return {"name": "bytes", "configuration": {"endian": "little"}}
+def create_codec_pipeline():
+    """Create a codec pipeline from one or more codecs."""
 
+    def _create_pipeline(*codecs):
+        """
+        Create a codec pipeline from the provided codecs.
+        Args:
+            *codecs: Variable number of codec configurations to include in the pipeline
+        Returns:
+            list: List of codec configurations in the correct order
+        """
+        return list(codecs) if codecs else [ARRAYBYTES_CODEC]
 
-@pytest.fixture
-def blosc_codec() -> Dict[str, Any]:
-    """Blosc codec configuration for bytes-to-bytes transformation."""
-    return {
-        "name": "blosc",
-        "configuration": {
-            "cname": "zstd",
-            "clevel": 5,
-            "shuffle": "shuffle",
-            "typesize": 4,
-        },
-    }
-
-
-@pytest.fixture
-def zlib_codec() -> Dict[str, Any]:
-    """Zlib codec configuration for bytes-to-bytes transformation."""
-    return {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+    return _create_pipeline

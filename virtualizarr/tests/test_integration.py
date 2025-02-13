@@ -6,6 +6,7 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
+from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
@@ -242,7 +243,7 @@ class TestRoundtrip:
         reason="zarr-python 3.0 does not support datetime and timedelta data types"
     )
     def test_datetime64_dtype_fill_value(
-        self, tmpdir, roundtrip_func, array_v3_metadata, zlib_codec
+        self, tmpdir, roundtrip_func, array_v3_metadata, create_codec_pipeline
     ):
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -253,7 +254,7 @@ class TestRoundtrip:
         metadata = array_v3_metadata(
             shape=shape,
             chunks=chunks,
-            codecs=[zlib_codec],
+            codecs=create_codec_pipeline(ARRAYBYTES_CODEC, ZLIB_CODEC),
             data_type=np.dtype("M8[ns]"),
         )
         marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)

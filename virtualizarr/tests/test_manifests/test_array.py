@@ -2,6 +2,10 @@ import numpy as np
 import pytest
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+from conftest import (
+    ARRAYBYTES_CODEC,
+    ZLIB_CODEC,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
@@ -226,13 +230,10 @@ class TestConcat:
         assert concatenated.dtype == np.dtype("int32")
 
     # FAILING: TypeError: no implementation found for 'numpy.concatenate' on types that implement __array_function__: [<class 'virtualizarr.manifests.array.ManifestArray'>, <class 'numpy.ndarray'>]
-    def test_concat_empty(self, array_v3_metadata, arraybytes_codec, zlib_codec):
+    def test_concat_empty(self, array_v3_metadata, create_codec_pipeline):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
-        codecs = [
-            arraybytes_codec,
-            zlib_codec,
-        ]
+        codecs = create_codec_pipeline(ARRAYBYTES_CODEC, ZLIB_CODEC)
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         empty_chunks_dict = {}
         empty_chunk_manifest = ChunkManifest(entries=empty_chunks_dict, shape=(1, 1, 2))
@@ -264,14 +265,11 @@ class TestConcat:
 
 
 class TestStack:
-    def test_stack(self, array_v3_metadata, arraybytes_codec, zlib_codec):
+    def test_stack(self, array_v3_metadata, create_codec_pipeline):
         # both manifest arrays in this example have the same zarray properties
         chunks = (5, 10)
         shape = (5, 20)
-        codecs = [
-            arraybytes_codec,
-            zlib_codec,
-        ]
+        codecs = create_codec_pipeline(ARRAYBYTES_CODEC, ZLIB_CODEC)
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -302,17 +300,14 @@ class TestStack:
         assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
-    def test_stack_empty(self, array_v3_metadata, arraybytes_codec, zlib_codec):
+    def test_stack_empty(self, array_v3_metadata, create_codec_pipeline):
         # both manifest arrays in this example have the same metadata properties
         chunks = (5, 10)
         shape = (5, 20)
         metadata = array_v3_metadata(
             shape=shape,
             chunks=chunks,
-            codecs=[
-                arraybytes_codec,
-                zlib_codec,
-            ],
+            codecs=create_codec_pipeline(ARRAYBYTES_CODEC, ZLIB_CODEC),
         )
 
         chunks_dict1 = {}
@@ -339,7 +334,7 @@ class TestStack:
         assert result.metadata.fill_value == metadata.fill_value
 
 
-def test_refuse_combine(array_v3_metadata, arraybytes_codec, zlib_codec):
+def test_refuse_combine(array_v3_metadata, create_codec_pipeline):
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
     chunks = (5, 1, 10)
     shape = (5, 1, 20)
@@ -358,10 +353,7 @@ def test_refuse_combine(array_v3_metadata, arraybytes_codec, zlib_codec):
     metadata_different_codecs = array_v3_metadata(
         shape=shape,
         chunks=chunks,
-        codecs=[
-            arraybytes_codec,
-            zlib_codec,
-        ],
+        codecs=create_codec_pipeline(ARRAYBYTES_CODEC, ZLIB_CODEC),
     )
     marr2 = ManifestArray(
         metadata=metadata_different_codecs, chunkmanifest=chunkmanifest2
