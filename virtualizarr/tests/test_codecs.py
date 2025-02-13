@@ -99,8 +99,8 @@ class TestCodecs:
             [DELTA_CODEC],
             BatchedCodecPipeline(
                 array_array_codecs=(
-                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),
-                ),  # type: ignore[arg-type]
+                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),  # type: ignore[arg-type]
+                ),
                 array_bytes_codec=BytesCodec(endian="little"),
                 bytes_bytes_codecs=(),
                 batch_size=1,
@@ -111,8 +111,8 @@ class TestCodecs:
             [DELTA_CODEC, BLOSC_CODEC, ZLIB_CODEC],
             BatchedCodecPipeline(
                 array_array_codecs=(
-                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),
-                ),  # type: ignore[arg-type]
+                    get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC),  # type: ignore[arg-type]
+                ),
                 array_bytes_codec=BytesCodec(endian="little"),
                 bytes_bytes_codecs=(
                     get_codec_class(key="blosc").from_dict(BLOSC_CODEC),  # type: ignore[arg-type]

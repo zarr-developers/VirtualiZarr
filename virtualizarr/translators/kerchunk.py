@@ -9,11 +9,11 @@ from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.codecs import (
-    convert_to_codec_pipeline,
     num_codec_config_to_configurable,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -84,21 +84,12 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     numcodec_configs = [
         num_codec_config_to_configurable(config) for config in codec_configs
     ]
-    return ArrayV3Metadata(
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": tuple(decoded_arr_refs_zarray["chunks"])},
-        },
-        codecs=convert_to_codec_pipeline(
-            dtype=dtype,
-            codecs=numcodec_configs,
-        ),
+    return create_v3_array_metadata(
+        chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
         data_type=dtype,
+        codecs=numcodec_configs,
         fill_value=fill_value,
         shape=tuple(decoded_arr_refs_zarray["shape"]),
-        chunk_key_encoding={"name": "default"},
-        attributes={},
-        dimension_names=None,
     )
 
 
