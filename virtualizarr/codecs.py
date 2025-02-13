@@ -10,9 +10,7 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 if TYPE_CHECKING:
     from .manifests.array import ManifestArray
 
-CodecPipeline = Tuple[
-    Union["ArrayArrayCodec", "ArrayBytesCodec", "BytesBytesCodec"], ...
-]
+CodecPipeline = Tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...]
 
 
 def num_codec_config_to_configurable(num_codec: dict) -> dict:
