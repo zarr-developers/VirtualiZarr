@@ -242,7 +242,7 @@ class TestRoundtrip:
         reason="zarr-python 3.0 does not support datetime and timedelta data types"
     )
     def test_datetime64_dtype_fill_value(
-        self, tmpdir, roundtrip_func, array_v3_metadata
+        self, tmpdir, roundtrip_func, array_v3_metadata, zlib_codec
     ):
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -253,7 +253,7 @@ class TestRoundtrip:
         metadata = array_v3_metadata(
             shape=shape,
             chunks=chunks,
-            codecs=[{"name": "numcodecs.zlib", "configuration": {"level": 1}}],
+            codecs=[zlib_codec],
             data_type=np.dtype("M8[ns]"),
         )
         marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)

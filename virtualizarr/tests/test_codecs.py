@@ -6,18 +6,6 @@ from zarr.registry import get_codec_class
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
-arrayarray_codec = {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
-arraybytes_codec = {"name": "bytes", "configuration": {"endian": "little"}}
-bytesbytes_codec = {
-    "name": "blosc",
-    "configuration": {
-        "cname": "zstd",
-        "clevel": 5,
-        "shuffle": "shuffle",
-        "typesize": 4,
-    },
-}
-
 
 class TestCodecs:
     def create_zarr_array(self, codecs=None, zarr_format=3):
@@ -47,12 +35,14 @@ class TestCodecs:
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
 
-    def test_manifest_array_zarr_v3_with_codecs(self, create_manifestarray):
+    def test_manifest_array_zarr_v3_with_codecs(
+        self, create_manifestarray, delta_codec, arraybytes_codec, blosc_codec
+    ):
         """Test get_codecs with ManifestArray using multiple v3 codecs."""
         test_codecs = [
-            arrayarray_codec,
+            delta_codec,
             arraybytes_codec,
-            bytesbytes_codec,
+            blosc_codec,
         ]
         manifest_array = create_manifestarray(codecs=test_codecs)
         actual_codecs = get_codecs(manifest_array)
@@ -69,12 +59,12 @@ class TestCodecs:
         actual_codecs = get_codecs(zarr_array)
         assert isinstance(actual_codecs[0], BytesCodec)
 
-    def test_zarr_v3_with_codecs(self):
+    def test_zarr_v3_with_codecs(self, delta_codec, arraybytes_codec, blosc_codec):
         """Test get_codecs with Zarr array using multiple v3 codecs."""
         test_codecs = [
-            arrayarray_codec,
+            delta_codec,
             arraybytes_codec,
-            bytesbytes_codec,
+            blosc_codec,
         ]
         zarr_array = self.create_zarr_array(codecs=test_codecs)
         actual_codecs = get_codecs(zarr_array)

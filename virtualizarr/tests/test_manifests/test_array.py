@@ -226,12 +226,12 @@ class TestConcat:
         assert concatenated.dtype == np.dtype("int32")
 
     # FAILING: TypeError: no implementation found for 'numpy.concatenate' on types that implement __array_function__: [<class 'virtualizarr.manifests.array.ManifestArray'>, <class 'numpy.ndarray'>]
-    def test_concat_empty(self, array_v3_metadata):
+    def test_concat_empty(self, array_v3_metadata, arraybytes_codec, zlib_codec):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
         codecs = [
-            {"name": "bytes", "configuration": {"endian": "little"}},
-            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            arraybytes_codec,
+            zlib_codec,
         ]
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         empty_chunks_dict = {}
@@ -264,13 +264,13 @@ class TestConcat:
 
 
 class TestStack:
-    def test_stack(self, array_v3_metadata):
+    def test_stack(self, array_v3_metadata, arraybytes_codec, zlib_codec):
         # both manifest arrays in this example have the same zarray properties
         chunks = (5, 10)
         shape = (5, 20)
         codecs = [
-            {"name": "bytes", "configuration": {"endian": "little"}},
-            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            arraybytes_codec,
+            zlib_codec,
         ]
         metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
         chunks_dict1 = {
@@ -302,7 +302,7 @@ class TestStack:
         assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
-    def test_stack_empty(self, array_v3_metadata):
+    def test_stack_empty(self, array_v3_metadata, arraybytes_codec, zlib_codec):
         # both manifest arrays in this example have the same metadata properties
         chunks = (5, 10)
         shape = (5, 20)
@@ -310,8 +310,8 @@ class TestStack:
             shape=shape,
             chunks=chunks,
             codecs=[
-                {"name": "bytes", "configuration": {"endian": "little"}},
-                {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+                arraybytes_codec,
+                zlib_codec,
             ],
         )
 
@@ -339,7 +339,7 @@ class TestStack:
         assert result.metadata.fill_value == metadata.fill_value
 
 
-def test_refuse_combine(array_v3_metadata):
+def test_refuse_combine(array_v3_metadata, arraybytes_codec, zlib_codec):
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
     chunks = (5, 1, 10)
     shape = (5, 1, 20)
@@ -359,8 +359,8 @@ def test_refuse_combine(array_v3_metadata):
         shape=shape,
         chunks=chunks,
         codecs=[
-            {"name": "bytes", "configuration": {"endian": "little"}},
-            {"name": "numcodecs.zlib", "configuration": {"level": 1}},
+            arraybytes_codec,
+            zlib_codec,
         ],
     )
     marr2 = ManifestArray(

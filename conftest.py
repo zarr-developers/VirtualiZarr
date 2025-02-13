@@ -1,7 +1,7 @@
 import itertools
 from itertools import product
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 
 import h5py
 import numpy as np
@@ -338,3 +338,36 @@ def gen_virtual_dataset(gen_virtual_variable: Callable) -> Callable:
             )
 
     return _gen_virtual_dataset
+
+
+# Common codec configurations used across tests
+@pytest.fixture
+def delta_codec() -> Dict[str, Any]:
+    """Delta codec configuration for array-to-array transformation."""
+    return {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
+
+
+@pytest.fixture
+def arraybytes_codec() -> Dict[str, Any]:
+    """Bytes codec configuration for array-to-bytes transformation."""
+    return {"name": "bytes", "configuration": {"endian": "little"}}
+
+
+@pytest.fixture
+def blosc_codec() -> Dict[str, Any]:
+    """Blosc codec configuration for bytes-to-bytes transformation."""
+    return {
+        "name": "blosc",
+        "configuration": {
+            "cname": "zstd",
+            "clevel": 5,
+            "shuffle": "shuffle",
+            "typesize": 4,
+        },
+    }
+
+
+@pytest.fixture
+def zlib_codec() -> Dict[str, Any]:
+    """Zlib codec configuration for bytes-to-bytes transformation."""
+    return {"name": "numcodecs.zlib", "configuration": {"level": 1}}
