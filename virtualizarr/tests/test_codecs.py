@@ -34,17 +34,17 @@ class TestCodecs:
         zarr_array[:] = np.arange(1000 * 1000).reshape(1000, 1000)
         return zarr_array
 
-    def test_manifest_array_zarr_v3_default(self, create_manifestarray):
+    def test_manifest_array_zarr_v3_default(self, manifest_array):
         """Test get_codecs with ManifestArray using default v3 codec."""
-        manifest_array = create_manifestarray(codecs=None)
+        manifest_array = manifest_array(codecs=None)
         actual_codecs = get_codecs(manifest_array)
         expected_codecs = tuple([BytesCodec(endian="little")])
         assert actual_codecs == expected_codecs
 
-    def test_manifest_array_zarr_v3_with_codecs(self, create_manifestarray):
+    def test_manifest_array_zarr_v3_with_codecs(self, manifest_array):
         """Test get_codecs with ManifestArray using multiple v3 codecs."""
         test_codecs = [DELTA_CODEC, ARRAYBYTES_CODEC, BLOSC_CODEC]
-        manifest_array = create_manifestarray(codecs=test_codecs)
+        manifest_array = manifest_array(codecs=test_codecs)
         actual_codecs = get_codecs(manifest_array)
         assert actual_codecs == tuple(
             [

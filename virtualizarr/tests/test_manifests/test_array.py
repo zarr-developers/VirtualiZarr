@@ -10,7 +10,7 @@ from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
 class TestManifestArray:
-    def test_create_manifestarray(self, array_v3_metadata):
+    def test_manifest_array(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
@@ -29,7 +29,7 @@ class TestManifestArray:
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
 
-    def test_create_manifestarray_dict_v3_metadata(self, array_v3_metadata):
+    def test_manifest_array_dict_v3_metadata(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
@@ -97,8 +97,8 @@ class TestEquals:
 
 
 class TestBroadcast:
-    def test_broadcast_existing_axis(self, create_manifestarray):
-        marr = create_manifestarray(shape=(1, 2), chunks=(1, 2))
+    def test_broadcast_existing_axis(self, manifest_array):
+        marr = manifest_array(shape=(1, 2), chunks=(1, 2))
         expanded = np.broadcast_to(marr, shape=(3, 2))
         assert expanded.shape == (3, 2)
         assert expanded.chunks == (1, 2)
@@ -108,8 +108,8 @@ class TestBroadcast:
             "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
         }
 
-    def test_broadcast_new_axis(self, create_manifestarray):
-        marr = create_manifestarray(shape=(3,), chunks=(1,))
+    def test_broadcast_new_axis(self, manifest_array):
+        marr = manifest_array(shape=(3,), chunks=(1,))
         expanded = np.broadcast_to(marr, shape=(1, 3))
         assert expanded.shape == (1, 3)
         assert expanded.chunks == (1, 1)
@@ -119,9 +119,9 @@ class TestBroadcast:
             "0.2": {"path": "file:///foo.2.nc", "offset": 20, "length": 7},
         }
 
-    def test_broadcast_scalar(self, create_manifestarray):
+    def test_broadcast_scalar(self, manifest_array):
         # regression test
-        marr = create_manifestarray(shape=(), chunks=())
+        marr = manifest_array(shape=(), chunks=())
         assert marr.shape == ()
         assert marr.chunks == ()
         assert marr.manifest.dict() == {
@@ -145,9 +145,9 @@ class TestBroadcast:
         ],
     )
     def test_raise_on_invalid_broadcast_shapes(
-        self, shape, chunks, target_shape, create_manifestarray
+        self, shape, chunks, target_shape, manifest_array
     ):
-        marr = create_manifestarray(shape=shape, chunks=chunks)
+        marr = manifest_array(shape=shape, chunks=chunks)
         with pytest.raises(ValueError):
             np.broadcast_to(marr, shape=target_shape)
 
@@ -161,10 +161,8 @@ class TestBroadcast:
             ((3, 1), (2, 1), (2, 3, 4)),
         ],
     )
-    def test_broadcast_any_shape(
-        self, shape, chunks, target_shape, create_manifestarray
-    ):
-        marr = create_manifestarray(shape=shape, chunks=chunks)
+    def test_broadcast_any_shape(self, shape, chunks, target_shape, manifest_array):
+        marr = manifest_array(shape=shape, chunks=chunks)
 
         # do the broadcasting
         broadcasted_marr = np.broadcast_to(marr, shape=target_shape)

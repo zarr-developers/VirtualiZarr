@@ -433,12 +433,12 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         simple_netcdf4: str,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
         # generate virtual dataset
-        vds = gen_virtual_dataset(file_uri=simple_netcdf4)
+        vds = virtual_dataset(file_uri=simple_netcdf4)
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.virtualize.to_icechunk(writable_session.store)
@@ -469,7 +469,7 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         netcdf4_files_factory: Callable,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
@@ -477,7 +477,7 @@ class TestAppend:
         encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -488,7 +488,7 @@ class TestAppend:
                 offset=15419,
                 length=15476000,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -531,8 +531,8 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         netcdf4_files_factory: Callable,
-        gen_virtual_variable: Callable,
-        gen_virtual_dataset: Callable,
+        virtual_variable: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
         from zarr.core.buffer import default_buffer_prototype
@@ -541,7 +541,7 @@ class TestAppend:
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
         )
 
-        lon_manifest = gen_virtual_variable(
+        lon_manifest = virtual_variable(
             filepath1,
             shape=(53,),
             chunk_shape=(53,),
@@ -550,7 +550,7 @@ class TestAppend:
             length=212,
             dims=["lon"],
         )
-        lat_manifest = gen_virtual_variable(
+        lat_manifest = virtual_variable(
             filepath1,
             shape=(25,),
             chunk_shape=(25,),
@@ -566,7 +566,7 @@ class TestAppend:
             "calendar": "standard",
         }
         time_manifest1, time_manifest2 = [
-            gen_virtual_variable(
+            virtual_variable(
                 filepath,
                 shape=(1460,),
                 chunk_shape=(1460,),
@@ -587,7 +587,7 @@ class TestAppend:
             for time_manifest in [time_manifest1, time_manifest2]
         ]
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -598,7 +598,7 @@ class TestAppend:
                 length=15476000,
                 coords=coords1,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -645,7 +645,7 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         netcdf4_files_factory: Callable,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
@@ -660,7 +660,7 @@ class TestAppend:
         file1, file2 = netcdf4_files_factory(encoding=encoding)
         # Generate compressed dataset
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=file1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -674,7 +674,7 @@ class TestAppend:
                 offset=18043,
                 length=3936114,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=file2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -715,10 +715,10 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         simple_netcdf4: str,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         # Generate a virtual dataset with specific chunking
-        vds = gen_virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
+        vds = virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
 
         # Commit the dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -726,7 +726,7 @@ class TestAppend:
         icechunk_filestore.commit("test commit")
 
         # Try to append dataset with different chunking, expect failure
-        vds_different_chunking = gen_virtual_dataset(
+        vds_different_chunking = virtual_dataset(
             file_uri=simple_netcdf4, chunk_shape=(1, 1)
         )
         icechunk_filestore_append = icechunk_repo.writable_session("main")
@@ -742,15 +742,11 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         simple_netcdf4: str,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         # Generate datasets with different encoding
-        vds1 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, encoding={"scale_factor": 0.1}
-        )
-        vds2 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, encoding={"scale_factor": 0.01}
-        )
+        vds1 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.1})
+        vds2 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.01})
 
         # Commit the first dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -769,15 +765,15 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         simple_netcdf4: str,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         # Generate datasets with different lengths on the non-append dimension (x)
-        vds1 = gen_virtual_dataset(
+        vds1 = virtual_dataset(
             # {'x': 5, 'y': 4}
             file_uri=simple_netcdf4,
             shape=(5, 4),
         )
-        vds2 = gen_virtual_dataset(
+        vds2 = virtual_dataset(
             # {'x': 6, 'y': 4}
             file_uri=simple_netcdf4,
             shape=(6, 4),
@@ -797,12 +793,12 @@ class TestAppend:
         self,
         icechunk_repo: "Repository",
         simple_netcdf4: str,
-        gen_virtual_dataset: Callable,
+        virtual_dataset: Callable,
     ):
         """
         Test that attempting to append with an append_dim not present in dims raises a ValueError.
         """
-        vds = gen_virtual_dataset(
+        vds = virtual_dataset(
             file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
         )
 
