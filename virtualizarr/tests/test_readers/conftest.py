@@ -352,3 +352,37 @@ def scalar_fill_value_hdf5_file(tmpdir):
     fill_value = 42
     f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
     return filepath
+
+
+fill_values = [
+    -9999,  # Integer fill value
+    -9999.0,  # Floating-point fill value
+    np.nan,  # NaN as fill value
+    True,
+    False,  # Boolean fill values
+    "N/A",  # String fill value
+    b"Unknown",  # Bytes fill value
+    1 + 2j,  # Complex number fill value
+    (b"Unknown", -1),  # Structured type (Tuple)
+]
+
+
+@pytest.fixture(params=fill_values)
+def cf_fill_value_hdf5_file(tmpdir, request):
+    filepath = f"{tmpdir}/cf_fill_value.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.randint(0, 10, size=(5))
+    dset = f.create_dataset(name="data", data=data, chunks=True)
+    if request.param is not None:
+        dset.attrs["_FillValue"] = request.param
+    return filepath
+
+
+@pytest.fixture
+def cf_array_fill_value_hdf5_file(tmpdir):
+    filepath = f"{tmpdir}/cf_array_fill_value.nc"
+    f = h5py.File(filepath, "w")
+    data = np.random.randint(0, 10, size=(5))
+    dset = f.create_dataset(name="data", data=data, chunks=True)
+    dset.attrs["_FillValue"] = np.array([np.nan])
+    return filepath

@@ -47,6 +47,10 @@ class TestIntegration:
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_allclose(ds, roundtrip)
+        assert (
+            ds["temperature"].encoding["_FillValue"]
+            == roundtrip["temperature"].encoding["_FillValue"]
+        )
 
     def test_non_coord_dim(self, tmpdir, non_coord_dim):
         ds = xr.open_dataset(non_coord_dim)

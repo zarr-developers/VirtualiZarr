@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import h5py  # type: ignore
+import numpy as np
 import pytest
 
 from virtualizarr import open_virtual_dataset
@@ -118,6 +119,22 @@ class TestDatasetToVariable:
             scalar_fill_value_hdf5_file, ds, group=""
         )
         assert var.data.zarray.fill_value == 42
+
+    def test_cf_fill_value(self, cf_fill_value_hdf5_file):
+        f = h5py.File(cf_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_fill_value_hdf5_file, ds, group=""
+        )
+        assert "_FillValue" in var.encoding
+
+    def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
+        f = h5py.File(cf_array_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_array_fill_value_hdf5_file, ds, group=""
+        )
+        assert not isinstance(var.encoding["_FillValue"], np.ndarray)
 
 
 @requires_hdf5plugin
