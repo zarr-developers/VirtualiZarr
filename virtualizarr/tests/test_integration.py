@@ -240,7 +240,7 @@ class TestRoundtrip:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     @pytest.mark.xfail(
-        reason="zarr-python 3.0 does not support datetime and timedelta data types"
+        reason="Datetime and timedelta data types not yet supported by zarr-python 3.0"  # https://github.com/zarr-developers/zarr-python/issues/2616
     )
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata

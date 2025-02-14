@@ -232,7 +232,9 @@ class TestReadFromURL:
             pytest.param(
                 "netcdf3",
                 "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
-                marks=pytest.mark.xfail(reason="Not supported by zarr-python 3.0"),
+                marks=pytest.mark.xfail(
+                    reason="Big endian not yet supported by zarr-python 3.0"
+                ),  # https://github.com/zarr-developers/zarr-python/issues/2324
             ),
             (
                 "netcdf4",
@@ -258,7 +260,9 @@ class TestReadFromURL:
             pytest.param(
                 "fits",
                 "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-                marks=pytest.mark.xfail(reason="Not supported by zarr-python 3.0"),
+                marks=pytest.mark.xfail(
+                    reason="Big endian not yet supported by zarr-python 3.0"
+                ),  # https://github.com/zarr-developers/zarr-python/issues/2324
             ),
             (
                 "jpg",
