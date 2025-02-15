@@ -227,7 +227,6 @@ class TestConcat:
         assert concatenated.shape == (10, 2, 20)
         assert concatenated.dtype == np.dtype("int32")
 
-    # FAILING: TypeError: no implementation found for 'numpy.concatenate' on types that implement __array_function__: [<class 'virtualizarr.manifests.array.ManifestArray'>, <class 'numpy.ndarray'>]
     def test_concat_empty(self, array_v3_metadata):
         chunks = (5, 1, 10)
         shape = (5, 1, 20)
