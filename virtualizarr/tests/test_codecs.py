@@ -25,8 +25,6 @@ class TestCodecs:
             dtype="int32",
             store=None,
             zarr_format=zarr_format,
-            # compressor=compressor,
-            # filters=filters,
             codecs=codecs,
         )
 
