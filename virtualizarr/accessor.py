@@ -7,7 +7,6 @@ from xarray import Dataset, register_dataset_accessor
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
-from virtualizarr.writers.zarr import dataset_to_zarr
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -23,21 +22,6 @@ class VirtualiZarrDatasetAccessor:
 
     def __init__(self, ds: Dataset):
         self.ds: Dataset = ds
-
-    def to_zarr(self, storepath: str) -> None:
-        """
-        Serialize all virtualized arrays in this xarray dataset as a Zarr store.
-
-        Currently requires all variables to be backed by ManifestArray objects.
-
-        Not very useful until some implementation of a Zarr reader can actually read these manifest.json files.
-        See https://github.com/zarr-developers/zarr-specs/issues/287
-
-        Parameters
-        ----------
-        storepath : str
-        """
-        dataset_to_zarr(self.ds, storepath)
 
     def to_icechunk(
         self,

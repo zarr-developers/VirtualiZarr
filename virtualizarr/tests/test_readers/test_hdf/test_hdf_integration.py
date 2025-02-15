@@ -4,16 +4,22 @@ import xarray.testing as xrt
 
 import virtualizarr
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import (
+    requires_hdf5plugin,
+    requires_imagecodecs,
+    requires_kerchunk,
+)
 
 
 @requires_kerchunk
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestIntegration:
     @pytest.mark.xfail(
         reason="0 time start is being interpreted as fillvalue see issues/280"
     )
     def test_filters_h5netcdf_roundtrip(
-        self, tmpdir, filter_encoded_roundtrip_hdf5_file, backend=HDFVirtualBackend
+        self, tmpdir, filter_encoded_roundtrip_hdf5_file
     ):
         ds = xr.open_dataset(filter_encoded_roundtrip_hdf5_file, decode_times=True)
         vds = virtualizarr.open_virtual_dataset(

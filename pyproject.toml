@@ -14,42 +14,78 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0,<2025.0.0",
+    "xarray>=2025.1.1",
     "numpy>=2.0.0",
-    "packaging",
     "universal-pathlib",
     "numcodecs",
     "ujson",
+    "packaging",
 ]
 
 [project.optional-dependencies]
-hdf_reader = [
+# for creating virtual datasets from objects on remote storage
+remote = [
     "fsspec",
+    "requests",
+    "aiohttp",
+    "s3fs",
+]
+
+# non-kerchunk-based readers
+hdf = [
+    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "numcodecs"
 ]
+
+# kerchunk-based readers
+hdf5 = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "h5py",
+]
+netcdf3 = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "scipy",
+]
+fits = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "astropy",
+]
+all_readers = [
+    "virtualizarr[hdf]",
+    "virtualizarr[hdf5]",
+    "virtualizarr[netcdf3]",
+    "virtualizarr[fits]",
+]
+
+# writers
 icechunk = [
-    "icechunk==0.1.0a8",
+    "icechunk>=0.1.1",
 ]
+kerchunk = ["fastparquet"]
+all_writers = [
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+]
+all = [
+    "virtualizarr[all_readers]",
+    "virtualizarr[all_writers]",
+]
+
 test = [
     "codecov",
-    "fastparquet",
-    "fsspec",
-    "h5py",
-    "kerchunk>=0.2.5",
     "mypy",
-    "netcdf4",
-    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -58,8 +94,7 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "scipy",
-    "virtualizarr[hdf_reader]"
+    "virtualizarr[all]"
 ]
 
 [project.urls]

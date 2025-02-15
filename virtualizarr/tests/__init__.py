@@ -35,7 +35,9 @@ def _importorskip(
 
 
 has_astropy, requires_astropy = _importorskip("astropy")
+has_icechunk, requires_icechunk = _importorskip("icechunk")
 has_kerchunk, requires_kerchunk = _importorskip("kerchunk")
+has_fastparquet, requires_fastparquet = _importorskip("fastparquet")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_scipy, requires_scipy = _importorskip("scipy")
 has_tifffile, requires_tifffile = _importorskip("tifffile")
