@@ -373,3 +373,27 @@ def virtual_dataset(virtual_variable: Callable) -> Callable:
             )
 
     return _virtual_dataset
+
+
+# Zarr fixtures
+@pytest.fixture
+def zarr_array():
+    def create_zarr_array(codecs=None, zarr_format=3):
+        """Create a test Zarr array with the specified codecs."""
+        import zarr
+
+        # Create a Zarr array in memory with the codecs
+        zarr_array = zarr.create(
+            shape=(1000, 1000),
+            chunks=(100, 100),
+            dtype="int32",
+            store=None,
+            zarr_format=zarr_format,
+            codecs=codecs,
+        )
+
+        # Populate the Zarr array with data
+        zarr_array[:] = np.arange(1000 * 1000).reshape(1000, 1000)
+        return zarr_array
+
+    return create_zarr_array
