@@ -57,9 +57,8 @@ def convert_to_codec_pipeline(
 
     Parameters
     ----------
-    dtype : Any
-        The data type.
-    codecs: list[ZarrCodec] | None
+    dtype : np.dtype
+    codecs: list[dict] | None
 
     Returns
     -------
