@@ -19,7 +19,7 @@ DeconstructedCodecPipeline = tuple[
 ]
 
 
-def num_codec_config_to_configurable(num_codec: dict) -> dict:
+def numcodec_config_to_configurable(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
     """

@@ -14,7 +14,7 @@ from typing import (
 import numpy as np
 import xarray as xr
 
-from virtualizarr.codecs import num_codec_config_to_configurable
+from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -304,7 +304,7 @@ class HDFVirtualBackend(VirtualBackend):
         if isinstance(fill_value, np.generic):
             fill_value = fill_value.item()
         codec_configs = [
-            num_codec_config_to_configurable(codec.get_config()) for codec in codecs
+            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
         metadata = create_v3_array_metadata(
             shape=dataset.shape,
