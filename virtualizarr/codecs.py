@@ -98,13 +98,10 @@ def get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
         return codec.codec_config
     elif hasattr(codec, "get_config"):
         return codec.get_config()
-    elif hasattr(codec, "codec_name"):
+    elif hasattr(codec, "to_dict"):
         # If we can't get config, try to get the name and configuration directly
         # This assumes the codec follows the v3 spec format
-        return {
-            "id": codec.codec_name.replace("numcodecs.", ""),
-            **getattr(codec, "configuration", {}),
-        }
+        return codec.to_dict()
     else:
         raise ValueError(f"Unable to parse codec configuration: {codec}")
 

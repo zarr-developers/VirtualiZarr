@@ -10,7 +10,12 @@ from conftest import (
     DELTA_CODEC,
     ZLIB_CODEC,
 )
-from virtualizarr.codecs import convert_to_codec_pipeline, extract_codecs, get_codecs
+from virtualizarr.codecs import (
+    convert_to_codec_pipeline,
+    extract_codecs,
+    get_codec_config,
+    get_codecs,
+)
 
 
 class TestGetCodecs:
@@ -185,3 +190,42 @@ class TestExtractCodecs:
             None,
             (),
         )
+
+
+class TestGetCodecConfig:
+    """Test the get_codec_config function."""
+
+    def test_codec_with_codec_config(self):
+        """Test get_codec_config with a codec having codec_config attribute."""
+        codec = get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC)
+        expected_config = codec.codec_config
+        actual_config = get_codec_config(codec)
+        assert actual_config == expected_config
+
+    def test_codec_with_to_dict(self):
+        """Test get_codec_config with a codec having get_config method."""
+        from zarr.codecs import BloscCodec
+
+        codec = BloscCodec(typesize=4, clevel=5, shuffle="shuffle", cname="lz4")
+        expected_config = codec.to_dict()
+        actual_config = get_codec_config(codec)
+        assert actual_config == expected_config
+
+    def test_codec_with_get_config(self):
+        """Test get_codec_config with a codec having to_dict method."""
+        from numcodecs import FixedScaleOffset
+
+        codec = FixedScaleOffset(offset=0, scale=1, dtype="<i4")
+        expected_config = codec.get_config()
+        actual_config = get_codec_config(codec)
+        assert actual_config == expected_config
+
+    def test_codec_with_no_config_methods(self):
+        """Test get_codec_config with a codec having no config methods."""
+
+        class DummyCodec:
+            pass
+
+        codec = DummyCodec()
+        with pytest.raises(ValueError, match="Unable to parse codec configuration:"):
+            get_codec_config(codec)

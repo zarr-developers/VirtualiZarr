@@ -3,7 +3,7 @@ import pandas as pd
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from conftest import ARRAYBYTES_CODEC, BLOSC_CODEC, DELTA_CODEC
+from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.writers.kerchunk import convert_v3_to_v2_metadata
@@ -153,8 +153,11 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
     chunks = (5, 10)
     codecs = [
         ARRAYBYTES_CODEC,
-        DELTA_CODEC,
-        BLOSC_CODEC,
+        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {
+            "name": "numcodecs.blosc",
+            "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
+        },
     ]
 
     v3_metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
