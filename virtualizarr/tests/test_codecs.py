@@ -10,7 +10,7 @@ from conftest import (
     DELTA_CODEC,
     ZLIB_CODEC,
 )
-from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
+from virtualizarr.codecs import convert_to_codec_pipeline, extract_codecs, get_codecs
 
 
 class TestGetCodecs:
@@ -116,3 +116,72 @@ class TestConvertToCodecPipeline:
 
         result = convert_to_codec_pipeline(dtype=dtype, codecs=input_codecs)
         assert result == expected_pipeline
+
+
+class TestExtractCodecs:
+    """Test the extract_codecs function."""
+
+    def test_extract_codecs_with_all_types(self):
+        """Test extract_codecs with all types of codecs."""
+        arrayarray_codec = get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC)
+        arraybytes_codec = BytesCodec(endian="little")
+        bytesbytes_codec = get_codec_class("numcodecs.zlib").from_dict(ZLIB_CODEC)
+
+        codecs = (arrayarray_codec, arraybytes_codec, bytesbytes_codec)
+        result = extract_codecs(codecs)
+
+        assert result == (
+            (arrayarray_codec,),
+            arraybytes_codec,
+            (bytesbytes_codec,),
+        )
+
+    def test_extract_codecs_with_only_arrayarray(self):
+        """Test extract_codecs with only ArrayArrayCodec."""
+        arrayarray_codec = get_codec_class("numcodecs.delta").from_dict(DELTA_CODEC)
+
+        codecs = (arrayarray_codec,)
+        result = extract_codecs(codecs)
+
+        assert result == (
+            (arrayarray_codec,),
+            None,
+            (),
+        )
+
+    def test_extract_codecs_with_only_arraybytes(self):
+        """Test extract_codecs with only ArrayBytesCodec."""
+        arraybytes_codec = BytesCodec(endian="little")
+
+        codecs = (arraybytes_codec,)
+        result = extract_codecs(codecs)
+
+        assert result == (
+            (),
+            arraybytes_codec,
+            (),
+        )
+
+    def test_extract_codecs_with_only_bytesbytes(self):
+        """Test extract_codecs with only BytesBytesCodec."""
+        bytesbytes_codec = get_codec_class("numcodecs.zlib").from_dict(ZLIB_CODEC)
+
+        codecs = (bytesbytes_codec,)
+        result = extract_codecs(codecs)
+
+        assert result == (
+            (),
+            None,
+            (bytesbytes_codec,),
+        )
+
+    def test_extract_codecs_with_empty_list(self):
+        """Test extract_codecs with an empty list."""
+        codecs = ()
+        result = extract_codecs(codecs)
+
+        assert result == (
+            (),
+            None,
+            (),
+        )
