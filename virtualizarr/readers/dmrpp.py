@@ -9,10 +9,10 @@ from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
-from virtualizarr.zarr import ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -378,6 +378,7 @@ class DMRParser:
         -------
         xr.Variable
         """
+
         # Dimension info
         dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
@@ -390,7 +391,6 @@ class DMRParser:
             self._DAP_NP_DTYPE[var_tag.tag.removeprefix("{" + self._NS["dap"] + "}")]
         )
         # Chunks and Filters
-        filters = None
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
@@ -406,7 +406,7 @@ class DMRParser:
                 chunks_shape = shape
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
-            filters = self._parse_filters(chunks_tag, dtype)
+            codecs = self._parse_filters(chunks_tag, dtype)
         # Attributes
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
@@ -414,16 +414,15 @@ class DMRParser:
         # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
         encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
-        # create ManifestArray and ZArray
-        zarray = ZArray(
-            chunks=chunks_shape,
-            dtype=dtype,
-            fill_value=fill_value,
-            filters=filters,
-            order="C",
+        # create ManifestArray
+        metadata = create_v3_array_metadata(
             shape=shape,
+            data_type=dtype,
+            chunk_shape=chunks_shape,
+            fill_value=fill_value,
+            codecs=codecs,
         )
-        marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
+        marr = ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
         return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
@@ -490,16 +489,23 @@ class DMRParser:
             compression_types = chunks_tag.attrib["compressionType"].split(" ")
             for c in compression_types:
                 if c == "shuffle":
-                    filters.append({"id": "shuffle", "elementsize": dtype.itemsize})
+                    filters.append(
+                        {
+                            "name": "numcodecs.shuffle",
+                            "configuration": {"elementsize": dtype.itemsize},
+                        }
+                    )
                 elif c == "deflate":
                     filters.append(
                         {
-                            "id": "zlib",
-                            "level": int(
-                                chunks_tag.attrib.get(
-                                    "deflateLevel", self._DEFAULT_ZLIB_VALUE
-                                )
-                            ),
+                            "name": "numcodecs.zlib",
+                            "configuration": {
+                                "level": int(
+                                    chunks_tag.attrib.get(
+                                        "deflateLevel", self._DEFAULT_ZLIB_VALUE
+                                    )
+                                ),
+                            },
                         }
                     )
             return filters

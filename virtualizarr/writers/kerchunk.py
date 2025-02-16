@@ -1,19 +1,31 @@
 import base64
 import json
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from xarray import Dataset
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.variable import Variable
+from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
+from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
+from virtualizarr.codecs import extract_codecs, get_codec_config
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
-from virtualizarr.zarr import ZArray
 
 
 class NumpyEncoder(json.JSONEncoder):
-    # TODO I don't understand how kerchunk gets around this problem of encoding numpy types (in the zattrs) whilst only using ujson
+    """JSON encoder that handles common scientific Python types found in attributes.
+
+    This encoder converts various Python types to JSON-serializable formats:
+    - NumPy arrays and scalars to Python lists and native types
+    - NumPy dtypes to strings
+    - Sets to lists
+    - Other objects that implement __array__ to lists
+    - Objects with to_dict method (like pandas objects)
+    - Objects with __str__ method as fallback
+    """
+
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()  # Convert NumPy array to Python list
@@ -21,7 +33,19 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.item()  # Convert NumPy scalar to Python scalar
         elif isinstance(obj, np.dtype):
             return str(obj)
-        return json.JSONEncoder.default(self, obj)
+        elif isinstance(obj, set):
+            return list(obj)  # Convert sets to lists
+        elif hasattr(obj, "__array__"):
+            return np.asarray(obj).tolist()  # Handle array-like objects
+        elif hasattr(obj, "to_dict"):
+            return obj.to_dict()  # Handle objects with to_dict method
+
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except TypeError:
+            if hasattr(obj, "__str__"):
+                return str(obj)
+            raise
 
 
 def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
@@ -38,7 +62,6 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
         prepended_with_var_name = {
             f"{var_name}/{key}": val for key, val in arr_refs.items()
         }
-
         all_arr_refs.update(prepended_with_var_name)
 
     zattrs = ds.attrs
@@ -67,6 +90,57 @@ def remove_file_uri_prefix(path: str):
         return path
 
 
+def convert_v3_to_v2_metadata(
+    v3_metadata: ArrayV3Metadata, fill_value: Any = None
+) -> ArrayV2Metadata:
+    """
+    Convert ArrayV3Metadata to ArrayV2Metadata.
+
+    Parameters
+    ----------
+    v3_metadata : ArrayV3Metadata
+        The metadata object in v3 format.
+    fill_value : Any, optional
+        Override the fill value from v3 metadata.
+
+    Returns
+    -------
+    ArrayV2Metadata
+        The metadata object in v2 format.
+    """
+    import warnings
+
+    array_filters: tuple[ArrayArrayCodec, ...]
+    bytes_compressors: tuple[BytesBytesCodec, ...]
+    array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
+
+    # Handle compressor configuration
+    compressor_config: dict[str, Any] | None = None
+    if bytes_compressors:
+        if len(bytes_compressors) > 1:
+            warnings.warn(
+                "Multiple compressors found in v3 metadata. Using the first compressor, "
+                "others will be ignored. This may affect data compatibility.",
+                UserWarning,
+            )
+        compressor_config = get_codec_config(bytes_compressors[0])
+
+    # Handle filter configurations
+    filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
+    v2_metadata = ArrayV2Metadata(
+        shape=v3_metadata.shape,
+        dtype=v3_metadata.data_type.to_numpy(),
+        chunks=v3_metadata.chunks,
+        fill_value=fill_value or v3_metadata.fill_value,
+        compressor=compressor_config,
+        filters=filter_configs,
+        order="C",
+        attributes=v3_metadata.attributes,
+        dimension_separator=".",  # Assuming '.' as default dimension separator
+    )
+    return v2_metadata
+
+
 def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRefs:
     """
     Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
@@ -74,6 +148,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
     from virtualizarr.manifests import ManifestArray
+    from virtualizarr.translators.kerchunk import to_kerchunk_json
 
     if isinstance(var.data, ManifestArray):
         marr = var.data
@@ -86,9 +161,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             ]
             for chunk_key, entry in marr.manifest.dict().items()
         }
-
-        zarray = marr.zarray.replace(zarr_format=2)
-
+        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
     else:
         try:
             np_arr = var.to_numpy()
@@ -118,15 +191,17 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         # TODO will this fail for a scalar?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
 
-        zarray = ZArray(
+        from zarr.core.metadata.v2 import ArrayV2Metadata
+
+        array_v2_metadata = ArrayV2Metadata(
             chunks=np_arr.shape,
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
-            fill_value=None,
+            fill_value=var.encoding.get("fill_value", None),
         )
 
-    zarray_dict = zarray.to_kerchunk_json()
+    zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
     zattrs = {**var.attrs, **var.encoding}
