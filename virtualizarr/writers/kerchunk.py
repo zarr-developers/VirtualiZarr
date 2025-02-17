@@ -163,6 +163,8 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         }
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
     else:
+        from zarr.core.metadata.v2 import ArrayV2Metadata
+
         try:
             np_arr = var.to_numpy()
         except AttributeError as e:
@@ -191,14 +193,12 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         # TODO will this fail for a scalar?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
 
-        from zarr.core.metadata.v2 import ArrayV2Metadata
-
         array_v2_metadata = ArrayV2Metadata(
             chunks=np_arr.shape,
             shape=np_arr.shape,
             dtype=np_arr.dtype,
             order="C",
-            fill_value=var.encoding.get("fill_value", None),
+            fill_value=None,
         )
 
     zarray_dict = to_kerchunk_json(array_v2_metadata)
