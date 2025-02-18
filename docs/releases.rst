@@ -3,7 +3,7 @@ Release notes
 
 .. _v1.3.1:
 
-v1.3.1 (unreleased)
+v1.3.1 (18th Feb 2025)
 -------------------
 
 New Features
