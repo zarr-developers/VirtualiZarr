@@ -8,7 +8,7 @@ v1.3.1 (unreleased)
 
 New Features
 ~~~~~~~~~~~~
-
+- Examples use new Icechunk syntax
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
