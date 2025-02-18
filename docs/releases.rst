@@ -1,5 +1,27 @@
 Release notes
 =============
+.. _v1.3.2:
+
+v1.3.2 (unreleased)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
 
 .. _v1.3.1:
 
