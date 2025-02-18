@@ -6,7 +6,7 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
-from virtualizarr.writers.kerchunk import convert_v3_to_v2_metadata
+from virtualizarr.utils import convert_v3_to_v2_metadata
 
 
 @requires_kerchunk

@@ -1,17 +1,15 @@
 import base64
 import json
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 from xarray import Dataset
 from xarray.coding.times import CFDatetimeCoder
 from xarray.core.variable import Variable
-from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
-from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
-from virtualizarr.codecs import extract_codecs, get_codec_config
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
+from virtualizarr.utils import convert_v3_to_v2_metadata
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -88,57 +86,6 @@ def remove_file_uri_prefix(path: str):
         return path.removeprefix("file://")
     else:
         return path
-
-
-def convert_v3_to_v2_metadata(
-    v3_metadata: ArrayV3Metadata, fill_value: Any = None
-) -> ArrayV2Metadata:
-    """
-    Convert ArrayV3Metadata to ArrayV2Metadata.
-
-    Parameters
-    ----------
-    v3_metadata : ArrayV3Metadata
-        The metadata object in v3 format.
-    fill_value : Any, optional
-        Override the fill value from v3 metadata.
-
-    Returns
-    -------
-    ArrayV2Metadata
-        The metadata object in v2 format.
-    """
-    import warnings
-
-    array_filters: tuple[ArrayArrayCodec, ...]
-    bytes_compressors: tuple[BytesBytesCodec, ...]
-    array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
-
-    # Handle compressor configuration
-    compressor_config: dict[str, Any] | None = None
-    if bytes_compressors:
-        if len(bytes_compressors) > 1:
-            warnings.warn(
-                "Multiple compressors found in v3 metadata. Using the first compressor, "
-                "others will be ignored. This may affect data compatibility.",
-                UserWarning,
-            )
-        compressor_config = get_codec_config(bytes_compressors[0])
-
-    # Handle filter configurations
-    filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
-    v2_metadata = ArrayV2Metadata(
-        shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type.to_numpy(),
-        chunks=v3_metadata.chunks,
-        fill_value=fill_value or v3_metadata.fill_value,
-        compressor=compressor_config,
-        filters=filter_configs,
-        order="C",
-        attributes=v3_metadata.attributes,
-        dimension_separator=".",  # Assuming '.' as default dimension separator
-    )
-    return v2_metadata
 
 
 def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRefs:
