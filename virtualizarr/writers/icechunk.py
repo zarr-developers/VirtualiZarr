@@ -306,6 +306,7 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
+    # from icechunk import VirtualChunkSpec
 
     key_prefix = f"{group.name}/{arr_name}"
 
