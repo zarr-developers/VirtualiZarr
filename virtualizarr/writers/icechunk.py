@@ -283,17 +283,18 @@ def generate_chunk_key(
     index: tuple[int, ...],
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
-) -> str:
+) -> list[int]:
     if append_axis and append_axis >= len(index):
         raise ValueError(
             f"append_axis {append_axis} is greater than the number of indices {len(index)}"
         )
-    return "/".join(
-        str(ind + existing_num_chunks)
+
+    return [
+        ind + existing_num_chunks
         if axis is append_axis and existing_num_chunks is not None
-        else str(ind)
+        else ind
         for axis, ind in enumerate(index)
-    )
+    ]
 
 
 def write_manifest_virtual_refs(
@@ -330,7 +331,7 @@ def write_manifest_virtual_refs(
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
-            index=it.multi_index,
+            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
