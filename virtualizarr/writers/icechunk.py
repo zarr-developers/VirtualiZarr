@@ -302,7 +302,6 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    # perhaps something changed that group.name now defaults to "/" instead of ""?
     if group.name == "/":
         key_prefix = arr_name
     else:
