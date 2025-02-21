@@ -325,22 +325,15 @@ def write_manifest_virtual_refs(
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
 
-    virtual_chunk_spec_list = []
-
-    for path, offset, length in it:
-        # it.multi_index will be an iterator of the chunk shape
-        index = it.multi_index
-        chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
-        
-        #  TODO it would be marginally neater if I could pass the group and name as separate args
-        virtual_chunk_spec_list.append(
-            VirtualChunkSpec(
-                index=index,
-                location=path.item(),  # + f"{key_prefix}/c/{chunk_key}",
-                offset=offset.item(),
-                length=length.item(),
-                last_updated_at_checksum=last_updated_at,
-            )
+    virtual_chunk_spec_list = [
+        VirtualChunkSpec(
+            index=it.multi_index,
+            location=path.item(),
+            offset=offset.item(),
+            length=length.item(),
+            last_updated_at_checksum=last_updated_at,
         )
+        for path, offset, length in it
+    ]
 
     store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)
