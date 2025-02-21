@@ -1,14 +1,36 @@
 Release notes
 =============
+.. _v1.3.2:
 
-.. _v1.3.1:
-
-v1.3.1 (unreleased)
+v1.3.2 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.1:
+
+v1.3.1 (18th Feb 2025)
+-------------------
+
+New Features
+~~~~~~~~~~~~
+- Examples use new Icechunk syntax
 Breaking changes
 ~~~~~~~~~~~~~~~~
 

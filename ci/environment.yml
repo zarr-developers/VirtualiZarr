@@ -14,8 +14,8 @@ dependencies:
   - packaging
   - universal_pathlib
   - hdf5plugin
-  - numcodecs>=0.15.1
-  - icechunk>=0.1.1
+  - numcodecs
+  - icechunk>=0.2.0
   # Testing
   - codecov[toml]
   - pre-commit

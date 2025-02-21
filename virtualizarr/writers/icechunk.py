@@ -304,7 +304,10 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    key_prefix = f"{group.name}/{arr_name}"
+    if group.name == "/":
+        key_prefix = arr_name
+    else:
+        key_prefix = f"{group.name}/{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once

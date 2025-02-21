@@ -72,7 +72,7 @@ all_readers = [
 
 # writers
 icechunk = [
-    "icechunk>=0.1.1",
+    "icechunk>=0.2.0",
 ]
 kerchunk = ["fastparquet"]
 all_writers = [
