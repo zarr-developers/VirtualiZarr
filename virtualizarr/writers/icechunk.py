@@ -302,7 +302,11 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    key_prefix = f"{group.name}/{arr_name}"
+    # perhaps something changed that group.name now defaults to "/" instead of ""?
+    if group.name == "/":
+        key_prefix = arr_name
+    else:
+        key_prefix = f"{group.name}{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
@@ -324,8 +328,11 @@ def write_manifest_virtual_refs(
         chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
 
         # set each reference individually
+        import pdb
+
+        pdb.set_trace()
         store.set_virtual_ref(
-            # TODO it would be marginally neater if I could pass the group and name as separate args
+            # perhaps an additional "/" is added here as well?
             key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
             location=path.item(),
             offset=offset.item(),
