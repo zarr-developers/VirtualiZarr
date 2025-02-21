@@ -328,11 +328,8 @@ def write_manifest_virtual_refs(
         chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
 
         # set each reference individually
-        import pdb
-
-        pdb.set_trace()
         store.set_virtual_ref(
-            # perhaps an additional "/" is added here as well?
+            # TODO it would be marginally neater if I could pass the group and name as separate args
             key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
             location=path.item(),
             offset=offset.item(),
