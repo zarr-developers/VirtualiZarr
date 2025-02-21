@@ -283,17 +283,18 @@ def generate_chunk_key(
     index: tuple[int, ...],
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
-) -> str:
+) -> list[int]:
     if append_axis and append_axis >= len(index):
         raise ValueError(
             f"append_axis {append_axis} is greater than the number of indices {len(index)}"
         )
-    return "/".join(
-        str(ind + existing_num_chunks)
+
+    return [
+        ind + existing_num_chunks
         if axis is append_axis and existing_num_chunks is not None
-        else str(ind)
+        else ind
         for axis, ind in enumerate(index)
-    )
+    ]
 
 
 def write_manifest_virtual_refs(
@@ -306,6 +307,7 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
+    from icechunk import VirtualChunkSpec
 
     if group.name == "/":
         key_prefix = arr_name
@@ -316,6 +318,7 @@ def write_manifest_virtual_refs(
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
     # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
+
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
@@ -326,17 +329,15 @@ def write_manifest_virtual_refs(
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
 
-    for path, offset, length in it:
-        # it.multi_index will be an iterator of the chunk shape
-        index = it.multi_index
-        chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
-
-        # set each reference individually
-        store.set_virtual_ref(
-            # TODO it would be marginally neater if I could pass the group and name as separate args
-            key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
+    virtual_chunk_spec_list = [
+        VirtualChunkSpec(
+            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
-            checksum=last_updated_at,
+            last_updated_at_checksum=last_updated_at,
         )
+        for path, offset, length in it
+    ]
+
+    store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)
