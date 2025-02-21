@@ -26,11 +26,12 @@ Internal Changes
 .. _v1.3.1:
 
 v1.3.1 (18th Feb 2025)
--------------------
+----------------------
 
 New Features
 ~~~~~~~~~~~~
 - Examples use new Icechunk syntax
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
