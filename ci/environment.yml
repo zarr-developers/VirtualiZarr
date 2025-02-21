@@ -37,4 +37,4 @@ dependencies:
   - astropy
   - pip
   - pip:
-    - imagecodecs-numcodecs==2024.6.1
+      - imagecodecs-numcodecs==2024.6.1
