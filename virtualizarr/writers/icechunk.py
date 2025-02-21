@@ -331,7 +331,7 @@ def write_manifest_virtual_refs(
         # it.multi_index will be an iterator of the chunk shape
         index = it.multi_index
         chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
-        
+
         #  TODO it would be marginally neater if I could pass the group and name as separate args
         virtual_chunk_spec_list.append(
             VirtualChunkSpec(
