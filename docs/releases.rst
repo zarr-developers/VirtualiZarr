@@ -23,6 +23,8 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
+- Updates `store.set_virtual_ref` to `store.set_virtual_refs` in `write_manifest_virtual_refs` (:pull:`443`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
 .. _v1.3.1:
 
 v1.3.1 (18th Feb 2025)
