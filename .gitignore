@@ -160,7 +160,7 @@ cython_debug/
 #.idea/
 virtualizarr/_version.py
 docs/generated/
-examples/
+!examples/mursst-icechunk-with-lithops/
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
