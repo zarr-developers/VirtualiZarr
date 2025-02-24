@@ -1,27 +1,25 @@
-# Adapted from https://github.com/lithops-cloud/lithops/blob/master/runtime/aws_lambda/Dockerfile
+FROM public.ecr.aws/lambda/python:3.11
 
-# Python 3.12
-FROM python:3.12-slim
+ARG FUNCTION_DIR
 
-RUN apt-get update \
-    # Install aws-lambda-cpp build dependencies
-    && apt-get install -y \
-    g++ \
-    make \
-    cmake \
-    unzip \
-    # cleanup package lists, they are not used anymore in this image
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-cache search linux-headers-generic
+# Update libs
+RUN yum update -y && \
+    yum install -y wget unzip && \
+    yum clean all
 
-ARG FUNCTION_DIR="/function"
+# Install conda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p /opt/miniconda && \
+    rm miniconda.sh
 
-# Copy function code
-RUN mkdir -p ${FUNCTION_DIR}
+COPY lithops-env.yml /tmp/lithops-conda.yml
 
-# Update pip
-RUN pip install --upgrade --ignore-installed pip wheel six setuptools \
-    && pip install --upgrade --no-cache-dir --ignore-installed \
+# Create conda environment
+RUN /opt/miniconda/bin/conda update -n base -c defaults conda && \
+    /opt/miniconda/bin/conda env create --file /tmp/lithops-conda.yml --prefix /opt/conda-env
+
+# Install Lithops dependencies
+RUN /opt/conda-env/bin/pip install --upgrade --no-cache-dir --ignore-installed \
     awslambdaric \
     boto3 \
     redis \
@@ -37,10 +35,15 @@ RUN pip install --upgrade --ignore-installed pip wheel six setuptools \
     tblib \
     psutil
 
-# Set working directory to function root directory
-WORKDIR ${FUNCTION_DIR}
+# Replace python interpreter with conda's
+RUN mv /var/lang/bin/python3.11 /var/lang/bin/python3.11-clean && \
+    ln -sf /opt/conda-env/bin/python /var/lang/bin/python3.11
 
-# Add Lithops
+ENV PYTHONPATH="/var/lang/lib/python3.11/site-packages:${FUNCTION_DIR}"
+
+ENV PATH="${PATH}:/opt/conda-env/bin/"
+
+# Install lithops
 COPY lithops_lambda.zip ${FUNCTION_DIR}
 RUN unzip lithops_lambda.zip \
     && rm lithops_lambda.zip \
@@ -48,9 +51,4 @@ RUN unzip lithops_lambda.zip \
     && touch handler/__init__.py \
     && mv entry_point.py handler/
 
-# Put your dependencies here, using RUN pip install... or RUN apt install...
-COPY requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
 CMD [ "handler.entry_point.lambda_handler" ]
