@@ -6,9 +6,11 @@ import virtualizarr
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
+    requires_icechunk,
     requires_imagecodecs,
     requires_kerchunk,
 )
+from virtualizarr.tests.test_integration import roundtrip_as_in_memory_icechunk
 
 
 @requires_kerchunk
@@ -58,7 +60,7 @@ class TestIntegration:
             == roundtrip["temperature"].encoding["_FillValue"]
         )
 
-    def test_non_coord_dim(self, tmpdir, non_coord_dim):
+    def test_non_coord_dim_roundtrip(self, tmpdir, non_coord_dim):
         ds = xr.open_dataset(non_coord_dim)
         vds = virtualizarr.open_virtual_dataset(
             non_coord_dim, backend=HDFVirtualBackend
@@ -67,3 +69,11 @@ class TestIntegration:
         vds.virtualize.to_kerchunk(kerchunk_file, format="json")
         roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
         xrt.assert_equal(ds, roundtrip)
+
+    @requires_icechunk
+    def test_cf_fill_value_roundtrip(self, tmpdir, cf_fill_value_hdf5_file):
+        #  ds = xr.open_dataset(cf_fill_value_hdf5_file)
+        vds = virtualizarr.open_virtual_dataset(
+            cf_fill_value_hdf5_file, backend=HDFVirtualBackend
+        )
+        roundtrip_as_in_memory_icechunk(vds, tmpdir, decode_times=False)

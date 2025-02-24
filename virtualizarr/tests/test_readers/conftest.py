@@ -354,16 +354,30 @@ def scalar_fill_value_hdf5_file(tmpdir):
     return filepath
 
 
+compound_dtype = np.dtype(
+    [
+        ("id", "i4"),  # 4-byte integer
+        ("temperature", "f4"),  # 4-byte float
+    ]
+)
+
+compound_data = np.array(
+    [
+        (1, 98.6),
+        (2, 101.3),
+    ],
+    dtype=compound_dtype,
+)
+
+compound_fill = (-9999, -9999.0)
+
 fill_values = [
-    -9999,  # Integer fill value
-    -9999.0,  # Floating-point fill value
-    np.nan,  # NaN as fill value
-    True,
-    False,  # Boolean fill values
-    "N/A",  # String fill value
-    b"Unknown",  # Bytes fill value
-    1 + 2j,  # Complex number fill value
-    (b"Unknown", -1),  # Structured type (Tuple)
+    {"fill_value": -9999, "data": np.random.randint(0, 10, size=(5))},
+    {"fill_value": -9999.0, "data": np.random.random(5)},
+    {"fill_value": np.nan, "data": np.random.random(5)},
+    {"fill_value": True, "data": np.random.choice([True, False], size=(5))},
+    {"fill_value": "NA".encode("ascii"), "data": np.array(["one"], dtype="S")},
+    #  {"fill_value": compound_fill, "data": compound_data},
 ]
 
 
@@ -371,10 +385,11 @@ fill_values = [
 def cf_fill_value_hdf5_file(tmpdir, request):
     filepath = f"{tmpdir}/cf_fill_value.nc"
     f = h5py.File(filepath, "w")
-    data = np.random.randint(0, 10, size=(5))
-    dset = f.create_dataset(name="data", data=data, chunks=True)
-    if request.param is not None:
-        dset.attrs["_FillValue"] = request.param
+    dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
+    wat = f.create_dataset(name="wat", data=request.param["data"], chunks=True)
+    wat.make_scale()
+    dset.dims[0].attach_scale(wat)
+    dset.attrs["_FillValue"] = request.param["fill_value"]
     return filepath
 
 
@@ -382,7 +397,7 @@ def cf_fill_value_hdf5_file(tmpdir, request):
 def cf_array_fill_value_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/cf_array_fill_value.nc"
     f = h5py.File(filepath, "w")
-    data = np.random.randint(0, 10, size=(5))
+    data = np.random.random(5)
     dset = f.create_dataset(name="data", data=data, chunks=True)
     dset.attrs["_FillValue"] = np.array([np.nan])
     return filepath

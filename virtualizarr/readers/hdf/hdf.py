@@ -14,6 +14,7 @@ from typing import (
 
 import numpy as np
 import xarray as xr
+from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -48,7 +49,6 @@ FillValueType = Union[
     complex,
     str,
     np.integer,
-    np.nan,
     np.floating,
     np.bool_,
     np.complexfloating,
@@ -248,11 +248,16 @@ class HDFVirtualBackend(VirtualBackend):
         fillvalue = None
         for n, v in h5obj.attrs.items():
             if n == "_FillValue":
-                # Extract scalar _FillValue
                 if isinstance(v, np.ndarray) and v.size == 1:
                     fillvalue = v.item()
                 else:
                     fillvalue = v
+                if (
+                    fillvalue is not None
+                    and h5obj.dtype.kind not in "S"
+                    and h5obj.dtype.fields is None
+                ):
+                    fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)
         return fillvalue
 
     @staticmethod
