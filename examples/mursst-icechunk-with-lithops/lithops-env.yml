@@ -1,0 +1,15 @@
+name: lithops-env
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - xarray>=2025.1.0
+  - h5netcdf
+  - h5py
+  - s3fs
+  - boto3
+  - pip:
+      - lithops
+      - virtualizarr[icechunk]>=1.3.0
