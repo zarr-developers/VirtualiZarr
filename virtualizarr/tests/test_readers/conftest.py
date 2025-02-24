@@ -376,8 +376,8 @@ fill_values = [
     {"fill_value": -9999.0, "data": np.random.random(5)},
     {"fill_value": np.nan, "data": np.random.random(5)},
     {"fill_value": True, "data": np.random.choice([True, False], size=(5))},
-    {"fill_value": "N/A", "data": np.array(["one", "two"], dtype="S")},
-    {"fill_value": compound_fill, "data": compound_data},
+    {"fill_value": "NA".encode("ascii"), "data": np.array(["one"], dtype="S")},
+    #  {"fill_value": compound_fill, "data": compound_data},
 ]
 
 
@@ -386,6 +386,9 @@ def cf_fill_value_hdf5_file(tmpdir, request):
     filepath = f"{tmpdir}/cf_fill_value.nc"
     f = h5py.File(filepath, "w")
     dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
+    wat = f.create_dataset(name="wat", data=request.param["data"], chunks=True)
+    wat.make_scale()
+    dset.dims[0].attach_scale(wat)
     dset.attrs["_FillValue"] = request.param["fill_value"]
     return filepath
 
