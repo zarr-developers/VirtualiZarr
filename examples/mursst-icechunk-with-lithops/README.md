@@ -14,29 +14,30 @@ Please, contribute improvements.
 1. Set up a Python environment
 
 ```bash
-micromamba create --name virtualizarr-lithops -y python=3.12
+micromamba create --name virtualizarr-lithops -y python=3.11 -f lithops-env.yml
 micromamba activate virtualizarr-lithops
-pip install -r requirements.txt
 ```
 
 2. Configure compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html).
-   The configuration in `lithops.yaml` uses AWS Lambda for [compute](https://lithops-cloud.github.io/docs/source/compute_config/aws_lambda.html) and AWS S3 for [storage](https://lithops-cloud.github.io/docs/source/storage_config/aws_s3.html).
-   To use those backends, simply edit `lithops.yaml` with your `bucket` and `execution_role`.
+   The configuration in `lithops.yaml` supports AWS Lambda for compute and AWS S3 for storage.
 
-1. Build a runtime image for Cubed
+   ### For AWS Lambda Backend
 
-```bash
-export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
-lithops runtime build -b aws_lambda -f Dockerfile virtualizarr-runtime
-```
+   - Edit `lithops.yaml` and set `backend: aws_lambda`
+   - Configure your `bucket` and `execution_role`
+   - Build the runtime:
+     ```bash
+     export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
+     lithops runtime build -b aws_lambda -f Dockerfile mursst-runtime
+     ```
 
-1. Test it's working
+3. Test it's working
 
 ```bash
 python test_lithops.py
 ```
 
-1. Run the script
+4. Run the script
 
 ```bash
 python virtualizarr-with-lithops.py
@@ -44,7 +45,9 @@ python virtualizarr-with-lithops.py
 
 ## Cleaning up
 
-To rebuild the Lithops image, delete the existing one by running
+### Lambda Backend
+
+To rebuild the Lithops Lambda runtime image, delete the existing one:
 
 ```bash
 lithops runtime delete -b aws_lambda -d virtualizarr-runtime

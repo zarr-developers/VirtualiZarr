@@ -1,4 +1,4 @@
-name: lithops-env
+name: virtualizarr-lithops
 channels:
   - conda-forge
   - nodefaults
@@ -8,8 +8,11 @@ dependencies:
   - xarray>=2025.1.0
   - h5netcdf
   - h5py
+  - pandas
   - s3fs
   - boto3
+  - dask
+  - distributed
   - pip:
       - lithops
       - virtualizarr[icechunk]>=1.3.0
