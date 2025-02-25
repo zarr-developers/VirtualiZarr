@@ -24,6 +24,8 @@ data_vars = ["analysed_sst", "analysis_error", "mask", "sea_ice_fraction"]
 drop_vars = ["dt_1km_data", "sst_anomaly"]
 bucket = "nasa-veda-scratch"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v5"
+lat_slice = slice(48.5, 48.7)
+lon_slice = slice(-124.7, -124.5)
 
 # Reset to a snapshot
 # [print(f"{snapshot.message}, snapshot_id: {snapshot.id}") for snapshot in repo.ancestry(branch="main")]
@@ -305,12 +307,36 @@ def lithops_check_data_store_access(open_or_create_repo: callable):
     xds = xr.open_dataset(
         session.store, consolidated=False, zarr_format=3, engine="zarr"
     )
-    return (
-        xds["analysed_sst"]
-        .sel(lat=slice(48.5, 48.7), lon=slice(-124.7, -124.5))
-        .mean()
-        .values
+    return xds["analysed_sst"].sel(lat=lat_slice, lon=lon_slice).mean().values
+
+
+def open_and_read_data(file, lat_slice, lon_slice):
+    ds = xr.open_dataset(fs_read.open(file), chunks={})
+    return ds.analysed_sst.sel(lat=lat_slice, lon=lon_slice).values
+
+
+def get_mean(values: np.ndarray):
+    return np.nanmean(values)
+
+
+def lithops_check_original_files(
+    start_date: str, end_date: str, lat_slice: tuple, lon_slice: tuple
+):
+    # map open and read data from selected space and time
+    files = list_mur_sst_files(start_date, end_date, dmrpp=False)
+    # fexec.map_reduce(
+    #     map_function=open_and_read_data, # return array
+    #     map_iterdata=files,
+    #     extra_args=(lat_slice, lon_slice),
+    #     reduce_function=get_mean,
+    # )
+    fexec.map(
+        map_function=open_and_read_data,  # return array
+        map_iterdata=files,
+        extra_args=(lat_slice, lon_slice),
+        # reduce_function=get_mean,
     )
+    return fexec.get_result()
 
 
 # Create a list of date ranges
@@ -359,6 +385,17 @@ def check_data_store_access():
     print(fexec.get_result())
 
 
+## Test original files
+def check_original_files():
+    result = lithops_check_original_files(
+        start_date="2002-06-30",
+        end_date="2002-07-07",
+        lat_slice=lat_slice,
+        lon_slice=lon_slice,
+    )
+    print(result)
+
+
 ## For debugging the environment
 def lithops_list_installed_packages():
     import subprocess
@@ -382,6 +419,7 @@ def parse_args():
         choices=[
             "write_to_icechunk",
             "check_data_store_access",
+            "check_original_files",
             "list_installed_packages",
         ],
         help="The function to run.",
@@ -396,5 +434,7 @@ if __name__ == "__main__":
         write_to_icechunk()
     elif args.function == "check_data_store_access":
         check_data_store_access()
+    elif args.function == "check_original_files":
+        check_original_files()
     elif args.function == "list_installed_packages":
         list_installed_packages()
