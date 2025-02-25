@@ -25,14 +25,15 @@ drop_vars = ["dt_1km_data", "sst_anomaly"]
 bucket = "nasa-veda-scratch"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v5"
 
-# Reset data
+# Reset to a snapshot
 # [print(f"{snapshot.message}, snapshot_id: {snapshot.id}") for snapshot in repo.ancestry(branch="main")]
 # repo.reset_branch("main", "BLAH")
 
 # TODO:
 # - [x] test small number of files with virtual refs
-# - [ ] test small number of files with zarr
-# - [ ] estimate memory runtime requirements
+# - [x] test small number of files with zarr
+# - [ ] Write and test with validation function
+# - [ ] estimate time to run + memory requirements for larger batches
 # - [ ] run on larger batches of files
 
 
@@ -330,7 +331,7 @@ date_process_dict = {
 }
 
 test_date_process_dict = {
-    ("2002-07-04", "2002-07-04"): "zarr",
+    ("2002-07-06", "2002-07-07"): "zarr",
 }
 
 fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)
