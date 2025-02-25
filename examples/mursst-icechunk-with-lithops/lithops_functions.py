@@ -1,7 +1,7 @@
 # Initialize dask config before importing
+import argparse
 import datetime
 import logging
-import sys
 from dataclasses import dataclass
 from typing import List, cast
 
@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import zarr
+from icechunk.distributed import merge_sessions
 
 from virtualizarr import open_virtual_dataset
 
@@ -23,6 +24,10 @@ data_vars = ["analysed_sst", "analysis_error", "mask", "sea_ice_fraction"]
 drop_vars = ["dt_1km_data", "sst_anomaly"]
 bucket = "nasa-veda-scratch"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v5"
+
+# Reset data
+# [print(f"{snapshot.message}, snapshot_id: {snapshot.id}") for snapshot in repo.ancestry(branch="main")]
+# repo.reset_branch("main", "BLAH")
 
 # TODO:
 # - [x] test small number of files with virtual refs
@@ -133,7 +138,7 @@ def write_virtual_results_to_icechunk(virtual_ds, start_date: str, end_date: str
             # If we can't check or there's an error, assume store is empty
             virtual_ds.virtualize.to_icechunk(session.store)
 
-        return session.commit("Commit data {start_date} to {end_date}")
+        return session.commit(f"Commit data {start_date} to {end_date}")
 
 
 def concat_and_write_virtual_datasets(results, start_date: str, end_date: str):
@@ -158,15 +163,17 @@ def lithops_write_virtual_references(start_date: datetime, end_date: datetime):
 
 
 # Zarr functions
-def resize_data_array(var_name: str, group: zarr.Group, n_timesteps: int):
+def resize_data_array(var_name: str, session: icechunk.Session, n_timesteps: int):
     """Resize a data variable array."""
+    group = zarr.group(store=session.store, overwrite=False)
     current_shape = group[var_name].shape
     group[var_name].resize((current_shape[0] + n_timesteps,) + current_shape[1:])
-    return group
+    return session
 
 
-def handle_time_dimension(group: zarr.Group, start_date: str, end_date: str):
+def handle_time_dimension(session: icechunk.Session, start_date: str, end_date: str):
     """Handle time dimension and return datetime-index pairs."""
+    group = zarr.group(store=session.store, overwrite=False)
     dt_index = pd.date_range(start=start_date, end=end_date, freq="1D")
     n_timesteps = len(dt_index)
     current_time_length = group["time"].shape[0]
@@ -180,7 +187,10 @@ def handle_time_dimension(group: zarr.Group, start_date: str, end_date: str):
     group["time"][-n_timesteps:] = np.int32(dt_index_seconds_since_1981)
 
     # Return list of (datetime, index) pairs
-    return (group, [(dt, current_time_length + idx) for idx, dt in enumerate(dt_index)])
+    return (
+        session,
+        [(dt, current_time_length + idx) for idx, dt in enumerate(dt_index)],
+    )
 
 
 def map_open_files(file):
@@ -207,51 +217,26 @@ class Task:
     var: str
     dt: str
     time_idx: int
-    session: icechunk.Session
 
 
-def write_data_to_zarr(task: Task, group: zarr.Group, ds: xr.Dataset):
-    var, dt, time_idx, session = task.var, task.dt, task.time_idx, task.session
+def write_data_to_zarr(task: Task, session: icechunk.Session, ds: xr.Dataset):
+    group = zarr.group(store=session.store, overwrite=False)
+    var, dt, time_idx = task.var, task.dt, task.time_idx
     data_array = ds[var].sel(time=dt)
     current_array = cast(zarr.Array, group[var])
+    # where we actually write the data
     current_array[time_idx, :, :] = data_array.values
     return session
 
 
-def commit_to_icechunk(_, session: icechunk.Session, start_date: str, end_date: str):
-    commit_response = session.commit(
-        f"Distributed commit for {start_date} to {end_date}"
-    )
-    return commit_response
-
-
 def lithops_write_zarr(start_date: str, end_date: str):
+    zarr.config.set(
+        {
+            "async": {"concurrency": 100, "timeout": None},
+            "threading": {"max_workers": None},
+        }
+    )
     files = list_mur_sst_files(start_date, end_date, dmrpp=False)
-    repo = open_or_create_repo()
-    session = repo.writable_session("main")
-    with session.allow_pickling():
-        store = session.store
-        group = zarr.group(store=store, overwrite=False)
-        fexec.call_async(
-            handle_time_dimension,
-            data=dict(
-                group=group,
-                start_date=start_date + " 09:00",
-                end_date=end_date + " 09:00",
-            ),
-        )
-        group, dt_index_pairs = fexec.get_result()
-        n_timesteps = len(dt_index_pairs)
-
-    # Then resize data arrays
-    # Unfortunately we can't do this in a map operation because the group needs to be updated in place
-    for var in data_vars:
-        fexec.call_async(
-            resize_data_array,
-            data=dict(var_name=var, group=group, n_timesteps=n_timesteps),
-        )
-        group = fexec.get_result()  # Wait for resize operations to complete
-
     # Open multi-file dataset with xarray
     fexec.map_reduce(
         map_function=map_open_files,
@@ -261,49 +246,70 @@ def lithops_write_zarr(start_date: str, end_date: str):
     )
     ds = fexec.get_result()
 
-    # Create tasks using datetime-index pairs
-    tasks = []
-    for var in data_vars:
-        for dt, time_idx in dt_index_pairs:
-            tasks.append(Task(var=var, dt=dt, time_idx=time_idx, session=session))
+    repo = open_or_create_repo()
+    resize_session = repo.writable_session("main")
+    resize_sessions = []
+    with resize_session.allow_pickling():
+        fexec.call_async(
+            handle_time_dimension,
+            data=dict(
+                session=resize_session,
+                start_date=start_date + " 09:00",
+                end_date=end_date + " 09:00",
+            ),
+        )
+        resize_time_session, dt_index_pairs = fexec.get_result()
+        resize_sessions.append(resize_time_session)
+        n_timesteps = len(dt_index_pairs)
 
-    with session.allow_pickling():
+        # Then resize data arrays
+        fexec.map(
+            map_function=resize_data_array,
+            map_iterdata=data_vars,
+            extra_args=(resize_session, n_timesteps),
+        )
+        resize_arrays_sessions = (
+            fexec.get_result()
+        )  # Wait for resize operations to complete
+        resize_sessions.extend(resize_arrays_sessions)
+    merge_sessions(resize_session, *resize_sessions)
+    resize_commit_id = resize_session.commit(
+        f"Resized time and data arrays for {start_date} to {end_date}"
+    )
+    print(f"Resize commit id: {resize_commit_id}")
+
+    write_session = repo.writable_session("main")
+    with write_session.allow_pickling():
+        # Create tasks using datetime-index pairs
+        tasks = []
+        for var in data_vars:
+            for dt, time_idx in dt_index_pairs:
+                tasks.append(Task(var=var, dt=dt, time_idx=time_idx))
+
         fexec.map(
             map_function=write_data_to_zarr,
             map_iterdata=tasks,
-            extra_args=(group, ds),
-            # reduce_function=commit_to_icechunk,
-            # extra_args_reduce=(session, start_date, end_date),
-            # spawn_reducer=100,
+            extra_args=(write_session, ds),
         )
-        worker_sessions = fexec.get_result()
+        write_sessions = fexec.get_result()
 
-    for worker_session in worker_sessions:
-        session.merge(worker_session)
-    import pdb
-
-    pdb.set_trace()
+    merge_sessions(write_session, *write_sessions)
+    snapshot_id = write_session.commit(f"Wrote data {start_date} to {end_date}")
+    return f"Wrote data to resized arrays, snapshot {snapshot_id}"
 
 
-def test_access(open_or_create_repo: callable):
+def lithops_check_data_store_access(open_or_create_repo: callable):
     repo = open_or_create_repo()
     session = repo.readonly_session("main")
-    with session.allow_pickling():
-        xds = xr.open_dataset(
-            session.store, consolidated=False, zarr_format=3, engine="zarr"
-        )
-        return xds
-    # for snapshot in repo.ancestry(branch="main"):
-    #     # this isn't working to write to STDOUT or the log, not sure why
-    #     logging.info(f"{snapshot.message}, snapshot_id: {snapshot.id}")
-
-
-fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-handler = logging.StreamHandler(sys.stdout)
-logger.addHandler(handler)
+    xds = xr.open_dataset(
+        session.store, consolidated=False, zarr_format=3, engine="zarr"
+    )
+    return (
+        xds["analysed_sst"]
+        .sel(lat=slice(48.5, 48.7), lon=slice(-124.7, -124.5))
+        .mean()
+        .values
+    )
 
 
 # Create a list of date ranges
@@ -324,38 +330,70 @@ date_process_dict = {
 }
 
 test_date_process_dict = {
-    ("2002-07-03", "2002-07-03"): "zarr",
+    ("2002-07-04", "2002-07-04"): "zarr",
 }
 
-for k, v in test_date_process_dict.items():
-    if v == "virtual_dataset":
-        result = lithops_write_virtual_references(start_date=k[0], end_date=k[1])
-        print(result)
-    elif v == "zarr":
-        result = lithops_write_zarr(start_date=k[0], end_date=k[1])
-        print(result)
-
-# Tests access
-# res = fexec.call_async(
-#     func=test_access, data={"open_or_create_repo": open_or_create_repo}
-# ).result()
-# print(res)
+fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)
 
 
-# def list_installed_packages():
-#     import subprocess
-#     import os
+# Wrapper functions for calling lithops
+## Main function - write to icechunk
+def write_to_icechunk():
+    for k, v in test_date_process_dict.items():
+        if v == "virtual_dataset":
+            result = lithops_write_virtual_references(start_date=k[0], end_date=k[1])
+            print(result)
+        elif v == "zarr":
+            result = lithops_write_zarr(start_date=k[0], end_date=k[1])
+            print(result)
+    return "Done"
 
-#     result = subprocess.run(["pwd"], capture_output=True, text=True)
-#     # result = os.getenv("PYTHONPATH", "Variable not set")
-#     # result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-#     #return xr.backends.list_engines()
-#     return result.stdout
+
+## Test data store access
+def check_data_store_access():
+    fexec.call_async(
+        func=lithops_check_data_store_access,
+        data={"open_or_create_repo": open_or_create_repo},
+    )
+    print(fexec.get_result())
 
 
-# fexec.call_async(
-#     list_installed_packages,
-#     data={},
-#     extra_env={'PYTHONPATH': '/var/lang/lib/python3.11/site-packages', 'PATH': '/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin:/opt/conda-env/bin/'}
-# )
-# print(fexec.get_result())
+## For debugging the environment
+def lithops_list_installed_packages():
+    import subprocess
+
+    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
+    return result.stdout
+
+
+def list_installed_packages():
+    fexec.call_async(
+        lithops_list_installed_packages,
+        data={},
+    )
+    print(fexec.get_result())
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run lithops functions.")
+    parser.add_argument(
+        "function",
+        choices=[
+            "write_to_icechunk",
+            "check_data_store_access",
+            "list_installed_packages",
+        ],
+        help="The function to run.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    if args.function == "write_to_icechunk":
+        write_to_icechunk()
+    elif args.function == "check_data_store_access":
+        check_data_store_access()
+    elif args.function == "list_installed_packages":
+        list_installed_packages()

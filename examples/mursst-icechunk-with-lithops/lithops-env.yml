@@ -10,7 +10,7 @@ dependencies:
   - h5py
   - pandas
   - s3fs
-  - boto3
+  - boto3==1.35.99
   - dask
   - distributed
   - pip:
