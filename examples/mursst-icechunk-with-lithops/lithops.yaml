@@ -7,8 +7,8 @@ aws:
 
 aws_lambda:
   execution_role: arn:aws:iam::444055461661:role/veda-data-reader-dev
-  runtime: virtualizarr-runtime
-  runtime_memory: 2000
+  runtime: mursst-runtime
+  runtime_memory: 10240
 
 aws_s3:
   bucket: arn:aws:s3:::nasa-eodc-lithops

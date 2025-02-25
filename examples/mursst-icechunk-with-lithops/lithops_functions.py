@@ -1,6 +1,8 @@
+# Initialize dask config before importing
 import datetime
 import logging
 import sys
+from dataclasses import dataclass
 from typing import List, cast
 
 import boto3
@@ -23,7 +25,7 @@ bucket = "nasa-veda-scratch"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v5"
 
 # TODO:
-# - [ ] test small number of files with virtual refs
+# - [x] test small number of files with virtual refs
 # - [ ] test small number of files with zarr
 # - [ ] estimate memory runtime requirements
 # - [ ] run on larger batches of files
@@ -156,18 +158,29 @@ def lithops_write_virtual_references(start_date: datetime, end_date: datetime):
 
 
 # Zarr functions
-def resize_array(var_name: str, group: zarr.Group, start_date: str, end_date: str):
+def resize_data_array(var_name: str, group: zarr.Group, n_timesteps: int):
+    """Resize a data variable array."""
+    current_shape = group[var_name].shape
+    group[var_name].resize((current_shape[0] + n_timesteps,) + current_shape[1:])
+    return group
+
+
+def handle_time_dimension(group: zarr.Group, start_date: str, end_date: str):
+    """Handle time dimension and return datetime-index pairs."""
     dt_index = pd.date_range(start=start_date, end=end_date, freq="1D")
     n_timesteps = len(dt_index)
-    # current shape
-    current_shape = group[var_name].shape
-    # assumes time is the first dimension, in the future this should be configurable
-    group[var_name].resize((current_shape[0] + n_timesteps,) + current_shape[1:])
-    if var_name == "time":
-        reference_date = pd.Timestamp("1981-01-01 00:00:00")
-        dt_index_seconds_since_1981 = (dt_index - reference_date).total_seconds()
-        group[var_name][-n_timesteps:] = np.int32(dt_index_seconds_since_1981)
-    return dt_index
+    current_time_length = group["time"].shape[0]
+
+    # Resize time array
+    group["time"].resize((current_time_length + n_timesteps,))
+
+    # Update time values
+    reference_date = pd.Timestamp("1981-01-01 00:00:00")
+    dt_index_seconds_since_1981 = (dt_index - reference_date).total_seconds()
+    group["time"][-n_timesteps:] = np.int32(dt_index_seconds_since_1981)
+
+    # Return list of (datetime, index) pairs
+    return (group, [(dt, current_time_length + idx) for idx, dt in enumerate(dt_index)])
 
 
 def map_open_files(file):
@@ -175,7 +188,9 @@ def map_open_files(file):
 
 
 def xarray_open_mfdataset(files):
-    ds = xr.open_mfdataset(files, mask_and_scale=False, drop_variables=drop_vars)
+    ds = xr.open_mfdataset(
+        files, mask_and_scale=False, drop_variables=drop_vars, chunks={}
+    )
     ds["analysed_sst"] = ds["analysed_sst"].chunk({"time": 1, "lat": 1023, "lon": 2047})
     ds["analysis_error"] = ds["analysis_error"].chunk(
         {"time": 1, "lat": 1023, "lon": 2047}
@@ -187,16 +202,20 @@ def xarray_open_mfdataset(files):
     return ds
 
 
-def write_data_to_zarr(
-    task: dict, group: zarr.Group, ds: xr.Dataset, session: icechunk.Session
-):
-    var, dt, time_idx = task["var"], task["datetime"], task["time_idx"]
+@dataclass
+class Task:
+    var: str
+    dt: str
+    time_idx: int
+    session: icechunk.Session
+
+
+def write_data_to_zarr(task: Task, group: zarr.Group, ds: xr.Dataset):
+    var, dt, time_idx, session = task.var, task.dt, task.time_idx, task.session
     data_array = ds[var].sel(time=dt)
-    with session.allow_pickling():
-        group = zarr.group(store=session.store, overwrite=False)
-        current_array = cast(zarr.Array, group[var])
-        current_array[time_idx, :, :] = data_array.values
-    return None
+    current_array = cast(zarr.Array, group[var])
+    current_array[time_idx, :, :] = data_array.values
+    return session
 
 
 def commit_to_icechunk(_, session: icechunk.Session, start_date: str, end_date: str):
@@ -213,63 +232,70 @@ def lithops_write_zarr(start_date: str, end_date: str):
     with session.allow_pickling():
         store = session.store
         group = zarr.group(store=store, overwrite=False)
+        fexec.call_async(
+            handle_time_dimension,
+            data=dict(
+                group=group,
+                start_date=start_date + " 09:00",
+                end_date=end_date + " 09:00",
+            ),
+        )
+        group, dt_index_pairs = fexec.get_result()
+        n_timesteps = len(dt_index_pairs)
 
-    # Resize arrays
-    dt_index = fexec.map(
-        map_function=resize_array,
-        map_iterdata=data_vars + ["time"],
-        extra_args=(
-            group,
-            start_date + " 09:00",
-            end_date + " 09:00",
-        ),  # Pass as tuple for positional args
-    )
-    fexec.get_result()
+    # Then resize data arrays
+    # Unfortunately we can't do this in a map operation because the group needs to be updated in place
+    for var in data_vars:
+        fexec.call_async(
+            resize_data_array,
+            data=dict(var_name=var, group=group, n_timesteps=n_timesteps),
+        )
+        group = fexec.get_result()  # Wait for resize operations to complete
 
     # Open multi-file dataset with xarray
-    ds = fexec.map_reduce(
+    fexec.map_reduce(
         map_function=map_open_files,
         map_iterdata=files,
         reduce_function=xarray_open_mfdataset,
         spawn_reducer=100,
     )
-    fexec.get_result()
+    ds = fexec.get_result()
 
-    # Create a list of tasks to write the data to zarr
-    # Each task has a variable, a datetime, and a time index
+    # Create tasks using datetime-index pairs
     tasks = []
     for var in data_vars:
-        for time_idx, dt in enumerate(dt_index):
-            tasks.append(
-                {
-                    "var": var,
-                    "datetime": dt,
-                    "time_idx": time_idx,
-                }
-            )
+        for dt, time_idx in dt_index_pairs:
+            tasks.append(Task(var=var, dt=dt, time_idx=time_idx, session=session))
 
-    fexec.map_reduce(
-        map_function=write_data_to_zarr,
-        map_iterdata=tasks,
-        extra_args=dict(group=group, ds=ds, session=session),
-        reduce_function=commit_to_icechunk,
-        extra_args_reduce=dict(
-            session=session, start_date=start_date, end_date=end_date
-        ),
-        spawn_reducer=100,
-    )
-    return fexec.get_result()
+    with session.allow_pickling():
+        fexec.map(
+            map_function=write_data_to_zarr,
+            map_iterdata=tasks,
+            extra_args=(group, ds),
+            # reduce_function=commit_to_icechunk,
+            # extra_args_reduce=(session, start_date, end_date),
+            # spawn_reducer=100,
+        )
+        worker_sessions = fexec.get_result()
+
+    for worker_session in worker_sessions:
+        session.merge(worker_session)
+    import pdb
+
+    pdb.set_trace()
 
 
 def test_access(open_or_create_repo: callable):
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    # repo = open_or_create_repo()
-    # session = repo.readonly_session("main")
-    # xds = xr.open_dataset(session.store, consolidated=False, zarr_format=3, engine="zarr")
+    repo = open_or_create_repo()
+    session = repo.readonly_session("main")
+    with session.allow_pickling():
+        xds = xr.open_dataset(
+            session.store, consolidated=False, zarr_format=3, engine="zarr"
+        )
+        return xds
     # for snapshot in repo.ancestry(branch="main"):
     #     # this isn't working to write to STDOUT or the log, not sure why
     #     logging.info(f"{snapshot.message}, snapshot_id: {snapshot.id}")
-    return xr.backends.list_engines()
 
 
 fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)
@@ -298,16 +324,16 @@ date_process_dict = {
 }
 
 test_date_process_dict = {
-    ("2002-07-03", "2002-07-04"): "zarr",
+    ("2002-07-03", "2002-07-03"): "zarr",
 }
 
-# for k, v in test_date_process_dict.items():
-#     if v == "virtual_dataset":
-#         result = lithops_write_virtual_references(start_date=k[0], end_date=k[1])
-#         print(result)
-#     elif v == "zarr":
-#         result = lithops_write_zarr(start_date=k[0], end_date=k[1])
-#         print(result)
+for k, v in test_date_process_dict.items():
+    if v == "virtual_dataset":
+        result = lithops_write_virtual_references(start_date=k[0], end_date=k[1])
+        print(result)
+    elif v == "zarr":
+        result = lithops_write_zarr(start_date=k[0], end_date=k[1])
+        print(result)
 
 # Tests access
 # res = fexec.call_async(
@@ -316,13 +342,20 @@ test_date_process_dict = {
 # print(res)
 
 
-def list_installed_packages():
-    import subprocess
+# def list_installed_packages():
+#     import subprocess
+#     import os
 
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    # xr.backends.list_engines()
-    return result.stdout
+#     result = subprocess.run(["pwd"], capture_output=True, text=True)
+#     # result = os.getenv("PYTHONPATH", "Variable not set")
+#     # result = subprocess.run(["pip", "list"], capture_output=True, text=True)
+#     #return xr.backends.list_engines()
+#     return result.stdout
 
 
-fexec.call_async(list_installed_packages, data={})
-print(fexec.get_result())
+# fexec.call_async(
+#     list_installed_packages,
+#     data={},
+#     extra_env={'PYTHONPATH': '/var/lang/lib/python3.11/site-packages', 'PATH': '/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin:/opt/conda-env/bin/'}
+# )
+# print(fexec.get_result())
