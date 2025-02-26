@@ -46,10 +46,6 @@ ENV PATH="/opt/uv-env/bin:$PATH"
 
 RUN yum install git -y
 
-# Copy and install dependencies from requirements.txt using uv
-COPY requirements.txt /tmp/requirements.txt
-RUN uv pip install -r /tmp/requirements.txt
-
 # Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
 RUN unzip lithops_lambda.zip \
@@ -57,6 +53,10 @@ RUN unzip lithops_lambda.zip \
     && mkdir handler \
     && touch handler/__init__.py \
     && mv entry_point.py handler/
+
+# Copy and install dependencies from requirements.txt using uv
+COPY requirements.txt /tmp/requirements.txt
+RUN uv pip install -u -r /tmp/requirements.txt
 
 # Set Lambda entry point
 CMD [ "handler.entry_point.lambda_handler" ]
