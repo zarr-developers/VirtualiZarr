@@ -7,7 +7,7 @@ aws:
 
 aws_lambda:
   execution_role: arn:aws:iam::444055461661:role/veda-data-reader-dev
-  runtime: mursst-runtime
+  runtime: lithops-virtualizarr-runtime
   runtime_memory: 10240
 
 aws_s3:
