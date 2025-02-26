@@ -11,16 +11,7 @@ by norlandrhagen.
 
 Please, contribute improvements.
 
-1. Set up a Python environment
-
-With micromamba:
-
-```bash
-micromamba create --name virtualizarr-lithops -y python=3.11 -f lithops-env.yml
-micromamba activate virtualizarr-lithops
-```
-
-or with uv:
+1. Set up a Python environment with uv:
 
 ```sh
 uv venv virtualizarr-lithops
@@ -31,14 +22,12 @@ uv pip install -r requirements.txt
 2. Configure compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html).
    The configuration in `lithops.yaml` supports AWS Lambda for compute and AWS S3 for storage.
 
-   ### For AWS Lambda Backend
-
    - Edit `lithops.yaml` and set `backend: aws_lambda`
    - Configure your `bucket` and `execution_role`
    - Build the runtime:
      ```bash
      export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
-     lithops runtime build -b aws_lambda -f Dockerfile mursst-runtime
+     lithops runtime build -b aws_lambda -f Dockerfile virtualizarr-runtime
      ```
 
 3. Test it's working
@@ -50,7 +39,7 @@ python test_lithops.py
 4. Run the script
 
 ```bash
-python virtualizarr-with-lithops.py
+python lithops_functions.py <function_name> --start_date <start_date> --end_date <end_date> --append_dim time
 ```
 
 ## Cleaning up
