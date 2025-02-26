@@ -13,9 +13,19 @@ Please, contribute improvements.
 
 1. Set up a Python environment
 
+With micromamba:
+
 ```bash
 micromamba create --name virtualizarr-lithops -y python=3.11 -f lithops-env.yml
 micromamba activate virtualizarr-lithops
+```
+
+or with uv:
+
+```sh
+uv venv virtualizarr-lithops
+source virtualizarr-lithops/bin/activate
+uv pip install -r requirements.txt
 ```
 
 2. Configure compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html).
