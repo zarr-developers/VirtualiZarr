@@ -7,7 +7,7 @@ aws:
 
 aws_lambda:
   execution_role: arn:aws:iam::444055461661:role/veda-data-reader-dev
-  runtime: virtualizarr-runtime:latest
+  runtime: vz-runtime:latest
   runtime_memory: 10240
   user_id: kuf3 # if the runtime was created with a different IAM identity, this user id will need to be included
   # see aws_lambda.py in lithops
