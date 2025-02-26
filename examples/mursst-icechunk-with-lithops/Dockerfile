@@ -1,49 +1,39 @@
+# Use AWS Lambda base image for Python 3.11
 FROM public.ecr.aws/lambda/python:3.11
 
 ARG FUNCTION_DIR
 
-# Update libs
+# Set working directory
+WORKDIR /var/task
+
+# Update system libraries and install necessary utilities
 RUN yum update -y && \
-    yum install -y wget unzip && \
+    yum install -y wget unzip tar gzip && \
     yum clean all
 
-# Install conda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
-    bash miniconda.sh -b -p /opt/miniconda && \
-    rm miniconda.sh
+# Install uv package manager and move it to /usr/local/bin
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    mv ~/.local/bin/uv /usr/local/bin/uv && \
+    chmod +x /usr/local/bin/uv
 
-COPY lithops-env.yml /tmp/lithops-conda.yml
+# Verify uv installation
+RUN uv --version
 
-# Create conda environment
-RUN /opt/miniconda/bin/conda update -n base -c defaults conda && \
-    /opt/miniconda/bin/conda env create --file /tmp/lithops-conda.yml --prefix /opt/conda-env
+# Create a virtual environment using uv
+RUN uv venv /opt/uv-env
 
-# Install Lithops dependencies
-RUN /opt/conda-env/bin/pip install --upgrade --no-cache-dir --ignore-installed \
-    awslambdaric \
-    boto3 \
-    redis \
-    httplib2 \
-    requests \
-    numpy \
-    scipy \
-    pandas \
-    pika \
-    kafka-python \
-    cloudpickle \
-    ps-mem \
-    tblib \
-    psutil
-
-# Replace python interpreter with conda's
-RUN mv /var/lang/bin/python3.11 /var/lang/bin/python3.11-clean && \
-    ln -sf /opt/conda-env/bin/python /var/lang/bin/python3.11
-
+# Set environment variables for Lambda
 ENV PYTHONPATH="/var/lang/lib/python3.11/site-packages:${FUNCTION_DIR}"
+ENV VIRTUAL_ENV=/opt/uv-env
+ENV PATH="/opt/uv-env/bin:$PATH"
 
-ENV PATH="${PATH}:/opt/conda-env/bin/"
+RUN yum install git -y
 
-# Install lithops
+# Copy and install dependencies from requirements.txt using uv
+COPY requirements.txt /tmp/requirements.txt
+RUN uv pip install -r /tmp/requirements.txt
+
+# Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
 RUN unzip lithops_lambda.zip \
     && rm lithops_lambda.zip \
@@ -51,4 +41,5 @@ RUN unzip lithops_lambda.zip \
     && touch handler/__init__.py \
     && mv entry_point.py handler/
 
+# Set Lambda entry point
 CMD [ "handler.entry_point.lambda_handler" ]
