@@ -33,6 +33,23 @@ RUN yum install git -y
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install -r /tmp/requirements.txt
 
+RUN uv pip install --upgrade --ignore-installed pip wheel six setuptools \
+    && pip install --upgrade --no-cache-dir --ignore-installed \
+    awslambdaric \
+    boto3 \
+    redis \
+    httplib2 \
+    requests \
+    numpy \
+    scipy \
+    pandas \
+    pika \
+    kafka-python \
+    cloudpickle \
+    ps-mem \
+    tblib \
+    psutil
+
 # Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
 RUN unzip lithops_lambda.zip \
