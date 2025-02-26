@@ -51,3 +51,7 @@ To rebuild the Lithops Lambda runtime image, delete the existing one:
 ```bash
 lithops runtime delete -b aws_lambda -d virtualizarr-runtime
 ```
+
+## Troubleshooting
+
+* check the image configured with the lambda, if you keep running into the same error even though you have updated the runtime in ECR, this may be because the image is not getting updated. Sometimes I have to delete the lambda function. I was able to update the lambda configuration in the console to use `:latest` instead of a sha.
