@@ -37,6 +37,7 @@ lon_slice = slice(-124.7, -124.5)
 # - [ ] Write and test with validation function
 # - [ ] estimate time to run + memory requirements for larger batches
 # - [ ] run on larger batches of files
+# - [ ] Nice to have - replace micromamba with uv in Dockerfile for mur sst runtime
 
 
 # NetCDF URL functions
