@@ -33,8 +33,8 @@ RUN yum install git -y
 COPY requirements.txt /tmp/requirements.txt
 RUN uv pip install -r /tmp/requirements.txt
 
-RUN uv pip install --upgrade --ignore-installed pip wheel six setuptools \
-    && pip install --upgrade --no-cache-dir --ignore-installed \
+RUN uv pip install --upgrade pip wheel six setuptools \
+    && uv pip install --upgrade --no-cache-dir \
     awslambdaric \
     boto3 \
     redis \
