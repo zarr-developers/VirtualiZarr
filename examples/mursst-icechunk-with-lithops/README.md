@@ -14,7 +14,7 @@ Please, contribute improvements.
 1. Set up a Python environment with uv:
 
 ```sh
-uv venv virtualizarr-lithops
+uv venv virtualizarr-lithops --python 3.11
 source virtualizarr-lithops/bin/activate
 uv pip install -r requirements.txt
 ```
