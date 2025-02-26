@@ -8,3 +8,4 @@ dask
 distributed
 lithops
 git+https://github.com/zarr-developers/virtualizarr.git@main[icechunk]
+

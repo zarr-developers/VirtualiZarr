@@ -8,7 +8,7 @@ WORKDIR /var/task
 
 # Update system libraries and install necessary utilities
 RUN yum update -y && \
-    yum install -y wget unzip tar gzip && \
+    yum install -y wget unzip tar gzip git && \
     yum clean all
 
 # Install uv package manager and move it to /usr/local/bin
@@ -34,26 +34,14 @@ RUN uv pip install --upgrade pip wheel six setuptools --system \
     cloudpickle \
     ps-mem \
     tblib \
-    psutil \
-    numcodecs \
-    xarray>=2025.1.1 \
-    numcodecs>=0.15.1 \
-    ujson \
-    zarr>=3.0.2
-
-# Create a virtual environment using uv
-RUN uv venv /opt/uv-env
+    psutil
 
 # Set environment variables for Lambda
 ENV PYTHONPATH="/var/lang/lib/python3.11/site-packages:${FUNCTION_DIR}"
-ENV VIRTUAL_ENV=/opt/uv-env
-ENV PATH="/opt/uv-env/bin:$PATH"
-
-RUN yum install git -y
 
 # Copy and install dependencies from requirements.txt using uv
 COPY requirements.txt /tmp/requirements.txt
-RUN uv pip install -r /tmp/requirements.txt
+RUN uv pip install --no-cache-dir -r /tmp/requirements.txt --system
 
 # Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
