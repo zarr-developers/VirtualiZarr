@@ -34,7 +34,12 @@ RUN uv pip install --upgrade pip wheel six setuptools --system \
     cloudpickle \
     ps-mem \
     tblib \
-    psutil
+    psutil \
+    numcodecs \
+    xarray>=2025.1.1 \
+    numcodecs>=0.15.1 \
+    ujson \
+    zarr>=3.0.2
 
 # Create a virtual environment using uv
 RUN uv venv /opt/uv-env
@@ -46,6 +51,10 @@ ENV PATH="/opt/uv-env/bin:$PATH"
 
 RUN yum install git -y
 
+# Copy and install dependencies from requirements.txt using uv
+COPY requirements.txt /tmp/requirements.txt
+RUN uv pip install -r /tmp/requirements.txt
+
 # Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
 RUN unzip lithops_lambda.zip \
@@ -53,10 +62,6 @@ RUN unzip lithops_lambda.zip \
     && mkdir handler \
     && touch handler/__init__.py \
     && mv entry_point.py handler/
-
-# Copy and install dependencies from requirements.txt using uv
-COPY requirements.txt /tmp/requirements.txt
-RUN uv pip install -u -r /tmp/requirements.txt
 
 # Set Lambda entry point
 CMD [ "handler.entry_point.lambda_handler" ]
