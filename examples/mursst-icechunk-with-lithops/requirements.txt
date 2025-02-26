@@ -7,5 +7,5 @@ boto3==1.35.99
 dask
 distributed
 lithops
-git+https://github.com/zarr-developers/virtualizarr.git@main
+numcodecs
 git+https://github.com/zarr-developers/virtualizarr.git@main[icechunk]

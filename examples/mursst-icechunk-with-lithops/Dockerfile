@@ -19,22 +19,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 # Verify uv installation
 RUN uv --version
 
-# Create a virtual environment using uv
-RUN uv venv /opt/uv-env
-
-# Set environment variables for Lambda
-ENV PYTHONPATH="/var/lang/lib/python3.11/site-packages:${FUNCTION_DIR}"
-ENV VIRTUAL_ENV=/opt/uv-env
-ENV PATH="/opt/uv-env/bin:$PATH"
-
-RUN yum install git -y
-
-# Copy and install dependencies from requirements.txt using uv
-COPY requirements.txt /tmp/requirements.txt
-RUN uv pip install -r /tmp/requirements.txt
-
-RUN uv pip install --upgrade pip wheel six setuptools \
-    && uv pip install --upgrade --no-cache-dir \
+RUN uv pip install --upgrade pip wheel six setuptools --system \
+    && uv pip install --upgrade --no-cache-dir --system \
     awslambdaric \
     boto3 \
     redis \
@@ -49,6 +35,20 @@ RUN uv pip install --upgrade pip wheel six setuptools \
     ps-mem \
     tblib \
     psutil
+
+# Create a virtual environment using uv
+RUN uv venv /opt/uv-env
+
+# Set environment variables for Lambda
+ENV PYTHONPATH="/var/lang/lib/python3.11/site-packages:${FUNCTION_DIR}"
+ENV VIRTUAL_ENV=/opt/uv-env
+ENV PATH="/opt/uv-env/bin:$PATH"
+
+RUN yum install git -y
+
+# Copy and install dependencies from requirements.txt using uv
+COPY requirements.txt /tmp/requirements.txt
+RUN uv pip install -r /tmp/requirements.txt
 
 # Copy application code
 COPY lithops_lambda.zip ${FUNCTION_DIR}
