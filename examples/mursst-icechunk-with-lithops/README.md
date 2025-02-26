@@ -27,7 +27,7 @@ uv pip install -r requirements.txt
    - Build the runtime:
      ```bash
      export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
-     lithops runtime build -b aws_lambda -f Dockerfile virtualizarr-runtime
+     lithops runtime build -b aws_lambda -f Dockerfile vz-runtime
      ```
 
 3. Test it's working
