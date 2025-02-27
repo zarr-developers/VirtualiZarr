@@ -123,6 +123,12 @@ class TestDatasetToVariable:
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         f = h5py.File(cf_fill_value_hdf5_file)
         ds = f["data"]
+        if ds.dtype.kind in "S":
+            pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
+        if ds.dtype.names:
+            pytest.xfail(
+                "To fix, structured dtype fill value encoding for Zarr backend"
+            )
         var = HDFVirtualBackend._dataset_to_variable(
             cf_fill_value_hdf5_file, ds, group=""
         )

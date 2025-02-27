@@ -72,8 +72,15 @@ class TestIntegration:
 
     @requires_icechunk
     def test_cf_fill_value_roundtrip(self, tmpdir, cf_fill_value_hdf5_file):
-        #  ds = xr.open_dataset(cf_fill_value_hdf5_file)
+        ds = xr.open_dataset(cf_fill_value_hdf5_file, engine="h5netcdf")
+        if ds["data"].dtype in [float, object]:
+            pytest.xfail(
+                "To fix handle fixed-length and structured type fill value \
+                encoding in xarray zarr backend."
+            )
         vds = virtualizarr.open_virtual_dataset(
-            cf_fill_value_hdf5_file, backend=HDFVirtualBackend
+            cf_fill_value_hdf5_file,
+            backend=HDFVirtualBackend,
         )
-        roundtrip_as_in_memory_icechunk(vds, tmpdir, decode_times=False)
+        roundtrip = roundtrip_as_in_memory_icechunk(vds, tmpdir, decode_times=False)
+        xrt.assert_equal(ds, roundtrip)

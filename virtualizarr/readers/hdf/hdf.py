@@ -252,12 +252,7 @@ class HDFVirtualBackend(VirtualBackend):
                     fillvalue = v.item()
                 else:
                     fillvalue = v
-                if (
-                    fillvalue is not None
-                    and h5obj.dtype.kind not in "S"
-                    and h5obj.dtype.fields is None
-                ):
-                    fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)
+                fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)  # type: ignore[arg-type]
         return fillvalue
 
     @staticmethod
@@ -334,6 +329,7 @@ class HDFVirtualBackend(VirtualBackend):
         cfcodec = cfcodec_from_dataset(dataset)
         attrs = HDFVirtualBackend._extract_attrs(dataset)
         cf_fill_value = HDFVirtualBackend._extract_cf_fill_value(dataset)
+        attrs.pop("_FillValue", None)
 
         if cfcodec:
             codecs.insert(0, cfcodec["codec"])
