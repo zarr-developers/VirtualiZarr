@@ -13,6 +13,7 @@
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/virtualizarr?label=pypi%7Cdownloads)](https://pypistats.org/packages/virtualizarr)
 [![Conda - Downloads](https://img.shields.io/conda/d/conda-forge/virtualizarr
 )](https://anaconda.org/conda-forge/virtualizarr)
+[![slack](https://img.shields.io/badge/slack-virtualizarr-purple.svg?logo=slack)](https://earthmover-community.slack.com/archives/C08EXCE8ZQX)
 
 ## Cloud-Optimize your Scientific Data as Virtual Zarr stores, using xarray syntax.
 
