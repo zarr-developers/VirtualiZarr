@@ -233,6 +233,9 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
 
 @requires_kerchunk
+@pytest.mark.xfail(
+    reason="Test hangs after https://github.com/zarr-developers/VirtualiZarr/pull/420"
+)
 def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     # For now, we raise a NotImplementedError if we read existing references that have inlined data
     # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
