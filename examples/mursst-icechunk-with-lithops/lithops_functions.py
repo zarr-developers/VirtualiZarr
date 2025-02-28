@@ -37,7 +37,7 @@ class Task:
 
 # Reset to a snapshot
 # [print(f"{snapshot.message}, snapshot_id: {snapshot.id}") for snapshot in repo.ancestry(branch="main")]
-# repo.reset_branch("main", "BLAH")
+# repo.reset_branch("main", "F3AJJJDF7A5Q39EJK9T0")
 
 # TODO:
 # - [x] test small number of files with virtual refs
@@ -300,13 +300,28 @@ def lithops_write_zarr(start_date: str, end_date: str):
     snapshot_id = write_session.commit(f"Wrote data {start_date} to {end_date}")
     return f"Wrote data to resized arrays, snapshot {snapshot_id}"
 
-
-def lithops_check_data_store_access(open_or_create_repo: callable, start_date: str, end_date: str):
+def xarray_open_icechunk(open_or_create_repo: callable):
+    # TODO: confirm this makes a difference for xarray
+    zarr.config.set(
+        {
+            "async": {"concurrency": 100, "timeout": None},
+            "threading": {"max_workers": None},
+        }
+    )    
     repo = open_or_create_repo()
     session = repo.readonly_session("main")
-    xds = xr.open_dataset(
+    return xr.open_dataset(
         session.store, consolidated=False, zarr_format=3, engine="zarr"
-    )
+    )    
+
+def lithops_check_data_store_access(open_or_create_repo: callable):  
+    xds = xarray_open_icechunk(open_or_create_repo)
+    return xds['time'][-1]#.__repr__()
+
+def lithops_calc_icechunk_store_mean(
+    open_or_create_repo: callable, start_date: str, end_date: str, lat_slice: tuple, lon_slice: tuple
+):
+    xds = xarray_open_icechunk(open_or_create_repo)
     return xds["analysed_sst"].sel(time=slice(start_date, end_date), lat=lat_slice, lon=lon_slice).mean().values
 
 
@@ -319,7 +334,7 @@ def get_mean(values: np.ndarray):
     return np.nanmean(values)
 
 
-def lithops_check_original_files(
+def lithops_calc_original_files_mean(
     start_date: str, end_date: str, lat_slice: tuple, lon_slice: tuple
 ):
     # map open and read data from selected space and time
@@ -343,7 +358,7 @@ date_process_dict = {
     ("2021-12-24", "2022-01-26"): "zarr",
     ("2022-01-27", "2022-11-08"): "virtual_dataset",
     ("2022-11-09", "2022-11-09"): "zarr",
-    ("2022-11-19", "2023-02-23"): "virtual_dataset",
+    ("2022-11-10", "2023-02-23"): "virtual_dataset",
     ("2023-02-24", "2023-02-28"): "zarr",
     ("2023-03-01", "2023-04-21"): "virtual_dataset",
     ("2023-04-22", "2023-04-22"): "zarr",
@@ -384,17 +399,17 @@ def write_to_icechunk(start_date: str, end_date: str, append_dim: str = None):
 
 
 ## Test data store access
-def check_data_store_access(start_date: str, end_date: str):
+def check_data_store_access():
     fexec.call_async(
         func=lithops_check_data_store_access,
-        data=dict(open_or_create_repo=open_or_create_repo, start_date=start_date, end_date=end_date),
+        data=dict(open_or_create_repo=open_or_create_repo),
     )
     print(fexec.get_result())
 
 
 ## Test original files
-def check_original_files(start_date: str, end_date: str):
-    result = lithops_check_original_files(
+def calc_original_files_mean(start_date: str, end_date: str):
+    result = lithops_calc_original_files_mean(
         start_date=start_date,
         end_date=end_date,
         lat_slice=lat_slice,
@@ -402,6 +417,12 @@ def check_original_files(start_date: str, end_date: str):
     )
     print(result)
 
+def calc_icechunk_store_mean(start_date: str, end_date: str):
+    fexec.call_async(
+        func=lithops_calc_icechunk_store_mean,
+        data=dict(open_or_create_repo=open_or_create_repo, start_date=start_date, end_date=end_date, lat_slice=lat_slice, lon_slice=lon_slice),
+    )
+    print(fexec.get_result())
 
 ## For debugging the environment
 def lithops_list_installed_packages():
@@ -409,7 +430,6 @@ def lithops_list_installed_packages():
 
     result = subprocess.run(["pip", "list"], capture_output=True, text=True)
     return result.stdout
-
 
 def list_installed_packages():
     fexec.call_async(
@@ -426,7 +446,8 @@ def parse_args():
         choices=[
             "write_to_icechunk",
             "check_data_store_access",
-            "check_original_files",
+            "calc_icechunk_store_mean",
+            "calc_original_files_mean",
             "list_installed_packages",
         ],
         help="The function to run.",
@@ -458,8 +479,10 @@ if __name__ == "__main__":
     if args.function == "write_to_icechunk":
         write_to_icechunk(start_date=start_date, end_date=end_date, append_dim=append_dim)
     elif args.function == "check_data_store_access":
-        check_data_store_access(start_date=start_date, end_date=end_date)
-    elif args.function == "check_original_files":
-        check_original_files(start_date=start_date, end_date=end_date)
+        check_data_store_access()
+    elif args.function == "calc_icechunk_store_mean":
+        calc_icechunk_store_mean(start_date=start_date, end_date=end_date)        
+    elif args.function == "calc_original_files_mean":
+        calc_original_files_mean(start_date=start_date, end_date=end_date)
     elif args.function == "list_installed_packages":
         list_installed_packages()
