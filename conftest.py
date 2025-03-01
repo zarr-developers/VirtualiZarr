@@ -103,7 +103,11 @@ def netcdf4_virtual_dataset(netcdf4_file):
 def netcdf4_inlined_ref(netcdf4_file):
     from kerchunk.hdf import SingleHdf5ToZarr
 
-    return SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
+    return SingleHdf5ToZarr(
+        netcdf4_file,
+        inline_threshold=1000,
+        storage_options={"use_listings_cache": False},
+    ).translate()
 
 
 @pytest.fixture
