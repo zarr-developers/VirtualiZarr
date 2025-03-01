@@ -387,7 +387,7 @@ fill_values = [
 
 @pytest.fixture(params=fill_values)
 def cf_fill_value_hdf5_file(tmpdir, request):
-    filepath = f"{tmpdir}/cf_fill_value_{request.param['label']}.nc"
+    filepath = tmp_path / f"cf_fill_value_{request.param['label']}.nc"
     f = h5py.File(filepath, "w")
     dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
     dim_scale = f.create_dataset(
