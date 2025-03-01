@@ -372,18 +372,22 @@ compound_data = np.array(
 compound_fill = (-9999, -9999.0)
 
 fill_values = [
-    {"fill_value": -9999, "data": np.random.randint(0, 10, size=(5))},
-    {"fill_value": -9999.0, "data": np.random.random(5)},
-    {"fill_value": np.nan, "data": np.random.random(5)},
-    {"fill_value": False, "data": np.array([True, False, False, True, True])},
-    {"fill_value": "NaN", "data": np.array(["three"], dtype="S10")},
-    {"fill_value": compound_fill, "data": compound_data},
+    {"label": "int", "fill_value": -9999, "data": np.random.randint(0, 10, size=(5))},
+    {"label": "float", "fill_value": -9999.0, "data": np.random.random(5)},
+    {"label": "npNan", "fill_value": np.nan, "data": np.random.random(5)},
+    {
+        "label": "False",
+        "fill_value": False,
+        "data": np.array([True, False, False, True, True]),
+    },
+    {"label": "NaN", "fill_value": "NaN", "data": np.array(["three"], dtype="S10")},
+    {"label": "compound", "fill_value": compound_fill, "data": compound_data},
 ]
 
 
 @pytest.fixture(params=fill_values)
 def cf_fill_value_hdf5_file(tmpdir, request):
-    filepath = f"{tmpdir}/cf_fill_value.nc"
+    filepath = f"{tmpdir}/cf_fill_value_{request.param['label']}.nc"
     f = h5py.File(filepath, "w")
     dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
     dim_scale = f.create_dataset(
