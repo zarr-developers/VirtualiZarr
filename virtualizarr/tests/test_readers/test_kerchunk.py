@@ -201,7 +201,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         # Test valid json and parquet reference formats
 
         if reference_format == "json":
-            ref_filepath = tmp_path / "ref1.json"
+            ref_filepath = tmp_path / "ref.json"
 
             import ujson
 
@@ -237,7 +237,7 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     # For now, we raise a NotImplementedError if we read existing references that have inlined data
     # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
 
-    ref_filepath = tmp_path / "ref2.json"
+    ref_filepath = tmp_path / "ref.json"
 
     import ujson
 
