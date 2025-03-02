@@ -23,9 +23,10 @@ dependencies = [
     "xarray>=2025.1.1",
     "numpy>=2.0.0",
     "universal-pathlib",
-    "numcodecs",
+    "numcodecs>=0.15.1",
     "ujson",
     "packaging",
+    "zarr>=3.0.2",
 ]
 
 [project.optional-dependencies]
@@ -71,7 +72,7 @@ all_readers = [
 
 # writers
 icechunk = [
-    "icechunk>=0.1.1",
+    "icechunk>=0.2.0",
 ]
 kerchunk = ["fastparquet"]
 all_writers = [

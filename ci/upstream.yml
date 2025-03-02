@@ -13,7 +13,7 @@ dependencies:
   - ujson
   - universal_pathlib
   - hdf5plugin
-  - numcodecs
+  - numcodecs>=0.15.1
   - imagecodecs>=2024.6.1
   # Testing
   - codecov[toml]
@@ -28,7 +28,7 @@ dependencies:
   - pooch
   - fsspec
   - pip
+  - zarr>=3.0.2
   - pip:
-      - git+https://github.com/earth-mover/icechunk.git@main#subdirectory=icechunk-python # Installs zarr-python v3.0.0 as dependency
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1

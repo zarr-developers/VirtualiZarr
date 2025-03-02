@@ -15,7 +15,7 @@ dependencies:
   - universal_pathlib
   - hdf5plugin
   - numcodecs
-  - icechunk>=0.1.1
+  - icechunk>=0.2.0
   # Testing
   - codecov[toml]
   - pre-commit
@@ -36,5 +36,6 @@ dependencies:
   # for opening FITS files
   - astropy
   - pip
+  - zarr>=3.0.2
   - pip:
-    - imagecodecs-numcodecs==2024.6.1
+      - imagecodecs-numcodecs==2024.6.1

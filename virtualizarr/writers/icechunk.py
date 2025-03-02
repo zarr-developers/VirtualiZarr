@@ -16,7 +16,6 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
-from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -194,7 +193,7 @@ def check_compatible_arrays(
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
-    check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
+    check_same_codecs([get_codecs(arr) for arr in arrays])
     check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
@@ -212,8 +211,10 @@ def write_virtual_variable_to_icechunk(
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
 
+    from virtualizarr.codecs import extract_codecs
+
     ma = cast(ManifestArray, var.data)
-    zarray = ma.zarray
+    metadata = ma.metadata
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
@@ -242,16 +243,17 @@ def write_virtual_variable_to_icechunk(
         )
     else:
         append_axis = None
-        # create array if it doesn't already exist
+        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
+        filters, _, compressors = extract_codecs(metadata.codecs)
         arr = group.require_array(
             name=name,
-            shape=zarray.shape,
-            chunks=zarray.chunks,
-            dtype=encode_dtype(zarray.dtype),
-            compressors=zarray._v3_codec_pipeline(),  # compressors,
-            serializer=zarray.serializer(),
+            shape=metadata.shape,
+            chunks=metadata.chunks,
+            dtype=metadata.data_type.to_numpy(),
+            filters=filters,
+            compressors=compressors,
             dimension_names=var.dims,
-            fill_value=zarray.fill_value,
+            fill_value=metadata.fill_value,
         )
 
         arr.update_attributes(
@@ -302,7 +304,10 @@ def write_manifest_virtual_refs(
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
 
-    key_prefix = f"{group.name}/{arr_name}"
+    if group.name == "/":
+        key_prefix = arr_name
+    else:
+        key_prefix = f"{group.name}/{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once

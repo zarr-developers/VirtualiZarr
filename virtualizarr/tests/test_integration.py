@@ -6,10 +6,12 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
+from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
     has_fastparquet,
+    has_icechunk,
     has_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
@@ -18,10 +20,9 @@ from virtualizarr.tests import (
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
-from virtualizarr.zarr import ZArray
 
 
-def test_kerchunk_roundtrip_in_memory_no_concat():
+def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     # Set up example xarray dataset
     chunks_dict = {
         "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -29,15 +30,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat():
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
-        zarray=dict(
-            shape=(2, 4),
-            dtype=np.dtype("<i8"),
-            chunks=(2, 2),
-            compressor=None,
-            filters=None,
-            fill_value=None,
-            order="C",
-        ),
+        metadata=array_v3_metadata(shape=(2, 4), chunks=(2, 4)),
         chunkmanifest=manifest,
     )
     vds = xr.Dataset({"a": (["x", "y"], marr)})
@@ -114,6 +107,21 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
 
 
+def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
+    from icechunk import Repository, Storage
+
+    # create an in-memory icechunk store
+    storage = Storage.new_in_memory()
+    repo = Repository.create(storage=storage)
+    session = repo.writable_session("main")
+
+    # write those references to an icechunk store
+    vds.virtualize.to_icechunk(session.store)
+
+    # read the dataset from icechunk
+    return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
+
+
 @requires_zarr_python
 @pytest.mark.parametrize(
     "roundtrip_func",
@@ -124,6 +132,7 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
             else []
         ),
         *([roundtrip_as_kerchunk_parquet] if has_kerchunk and has_fastparquet else []),
+        *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
     ],
 )
 class TestRoundtrip:
@@ -230,24 +239,25 @@ class TestRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    def test_datetime64_dtype_fill_value(self, tmpdir, roundtrip_func):
+    @pytest.mark.xfail(
+        reason="Datetime and timedelta data types not yet supported by zarr-python 3.0"  # https://github.com/zarr-developers/zarr-python/issues/2616
+    )
+    def test_datetime64_dtype_fill_value(
+        self, tmpdir, roundtrip_func, array_v3_metadata
+    ):
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)
         shape = (1, 1, 1)
-        zarray = ZArray(
-            chunks=chunks,
-            compressor={"id": "zlib", "level": 1},
-            dtype=np.dtype("<M8[ns]"),
-            # fill_value=0.0,
-            filters=None,
-            order="C",
+        metadata = array_v3_metadata(
             shape=shape,
-            zarr_format=2,
+            chunks=chunks,
+            codecs=[ARRAYBYTES_CODEC, ZLIB_CODEC],
+            data_type=np.dtype("M8[ns]"),
         )
-        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
         vds = xr.Dataset(
             {
                 "a": xr.DataArray(
