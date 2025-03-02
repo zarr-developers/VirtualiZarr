@@ -13,7 +13,7 @@ dependencies:
   - ujson
   - universal_pathlib
   - hdf5plugin
-  - numcodecs
+  - numcodecs>=0.15.1
   - imagecodecs>=2024.6.1
   # Testing
   - codecov[toml]
@@ -28,7 +28,7 @@ dependencies:
   - pooch
   - fsspec
   - pip
-  - icechunk>=0.2.0
+  - zarr>=3.0.2
   - pip:
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1

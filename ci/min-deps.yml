@@ -6,9 +6,9 @@ dependencies:
   - h5py
   - hdf5
   - netcdf4
-  - xarray>=2024.10.0
+  - xarray>=2025.1.1
   - numpy>=2.0.0
-  - numcodecs
+  - numcodecs>=0.15.1
   - packaging
   - ujson
   - universal_pathlib
@@ -23,3 +23,4 @@ dependencies:
   - pytest
   - pooch
   - fsspec
+  - zarr>=3.0.2
