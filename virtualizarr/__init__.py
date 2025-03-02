@@ -1,6 +1,7 @@
 from virtualizarr.manifests import ChunkManifest, ManifestArray  # type: ignore # noqa
 from virtualizarr.accessor import VirtualiZarrDatasetAccessor  # type: ignore # noqa
 from virtualizarr.backend import open_virtual_dataset  # noqa: F401
+from virtualizarr.store import ManifestStore
 
 from importlib.metadata import version as _version
 
