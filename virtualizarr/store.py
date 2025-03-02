@@ -13,7 +13,9 @@ from virtualizarr.manifests import ManifestArray
 def validate_dataset_is_fully_virtual(vds: xr.Dataset) -> None:
     for name, var in vds.variables.items():
         if not isinstance(var.data, ManifestArray):
-            raise TypeError(f"All variables in the dataset must be virtual, but variable {name} is of type {type(var.data)}, not type `ManifestArray`")
+            raise TypeError(
+                f"All variables in the dataset must be virtual, but variable {name} is of type {type(var.data)}, not type `ManifestArray`"
+            )
 
 
 class ManifestStore(Store):
@@ -27,7 +29,6 @@ class ManifestStore(Store):
     vds: xr.Dataset
 
     def __init__(self, fs, vds, read_only=True):
-
         # TODO do we need to specify that this is v3 only?
 
         super().__init__(read_only=read_only)
@@ -67,12 +68,11 @@ class ManifestStore(Store):
         prototype: BufferPrototype,
         byte_range: None = None,  # could this optionally accept a RangeByteRequest?
     ) -> Buffer | None:
-        
         if not self._is_open:
             await self._open()
 
-        if key.endswith('zarr.json'):
-            array_path = key.removesuffix('zarr.json')
+        if key.endswith("zarr.json"):
+            array_path = key.removesuffix("zarr.json")
             metadata = self.get_array_metadata(array_path)
             # I don't understand why there is a single-element dict to unpack here...
             return metadata.to_buffer_dict["zarr.json"]
@@ -92,8 +92,8 @@ class ManifestStore(Store):
         return value
 
     def get_array_metadata(self, array_path: str) -> ArrayV3Metadata:
-        *groups, array_name = array_path.split('/')
-        
+        *groups, array_name = array_path.split("/")
+
         if groups:
             # TODO support groups via dict[path, Dataset]
             raise NotImplementedError()

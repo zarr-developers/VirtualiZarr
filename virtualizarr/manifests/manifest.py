@@ -13,7 +13,6 @@ from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 
-
 from virtualizarr.types import ChunkKey
 
 _INTEGER = (
