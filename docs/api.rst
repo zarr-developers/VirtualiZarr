@@ -84,3 +84,16 @@ VirtualiZarr's :py:class:`~virtualizarr.ManifestArray` objects support a limited
     stack
     expand_dims
     broadcast_to
+
+Store
+-----
+
+VirtualiZarr's :py:class:`~virtualizarr.ManifestStore` class is a zarr-python compliant zarr store implementation.
+It is useful for loading specific variables into memory as via `xarray.open_zarr`.
+
+.. currentmodule:: virtualizarr.store
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    ManifestStore

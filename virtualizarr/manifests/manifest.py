@@ -1,6 +1,12 @@
 import json
 import re
-from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
+from collections.abc import (
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    ValuesView,
+)
 from pathlib import PosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
