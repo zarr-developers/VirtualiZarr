@@ -1,5 +1,6 @@
 Release notes
 =============
+
 .. _v1.3.2:
 
 v1.3.2 (unreleased)
@@ -10,6 +11,9 @@ New Features
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
+
+- Minimum supported version of Icechunk is now `v0.2.4` (:pull:`462`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -32,6 +36,7 @@ v1.3.1 (18th Feb 2025)
 
 New Features
 ~~~~~~~~~~~~
+
 - Examples use new Icechunk syntax
 
 Breaking changes
