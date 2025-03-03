@@ -31,7 +31,7 @@ authors:
     orcid: https://orcid.org/0000-0002-4120-3192
     affiliation: 5
   - name: Ayush Nag
-    orcid: 0000-0000-0000-0000
+    orcid: https://orcid.org/0009-0008-1790-597X
     affiliation: "6, 7"
   - name: Gustavo Hidalgo
     orcid: 0000-0000-0000-0000
