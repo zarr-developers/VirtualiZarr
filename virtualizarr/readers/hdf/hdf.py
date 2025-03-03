@@ -8,11 +8,13 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Tuple,
     Union,
 )
 
 import numpy as np
 import xarray as xr
+from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -39,6 +41,20 @@ if TYPE_CHECKING:
 else:
     H5Dataset: Any = None
     H5Group: Any = None
+
+FillValueType = Union[
+    int,
+    float,
+    bool,
+    complex,
+    str,
+    np.integer,
+    np.floating,
+    np.bool_,
+    np.complexfloating,
+    bytes,  # For fixed-length string storage
+    Tuple[bytes, int],  # Structured type
+]
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -217,6 +233,29 @@ class HDFVirtualBackend(VirtualBackend):
         return [dim.removeprefix(group) for dim in dims]
 
     @staticmethod
+    def _extract_cf_fill_value(
+        h5obj: Union[H5Dataset, H5Group],
+    ) -> Optional[FillValueType]:
+        """
+        Convert the _FillValue attribute from an HDF5 group or dataset into
+        encoding.
+
+        Parameters
+        ----------
+        h5obj : h5py.Group or h5py.Dataset
+            An h5py group or dataset.
+        """
+        fillvalue = None
+        for n, v in h5obj.attrs.items():
+            if n == "_FillValue":
+                if isinstance(v, np.ndarray) and v.size == 1:
+                    fillvalue = v.item()
+                else:
+                    fillvalue = v
+                fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)  # type: ignore[arg-type]
+        return fillvalue
+
+    @staticmethod
     def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
         """
         Extract attributes from an HDF5 group or dataset.
@@ -240,14 +279,14 @@ class HDFVirtualBackend(VirtualBackend):
         for n, v in h5obj.attrs.items():
             if n in _HIDDEN_ATTRS:
                 continue
+            if n == "_FillValue":
+                continue
             # Fix some attribute values to avoid JSON encoding exceptions...
             if isinstance(v, bytes):
                 v = v.decode("utf-8") or " "
             elif isinstance(v, (np.ndarray, np.number, np.bool_)):
                 if v.dtype.kind == "S":
                     v = v.astype(str)
-                if n == "_FillValue":
-                    continue
                 elif v.size == 1:
                     v = v.flatten()[0]
                     if isinstance(v, (np.ndarray, np.number, np.bool_)):
@@ -258,7 +297,6 @@ class HDFVirtualBackend(VirtualBackend):
                 v = ""
             if v == "DIMENSION_SCALE":
                 continue
-
             attrs[n] = v
         return attrs
 
@@ -290,21 +328,19 @@ class HDFVirtualBackend(VirtualBackend):
         codecs = codecs_from_dataset(dataset)
         cfcodec = cfcodec_from_dataset(dataset)
         attrs = HDFVirtualBackend._extract_attrs(dataset)
+        cf_fill_value = HDFVirtualBackend._extract_cf_fill_value(dataset)
+        attrs.pop("_FillValue", None)
+
         if cfcodec:
             codecs.insert(0, cfcodec["codec"])
             dtype = cfcodec["target_dtype"]
             attrs.pop("scale_factor", None)
             attrs.pop("add_offset", None)
-            fill_value = cfcodec["codec"].decode(dataset.fillvalue)
         else:
             dtype = dataset.dtype
-            fill_value = dataset.fillvalue
-        if isinstance(fill_value, np.ndarray):
-            fill_value = fill_value[0]
-        if np.isnan(fill_value):
-            fill_value = float("nan")
-        if isinstance(fill_value, np.generic):
-            fill_value = fill_value.item()
+
+        fill_value = dataset.fillvalue.item()
+
         filters = [codec.get_config() for codec in codecs]
         zarray = ZArray(
             chunks=chunks,  # type: ignore
@@ -323,6 +359,8 @@ class HDFVirtualBackend(VirtualBackend):
             variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
         else:
             variable = xr.Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)
+        if cf_fill_value is not None:
+            variable.encoding["_FillValue"] = cf_fill_value
         return variable
 
     @staticmethod
