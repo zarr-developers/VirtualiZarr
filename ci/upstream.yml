@@ -28,7 +28,7 @@ dependencies:
   - pooch
   - fsspec
   - pip
-  - icechunk>=0.2.0
+  - icechunk>=0.2.4
   - pip:
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1
