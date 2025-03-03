@@ -6,7 +6,7 @@ Release notes
 v1.3.2 (3rd Mar 2025)
 ---------------------
 
-Small release which fixes a problem causing the docs to be out of date, but also increases the performance of writing large numbers of virtual references to Icechunk!
+Small release which fixes a problem causing the docs to be out of date, fixes some issues in the tests with unclosed file handles, but also increases the performance of writing large numbers of virtual references to Icechunk!
 
 New Features
 ~~~~~~~~~~~~
