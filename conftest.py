@@ -61,7 +61,7 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_files_factory(tmp_path: Path) -> Callable:
+def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
     def create_netcdf4_files(
         encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> tuple[str, str]:
@@ -96,7 +96,8 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr import open_virtual_dataset
 
-    return open_virtual_dataset(netcdf4_file, indexes={})
+    with open_virtual_dataset(netcdf4_file, indexes={}) as ds:
+        yield ds
 
 
 @pytest.fixture
