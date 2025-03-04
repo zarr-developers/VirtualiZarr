@@ -1,8 +1,7 @@
 import time
 from datetime import datetime, timedelta, timezone
-from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import pytest
 
@@ -17,7 +16,6 @@ from zarr.core.metadata import ArrayV3Metadata
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.writers.icechunk import generate_chunk_key
-from virtualizarr.zarr import ZArray
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
@@ -103,7 +101,7 @@ def test_write_new_virtual_variable(
 
 
 def test_set_single_virtual_ref_without_encoding(
-    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path
+    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path, array_v3_metadata
 ):
     import xarray.testing as xrt
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
@@ -113,17 +111,14 @@ def test_set_single_virtual_ref_without_encoding(
     manifest = ChunkManifest(
         {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
     )
-    zarray = ZArray(
+    metadata = array_v3_metadata(
         shape=(3, 4),
         chunks=(3, 4),
-        dtype=np.dtype("int32"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
+        codecs=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
-        zarray=zarray,
+        metadata=metadata,
     )
     foo = xr.Variable(data=ma, dims=["x", "y"])
     vds = xr.Dataset(
@@ -152,7 +147,7 @@ def test_set_single_virtual_ref_without_encoding(
 
 
 def test_set_single_virtual_ref_with_encoding(
-    icechunk_filestore: "IcechunkStore", netcdf4_file: Path
+    icechunk_filestore: "IcechunkStore", netcdf4_file: Path, array_v3_metadata
 ):
     import xarray.testing as xrt
 
@@ -164,17 +159,15 @@ def test_set_single_virtual_ref_with_encoding(
         manifest = ChunkManifest(
             {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
         )
-        zarray = ZArray(
+        metadata = array_v3_metadata(
             shape=(2920, 25, 53),
             chunks=(2920, 25, 53),
-            dtype=np.dtype("int16"),
-            compressor=None,
-            filters=None,
-            fill_value=None,
+            codecs=None,
+            data_type=np.dtype("int16"),
         )
         ma = ManifestArray(
             chunkmanifest=manifest,
-            zarray=zarray,
+            metadata=metadata,
         )
         air = xr.Variable(
             data=ma,
@@ -214,7 +207,9 @@ def test_set_single_virtual_ref_with_encoding(
     # them now.
 
 
-def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file: Path):
+def test_set_grid_virtual_refs(
+    icechunk_filestore: "IcechunkStore", netcdf4_file: Path, array_v3_metadata
+):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
@@ -231,17 +226,14 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
             "1.1": {"path": netcdf4_file, "offset": 248, "length": 16},
         }
     )
-    zarray = ZArray(
+    metadata = array_v3_metadata(
         shape=(4, 4),
         chunks=(2, 2),
-        dtype=np.dtype("<i4"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
+        codecs=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
-        zarray=zarray,
+        metadata=metadata,
     )
     air = xr.Variable(data=ma, dims=["y", "x"])
     vds = xr.Dataset(
@@ -277,22 +269,20 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", netcdf4_file
 def test_write_loadable_variable(
     icechunk_filestore: "IcechunkStore",
     simple_netcdf4: Path,
+    array_v3_metadata,
 ):
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
         {"0.0": {"path": str(simple_netcdf4), "offset": 6144, "length": 48}}
     )
-    zarray = ZArray(
+    metadata = array_v3_metadata(
         shape=(3, 4),
         chunks=(3, 4),
-        dtype=np.dtype("int32"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
+        codecs=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
-        zarray=zarray,
+        metadata=metadata,
     )
 
     ma_v = xr.Variable(data=ma, dims=["x", "y"])
@@ -330,6 +320,7 @@ def test_write_loadable_variable(
 def test_checksum(
     icechunk_filestore: "IcechunkStore",
     tmpdir: Path,
+    array_v3_metadata,
 ):
     from icechunk import IcechunkError
 
@@ -343,17 +334,14 @@ def test_checksum(
     manifest = ChunkManifest(
         {"0.0": {"path": str(netcdf_path), "offset": 6144, "length": 48}}
     )
-    zarray = ZArray(
+    metadata = array_v3_metadata(
         shape=(3, 4),
         chunks=(3, 4),
-        dtype=np.dtype("int32"),
-        compressor=None,
-        filters=None,
-        fill_value=None,
+        codecs=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
-        zarray=zarray,
+        metadata=metadata,
     )
 
     ma_v = xr.Variable(data=ma, dims=["x", "y"])
@@ -436,110 +424,6 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
         generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
 
 
-def generate_chunk_manifest(
-    netcdf4_file: str,
-    shape: tuple[int, ...],
-    chunks: tuple[int, ...],
-    offset=6144,
-    length=48,
-) -> ChunkManifest:
-    chunk_dict = {}
-    num_chunks = [shape[i] // chunks[i] for i in range(len(shape))]
-    offset = offset
-
-    # Generate all possible chunk indices using Cartesian product
-    for chunk_indices in product(*[range(n) for n in num_chunks]):
-        chunk_index = ".".join(map(str, chunk_indices))
-        chunk_dict[chunk_index] = {
-            "path": netcdf4_file,
-            "offset": offset,
-            "length": length,
-        }
-        offset += length  # Increase offset for each chunk
-
-    return ChunkManifest(chunk_dict)
-
-
-def gen_virtual_variable(
-    file_uri: str,
-    shape: tuple[int, ...] = (3, 4),
-    chunk_shape: tuple[int, ...] = (3, 4),
-    dtype: np.dtype = np.dtype("int32"),
-    compressor: Optional[dict] = None,
-    filters: Optional[list[dict[Any, Any]]] = None,
-    fill_value: Optional[str] = None,
-    encoding: Optional[dict] = None,
-    offset: int = 6144,
-    length: int = 48,
-    dims: list[str] = [],
-    zarr_format: Literal[2, 3] = 2,
-    attrs: dict[str, Any] = {},
-) -> xr.Variable:
-    manifest = generate_chunk_manifest(
-        file_uri,
-        shape=shape,
-        chunks=chunk_shape,
-        offset=offset,
-        length=length,
-    )
-    zarray = ZArray(
-        shape=shape,
-        chunks=chunk_shape,
-        dtype=dtype,
-        compressor=compressor,
-        filters=filters,
-        fill_value=fill_value,
-        zarr_format=zarr_format,
-    )
-    ma = ManifestArray(chunkmanifest=manifest, zarray=zarray)
-    return xr.Variable(
-        data=ma,
-        dims=dims,
-        encoding=encoding,
-        attrs=attrs,
-    )
-
-
-def gen_virtual_dataset(
-    file_uri: str,
-    shape: tuple[int, ...] = (3, 4),
-    chunk_shape: tuple[int, ...] = (3, 4),
-    dtype: np.dtype = np.dtype("int32"),
-    compressor: Optional[dict] = None,
-    filters: Optional[list[dict[Any, Any]]] = None,
-    fill_value: Optional[str] = None,
-    encoding: Optional[dict] = None,
-    variable_name: str = "foo",
-    offset: int = 6144,
-    length: int = 48,
-    dims: Optional[list[str]] = None,
-    zarr_format: Literal[2, 3] = 2,
-    coords: Optional[xr.Coordinates] = None,
-) -> xr.Dataset:
-    with xr.open_dataset(file_uri) as ds:
-        var = gen_virtual_variable(
-            file_uri,
-            shape=shape,
-            chunk_shape=chunk_shape,
-            dtype=dtype,
-            compressor=compressor,
-            filters=filters,
-            fill_value=fill_value,
-            encoding=encoding,
-            offset=offset,
-            length=length,
-            dims=dims or [str(name) for name in ds.dims],
-            zarr_format=zarr_format,
-            attrs=ds[variable_name].attrs,
-        )
-
-        return xr.Dataset(
-            {variable_name: var},
-            coords=coords,
-            attrs=ds.attrs,
-        )
-
-
 class TestAppend:
     """
     Tests for appending to existing icechunk store.
@@ -548,12 +432,15 @@ class TestAppend:
     # Success cases
     ## When appending to a single virtual ref without encoding, it succeeds
     def test_append_virtual_ref_without_encoding(
-        self, icechunk_repo: "Repository", simple_netcdf4: str
+        self,
+        icechunk_repo: "Repository",
+        simple_netcdf4: str,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
         # generate virtual dataset
-        vds = gen_virtual_dataset(file_uri=simple_netcdf4)
+        vds = virtual_dataset(file_uri=simple_netcdf4)
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.virtualize.to_icechunk(writable_session.store)
@@ -581,16 +468,18 @@ class TestAppend:
             xrt.assert_identical(array, expected_array)
 
     def test_append_virtual_ref_with_encoding(
-        self, icechunk_repo: "Repository", netcdf4_files_factory: Callable
+        self,
+        icechunk_repo: "Repository",
+        netcdf4_files_factory: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
-
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -601,7 +490,7 @@ class TestAppend:
                 offset=15419,
                 length=15476000,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -641,7 +530,11 @@ class TestAppend:
     ## When appending to a virtual ref with encoding, it succeeds
     @pytest.mark.asyncio
     async def test_append_with_multiple_root_arrays(
-        self, icechunk_repo: "Repository", netcdf4_files_factory: Callable
+        self,
+        icechunk_repo: "Repository",
+        netcdf4_files_factory: Callable,
+        virtual_variable: Callable,
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
         from zarr.core.buffer import default_buffer_prototype
@@ -650,7 +543,7 @@ class TestAppend:
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
         )
 
-        lon_manifest = gen_virtual_variable(
+        lon_manifest = virtual_variable(
             filepath1,
             shape=(53,),
             chunk_shape=(53,),
@@ -659,7 +552,7 @@ class TestAppend:
             length=212,
             dims=["lon"],
         )
-        lat_manifest = gen_virtual_variable(
+        lat_manifest = virtual_variable(
             filepath1,
             shape=(25,),
             chunk_shape=(25,),
@@ -675,7 +568,7 @@ class TestAppend:
             "calendar": "standard",
         }
         time_manifest1, time_manifest2 = [
-            gen_virtual_variable(
+            virtual_variable(
                 filepath,
                 shape=(1460,),
                 chunk_shape=(1460,),
@@ -696,7 +589,7 @@ class TestAppend:
             for time_manifest in [time_manifest1, time_manifest2]
         ]
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -707,7 +600,7 @@ class TestAppend:
                 length=15476000,
                 coords=coords1,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
@@ -750,12 +643,11 @@ class TestAppend:
             xrt.assert_equal(ds, expected_ds)
 
     # When appending to a virtual ref with compression, it succeeds
-    @pytest.mark.parametrize("zarr_format", [2, 3])
     def test_append_with_compression_succeeds(
         self,
         icechunk_repo: "Repository",
         netcdf4_files_factory: Callable,
-        zarr_format: Literal[2, 3],
+        virtual_dataset: Callable,
     ):
         import xarray.testing as xrt
 
@@ -770,29 +662,33 @@ class TestAppend:
         file1, file2 = netcdf4_files_factory(encoding=encoding)
         # Generate compressed dataset
         vds1, vds2 = (
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=file1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
-                compressor={"id": "zlib", "level": 4},
+                codecs=[
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
+                ],
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 offset=18043,
                 length=3936114,
-                zarr_format=zarr_format,
             ),
-            gen_virtual_dataset(
+            virtual_dataset(
                 file_uri=file2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
-                compressor={"id": "zlib", "level": 4},
+                codecs=[
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
+                ],
                 dims=["time", "lat", "lon"],
                 dtype=np.dtype("float64"),
                 variable_name="air",
                 offset=18043,
                 length=3938672,
-                zarr_format=zarr_format,
             ),
         )
 
@@ -818,10 +714,13 @@ class TestAppend:
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
-        self, icechunk_repo: "Repository", simple_netcdf4: str
+        self,
+        icechunk_repo: "Repository",
+        simple_netcdf4: str,
+        virtual_dataset: Callable,
     ):
         # Generate a virtual dataset with specific chunking
-        vds = gen_virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
+        vds = virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
 
         # Commit the dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -829,7 +728,7 @@ class TestAppend:
         icechunk_filestore.commit("test commit")
 
         # Try to append dataset with different chunking, expect failure
-        vds_different_chunking = gen_virtual_dataset(
+        vds_different_chunking = virtual_dataset(
             file_uri=simple_netcdf4, chunk_shape=(1, 1)
         )
         icechunk_filestore_append = icechunk_repo.writable_session("main")
@@ -842,15 +741,14 @@ class TestAppend:
 
     ## When encoding is different it fails
     def test_append_with_different_encoding_fails(
-        self, icechunk_repo: "Repository", simple_netcdf4: str
+        self,
+        icechunk_repo: "Repository",
+        simple_netcdf4: str,
+        virtual_dataset: Callable,
     ):
         # Generate datasets with different encoding
-        vds1 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, encoding={"scale_factor": 0.1}
-        )
-        vds2 = gen_virtual_dataset(
-            file_uri=simple_netcdf4, encoding={"scale_factor": 0.01}
-        )
+        vds1 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.1})
+        vds2 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.01})
 
         # Commit the first dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -866,15 +764,18 @@ class TestAppend:
             vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="x")
 
     def test_dimensions_do_not_align(
-        self, icechunk_repo: "Repository", simple_netcdf4: str
+        self,
+        icechunk_repo: "Repository",
+        simple_netcdf4: str,
+        virtual_dataset: Callable,
     ):
         # Generate datasets with different lengths on the non-append dimension (x)
-        vds1 = gen_virtual_dataset(
+        vds1 = virtual_dataset(
             # {'x': 5, 'y': 4}
             file_uri=simple_netcdf4,
             shape=(5, 4),
         )
-        vds2 = gen_virtual_dataset(
+        vds2 = virtual_dataset(
             # {'x': 6, 'y': 4}
             file_uri=simple_netcdf4,
             shape=(6, 4),
@@ -891,12 +792,15 @@ class TestAppend:
             vds2.virtualize.to_icechunk(icechunk_filestore_append.store, append_dim="y")
 
     def test_append_dim_not_in_dims_raises_error(
-        self, icechunk_repo: "Repository", simple_netcdf4: str
+        self,
+        icechunk_repo: "Repository",
+        simple_netcdf4: str,
+        virtual_dataset: Callable,
     ):
         """
         Test that attempting to append with an append_dim not present in dims raises a ValueError.
         """
-        vds = gen_virtual_dataset(
+        vds = virtual_dataset(
             file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
         )
 
