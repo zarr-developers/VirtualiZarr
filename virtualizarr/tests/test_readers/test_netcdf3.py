@@ -1,17 +1,15 @@
-import pytest
+import numpy as np
 import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_scipy
+from virtualizarr.zarr import ZArray
 
 
 @requires_scipy
-@pytest.mark.xfail(
-    reason="Big endian not yet supported by zarr-python 3.0"
-)  # https://github.com/zarr-developers/zarr-python/issues/2324
-def test_read_netcdf3(netcdf3_file, array_v3_metadata):
+def test_read_netcdf3(netcdf3_file):
     filepath = str(netcdf3_file)
     vds = open_virtual_dataset(filepath)
 
@@ -22,8 +20,8 @@ def test_read_netcdf3(netcdf3_file, array_v3_metadata):
     expected_manifest = ChunkManifest(
         entries={"0": {"path": filepath, "offset": 80, "length": 12}}
     )
-    metadata = array_v3_metadata(shape=(3,), chunks=(3,))
-    expected_ma = ManifestArray(chunkmanifest=expected_manifest, metadata=metadata)
+    expected_zarray = ZArray(dtype=np.dtype(">i4"), shape=(3,), chunks=(3,))
+    expected_ma = ManifestArray(chunkmanifest=expected_manifest, zarray=expected_zarray)
     expected_vds = xr.Dataset({"foo": xr.Variable(data=expected_ma, dims=["x"])})
 
     xrt.assert_identical(vds, expected_vds)

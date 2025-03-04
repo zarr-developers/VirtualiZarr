@@ -6,7 +6,6 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
-from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
@@ -20,9 +19,10 @@ from virtualizarr.tests import (
 from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
+from virtualizarr.zarr import ZArray
 
 
-def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
+def test_kerchunk_roundtrip_in_memory_no_concat():
     # Set up example xarray dataset
     chunks_dict = {
         "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -30,7 +30,15 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     }
     manifest = ChunkManifest(entries=chunks_dict)
     marr = ManifestArray(
-        metadata=array_v3_metadata(shape=(2, 4), chunks=(2, 4)),
+        zarray=dict(
+            shape=(2, 4),
+            dtype=np.dtype("<i8"),
+            chunks=(2, 2),
+            compressor=None,
+            filters=None,
+            fill_value=None,
+            order="C",
+        ),
         chunkmanifest=manifest,
     )
     vds = xr.Dataset({"a": (["x", "y"], marr)})
@@ -239,25 +247,30 @@ class TestRoundtrip:
         for coord in ds.coords:
             assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    @pytest.mark.xfail(
-        reason="Datetime and timedelta data types not yet supported by zarr-python 3.0"  # https://github.com/zarr-developers/zarr-python/issues/2616
-    )
-    def test_datetime64_dtype_fill_value(
-        self, tmpdir, roundtrip_func, array_v3_metadata
-    ):
+    def test_datetime64_dtype_fill_value(self, tmpdir, roundtrip_func):
+        if "icechunk" in roundtrip_func.__name__:
+            pytest.xfail(
+                "zarr 3 does not support datetimes yet "
+                "https://github.com/zarr-developers/zarr-python/issues/2616"
+            )
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
         chunks = (1, 1, 1)
         shape = (1, 1, 1)
-        metadata = array_v3_metadata(
-            shape=shape,
+        zarray = ZArray(
             chunks=chunks,
-            codecs=[ARRAYBYTES_CODEC, ZLIB_CODEC],
-            data_type=np.dtype("M8[ns]"),
+            compressor={"id": "zlib", "level": 1},
+            dtype=np.dtype("<M8[ns]"),
+            # fill_value=0.0,
+            filters=None,
+            order="C",
+            shape=shape,
+            zarr_format=2,
         )
-        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest)
         vds = xr.Dataset(
             {
                 "a": xr.DataArray(

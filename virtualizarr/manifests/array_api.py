@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
 
-from virtualizarr.utils import determine_chunk_grid_shape
+from virtualizarr.zarr import determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 from .utils import (
@@ -10,7 +10,6 @@ from .utils import (
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
-    copy_and_replace_metadata,
 )
 
 if TYPE_CHECKING:
@@ -54,7 +53,6 @@ def concatenate(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.concat`.
     """
-
     from .array import ManifestArray
 
     if axis is None:
@@ -102,11 +100,12 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    new_metadata = copy_and_replace_metadata(
-        old_metadata=first_arr.metadata, new_shape=new_shape
+    # chunk shape has not changed, there are just now more chunks along the concatenation axis
+    new_zarray = first_arr.zarray.replace(
+        shape=tuple(new_shape),
     )
 
-    return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
+    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
 
 
 @implements(np.stack)
@@ -121,7 +120,6 @@ def stack(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.stack`.
     """
-
     from .array import ManifestArray
 
     if not isinstance(axis, int):
@@ -172,11 +170,12 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_metadata = copy_and_replace_metadata(
-        old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
+    new_zarray = first_arr.zarray.replace(
+        chunks=tuple(new_chunks),
+        shape=tuple(new_shape),
     )
 
-    return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
+    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
 
 
 @implements(np.expand_dims)
@@ -237,13 +236,12 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_metadata = copy_and_replace_metadata(
-        old_metadata=x.metadata,
-        new_shape=list(new_shape),
-        new_chunks=list(new_chunk_shape),
+    new_zarray = x.zarray.replace(
+        chunks=new_chunk_shape,
+        shape=new_shape,
     )
 
-    return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:

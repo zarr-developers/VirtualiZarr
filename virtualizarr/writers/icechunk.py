@@ -16,6 +16,7 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
+from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -193,7 +194,7 @@ def check_compatible_arrays(
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
-    check_same_codecs([get_codecs(arr) for arr in arrays])
+    check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
     check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
@@ -211,10 +212,8 @@ def write_virtual_variable_to_icechunk(
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
 
-    from virtualizarr.codecs import extract_codecs
-
     ma = cast(ManifestArray, var.data)
-    metadata = ma.metadata
+    zarray = ma.zarray
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
@@ -243,17 +242,21 @@ def write_virtual_variable_to_icechunk(
         )
     else:
         append_axis = None
-        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
-        filters, _, compressors = extract_codecs(metadata.codecs)
+
+        # Get the codecs and convert them to zarr v3 format
+        codecs = zarray._v3_codecs()
+
+        # create array if it doesn't already exist
         arr = group.require_array(
             name=name,
-            shape=metadata.shape,
-            chunks=metadata.chunks,
-            dtype=metadata.data_type.to_numpy(),
-            filters=filters,
-            compressors=compressors,
+            shape=zarray.shape,
+            chunks=zarray.chunks,
+            dtype=encode_dtype(zarray.dtype),
+            compressors=codecs.compressors,
+            serializer=codecs.serializer,
+            filters=codecs.filters,
             dimension_names=var.dims,
-            fill_value=metadata.fill_value,
+            fill_value=zarray.fill_value,
         )
 
         arr.update_attributes(
