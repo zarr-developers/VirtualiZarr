@@ -70,7 +70,7 @@ python main.py <function> [options]
 
 Available functions:
 
-- `write_to_icechunk`: Write data to IceChunk
+- `write_to_icechunk`: Write data to Icechunk
 - `check_data_store_access`: Check access to the data store
 - `calc_icechunk_store_mean`: Calculate the mean of the IceChunk store
 - `calc_original_files_mean`: Calculate the mean of the original files
