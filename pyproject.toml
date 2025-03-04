@@ -90,6 +90,7 @@ test = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
+    "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
     "pytest",
@@ -115,18 +116,16 @@ channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [tool.pixi.environments]
-test = { features = ["test", "remote", "hdf_reader", "kerchunk", "icechunk"], solve-group = "default" }
-hdf-reader = { features = ["hdf_reader"], solve-group = "default" }
-kerchunk = { features = ["kerchunk"], solve-group = "default" }
-icechunk = { features = ["icechunk"], solve-group = "default" }
+default = { solve-group = "default" }
+test = { features = ["test", "remote", "hdf", "hdf5", "netcdf3", "fits", "all", "kerchunk", "icechunk"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "default" }
 
-[tool.pixi.feature.hdf_reader.dependencies]
+[tool.pixi.feature.hdf5.dependencies]
 netcdf4 = ">=1.7.2,<2"
 hdf5 = ">=1.14.4,<2"
 h5netcdf = ">=1.5.0,<2"
 
-[tool.pixi.feature.kerchunk.dependencies]
+[tool.pixi.feature.hdf.dependencies]
 netcdf4 = ">=1.7.2,<2"
 hdf5 = ">=1.14.4,<2"
 h5netcdf = ">=1.5.0,<2"
