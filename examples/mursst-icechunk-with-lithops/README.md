@@ -1,15 +1,12 @@
-# Generating a combined virtual + native Zarr store for MUR SST using icehunk and lithops
+# Lithops Package for MUR SST Data Processing
 
-This example demonstrates how to create a virtual and native Zarr dataset from a collection of
-netCDF files on s3. This example uses lithops for various map and map reduce operations involved in reading and writing the data as either virtual references or native Zarr. [Icechunk](https://icechunk.io) is used as the storage engine.
+This package provides functionality for processing MUR SST (Multi-scale Ultra-high Resolution Sea Surface Temperature) data using [Lithops](https://lithops-cloud.github.io/), a framework for serverless computing.
 
-## Credits
+## Environment + Lithops Setup
 
-Inspired by the [Generate a virtual zarr dataset using lithops](./virtualizarr-lithops/) example by @thodson-usgs.
+It is recommended to read through and verify all the
 
-## Setup
-
-1. Set up a Python environment with uv:
+1. Set up a Python environment, the below example uses [`uv`](https://docs.astral.sh/uv/):
 
 ```sh
 uv venv virtualizarr-lithops --python 3.11
@@ -17,62 +14,111 @@ source virtualizarr-lithops/bin/activate
 uv pip install -r requirements.txt
 ```
 
-2. Configure compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html) in `lithops.yaml`. Note the `aws_lambda: runtime:` value should match the runtime name used in the `lithops runtime build` command below.
+2. Follow the [AWS Lambda Configuration](https://lithops-cloud.github.io/docs/source/compute_config/aws_lambda.html#configuration) instructions, unless you already have an appropriate role to use.
 
-3. Build the lambda runtime:
+3. Follow the [AWS Credential setup](https://lithops-cloud.github.io/docs/source/compute_config/aws_lambda.html#aws-credential-setup) instructions.
 
+4. Check the compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html).
+   in `lithops.yaml`.
+
+
+5. Build the lithops lambda runtime if it does not exist in your target AWS environemnt.
 ```bash
 export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
 lithops runtime build -b aws_lambda -f Dockerfile vz-runtime
 ```
 
-> [!IMPORTANT]  
-> To rebuild the lithops lambda runtime image, you first need to delete the existing one:
->```bash
->lithops runtime delete -b aws_lambda -d vz-runtime
->```
->You can also update the lambda configuration to use to the `latest` tag in the image URI declaration, but you will need to `Deploy image` to the lambda whenever there are changes.
+For various reasons, you may want to build the lambda runtime on EC2 (docker can be a resource hog and pushing to ECR is faster, for example). If you wish to use EC2, as the author did, please see the scripts in `ec2_for_lithops_runtime/` in this directory.
 
-4. Test it's working
+> [!IMPORTANT]
+> If the runtime was created with a different IAM identity, an appropriate `user_id` will need to be included in the lithops configuration under `aws_lamda`.
 
-```bash
-python test_lithops.py
-```
+> [!TIP]
+> You can configure the AWS Lambda architecture via the `architecture` key under `aws_lambda` in the lithops configuration file.
 
-## Reading, writing and validating the MUR SST icechunk store.
 
-`lithops_functions.py` includes a number of functions for writing data and validating the store. There is customization as to which dates shoudl be written as native Zarr and which should be written as virtual data, which is more fully explained in this [MUR SST Icechunk Dataset Design Document](https://github.com/earth-mover/icechunk-nasa/blob/main/design-docs/mursst-virtual-icechunk-store.md).
-
-These functions are intended to be used as follows:
-
-1. (Optional) Check data store access:
+6. To rebuild the Lithops Lambda runtime image, delete the existing one:
 
 ```bash
-python lithops_functions.py check_data_store_access
+lithops runtime delete -b aws_lambda -d virtualizarr-runtime
 ```
 
-2. Write data for some datetime range, omitting `append_dim` if you are initiating the data store.
+## Package Structure
+
+The package is organized into the following modules:
+
+- `__init__.py`: Package initialization and exports
+- `config.py`: Configuration settings and constants
+- `models.py`: Data models and structures
+- `url_utils.py`: URL generation and file listing
+- `repo.py`: IceChunk repository management
+- `virtual_datasets.py`: Virtual dataset operations
+- `zarr_operations.py`: Zarr array operations
+- `data_processing.py`: Data processing and validation
+- `lithops_wrappers.py`: Lithops execution wrappers
+- `cli.py`: Command-line interface
+
+## Usage
+
+### Command-line Interface
+
+The package provides a command-line interface for running various functions:
 
 ```bash
-python lithops_functions.py write_to_icechunk --start_date <start_date> --end_date <end_date> --append_dim time
+python main.py <function> [options]
 ```
 
-3. Validate the data written. Because it can take awhile to read from the original files, I usually do this for a small subset of the data, say 10 days.
+Available functions:
 
-The following script calculates the mean for a small spatial subset using the original files and `xr.open_mfdataset`.
+- `write_to_icechunk`: Write data to IceChunk
+- `check_data_store_access`: Check access to the data store
+- `calc_icechunk_store_mean`: Calculate the mean of the IceChunk store
+- `calc_original_files_mean`: Calculate the mean of the original files
+- `list_installed_packages`: List installed packages
+
+Options:
+
+- `--start_date`: Start date for data processing (YYYY-MM-DD)
+- `--end_date`: End date for data processing (YYYY-MM-DD)
+- `--append_dim`: Append dimension for writing to IceChunk
+
+### Examples
+
+#### Writing Data to IceChunk
 
 ```bash
-python lithops_functions.py calc_original_files_mean --start_date 2021-01-01 --end_date 2021-01-11 
+python main.py write_to_icechunk --start_date 2022-01-01 --end_date 2022-01-31
 ```
 
-the output value should be compared with the output of the icechunk store:
+#### Calculating the Mean of the IceChunk Store
 
 ```bash
-python lithops_functions.py calc_icechunk_store_mean --start_date 2021-01-01 --end_date 2021-01-11 
+python main.py calc_icechunk_store_mean --start_date 2022-01-01 --end_date 2022-01-31
 ```
 
-# TODOs:
+#### Checking Data Store Access
 
-- [ ] Use a uv environment in the `Dockerfile` rather than installing packages globally
-- [ ] Document how to build runtime using ec2
-- [ ] Update documentation in earth-mover/icechunk-nasa repo
+```bash
+python main.py check_data_store_access
+```
+
+## Programmatic Usage
+
+You can also use the package programmatically:
+
+```python
+from lithops_package.lithops_wrappers import write_to_icechunk
+
+# Write data to IceChunk
+write_to_icechunk(start_date="2022-01-01", end_date="2022-01-31")
+```
+
+## Testing
+
+To test the package, you can use the provided test functions:
+
+```bash
+python main.py check_data_store_access
+```
+
+This will verify that the package can access the data store.
