@@ -14,55 +14,79 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0",
+    "xarray>=2025.1.1",
     "numpy>=2.0.0",
-    "packaging",
     "universal-pathlib",
     "numcodecs",
     "ujson",
-    "zarr"
+    "packaging",
 ]
 
 [project.optional-dependencies]
+# for creating virtual datasets from objects on remote storage
 remote = [
     "fsspec",
     "requests",
     "aiohttp",
     "s3fs",
 ]
-hdf_reader = [
+
+# non-kerchunk-based readers
+hdf = [
     "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
+]
 
-]
-icechunk = [
-    "icechunk==0.1.0a12",
-]
-kerchunk = [
+# kerchunk-based readers
+hdf5 = [
     "virtualizarr[remote]",
-    "fastparquet",
+    "kerchunk>=0.2.8",
     "h5py",
-    "kerchunk @ git+https://github.com/fsspec/kerchunk@main",
-    "netcdf4",
-    "scipy",
-    "tifffile",
-    "astropy",
-
 ]
+netcdf3 = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "scipy",
+]
+fits = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "astropy",
+]
+all_readers = [
+    "virtualizarr[hdf]",
+    "virtualizarr[hdf5]",
+    "virtualizarr[netcdf3]",
+    "virtualizarr[fits]",
+]
+
+# writers
+icechunk = [
+    "icechunk>=0.2.4",
+]
+kerchunk = ["fastparquet"]
+
+all_writers = [
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+]
+all = [
+    "virtualizarr[all_readers]",
+    "virtualizarr[all_writers]",
+]
+
 test = [
     "codecov",
     "mypy",
-    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -70,19 +94,8 @@ test = [
     "pytest-mypy",
     "pytest",
     "ruff",
-    "virtualizarr[hdf_reader]",
-    "virtualizarr[icechunk]",
-    "virtualizarr[kerchunk]",
-    "virtualizarr[remote]"
-]
-docs = [
-    "sphinx",
-    "myst_nb",
-    "pydata_sphinx_theme",
-    "sphinx_copybutton",
-    "sphinx_design",
-    "sphinx_togglebutton",
-    "sphinx-autodoc-typehints",
+    "s3fs",
+    "virtualizarr[all]"
 ]
 
 [project.urls]

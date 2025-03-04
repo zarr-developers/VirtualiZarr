@@ -1,0 +1,41 @@
+name: virtualizarr-tests
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - xarray>=2024.10.0
+  - kerchunk>=0.2.8
+  - numpy>=2.0.0
+  - ujson
+  - packaging
+  - universal_pathlib
+  - hdf5plugin
+  - numcodecs
+  - icechunk>=0.2.4
+  # Testing
+  - codecov[toml]
+  - pre-commit
+  - mypy
+  - ruff
+  - pandas-stubs
+  - pytest-asyncio
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - scipy
+  - fsspec
+  - s3fs
+  - fastparquet
+  - imagecodecs>=2024.6.1
+  # for opening tiff files
+  - tifffile
+  # for opening FITS files
+  - astropy
+  - pip
+  - pip:
+      - imagecodecs-numcodecs==2024.6.1

@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import h5py  # type: ignore
+import numpy as np
 import pytest
 
 from virtualizarr import open_virtual_dataset
@@ -111,6 +112,36 @@ class TestDatasetToVariable:
         )
         assert var.attrs["attribute_name"] == "attribute_name"
 
+    def test_scalar_fill_value(self, scalar_fill_value_hdf5_file):
+        f = h5py.File(scalar_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            scalar_fill_value_hdf5_file, ds, group=""
+        )
+        assert var.data.zarray.fill_value == 42
+
+    def test_cf_fill_value(self, cf_fill_value_hdf5_file):
+        f = h5py.File(cf_fill_value_hdf5_file)
+        ds = f["data"]
+        if ds.dtype.kind in "S":
+            pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
+        if ds.dtype.names:
+            pytest.xfail(
+                "To fix, structured dtype fill value encoding for Zarr backend"
+            )
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_fill_value_hdf5_file, ds, group=""
+        )
+        assert "_FillValue" in var.encoding
+
+    def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
+        f = h5py.File(cf_array_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_array_fill_value_hdf5_file, ds, group=""
+        )
+        assert not isinstance(var.encoding["_FillValue"], np.ndarray)
+
 
 @requires_hdf5plugin
 @requires_imagecodecs
@@ -142,11 +173,11 @@ class TestVirtualVarsFromHDF:
         )
         assert len(variables) == 3
 
-    def test_nested_groups_not_implemented(self, nested_group_hdf5_file):
-        with pytest.raises(NotImplementedError):
-            HDFVirtualBackend._virtual_vars_from_hdf(
-                path=nested_group_hdf5_file, group="group"
-            )
+    def test_nested_groups_are_ignored(self, nested_group_hdf5_file):
+        variables = HDFVirtualBackend._virtual_vars_from_hdf(
+            path=nested_group_hdf5_file, group="group"
+        )
+        assert len(variables) == 1
 
     def test_drop_variables(self, multiple_datasets_hdf5_file):
         variables = HDFVirtualBackend._virtual_vars_from_hdf(
@@ -185,7 +216,7 @@ class TestOpenVirtualDataset:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-@pytest.mark.parametrize("group", ["subgroup", "subgroup/"])
+@pytest.mark.parametrize("group", [None, "subgroup", "subgroup/"])
 def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
     # regression test for GH issue #364
     vds = open_virtual_dataset(
@@ -194,17 +225,3 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
-
-
-@requires_hdf5plugin
-@requires_imagecodecs
-def test_nested_groups(hdf5_groups_file):
-    # try to open an empty group
-    with pytest.raises(
-        NotImplementedError, match="Nested groups are not yet supported"
-    ):
-        open_virtual_dataset(
-            hdf5_groups_file,
-            group="/",
-            backend=HDFVirtualBackend,
-        )

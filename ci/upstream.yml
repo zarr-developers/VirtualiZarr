@@ -1,0 +1,34 @@
+name: virtualizarr-upstream
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - xarray>=2025.1.1
+  - h5netcdf
+  - h5py
+  - hdf5
+  - netcdf4
+  - numpy>=2.0.0
+  - packaging
+  - ujson
+  - universal_pathlib
+  - hdf5plugin
+  - numcodecs
+  - imagecodecs>=2024.6.1
+  # Testing
+  - codecov[toml]
+  - pre-commit
+  - mypy
+  - ruff
+  - pandas-stubs
+  - pytest-asyncio
+  - pytest-mypy
+  - pytest-cov
+  - pytest
+  - pooch
+  - fsspec
+  - pip
+  - icechunk>=0.2.4
+  - pip:
+      - git+https://github.com/fsspec/kerchunk.git@main
+      - imagecodecs-numcodecs==2024.6.1

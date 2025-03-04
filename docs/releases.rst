@@ -1,16 +1,104 @@
 Release notes
 =============
 
-.. _v1.2.1:
+.. _v1.3.3:
 
-v1.2.1 (unreleased)
+v1.3.3 (unreleased)
 -------------------
 
 New Features
 ~~~~~~~~~~~~
 
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.2:
+
+v1.3.2 (3rd Mar 2025)
+---------------------
+
+Small release which fixes a problem causing the docs to be out of date, fixes some issues in the tests with unclosed file handles, but also increases the performance of writing large numbers of virtual references to Icechunk!
+
+New Features
+~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Minimum supported version of Icechunk is now `v0.2.4` (:pull:`462`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Updates `store.set_virtual_ref` to `store.set_virtual_refs` in `write_manifest_virtual_refs` (:pull:`443`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+.. _v1.3.1:
+
+v1.3.1 (18th Feb 2025)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+- Examples use new Icechunk syntax
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Reading and writing Zarr chunk manifest formats are no longer supported.
+  (:issue:`359`), (:pull:`426`). By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.0:
+
+v1.3.0 (3rd Feb 2025)
+---------------------
+
+This release stabilises our dependencies - you can now use released versions of VirtualiZarr, Kerchunk, and Icechunk all in the same environment!
+
+It also fixes a number of bugs, adds minor features, changes the default reader for HDF/netCDF4 files, and includes refactors to reduce code redundancy with zarr-python v3. You can also choose which sets of dependencies you want at installation time.
+
+New Features
+~~~~~~~~~~~~
+
+- Optional dependencies can now be installed in groups via pip. See the installation docs.
+  (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
   (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Upgrade icechunk dependency to ``>=0.1.0a12``. (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
 - Sync with Icechunk v0.1.0a8  (:pull:`368`) By `Matthew Iannucci <https://github.com/mpiannucci>`. This also adds support
   for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
   is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
@@ -35,6 +123,12 @@ Breaking changes
   rather than positional or keyword.  This change is breaking _only_ where arguments for
   these parameters are currently given positionally.  (:issue:`341`) By
   `Chuck Daniels <https://github.com/chuckwondo>`_.
+- The default backend for netCDF4 and HDF5 is now the custom ``HDFVirtualBackend`` replacing
+  the previous default which was a wrapper around the kerchunk backend.
+  (:issue:`374`, :pull:`395`) By `Julia Signell <https://github.com/jsignell>`_.
+- Optional dependency on kerchunk is now the newly-released v0.2.8. This release of kerchunk is compatible with zarr-python v3.0.0,
+  which means a released version of kerchunk can now be used with both VirtualiZarr and Icechunk.
+  (:issue:`392`, :pull:`406`, :pull:`412``) By `Julia Signell <https://github.com/jsignell>`_ and `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -60,7 +154,7 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
-- Vendor netCDF3 reader from kerchunk. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.2.0:
 
@@ -85,6 +179,10 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Icechunk is now v0.1.1.
+  (:pull:`419`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Kerchunk is now v0.2.8.
+  (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
 - Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 

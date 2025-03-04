@@ -13,11 +13,10 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
-    HDF5VirtualBackend,
+    HDFVirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
-    ZarrV3VirtualBackend,
 )
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -25,11 +24,10 @@ from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
-    "zarr_v3": ZarrV3VirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
+    "hdf5": HDFVirtualBackend,
+    "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
-    "hdf5": HDF5VirtualBackend,
-    "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
     "netcdf3": NetCDF3VirtualBackend,
     "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,
@@ -51,9 +49,7 @@ class FileType(AutoName):
     grib = auto()
     tiff = auto()
     fits = auto()
-    zarr = auto()
     dmrpp = auto()
-    zarr_v3 = auto()
     kerchunk = auto()
 
 
@@ -130,7 +126,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType or str, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'zarr_v3', 'kerchunk'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".
