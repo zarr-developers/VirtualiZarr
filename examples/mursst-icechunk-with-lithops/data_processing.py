@@ -8,9 +8,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import zarr
-
-from lithops_package.config import lat_slice, lon_slice
-from lithops_package.repo import open_or_create_repo
+from config import lat_slice, lon_slice
+from repo import open_or_create_repo
 
 
 def xarray_open_icechunk(open_or_create_repo_func=open_or_create_repo):
@@ -92,7 +91,7 @@ def open_and_read_data(file, lat_slice_arg=lat_slice, lon_slice_arg=lon_slice):
     Returns:
         The data values
     """
-    from lithops_package.config import fs_read
+    from config import fs_read
 
     ds = xr.open_dataset(fs_read.open(file), chunks={})
     return ds.analysed_sst.sel(lat=lat_slice_arg, lon=lon_slice_arg).values
@@ -109,35 +108,6 @@ def get_mean(values: np.ndarray):
         The mean value
     """
     return np.nanmean(values)
-
-
-def lithops_calc_original_files_mean(
-    start_date: str, end_date: str, lat_slice_arg=lat_slice, lon_slice_arg=lon_slice
-):
-    """
-    Calculate the mean of the original files.
-
-    Args:
-        start_date: The start date in YYYY-MM-DD format
-        end_date: The end date in YYYY-MM-DD format
-        lat_slice_arg: The latitude slice
-        lon_slice_arg: The longitude slice
-
-    Returns:
-        The mean value
-    """
-    from lithops_package.config import fexec
-    from lithops_package.url_utils import list_mur_sst_files
-
-    # map open and read data from selected space and time
-    files = list_mur_sst_files(start_date, end_date, dmrpp=False)
-    fexec.map_reduce(
-        map_function=open_and_read_data,  # return array
-        map_iterdata=files,
-        extra_args=(lat_slice_arg, lon_slice_arg),
-        reduce_function=get_mean,
-    )
-    return fexec.get_result()
 
 
 # Date range processing dictionary

@@ -11,8 +11,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import zarr
-
-from lithops_package.models import Task
+from models import Task
 
 
 def resize_data_array(var_name: str, session: icechunk.Session, n_timesteps: int):
@@ -108,7 +107,7 @@ def map_open_files(file):
     Returns:
         An opened file object
     """
-    from lithops_package.config import fs_read
+    from config import fs_read
 
     return fs_read.open(file)
 
@@ -123,7 +122,7 @@ def xarray_open_mfdataset(files):
     Returns:
         An xarray Dataset
     """
-    from lithops_package.config import drop_vars
+    from config import drop_vars
 
     ds = xr.open_mfdataset(
         files, mask_and_scale=False, drop_variables=drop_vars, chunks={}

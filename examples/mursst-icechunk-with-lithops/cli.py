@@ -6,7 +6,7 @@ This module provides a command-line interface for the package.
 
 import argparse
 
-from lithops_package.lithops_wrappers import (
+from lithops_wrappers import (
     calc_icechunk_store_mean,
     calc_original_files_mean,
     check_data_store_access,
