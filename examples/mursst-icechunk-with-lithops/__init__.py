@@ -5,7 +5,7 @@ This package provides functionality for processing MUR SST data using Lithops,
 a framework for serverless computing import
 """
 
-from lithops_package import (
+from . import (
     config,
     data_processing,
     lithops_wrappers,

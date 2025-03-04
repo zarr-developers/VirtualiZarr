@@ -6,8 +6,7 @@ This module contains functions for creating and managing IceChunk repositories.
 
 import boto3
 import icechunk
-
-from lithops_package.config import bucket, store_name
+from config import bucket, store_name
 
 
 def open_or_create_repo():

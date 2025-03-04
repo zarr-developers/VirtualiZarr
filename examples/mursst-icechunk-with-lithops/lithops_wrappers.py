@@ -4,26 +4,28 @@ Lithops execution wrappers.
 This module contains functions that wrap Lithops execution for various tasks.
 """
 
+import logging
 import subprocess
 
-from icechunk.distributed import merge_sessions
-
-from lithops_package.config import data_vars, fexec, lat_slice, lon_slice
-from lithops_package.data_processing import (
+import lithops
+from config import data_vars, lat_slice, lon_slice
+from data_processing import (
     find_label_for_range,
+    get_mean,
     interval_df,
     lithops_calc_icechunk_store_mean,
-    lithops_calc_original_files_mean,
     lithops_check_data_store_access,
+    open_and_read_data,
 )
-from lithops_package.models import Task
-from lithops_package.repo import open_or_create_repo
-from lithops_package.url_utils import list_mur_sst_files
-from lithops_package.virtual_datasets import (
+from icechunk.distributed import merge_sessions
+from models import Task
+from repo import open_or_create_repo
+from url_utils import list_mur_sst_files
+from virtual_datasets import (
     concat_and_write_virtual_datasets,
     map_open_virtual_dataset,
 )
-from lithops_package.zarr_operations import (
+from zarr_operations import (
     configure_zarr,
     handle_time_dimension,
     map_open_files,
@@ -31,6 +33,37 @@ from lithops_package.zarr_operations import (
     write_data_to_zarr,
     xarray_open_mfdataset,
 )
+
+# Lithops executor
+fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)
+
+
+def lithops_calc_original_files_mean(
+    start_date: str, end_date: str, lat_slice_arg=lat_slice, lon_slice_arg=lon_slice
+):
+    """
+    Calculate the mean of the original files.
+
+    Args:
+        start_date: The start date in YYYY-MM-DD format
+        end_date: The end date in YYYY-MM-DD format
+        lat_slice_arg: The latitude slice
+        lon_slice_arg: The longitude slice
+
+    Returns:
+        The mean value
+    """
+    from url_utils import list_mur_sst_files
+
+    # map open and read data from selected space and time
+    files = list_mur_sst_files(start_date, end_date, dmrpp=False)
+    fexec.map_reduce(
+        map_function=open_and_read_data,  # return array
+        map_iterdata=files,
+        extra_args=(lat_slice_arg, lon_slice_arg),
+        reduce_function=get_mean,
+    )
+    return fexec.get_result()
 
 
 def lithops_write_virtual_references(

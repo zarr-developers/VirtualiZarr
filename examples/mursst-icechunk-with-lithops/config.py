@@ -5,10 +5,7 @@ This module contains all the configuration settings and constants used
 throughout the package.
 """
 
-import logging
-
 import fsspec
-import lithops
 
 # S3 filesystem for reading data
 fs_read = fsspec.filesystem("s3", anon=False, skip_instance_cache=True)
@@ -25,6 +22,3 @@ store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v1"
 # Spatial subset configuration
 lat_slice = slice(48.5, 48.7)
 lon_slice = slice(-124.7, -124.5)
-
-# Lithops executor
-fexec = lithops.FunctionExecutor(config_file="lithops.yaml", log_level=logging.INFO)

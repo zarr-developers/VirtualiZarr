@@ -5,9 +5,9 @@ This module contains functions for working with virtual datasets.
 """
 
 import xarray as xr
+from config import drop_vars
+from repo import open_or_create_repo
 
-from lithops_package.config import drop_vars
-from lithops_package.repo import open_or_create_repo
 from virtualizarr import open_virtual_dataset
 
 

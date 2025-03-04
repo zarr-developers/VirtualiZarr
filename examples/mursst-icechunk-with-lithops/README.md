@@ -107,7 +107,7 @@ python main.py check_data_store_access
 You can also use the package programmatically:
 
 ```python
-from lithops_package.lithops_wrappers import write_to_icechunk
+from lithops_wrappers import write_to_icechunk
 
 # Write data to IceChunk
 write_to_icechunk(start_date="2022-01-01", end_date="2022-01-31")

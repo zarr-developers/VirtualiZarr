@@ -8,8 +8,7 @@ import datetime
 from typing import List
 
 import pandas as pd
-
-from lithops_package.config import base_url
+from config import base_url
 
 
 def make_url(date: datetime) -> str:
