@@ -1,20 +1,20 @@
 """
-IceChunk repository management.
+Icechunk repository management.
 
-This module contains functions for creating and managing IceChunk repositories.
+This module contains functions for creating and managing Icechunk repositories.
 """
 
 import boto3
 import icechunk
-from config import bucket, store_name
+from config import bucket, directory, store_name
 
 
 def open_or_create_repo():
     """
-    Open or create an IceChunk repository.
+    Open or create an Icechunk repository.
 
     Returns:
-        An IceChunk repository object
+        An Icechunk repository object
     """
     # Config for repo storage
     session = boto3.Session()
@@ -26,7 +26,7 @@ def open_or_create_repo():
     creds = credentials.get_frozen_credentials()
     storage_config = icechunk.s3_storage(
         bucket=bucket,
-        prefix=f"icechunk/{store_name}",
+        prefix=f"{directory}/{store_name}",
         region="us-west-2",
         access_key_id=creds.access_key,
         secret_access_key=creds.secret_key,

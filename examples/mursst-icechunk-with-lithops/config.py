@@ -18,6 +18,7 @@ drop_vars = ["dt_1km_data", "sst_anomaly"]
 # Storage configuration
 bucket = "nasa-eodc-scratch"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v1"
+directory = "test"
 
 # Spatial subset configuration
 lat_slice = slice(48.5, 48.7)
@@ -38,4 +39,13 @@ date_process_dict = {
     ("2023-03-01", "2023-04-21"): "virtual_dataset",
     ("2023-04-22", "2023-04-22"): "zarr",
     ("2023-04-23", "2023-09-03"): "virtual_dataset",
+}
+
+zarr_concurrency = 4
+
+mursst_var_chunks = {
+    "analysed_sst": {"time": 1, "lat": 1023, "lon": 2047},
+    "analysis_error": {"time": 1, "lat": 1023, "lon": 2047},
+    "mask": {"time": 1, "lat": 1447, "lon": 2895},
+    "sea_ice_fraction": {"time": 1, "lat": 1447, "lon": 2895},
 }

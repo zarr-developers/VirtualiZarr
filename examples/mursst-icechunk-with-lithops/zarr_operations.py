@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import zarr
+from config import mursst_var_chunks, zarr_concurrency
 from models import Task
 
 
@@ -37,7 +38,7 @@ def handle_time_dimension(session: icechunk.Session, start_date: str, end_date: 
     Handle time dimension and return datetime-index pairs.
 
     Args:
-        session: The IceChunk session
+        session: The Icechunk session
         start_date: The start date in YYYY-MM-DD format
         end_date: The end date in YYYY-MM-DD format
 
@@ -70,7 +71,7 @@ def write_data_to_zarr(task: Task, session: icechunk.Session, ds: xr.Dataset):
 
     Args:
         task: The task containing variable, datetime, and time index
-        session: The IceChunk session
+        session: The Icechunk session
         ds: The xarray Dataset containing the data
 
     Returns:
@@ -91,13 +92,13 @@ def configure_zarr():
     """
     zarr.config.set(
         {
-            "async": {"concurrency": 100, "timeout": None},
+            "async": {"concurrency": zarr_concurrency, "timeout": None},
             "threading": {"max_workers": None},
         }
     )
 
 
-def map_open_files(file):
+def map_open_files(file: str):
     """
     Map function to open files.
 
@@ -112,7 +113,7 @@ def map_open_files(file):
     return fs_read.open(file)
 
 
-def xarray_open_mfdataset(files):
+def xarray_open_mfdataset(files: list[str]):
     """
     Open multiple files as an xarray Dataset.
 
@@ -127,12 +128,6 @@ def xarray_open_mfdataset(files):
     ds = xr.open_mfdataset(
         files, mask_and_scale=False, drop_variables=drop_vars, chunks={}
     )
-    ds["analysed_sst"] = ds["analysed_sst"].chunk({"time": 1, "lat": 1023, "lon": 2047})
-    ds["analysis_error"] = ds["analysis_error"].chunk(
-        {"time": 1, "lat": 1023, "lon": 2047}
-    )
-    ds["mask"] = ds["mask"].chunk({"time": 1, "lat": 1447, "lon": 2895})
-    ds["sea_ice_fraction"] = ds["sea_ice_fraction"].chunk(
-        {"time": 1, "lat": 1447, "lon": 2895}
-    )
+    for var, chunks in mursst_var_chunks.items():
+        ds[var] = ds[var].chunk(chunks)
     return ds

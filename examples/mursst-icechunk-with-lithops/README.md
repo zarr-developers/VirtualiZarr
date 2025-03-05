@@ -69,7 +69,7 @@ Available functions:
 
 - `write_to_icechunk`: Write data to Icechunk
 - `check_data_store_access`: Check access to the data store
-- `calc_icechunk_store_mean`: Calculate the mean of the IceChunk store
+- `calc_icechunk_store_mean`: Calculate the mean of the Icechunk store
 - `calc_original_files_mean`: Calculate the mean of the original files
 - `list_installed_packages`: List installed packages
 
@@ -77,17 +77,17 @@ Options:
 
 - `--start_date`: Start date for data processing (YYYY-MM-DD)
 - `--end_date`: End date for data processing (YYYY-MM-DD)
-- `--append_dim`: Append dimension for writing to IceChunk
+- `--append_dim`: Append dimension for writing to Icechunk
 
 ### Examples
 
-#### Writing Data to IceChunk
+#### Writing Data to Icechunk
 
 ```bash
-python main.py write_to_icechunk --start_date 2022-01-01 --end_date 2022-01-31
+python main.py write_to_icechunk --start_date 2022-01-01 --end_date 2022-01-02
 ```
 
-#### Calculating the Mean of the IceChunk Store
+#### Calculating the Mean of the Icechunk Store
 
 ```bash
 python main.py calc_icechunk_store_mean --start_date 2022-01-01 --end_date 2022-01-31
@@ -106,7 +106,7 @@ You can also use the package programmatically:
 ```python
 from lithops_functions import write_to_icechunk
 
-# Write data to IceChunk
+# Write data to Icechunk
 write_to_icechunk(start_date="2022-01-01", end_date="2022-01-31")
 ```
 

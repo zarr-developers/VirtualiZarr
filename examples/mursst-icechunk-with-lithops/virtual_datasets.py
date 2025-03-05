@@ -11,7 +11,7 @@ from repo import open_or_create_repo
 from virtualizarr import open_virtual_dataset
 
 
-def map_open_virtual_dataset(uri):
+def map_open_virtual_dataset(uri, open_args: dict = {}):
     """
     Map function to open virtual datasets.
 
@@ -24,7 +24,7 @@ def map_open_virtual_dataset(uri):
     vds = open_virtual_dataset(
         uri,
         indexes={},
-        filetype="dmrpp",
+        **open_args,
     )
     return vds.drop_vars(drop_vars, errors="ignore")
 
