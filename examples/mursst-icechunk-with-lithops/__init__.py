@@ -8,7 +8,7 @@ a framework for serverless computing import
 from . import (
     config,
     data_processing,
-    lithops_wrappers,
+    lithops_functions,
     models,
     repo,
     url_utils,
@@ -18,7 +18,7 @@ from . import (
 __all__ = [
     "config",
     "data_processing",
-    "lithops_wrappers",
+    "lithops_functions",
     "models",
     "repo",
     "url_utils",

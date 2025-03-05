@@ -6,11 +6,11 @@ This module provides a command-line interface for the package.
 
 import argparse
 
-from lithops_wrappers import (
-    calc_icechunk_store_mean,
-    calc_original_files_mean,
-    check_data_store_access,
-    list_installed_packages,
+from lithops_functions import (
+    lithops_calc_icechunk_store_mean,
+    lithops_calc_original_files_mean,
+    lithops_check_data_store_access,
+    lithops_list_installed_packages,
     write_to_icechunk,
 )
 
@@ -66,13 +66,13 @@ def main():
             start_date=start_date, end_date=end_date, append_dim=append_dim
         )
     elif args.function == "check_data_store_access":
-        check_data_store_access()
+        lithops_check_data_store_access()
     elif args.function == "calc_icechunk_store_mean":
-        calc_icechunk_store_mean(start_date=start_date, end_date=end_date)
+        lithops_calc_icechunk_store_mean(start_date=start_date, end_date=end_date)
     elif args.function == "calc_original_files_mean":
-        calc_original_files_mean(start_date=start_date, end_date=end_date)
+        lithops_calc_original_files_mean(start_date=start_date, end_date=end_date)
     elif args.function == "list_installed_packages":
-        list_installed_packages()
+        lithops_list_installed_packages()
 
 
 if __name__ == "__main__":
