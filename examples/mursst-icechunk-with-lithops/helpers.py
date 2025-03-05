@@ -5,9 +5,9 @@ Helpers.
 import numpy as np
 import pandas as pd
 import xarray as xr
-import zarr
 from config import date_process_dict, lat_slice, lon_slice
 from repo import open_or_create_repo
+from zarr_operations import configure_zarr
 
 
 def xarray_open_icechunk(open_or_create_repo_func: callable = open_or_create_repo):
@@ -21,12 +21,7 @@ def xarray_open_icechunk(open_or_create_repo_func: callable = open_or_create_rep
         An xarray Dataset
     """
     # Configure Zarr for optimal performance
-    zarr.config.set(
-        {
-            "async": {"concurrency": 100, "timeout": None},
-            "threading": {"max_workers": None},
-        }
-    )
+    configure_zarr()
     repo = open_or_create_repo_func()
     session = repo.readonly_session("main")
     return xr.open_dataset(
