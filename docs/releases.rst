@@ -22,7 +22,7 @@ Documentation
 ~~~~~~~~~~~~~
 
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
-  (:pull:`474`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+  (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
