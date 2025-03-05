@@ -1,5 +1,6 @@
 from os.path import relpath
 from pathlib import Path
+from typing import Callable, Concatenate, TypeAlias
 
 import numpy as np
 import pytest
@@ -7,6 +8,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.backend import VirtualBackend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
     has_fastparquet,
@@ -20,6 +22,8 @@ from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
 from virtualizarr.zarr import ZArray
+
+RoundtripFunction: TypeAlias = Callable[Concatenate[xr.Dataset, Path, ...], xr.Dataset]
 
 
 def test_kerchunk_roundtrip_in_memory_no_concat():
@@ -78,17 +82,17 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     ).translate()
 
     # loading the variables should produce same result as inlining them using kerchunk
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
-    )
-    refs = vds.virtualize.to_kerchunk(format="dict")
+    ) as vds:
+        refs = vds.virtualize.to_kerchunk(format="dict")
 
-    # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
-    # assert refs == expected
-    assert refs["refs"]["air/0.0.0"] == expected["refs"]["air/0.0.0"]
-    assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
-    assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
-    assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
+        # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # assert refs == expected
+        assert refs["refs"]["air/0.0.0"] == expected["refs"]["air/0.0.0"]
+        assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
+        assert refs["refs"]["lat/0"] == expected["refs"]["lat/0"]
+        assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
 def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
@@ -145,82 +149,109 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
 )
 class TestRoundtrip:
     @parametrize_over_hdf_backends
-    def test_roundtrip_no_concat(self, tmpdir, roundtrip_func, hdf_backend):
+    def test_roundtrip_no_concat(
+        self,
+        tmp_path,
+        roundtrip_func: RoundtripFunction,
+        hdf_backend: type[VirtualBackend],
+    ):
+        air_nc_path = tmp_path / "air.nc"
+
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=False)
+        with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
+            # save it to disk as netCDF (in temporary directory)
+            ds.to_netcdf(air_nc_path)
 
-        # save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(f"{tmpdir}/air.nc")
+            # use open_dataset_via_kerchunk to read it as references
+            with open_virtual_dataset(
+                str(air_nc_path), indexes={}, backend=hdf_backend
+            ) as vds:
+                roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
 
-        # use open_dataset_via_kerchunk to read it as references
-        vds = open_virtual_dataset(f"{tmpdir}/air.nc", indexes={}, backend=hdf_backend)
+                # assert all_close to original dataset
+                xrt.assert_allclose(roundtrip, ds)
 
-        roundtrip = roundtrip_func(vds, tmpdir, decode_times=False)
-
-        # assert all_close to original dataset
-        xrt.assert_allclose(roundtrip, ds)
-
-        # assert coordinate attributes are maintained
-        for coord in ds.coords:
-            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+                # assert coordinate attributes are maintained
+                for coord in ds.coords:
+                    assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     @parametrize_over_hdf_backends
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
     def test_kerchunk_roundtrip_concat(
-        self, tmpdir, roundtrip_func, hdf_backend, decode_times, time_vars
+        self,
+        tmp_path: Path,
+        roundtrip_func: RoundtripFunction,
+        hdf_backend: type[VirtualBackend],
+        decode_times: bool,
+        time_vars: list[str],
     ):
         # set up example xarray dataset
-        ds = xr.tutorial.open_dataset("air_temperature", decode_times=decode_times)
+        with xr.tutorial.open_dataset(
+            "air_temperature", decode_times=decode_times
+        ) as ds:
+            # split into two datasets
+            ds1 = ds.isel(time=slice(None, 1460))
+            ds2 = ds.isel(time=slice(1460, None))
 
-        # split into two datasets
-        ds1, ds2 = ds.isel(time=slice(None, 1460)), ds.isel(time=slice(1460, None))
+            # save it to disk as netCDF (in temporary directory)
+            air1_nc_path = tmp_path / "air1.nc"
+            air2_nc_path = tmp_path / "air2.nc"
+            ds1.to_netcdf(air1_nc_path)
+            ds2.to_netcdf(air2_nc_path)
 
-        # save it to disk as netCDF (in temporary directory)
-        ds1.to_netcdf(f"{tmpdir}/air1.nc")
-        ds2.to_netcdf(f"{tmpdir}/air2.nc")
+            # use open_dataset_via_kerchunk to read it as references
+            with (
+                open_virtual_dataset(
+                    str(air1_nc_path),
+                    indexes={},
+                    loadable_variables=time_vars,
+                    backend=hdf_backend,
+                ) as vds1,
+                open_virtual_dataset(
+                    str(air2_nc_path),
+                    indexes={},
+                    loadable_variables=time_vars,
+                    backend=hdf_backend,
+                ) as vds2,
+            ):
+                if not decode_times:
+                    assert vds1.time.dtype == np.dtype("float32")
+                else:
+                    assert vds1.time.dtype == np.dtype("<M8[ns]")
+                    assert "units" in vds1.time.encoding
+                    assert "calendar" in vds1.time.encoding
 
-        # use open_dataset_via_kerchunk to read it as references
-        vds1 = open_virtual_dataset(
-            f"{tmpdir}/air1.nc",
-            indexes={},
-            loadable_variables=time_vars,
-            backend=hdf_backend,
-        )
-        vds2 = open_virtual_dataset(
-            f"{tmpdir}/air2.nc",
-            indexes={},
-            loadable_variables=time_vars,
-            backend=hdf_backend,
-        )
+                # concatenate virtually along time
+                vds = xr.concat(
+                    [vds1, vds2], dim="time", coords="minimal", compat="override"
+                )
 
-        if decode_times is False:
-            assert vds1.time.dtype == np.dtype("float32")
-        else:
-            assert vds1.time.dtype == np.dtype("<M8[ns]")
-            assert "units" in vds1.time.encoding
-            assert "calendar" in vds1.time.encoding
+                roundtrip = roundtrip_func(vds, tmp_path, decode_times=decode_times)
 
-        # concatenate virtually along time
-        vds = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
+                if decode_times is False:
+                    # assert all_close to original dataset
+                    xrt.assert_allclose(roundtrip, ds)
 
-        roundtrip = roundtrip_func(vds, tmpdir, decode_times=decode_times)
-
-        if decode_times is False:
-            # assert all_close to original dataset
-            xrt.assert_allclose(roundtrip, ds)
-
-            # assert coordinate attributes are maintained
-            for coord in ds.coords:
-                assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
-        else:
-            # they are very very close! But assert_allclose doesn't seem to work on datetimes
-            assert (roundtrip.time - ds.time).sum() == 0
-            assert roundtrip.time.dtype == ds.time.dtype
-            assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
-            assert roundtrip.time.encoding["calendar"] == ds.time.encoding["calendar"]
+                    # assert coordinate attributes are maintained
+                    for coord in ds.coords:
+                        assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+                else:
+                    # they are very very close! But assert_allclose doesn't seem to work on datetimes
+                    assert (roundtrip.time - ds.time).sum() == 0
+                    assert roundtrip.time.dtype == ds.time.dtype
+                    assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
+                    assert (
+                        roundtrip.time.encoding["calendar"]
+                        == ds.time.encoding["calendar"]
+                    )
 
     @parametrize_over_hdf_backends
-    def test_non_dimension_coordinates(self, tmpdir, roundtrip_func, hdf_backend):
+    def test_non_dimension_coordinates(
+        self,
+        tmp_path: Path,
+        roundtrip_func: RoundtripFunction,
+        hdf_backend: type[VirtualBackend],
+    ):
         # regression test for GH issue #105
 
         if hdf_backend:
@@ -230,22 +261,21 @@ class TestRoundtrip:
         ds = xr.Dataset(coords={"lat": (["x", "y"], np.arange(6.0).reshape(2, 3))})
 
         # save it to disk as netCDF (in temporary directory)
-        ds.to_netcdf(f"{tmpdir}/non_dim_coords.nc")
+        nc_path = tmp_path / "non_dim_coords.nc"
+        ds.to_netcdf(nc_path)
 
-        vds = open_virtual_dataset(
-            f"{tmpdir}/non_dim_coords.nc", indexes={}, backend=hdf_backend
-        )
-        assert "lat" in vds.coords
-        assert "coordinates" not in vds.attrs
+        with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+            assert "lat" in vds.coords
+            assert "coordinates" not in vds.attrs
 
-        roundtrip = roundtrip_func(vds, tmpdir)
+            roundtrip = roundtrip_func(vds, tmp_path)
 
-        # assert equal to original dataset
-        xrt.assert_allclose(roundtrip, ds)
+            # assert equal to original dataset
+            xrt.assert_allclose(roundtrip, ds)
 
-        # assert coordinate attributes are maintained
-        for coord in ds.coords:
-            assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+            # assert coordinate attributes are maintained
+            for coord in ds.coords:
+                assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_datetime64_dtype_fill_value(self, tmpdir, roundtrip_func):
         if "icechunk" in roundtrip_func.__name__:
@@ -288,33 +318,35 @@ class TestRoundtrip:
 
 
 @parametrize_over_hdf_backends
-def test_open_scalar_variable(tmpdir, hdf_backend):
+def test_open_scalar_variable(tmp_path: Path, hdf_backend: type[VirtualBackend]):
     # regression test for GH issue #100
 
+    nc_path = tmp_path / "scalar.nc"
     ds = xr.Dataset(data_vars={"a": 0})
-    ds.to_netcdf(f"{tmpdir}/scalar.nc")
+    ds.to_netcdf(nc_path)
 
-    vds = open_virtual_dataset(f"{tmpdir}/scalar.nc", indexes={}, backend=hdf_backend)
-    assert vds["a"].shape == ()
+    with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+        assert vds["a"].shape == ()
 
 
 @parametrize_over_hdf_backends
 class TestPathsToURIs:
     def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+            expected_path = Path(netcdf4_file).as_uri()
+            manifest = vds["air"].data.manifest.dict()
+            path = manifest["0.0.0"]["path"]
 
-        expected_path = Path(netcdf4_file).as_uri()
-
-        manifest = vds["air"].data.manifest.dict()
-        path = manifest["0.0.0"]["path"]
-        assert path == expected_path
+            assert path == expected_path
 
     def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
         relative_path = relpath(netcdf4_file)
-        vds = open_virtual_dataset(relative_path, indexes={}, backend=hdf_backend)
 
-        expected_path = Path(netcdf4_file).as_uri()
+        with open_virtual_dataset(
+            relative_path, indexes={}, backend=hdf_backend
+        ) as vds:
+            expected_path = Path(netcdf4_file).as_uri()
+            manifest = vds["air"].data.manifest.dict()
+            path = manifest["0.0.0"]["path"]
 
-        manifest = vds["air"].data.manifest.dict()
-        path = manifest["0.0.0"]["path"]
-        assert path == expected_path
+            assert path == expected_path

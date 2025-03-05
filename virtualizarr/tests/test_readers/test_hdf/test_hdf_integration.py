@@ -36,10 +36,10 @@ class TestIntegration:
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
             vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-            roundtrip = xr.open_dataset(
+            with xr.open_dataset(
                 kerchunk_file, engine="kerchunk", decode_times=True
-            )
-            xrt.assert_allclose(ds, roundtrip)
+            ) as roundtrip:
+                xrt.assert_allclose(ds, roundtrip)
 
     def test_filters_netcdf4_roundtrip(
         self, tmp_path, filter_encoded_roundtrip_netcdf4_file
@@ -53,8 +53,8 @@ class TestIntegration:
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
             vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-            roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
-            xrt.assert_equal(ds, roundtrip)
+            with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
+                xrt.assert_equal(ds, roundtrip)
 
     def test_filter_and_cf_roundtrip(self, tmp_path, filter_and_cf_roundtrip_hdf5_file):
         with (
@@ -65,12 +65,12 @@ class TestIntegration:
         ):
             kerchunk_file = str(tmp_path / "filter_cf_kerchunk.json")
             vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-            roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
-            xrt.assert_allclose(ds, roundtrip)
-            assert (
-                ds["temperature"].encoding["_FillValue"]
-                == roundtrip["temperature"].encoding["_FillValue"]
-            )
+            with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
+                xrt.assert_allclose(ds, roundtrip)
+                assert (
+                    ds["temperature"].encoding["_FillValue"]
+                    == roundtrip["temperature"].encoding["_FillValue"]
+                )
 
     def test_non_coord_dim_roundtrip(self, tmp_path, non_coord_dim):
         with (
@@ -81,8 +81,8 @@ class TestIntegration:
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
             vds.virtualize.to_kerchunk(kerchunk_file, format="json")
-            roundtrip = xr.open_dataset(kerchunk_file, engine="kerchunk")
-            xrt.assert_equal(ds, roundtrip)
+            with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
+                xrt.assert_equal(ds, roundtrip)
 
     @requires_icechunk
     def test_cf_fill_value_roundtrip(self, tmp_path, cf_fill_value_hdf5_file):
