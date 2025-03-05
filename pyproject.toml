@@ -83,20 +83,14 @@ all = [
     "virtualizarr[all_readers]",
     "virtualizarr[all_writers]",
 ]
-
-test = [
-    "codecov",
-    "mypy",
-    "pandas-stubs",
-    "pooch",
-    "pre-commit",
-    "pytest-asyncio",
-    "pytest-cov",
-    "pytest-mypy",
-    "pytest",
-    "ruff",
-    "s3fs",
-    "virtualizarr[all]"
+docs = [
+    "sphinx",
+    "myst_nb",
+    "pydata_sphinx_theme",
+    "sphinx_copybutton",
+    "sphinx_design",
+    "sphinx_togglebutton",
+    "sphinx-autodoc-typehints",
 ]
 
 [project.urls]
@@ -115,23 +109,30 @@ requires = [
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
-[tool.pixi.environments]
-default = { solve-group = "default" }
-test = { features = ["test", "remote", "hdf", "hdf5", "netcdf3", "fits", "all", "kerchunk", "icechunk"], solve-group = "default" }
-docs = { features = ["docs"], solve-group = "default" }
-
-[tool.pixi.feature.hdf5.dependencies]
-netcdf4 = ">=1.7.2,<2"
-hdf5 = ">=1.14.4,<2"
-h5netcdf = ">=1.5.0,<2"
-
-[tool.pixi.feature.hdf.dependencies]
-netcdf4 = ">=1.7.2,<2"
-hdf5 = ">=1.14.4,<2"
-h5netcdf = ">=1.5.0,<2"
-
 [tool.pixi.pypi-dependencies]
 virtualizarr = { path = ".", editable = true }
+
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.hdf5-lib.dependencies]
+netcdf4 = ">=1.7.2,<2"
+hdf5 = ">=1.14.4,<2"
+h5netcdf = ">=1.5.0,<2"
+
+[tool.pixi.feature.test.dependencies]
+codecov = ">=2.1.13,<3"
+mypy = ">=1.15.0,<2"
+pandas-stubs = ">=2.2.3.241126,<3"
+pooch = ">=1.8.2,<2"
+pre-commit = ">=4.1.0,<5"
+pytest-asyncio = ">=0.25.3,<0.26"
+pytest-cov = ">=6.0.0,<7"
+pytest-mypy = ">=0.10.3,<0.11"
+ruff = ">=0.9.9,<0.10"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest --run-network-tests" }
@@ -139,6 +140,12 @@ test-no-network = { cmd = "pytest" }
 test-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 test-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
 test-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+
+[tool.pixi.environments]
+test = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib"]
+test-py311 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py311"] # test against python 3.11
+test-py312 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py312"] # test against python 3.12
+doc = ["docs"]
 
 [tool.pixi.feature.docs.tasks]
 docs = { cmd = "make html", cwd = "docs" }
