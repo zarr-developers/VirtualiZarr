@@ -135,6 +135,7 @@ pytest-mypy = ">=0.10.3,<0.11"
 ruff = ">=0.9.9,<0.10"
 
 [tool.pixi.feature.test.tasks]
+run-mypy = { cmd = "mypy virtualizarr" }
 test = { cmd = "pytest --run-network-tests" }
 test-no-network = { cmd = "pytest" }
 test-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
@@ -145,7 +146,7 @@ test-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr
 test = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib"]
 test-py311 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py311"] # test against python 3.11
 test-py312 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py312"] # test against python 3.12
-doc = ["docs"]
+docs = ["docs"]
 
 [tool.pixi.feature.docs.tasks]
 docs = { cmd = "make html", cwd = "docs" }
