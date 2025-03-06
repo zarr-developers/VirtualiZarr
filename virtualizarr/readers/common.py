@@ -1,108 +1,30 @@
 from abc import ABC
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, Mapping
 from typing import (
-    Any,
-    Hashable,
     Optional,
 )
 
-import xarray  # noqa
-from xarray import (
-    Coordinates,
-    Dataset,
-    DataTree,
-    Index,
-    IndexVariable,
-    Variable,
-    open_dataset,
-)
-from xarray.core.indexes import PandasIndex
+import xarray as xr
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 
-def maybe_open_loadable_vars_and_indexes(
-    filepath: str,
-    loadable_variables,
-    reader_options,
-    drop_variables,
-    indexes,
-    group,
-    decode_times,
-) -> tuple[Mapping[str, Variable], Mapping[str, Index]]:
-    """
-    Open selected variables and indexes using xarray.
-
-    Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
-    """
-
-    if loadable_variables == [] and indexes == {}:
-        # no need to even attempt to open the file using xarray
-        return {}, {}
-
-    # TODO We are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-    # TODO It would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-    # TODO Really we probably want a dedicated backend that iterates over all variables only once
-    # TODO See issue #124 for a suggestion of how to avoid calling xarray here.
-
-    fpath = _FsspecFSFromFilepath(
-        filepath=filepath, reader_options=reader_options
-    ).open_file()
-
-    # fpath can be `Any` thanks to fsspec.filesystem(...).open() returning Any.
-    ds = open_dataset(
-        fpath,  # type: ignore[arg-type]
-        drop_variables=drop_variables,
-        group=group,
-        decode_times=decode_times,
-    )
-
-    if indexes is None:
-        # add default indexes by reading data from file
-        # but avoid creating an in-memory index for virtual variables by default
-        indexes = {
-            name: index
-            for name, index in ds.xindexes.items()
-            if name in loadable_variables
-        }
-    elif indexes != {}:
-        # TODO allow manual specification of index objects
-        raise NotImplementedError()
-    else:
-        indexes = dict(**indexes)  # for type hinting: to allow mutation
-
-    # TODO we should drop these earlier by using drop_variables
-    loadable_vars = {
-        str(name): var
-        for name, var in ds.variables.items()
-        if name in loadable_variables
-    }
-
-    # if we only read the indexes we can just close the file right away as nothing is lazy
-    if loadable_vars == {}:
-        ds.close()
-        fpath.close()
-
-    return loadable_vars, indexes
-
-
-def construct_virtual_dataset(
+def construct_fully_virtual_dataset(
     virtual_vars,
-    loadable_vars,
-    indexes,
     coord_names,
     attrs,
-) -> Dataset:
-    """Construct a virtual Datset from consistuent parts."""
+) -> xr.Dataset:
+    """Construct a fully virtual Dataset from constituent parts."""
 
-    vars = {**virtual_vars, **loadable_vars}
+    data_vars = {name: var for name, var in virtual_vars.items() if name not in coord_names}
+    coord_vars = {name: var for name, var in virtual_vars.items() if name in coord_names}
+    
+    # We avoid constructing indexes yet so as to delay loading any data.
+    coords = xr.Coordinates(coords=coord_vars, indexes={})
 
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
-
-    vds = Dataset(
-        data_vars,
+    vds = xr.Dataset(
+        data_vars=data_vars,
         coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
         attrs=attrs,
     )
 
@@ -111,53 +33,46 @@ def construct_virtual_dataset(
     return vds
 
 
-def separate_coords(
-    vars: Mapping[str, Variable],
-    indexes: MutableMapping[str, Index],
-    coord_names: Iterable[str] | None = None,
-) -> tuple[dict[str, Variable], Coordinates]:
-    """
-    Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
+# TODO reimplement this using ManifestStore (GH #473)
+def replace_virtual_with_loadable_vars(
+    fully_virtual_dataset: xr.Dataset,
+    filepath: str,  # TODO won't need this after #473
+    group: str | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+    indexes: Mapping[str, xr.Index] | None = None,
+    reader_options: Optional[dict] = None,
+) -> xr.Dataset:
+    
+    if indexes is not None:
+        raise NotImplementedError()
 
-    Currently requires this function as a workaround unless xarray PR #8124 is merged.
+    fpath = _FsspecFSFromFilepath(
+        filepath=filepath, reader_options=reader_options
+    ).open_file()
 
-    Will also preserve any loaded variables and indexes it is passed.
-    """
+    # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
+    loadable_ds = xr.open_dataset(
+        fpath, 
+        group=group,
+        decode_times=decode_times,
+    )
 
-    if coord_names is None:
-        coord_names = []
+    if isinstance(loadable_variables, list):
+        ds_loadable_to_keep = loadable_ds[loadable_variables]
+        ds_virtual_to_keep = fully_virtual_dataset.drop(loadable_variables)
+    elif loadable_variables is None:
+        # TODO if loadable_variables is None then we have to explicitly match default behaviour of xarray
+        raise NotImplementedError()
+    else:
+        raise ValueError()
 
-    # split data and coordinate variables (promote dimension coordinates)
-    data_vars = {}
-    coord_vars: dict[
-        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
-    ] = {}
-    found_coord_names: set[str] = set()
-    # Search through variable attributes for coordinate names
-    for var in vars.values():
-        if "coordinates" in var.attrs:
-            found_coord_names.update(var.attrs["coordinates"].split(" "))
-    for name, var in vars.items():
-        if name in coord_names or var.dims == (name,) or name in found_coord_names:
-            # use workaround to avoid creating IndexVariables described here https://github.com/pydata/xarray/pull/8107#discussion_r1311214263
-            if len(var.dims) == 1:
-                dim1d, *_ = var.dims
-                coord_vars[name] = (dim1d, var.data, var.attrs, var.encoding)
-
-                if isinstance(var, IndexVariable):
-                    # unless variable actually already is a loaded IndexVariable,
-                    # in which case we need to keep it and add the corresponding indexes explicitly
-                    coord_vars[str(name)] = var
-                    # TODO this seems suspect - will it handle datetimes?
-                    indexes[name] = PandasIndex(var, dim1d)
-            else:
-                coord_vars[name] = var
-        else:
-            data_vars[name] = var
-
-    coords = Coordinates(coord_vars, indexes=indexes)
-
-    return data_vars, coords
+    return xr.merge(
+        [
+            ds_loadable_to_keep, 
+            ds_virtual_to_keep,
+        ]
+    )
 
 
 class VirtualBackend(ABC):
@@ -168,10 +83,10 @@ class VirtualBackend(ABC):
         drop_variables: Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
-    ) -> Dataset:
+    ) -> xr.Dataset:
         raise NotImplementedError()
 
     @staticmethod
@@ -181,8 +96,8 @@ class VirtualBackend(ABC):
         drop_variables: Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
-    ) -> DataTree:
+    ) -> xr.DataTree:
         raise NotImplementedError()
