@@ -118,8 +118,8 @@ docs = [
     ]
 
 [project.urls]
-Home = "https://github.com/TomNicholas/VirtualiZarr"
-Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+Home = "https://github.com/zarr-developers/virtualizarr"
+Documentation = "https://virtualizarr.readthedocs.io/"
 
 [build-system]
 requires = [
