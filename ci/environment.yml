@@ -15,13 +15,14 @@ dependencies:
   - universal_pathlib
   - hdf5plugin
   - numcodecs
-  - icechunk>=0.2.0
+  - icechunk>=0.2.4
   # Testing
   - codecov[toml]
   - pre-commit
   - mypy
   - ruff
   - pandas-stubs
+  - pytest-asyncio
   - pytest-mypy
   - pytest-cov
   - pytest

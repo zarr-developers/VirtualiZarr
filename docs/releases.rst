@@ -1,8 +1,9 @@
 Release notes
 =============
-.. _v1.3.2:
 
-v1.3.2 (unreleased)
+.. _v1.3.3:
+
+v1.3.3 (unreleased)
 -------------------
 
 New Features
@@ -23,14 +24,46 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
-.. _v1.3.1:
+.. _v1.3.2:
 
-v1.3.1 (18th Feb 2025)
--------------------
+v1.3.2 (3rd Mar 2025)
+---------------------
+
+Small release which fixes a problem causing the docs to be out of date, fixes some issues in the tests with unclosed file handles, but also increases the performance of writing large numbers of virtual references to Icechunk!
 
 New Features
 ~~~~~~~~~~~~
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Minimum supported version of Icechunk is now `v0.2.4` (:pull:`462`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Updates `store.set_virtual_ref` to `store.set_virtual_refs` in `write_manifest_virtual_refs` (:pull:`443`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+.. _v1.3.1:
+
+v1.3.1 (18th Feb 2025)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
 - Examples use new Icechunk syntax
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 

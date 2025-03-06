@@ -6,6 +6,7 @@ import xarray as xr
 from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.backend import VirtualBackend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
     parametrize_over_hdf_backends,
@@ -181,99 +182,110 @@ class TestConcat:
 @requires_imagecodecs
 @parametrize_over_hdf_backends
 class TestCombineUsingIndexes:
-    def test_combine_by_coords(self, netcdf4_files_factory: Callable, hdf_backend):
+    def test_combine_by_coords(
+        self,
+        netcdf4_files_factory: Callable[[], tuple[str, str]],
+        hdf_backend: type[VirtualBackend],
+    ):
         filepath1, filepath2 = netcdf4_files_factory()
 
-        vds1 = open_virtual_dataset(
-            filepath1, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
-        )
-        vds2 = open_virtual_dataset(
-            filepath2, backend=hdf_backend, loadable_variables=["time", "lat", "lon"]
-        )
+        with (
+            open_virtual_dataset(
+                filepath1,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds1,
+            open_virtual_dataset(
+                filepath2,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds2,
+        ):
+            combined_vds = xr.combine_by_coords(
+                [vds2, vds1],
+            )
 
-        combined_vds = xr.combine_by_coords(
-            [vds2, vds1],
-        )
-
-        assert combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+            assert (
+                combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+            )
 
     @pytest.mark.xfail(reason="Not yet implemented, see issue #18")
-    def test_combine_by_coords_keeping_manifestarrays(self, netcdf4_files, hdf_backend):
-        filepath1, filepath2 = netcdf4_files
+    def test_combine_by_coords_keeping_manifestarrays(
+        self,
+        netcdf4_files_factory: Callable[[], tuple[str, str]],
+        hdf_backend: type[VirtualBackend],
+    ):
+        filepath1, filepath2 = netcdf4_files_factory()
 
-        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        with (
+            open_virtual_dataset(filepath1, backend=hdf_backend) as vds1,
+            open_virtual_dataset(filepath2, backend=hdf_backend) as vds2,
+        ):
+            combined_vds = xr.combine_by_coords([vds2, vds1])
 
-        combined_vds = xr.combine_by_coords(
-            [vds2, vds1],
-        )
-
-        assert isinstance(combined_vds["time"].data, ManifestArray)
-        assert isinstance(combined_vds["lat"].data, ManifestArray)
-        assert isinstance(combined_vds["lon"].data, ManifestArray)
+            assert isinstance(combined_vds["time"].data, ManifestArray)
+            assert isinstance(combined_vds["lat"].data, ManifestArray)
+            assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
 @parametrize_over_hdf_backends
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
-        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
-        assert (
-            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
-            == "s3://bucket/air.nc"
-        )
+        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            assert (
+                renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                == "s3://bucket/air.nc"
+            )
 
     def test_rename_using_function(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
-
         def local_to_s3_url(old_local_path: str) -> str:
             from pathlib import Path
 
             new_s3_bucket_url = "s3://bucket/"
-
             filename = Path(old_local_path).name
             return str(new_s3_bucket_url + filename)
 
-        renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
-        assert (
-            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
-            == "s3://bucket/air.nc"
-        )
+        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+            renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+            assert (
+                renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                == "s3://bucket/air.nc"
+            )
 
     def test_invalid_type(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
-
-        with pytest.raises(TypeError):
-            vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+            with pytest.raises(TypeError):
+                vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
     @requires_hdf5plugin
     @requires_imagecodecs
     def test_mixture_of_manifestarrays_and_numpy_arrays(
         self, netcdf4_file, hdf_backend
     ):
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             netcdf4_file,
             indexes={},
             loadable_variables=["lat", "lon"],
             backend=hdf_backend,
-        )
-        renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
-        assert (
-            renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
-            == "s3://bucket/air.nc"
-        )
-        assert isinstance(renamed_vds["lat"].data, np.ndarray)
+        ) as vds:
+            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            assert (
+                renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                == "s3://bucket/air.nc"
+            )
+            assert isinstance(renamed_vds["lat"].data, np.ndarray)
 
 
 @requires_hdf5plugin
 @requires_imagecodecs
 def test_nbytes(simple_netcdf4):
-    vds = open_virtual_dataset(simple_netcdf4)
-    assert vds.virtualize.nbytes == 32
-    assert vds.nbytes == 48
+    with open_virtual_dataset(simple_netcdf4) as vds:
+        assert vds.virtualize.nbytes == 32
+        assert vds.nbytes == 48
 
-    vds = open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"])
-    assert vds.virtualize.nbytes == 48
+    with open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"]) as vds:
+        assert vds.virtualize.nbytes == 48
 
-    ds = open_dataset(simple_netcdf4)
-    assert ds.virtualize.nbytes == ds.nbytes
+    with open_dataset(simple_netcdf4) as ds:
+        assert ds.virtualize.nbytes == ds.nbytes

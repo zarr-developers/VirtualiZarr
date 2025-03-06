@@ -29,6 +29,7 @@ dependencies:
   - fsspec
   - pip
   - zarr>=3.0.2
+  - icechunk>=0.2.4
   - pip:
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1

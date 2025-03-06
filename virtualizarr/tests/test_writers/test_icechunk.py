@@ -387,7 +387,9 @@ def test_generate_chunk_key_no_offset():
     # Test case without any offset (append_axis and existing_num_chunks are None)
     index = (1, 2, 3)
     result = generate_chunk_key(index)
-    assert result == "1/2/3", "The chunk key should match the index without any offset."
+    assert result == [1, 2, 3], (
+        "The chunk key should match the index without any offset."
+    )
 
 
 def test_generate_chunk_key_with_offset():
@@ -398,7 +400,7 @@ def test_generate_chunk_key_with_offset():
     result = generate_chunk_key(
         index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
     )
-    assert result == "1/7/3", "The chunk key should offset the second index by 5."
+    assert result == [1, 7, 3], "The chunk key should offset the second index by 5."
 
 
 def test_generate_chunk_key_zero_offset():
@@ -409,7 +411,7 @@ def test_generate_chunk_key_zero_offset():
     result = generate_chunk_key(
         index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
     )
-    assert result == "4/5/6", (
+    assert result == [4, 5, 6], (
         "No offset should be applied when existing_num_chunks is 0."
     )
 
