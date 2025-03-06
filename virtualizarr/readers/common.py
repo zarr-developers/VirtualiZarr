@@ -16,9 +16,13 @@ def construct_fully_virtual_dataset(
 ) -> xr.Dataset:
     """Construct a fully virtual Dataset from constituent parts."""
 
-    data_vars = {name: var for name, var in virtual_vars.items() if name not in coord_names}
-    coord_vars = {name: var for name, var in virtual_vars.items() if name in coord_names}
-    
+    data_vars = {
+        name: var for name, var in virtual_vars.items() if name not in coord_names
+    }
+    coord_vars = {
+        name: var for name, var in virtual_vars.items() if name in coord_names
+    }
+
     # We avoid constructing indexes yet so as to delay loading any data.
     coords = xr.Coordinates(coords=coord_vars, indexes={})
 
@@ -43,7 +47,6 @@ def replace_virtual_with_loadable_vars(
     indexes: Mapping[str, xr.Index] | None = None,
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
-    
     if indexes is not None:
         raise NotImplementedError()
 
@@ -53,7 +56,7 @@ def replace_virtual_with_loadable_vars(
 
     # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
     loadable_ds = xr.open_dataset(
-        fpath, 
+        fpath,
         group=group,
         decode_times=decode_times,
     )
@@ -69,7 +72,7 @@ def replace_virtual_with_loadable_vars(
 
     return xr.merge(
         [
-            ds_loadable_to_keep, 
+            ds_loadable_to_keep,
             ds_virtual_to_keep,
         ]
     )
