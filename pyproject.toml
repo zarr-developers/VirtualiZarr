@@ -83,26 +83,7 @@ all = [
     "virtualizarr[all_readers]",
     "virtualizarr[all_writers]",
 ]
-docs = [
-    "sphinx",
-    "myst_nb",
-    "pydata_sphinx_theme",
-    "sphinx_copybutton",
-    "sphinx_design",
-    "sphinx_togglebutton",
-    "sphinx-autodoc-typehints",
-]
-upstream = [
-    'xarray @ git+https://github.com/pydata/xarray',
-    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
-    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
-    'ujson @ git+https://github.com/ultrajson/ultrajson',
-    # optional dependencies
-    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
-    's3fs @ git+https://github.com/fsspec/s3fs',
-    'kerchunk @ git+https://github.com/fsspec/kerchunk',
-    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
-]
+
 
 [project.urls]
 Home = "https://github.com/zarr-developers/VirtualiZarr"
@@ -144,6 +125,25 @@ pytest-asyncio = ">=0.25.3,<0.26"
 pytest-cov = ">=6.0.0,<7"
 pytest-mypy = ">=0.10.3,<0.11"
 ruff = ">=0.9.9,<0.10"
+
+[tool.pixi.feature.docs.dependencies]
+sphinx = ">=8.2.3,<9"
+
+[dependency-groups]
+upstream = [
+    'xarray @ git+https://github.com/pydata/xarray',
+    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
+    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
+    'ujson @ git+https://github.com/ultrajson/ultrajson',
+    # optional dependencies
+    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
+    's3fs @ git+https://github.com/fsspec/s3fs',
+    'kerchunk @ git+https://github.com/fsspec/kerchunk',
+    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+]
+docs = [
+    "myst-nb>=1.2.0,<2", "pydata-sphinx-theme>=0.16.1,<0.17", "sphinx-copybutton>=0.5.2,<0.6", "sphinx-design>=0.6.1,<0.7", "sphinx-togglebutton>=0.3.2,<0.4", "sphinx-autodoc-typehints>=3.1.0,<4",
+    ]
 
 [tool.pixi.feature.test.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
