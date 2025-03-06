@@ -336,11 +336,11 @@ class HDFVirtualBackend(VirtualBackend):
             attrs.pop("add_offset", None)
         else:
             dtype = dataset.dtype
-            
+
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-        
+
         fill_value = dataset.fillvalue.item()
         metadata = create_v3_array_metadata(
             shape=dataset.shape,

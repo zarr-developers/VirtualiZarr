@@ -165,6 +165,7 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 @pytest.fixture
 def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
     """Factory fixture to create multiple NetCDF4 files."""
+
     def create_netcdf4_files(
         encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> tuple[str, str]:
