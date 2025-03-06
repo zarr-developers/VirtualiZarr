@@ -5,8 +5,8 @@ from xarray import Dataset, Index
 
 from virtualizarr.readers.common import (
     VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
+    #construct_virtual_dataset,
+    #maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,

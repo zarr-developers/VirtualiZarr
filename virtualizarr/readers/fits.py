@@ -5,7 +5,6 @@ from xarray import Dataset, Index, Variable
 
 from virtualizarr.readers.common import (
     VirtualBackend,
-    construct_virtual_dataset,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,
