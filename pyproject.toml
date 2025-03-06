@@ -84,32 +84,23 @@ all = [
 ]
 
 [dependency-groups]
-test = [
+dev = [
     "codecov",
     "mypy",
     "pandas-stubs",
     "pooch",
     "pre-commit",
+    "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
     "pytest",
     "ruff",
     "s3fs",
+    "twine",
     "netCDF4",
     "h5netcdf",
     "hdf5plugin",
     "virtualizarr[all]",
-]
-upstream = [
-    'xarray @ git+https://github.com/pydata/xarray',
-    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
-    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
-    'ujson @ git+https://github.com/ultrajson/ultrajson',
-    # optional dependencies
-    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
-    's3fs @ git+https://github.com/fsspec/s3fs',
-    'kerchunk @ git+https://github.com/fsspec/kerchunk',
-    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
 ]
 docs = [
     "myst-nb>=1.2.0,<2",
@@ -142,10 +133,18 @@ exclude = ["docs", "tests", "tests.*", "docs.*"]
 datatree = ["py.typed"]
 
 [tool.uv]
-default-groups = ["test"]
+default-groups = ["dev"]
 
 [tool.uv.sources]
 virtualizarr = { workspace = true }
+xarray = { git = "https://github.com/pydata/xarray" }
+universal-pathlib = { git = "https://github.com/fsspec/universal_pathlib" }
+numcodecs = { git = "https://github.com/zarr-developers/numcodecs" }
+ujson = { git = "https://github.com/ultrajson/ultrajson" }
+fsspec = { git = "https://github.com/fsspec/filesystem_spec" }
+s3fs = { git = "https://github.com/fsspec/s3fs" }
+kerchunk = { git = "https://github.com/fsspec/kerchunk" }
+icechunk = { git = "https://github.com/earth-mover/icechunk", subdirectory = "icechunk-python" }
 
 [tool.mypy]
 files = "virtualizarr/**/*.py"

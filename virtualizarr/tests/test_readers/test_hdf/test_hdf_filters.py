@@ -42,7 +42,6 @@ class TestFilterToCodec:
             "clevel": 9,
             "shuffle": 2,
             "cname": "lz4",
-            "typesize": None,
         }
         assert codec.get_config() == expected_config
 
