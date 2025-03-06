@@ -92,6 +92,17 @@ docs = [
     "sphinx_togglebutton",
     "sphinx-autodoc-typehints",
 ]
+upstream = [
+    'xarray @ git+https://github.com/pydata/xarray',
+    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
+    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
+    'ujson @ git+https://github.com/ultrajson/ultrajson',
+    # optional dependencies
+    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
+    's3fs @ git+https://github.com/fsspec/s3fs',
+    'kerchunk @ git+https://github.com/fsspec/kerchunk',
+    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+]
 
 [project.urls]
 Home = "https://github.com/zarr-developers/VirtualiZarr"
@@ -146,6 +157,8 @@ test-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr
 test = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib"]
 test-py311 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py311"] # test against python 3.11
 test-py312 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py312"] # test against python 3.12
+upstream = ["upstream", "test", "hdf5-lib", "py312"]
+min-deps = ["test", "py312"]
 docs = ["docs"]
 
 [tool.pixi.feature.docs.tasks]

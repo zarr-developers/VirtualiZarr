@@ -18,20 +18,25 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.python-version }}-build
+    name: ${{ matrix.environment }}-build
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
-        environment: [test-py311, test-py312]
+        environment: [test-py311, test-py312, upstream, min-deps]
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.3
         with:
           pixi-version: v0.41.4
           environments: ${{ matrix.environment }}
+
+      - name: Install Rust # For icechunk dev version
+        uses: dtolnay/rust-toolchain@stable
+        if: "${{ matrix.environment }} == upstream"
+
       - name: List installed libraries
         run: |
           pixi run -e ${{ matrix.environment }} pip list
