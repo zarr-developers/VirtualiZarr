@@ -360,10 +360,8 @@ def test_checksum(
 
     vds = xr.Dataset({"pres": ma_v})
 
-    # Icechunk checksums currently store with second precision, so we need to make sure
-    # the checksum_date is at least one second in the future
-    checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
-    vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at=checksum_date)
+    # default behaviour is to create a checksum based on the current time
+    vds.virtualize.to_icechunk(icechunk_filestore)
 
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
