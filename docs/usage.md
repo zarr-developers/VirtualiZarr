@@ -476,11 +476,11 @@ We can also write these references out as an [IcechunkStore](https://icechunk.io
 ```python
 # create an icechunk repository, session and write the virtual dataset to the session
 import icechunk
-storage = local_filesystem_storage("./local/icechunk/store")
+storage = icechunk.local_filesystem_storage("./local/icechunk/store")
 
 # By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
 repo = icechunk.Repository.create(storage)
-session = repo.writeable_session("main")
+session = repo.writable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
 vds1.virtualize.to_icechunk(session.store)
