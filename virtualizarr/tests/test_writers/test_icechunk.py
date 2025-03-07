@@ -367,7 +367,9 @@ def test_checksum(
     with pytest.raises(TypeError):
         vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
 
-    time.sleep(1)  # Make sure the checksum_date is at least one second in the past before trying to read data back
+    time.sleep(
+        1
+    )  # Make sure the checksum_date is at least one second in the past before trying to read data back
 
     root_group = zarr.group(store=icechunk_filestore)
     pres_array = root_group["pres"]
