@@ -360,14 +360,16 @@ def test_checksum(
 
     vds = xr.Dataset({"pres": ma_v})
 
-    # Icechunk checksums currently store with second precision, so we need to make sure
-    # the checksum_date is at least one second in the future
-    checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
-    vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at=checksum_date)
+    # default behaviour is to create a checksum based on the current time
+    vds.virtualize.to_icechunk(icechunk_filestore)
 
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
         vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
+
+    time.sleep(
+        1
+    )  # Make sure the checksum_date is at least one second in the past before trying to read data back
 
     root_group = zarr.group(store=icechunk_filestore)
     pres_array = root_group["pres"]
@@ -384,7 +386,6 @@ def test_checksum(
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
     var = xr.Variable(data=arr, dims=["x", "y"])
     ds = xr.Dataset({"foo": var})
-    time.sleep(1)  # Make sure the checksum_date is at least one second in the future
     ds.to_netcdf(netcdf_path)
 
     # Now if we try to read the data back in, it should fail because the checksum_date
