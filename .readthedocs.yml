@@ -9,9 +9,8 @@ build:
     python: mambaforge-latest
   commands:
     - mamba install -c conda-forge -c nodefaults uv
-    - uv run --no-sources --group docs zsh
-    - make -C docs clean
-    - make -C docs html
+    - uv run --no-sources --group docs make -C docs clean
+    - uv run --no-sources --group docs make -C docs html
     - rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTHEDOCS_OUTPUT/html
 
 # Build documentation in the doc/ directory with Sphinx
