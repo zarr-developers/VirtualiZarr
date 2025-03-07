@@ -181,7 +181,7 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 @pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
+    result = open_virtual_dataset(dmrpp_url, filetype="dmrpp")
     expected = open_virtual_dataset(data_url, indexes={})
     xr.testing.assert_identical(result, expected)
 

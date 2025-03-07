@@ -9,7 +9,7 @@ from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.readers.common import VirtualBackend
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 from virtualizarr.zarr import ZArray

@@ -4,11 +4,12 @@ from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
-from virtualizarr.readers.common import (
-    VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
-)
+from virtualizarr.readers.api import VirtualBackend
+
+# from virtualizarr.readers.common import (
+# construct_virtual_dataset,
+# maybe_open_loadable_vars_and_indexes,
+# )
 from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,

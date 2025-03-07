@@ -3,9 +3,8 @@ from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index, Variable
 
-from virtualizarr.readers.common import (
+from virtualizarr.readers.api import (
     VirtualBackend,
-    construct_virtual_dataset,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,

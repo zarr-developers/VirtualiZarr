@@ -18,7 +18,7 @@ from virtualizarr.readers import (
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
 )
-from virtualizarr.readers.common import VirtualBackend
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
 
 # TODO add entrypoint to allow external libraries to add to this mapping
