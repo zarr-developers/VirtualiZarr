@@ -74,6 +74,7 @@ icechunk = [
     "icechunk>=0.2.4",
 ]
 kerchunk = ["fastparquet"]
+
 all_writers = [
     "virtualizarr[icechunk]",
     "virtualizarr[kerchunk]",
@@ -83,23 +84,10 @@ all = [
     "virtualizarr[all_writers]",
 ]
 
-test = [
-    "codecov",
-    "mypy",
-    "pandas-stubs",
-    "pooch",
-    "pre-commit",
-    "pytest-cov",
-    "pytest-mypy",
-    "pytest",
-    "ruff",
-    "s3fs",
-    "virtualizarr[all]"
-]
 
 [project.urls]
-Home = "https://github.com/TomNicholas/VirtualiZarr"
-Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+Home = "https://github.com/zarr-developers/VirtualiZarr"
+Documentation = "https://github.com/zarr-developers/VirtualiZarr/blob/main/README.md"
 
 [build-system]
 requires = [
@@ -108,6 +96,74 @@ requires = [
     "setuptools_scm[toml]>=7.0",
     "check-manifest"
 ]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.pypi-dependencies]
+virtualizarr = { path = ".", editable = true }
+
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.hdf5-lib.dependencies]
+netcdf4 = ">=1.7.2,<2"
+hdf5 = ">=1.14.4,<2"
+h5netcdf = ">=1.5.0,<2"
+
+[tool.pixi.feature.test.dependencies]
+codecov = ">=2.1.13,<3"
+mypy = ">=1.15.0,<2"
+pandas-stubs = ">=2.2.3.241126,<3"
+pooch = ">=1.8.2,<2"
+pre-commit = ">=4.1.0,<5"
+pytest-asyncio = ">=0.25.3,<0.26"
+pytest-cov = ">=6.0.0,<7"
+pytest-mypy = ">=0.10.3,<0.11"
+ruff = ">=0.9.9,<0.10"
+
+[tool.pixi.feature.docs.dependencies]
+sphinx = ">=8.2.3,<9"
+
+[dependency-groups]
+upstream = [
+    'xarray @ git+https://github.com/pydata/xarray',
+    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
+    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
+    'ujson @ git+https://github.com/ultrajson/ultrajson',
+    # optional dependencies
+    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
+    's3fs @ git+https://github.com/fsspec/s3fs',
+    'kerchunk @ git+https://github.com/fsspec/kerchunk',
+    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+]
+docs = [
+    "myst-nb>=1.2.0,<2", "pydata-sphinx-theme>=0.16.1,<0.17", "sphinx-copybutton>=0.5.2,<0.6", "sphinx-design>=0.6.1,<0.7", "sphinx-togglebutton>=0.3.2,<0.4", "sphinx-autodoc-typehints>=3.1.0,<4",
+    ]
+
+[tool.pixi.feature.test.tasks]
+run-mypy = { cmd = "mypy virtualizarr" }
+test = { cmd = "pytest --run-network-tests" }
+test-no-network = { cmd = "pytest" }
+test-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
+test-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
+test-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+
+[tool.pixi.environments]
+test = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib"]
+test-py311 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py311"] # test against python 3.11
+test-py312 = ["remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "test", "hdf5-lib", "py312"] # test against python 3.12
+upstream = ["upstream", "test", "hdf5-lib", "py312"]
+min-deps = ["test", "py312"]
+docs = ["docs"]
+
+[tool.pixi.feature.docs.tasks]
+docs = { cmd = "make html", cwd = "docs" }
+readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTHEDOCS_OUTPUT/html"
 
 [tool.setuptools_scm]
 fallback_version = "9999"

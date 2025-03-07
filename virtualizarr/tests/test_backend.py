@@ -274,6 +274,8 @@ class TestReadFromURL:
         ],
     )
     def test_read_from_url(self, hdf_backend, filetype, url):
+        if filetype == "netcdf3":
+            pytest.importorskip("scipy")
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
                 open_virtual_dataset(url, reader_options={}, indexes={})
