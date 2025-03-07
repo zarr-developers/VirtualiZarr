@@ -66,7 +66,7 @@ class HDF5VirtualBackend(VirtualBackend):
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            #drop_variables=drop_variables,
+            # drop_variables=drop_variables,
             indexes=indexes,
             decode_times=decode_times,
         )
