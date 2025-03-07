@@ -163,9 +163,7 @@ class TestRoundtrip:
             ds.to_netcdf(air_nc_path)
 
             # use open_dataset_via_kerchunk to read it as references
-            with open_virtual_dataset(
-                str(air_nc_path), backend=hdf_backend
-            ) as vds:
+            with open_virtual_dataset(str(air_nc_path), backend=hdf_backend) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
 
                 # assert all_close to original dataset

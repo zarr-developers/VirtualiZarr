@@ -328,9 +328,7 @@ class TestReadFromURL:
 @parametrize_over_hdf_backends
 class TestOpenVirtualDatasetHDFGroup:
     def test_open_empty_group(self, empty_netcdf4_file, hdf_backend):
-        with open_virtual_dataset(
-            empty_netcdf4_file, backend=hdf_backend
-        ) as vds:
+        with open_virtual_dataset(empty_netcdf4_file, backend=hdf_backend) as vds:
             assert isinstance(vds, xr.Dataset)
             expected = Dataset()
             xrt.assert_identical(vds, expected)
@@ -442,9 +440,7 @@ class TestLoadVirtualDataset:
         self, mock_read_kerchunk, netcdf4_file
     ):
         reader_options = {"option1": "value1", "option2": "value2"}
-        with open_virtual_dataset(
-            netcdf4_file, reader_options=reader_options
-        ):
+        with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
             pass
         args = {
             "filepath": netcdf4_file,
