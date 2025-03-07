@@ -91,7 +91,7 @@ def test_FileType():
 @parametrize_over_hdf_backends
 class TestOpenVirtualDatasetIndexes:
     def test_no_indexes(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
         assert vds.indexes == {}
 
     @requires_hdf5plugin
@@ -152,7 +152,6 @@ def test_cftime_index(tmp_path: Path, hdf_backend: type[VirtualBackend]):
     with open_virtual_dataset(
         str(tmp_path / "tmp.nc"),
         loadable_variables=["time", "lat", "lon"],
-        indexes={},
         backend=hdf_backend,
     ) as vds:
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
@@ -166,12 +165,12 @@ def test_cftime_index(tmp_path: Path, hdf_backend: type[VirtualBackend]):
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #150
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
         assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
 
     def test_coordinate_variable_attrs_preserved(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #155
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
         assert vds["lat"].attrs == {
             "standard_name": "latitude",
             "long_name": "Latitude",
@@ -183,12 +182,12 @@ class TestOpenVirtualDatasetAttrs:
 @parametrize_over_hdf_backends
 class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             assert set(vds.coords) == {"time", "lat", "lon"}
 
     def test_var_attr_coords(self, netcdf4_file_with_2d_coords, hdf_backend):
         with open_virtual_dataset(
-            netcdf4_file_with_2d_coords, indexes={}, backend=hdf_backend
+            netcdf4_file_with_2d_coords, backend=hdf_backend
         ) as vds:
             expected_dimension_coords = ["ocean_time", "s_rho"]
             expected_2d_coords = ["lon_rho", "lat_rho", "h"]
@@ -282,7 +281,6 @@ class TestReadFromURL:
                 url,
                 group="science/LSAR/GCOV/grids/frequencyA",
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
-                indexes={},
                 reader_options={},
                 backend=hdf_backend,
             ) as vds:
@@ -315,7 +313,6 @@ class TestReadFromURL:
             open_virtual_dataset(
                 tmpfile,
                 group=hdf_group,
-                indexes={},
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
                 backend=hdf_backend,
             ) as vds,
@@ -332,7 +329,7 @@ class TestReadFromURL:
 class TestOpenVirtualDatasetHDFGroup:
     def test_open_empty_group(self, empty_netcdf4_file, hdf_backend):
         with open_virtual_dataset(
-            empty_netcdf4_file, indexes={}, backend=hdf_backend
+            empty_netcdf4_file, backend=hdf_backend
         ) as vds:
             assert isinstance(vds, xr.Dataset)
             expected = Dataset()
@@ -344,7 +341,6 @@ class TestOpenVirtualDatasetHDFGroup:
         with open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group="subgroup",
-            indexes={},
             backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["bar"]
@@ -361,7 +357,6 @@ class TestOpenVirtualDatasetHDFGroup:
         with open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group=group,
-            indexes={},
             backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["foo"]
@@ -379,7 +374,6 @@ class TestLoadVirtualDataset:
             open_virtual_dataset(
                 netcdf4_file,
                 loadable_variables=vars_to_load,
-                indexes={},
                 backend=hdf_backend,
             ) as vds,
             xr.open_dataset(netcdf4_file, decode_times=True) as full_ds,
@@ -434,7 +428,6 @@ class TestLoadVirtualDataset:
                 hdf5_groups_file,
                 group="test/group",
                 loadable_variables=vars_to_load,
-                indexes={},
                 backend=hdf_backend,
             ) as vds,
             xr.open_dataset(hdf5_groups_file, group="test/group") as full_ds,
@@ -450,7 +443,7 @@ class TestLoadVirtualDataset:
     ):
         reader_options = {"option1": "value1", "option2": "value2"}
         with open_virtual_dataset(
-            netcdf4_file, indexes={}, reader_options=reader_options
+            netcdf4_file, reader_options=reader_options
         ):
             pass
         args = {

@@ -83,7 +83,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
     # loading the variables should produce same result as inlining them using kerchunk
     with open_virtual_dataset(
-        netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
+        netcdf4_file, loadable_variables=vars_to_inline, backend=hdf_backend
     ) as vds:
         refs = vds.virtualize.to_kerchunk(format="dict")
 
@@ -164,7 +164,7 @@ class TestRoundtrip:
 
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(
-                str(air_nc_path), indexes={}, backend=hdf_backend
+                str(air_nc_path), backend=hdf_backend
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
 
@@ -203,13 +203,11 @@ class TestRoundtrip:
             with (
                 open_virtual_dataset(
                     str(air1_nc_path),
-                    indexes={},
                     loadable_variables=time_vars,
                     backend=hdf_backend,
                 ) as vds1,
                 open_virtual_dataset(
                     str(air2_nc_path),
-                    indexes={},
                     loadable_variables=time_vars,
                     backend=hdf_backend,
                 ) as vds2,
@@ -264,7 +262,7 @@ class TestRoundtrip:
         nc_path = tmp_path / "non_dim_coords.nc"
         ds.to_netcdf(nc_path)
 
-        with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(str(nc_path), backend=hdf_backend) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs
 
@@ -325,14 +323,14 @@ def test_open_scalar_variable(tmp_path: Path, hdf_backend: type[VirtualBackend])
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(nc_path)
 
-    with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+    with open_virtual_dataset(str(nc_path), backend=hdf_backend) as vds:
         assert vds["a"].shape == ()
 
 
 @parametrize_over_hdf_backends
 class TestPathsToURIs:
     def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()
             path = manifest["0.0.0"]["path"]
