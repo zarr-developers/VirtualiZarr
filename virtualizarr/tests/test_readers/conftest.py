@@ -222,7 +222,7 @@ def skip_test_for_libhdf5_version():
     return libhdf5_version < Version("1.14")
 
 
-@pytest.fixture(params=["zlib", ""])
+@pytest.fixture(params=["blosc_zlib", ""])
 def filter_encoded_roundtrip_netcdf4_file(
     tmpdir, request, skip_test_for_libhdf5_version
 ):
