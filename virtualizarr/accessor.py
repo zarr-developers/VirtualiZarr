@@ -17,11 +17,11 @@ class VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
 
-    Methods on this object are called via `ds.virtualize.{method}`.
+    Methods on this object are called via `vds.virtualize.{method}`.
     """
 
-    def __init__(self, ds: Dataset):
-        self.ds: Dataset = ds
+    def __init__(self, vds: Dataset):
+        self.vds: Dataset = vds
 
     def to_icechunk(
         self,
@@ -69,7 +69,7 @@ class VirtualiZarrDatasetAccessor:
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
         dataset_to_icechunk(
-            self.ds,
+            self.vds,
             store,
             group=group,
             append_dim=append_dim,
@@ -122,7 +122,7 @@ class VirtualiZarrDatasetAccessor:
         ----------
         https://fsspec.github.io/kerchunk/spec.html
         """
-        refs = dataset_to_kerchunk_refs(self.ds)
+        refs = dataset_to_kerchunk_refs(self.vds)
 
         if format == "dict":
             return refs
@@ -195,7 +195,7 @@ class VirtualiZarrDatasetAccessor:
         ChunkManifest.rename_paths
         """
 
-        new_ds = self.ds.copy()
+        new_ds = self.vds.copy()
         for var_name in new_ds.variables:
             data = new_ds[var_name].data
             if isinstance(data, ManifestArray):
@@ -218,5 +218,5 @@ class VirtualiZarrDatasetAccessor:
             var.data.nbytes_virtual
             if isinstance(var.data, ManifestArray)
             else var.nbytes
-            for var in self.ds.variables.values()
+            for var in self.vds.variables.values()
         )
