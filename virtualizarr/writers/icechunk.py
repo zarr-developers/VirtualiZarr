@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
@@ -335,7 +335,7 @@ def write_manifest_virtual_refs(
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
-            last_updated_at_checksum=last_updated_at,
+            last_updated_at_checksum=datetime.now(),
         )
         for path, offset, length in it
     ]

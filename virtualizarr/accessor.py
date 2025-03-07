@@ -45,7 +45,7 @@ class VirtualiZarrDatasetAccessor:
         chunks written to the store with this operation.  At read time, if any of the
         virtual chunks have been updated since this provided datetime, an error will be
         raised.  This protects against reading outdated virtual chunks that have been
-        updated since the last read.  When not provided, no check is performed.  This
+        updated since the last read.  When not provided, the current time is used.  This
         value is stored in Icechunk with seconds precision, so be sure to take that into
         account when providing this value.
 
@@ -59,24 +59,12 @@ class VirtualiZarrDatasetAccessor:
             Dimension along which to append the virtual dataset.
         last_updated_at: datetime, optional
             Datetime to use as a checksum for any virtual chunks written to the store
-            with this operation.  When not provided, no check is performed.
+            with this operation. When not provided, the current time is used.
 
         Raises
         ------
         ValueError
             If the store is read-only.
-
-        Examples
-        --------
-        To ensure an error is raised if the files containing referenced virtual chunks
-        are modified at any time from now on, pass the current time to
-        ``last_updated_at``.
-
-        >>> from datetime import datetime
-        >>> vds.virtualize.to_icechunk(  # doctest: +SKIP
-        ...     icechunkstore,
-        ...     last_updated_at=datetime.now(),
-        ... )
         """
         from virtualizarr.writers.icechunk import dataset_to_icechunk
 
