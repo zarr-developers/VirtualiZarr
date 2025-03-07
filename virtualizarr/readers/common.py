@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Mapping
 from typing import (
-    Hashable,
     Any,
+    Hashable,
     MutableMapping,
     Optional,
 )
@@ -62,7 +62,9 @@ def replace_virtual_with_loadable_vars(
     if isinstance(loadable_variables, list):
         # this will automatically keep any IndexVariables needed for loadable 1D coordinates
         ds_loadable_to_keep = loadable_ds[loadable_variables]
-        ds_virtual_to_keep = fully_virtual_dataset.drop_vars(loadable_variables, errors='ignore')
+        ds_virtual_to_keep = fully_virtual_dataset.drop_vars(
+            loadable_variables, errors="ignore"
+        )
     elif loadable_variables is None:
         # TODO if loadable_variables is None then we have to explicitly match default behaviour of xarray
         # i.e. load and create indexes only for dimension coordinate variables
