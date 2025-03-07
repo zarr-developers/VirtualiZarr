@@ -83,23 +83,37 @@ all = [
     "virtualizarr[all_writers]",
 ]
 
-test = [
+[dependency-groups]
+dev = [
     "codecov",
     "mypy",
     "pandas-stubs",
     "pooch",
     "pre-commit",
+    "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
     "pytest",
     "ruff",
     "s3fs",
-    "virtualizarr[all]"
+    "twine",
+    "netCDF4",
+    "h5netcdf",
+    "hdf5plugin",
+    "virtualizarr[all]",
 ]
+docs = [
+    "myst-nb>=1.2.0,<2",
+    "pydata-sphinx-theme>=0.16.1,<0.17",
+    "sphinx-copybutton>=0.5.2,<0.6",
+    "sphinx-design>=0.6.1,<0.7",
+    "sphinx-togglebutton>=0.3.2,<0.4",
+    "sphinx-autodoc-typehints>=3.1.0,<4",
+    ]
 
 [project.urls]
-Home = "https://github.com/TomNicholas/VirtualiZarr"
-Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+Home = "https://github.com/zarr-developers/virtualizarr"
+Documentation = "https://virtualizarr.readthedocs.io/"
 
 [build-system]
 requires = [
@@ -117,6 +131,20 @@ exclude = ["docs", "tests", "tests.*", "docs.*"]
 
 [tool.setuptools.package-data]
 datatree = ["py.typed"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.sources]
+virtualizarr = { workspace = true }
+xarray = { git = "https://github.com/pydata/xarray" }
+universal-pathlib = { git = "https://github.com/fsspec/universal_pathlib" }
+numcodecs = { git = "https://github.com/zarr-developers/numcodecs" }
+ujson = { git = "https://github.com/ultrajson/ultrajson" }
+fsspec = { git = "https://github.com/fsspec/filesystem_spec" }
+s3fs = { git = "https://github.com/fsspec/s3fs" }
+kerchunk = { git = "https://github.com/fsspec/kerchunk" }
+icechunk = { git = "https://github.com/earth-mover/icechunk", subdirectory = "icechunk-python" }
 
 [tool.mypy]
 files = "virtualizarr/**/*.py"

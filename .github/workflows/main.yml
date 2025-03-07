@@ -32,26 +32,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup micromamba
-        uses: mamba-org/setup-micromamba@v1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          environment-file: ci/environment.yml
-          cache-environment: true
-          create-args: >-
-            python=${{matrix.python-version}}
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install virtualizarr
-        run: |
-           python -m pip install -e . --no-deps
+      - name: Install VirtualiZarr
+        run: uv sync --all-extras --no-sources
 
-      - name: Conda list information
+      - name: List environment information
         run: |
-          micromamba env list
-          micromamba list
+          uv pip list
 
       - name: Running Tests
         run: |
-          python -m pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml
+          uv run --all-extras --no-sources pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4

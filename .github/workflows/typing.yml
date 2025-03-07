@@ -26,16 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.12'
 
-      - name: Install deps
-        run: |
-          # We need to test optional dep to add all the library stubs
-          pip install -e '.[test]'
-
       - name: Type check
         run: |
-          mypy virtualizarr
+          uv run --no-sources mypy virtualizarr
