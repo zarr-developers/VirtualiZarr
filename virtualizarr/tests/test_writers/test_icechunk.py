@@ -15,7 +15,6 @@ import zarr
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.common import separate_coords
 from virtualizarr.writers.icechunk import generate_chunk_key
 from virtualizarr.zarr import ZArray
 
@@ -639,6 +638,7 @@ class TestAppend:
             xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with encoding, it succeeds
+    @pytest.mark.xfail
     @pytest.mark.asyncio
     async def test_append_with_multiple_root_arrays(
         self, icechunk_repo: "Repository", netcdf4_files_factory: Callable

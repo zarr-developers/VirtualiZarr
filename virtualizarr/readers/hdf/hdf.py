@@ -109,11 +109,12 @@ class HDFVirtualBackend(VirtualBackend):
 
         vds = replace_virtual_with_loadable_vars(
             fully_virtual_dataset,
+            filepath,
+            group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            drop_variables=drop_variables,
+            #drop_variables=drop_variables,
             indexes=indexes,
-            group=group,
             decode_times=decode_times,
         )
 
