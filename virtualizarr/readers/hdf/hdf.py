@@ -69,6 +69,8 @@ class HDFVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> xr.Dataset:
+        if h5py is None:
+            raise ImportError("h5py is required for using the HDFVirtualBackend")
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "HDF reader does not understand any virtual_backend_kwargs"
