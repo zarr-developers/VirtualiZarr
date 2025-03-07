@@ -3,7 +3,7 @@ from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index, Variable
 
-from virtualizarr.readers.common import (
+from virtualizarr.readers.api import (
     VirtualBackend,
 )
 from virtualizarr.translators.kerchunk import (

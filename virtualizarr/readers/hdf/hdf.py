@@ -23,8 +23,8 @@ from virtualizarr.manifests import (
     ManifestArray,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.common import (
-    VirtualBackend,
     construct_fully_virtual_dataset,
     replace_virtual_with_loadable_vars,
 )

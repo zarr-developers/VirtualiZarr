@@ -3,8 +3,8 @@ from typing import Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.common import (
-    VirtualBackend,
     construct_fully_virtual_dataset,
     replace_virtual_with_loadable_vars,
 )

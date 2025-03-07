@@ -1,4 +1,3 @@
-from abc import ABC
 from collections.abc import Iterable, Mapping
 from typing import (
     Hashable,
@@ -127,32 +126,3 @@ def separate_coords(
     coords = xr.Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
-
-
-# TODO move this into a separate api.py module
-class VirtualBackend(ABC):
-    @staticmethod
-    def open_virtual_dataset(
-        filepath: str,
-        group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, xr.Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> xr.Dataset:
-        raise NotImplementedError()
-
-    @staticmethod
-    def open_virtual_datatree(
-        path: str,
-        group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, xr.Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> xr.DataTree:
-        raise NotImplementedError()
