@@ -329,9 +329,8 @@ def write_manifest_virtual_refs(
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
 
-    # Icechunk checksums currently store with second precision, so we need to make sure
-    # the checksum_date is at least one second in the future
-    timestamp_checksum = datetime.now(timezone.utc) + timedelta(seconds=1)
+    if last_updated_at is None:
+        last_updated_at = datetime.now(timezone.utc)
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
@@ -339,7 +338,7 @@ def write_manifest_virtual_refs(
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
-            last_updated_at_checksum=timestamp_checksum,
+            last_updated_at_checksum=last_updated_at,
         )
         for path, offset, length in it
     ]
