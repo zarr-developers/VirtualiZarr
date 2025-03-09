@@ -2,9 +2,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from xarray import Dataset, register_dataset_accessor
+from xarray import Dataset, open_zarr, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.storage._obstore import VirtualObjectStore
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
@@ -23,6 +24,10 @@ class VirtualiZarrDatasetAccessor:
     def __init__(self, ds: Dataset):
         self.ds: Dataset = ds
 
+    def to_virtual_object_store(self, **kwargs) -> Dataset:
+        store = VirtualObjectStore(self.ds, **kwargs)
+        return open_zarr(store, zarr_format=3, consolidated=False)
+
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -31,7 +36,7 @@ class VirtualiZarrDatasetAccessor:
         append_dim: str | None = None,
         last_updated_at: datetime | None = None,
     ) -> None:
-        """
+        """o
         Write an xarray dataset to an Icechunk store.
 
         Any variables backed by ManifestArray objects will be be written as virtual
