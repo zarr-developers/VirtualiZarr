@@ -3,10 +3,9 @@ import pytest
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.tests import requires_network, requires_zarr_python_v3
+from virtualizarr.tests import requires_network
 
 
-@requires_zarr_python_v3
 @requires_network
 @pytest.mark.parametrize(
     "zarr_store",

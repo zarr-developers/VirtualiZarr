@@ -16,7 +16,6 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
-from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -194,7 +193,7 @@ def check_compatible_arrays(
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
-    check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
+    check_same_codecs([get_codecs(arr) for arr in arrays])
     check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
@@ -212,8 +211,10 @@ def write_virtual_variable_to_icechunk(
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
 
+    from virtualizarr.codecs import extract_codecs
+
     ma = cast(ManifestArray, var.data)
-    zarray = ma.zarray
+    metadata = ma.metadata
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
@@ -242,16 +243,17 @@ def write_virtual_variable_to_icechunk(
         )
     else:
         append_axis = None
-        # create array if it doesn't already exist
+        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
+        filters, _, compressors = extract_codecs(metadata.codecs)
         arr = group.require_array(
             name=name,
-            shape=zarray.shape,
-            chunks=zarray.chunks,
-            dtype=encode_dtype(zarray.dtype),
-            compressors=zarray._v3_codec_pipeline(),  # compressors,
-            serializer=zarray.serializer(),
+            shape=metadata.shape,
+            chunks=metadata.chunks,
+            dtype=metadata.data_type.to_numpy(),
+            filters=filters,
+            compressors=compressors,
             dimension_names=var.dims,
-            fill_value=zarray.fill_value,
+            fill_value=metadata.fill_value,
         )
 
         arr.update_attributes(
@@ -278,17 +280,18 @@ def generate_chunk_key(
     index: tuple[int, ...],
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
-) -> str:
+) -> list[int]:
     if append_axis and append_axis >= len(index):
         raise ValueError(
             f"append_axis {append_axis} is greater than the number of indices {len(index)}"
         )
-    return "/".join(
-        str(ind + existing_num_chunks)
+
+    return [
+        ind + existing_num_chunks
         if axis is append_axis and existing_num_chunks is not None
-        else str(ind)
+        else ind
         for axis, ind in enumerate(index)
-    )
+    ]
 
 
 def write_manifest_virtual_refs(
@@ -301,13 +304,18 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
+    from icechunk import VirtualChunkSpec
 
-    key_prefix = f"{group.name}/{arr_name}"
+    if group.name == "/":
+        key_prefix = arr_name
+    else:
+        key_prefix = f"{group.name}/{arr_name}"
 
     # loop over every reference in the ChunkManifest for that array
     # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
     # but Icechunk need to expose a suitable API first
     # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
+
     it = np.nditer(
         [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
         flags=[
@@ -318,17 +326,15 @@ def write_manifest_virtual_refs(
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
 
-    for path, offset, length in it:
-        # it.multi_index will be an iterator of the chunk shape
-        index = it.multi_index
-        chunk_key = generate_chunk_key(index, append_axis, existing_num_chunks)
-
-        # set each reference individually
-        store.set_virtual_ref(
-            # TODO it would be marginally neater if I could pass the group and name as separate args
-            key=f"{key_prefix}/c/{chunk_key}",  # should be of form 'group/arr_name/c/0/1/2', where c stands for chunks
+    virtual_chunk_spec_list = [
+        VirtualChunkSpec(
+            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
-            checksum=last_updated_at,
+            last_updated_at_checksum=last_updated_at,
         )
+        for path, offset, length in it
+    ]
+
+    store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)

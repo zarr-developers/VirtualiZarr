@@ -51,9 +51,7 @@ class FileType(AutoName):
     grib = auto()
     tiff = auto()
     fits = auto()
-    zarr = auto()
     dmrpp = auto()
-    zarr_v3 = auto()
     kerchunk = auto()
 
 
@@ -112,9 +110,9 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    virtual_backend_kwargs: Optional[dict] = None,
-    reader_options: Optional[dict] = None,
-    backend: Optional[VirtualBackend] = None,
+    virtual_backend_kwargs: dict | None = None,
+    reader_options: dict | None = None,
+    backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -129,7 +127,7 @@ def open_virtual_dataset(
         File path to open as a set of virtualized zarr arrays.
     filetype : FileType or str, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'zarr_v3', 'kerchunk'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".

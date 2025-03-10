@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import h5py  # type: ignore
+import numpy as np
 import pytest
 
 from virtualizarr import open_virtual_dataset
@@ -110,6 +111,36 @@ class TestDatasetToVariable:
             string_attributes_hdf5_file, ds, group=""
         )
         assert var.attrs["attribute_name"] == "attribute_name"
+
+    def test_scalar_fill_value(self, scalar_fill_value_hdf5_file):
+        f = h5py.File(scalar_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            scalar_fill_value_hdf5_file, ds, group=""
+        )
+        assert var.data.metadata.fill_value == 42
+
+    def test_cf_fill_value(self, cf_fill_value_hdf5_file):
+        f = h5py.File(cf_fill_value_hdf5_file)
+        ds = f["data"]
+        if ds.dtype.kind in "S":
+            pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
+        if ds.dtype.names:
+            pytest.xfail(
+                "To fix, structured dtype fill value encoding for Zarr backend"
+            )
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_fill_value_hdf5_file, ds, group=""
+        )
+        assert "_FillValue" in var.encoding
+
+    def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
+        f = h5py.File(cf_array_fill_value_hdf5_file)
+        ds = f["data"]
+        var = HDFVirtualBackend._dataset_to_variable(
+            cf_array_fill_value_hdf5_file, ds, group=""
+        )
+        assert not isinstance(var.encoding["_FillValue"], np.ndarray)
 
 
 @requires_hdf5plugin

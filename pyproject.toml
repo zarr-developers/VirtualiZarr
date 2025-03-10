@@ -23,9 +23,12 @@ dependencies = [
     "xarray>=2025.1.1",
     "numpy>=2.0.0",
     "universal-pathlib",
-    "numcodecs",
+    "numcodecs>=0.15.1",
     "ujson",
     "packaging",
+    "zarr>=3.0.2",
+    "ipython>=9.0.2",
+    "ipdb>=0.13.13",
 ]
 
 [project.optional-dependencies]
@@ -71,7 +74,7 @@ all_readers = [
 
 # writers
 icechunk = [
-    "icechunk>=0.1.1",
+    "icechunk>=0.2.4",
 ]
 kerchunk = ["fastparquet"]
 all_writers = [
@@ -96,6 +99,37 @@ test = [
     "s3fs",
     "virtualizarr[all]"
 ]
+
+
+[dependency-groups]
+dev = [
+    "codecov",
+    "mypy",
+    "pandas-stubs",
+    "pooch",
+    "pre-commit",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mypy",
+    "pytest",
+    "ruff",
+    "s3fs",
+    "twine",
+    "netCDF4",
+    "h5netcdf",
+    "hdf5plugin",
+    "virtualizarr[all]",
+    "ipdb>=0.13.13",
+    "ipykernel>=6.29.5",
+]
+docs = [
+    "myst-nb>=1.2.0,<2",
+    "pydata-sphinx-theme>=0.16.1,<0.17",
+    "sphinx-copybutton>=0.5.2,<0.6",
+    "sphinx-design>=0.6.1,<0.7",
+    "sphinx-togglebutton>=0.3.2,<0.4",
+    "sphinx-autodoc-typehints>=3.1.0,<4",
+    ]
 
 [project.urls]
 Home = "https://github.com/TomNicholas/VirtualiZarr"
