@@ -34,10 +34,10 @@ class HDF5VirtualBackend(VirtualBackend):
                 "HDF5 reader does not understand any virtual_backend_kwargs"
             )
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables,
-            loadable_variables,
-        )
+        # drop_variables, loadable_variables = check_for_collisions(
+        #     drop_variables,
+        #     loadable_variables,
+        # )
 
         refs = SingleHdf5ToZarr(
             filepath, inline_threshold=0, **reader_options
@@ -49,8 +49,7 @@ class HDF5VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
+            drop_variables=drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 

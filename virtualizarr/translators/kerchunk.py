@@ -17,8 +17,7 @@ from virtualizarr.zarr import ZArray, ZAttrs, determine_chunk_grid_shape
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
     vds_refs: KerchunkStoreRefs,
-    loadable_variables,
-    drop_variables,
+    drop_variables: list[str] | None = None,
     virtual_array_class=ManifestArray,
     fs_root: str | None = None,
 ) -> tuple[Mapping[str, Variable], dict[str, Any], list[str]]:
@@ -27,6 +26,8 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
     Parameters
     ----------
+    drop_variables
+        Variables in the file to not bother generating chunk metadata for.
     fs_root
         The root of the fsspec filesystem on which these references were generated.
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
@@ -34,7 +35,7 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
-        drop_variables=drop_variables + loadable_variables,
+        drop_variables=drop_variables,
         virtual_array_class=virtual_array_class,
         fs_root=fs_root,
     )

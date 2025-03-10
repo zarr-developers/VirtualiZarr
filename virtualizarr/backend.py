@@ -164,10 +164,10 @@ def open_virtual_dataset(
             stacklevel=2,
         )
 
-    drop_variables, loadable_variables = check_for_collisions(
-        drop_variables,
-        loadable_variables,
-    )
+    # drop_variables, loadable_variables = check_for_collisions(
+    #     drop_variables,
+    #     loadable_variables,
+    # )
 
     if virtual_array_class is not ManifestArray:
         raise NotImplementedError()
