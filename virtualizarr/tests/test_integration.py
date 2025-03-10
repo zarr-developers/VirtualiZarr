@@ -339,7 +339,7 @@ class TestPathsToURIs:
         relative_path = relpath(netcdf4_file)
 
         with open_virtual_dataset(
-            relative_path, indexes={}, backend=hdf_backend
+            relative_path, backend=hdf_backend
         ) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()

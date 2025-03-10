@@ -96,7 +96,7 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr import open_virtual_dataset
 
-    with open_virtual_dataset(netcdf4_file, indexes={}) as ds:
+    with open_virtual_dataset(netcdf4_file) as ds:
         yield ds
 
 
