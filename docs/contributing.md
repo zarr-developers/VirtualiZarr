@@ -9,7 +9,6 @@ Before opening a PR to contribute code you should check that your changes work b
 We use [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage dependencies, which you'll want to install to get started.
 
 ```bash
-mamba env create -f ci/environment.yml
 uv run --all-extras --no-sources pytest
 ```
 The `--all-extras` options tells `uv` to install all optional dependencies and the `--no-sources` option tells `uv` to not use the
