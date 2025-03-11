@@ -1,13 +1,64 @@
-from typing import TYPE_CHECKING, Any, Iterable, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 import numpy as np
+from zarr import Array
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 if TYPE_CHECKING:
-    from zarr import Array  # type: ignore
-
     from .array import ManifestArray
+
+
+def create_v3_array_metadata(
+    shape: tuple[int, ...],
+    data_type: np.dtype,
+    chunk_shape: tuple[int, ...],
+    fill_value: Any = None,
+    codecs: Optional[list[Dict[str, Any]]] = None,
+    attributes: Optional[Dict[str, Any]] = None,
+) -> ArrayV3Metadata:
+    """
+    Create an ArrayV3Metadata instance with standard configuration.
+    This function encapsulates common patterns used across different readers.
+
+    Parameters
+    ----------
+    shape : tuple[int, ...]
+        The shape of the array
+    data_type : np.dtype
+        The numpy dtype of the array
+    chunk_shape : tuple[int, ...]
+        The shape of each chunk
+    fill_value : Any, optional
+        The fill value for the array
+    codecs : list[Dict[str, Any]], optional
+        List of codec configurations
+    attributes : Dict[str, Any], optional
+        Additional attributes for the array
+
+    Returns
+    -------
+    ArrayV3Metadata
+        A configured ArrayV3Metadata instance with standard defaults
+    """
+    return ArrayV3Metadata(
+        shape=shape,
+        data_type=data_type,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": chunk_shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=fill_value,
+        codecs=convert_to_codec_pipeline(
+            codecs=codecs or [],
+            dtype=data_type,
+        ),
+        attributes=attributes or {},
+        dimension_names=None,
+        storage_transformers=None,
+    )
 
 
 def check_same_dtypes(dtypes: list[np.dtype]) -> None:
@@ -116,3 +167,23 @@ def check_compatible_arrays(
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+
+
+def copy_and_replace_metadata(
+    old_metadata: ArrayV3Metadata,
+    new_shape: list[int] | None = None,
+    new_chunks: list[int] | None = None,
+) -> ArrayV3Metadata:
+    """
+    Update metadata to reflect a new shape and/or chunk shape.
+    """
+    metadata_copy = old_metadata.to_dict().copy()
+    metadata_copy["shape"] = new_shape  # type: ignore[assignment]
+    if new_chunks is not None:
+        metadata_copy["chunk_grid"] = {
+            "name": "regular",
+            "configuration": {"chunk_shape": tuple(new_chunks)},
+        }
+    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
+    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
+    return new_metadata

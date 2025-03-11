@@ -73,10 +73,11 @@ def test_dataset_from_df_refs(refs_file_factory):
     assert vda.chunks == (2, 3)
     assert vda.dtype == np.dtype("<i8")
 
-    assert vda.data.zarray.compressor is None
-    assert vda.data.zarray.filters is None
-    assert vda.data.zarray.fill_value == 0
-    assert vda.data.zarray.order == "C"
+    assert vda.data.metadata.codecs[0].to_dict() == {
+        "configuration": {"endian": "little"},
+        "name": "bytes",
+    }
+    assert vda.data.metadata.fill_value == 0
 
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
@@ -84,13 +85,13 @@ def test_dataset_from_df_refs(refs_file_factory):
 
 
 def test_dataset_from_df_refs_with_filters(refs_file_factory):
-    filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
+    compressor = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
-        "compressor": None,
+        "compressor": compressor,
         "dtype": "<i8",
         "fill_value": None,
-        "filters": filters,
+        "filters": None,
         "order": "C",
         "shape": [2, 3],
         "zarr_format": 2,
@@ -100,7 +101,10 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     vds = open_virtual_dataset(refs_file, filetype="kerchunk")
 
     vda = vds["a"]
-    assert vda.data.zarray.filters == filters
+    assert vda.data.metadata.codecs[1].to_dict() == {
+        "name": "numcodecs.shuffle",
+        "configuration": {"elementsize": 4},
+    }
 
 
 def test_empty_chunk_manifest(refs_file_factory):
