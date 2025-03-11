@@ -6,21 +6,20 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
+We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
+
+To run the tests in the default test environment, run:
+
 ```bash
-mamba env create -f ci/environment.yml
-mamba activate virtualizarr-tests
-pre-commit install
-# git checkout -b new-feature
-python -m pip install -e . --no-deps
-python -m pytest
+pixi run --environment test test-no-network
 ```
 
-You may also add the `--run-network-tests` option, which will run additional tests
-that require downloading files over the network.  Skip this if you want the tests to run
-faster or you have no internet access:
+As shown below, you can run additional tests that require downloading files over the network.
+Use the `test-no-network` task shown above instead if you want the tests to run faster or
+you have no internet access:
 
 ```bash
-python -m pytest --run-network-tests
+pixi run --environment test
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
@@ -28,14 +27,9 @@ coverage report locally, if you wish (CI will automatically do so).  Here are so
 examples:
 
 ```bash
-python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
-python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
-python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
+pixi run --environment test-cov              # Terminal report showing missing coverage
+pixi run --environment test-html-cov         # HTML report written to htmlcov/index.html
 ```
-
-To see all available `pytest` options added by the `pytest-cov` plugin, run
-`python -m pytest -h`, or see the
-[pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/readme.html).
 
 ## Contributing documentation
 
@@ -44,13 +38,8 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 ### Build the documentation locally
 
 ```bash
-mamba env create -f ci/doc.yml
-mamba activate virtualizarr-docs
-python -m pip install -e .  # From project's root - needed to generate API docs
-cd docs # From project's root
-rm -rf generated
-make clean
-make html
+pixi install --environment docs
+pixi run docs
 ```
 
 ### Access the documentation locally
