@@ -37,5 +37,6 @@ dependencies:
   # for opening FITS files
   - astropy
   - pip
+  - zarr>=3.0.2
   - pip:
       - imagecodecs-numcodecs==2024.6.1

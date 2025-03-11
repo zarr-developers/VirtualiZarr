@@ -109,9 +109,9 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
     virtual_array_class=ManifestArray,
-    virtual_backend_kwargs: Optional[dict] = None,
-    reader_options: Optional[dict] = None,
-    backend: Optional[VirtualBackend] = None,
+    virtual_backend_kwargs: dict | None = None,
+    reader_options: dict | None = None,
+    backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
