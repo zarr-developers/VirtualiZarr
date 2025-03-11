@@ -33,10 +33,6 @@ jobs:
           pixi-version: v0.41.4
           environments: ${{ matrix.environment }}
 
-      - name: Install Rust # For icechunk dev version
-        uses: dtolnay/rust-toolchain@stable
-        if: "${{ matrix.environment }} == upstream"
-
       - name: List installed libraries
         run: |
           pixi run -e ${{ matrix.environment }} pip list
