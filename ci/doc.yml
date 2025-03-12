@@ -13,3 +13,9 @@ dependencies:
       - "sphinx_design"
       - "sphinx_togglebutton"
       - "sphinx-autodoc-typehints"
+  - xarray>=2024.10.0
+  - kerchunk>=0.2.8
+  - h5netcdf
+  - h5py
+  - hdf5
+  - icechunk
