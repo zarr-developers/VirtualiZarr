@@ -57,6 +57,17 @@ make html
 
 Open `docs/_build/html/index.html` in a web browser (on MacOS you can do this from the terminal using `open docs/_build/html/index.html`).
 
+
+### Automatically rebuild the documentation
+
+Alternatively, you can use [sphinx-autobuild](https://github.com/executablebooks/sphinx-autobuild) to continuously watch source files for changes and rebuild the documentation for you. You can install it with pip: `pip install sphinx-autobuild` and then run with:
+
+```bash
+make watch
+```
+
+In a few seconds your web browser should open up the documentation. Now whenever you save a file the documentation will automatically regenerate and the webpage will refresh for you!
+
 ## Making a release
 
 Anyone with commit privileges to the repository can issue a release, and you should feel free to issue a release at any point in time when all the CI tests on `main` are passing.
