@@ -275,7 +275,7 @@ class TestReadFromURL:
     def test_read_from_url(self, hdf_backend, filetype, url):
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
-                open_virtual_dataset(url, reader_options={}, indexes={})
+                open_virtual_dataset(url, reader_options={})
         elif filetype == "hdf5":
             with open_virtual_dataset(
                 url,
@@ -286,7 +286,7 @@ class TestReadFromURL:
             ) as vds:
                 assert isinstance(vds, xr.Dataset)
         else:
-            with open_virtual_dataset(url, indexes={}) as vds:
+            with open_virtual_dataset(url) as vds:
                 assert isinstance(vds, xr.Dataset)
 
     @pytest.mark.skip(reason="often times out, as nisar file is 200MB")

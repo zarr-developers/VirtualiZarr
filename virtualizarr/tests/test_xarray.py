@@ -201,7 +201,7 @@ class TestConcat:
         }
         manifest1 = ChunkManifest(entries=chunks_dict1)
         marr1 = ManifestArray(zarray=zarray, chunkmanifest=manifest1)
-        coords = xr.Coordinates({"t": (["t"], marr1)}, indexes={})
+        coords = xr.Coordinates({"t": (["t"], marr1)})
         ds1 = xr.Dataset(coords=coords)
 
         chunks_dict2 = {
@@ -210,7 +210,7 @@ class TestConcat:
         }
         manifest2 = ChunkManifest(entries=chunks_dict2)
         marr2 = ManifestArray(zarray=zarray, chunkmanifest=manifest2)
-        coords = xr.Coordinates({"t": (["t"], marr2)}, indexes={})
+        coords = xr.Coordinates({"t": (["t"], marr2)})
         ds2 = xr.Dataset(coords=coords)
 
         result = xr.concat([ds1, ds2], dim="t")["t"]
