@@ -40,4 +40,3 @@ dependencies:
   - zarr>=3.0.2
   - pip:
       - imagecodecs-numcodecs==2024.6.1
-      - obstore==0.4.0

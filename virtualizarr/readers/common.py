@@ -1,14 +1,19 @@
+import dataclasses
 from abc import ABC
 from collections.abc import Iterable, Mapping, MutableMapping
 from typing import (
     Any,
     Hashable,
     Optional,
+    TypedDict,
 )
 
+import numpy as np
 import xarray  # noqa
+from numcodecs.abc import Codec
 from xarray import (
     Coordinates,
+    DataArray,
     Dataset,
     DataTree,
     Index,
@@ -19,6 +24,26 @@ from xarray import (
 from xarray.core.indexes import PandasIndex
 
 from virtualizarr.utils import _FsspecFSFromFilepath
+
+
+@dataclasses.dataclass
+class ZstdProperties:
+    level: int
+
+
+@dataclasses.dataclass
+class ShuffleProperties:
+    elementsize: int
+
+
+@dataclasses.dataclass
+class ZlibProperties:
+    level: int
+
+
+class CFCodec(TypedDict):
+    target_dtype: np.dtype
+    codec: Codec
 
 
 def maybe_open_loadable_vars_and_indexes(
@@ -84,6 +109,18 @@ def maybe_open_loadable_vars_and_indexes(
         fpath.close()
 
     return loadable_vars, indexes
+
+
+def construct_virtual_dataarray(
+    virtual_var, coord_vars: Optional[Variable] = None, attrs: Optional[dict] = None
+) -> DataArray:
+    """Construct a virtual DataArray from consistuent parts."""
+    vda = DataArray(
+        data=virtual_var,
+        coords=coord_vars,
+        attrs=attrs,
+    )
+    return vda
 
 
 def construct_virtual_dataset(

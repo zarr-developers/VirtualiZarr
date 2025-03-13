@@ -1,20 +1,47 @@
-import warnings
-from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from __future__ import annotations
 
-from xarray import Dataset, Index
+import asyncio
+import dataclasses
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional
+
+import numcodecs.registry as registry
+from async_tiff import TIFF
+
+from virtualizarr.codecs import numcodec_config_to_configurable
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.utils import create_v3_array_metadata
+
+if TYPE_CHECKING:
+    from async_tiff._ifd import ImageFileDirectory
+    from obstore.store import ObjectStore
+
+
+import numpy as np
+from xarray import DataArray, Dataset, Index, Variable
 
 from virtualizarr.readers.common import (
     VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
+    ZlibProperties,
+    construct_virtual_dataarray,
 )
-from virtualizarr.translators.kerchunk import (
-    extract_group,
-    virtual_vars_and_metadata_from_kerchunk_refs,
-)
-from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.utils import check_for_collisions
+
+
+def _get_dtype(sample_format, bits_per_sample):
+    if sample_format[0] == 1 and bits_per_sample[0] == 16:
+        return np.dtype(np.uint16)
+    else:
+        raise NotImplementedError
+
+
+def _get_codecs(compression):
+    if compression == 8:  # Adobe DEFLATE
+        zlib_props = ZlibProperties(level=6)  # type: ignore
+        conf = dataclasses.asdict(zlib_props)
+        conf["id"] = "zlib"
+    else:
+        raise NotImplementedError
+    codec = registry.get_codec(conf)
+    return codec
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -29,54 +56,84 @@ class TIFFVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        if virtual_backend_kwargs:
-            raise NotImplementedError(
-                "TIFF reader does not understand any virtual_backend_kwargs"
-            )
+        """
+        Opens a TIFF with multiple ImageFileDirectories that share a common width and height as an
+        Xarray Dataset.
+        """
+        raise NotImplementedError
 
-        from kerchunk.tiff import tiff_to_zarr
-
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables=drop_variables, loadable_variables=loadable_variables
+    @staticmethod
+    def _contruct_chunk_manifest(
+        ifd: TIFF.ifds,
+        filepath: str,
+    ) -> ChunkManifest:
+        tile_offsets = np.array(ifd.tile_offsets, dtype=np.uint64)
+        tile_counts = np.array(ifd.tile_byte_counts, dtype=np.uint64)
+        paths = np.repeat(
+            np.array(filepath, dtype=np.dtypes.StringDType), len(tile_counts)
+        )
+        return ChunkManifest.from_arrays(
+            paths=paths,
+            offsets=tile_offsets,
+            lengths=tile_counts,
         )
 
-        if reader_options is None:
-            reader_options = {}
+    @staticmethod
+    async def _open_tiff(filepath: str, store: ObjectStore) -> TIFF:
+        return await TIFF.open(filepath, store=store)
 
-        reader_options.pop("storage_options", {})
-        warnings.warn(
-            "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
-            UserWarning,
+    @staticmethod
+    def _contruct_virtual_variable(ifd: ImageFileDirectory, filepath: str) -> Variable:
+        chunk_manifest = TIFFVirtualBackend._contruct_chunk_manifest(ifd, filepath)
+        codecs = [_get_codecs(ifd.compression)]
+        codec_configs = [
+            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
+        ]
+        metadata = create_v3_array_metadata(
+            shape=(
+                ifd.image_height,
+                ifd.image_width,
+            ),  # TODO: Check if height and width are always ordered along the same axes
+            data_type=_get_dtype(
+                sample_format=ifd.sample_format, bits_per_sample=ifd.bits_per_sample
+            ),
+            chunk_shape=(ifd.tile_height, ifd.tile_height),
+            fill_value=None,  # TODO: Fix fill value
+            codecs=codec_configs,
         )
+        manifest_array = ManifestArray(metadata=metadata, chunkmanifest=chunk_manifest)
+        variable = Variable(data=manifest_array, dims=["y", "x"], attrs=None)
+        return variable
 
-        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
-
-        # both group=None and group='' mean to read root group
+    @staticmethod
+    def open_virtual_dataarray(
+        filepath: str,
+        *,
+        group: str | None = None,
+        virtual_backend_kwargs: Optional[dict] = None,
+        reader_options: Optional[dict] = None,
+    ) -> DataArray:
+        """
+        Opens a TIFF with a single ImageFileDirectory as an Xarray DataArray.
+        """
         if group:
-            refs = extract_group(refs, group)
-
-        virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
-            refs,
-            loadable_variables,
-            drop_variables,
-            fs_root=Path.cwd().as_uri(),
+            raise NotImplementedError(
+                f"Expected None for group, got {group}. Please use the `ifd` keyword to specify which IFD to virtualize."
+            )
+        if reader_options:
+            raise NotImplementedError(
+                f"reader_options is not supported for TIFFVirtualBackend but got {reader_options}."
+            )
+        if not virtual_backend_kwargs:
+            raise ValueError(
+                f"The store must be supplied to TIFFVirtualBackend through `virtual_backend_kwargs`, but received `virtual_backend_kwargs={virtual_backend_kwargs}`"
+            )
+        store = virtual_backend_kwargs["store"]
+        image_file_directory = virtual_backend_kwargs.get("image_file_directory", 0)
+        # TODO: Make an async approach
+        tiff = asyncio.run(TIFFVirtualBackend._open_tiff(filepath, store))
+        ifd = tiff.ifds[image_file_directory]
+        variable = TIFFVirtualBackend._contruct_virtual_variable(
+            ifd=ifd, filepath=filepath
         )
-
-        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
-            filepath,
-            loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            drop_variables=drop_variables,
-            indexes=indexes,
-            group=group,
-            decode_times=decode_times,
-        )
-
-        return construct_virtual_dataset(
-            virtual_vars=virtual_vars,
-            loadable_vars=loadable_vars,
-            indexes=indexes,
-            coord_names=coord_names,
-            attrs=attrs,
-        )
+        return construct_virtual_dataarray(variable)
