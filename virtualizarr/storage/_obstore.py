@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from xarray import Dataset
+from xarray import DataArray
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -49,17 +49,38 @@ class VirtualObjectStore(Store):
     --------
     ObjectStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
+
+    Notes
+    -----
+    Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
     def __eq__(self, value: object) -> bool:
         NotImplementedError
 
-    def __init__(self, vds: Dataset, *, read_only: bool = False) -> None:
+    def __init__(
+        self, vda: DataArray, store: _UpstreamObjectStore, *, read_only: bool = False
+    ) -> None:
+        import obstore as obs
+
+        if not isinstance(
+            store,
+            (
+                obs.store.AzureStore,
+                obs.store.GCSStore,
+                obs.store.HTTPStore,
+                obs.store.S3Store,
+                obs.store.LocalStore,
+                obs.store.MemoryStore,
+            ),
+        ):
+            raise TypeError(f"expected ObjectStore class, got {store!r}")
         super().__init__(read_only=read_only)
-        self.vds = vds
+        self.store = store
+        self.vda = vda
 
     def __str__(self) -> str:
-        return f"ManifesStore({self.vds})"
+        return f"ManifesStore({self.vda})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
@@ -79,6 +100,9 @@ class VirtualObjectStore(Store):
         # docstring inherited
         import obstore as obs
 
+        # Treat as a Zarr array since there is only one data variable and no coordinate variables
+        if key == "zarr.json" and self.vda.coords == {}:
+            return self.vda.data.metadata.to_dict()
         try:
             if byte_range is None:
                 resp = await obs.get_async(self.store, key)

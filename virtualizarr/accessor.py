@@ -2,7 +2,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from xarray import Dataset, open_zarr, register_dataset_accessor
+from xarray import (
+    DataArray,
+    Dataset,
+    open_zarr,
+    register_dataarray_accessor,
+    register_dataset_accessor,
+)
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.storage._obstore import VirtualObjectStore
@@ -11,6 +17,22 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+
+
+@register_dataarray_accessor("virtualize")
+class VirtualDataArrayAccessor:
+    """
+    Xarray accessor for writing out virtual dataarrays to disk.
+
+    Methods on this object are called via `ds.virtualize.{method}`.
+    """
+
+    def __init__(self, da: DataArray):
+        self.da: Dataset = da
+
+    def to_virtual_object_store(self, store, **kwargs) -> Dataset:
+        store = VirtualObjectStore(self.da, store, **kwargs)
+        return open_zarr(store, zarr_format=3, consolidated=False)
 
 
 @register_dataset_accessor("virtualize")
@@ -23,10 +45,6 @@ class VirtualiZarrDatasetAccessor:
 
     def __init__(self, ds: Dataset):
         self.ds: Dataset = ds
-
-    def to_virtual_object_store(self, **kwargs) -> Dataset:
-        store = VirtualObjectStore(self.ds, **kwargs)
-        return open_zarr(store, zarr_format=3, consolidated=False)
 
     def to_icechunk(
         self,
