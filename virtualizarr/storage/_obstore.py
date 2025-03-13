@@ -14,8 +14,10 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer
+from zarr.core.buffer import Buffer, default_buffer_prototype
 from zarr.core.buffer.core import BufferPrototype
+
+from virtualizarr.vendor.zarr.metadata import dict_to_buffer_dict
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Coroutine, Iterable
@@ -100,9 +102,14 @@ class VirtualObjectStore(Store):
         # docstring inherited
         import obstore as obs
 
-        # Treat as a Zarr array since there is only one data variable and no coordinate variables
-        if key == "zarr.json" and self.vda.coords == {}:
-            return self.vda.data.metadata.to_dict()
+        if key == "zarr.json":
+            # Add V3 group metadata (https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#group-metadata)
+            attributes = {
+                "zarr_format": 3,
+                "node_type": "group",
+                "attributes": self.vda.attrs,
+            }
+            return dict_to_buffer_dict(attributes, prototype=default_buffer_prototype())
         try:
             if byte_range is None:
                 resp = await obs.get_async(self.store, key)
