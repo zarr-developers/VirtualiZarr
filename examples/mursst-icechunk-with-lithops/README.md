@@ -37,7 +37,7 @@ For various reasons, you may want to build the lambda runtime on EC2 (docker can
 6. (Optional) To rebuild the Lithops Lambda runtime image, delete the existing one:
 
 ```bash
-lithops runtime delete -b aws_lambda -d virtualizarr-runtime
+lithops runtime delete -b aws_lambda -d vz-runtime
 ```
 
 ## Package Structure
