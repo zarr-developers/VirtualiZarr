@@ -65,13 +65,14 @@ fits = [
 ]
 tif = [
     "obstore @ git+https://github.com/developmentseed/obstore@main#subdirectory=obstore",
-    "async-tiff @ git+file:///Users/max/Documents/Code/developmentseed/async-tiff#subdirectory=python",
+    "async-tiff @ git+https://github.com/developmentseed/async-tiff#subdirectory=python",
 ]
 all_readers = [
     "virtualizarr[hdf]",
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
+    "virtualizarr[tif]",
 ]
 
 # writers
@@ -99,7 +100,8 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "virtualizarr[all]"
+    "virtualizarr[all]",
+    "rioxarray",
 ]
 
 [project.urls]

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, Literal, overload
 from xarray import (
     DataArray,
     Dataset,
-    open_zarr,
+    open_dataarray,
     register_dataarray_accessor,
     register_dataset_accessor,
 )
@@ -28,11 +28,15 @@ class VirtualDataArrayAccessor:
     """
 
     def __init__(self, da: DataArray):
-        self.da: Dataset = da
+        self.da: DataArray = da
 
-    def to_virtual_object_store(self, store, **kwargs) -> Dataset:
+    def to_xarray(self, store, **kwargs) -> DataArray:
         store = VirtualObjectStore(self.da, store, **kwargs)
-        return open_zarr(store, zarr_format=3, consolidated=False)
+        return open_dataarray(
+            store,
+            engine="zarr",
+            backend_kwargs={"zarr_format": 3, "consolidated": False},
+        )
 
 
 @register_dataset_accessor("virtualize")

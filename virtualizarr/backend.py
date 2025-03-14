@@ -259,19 +259,18 @@ def open_virtual_dataarray(
     if backend and filetype:
         raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
 
-    if filetype is None:
-        filetype = automatically_determine_filetype(
-            filepath=filepath, reader_options=reader_options
-        )
-    elif isinstance(filetype, str):
-        # if filetype is a user defined string, convert to FileType
-        filetype = FileType(filetype.lower())
-    elif not isinstance(filetype, FileType):
-        raise ValueError("Filetype must be a valid string or FileType")
-
     if backend:
         backend_cls = backend
     else:
+        if filetype is None:
+            filetype = automatically_determine_filetype(
+                filepath=filepath, reader_options=reader_options
+            )
+        elif isinstance(filetype, str):
+            # if filetype is a user defined string, convert to FileType
+            filetype = FileType(filetype.lower())
+        elif not isinstance(filetype, FileType):
+            raise ValueError("Filetype must be a valid string or FileType")
         backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())  # type: ignore
 
     if backend_cls is None:

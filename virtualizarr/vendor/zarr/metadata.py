@@ -26,7 +26,7 @@ def _replace_special_floats(obj: object) -> Any:
     return obj
 
 
-def dict_to_buffer_dict(input: dict, prototype: BufferPrototype) -> dict[str, Buffer]:
+def dict_to_buffer(input: dict, prototype: BufferPrototype) -> Buffer:
     # modified from ArrayV3Metadata.to_buffer_dict
     d = _replace_special_floats(input)
     return prototype.buffer.from_bytes(json.dumps(d, cls=V3JsonEncoder).encode())

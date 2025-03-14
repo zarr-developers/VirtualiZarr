@@ -70,6 +70,10 @@ class TIFFVirtualBackend(VirtualBackend):
     ) -> ChunkManifest:
         shape = (ifd.image_height, ifd.image_width)
         chunks = (ifd.tile_height, ifd.tile_height)
+        if chunks == (None, None):
+            raise NotImplementedError(
+                f"TIFF reader currently only supports tiled TIFFs, but {filepath} has no internal tiling."
+            )
         tile_shape = tuple(math.ceil(a / b) for a, b in zip(shape, chunks))
         # See https://web.archive.org/web/20240329145228/https://www.awaresystems.be/imaging/tiff/tifftags/tileoffsets.html for ordering of offsets.
         tile_offsets = np.array(ifd.tile_offsets, dtype=np.uint64).reshape(tile_shape)

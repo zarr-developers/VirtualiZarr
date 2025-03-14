@@ -14,10 +14,15 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer, default_buffer_prototype
+from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
 
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer_dict
+from virtualizarr.storage.common import (
+    find_matching_store,
+    get_zarr_metadata,
+    list_dir_dataarray,
+    parse_manifest_index,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Coroutine, Iterable
@@ -27,6 +32,9 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore as _UpstreamObjectStore
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
+
+    from virtualizarr.types.general import T_Xarray
+
 
 __all__ = ["VirtualObjectStore"]
 
@@ -61,28 +69,34 @@ class VirtualObjectStore(Store):
         NotImplementedError
 
     def __init__(
-        self, vda: DataArray, store: _UpstreamObjectStore, *, read_only: bool = False
+        self,
+        xr_obj: T_Xarray,
+        stores: dict[str:_UpstreamObjectStore],
+        *,
+        read_only: bool = False,
     ) -> None:
         import obstore as obs
 
-        if not isinstance(
-            store,
-            (
-                obs.store.AzureStore,
-                obs.store.GCSStore,
-                obs.store.HTTPStore,
-                obs.store.S3Store,
-                obs.store.LocalStore,
-                obs.store.MemoryStore,
-            ),
-        ):
-            raise TypeError(f"expected ObjectStore class, got {store!r}")
+        # TODO: Support DataArray, Dataset, or DataTree across all methods
+        for store in stores.values():
+            if not isinstance(
+                store,
+                (
+                    obs.store.AzureStore,
+                    obs.store.GCSStore,
+                    obs.store.HTTPStore,
+                    obs.store.S3Store,
+                    obs.store.LocalStore,
+                    obs.store.MemoryStore,
+                ),
+            ):
+                raise TypeError(f"expected ObjectStore class, got {store!r}")
         super().__init__(read_only=read_only)
-        self.store = store
-        self.vda = vda
+        self.stores = stores
+        self.xr_obj = xr_obj
 
     def __str__(self) -> str:
-        return f"ManifesStore({self.vda})"
+        return f"ManifesStore({self.xr_obj})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
@@ -102,35 +116,28 @@ class VirtualObjectStore(Store):
         # docstring inherited
         import obstore as obs
 
-        if key == "zarr.json":
-            # Add V3 group metadata (https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#group-metadata)
-            attributes = {
-                "zarr_format": 3,
-                "node_type": "group",
-                "attributes": self.vda.attrs,
-            }
-            return dict_to_buffer_dict(attributes, prototype=default_buffer_prototype())
+        if "zarr.json" in key:
+            return get_zarr_metadata(self.xr_obj, key)
+        manifest_index = parse_manifest_index(key)
+        if manifest_index.variable == "__xarray_dataarray_variable__":
+            path = self.xr_obj.data.manifest._paths[*manifest_index.indexes]
+            offset = self.xr_obj.data.manifest._offsets[*manifest_index.indexes]
+            length = self.xr_obj.data.manifest._lengths[*manifest_index.indexes]
+            store_request = find_matching_store(stores=self.stores, request_key=path)
+        else:
+            raise NotImplementedError
+        if byte_range is None:
+            byte_range = RangeByteRequest(offset, offset + length + 1)
+        else:
+            raise NotImplementedError
         try:
-            if byte_range is None:
-                resp = await obs.get_async(self.store, key)
-                return prototype.buffer.from_bytes(await resp.bytes_async())  # type: ignore[arg-type]
-            elif isinstance(byte_range, RangeByteRequest):
-                bytes = await obs.get_range_async(
-                    self.store, key, start=byte_range.start, end=byte_range.end
-                )
-                return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
-            elif isinstance(byte_range, OffsetByteRequest):
-                resp = await obs.get_async(
-                    self.store, key, options={"range": {"offset": byte_range.offset}}
-                )
-                return prototype.buffer.from_bytes(await resp.bytes_async())  # type: ignore[arg-type]
-            elif isinstance(byte_range, SuffixByteRequest):
-                resp = await obs.get_async(
-                    self.store, key, options={"range": {"suffix": byte_range.suffix}}
-                )
-                return prototype.buffer.from_bytes(await resp.bytes_async())  # type: ignore[arg-type]
-            else:
-                raise ValueError(f"Unexpected byte_range, got {byte_range}")
+            bytes = await obs.get_range_async(
+                self.stores[store_request.store_id],
+                store_request.key,
+                start=byte_range.start,
+                end=byte_range.end,
+            )
+            return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
         except _ALLOWED_EXCEPTIONS:
             return None
 
@@ -190,7 +197,7 @@ class VirtualObjectStore(Store):
     @property
     def supports_listing(self) -> bool:
         # docstring inherited
-        return False
+        return True
 
     def list(self) -> AsyncGenerator[str, None]:
         # docstring inherited
@@ -202,7 +209,10 @@ class VirtualObjectStore(Store):
 
     def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
-        raise NotImplementedError
+        if isinstance(self.xr_obj, DataArray):
+            return list_dir_dataarray(self.xr_obj, prefix)
+        else:
+            raise NotImplementedError("Only DataArray support is currently implemented")
 
 
 class _BoundedRequest(TypedDict):
