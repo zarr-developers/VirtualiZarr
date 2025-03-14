@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any
 
-from xarray import DataArray
+from xarray import DataArray, Dataset
 from xarray.backends.api import DATAARRAY_VARIABLE
 from zarr.core.buffer import Buffer, default_buffer_prototype
 
@@ -30,12 +30,12 @@ class ManifestIndex:
     """Index of specific chunk within the ChunkManifest."""
 
 
-async def list_dir_dataarray(vda: DataArray, prefix: str) -> AsyncGenerator[str]:
-    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray
+async def list_dir_from_xr_obj(vd: T_Xarray, prefix: str) -> AsyncGenerator[str]:
+    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
     ----------
-    vda : DataArray
+    vd : xarray DataArray or Dataset
     prefix : str
 
 
@@ -46,13 +46,14 @@ async def list_dir_dataarray(vda: DataArray, prefix: str) -> AsyncGenerator[str]
     # Start with expected group level metadata
     if prefix:
         raise NotImplementedError
-    items = ["zarr.json"]
-    # TODO: Check whether data array name should be used if present
-    items.append(DATAARRAY_VARIABLE)
-    # Add coordinates that would be stored as zarr groups
-    items += list(vda.coords)
-    for item in items:
-        yield item
+    yield "zarr.json"
+    if isinstance(vd, Dataset):
+        for v in vd.variables:
+            yield v
+    if isinstance(vd, DataArray):
+        yield DATAARRAY_VARIABLE
+        for c in vd.coords:
+            yield c
 
 
 def get_zarr_metadata(vd: T_Xarray, key: str) -> Buffer:

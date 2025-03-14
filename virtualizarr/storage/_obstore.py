@@ -20,7 +20,7 @@ from zarr.core.buffer.core import BufferPrototype
 from virtualizarr.storage.common import (
     find_matching_store,
     get_zarr_metadata,
-    list_dir_dataarray,
+    list_dir_from_xr_obj,
     parse_manifest_index,
 )
 
@@ -210,7 +210,7 @@ class VirtualObjectStore(Store):
     def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
         if isinstance(self.xr_obj, DataArray):
-            return list_dir_dataarray(self.xr_obj, prefix)
+            return list_dir_from_xr_obj(self.xr_obj, prefix)
         else:
             raise NotImplementedError("Only DataArray support is currently implemented")
 
