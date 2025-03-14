@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import math
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional
 
 import numcodecs.registry as registry
@@ -67,11 +68,15 @@ class TIFFVirtualBackend(VirtualBackend):
         ifd: TIFF.ifds,
         filepath: str,
     ) -> ChunkManifest:
-        tile_offsets = np.array(ifd.tile_offsets, dtype=np.uint64)
-        tile_counts = np.array(ifd.tile_byte_counts, dtype=np.uint64)
-        paths = np.repeat(
-            np.array(filepath, dtype=np.dtypes.StringDType), len(tile_counts)
+        shape = (ifd.image_height, ifd.image_width)
+        chunks = (ifd.tile_height, ifd.tile_height)
+        tile_shape = tuple(math.ceil(a / b) for a, b in zip(shape, chunks))
+        # See https://web.archive.org/web/20240329145228/https://www.awaresystems.be/imaging/tiff/tifftags/tileoffsets.html for ordering of offsets.
+        tile_offsets = np.array(ifd.tile_offsets, dtype=np.uint64).reshape(tile_shape)
+        tile_counts = np.array(ifd.tile_byte_counts, dtype=np.uint64).reshape(
+            tile_shape
         )
+        paths = np.full_like(tile_offsets, filepath, dtype=np.dtypes.StringDType)
         return ChunkManifest.from_arrays(
             paths=paths,
             offsets=tile_offsets,
@@ -89,6 +94,7 @@ class TIFFVirtualBackend(VirtualBackend):
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
+        dimension_names = ["y", "x"]  # Folllowing rioxarray's behavior
         metadata = create_v3_array_metadata(
             shape=(
                 ifd.image_height,
@@ -100,9 +106,10 @@ class TIFFVirtualBackend(VirtualBackend):
             chunk_shape=(ifd.tile_height, ifd.tile_height),
             fill_value=None,  # TODO: Fix fill value
             codecs=codec_configs,
+            dimension_names=dimension_names,
         )
         manifest_array = ManifestArray(metadata=metadata, chunkmanifest=chunk_manifest)
-        variable = Variable(data=manifest_array, dims=["y", "x"], attrs=None)
+        variable = Variable(data=manifest_array, dims=dimension_names, attrs=None)
         return variable
 
     @staticmethod
@@ -136,4 +143,4 @@ class TIFFVirtualBackend(VirtualBackend):
         variable = TIFFVirtualBackend._contruct_virtual_variable(
             ifd=ifd, filepath=filepath
         )
-        return construct_virtual_dataarray(variable)
+        return construct_virtual_dataarray(variable, dims=variable.dims)

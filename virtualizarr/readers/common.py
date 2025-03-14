@@ -112,15 +112,19 @@ def maybe_open_loadable_vars_and_indexes(
 
 
 def construct_virtual_dataarray(
-    virtual_var, coord_vars: Optional[Variable] = None, attrs: Optional[dict] = None
+    virtual_var,
+    coord_vars: Optional[Variable] = None,
+    name: Optional[str] = None,
+    dims: Optional[Hashable] = None,
+    attrs: Optional[dict] = None,
 ) -> DataArray:
     """Construct a virtual DataArray from consistuent parts."""
-    # Add V3 group metadata (https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#group-metadata)
-    attributes = {"zarr_format": 3, "node_type": "group", "attributes": attrs}
     vda = DataArray(
         data=virtual_var,
         coords=coord_vars,
-        attrs=attributes,
+        attrs=attrs,
+        dims=dims,
+        name=name,
     )
     return vda
 
