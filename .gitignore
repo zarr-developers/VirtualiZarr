@@ -187,4 +187,3 @@ examples/
 # python virtual environment
 .venv
 venv
-pixi.lock
