@@ -16,6 +16,7 @@ def create_v3_array_metadata(
     chunk_shape: tuple[int, ...],
     fill_value: Any = None,
     codecs: Optional[list[Dict[str, Any]]] = None,
+    dimension_names: Optional[tuple[str, ...]] | None = None,
     attributes: Optional[Dict[str, Any]] = None,
 ) -> ArrayV3Metadata:
     """
@@ -56,7 +57,7 @@ def create_v3_array_metadata(
             dtype=data_type,
         ),
         attributes=attributes or {},
-        dimension_names=None,
+        dimension_names=dimension_names,
         storage_transformers=None,
     )
 

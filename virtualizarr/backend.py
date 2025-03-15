@@ -53,6 +53,7 @@ class FileType(AutoName):
     fits = auto()
     dmrpp = auto()
     kerchunk = auto()
+    zarr = auto()
 
 
 def automatically_determine_filetype(

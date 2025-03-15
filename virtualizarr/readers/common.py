@@ -89,7 +89,7 @@ def maybe_open_loadable_vars_and_indexes(
     # if we only read the indexes we can just close the file right away as nothing is lazy
     if loadable_vars == {}:
         ds.close()
-        fpath.close()
+        # fpath.close()
 
     return loadable_vars, indexes
 

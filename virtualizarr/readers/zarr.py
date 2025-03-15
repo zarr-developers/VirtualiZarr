@@ -19,13 +19,14 @@ from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
     maybe_open_loadable_vars_and_indexes,
 )
 from virtualizarr.utils import check_for_collisions
-from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE, ZArray
+from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE
 
 if TYPE_CHECKING:
     import zarr
@@ -99,19 +100,16 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
         fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
 
     zarr_format = zarr_array.metadata.zarr_format
-    # set ZArray specific values depending on Zarr version
+
     if zarr_format == 2:
-        compressors = zarr_array.compressors[0].get_config()  # type: ignore[union-attr]
-        array_dims = attrs["_ARRAY_DIMENSIONS"]
+        # TODO: Add ability to read Zarr V2 stores.
+        # TODO: Convert Zarr v2 compressors and filters to Zarr v3 compliant codec chain.
+        # array_dims = attrs["_ARRAY_DIMENSIONS"]
+        raise NotImplementedError("Reading Zarr V2 currently not supported.")
 
     elif zarr_format == 3:
-        serializer = zarr_array.serializer.to_dict()  # type: ignore[union-attr] # noqa: F841
-        # serializer is unused in ZArray. Maybe we will need this in the ZArray refactor
-        # https://github.com/zarr-developers/VirtualiZarr/issues/411
-        compressors = zarr_array.compressors[
-            0
-        ].to_dict()  # ZArray expects a dict, not a list of dicts, so only the first val from the tuples?
         array_dims = zarr_array.metadata.dimension_names  # type: ignore[union-attr]
+        codec_list = [codec.to_dict() for codec in zarr_array.codec_pipeline]
         if fill_value is None:
             raise ValueError(
                 "fill_value must be specified https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html#fill-value"
@@ -120,23 +118,21 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
-    filters = (
-        zarr_array.filters if zarr_array.filters else None
-    )  # if tuple is empty, assign filters to None
-
-    array_zarray = ZArray(
+    # So we can get a zarr.core.codec_pipeline.BatchedCodecPipeline from Zarr python,
+    # which is the end result dtype from create_v3_array_metadata->convert_to_codec_pipeline.
+    # This deconstruction -> reconstuction seems kind excessive. Should we bypass it?
+    array_v3_metadata = create_v3_array_metadata(
         shape=zarr_array.shape,
-        chunks=zarr_array.chunks,  # type: ignore[attr-defined]
-        dtype=zarr_array.dtype.name,  # type: ignore
+        data_type=zarr_array.dtype.name,
+        chunk_shape=zarr_array.chunks,
         fill_value=fill_value,
-        order=zarr_array.order,
-        compressor=compressors,
-        filters=filters,  # type: ignore[arg-type]
-        zarr_format=zarr_format,
+        codecs=codec_list,
+        dimension_names=array_dims,
+        attributes=attrs,
     )
 
     return {
-        "zarray_array": array_zarray,
+        "zarray_array": array_v3_metadata,
         "array_dims": array_dims,
         "array_metadata": attrs,
     }
@@ -151,19 +147,18 @@ async def virtual_variable_from_zarr_array(
         # if we have Zarr format/version 3, we add /c/ to the chunk paths
         zarr_prefix = f"{zarr_prefix}/c"
 
-    zarray_array = await build_zarray_metadata(zarr_array=zarr_array)
+    zarray_array_dict = await build_zarray_metadata(zarr_array=zarr_array)
 
     chunk_manifest = await build_chunk_manifest(
         zarr_array, prefix=zarr_prefix, filepath=filepath
     )
-
     manifest_array = ManifestArray(
-        zarray=zarray_array["zarray_array"], chunkmanifest=chunk_manifest
+        metadata=zarray_array_dict["zarray_array"], chunkmanifest=chunk_manifest
     )
     return Variable(
-        dims=zarray_array["array_dims"],
+        dims=zarray_array_dict["array_dims"],
         data=manifest_array,
-        attrs=zarray_array["array_metadata"],
+        attrs=zarray_array_dict["array_metadata"],
     )
 
 

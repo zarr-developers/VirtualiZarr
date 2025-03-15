@@ -17,7 +17,6 @@ from virtualizarr.tests import (
     has_kerchunk,
     parametrize_over_hdf_backends,
     requires_kerchunk,
-    requires_network,
     requires_zarr_python,
 )
 from virtualizarr.translators.kerchunk import (
@@ -88,66 +87,6 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
         assert refs["refs"]["time/0"] == expected["refs"]["time/0"]
 
 
-@requires_network
-@requires_kerchunk
-@pytest.mark.skip(
-    reason="WIP on kerchunk v3 RT- fails in RT: RuntimeError: 'error during blosc decompression: -1' for Zarr v3 + kerchunk v3 branch"
-)
-@pytest.mark.parametrize(
-    "zarr_store",
-    [
-        pytest.param(2, id="Zarr V2"),
-        pytest.param(3, id="Zarr V3"),
-    ],
-    indirect=True,
-)
-def test_zarr_roundtrip_kerchunk(zarr_store):
-    comparion_ds = xr.open_zarr(zarr_store)
-
-    ds = open_virtual_dataset(
-        zarr_store,
-        indexes={},
-    )
-    ds_refs = ds.virtualize.to_kerchunk(format="dict")
-    roundtrip = xr.open_dataset(ds_refs, engine="kerchunk", decode_times=False)
-
-    xrt.assert_equal(comparion_ds, roundtrip)
-
-
-@requires_network
-@pytest.mark.skip(reason="WIP on icechunk round-trip/")
-@pytest.mark.parametrize(
-    "zarr_store",
-    [
-        pytest.param(2, id="Zarr V2"),
-        pytest.param(3, id="Zarr V3"),
-    ],
-    indirect=True,
-)
-def test_zarr_roundtrip_icechunk(zarr_store):
-    import icechunk  # type: ignore[import-not-found]
-
-    # open zarr store with Xarray for comparison
-    comparion_ds = xr.open_zarr(zarr_store)
-
-    ds = open_virtual_dataset(
-        zarr_store,
-        indexes={},
-    )
-
-    # Note: this was done with icechunk 0.1.0a15 - syntax could be incorrect
-    storage = icechunk.storage.in_memory_storage()
-    repo = icechunk.Repository.open_or_create(storage=storage)
-    session = repo.writable_session("main")
-
-    # Write the virtual dataset to icechunk
-
-    ds.virtualize.to_icechunk(session.store)
-
-    rtds = xr.open_zarr(session.store)
-    xrt.assert_equal(comparion_ds, rtds)
-
-
 def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to an in-memory kerchunk-formatted references dictionary
     ds_refs = vds.virtualize.to_kerchunk(format="dict")
@@ -201,6 +140,27 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
     ],
 )
 class TestRoundtrip:
+    def test_zarr_roundtrip(
+        self,
+        tmp_path,
+        roundtrip_func: RoundtripFunction,
+    ):
+        air_zarr_path = tmp_path / "air_temperature.zarr"
+        with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
+            # TODO: We can use the zarr subset fixture as an input instead of full air_temperature.
+            # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
+            ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
+
+            with open_virtual_dataset(str(air_zarr_path), indexes={}) as vds:
+                roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
+
+                # assert all_close to original dataset
+                xrt.assert_allclose(roundtrip, ds)
+
+                # assert coordinate attributes are maintained
+                for coord in ds.coords:
+                    assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+
     @parametrize_over_hdf_backends
     def test_roundtrip_no_concat(
         self,
