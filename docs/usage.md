@@ -500,10 +500,7 @@ session.commit("Appended second dataset")
 ```
 
 See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
-<<<<<<< HEAD
-=======
 icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr
->>>>>>> develop
 
 ## Opening Kerchunk references as virtual datasets
 

@@ -9,7 +9,7 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V2 and V3 stores as virtual datasets.
+- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 
 Breaking changes

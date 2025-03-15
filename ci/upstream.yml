@@ -27,8 +27,6 @@ dependencies:
   - pytest
   - pooch
   - fsspec
-  - dask
-  - zarr>=3.0.2
   - pip
   - zarr>=3.0.2
   - icechunk>=0.2.4
