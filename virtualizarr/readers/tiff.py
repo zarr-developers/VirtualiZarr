@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import math
 from typing import TYPE_CHECKING, Iterable, Mapping, Optional
@@ -19,6 +18,7 @@ if TYPE_CHECKING:
 
 import numpy as np
 from xarray import DataArray, Dataset, Index, Variable
+from zarr.core.sync import sync
 
 from virtualizarr.readers.common import (
     VirtualBackend,
@@ -142,7 +142,7 @@ class TIFFVirtualBackend(VirtualBackend):
         store = virtual_backend_kwargs["store"]
         image_file_directory = virtual_backend_kwargs.get("image_file_directory", 0)
         # TODO: Make an async approach
-        tiff = asyncio.run(TIFFVirtualBackend._open_tiff(filepath, store))
+        tiff = sync(TIFFVirtualBackend._open_tiff(filepath, store))
         ifd = tiff.ifds[image_file_directory]
         variable = TIFFVirtualBackend._contruct_virtual_variable(
             ifd=ifd, filepath=filepath
