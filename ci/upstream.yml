@@ -33,4 +33,3 @@ dependencies:
   - pip:
       - git+https://github.com/fsspec/kerchunk.git@main
       - imagecodecs-numcodecs==2024.6.1
-      - git+https://github.com/fsspec/kerchunk.git@main
