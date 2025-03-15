@@ -126,10 +126,27 @@ class VirtualObjectStore(Store):
             store_request = find_matching_store(stores=self.stores, request_key=path)
         else:
             raise NotImplementedError
+        chunk_end_exclusive = offset + length + 1
         if byte_range is None:
-            byte_range = RangeByteRequest(offset, offset + length + 1)
+            byte_range = RangeByteRequest(offset, chunk_end_exclusive)
+        elif isinstance(byte_range, RangeByteRequest):
+            if byte_range.end > length + 1:
+                raise ValueError(
+                    f"Chunk ends at byte {length} but request end was {byte_range}"
+                )
+            byte_range = RangeByteRequest(
+                offset + byte_range.start, offset + byte_range.end
+            )
+        elif isinstance(byte_range, OffsetByteRequest):
+            byte_range = RangeByteRequest(
+                offset + byte_range.offset, chunk_end_exclusive
+            )  # type: ignore[arg-type]
+        elif isinstance(byte_range, SuffixByteRequest):
+            byte_range = RangeByteRequest(
+                chunk_end_exclusive - byte_range.suffix, chunk_end_exclusive
+            )  # type: ignore[arg-type]
         else:
-            raise NotImplementedError
+            raise ValueError(f"Unexpected byte_range, got {byte_range}")
         try:
             bytes = await obs.get_range_async(
                 self.stores[store_request.store_id],
