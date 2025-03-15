@@ -118,9 +118,9 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
-    # So we can get a zarr.core.codec_pipeline.BatchedCodecPipeline from Zarr python,
-    # which is the end result dtype from create_v3_array_metadata->convert_to_codec_pipeline.
-    # This deconstruction -> reconstuction seems kind excessive. Should we bypass it?
+    # TODO: / Question: We can get a `zarr.core.codec_pipeline.BatchedCodecPipeline`` from zarr-python,
+    # which is the end result dtype from create_v3_array_metadata -> convert_to_codec_pipeline.
+    # This deconstruction, then reconstuction seems kind of excessive. Should/could we bypass this?
     array_v3_metadata = create_v3_array_metadata(
         shape=zarr_array.shape,
         data_type=zarr_array.dtype.name,
