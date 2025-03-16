@@ -70,7 +70,6 @@ all_readers = [
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
-    "virtualizarr[tif]",
 ]
 
 # writers
