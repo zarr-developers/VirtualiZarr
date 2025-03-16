@@ -2,9 +2,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from xarray import Dataset, register_dataset_accessor
+from xarray import Dataset, open_dataset, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.storage._obstore import VirtualObjectStore
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
@@ -86,6 +87,14 @@ class VirtualiZarrDatasetAccessor:
             group=group,
             append_dim=append_dim,
             last_updated_at=last_updated_at,
+        )
+
+    def to_xarray(self, store, **kwargs) -> Dataset:
+        store = VirtualObjectStore(self.ds, store, **kwargs)
+        return open_dataset(
+            store,
+            engine="zarr",
+            backend_kwargs={"zarr_format": 3, "consolidated": False},
         )
 
     @overload

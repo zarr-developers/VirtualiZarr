@@ -15,6 +15,7 @@ from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
     has_kerchunk,
+    has_obstore,
     parametrize_over_hdf_backends,
     requires_kerchunk,
     requires_zarr_python,
@@ -126,6 +127,15 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
 
 
+def roundtrip_as_virtual_object_store(vds: xr.Dataset, tmpdir, **kwargs):
+    from obstore.store import LocalStore
+
+    store = LocalStore()
+    stores = {"file://": store}
+    # Convert dataset to a be obstore backed for loading
+    return vds.virtualize.to_xarray(stores)
+
+
 @requires_zarr_python
 @pytest.mark.parametrize(
     "roundtrip_func",
@@ -137,6 +147,7 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
         ),
         *([roundtrip_as_kerchunk_parquet] if has_kerchunk and has_fastparquet else []),
         *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
+        *([roundtrip_as_virtual_object_store] if has_obstore else []),
     ],
 )
 class TestRoundtrip:
