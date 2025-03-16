@@ -156,20 +156,11 @@ class VirtualObjectStore(Store):
         key_ranges: Iterable[tuple[str, ByteRequest | None]],
     ) -> list[Buffer | None]:
         # docstring inherited
-        return await _get_partial_values(
-            self.store, prototype=prototype, key_ranges=key_ranges
-        )
+        raise NotImplementedError
 
     async def exists(self, key: str) -> bool:
         # docstring inherited
-        import obstore as obs
-
-        try:
-            await obs.head_async(self.store, key)
-        except FileNotFoundError:
-            return False
-        else:
-            return True
+        raise NotImplementedError
 
     @property
     def supports_writes(self) -> bool:
