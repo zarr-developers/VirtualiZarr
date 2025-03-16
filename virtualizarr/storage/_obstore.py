@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from xarray import DataArray
+from xarray import DataArray, Dataset
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -209,10 +209,12 @@ class VirtualObjectStore(Store):
 
     def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
-        if isinstance(self.xr_obj, DataArray):
+        if isinstance(self.xr_obj, (DataArray, Dataset)):
             return list_dir_from_xr_obj(self.xr_obj, prefix)
         else:
-            raise NotImplementedError("Only DataArray support is currently implemented")
+            raise NotImplementedError(
+                "Only DataArray and Datasets are currently supported"
+            )
 
 
 class _BoundedRequest(TypedDict):
