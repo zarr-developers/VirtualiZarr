@@ -50,10 +50,8 @@ class VirtualObjectStore(Store):
 
     Parameters
     ----------
-    store : obstore.store.ObjectStore
-        An obstore store instance that is set up with the proper credentials.
-    read_only : bool
-        Whether to open the store in read-only mode.
+    stores : dict[prefix, obstore.store.ObjectStore]
+        A mapping of url prefixes to obstore store instance set up with the proper credentials.
 
     Warnings
     --------
@@ -72,8 +70,6 @@ class VirtualObjectStore(Store):
         self,
         xr_obj: T_Xarray,
         stores: dict[str:_UpstreamObjectStore],
-        *,
-        read_only: bool = False,
     ) -> None:
         import obstore as obs
 
@@ -91,7 +87,7 @@ class VirtualObjectStore(Store):
                 ),
             ):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
-        super().__init__(read_only=read_only)
+        super().__init__(read_only=True)
         self.stores = stores
         self.xr_obj = xr_obj
 
