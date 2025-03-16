@@ -30,8 +30,6 @@ if TYPE_CHECKING:
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
 
-    from virtualizarr.types.general import T_Xarray
-
 
 __all__ = ["VirtualObjectStore"]
 
@@ -60,13 +58,13 @@ class VirtualObjectStore(Store):
     Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
-    def __eq__(self, value: object) -> bool:
+    def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
         self,
-        xr_obj: T_Xarray,
-        stores: dict[str:_UpstreamObjectStore],
+        xr_obj: DataArray | Dataset,
+        stores: dict[str, _UpstreamObjectStore],
     ) -> None:
         import obstore as obs
 
@@ -86,18 +84,24 @@ class VirtualObjectStore(Store):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
         super().__init__(read_only=True)
         self.stores = stores
-        self.xr_obj = xr_obj
+        self.xr_obj: DataArray | Dataset = xr_obj
 
     def __str__(self) -> str:
         return f"ManifesStore({self.xr_obj})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
-        state["store"] = pickle.dumps(self.store)
+        stores = state["stores"]
+        for k, v in stores:
+            stores[k] = pickle.dumps(v)
+        state["stores"] = stores
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        state["store"] = pickle.loads(state["store"])
+        stores = state["stores"]
+        for k, v in stores:
+            stores[k] = pickle.loads(v)
+        state["stores"] = stores
         self.__dict__.update(state)
 
     async def get(

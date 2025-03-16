@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
@@ -123,7 +125,7 @@ class VirtualiZarrDatasetAccessor:
         """
         store = VirtualObjectStore(self.ds, stores)
         return open_dataset(
-            store,
+            store,  # type: ignore[arg-type]
             engine="zarr",
             backend_kwargs={"zarr_format": 3, "consolidated": False},
             **kwargs,

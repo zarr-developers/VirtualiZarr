@@ -6,7 +6,6 @@ from xarray import DataArray, Dataset
 from xarray.backends.api import DATAARRAY_VARIABLE
 from zarr.core.buffer import Buffer, default_buffer_prototype
 
-from virtualizarr.types.general import T_Xarray
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 
@@ -30,7 +29,9 @@ class ManifestIndex:
     """Index of specific chunk within the ChunkManifest."""
 
 
-async def list_dir_from_xr_obj(vd: T_Xarray, prefix: str) -> AsyncGenerator[str]:
+async def list_dir_from_xr_obj(
+    vd: DataArray | Dataset, prefix: str
+) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
@@ -49,14 +50,14 @@ async def list_dir_from_xr_obj(vd: T_Xarray, prefix: str) -> AsyncGenerator[str]
     yield "zarr.json"
     if isinstance(vd, Dataset):
         for v in vd.variables:
-            yield v
+            yield str(v)
     if isinstance(vd, DataArray):
         yield DATAARRAY_VARIABLE
         for c in vd.coords:
-            yield c
+            yield str(c)
 
 
-def get_zarr_metadata(vd: T_Xarray, key: str) -> Buffer:
+def get_zarr_metadata(vd: DataArray | Dataset, key: str) -> Buffer:
     """
     Generate the expected Zarr V3 metadata from a virtual dataset.
 
