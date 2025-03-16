@@ -89,12 +89,13 @@ class VirtualiZarrDatasetAccessor:
             last_updated_at=last_updated_at,
         )
 
-    def to_xarray(self, store, **kwargs) -> Dataset:
-        store = VirtualObjectStore(self.ds, store, **kwargs)
+    def to_xarray(self, stores, **kwargs) -> Dataset:
+        store = VirtualObjectStore(self.ds, stores)
         return open_dataset(
             store,
             engine="zarr",
             backend_kwargs={"zarr_format": 3, "consolidated": False},
+            **kwargs,
         )
 
     @overload
