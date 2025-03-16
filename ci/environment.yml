@@ -40,3 +40,4 @@ dependencies:
   - zarr>=3.0.2
   - pip:
       - imagecodecs-numcodecs==2024.6.1
+      - obstore @ git+https://github.com/developmentseed/obstore.git@main#subdirectory=obstore

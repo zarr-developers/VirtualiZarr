@@ -97,6 +97,7 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
+    "virtualizarr[obstore]",
     "virtualizarr[all]",
 ]
 
