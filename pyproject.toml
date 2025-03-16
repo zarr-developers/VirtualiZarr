@@ -37,7 +37,9 @@ remote = [
     "aiohttp",
     "s3fs",
 ]
-
+obstore = [
+    "obstore @ git+https://github.com/developmentseed/obstore@main#subdirectory=obstore",
+]
 # non-kerchunk-based readers
 hdf = [
     "virtualizarr[remote]",
@@ -68,6 +70,7 @@ all_readers = [
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
+    "virtualizarr[tif]",
 ]
 
 # writers
@@ -95,7 +98,7 @@ test = [
     "pytest",
     "ruff",
     "s3fs",
-    "virtualizarr[all]"
+    "virtualizarr[all]",
 ]
 
 [project.urls]
