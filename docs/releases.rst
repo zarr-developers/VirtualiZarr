@@ -9,6 +9,8 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added experimental VirtualObjectStore for loading data directly from virtual datasets.
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
