@@ -125,8 +125,17 @@ class VirtualObjectStore(Store):
             length = self.xr_obj.data.manifest._lengths[*manifest_index.indexes]
             store_request = find_matching_store(stores=self.stores, request_key=path)
         else:
-            raise NotImplementedError
-        chunk_end_exclusive = offset + length + 1
+            path = self.xr_obj[manifest_index.variable].data.manifest._paths[
+                *manifest_index.indexes
+            ]
+            offset = self.xr_obj[manifest_index.variable].data.manifest._offsets[
+                *manifest_index.indexes
+            ]
+            length = self.xr_obj[manifest_index.variable].data.manifest._lengths[
+                *manifest_index.indexes
+            ]
+            store_request = find_matching_store(stores=self.stores, request_key=path)
+        chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
             byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
         )
