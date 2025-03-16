@@ -48,11 +48,11 @@ class VirtualObjectStore(Store):
     Parameters
     ----------
     stores : dict[prefix, obstore.store.ObjectStore]
-        A mapping of url prefixes to obstore store instance set up with the proper credentials.
+        A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
     Warnings
     --------
-    ObjectStore is experimental and subject to API changes without notice. Please
+    VirtualObjectStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
 
     Notes
@@ -112,11 +112,11 @@ class VirtualObjectStore(Store):
         if "zarr.json" in key:
             return get_zarr_metadata(self.xr_obj, key)
         manifest_index = parse_manifest_index(key)
+        # Get path, offset, and length matching this key from the ChunkManifest
         if manifest_index.variable == "__xarray_dataarray_variable__":
             path = self.xr_obj.data.manifest._paths[*manifest_index.indexes]
             offset = self.xr_obj.data.manifest._offsets[*manifest_index.indexes]
             length = self.xr_obj.data.manifest._lengths[*manifest_index.indexes]
-            store_request = find_matching_store(stores=self.stores, request_key=path)
         else:
             path = self.xr_obj[manifest_index.variable].data.manifest._paths[
                 *manifest_index.indexes
@@ -127,11 +127,13 @@ class VirtualObjectStore(Store):
             length = self.xr_obj[manifest_index.variable].data.manifest._lengths[
                 *manifest_index.indexes
             ]
-            store_request = find_matching_store(stores=self.stores, request_key=path)
+        store_request = find_matching_store(stores=self.stores, request_key=path)
+        # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
             byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
         )
+        # Actually get the bytes
         try:
             bytes = await obs.get_range_async(
                 self.stores[store_request.store_id],
@@ -210,7 +212,9 @@ class VirtualObjectStore(Store):
             )
 
 
-def _transform_byte_range(byte_range, *, chunk_start, chunk_end_exclusive):
+def _transform_byte_range(
+    byte_range: ByteRequest | None, *, chunk_start: int, chunk_end_exclusive: int
+) -> RangeByteRequest:
     """
     Convert an incoming byte_range which assumes one chunk per file to a
     virtual byte range that accounts for the location of a chunk within a file.
