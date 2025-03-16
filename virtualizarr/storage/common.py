@@ -68,10 +68,12 @@ def get_zarr_metadata(vd: T_Xarray, key: str) -> Buffer:
     # Handle metadata for data variable within a DataArray
     elif key == "__xarray_dataarray_variable__/zarr.json":
         metadata = vd.data.metadata.to_dict()
+        metadata["attributes"] = vd.attrs
     # Handle metadata for variables within Datasets
     else:
         var, _ = key.split("/")
         metadata = vd[var].data.metadata.to_dict()
+        metadata["attributes"] = vd[var].attrs
         if not metadata.get("dimension_names", None):
             metadata["dimension_names"] = vd[var].dims
     return dict_to_buffer(metadata, prototype=default_buffer_prototype())
