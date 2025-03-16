@@ -11,6 +11,9 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+    from obstore.store import (
+        ObjectStore as _UpstreamObjectStore,  # type: ignore[import-not-found]
+    )
 
 
 @register_dataset_accessor("virtualize")
@@ -89,7 +92,35 @@ class VirtualiZarrDatasetAccessor:
             last_updated_at=last_updated_at,
         )
 
-    def to_xarray(self, stores, **kwargs) -> Dataset:
+    def to_xarray(self, stores: dict[str, _UpstreamObjectStore], **kwargs) -> Dataset:
+        """
+        Convert the virtual dataset to a VirtualObjectStore dataset which can be used to
+        load data directly without first serializing using Icechunk or Kerchunk.
+
+        Parameters
+        ----------
+        stores: dict
+            Object stores to use for fetching data. A store must be provided for
+            each storage type and configuration set (e.g., LocalStore, S3Store).
+
+            The keys should provide a prefix that can be matched to urls contained
+            within the virtual dataset (e.g., `file://`, `s3://mybucket`, `s3://mybucket1`)
+
+        kwargs: dict, optional
+            Additional keyword-arguments to pass to xarray.open_dataset().
+
+
+        Examples
+        --------
+
+        >>> from obstore.store import LocalStore
+        >>> stores = {"file://": LocalStore()}
+        >>> vds.virtualize.to_xarray(stores=stores)  # doctest: +SKIP
+
+        Warnings
+        --------
+        The to_xarray() functionality is experimental.
+        """
         store = VirtualObjectStore(self.ds, stores)
         return open_dataset(
             store,
