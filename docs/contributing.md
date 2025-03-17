@@ -26,7 +26,8 @@ You can also run tests in other environments:
 ```bash
 pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
 pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
-
+# List which versions are installed in the `min-deps` environment
+pixi list --environment min-deps
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
