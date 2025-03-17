@@ -6,27 +6,26 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
+```{important}
+:name: dependencies
 We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
-
-To run the tests in the default test environment, run:
-
-```bash
-pixi run --environment test test-no-network
 ```
 
-As shown below, you can run additional tests that require downloading files over the network.
-Use the `test-no-network` task shown above instead if you want the tests to run faster or
-you have no internet access:
+Run tests with the `pixi run --environment test run-tests` command. Some tests require downloading files over the network.
+Use the `run-tests-no-network` task if you want to run tests faster or have no internet access:
 
 ```bash
-pixi run --environment test
+# Run all tests
+pixi run --environment test run-tests
+# Skip tests that require a network connection
+pixi run --environment test run-tests-no-network
 ```
 
 You can also run tests in other environments:
 
 ```bash
-pixi run --environment min-deps test # Test with the minimal set of dependencies installed
-pixi run --environment upstream test # Test with unreleased versions of upstream libraries
+pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
+pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
 
 ```
 
@@ -35,8 +34,8 @@ coverage report locally, if you wish (CI will automatically do so).  Here are so
 examples:
 
 ```bash
-pixi run --environment test-cov              # Terminal report showing missing coverage
-pixi run --environment test-html-cov         # HTML report written to htmlcov/index.html
+pixi run --environment test run-tests-cov              # Terminal report showing missing coverage
+pixi run --environment test run-tests-html-cov         # HTML report written to htmlcov/index.html
 ```
 
 ## Contributing documentation
@@ -47,7 +46,7 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 
 ```bash
 pixi install --environment docs
-pixi run docs
+pixi run build-docs
 ```
 
 ### Access the documentation locally
