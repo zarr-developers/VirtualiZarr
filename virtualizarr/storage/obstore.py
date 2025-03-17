@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
 
-    from obstore.store import ObjectStore as _UpstreamObjectStore
+    from obstore.store import ObjectStore
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
 
@@ -59,7 +59,7 @@ class VirtualStore(Store):
     """
 
     xr_obj: DataArray | Dataset
-    stores: dict[str, _UpstreamObjectStore]
+    stores: dict[str, ObjectStore]
 
     def __eq__(self, value: object):
         NotImplementedError
@@ -67,7 +67,7 @@ class VirtualStore(Store):
     def __init__(
         self,
         xr_obj: DataArray | Dataset,
-        stores: dict[str, _UpstreamObjectStore],
+        stores: dict[str, ObjectStore],
     ) -> None:
         import obstore as obs
 
