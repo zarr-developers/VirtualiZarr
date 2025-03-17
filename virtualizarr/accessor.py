@@ -4,18 +4,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from xarray import Dataset, open_dataset, register_dataset_accessor
+from xarray import Dataset, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.storage.obstore import VirtualStore
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from obstore.store import (
-        ObjectStore as _UpstreamObjectStore,  # type: ignore[import-not-found]
-    )
 
 
 @register_dataset_accessor("virtualize")
@@ -92,43 +88,6 @@ class VirtualiZarrDatasetAccessor:
             group=group,
             append_dim=append_dim,
             last_updated_at=last_updated_at,
-        )
-
-    def _to_xarray(self, stores: dict[str, _UpstreamObjectStore], **kwargs) -> Dataset:
-        """
-        Convert the virtual dataset to an VirtualStore-backed xarray dataset which can
-        be used to load data directly without first serializing using Icechunk or Kerchunk.
-
-        Parameters
-        ----------
-        stores: dict
-            Object stores to use for fetching data. The keys should provide a prefix that can
-            be matched to urls contained within the virtual dataset (e.g., `file://`,
-            `s3://mybucket`, `s3://mybucket1`) and the values should be properly configured
-            ObjectStore instances. A store must be provided for each storage type and
-            configuration set (e.g., LocalStore, public S3Store, private S3Store).
-
-        kwargs: dict, optional
-            Additional keyword-arguments to pass to xarray.open_dataset().
-
-
-        Examples
-        --------
-
-        >>> from obstore.store import LocalStore
-        >>> stores = {"file://": LocalStore()}
-        >>> vds.virtualize._to_xarray(stores=stores)  # doctest: +SKIP
-
-        Warnings
-        --------
-        The _to_xarray() functionality is experimental.
-        """
-        store = VirtualStore(self.ds, stores)
-        return open_dataset(
-            store,  # type: ignore[arg-type]
-            engine="zarr",
-            backend_kwargs={"zarr_format": 3, "consolidated": False},
-            **kwargs,
         )
 
     @overload
