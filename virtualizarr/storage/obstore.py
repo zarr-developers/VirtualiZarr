@@ -131,6 +131,8 @@ class VirtualStore(Store):
             offset = self.xr_obj[var_name].data.manifest._offsets[*chunk_key]
             length = self.xr_obj[var_name].data.manifest._lengths[*chunk_key]
         store_request = find_matching_store(stores=self.stores, request_key=path)
+        # Get the  configured object store instance that matches the path
+        store = self.stores[store_request.store_id]
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -139,7 +141,7 @@ class VirtualStore(Store):
         # Actually get the bytes
         try:
             bytes = await obs.get_range_async(
-                self.stores[store_request.store_id],
+                store,
                 store_request.key,
                 start=byte_range.start,
                 end=byte_range.end,
