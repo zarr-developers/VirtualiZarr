@@ -22,6 +22,14 @@ you have no internet access:
 pixi run --environment test
 ```
 
+You can also run tests in other environments:
+
+```bash
+pixi run --environment min-deps test # Test with the minimal set of dependencies installed
+pixi run --environment upstream test # Test with unreleased versions of upstream libraries
+
+```
+
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
 coverage report locally, if you wish (CI will automatically do so).  Here are some
 examples:
