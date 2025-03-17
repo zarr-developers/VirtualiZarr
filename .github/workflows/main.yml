@@ -39,7 +39,7 @@ jobs:
 
       - name: Running Tests
         run: |
-          pixi run -e ${{ matrix.environment }} test-xml-cov
+          pixi run -e ${{ matrix.environment }} run-tests-xml-cov
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4
