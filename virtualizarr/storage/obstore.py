@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from zarr.core.common import BytesLike
 
 
-__all__ = ["VirtualStore"]
+__all__ = ["ManifestStore"]
 
 _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     FileNotFoundError,
@@ -40,7 +40,7 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
 )
 
 
-class VirtualStore(Store):
+class ManifestStore(Store):
     """A Zarr store that uses obstore for fast read/write from AWS, GCP, Azure.
 
     Parameters
@@ -50,7 +50,7 @@ class VirtualStore(Store):
 
     Warnings
     --------
-    VirtualStore is experimental and subject to API changes without notice. Please
+    ManifestStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
 
     Notes
