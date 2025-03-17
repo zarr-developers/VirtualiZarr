@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, Literal, overload
 from xarray import Dataset, open_dataset, register_dataset_accessor
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.storage._obstore import VirtualObjectStore
+from virtualizarr.storage.obstore import VirtualStore
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
@@ -94,9 +94,9 @@ class VirtualiZarrDatasetAccessor:
             last_updated_at=last_updated_at,
         )
 
-    def to_xarray(self, stores: dict[str, _UpstreamObjectStore], **kwargs) -> Dataset:
+    def _to_xarray(self, stores: dict[str, _UpstreamObjectStore], **kwargs) -> Dataset:
         """
-        Convert the virtual dataset to an VirtualObjectStore-backed xarray dataset which can
+        Convert the virtual dataset to an VirtualStore-backed xarray dataset which can
         be used to load data directly without first serializing using Icechunk or Kerchunk.
 
         Parameters
@@ -117,13 +117,13 @@ class VirtualiZarrDatasetAccessor:
 
         >>> from obstore.store import LocalStore
         >>> stores = {"file://": LocalStore()}
-        >>> vds.virtualize.to_xarray(stores=stores)  # doctest: +SKIP
+        >>> vds.virtualize._to_xarray(stores=stores)  # doctest: +SKIP
 
         Warnings
         --------
-        The to_xarray() functionality is experimental.
+        The _to_xarray() functionality is experimental.
         """
-        store = VirtualObjectStore(self.ds, stores)
+        store = VirtualStore(self.ds, stores)
         return open_dataset(
             store,  # type: ignore[arg-type]
             engine="zarr",

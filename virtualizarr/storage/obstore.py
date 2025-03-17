@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from zarr.core.common import BytesLike
 
 
-__all__ = ["VirtualObjectStore"]
+__all__ = ["VirtualStore"]
 
 _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     FileNotFoundError,
@@ -40,7 +40,7 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
 )
 
 
-class VirtualObjectStore(Store):
+class VirtualStore(Store):
     """A Zarr store that uses obstore for fast read/write from AWS, GCP, Azure.
 
     Parameters
@@ -50,13 +50,16 @@ class VirtualObjectStore(Store):
 
     Warnings
     --------
-    VirtualObjectStore is experimental and subject to API changes without notice. Please
+    VirtualStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
 
     Notes
     -----
     Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
+
+    xr_obj: DataArray | Dataset
+    stores: dict[str, _UpstreamObjectStore]
 
     def __eq__(self, value: object):
         NotImplementedError
@@ -82,9 +85,11 @@ class VirtualObjectStore(Store):
                 ),
             ):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
+        if not isinstance(xr_obj, (DataArray, Dataset)):
+            raise TypeError(f"expected Dataset or DataArray class, got {xr_obj!r}")
         super().__init__(read_only=True)
         self.stores = stores
-        self.xr_obj: DataArray | Dataset = xr_obj
+        self.xr_obj = xr_obj
 
     def __str__(self) -> str:
         return f"ManifesStore({self.xr_obj})"
@@ -115,22 +120,16 @@ class VirtualObjectStore(Store):
 
         if "zarr.json" in key:
             return get_zarr_metadata(self.xr_obj, key)
-        manifest_index = parse_manifest_index(key)
+        var_name, chunk_key = parse_manifest_index(key)
         # Get path, offset, and length matching this key from the ChunkManifest
-        if manifest_index.variable == "__xarray_dataarray_variable__":
-            path = self.xr_obj.data.manifest._paths[*manifest_index.indexes]
-            offset = self.xr_obj.data.manifest._offsets[*manifest_index.indexes]
-            length = self.xr_obj.data.manifest._lengths[*manifest_index.indexes]
+        if var_name == "__xarray_dataarray_variable__":
+            path = self.xr_obj.data.manifest._paths[*chunk_key]
+            offset = self.xr_obj.data.manifest._offsets[*chunk_key]
+            length = self.xr_obj.data.manifest._lengths[*chunk_key]
         else:
-            path = self.xr_obj[manifest_index.variable].data.manifest._paths[
-                *manifest_index.indexes
-            ]
-            offset = self.xr_obj[manifest_index.variable].data.manifest._offsets[
-                *manifest_index.indexes
-            ]
-            length = self.xr_obj[manifest_index.variable].data.manifest._lengths[
-                *manifest_index.indexes
-            ]
+            path = self.xr_obj[var_name].data.manifest._paths[*chunk_key]
+            offset = self.xr_obj[var_name].data.manifest._offsets[*chunk_key]
+            length = self.xr_obj[var_name].data.manifest._lengths[*chunk_key]
         store_request = find_matching_store(stores=self.stores, request_key=path)
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length

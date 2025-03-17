@@ -133,7 +133,7 @@ def roundtrip_as_virtual_object_store(vds: xr.Dataset, tmpdir, **kwargs):
     store = LocalStore()
     stores = {"file://": store}
     # Convert dataset to a be obstore backed for loading
-    return vds.virtualize.to_xarray(stores)
+    return vds.virtualize._to_xarray(stores)
 
 
 @requires_zarr_python

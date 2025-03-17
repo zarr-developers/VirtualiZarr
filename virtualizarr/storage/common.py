@@ -19,16 +19,6 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-@dataclass
-class ManifestIndex:
-    """Dataclass for indexing into ChunkManifests"""
-
-    variable: str
-    """Variable to extract keys, offsets, and lengths from."""
-    indexes: tuple[int, ...]
-    """Index of specific chunk within the ChunkManifest."""
-
-
 async def list_dir_from_xr_obj(
     vd: DataArray | Dataset, prefix: str
 ) -> AsyncGenerator[str]:
@@ -98,7 +88,7 @@ def get_zarr_metadata(vd: DataArray | Dataset, key: str) -> Buffer:
     return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
-def parse_manifest_index(key: str) -> ManifestIndex:
+def parse_manifest_index(key: str) -> tuple[str, tuple[int, ...]]:
     """
     Splits `key` provided to a zarr store into the variable indicated
     by the first part and the chunk index from the 3rd through last parts,
@@ -121,7 +111,7 @@ def parse_manifest_index(key: str) -> ManifestIndex:
     # Assume "c" is the second part
     # TODO: Handle scalar array case with "c" holds the data
     indexes = tuple(int(ind) for ind in parts[2:])
-    return ManifestIndex(variable=var, indexes=indexes)
+    return var, indexes
 
 
 def find_matching_store(stores: dict[str, Any], request_key: str) -> StoreRequest:
