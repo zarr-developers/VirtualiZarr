@@ -48,6 +48,12 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 pixi install --environment docs
 pixi run build-docs
 ```
+Pixi can also be used to serve continuously updating version of the documentation during development at [http://0.0.0.0:8000/](http://0.0.0.0:8000/).
+This can be done by navigating to [http://0.0.0.0:8000/](http://0.0.0.0:8000/) in your browser after running:
+
+```bash
+pixi run serve-docs
+```
 
 ### Access the documentation locally
 
