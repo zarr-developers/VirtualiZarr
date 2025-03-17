@@ -89,7 +89,9 @@ upstream = [
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
+    'zarr @ git+https://github.com/zarr-developers/zarr-python',
     # optional dependencies
+    'astropy @ git+https://github.com/astropy/astropy',
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
@@ -170,7 +172,7 @@ min-deps = ["dev", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h
 test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib"]
 test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py311"] # test against python 3.11
 test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312"] # test against python 3.12
-upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "upstream", "icechunk-dev"]
+upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
 all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "all_readers", "all_writers"]
 docs = ["docs"]
 
