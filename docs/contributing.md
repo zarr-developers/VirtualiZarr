@@ -38,6 +38,19 @@ pixi run --environment test run-tests-cov              # Terminal report showing
 pixi run --environment test run-tests-html-cov         # HTML report written to htmlcov/index.html
 ```
 
+Rather than using pixi tasks (essentially aliases for running commands in a given shell), you can explicitly start
+a shell within a given environment and execute `pytest` (or other commands) directly:
+
+```bash
+# Start a shell within the environment
+pixi shell --environment test
+# Run the tests
+pytest virtualizarr
+# Exit the shell
+exit
+```
+
+
 ## Contributing documentation
 
 Whilst the CI will build the updated documentation for each PR, it can also be useful to check that the documentation has rendered as expected by building it locally.
