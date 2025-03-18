@@ -172,11 +172,11 @@ run-tests-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtual
 [tool.pixi.environments]
 min-deps = ["dev", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib"]
-test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py311"] # test against python 3.11
-test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312"] # test against python 3.12
+test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
+test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
+test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
 upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "all_readers", "all_writers"]
+all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
 docs = ["docs"]
 
 
