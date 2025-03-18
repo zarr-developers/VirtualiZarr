@@ -14,6 +14,12 @@ New Features
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added :py:func:`datatree_to_icechunk` function for writing an ``xarray.DataTree`` to
+  an Icechunk store (:issue:`244`).  By `Chuck Daniels <https://github.com/chuckwondo>`_.
+- Added a ``.virtualize`` custom accessor to ``xarray.DataTree``, exposing the method
+  :py:meth:`xarray.DataTree.virtualize.to_icechunk()` for writing an ``xarray.DataTree``
+  to an Icechunk store (:issue:`244`).  By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
