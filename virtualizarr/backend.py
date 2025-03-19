@@ -7,7 +7,7 @@ from typing import (
     Optional,
 )
 
-from xarray import DataArray, Dataset, Index
+from xarray import Dataset, Index
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
@@ -208,79 +208,3 @@ def open_virtual_dataset(
     )
 
     return vds
-
-
-def open_virtual_dataarray(
-    filepath: str,
-    *,
-    filetype: FileType | str | None = None,
-    group: str | None = None,
-    virtual_array_class=ManifestArray,
-    virtual_backend_kwargs: dict | None = None,
-    reader_options: dict | None = None,
-    backend: type[VirtualBackend] | None = None,
-) -> DataArray:
-    """
-    Open a file or store as an xarray DataArray wrapping virtualized zarr arrays.
-
-    No data variables will be loaded.
-
-    Parameters
-    ----------
-    filepath : str, default None
-        File path to open as a set of virtualized zarr arrays.
-    filetype : FileType or str, default None
-        Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'kerchunk'}.
-        If not provided will attempt to automatically infer the correct filetype from header bytes.
-    group : str, default is None
-        Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
-    virtual_backend_kwargs: dict, default is None
-        Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
-    reader_options: dict, default {}
-        Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
-        Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
-
-    Returns
-    -------
-    vds
-        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
-    """
-
-    if virtual_array_class is not ManifestArray:
-        raise NotImplementedError()
-
-    if reader_options is None:
-        reader_options = {}
-
-    if backend and filetype:
-        raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
-
-    if backend:
-        backend_cls = backend
-    else:
-        if filetype is None:
-            filetype = automatically_determine_filetype(
-                filepath=filepath, reader_options=reader_options
-            )
-        elif isinstance(filetype, str):
-            # if filetype is a user defined string, convert to FileType
-            filetype = FileType(filetype.lower())
-        elif not isinstance(filetype, FileType):
-            raise ValueError("Filetype must be a valid string or FileType")
-        backend_cls = VIRTUAL_BACKENDS.get(filetype.name.lower())  # type: ignore
-
-    if backend_cls is None:
-        raise NotImplementedError(f"Unsupported file type: {filetype.name}")
-
-    vda = backend_cls.open_virtual_dataarray(
-        filepath,
-        group=group,
-        virtual_backend_kwargs=virtual_backend_kwargs,
-        reader_options=reader_options,
-    )
-
-    return vda

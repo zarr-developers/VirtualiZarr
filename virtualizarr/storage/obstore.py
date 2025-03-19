@@ -4,7 +4,6 @@ import pickle
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
-from xarray import DataArray, Dataset
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -15,10 +14,11 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
 
+from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.storage.common import (
+    StoreDict,
     find_matching_store,
     get_zarr_metadata,
-    list_dir_from_xr_obj,
     parse_manifest_index,
 )
 
@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
 
-    from obstore.store import ObjectStore
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
 
@@ -58,20 +57,20 @@ class ManifestStore(Store):
     Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
-    xr_obj: DataArray | Dataset
-    stores: dict[str, ObjectStore]
+    _manifest_group: ManifestGroup
+    _stores: StoreDict
 
     def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
         self,
-        xr_obj: DataArray | Dataset,
-        stores: dict[str, ObjectStore],
+        manifest_group: ManifestGroup,
+        *,
+        stores: StoreDict,
     ) -> None:
         import obstore as obs
 
-        # TODO: Support DataArray, Dataset, or DataTree across all methods
         for store in stores.values():
             if not isinstance(
                 store,
@@ -85,28 +84,27 @@ class ManifestStore(Store):
                 ),
             ):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
-        if not isinstance(xr_obj, (DataArray, Dataset)):
-            raise TypeError(f"expected Dataset or DataArray class, got {xr_obj!r}")
+        # TODO: Type check the manifest arrays
         super().__init__(read_only=True)
-        self.stores = stores
-        self.xr_obj = xr_obj
+        self._stores = stores
+        self._manifest_group = manifest_group
 
     def __str__(self) -> str:
-        return f"ManifesStore({self.xr_obj})"
+        return f"ManifestStore({self._manifest_group}, {self._stores})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
-        stores = state["stores"]
+        stores = state["_stores"]
         for k, v in stores:
             stores[k] = pickle.dumps(v)
-        state["stores"] = stores
+        state["_stores"] = stores
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["stores"]
+        stores = state["_stores"]
         for k, v in stores:
             stores[k] = pickle.loads(v)
-        state["stores"] = stores
+        state["_stores"] = stores
         self.__dict__.update(state)
 
     async def get(
@@ -119,20 +117,14 @@ class ManifestStore(Store):
         import obstore as obs
 
         if "zarr.json" in key:
-            return get_zarr_metadata(self.xr_obj, key)
-        var_name, chunk_key = parse_manifest_index(key)
-        # Get path, offset, and length matching this key from the ChunkManifest
-        if var_name == "__xarray_dataarray_variable__":
-            path = self.xr_obj.data.manifest._paths[*chunk_key]
-            offset = self.xr_obj.data.manifest._offsets[*chunk_key]
-            length = self.xr_obj.data.manifest._lengths[*chunk_key]
-        else:
-            path = self.xr_obj[var_name].data.manifest._paths[*chunk_key]
-            offset = self.xr_obj[var_name].data.manifest._offsets[*chunk_key]
-            length = self.xr_obj[var_name].data.manifest._lengths[*chunk_key]
-        store_request = find_matching_store(stores=self.stores, request_key=path)
+            return get_zarr_metadata(self._manifest_group, key)
+        var, chunk_key = parse_manifest_index(key)
+        path = self._manifest_group._manifest_dict[var]._manifest._paths[*chunk_key]
+        offset = self._manifest_group._manifest_dict[var]._manifest._offsets[*chunk_key]
+        length = self._manifest_group._manifest_dict[var]._manifest._lengths[*chunk_key]
+        store_request = find_matching_store(stores=self._stores, request_key=path)
         # Get the  configured object store instance that matches the path
-        store = self.stores[store_request.store_id]
+        store = self._stores[store_request.store_id]
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -207,14 +199,10 @@ class ManifestStore(Store):
         # docstring inherited
         raise NotImplementedError
 
-    def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
+    async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
-        if isinstance(self.xr_obj, (DataArray, Dataset)):
-            return list_dir_from_xr_obj(self.xr_obj, prefix)
-        else:
-            raise NotImplementedError(
-                "Only DataArray and Datasets are currently supported"
-            )
+        for k in self._manifest_group._manifest_dict.keys():
+            yield k
 
 
 def _transform_byte_range(

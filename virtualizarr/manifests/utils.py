@@ -17,7 +17,7 @@ def create_v3_array_metadata(
     fill_value: Any = None,
     codecs: Optional[list[Dict[str, Any]]] = None,
     attributes: Optional[Dict[str, Any]] = None,
-    dimension_names: Optional[tuple[str]] = None,
+    dimension_names: Optional[tuple[str, ...]] = None,
 ) -> ArrayV3Metadata:
     """
     Create an ArrayV3Metadata instance with standard configuration.
