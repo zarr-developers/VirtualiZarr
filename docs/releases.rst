@@ -30,7 +30,7 @@ Documentation
 Internal Changes
 ~~~~~~~~~~~~~~~~
 
-- `ManifestArrays` now internally use `zarr.core.metadata.v3.ArrayV3Metadata <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/metadata/v3.py>_`. This replaces the `ZArray` class that was previously used to store metadata about manifest arrays. (:pull:`429`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_. Notable internal changes:
+- `ManifestArrays` now internally use `zarr.core.metadata.v3.ArrayV3Metadata <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/metadata/v3.py>`_. This replaces the `ZArray` class that was previously used to store metadata about manifest arrays. (:pull:`429`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_. Notable internal changes:
     - Make zarr-python a required dependency with a minimum version `>=3.0.2`.
     - Specify a minimum numcodecs version of `>=0.15.1`.
     - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
@@ -41,6 +41,7 @@ Internal Changes
       - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
     - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).
     - zarr-python 3.0 does not yet support datetime and timedelta data types (`zarr-python issue #2616 <https://github.com/zarr-developers/zarr-python/issues/2616>`_).
+- The continuous integration workflows and developer environment now use `pixi <https://pixi.sh/latest/>`_ (:pull:`407`).
 
 .. _v1.3.2:
 
