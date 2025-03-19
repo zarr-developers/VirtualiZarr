@@ -147,7 +147,6 @@ class TestRoundtrip:
     ):
         air_zarr_path = tmp_path / "air_temperature.zarr"
         with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
-            # TODO: We can use the zarr subset fixture as an input instead of full air_temperature.
             # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
             ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
 

@@ -31,6 +31,7 @@ dependencies = [
     "ipdb>=0.13.13",
     "icechunk>=0.2.7",
     "pre-commit>=4.1.0",
+    "mypy>=1.15.0",
 ]
 
 [project.optional-dependencies]

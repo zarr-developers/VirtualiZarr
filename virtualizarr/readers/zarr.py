@@ -244,14 +244,6 @@ class ZarrVirtualBackend(VirtualBackend):
 
         import zarr
 
-        #  We should remove this once zarr v3 is pinned!
-        # ---------------------------
-        from packaging import version
-
-        if version.parse(zarr.__version__).major < 3:
-            raise ImportError("Zarr V3 is required")
-        # ---------------------------
-
         async def _open_virtual_dataset(
             filepath=filepath,
             group=group,
