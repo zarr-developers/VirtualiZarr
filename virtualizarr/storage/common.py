@@ -6,7 +6,6 @@ from xarray import DataArray, Dataset
 from xarray.backends.api import DATAARRAY_VARIABLE
 from zarr.core.buffer import Buffer, default_buffer_prototype
 
-from virtualizarr.types.general import T_Xarray
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 
@@ -20,17 +19,9 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-@dataclass
-class ManifestIndex:
-    """Dataclass for indexing into ChunkManifests"""
-
-    variable: str
-    """Variable to extract keys, offsets, and lengths from."""
-    indexes: tuple[int, ...]
-    """Index of specific chunk within the ChunkManifest."""
-
-
-async def list_dir_from_xr_obj(vd: T_Xarray, prefix: str) -> AsyncGenerator[str]:
+async def list_dir_from_xr_obj(
+    vd: DataArray | Dataset, prefix: str
+) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
@@ -49,14 +40,32 @@ async def list_dir_from_xr_obj(vd: T_Xarray, prefix: str) -> AsyncGenerator[str]
     yield "zarr.json"
     if isinstance(vd, Dataset):
         for v in vd.variables:
-            yield v
+            yield str(v)
     if isinstance(vd, DataArray):
         yield DATAARRAY_VARIABLE
         for c in vd.coords:
-            yield c
+            yield str(c)
 
 
-def get_zarr_metadata(vd: T_Xarray, key: str) -> Buffer:
+def get_zarr_metadata(vd: DataArray | Dataset, key: str) -> Buffer:
+    """
+    Generate the expected Zarr V3 metadata from a virtual dataset.
+
+    Group metadata is returned for all Datasets and Array metadata
+    is returned for all DataArrays.
+
+    Combines the ManifestArray metadata with the attrs from the DataArray
+    and adds `dimension_names` for all arrays if not already provided.
+
+    Parameters
+    ----------
+    vd : xarray DataArray or Dataset
+    key : str
+
+    Returns
+    -------
+    Buffer
+    """
     # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
     if key == "zarr.json":
         metadata = {
@@ -67,33 +76,55 @@ def get_zarr_metadata(vd: T_Xarray, key: str) -> Buffer:
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
     # Handle metadata for data variable within a DataArray
     elif key == "__xarray_dataarray_variable__/zarr.json":
-        return dict_to_buffer(
-            vd.data.metadata.to_dict(), prototype=default_buffer_prototype()
-        )
-    raise NotImplementedError(
-        "Only DataArray's without coordinates are currently implemented in Virtual Zarr Stores"
-    )
+        metadata = vd.data.metadata.to_dict()
+        metadata["attributes"] = vd.attrs
+    # Handle metadata for variables within Datasets
+    else:
+        var, _ = key.split("/")
+        metadata = vd[var].data.metadata.to_dict()
+        metadata["attributes"] = vd[var].attrs
+        if not metadata.get("dimension_names", None):
+            metadata["dimension_names"] = vd[var].dims
+    return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
-def parse_manifest_index(key: str) -> ManifestIndex:
+def parse_manifest_index(key: str) -> tuple[str, tuple[int, ...]]:
+    """
+    Splits `key` provided to a zarr store into the variable indicated
+    by the first part and the chunk index from the 3rd through last parts,
+    which can be used to index into the ndarrays containing paths, offsets,
+    and lengths in ManifestArrays.
+
+    Currently only works for 1d+ arrays with a tree depth of one from the
+    root Zarr group.
+
+    Parameters
+    ----------
+    key : str
+
+    Returns
+    -------
+    ManifestIndex
+    """
     parts = key.split("/")
     var = parts[0]
     # Assume "c" is the second part
     # TODO: Handle scalar array case with "c" holds the data
     indexes = tuple(int(ind) for ind in parts[2:])
-    return ManifestIndex(variable=var, indexes=indexes)
+    return var, indexes
 
 
 def find_matching_store(stores: dict[str, Any], request_key: str) -> StoreRequest:
     """
-    Find which key in a dictionary matches the beginning of a given URI string.
+    Find the matching store based on the store keys and the beginning of the URI strings,
+    to fetch data from the appropriately configured ObjectStore.
 
     Parameters:
     -----------
     stores : dict
         A dictionary with URI prefixes for different stores as keys
     request_key : str
-        A string to match against the stores dictionary keys
+        A string to match against the dictionary keys
 
     Returns:
     --------
