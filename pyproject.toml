@@ -27,11 +27,6 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.0.2",
-    "ipython>=9.0.2",
-    "ipdb>=0.13.13",
-    "icechunk>=0.2.7",
-    "pre-commit>=4.1.0",
-    "mypy>=1.15.0",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -124,37 +119,6 @@ dev = [
     "ruff",
     "s3fs",
 ]
-
-
-[dependency-groups]
-dev = [
-    "codecov",
-    "mypy",
-    "pandas-stubs",
-    "pooch",
-    "pre-commit",
-    "pytest-asyncio",
-    "pytest-cov",
-    "pytest-mypy",
-    "pytest",
-    "ruff",
-    "s3fs",
-    "twine",
-    "netCDF4",
-    "h5netcdf",
-    "hdf5plugin",
-    "virtualizarr[all]",
-    "ipdb>=0.13.13",
-    "ipykernel>=6.29.5",
-]
-docs = [
-    "myst-nb>=1.2.0,<2",
-    "pydata-sphinx-theme>=0.16.1,<0.17",
-    "sphinx-copybutton>=0.5.2,<0.6",
-    "sphinx-design>=0.6.1,<0.7",
-    "sphinx-togglebutton>=0.3.2,<0.4",
-    "sphinx-autodoc-typehints>=3.1.0,<4",
-    ]
 
 [project.urls]
 Home = "https://github.com/zarr-developers/VirtualiZarr"
