@@ -36,7 +36,7 @@ class VirtualiZarrDatasetAccessor:
         append_dim: str | None = None,
         last_updated_at: datetime | None = None,
     ) -> None:
-        """o
+        """
         Write an xarray dataset to an Icechunk store.
 
         Any variables backed by ManifestArray objects will be be written as virtual
