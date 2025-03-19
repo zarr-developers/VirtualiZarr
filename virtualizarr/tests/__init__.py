@@ -40,6 +40,7 @@ has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_zarr_python, requires_zarr_python = _importorskip("zarr")
 has_obstore, requires_obstore = _importorskip("obstore")
+has_rioxarray, requires_rioxarray = _importorskip("rioxarray")
 
 parametrize_over_hdf_backends = pytest.mark.parametrize(
     "hdf_backend",

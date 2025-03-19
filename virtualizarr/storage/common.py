@@ -1,14 +1,16 @@
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-from obstore.store import ObjectStore
 from zarr.core.buffer import Buffer, default_buffer_prototype
 
 from virtualizarr.manifests.group import ManifestDict, ManifestGroup
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
-StoreDict: TypeAlias = dict[str, ObjectStore]
+if TYPE_CHECKING:
+    from obstore.store import ObjectStore
+
+    StoreDict: TypeAlias = dict[str, ObjectStore]
 
 
 @dataclass

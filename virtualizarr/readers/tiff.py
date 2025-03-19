@@ -11,7 +11,6 @@ from typing import (
 )
 
 import numcodecs.registry as registry
-from async_tiff import TIFF
 from zarr.core.sync import sync
 
 from virtualizarr.codecs import numcodec_config_to_configurable
@@ -20,6 +19,7 @@ from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.storage.obstore import ManifestStore
 
 if TYPE_CHECKING:
+    from async_tiff import TIFF
     from async_tiff._ifd import ImageFileDirectory
     from obstore.store import ObjectStore
     from zarr.core.abc.store import Store

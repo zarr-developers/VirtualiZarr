@@ -16,7 +16,6 @@ from zarr.core.buffer.core import BufferPrototype
 
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.storage.common import (
-    StoreDict,
     find_matching_store,
     get_zarr_metadata,
     parse_manifest_index,
@@ -28,6 +27,8 @@ if TYPE_CHECKING:
 
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
+
+    from virtualizarr.storage.common import StoreDict
 
 
 __all__ = ["ManifestStore"]

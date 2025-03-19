@@ -1,15 +1,16 @@
 from pathlib import Path
 
 import numpy as np
-import rioxarray
 import xarray as xr
 
 from virtualizarr.readers import TIFFVirtualBackend
-from virtualizarr.tests import requires_asynctiff
+from virtualizarr.tests import requires_asynctiff, requires_rioxarray
 
 
 @requires_asynctiff
+@requires_rioxarray
 def test_read_single_band_tiff():
+    import rioxarray
     from obstore.store import LocalStore
 
     current_file_path = Path(__file__).resolve()
