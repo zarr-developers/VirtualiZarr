@@ -19,8 +19,7 @@ from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.storage.obstore import ManifestStore
 
 if TYPE_CHECKING:
-    from async_tiff import TIFF
-    from async_tiff._ifd import ImageFileDirectory
+    from async_tiff import TIFF, ImageFileDirectory
     from obstore.store import ObjectStore
     from zarr.core.abc.store import Store
 
@@ -76,6 +75,8 @@ class TIFFVirtualBackend(VirtualBackend):
 
     @staticmethod
     async def _open_tiff(*, path: str, store: ObjectStore) -> TIFF:
+        from async_tiff import TIFF
+
         return await TIFF.open(path, store=store)
 
     @staticmethod
