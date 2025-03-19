@@ -61,17 +61,18 @@ class _FsspecFSFromFilepath:
         """Returns a mapper for use with Zarr"""
         return self.fs.get_mapper(self.filepath)
 
+    def filepath(self):
+        return upath.as_uri()
+
     def __post_init__(self) -> None:
         """Initialize the fsspec filesystem object"""
         import fsspec
         from upath import UPath
-
         if not isinstance(self.filepath, UPath):
             upath = UPath(self.filepath)
 
         self.upath = upath
         self.protocol = upath.protocol
-        self.filepath = upath.as_uri()
 
         self.reader_options = self.reader_options or {}
         storage_options = self.reader_options.get("storage_options", {})  # type: ignore
@@ -156,7 +157,6 @@ def convert_v3_to_v2_metadata(
     array_filters: tuple[ArrayArrayCodec, ...]
     bytes_compressors: tuple[BytesBytesCodec, ...]
     array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
-
     # Handle compressor configuration
     compressor_config: dict[str, Any] | None = None
     if bytes_compressors:
@@ -166,10 +166,13 @@ def convert_v3_to_v2_metadata(
                 "others will be ignored. This may affect data compatibility.",
                 UserWarning,
             )
+
         compressor_config = get_codec_config(bytes_compressors[0])
 
     # Handle filter configurations
+
     filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
+
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
