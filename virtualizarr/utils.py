@@ -68,6 +68,7 @@ class _FsspecFSFromFilepath:
         """Initialize the fsspec filesystem object"""
         import fsspec
         from upath import UPath
+
         if not isinstance(self.filepath, UPath):
             upath = UPath(self.filepath)
 
