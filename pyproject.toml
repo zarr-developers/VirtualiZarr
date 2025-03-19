@@ -184,7 +184,7 @@ test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk
 test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "rio", "py311"] # test against python 3.11
 test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "rio", "py312"] # test against python 3.12
 upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "rio", "all_readers", "all_writers"]
+all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "all_readers", "all_writers"]
 docs = ["docs"]
 
 

@@ -136,13 +136,13 @@ class TIFFVirtualBackend(VirtualBackend):
         return ManifestGroup(manifest_dict=manifest_dict, attributes=attrs)
 
     @staticmethod
-    def open_virtual_zarr(
+    def _create_manifest_store(
         filepath: str,
         group: str,
         file_id: str,
         object_store: ObjectStore,
     ) -> Store:
-        # TODO: Make this less sketchy, but it's better to AsyncTIFF store rather than an obstore store so here we are
+        # TODO: Make this less sketchy, but it's better to use an AsyncTIFF store rather than an obstore store
         from async_tiff.store import LocalStore as ATStore
 
         newargs = object_store.__getnewargs_ex__()
@@ -184,7 +184,7 @@ class TIFFVirtualBackend(VirtualBackend):
             raise ValueError(
                 f"Expected 'file_id' key in virtual_backend_kwargs, got {virtual_backend_kwargs}"
             )
-        manifest_store = TIFFVirtualBackend.open_virtual_zarr(
+        manifest_store = TIFFVirtualBackend._create_manifest_store(
             filepath=filepath,
             group=group,
             object_store=store,
