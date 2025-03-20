@@ -118,7 +118,7 @@ def open_virtual_dataset(
 
     Some variables can be opened as loadable lazy numpy arrays. This can be controlled explicitly using the ``loadable_variables`` keyword argument.
     By default this will be the same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
-    name matches the name of their only dimension (also known as "dimension coordinates"). 
+    name matches the name of their only dimension (also known as "dimension coordinates").
     Pandas indexes will also now be created by default for these loadable variables, but this can be controlled by passing a value for the ``indexes`` keyword argument.
     To avoid creating any xarray indexes pass ``indexes={}``.
 
