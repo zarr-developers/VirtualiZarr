@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
-from xarray import Dataset, Index, Variable
+from xarray import Dataset, Index
 
 from virtualizarr.readers.api import (
     VirtualBackend,
