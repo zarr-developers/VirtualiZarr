@@ -114,11 +114,13 @@ def open_virtual_dataset(
     backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
-    Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
+    Open a file or store as an xarray.Dataset wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
-
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+    Some variables can be opened as loadable lazy numpy arrays. This can be controlled explicitly using the ``loadable_variables`` keyword argument.
+    By default this will be the same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+    name matches the name of their only dimension (also known as "dimension coordinates"). 
+    Pandas indexes will also now be created by default for these loadable variables, but this can be controlled by passing a value for the ``indexes`` keyword argument.
+    To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -133,8 +135,9 @@ def open_virtual_dataset(
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
-        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
-        Default is to open all variables as virtual arrays (i.e. ManifestArray).
+        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class (i.e. ManifestArrays).
+        Default is to open those variables as loadable arrays (i.e. ManifestArray) which ``xarray.open_dataset`` would have created indexes for,
+        i.e. i.e. one-dimensional coordinate variables whose name matches the name of their only dimension (also known as "dimension coordinates").
     decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     indexes : Mapping[str, Index], default is None
