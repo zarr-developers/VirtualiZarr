@@ -6,7 +6,6 @@ from xarray.core.variable import Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
-
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
