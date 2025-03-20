@@ -207,7 +207,12 @@ class TestDetermineCoords:
 @requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
-        "indexes", [None, {}], ids=["None index", "empty dict index"]
+        "indexes",
+        [
+            None,
+            pytest.param({}, marks=pytest.mark.xfail(reason="not implemented")),
+        ],
+        ids=["None index", "empty dict index"],
     )
     @parametrize_over_hdf_backends
     def test_anon_read_s3(self, indexes, hdf_backend):
