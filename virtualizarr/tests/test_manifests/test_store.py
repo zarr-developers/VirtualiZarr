@@ -4,8 +4,8 @@ import xarray as xr
 from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests.store import ManifestStore
 from virtualizarr.readers.hdf import HDFVirtualBackend
-from virtualizarr.storage.obstore import ManifestStore
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_obstore,
