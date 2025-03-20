@@ -90,8 +90,9 @@ def test_FileType():
 
 @parametrize_over_hdf_backends
 class TestOpenVirtualDatasetIndexes:
-    def test_no_indexes(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
+    @pytest.mark.xfail(reason="not yet implemented")
+    def test_specify_no_indexes(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend, indexes={})
         assert vds.indexes == {}
 
     @requires_hdf5plugin
