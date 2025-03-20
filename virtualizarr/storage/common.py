@@ -1,12 +1,16 @@
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-from xarray import DataArray, Dataset
-from xarray.backends.api import DATAARRAY_VARIABLE
 from zarr.core.buffer import Buffer, default_buffer_prototype
 
+from virtualizarr.manifests.group import ManifestDict, ManifestGroup
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
+
+if TYPE_CHECKING:
+    from obstore.store import ObjectStore
+
+    StoreDict: TypeAlias = dict[str, ObjectStore]
 
 
 @dataclass
@@ -19,8 +23,8 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-async def list_dir_from_xr_obj(
-    vd: DataArray | Dataset, prefix: str
+async def list_dir_from_manifest_dict(
+    manifest_arrays: ManifestDict, prefix: str
 ) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
@@ -35,19 +39,10 @@ async def list_dir_from_xr_obj(
     AsyncIterator[str]
     """
     # Start with expected group level metadata
-    if prefix:
-        raise NotImplementedError
-    yield "zarr.json"
-    if isinstance(vd, Dataset):
-        for v in vd.variables:
-            yield str(v)
-    if isinstance(vd, DataArray):
-        yield DATAARRAY_VARIABLE
-        for c in vd.coords:
-            yield str(c)
+    raise NotImplementedError
 
 
-def get_zarr_metadata(vd: DataArray | Dataset, key: str) -> Buffer:
+def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     """
     Generate the expected Zarr V3 metadata from a virtual dataset.
 
@@ -67,25 +62,14 @@ def get_zarr_metadata(vd: DataArray | Dataset, key: str) -> Buffer:
     Buffer
     """
     # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
+
     if key == "zarr.json":
-        metadata = {
-            "zarr_format": 3,
-            "node_type": "group",
-            "attributes": vd.attrs,
-        }
+        metadata = manifest_group._metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
-    # Handle metadata for data variable within a DataArray
-    elif key == "__xarray_dataarray_variable__/zarr.json":
-        metadata = vd.data.metadata.to_dict()
-        metadata["attributes"] = vd.attrs
-    # Handle metadata for variables within Datasets
     else:
         var, _ = key.split("/")
-        metadata = vd[var].data.metadata.to_dict()
-        metadata["attributes"] = vd[var].attrs
-        if not metadata.get("dimension_names", None):
-            metadata["dimension_names"] = vd[var].dims
-    return dict_to_buffer(metadata, prototype=default_buffer_prototype())
+        metadata = manifest_group._manifest_dict[var].metadata.to_dict()
+        return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
 def parse_manifest_index(key: str) -> tuple[str, tuple[int, ...]]:
