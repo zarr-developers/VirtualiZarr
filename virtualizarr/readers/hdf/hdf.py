@@ -21,8 +21,6 @@ from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
     ManifestArray,
-    ManifestGroup,
-    ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
@@ -41,11 +39,9 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset  # type: ignore[import-untyped]
     from h5py import Group as H5Group  # type: ignore[import-untyped]
-    from obstore.store import ObjectStore
 else:
     H5Dataset: Any = None
     H5Group: Any = None
-    ObjectStore: Any = None
 
 FillValueType = Union[
     int,
@@ -63,113 +59,6 @@ FillValueType = Union[
 
 
 class HDFVirtualBackend(VirtualBackend):
-    @staticmethod
-    def _construct_manifest_array(
-        path: str,
-        dataset: H5Dataset,
-        group: str,
-    ) -> ManifestArray:
-        """
-        Construct a ManifestArray from an h5py dataset
-
-        Parameters
-        ----------
-        path: str
-            The path of the hdf5 file.
-        dataset : h5py.Dataset
-            An h5py dataset.
-        group : str
-            Name of the group containing this h5py.Dataset.
-
-        Returns
-        -------
-        ManifestArray
-        """
-        chunks = dataset.chunks if dataset.chunks else dataset.shape
-        codecs = codecs_from_dataset(dataset)
-        attrs = HDFVirtualBackend._extract_attrs(dataset)
-        dtype = dataset.dtype
-
-        codec_configs = [
-            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
-        ]
-
-        fill_value = dataset.fillvalue.item()
-        dims = tuple(HDFVirtualBackend._dataset_dims(dataset, group=group))
-        metadata = create_v3_array_metadata(
-            shape=dataset.shape,
-            data_type=dtype,
-            chunk_shape=chunks,
-            fill_value=fill_value,
-            codecs=codec_configs,
-            dimension_names=dims,
-            attributes=attrs,
-        )
-
-        manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
-        return ManifestArray(metadata=metadata, chunkmanifest=manifest)
-
-    @staticmethod
-    def _construct_manifest_group(
-        store: ObjectStore,
-        filepath: str,
-        *,
-        group: str | None = None,
-        drop_variables: Optional[List[str]] = None,
-    ) -> ManifestGroup:
-        """
-        Construct a virtual Group from a HDF dataset.
-        """
-        from virtualizarr.utils import ObstoreReader
-
-        if drop_variables is None:
-            drop_variables = []
-
-        reader = ObstoreReader(store=store, path=filepath)
-        f = h5py.File(reader, mode="r")
-
-        if group is not None and group != "":
-            g = f[group]
-            group_name = group
-            if not isinstance(g, h5py.Group):
-                raise ValueError("The provided group is not an HDF group")
-        else:
-            g = f["/"]
-            group_name = "/"
-
-        manifest_dict = {}
-        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
-            group=g
-        )
-        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
-        attrs: dict[str, Any] = {}
-        for key in g.keys():
-            if key not in drop_variables:
-                if isinstance(g[key], h5py.Dataset):
-                    variable = HDFVirtualBackend._construct_manifest_array(
-                        path=filepath,
-                        dataset=g[key],
-                        group=group_name,
-                    )
-                    if variable is not None:
-                        manifest_dict[key] = variable
-        return ManifestGroup(manifest_dict=manifest_dict, attributes=attrs)
-
-    @staticmethod
-    def _create_manifest_store(
-        filepath: str,
-        *,
-        file_id: str,
-        store: ObjectStore,
-        group: str | None = None,
-    ) -> ManifestStore:
-        # Create a group containing dataset level metadata and all the manifest arrays
-        manifest_group = HDFVirtualBackend._construct_manifest_group(
-            store=store, filepath=filepath, group=group
-        )
-        # Convert to a manifest store
-        return ManifestStore(stores={file_id: store}, manifest_group=manifest_group)
-
     @staticmethod
     def open_virtual_dataset(
         filepath: str,
