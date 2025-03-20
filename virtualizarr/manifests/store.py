@@ -222,15 +222,15 @@ class ManifestStore(Store):
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
-        stores = state["_stores"]
-        for k, v in stores:
+        stores = state["_stores"].copy()
+        for k, v in stores.items():
             stores[k] = pickle.dumps(v)
         state["_stores"] = stores
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_stores"]
-        for k, v in stores:
+        stores = state["_stores"].copy()
+        for k, v in stores.items():
             stores[k] = pickle.loads(v)
         state["_stores"] = stores
         self.__dict__.update(state)

@@ -1,3 +1,6 @@
+import json
+import pickle
+
 import pytest
 from zarr.abc.store import (
     OffsetByteRequest,
@@ -44,8 +47,8 @@ def manifest_store(filepath, array_v3_metadata):
         "1.1": {"path": f"file://{filepath}", "offset": 12, "length": 4},
     }
     manifest = ChunkManifest(entries=chunk_dict)
-    chunks = (1, 1)
-    shape = (2, 2)
+    chunks = (1, 4)
+    shape = (2, 8)
     array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(
@@ -65,7 +68,7 @@ class TestManifestStore:
         assert not manifest_store.supports_writes
 
     @pytest.mark.asyncio
-    async def test_get(self, manifest_store):
+    async def test_get_data(self, manifest_store):
         observed = await manifest_store.get(
             "foo/c/0.0", prototype=default_buffer_prototype()
         )
@@ -92,3 +95,36 @@ class TestManifestStore:
             byte_range=SuffixByteRequest(suffix=2),
         )
         assert observed.to_bytes() == b"\x03\x04"
+
+    @pytest.mark.asyncio
+    async def test_get_metadata(self, manifest_store):
+        observed = await manifest_store.get(
+            "foo/zarr.json", prototype=default_buffer_prototype()
+        )
+        metadata = json.loads(observed.to_bytes())
+        assert metadata["chunk_grid"]["configuration"]["chunk_shape"] == [1, 4]
+        assert metadata["node_type"] == "array"
+        assert metadata["zarr_format"] == 3
+
+        observed = await manifest_store.get(
+            "zarr.json", prototype=default_buffer_prototype()
+        )
+        metadata = json.loads(observed.to_bytes())
+        assert metadata["node_type"] == "group"
+        assert metadata["zarr_format"] == 3
+        assert metadata["attributes"]["Zarr"] == "Hooray!"
+
+    @pytest.mark.asyncio
+    async def test_pickling(self, manifest_store):
+        new_store = pickle.loads(pickle.dumps(manifest_store))
+        assert isinstance(new_store, ManifestStore)
+        # Check new store works
+        observed = await manifest_store.get(
+            "foo/c/0.0", prototype=default_buffer_prototype()
+        )
+        assert observed.to_bytes() == b"\x01\x02\x03\x04"
+        # Check old store works
+        observed = await new_store.get(
+            "foo/c/0.0", prototype=default_buffer_prototype()
+        )
+        assert observed.to_bytes() == b"\x01\x02\x03\x04"
