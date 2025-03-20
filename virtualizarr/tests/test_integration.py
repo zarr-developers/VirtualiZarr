@@ -338,9 +338,7 @@ class TestPathsToURIs:
     def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
         relative_path = relpath(netcdf4_file)
 
-        with open_virtual_dataset(
-            relative_path, backend=hdf_backend
-        ) as vds:
+        with open_virtual_dataset(relative_path, backend=hdf_backend) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()
             path = manifest["0.0.0"]["path"]
