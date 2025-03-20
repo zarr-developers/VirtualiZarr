@@ -4,3 +4,4 @@
 from .array import ManifestArray  # type: ignore # noqa
 from .group import ManifestGroup  # type: ignore # noqa
 from .manifest import ChunkEntry, ChunkManifest  # type: ignore # noqa
+from .store import ManifestStore  # type: ignore # noqa

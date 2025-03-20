@@ -206,6 +206,7 @@ class ManifestStore(Store):
                 ),
             ):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
+        # TODO: Don't allow stores with prefix
         # TODO: Type check the manifest arrays
         super().__init__(read_only=True)
         self._stores = stores

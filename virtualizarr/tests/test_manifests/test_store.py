@@ -3,8 +3,6 @@ import pytest
 import xarray as xr
 from obstore.store import LocalStore
 
-from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests.store import ManifestStore
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -32,14 +30,11 @@ class TestManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        vds = open_virtual_dataset(
-            filepath,
-            backend=HDFVirtualBackend,
+        store = HDFVirtualBackend._create_manifest_store(
+            filepath=filepath, store=LocalStore(), file_id="file://"
         )
-        stores = {"file://": LocalStore()}
-        ms = ManifestStore(vds, stores=stores)
         rountripped_ds = xr.open_dataset(
-            ms, engine="zarr", consolidated=False, zarr_format=3
+            store, engine="zarr", consolidated=False, zarr_format=3
         )
         xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
