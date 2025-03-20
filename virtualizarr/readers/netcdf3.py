@@ -4,11 +4,10 @@ from typing import Iterable, Mapping, Optional
 from xarray import Dataset, Index
 
 from virtualizarr.readers.api import VirtualBackend
-
-# from virtualizarr.readers.common import (
-# construct_virtual_dataset,
-# maybe_open_loadable_vars_and_indexes,
-# )
+from virtualizarr.readers.common import (
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
+)
 from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
@@ -49,25 +48,25 @@ class NetCDF3VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
             drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
-        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
-            filepath,
-            loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            drop_variables=drop_variables,
-            indexes=indexes,
-            group=group,
-            decode_times=decode_times,
-        )
-
-        return construct_virtual_dataset(
+        fully_virtual_dataset = construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
-            loadable_vars=loadable_vars,
-            indexes=indexes,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        vds = replace_virtual_with_loadable_vars(
+            fully_virtual_dataset,
+            filepath,
+            group=group,
+            loadable_variables=loadable_variables,
+            reader_options=reader_options,
+            # drop_variables=drop_variables,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
+
+        return vds
