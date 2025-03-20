@@ -106,7 +106,9 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
-def parse_manifest_index(key: str) -> tuple[str, tuple[int, ...]]:
+def parse_manifest_index(
+    key: str, chunk_key_encoding: str = "."
+) -> tuple[str, tuple[int, ...]]:
     """
     Splits `key` provided to a zarr store into the variable indicated
     by the first part and the chunk index from the 3rd through last parts,
@@ -128,7 +130,10 @@ def parse_manifest_index(key: str) -> tuple[str, tuple[int, ...]]:
     var = parts[0]
     # Assume "c" is the second part
     # TODO: Handle scalar array case with "c" holds the data
-    indexes = tuple(int(ind) for ind in parts[2:])
+    if chunk_key_encoding == "/":
+        indexes = tuple(int(ind) for ind in parts[2:])
+    else:
+        indexes = tuple(int(ind) for ind in parts[2].split(chunk_key_encoding))
     return var, indexes
 
 

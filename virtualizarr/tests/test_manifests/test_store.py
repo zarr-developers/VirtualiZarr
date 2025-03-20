@@ -1,55 +1,91 @@
-import numpy as np
 import pytest
-import xarray as xr
 from obstore.store import LocalStore
+from zarr.abc.store import (
+    OffsetByteRequest,
+    RangeByteRequest,
+    SuffixByteRequest,
+)
+from zarr.core.buffer import default_buffer_prototype
 
-from virtualizarr.readers.hdf import HDFVirtualBackend
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestGroup,
+    ManifestStore,
+)
 from virtualizarr.tests import (
-    requires_hdf5plugin,
     requires_obstore,
 )
 
 
-@pytest.fixture(name="basic_ds")
-def basic_ds():
-    x = np.arange(100)
-    y = np.arange(100)
-    temperature = 0.1 * x[:, None] + 0.1 * y[None, :]
-    ds = xr.Dataset(
-        {"temperature": (["x", "y"], temperature)},
-        coords={"x": np.arange(100), "y": np.arange(100)},
+@pytest.fixture()
+def filepath(tmpdir):
+    import obstore as obs
+
+    store = LocalStore(prefix=tmpdir)
+    filepath = "data.tmp"
+    obs.put(
+        store,
+        filepath,
+        b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
     )
-    return ds
+    return f"{tmpdir}/{filepath}"
 
 
-@requires_hdf5plugin
+@pytest.fixture()
+def manifest_store(filepath, array_v3_metadata):
+    chunk_dict = {
+        "0.0": {"path": f"file://{filepath}", "offset": 0, "length": 4},
+        "0.1": {"path": f"file://{filepath}", "offset": 4, "length": 4},
+        "1.0": {"path": f"file://{filepath}", "offset": 8, "length": 4},
+        "1.1": {"path": f"file://{filepath}", "offset": 12, "length": 4},
+    }
+    manifest = ChunkManifest(entries=chunk_dict)
+    chunks = (1, 1)
+    shape = (2, 2)
+    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
+    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    manifest_group = ManifestGroup(
+        {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
+    )
+    return ManifestStore(
+        stores={"file://": LocalStore()}, manifest_group=manifest_group
+    )
+
+
 @requires_obstore
 class TestManifestStore:
-    def test_rountrip_simple_virtualdataset(self, tmpdir, basic_ds):
-        "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
+    def test_manifest_store_properties(self, manifest_store):
+        assert manifest_store.read_only
+        assert manifest_store.supports_listing
+        assert not manifest_store.supports_deletes
+        assert not manifest_store.supports_writes
 
-        filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
-        basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = HDFVirtualBackend._create_manifest_store(
-            filepath=filepath, store=LocalStore(), file_id="file://"
+    @pytest.mark.asyncio
+    async def test_get(self, manifest_store):
+        observed = await manifest_store.get(
+            "foo/c/0.0", prototype=default_buffer_prototype()
         )
-        rountripped_ds = xr.open_dataset(
-            store, engine="zarr", consolidated=False, zarr_format=3
+        assert observed.to_bytes() == b"\x01\x02\x03\x04"
+        observed = await manifest_store.get(
+            "foo/c/1.0", prototype=default_buffer_prototype()
         )
-        xr.testing.assert_allclose(basic_ds, rountripped_ds)
-
-    # def test_convert_simple_dataset(self, tmpdir):
-    #     "Pass a regular dataset into ManifestStore"
-    #     raise NotImplementedError
-
-    # def test_rountrip_virtualdataset_nans(self, tmpdir):
-    #     "Roundtrip a dataset containing NaNs to/from NetCDF with the HDF reader and ManifestStore"
-    #     raise NotImplementedError
-
-    # def test_rountrip_virtualdataset_mask_and_scale(self, tmpdir):
-    #     "Roundtrip a dataset with a scale and offset to/from NetCDF with the HDF reader and ManifestStore"
-    #     raise NotImplementedError
-
-    # def test_rountrip_virtualdataset_time(self, tmpdir):
-    #     "Roundtrip a dataset containing datetime values to/from NetCDF with the HDF reader and ManifestStore"
-    #     raise NotImplementedError
+        assert observed.to_bytes() == b"\x09\x10\x11\x12"
+        observed = await manifest_store.get(
+            "foo/c/0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=RangeByteRequest(start=1, end=2),
+        )
+        assert observed.to_bytes() == b"\x02"
+        observed = await manifest_store.get(
+            "foo/c/0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=OffsetByteRequest(offset=1),
+        )
+        assert observed.to_bytes() == b"\x02\x03\x04"
+        observed = await manifest_store.get(
+            "foo/c/0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=SuffixByteRequest(suffix=2),
+        )
+        assert observed.to_bytes() == b"\x03\x04"
