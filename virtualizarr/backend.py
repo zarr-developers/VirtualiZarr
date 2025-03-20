@@ -19,7 +19,7 @@ from virtualizarr.readers import (
     TIFFVirtualBackend,
 )
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {

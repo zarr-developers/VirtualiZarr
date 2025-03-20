@@ -12,7 +12,6 @@ from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
-from virtualizarr.utils import check_for_collisions
 
 
 class HDF5VirtualBackend(VirtualBackend):
