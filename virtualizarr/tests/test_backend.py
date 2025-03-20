@@ -372,25 +372,48 @@ class TestOpenVirtualDatasetHDFGroup:
 @requires_imagecodecs
 class TestLoadVirtualDataset:
     @parametrize_over_hdf_backends
-    def test_loadable_variables(self, netcdf4_file, hdf_backend):
-        vars_to_load = ["air", "time"]
+    @pytest.mark.parametrize(
+        "loadable_variables, expected_loadable_variables",
+        [
+            ([], []),
+            (["time"], ["time"]),
+            (["air", "time"], ["air", "time"]),
+            (None, ["lat", "lon", "time"]),
+        ],
+    )
+    def test_loadable_variables(
+        self, netcdf4_file, hdf_backend, loadable_variables, expected_loadable_variables
+    ):
         with (
             open_virtual_dataset(
                 netcdf4_file,
-                loadable_variables=vars_to_load,
+                loadable_variables=loadable_variables,
                 backend=hdf_backend,
             ) as vds,
-            xr.open_dataset(netcdf4_file, decode_times=True) as full_ds,
+            xr.open_dataset(netcdf4_file, decode_times=True) as ds,
         ):
-            for name in vds.variables:
-                if name in vars_to_load:
-                    assert isinstance(vds[name].data, np.ndarray), name
-                else:
-                    assert isinstance(vds[name].data, ManifestArray), name
+            assert set(vds.variables) == set(ds.variables)
+            assert set(vds.coords) == set(vds.coords)
 
-            for name in full_ds.variables:
-                if name in vars_to_load:
-                    xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+            virtual_variables = {
+                name: var
+                for name, var in vds.variables.items()
+                if isinstance(var.data, ManifestArray)
+            }
+            actual_loadable_variables = {
+                name: var
+                for name, var in vds.variables.items()
+                if not isinstance(var.data, ManifestArray)
+            }
+
+            assert set(actual_loadable_variables) == set(expected_loadable_variables)
+
+            for name, var in virtual_variables.items():
+                assert isinstance(var.data, ManifestArray)
+
+            for name, var in ds.variables.items():
+                if name in actual_loadable_variables:
+                    xrt.assert_identical(vds.variables[name], ds.variables[name])
 
     def test_explicit_filetype(self, netcdf4_file):
         with pytest.raises(ValueError):
