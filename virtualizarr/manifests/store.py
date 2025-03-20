@@ -329,6 +329,7 @@ class ManifestStore(Store):
 
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
+        yield "zarr.json"
         for k in self._manifest_group._manifest_dict.keys():
             yield k
 

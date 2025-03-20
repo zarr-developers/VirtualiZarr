@@ -8,6 +8,7 @@ from zarr.abc.store import (
     SuffixByteRequest,
 )
 from zarr.core.buffer import default_buffer_prototype
+from zarr.core.sync import _collect_aiterator
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -59,6 +60,7 @@ def manifest_store(filepath, array_v3_metadata):
     )
 
 
+@pytest.mark.asyncio
 @requires_obstore
 class TestManifestStore:
     def test_manifest_store_properties(self, manifest_store):
@@ -67,7 +69,6 @@ class TestManifestStore:
         assert not manifest_store.supports_deletes
         assert not manifest_store.supports_writes
 
-    @pytest.mark.asyncio
     async def test_get_data(self, manifest_store):
         observed = await manifest_store.get(
             "foo/c/0.0", prototype=default_buffer_prototype()
@@ -96,7 +97,6 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x03\x04"
 
-    @pytest.mark.asyncio
     async def test_get_metadata(self, manifest_store):
         observed = await manifest_store.get(
             "foo/zarr.json", prototype=default_buffer_prototype()
@@ -114,7 +114,6 @@ class TestManifestStore:
         assert metadata["zarr_format"] == 3
         assert metadata["attributes"]["Zarr"] == "Hooray!"
 
-    @pytest.mark.asyncio
     async def test_pickling(self, manifest_store):
         new_store = pickle.loads(pickle.dumps(manifest_store))
         assert isinstance(new_store, ManifestStore)
@@ -128,3 +127,7 @@ class TestManifestStore:
             "foo/c/0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
+
+    async def test_list_dir(self, manifest_store) -> None:
+        observed = await _collect_aiterator(manifest_store.list_dir(""))
+        assert observed == ("zarr.json", "foo", "bar")
