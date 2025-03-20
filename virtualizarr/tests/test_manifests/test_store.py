@@ -1,5 +1,4 @@
 import pytest
-from obstore.store import LocalStore
 from zarr.abc.store import (
     OffsetByteRequest,
     RangeByteRequest,
@@ -19,10 +18,11 @@ from virtualizarr.tests import (
 
 
 @pytest.fixture()
+@requires_obstore
 def filepath(tmpdir):
     import obstore as obs
 
-    store = LocalStore(prefix=tmpdir)
+    store = obs.store.LocalStore(prefix=tmpdir)
     filepath = "data.tmp"
     obs.put(
         store,
@@ -32,8 +32,11 @@ def filepath(tmpdir):
     return f"{tmpdir}/{filepath}"
 
 
+@requires_obstore
 @pytest.fixture()
 def manifest_store(filepath, array_v3_metadata):
+    import obstore as obs
+
     chunk_dict = {
         "0.0": {"path": f"file://{filepath}", "offset": 0, "length": 4},
         "0.1": {"path": f"file://{filepath}", "offset": 4, "length": 4},
@@ -49,7 +52,7 @@ def manifest_store(filepath, array_v3_metadata):
         {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
     )
     return ManifestStore(
-        stores={"file://": LocalStore()}, manifest_group=manifest_group
+        stores={"file://": obs.store.LocalStore()}, manifest_group=manifest_group
     )
 
 
