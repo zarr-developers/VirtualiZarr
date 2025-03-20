@@ -6,6 +6,7 @@ from xarray import Dataset, Index, Variable
 from virtualizarr.readers.api import (
     VirtualBackend,
 )
+from virtualizarr.readers.common import construct_fully_virtual_dataset
 from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
@@ -55,7 +56,7 @@ class FITSVirtualBackend(VirtualBackend):
             fs_root=Path.cwd().as_uri(),
         )
 
-        return construct_virtual_dataset(
+        return construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
             loadable_vars=loadable_vars,
             indexes=indexes,
