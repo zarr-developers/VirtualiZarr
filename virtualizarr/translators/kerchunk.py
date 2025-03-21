@@ -181,9 +181,7 @@ def virtual_vars_from_kerchunk_refs(
     ]
 
     vars = {
-        var_name: variable_from_kerchunk_refs(
-            refs, var_name, fs_root=fs_root
-        )
+        var_name: variable_from_kerchunk_refs(refs, var_name, fs_root=fs_root)
         for var_name in var_names_to_keep
     }
     return vars
@@ -202,9 +200,7 @@ def dataset_from_kerchunk_refs(
         Variables in the file to drop before returning.
     """
 
-    vars = virtual_vars_from_kerchunk_refs(
-        refs, drop_variables, fs_root=fs_root
-    )
+    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, fs_root=fs_root)
     ds_attrs = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
 

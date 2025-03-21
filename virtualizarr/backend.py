@@ -9,7 +9,6 @@ from typing import (
 
 from xarray import Dataset, Index
 
-from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
