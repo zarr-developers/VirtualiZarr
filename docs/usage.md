@@ -28,7 +28,7 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.)
 
-Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, instead of some numpy or dask arrays, instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 ```python
 vds
@@ -230,7 +230,7 @@ But before we combine our data, we might want to consider loading some variables
 
 ## Loading variables
 
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns.
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy arrays, just like `xr.open_dataset` normally returns.
 
 Which variables to open this way can be specified using the `loadable_variables` argument:
 
@@ -277,7 +277,7 @@ However, you should not do this for higher-dimensional variables, as then you mi
 
 ### CF-encoded time variables
 
-To decode time variables according to the CF conventions, you need ensure `time` is one of the `loadable_variables` and the `decode_times` argument of `open_virtual_dataset` is set to `True` (`decode_times` defaults to None).
+To decode time variables according to the CF conventions, you must ensure `time` is one of the `loadable_variables` and the `decode_times` argument of `open_virtual_dataset` is set to `True` (`decode_times` defaults to None).
 
 ```python
 vds = open_virtual_dataset(
@@ -367,7 +367,7 @@ combined_vds['air'].data.manifest.dict()
 ```
 
 ```{note}
-If you have any virtual coordinate variables, you will likely need to specify the keyword arguments ``coords='minimal'`` and ``compat='override'`` to ``xarray.concat()``, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
+If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 ```
 
 The general multi-dimensional version of this concatenation-by-order-supplied can be achieved using `xarray.combine_nested()`.
