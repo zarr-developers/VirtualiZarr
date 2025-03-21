@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Hashable,
     Iterable,
     List,
     Mapping,
@@ -77,21 +78,16 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        # drop_variables, loadable_variables = check_for_collisions(
-        #     drop_variables,
-        #     loadable_variables,
-        #
-
         filepath = validate_and_normalize_path_to_uri(
             filepath, fs_root=Path.cwd().as_uri()
         )
 
+        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+
+        # TODO provide a way to drop a variable _before_ h5py attempts to inspect it?
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
             path=filepath,
             group=group,
-            # TODO loadable_variables could also be dropped here, which would avoid reading then dropping loadable variables.
-            # TODO however an explicit list of loadable_variables isn't always known at this point, so that logic would need to live deeper.
-            drop_variables=drop_variables,
             reader_options=reader_options,
         )
 
@@ -113,12 +109,11 @@ class HDFVirtualBackend(VirtualBackend):
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            # drop_variables=drop_variables,
             indexes=indexes,
             decode_times=decode_times,
         )
 
-        return vds
+        return vds.drop_vars(_drop_vars)
 
     @staticmethod
     def _dataset_chunk_manifest(

@@ -14,7 +14,6 @@ from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.utils import check_for_collisions
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -35,10 +34,6 @@ class TIFFVirtualBackend(VirtualBackend):
             )
 
         from kerchunk.tiff import tiff_to_zarr
-
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables=drop_variables, loadable_variables=loadable_variables
-        )
 
         if reader_options is None:
             reader_options = {}
@@ -80,4 +75,4 @@ class TIFFVirtualBackend(VirtualBackend):
             decode_times=decode_times,
         )
 
-        return vds
+        return vds.drop_vars(drop_variables)

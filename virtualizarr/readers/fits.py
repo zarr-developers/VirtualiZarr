@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
@@ -33,6 +33,8 @@ class FITSVirtualBackend(VirtualBackend):
                 "FITS reader does not understand any virtual_backend_kwargs"
             )
 
+        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 
@@ -52,8 +54,10 @@ class FITSVirtualBackend(VirtualBackend):
             fs_root=Path.cwd().as_uri(),
         )
 
-        return construct_fully_virtual_dataset(
+        vds = construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        return vds.drop_vars(_drop_vars)

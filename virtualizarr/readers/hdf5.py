@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
@@ -33,10 +33,7 @@ class HDF5VirtualBackend(VirtualBackend):
                 "HDF5 reader does not understand any virtual_backend_kwargs"
             )
 
-        # drop_variables, loadable_variables = check_for_collisions(
-        #     drop_variables,
-        #     loadable_variables,
-        # )
+        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
 
         refs = SingleHdf5ToZarr(
             filepath, inline_threshold=0, **reader_options
@@ -64,9 +61,8 @@ class HDF5VirtualBackend(VirtualBackend):
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            # drop_variables=drop_variables,
             indexes=indexes,
             decode_times=decode_times,
         )
 
-        return vds
+        return vds.drop_vars(_drop_vars)

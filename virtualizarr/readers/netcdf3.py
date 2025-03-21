@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
@@ -11,7 +11,6 @@ from virtualizarr.readers.common import (
 from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
-from virtualizarr.utils import check_for_collisions
 
 
 class NetCDF3VirtualBackend(VirtualBackend):
@@ -33,10 +32,7 @@ class NetCDF3VirtualBackend(VirtualBackend):
                 "netcdf3 reader does not understand any virtual_backend_kwargs"
             )
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables,
-            loadable_variables,
-        )
+        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
@@ -64,9 +60,8 @@ class NetCDF3VirtualBackend(VirtualBackend):
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            # drop_variables=drop_variables,
             indexes=indexes,
             decode_times=decode_times,
         )
 
-        return vds
+        return vds.drop_vars(_drop_vars)
