@@ -262,7 +262,8 @@ def manifest_from_kerchunk_chunk_dict(
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
             raise NotImplementedError(
-                "Reading inlined reference data is currently not supported. [ToDo]"
+                "Reading inlined reference data is currently not supported."
+                "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
             )
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
