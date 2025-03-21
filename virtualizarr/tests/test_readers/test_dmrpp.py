@@ -458,7 +458,7 @@ class TestRelativePaths:
         assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", ["mask", ["data", "mask"]])
+@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
 def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
     vds = open_virtual_dataset(
         str(basic_dmrpp_temp_filepath),
