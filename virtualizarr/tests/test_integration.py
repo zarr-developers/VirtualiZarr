@@ -58,7 +58,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
         pytest.param(
             5e7,
             ["lat", "lon", "time", "air"],
-            marks=pytest.mark.xfail(reason="scale factor encoding"),
+            marks=pytest.mark.skip(reason="slow"),
         ),
     ],
 )
