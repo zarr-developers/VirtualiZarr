@@ -32,7 +32,9 @@ class DMRPPVirtualBackend(VirtualBackend):
                 "DMR++ reader does not understand any virtual_backend_kwargs"
             )
 
-        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
 
         # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
         # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626

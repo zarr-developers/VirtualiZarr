@@ -32,7 +32,9 @@ class NetCDF3VirtualBackend(VirtualBackend):
                 "netcdf3 reader does not understand any virtual_backend_kwargs"
             )
 
-        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
 
@@ -44,7 +46,6 @@ class NetCDF3VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 

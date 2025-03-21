@@ -29,7 +29,9 @@ class KerchunkVirtualBackend(VirtualBackend):
         if virtual_backend_kwargs is None:
             virtual_backend_kwargs = {}
 
-        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
 
         fs_root = virtual_backend_kwargs.pop("fs_root", None)
 

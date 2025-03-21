@@ -82,7 +82,9 @@ class HDFVirtualBackend(VirtualBackend):
             filepath, fs_root=Path.cwd().as_uri()
         )
 
-        _drop_vars: list[Hashable] = [] if drop_variables is None else drop_variables
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
 
         # TODO provide a way to drop a variable _before_ h5py attempts to inspect it?
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(

@@ -1,6 +1,6 @@
 import warnings
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
@@ -44,6 +44,10 @@ class TIFFVirtualBackend(VirtualBackend):
             UserWarning,
         )
 
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
 
@@ -53,8 +57,6 @@ class TIFFVirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
@@ -70,9 +72,8 @@ class TIFFVirtualBackend(VirtualBackend):
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,
-            # drop_variables=drop_variables,
             indexes=indexes,
             decode_times=decode_times,
         )
 
-        return vds.drop_vars(drop_variables)
+        return vds.drop_vars(_drop_vars)
