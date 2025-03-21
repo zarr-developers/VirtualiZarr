@@ -226,8 +226,10 @@ class TestReadFromS3:
             backend=hdf_backend,
         ) as vds:
             assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
-            for var in vds.variables:
-                assert isinstance(vds[var].data, ManifestArray), var
+
+            assert isinstance(vds["air"].data, ManifestArray)
+            for name in ["time", "lat", "lon"]:
+                assert isinstance(vds[name].data, np.ndarray)
 
 
 @requires_network
