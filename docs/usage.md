@@ -201,7 +201,7 @@ But before we combine our data, we might want to consider loading some variables
 
 ## Loading variables
 
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns. 
+Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy/dask arrays, just like `xr.open_dataset` normally returns.
 
 Which variables to open this way can be specified using the `loadable_variables` argument:
 
