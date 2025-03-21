@@ -6,7 +6,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Literal,
     Mapping,
     Optional,
     Tuple,
@@ -30,7 +29,7 @@ from virtualizarr.readers.common import (
 )
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
+from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
 from virtualizarr.zarr import ZArray
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
@@ -64,9 +63,7 @@ class HDFVirtualBackend(VirtualBackend):
         filepath: str,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        loadable_variables: Literal["1d_coord_dims"]
-        | Literal["all_coords"]
-        | Iterable[str] = "1d_coord_dims",
+        loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, xr.Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
@@ -77,10 +74,10 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables,
-            loadable_variables,
-        )
+        # drop_variables, loadable_variables = check_for_collisions(
+        #     drop_variables,
+        #     loadable_variables,
+        #
 
         filepath = validate_and_normalize_path_to_uri(
             filepath, fs_root=Path.cwd().as_uri()
