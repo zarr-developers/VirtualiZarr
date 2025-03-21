@@ -3,9 +3,9 @@ import json
 from typing import cast
 
 import numpy as np
-from xarray import Dataset
+from xarray import Dataset, Variable
 from xarray.coding.times import CFDatetimeCoder
-from xarray.core.variable import Variable
+from xarray.conventions import encode_dataset_coordinates
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
@@ -53,8 +53,11 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
 
     import ujson
 
+    # xarray's .to_zarr() does this, so we need to do it for kerchunk too
+    variables, attrs = encode_dataset_coordinates(ds)
+
     all_arr_refs = {}
-    for var_name, var in ds.variables.items():
+    for var_name, var in variables.items():
         arr_refs = variable_to_kerchunk_arr_refs(var, str(var_name))
 
         prepended_with_var_name = {
@@ -62,18 +65,11 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
         }
         all_arr_refs.update(prepended_with_var_name)
 
-    zattrs = ds.attrs
-    if ds.coords:
-        coord_names = [str(x) for x in ds.coords]
-        # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
-        # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
-        zattrs["coordinates"] = " ".join(coord_names)
-
     ds_refs = {
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(zattrs),
+            ".zattrs": ujson.dumps(attrs),
             **all_arr_refs,
         },
     }
