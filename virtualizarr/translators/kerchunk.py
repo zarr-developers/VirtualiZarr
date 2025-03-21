@@ -18,7 +18,6 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     vds_refs: KerchunkStoreRefs,
     loadable_variables,
     drop_variables,
-    virtual_array_class=ManifestArray,
     fs_root: str | None = None,
 ) -> tuple[Mapping[str, Variable], dict[str, Any], list[str]]:
     """
@@ -34,7 +33,6 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
         drop_variables=drop_variables + loadable_variables,
-        virtual_array_class=virtual_array_class,
         fs_root=fs_root,
     )
     ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
@@ -85,7 +83,6 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
 def virtual_vars_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] | None = None,
-    virtual_array_class=ManifestArray,
     fs_root: str | None = None,
 ) -> dict[str, Variable]:
     """
@@ -95,9 +92,6 @@ def virtual_vars_from_kerchunk_refs(
     ----------
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
     var_names = find_var_names(refs)
@@ -109,7 +103,7 @@ def virtual_vars_from_kerchunk_refs(
 
     vars = {
         var_name: variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class, fs_root=fs_root
+            refs, var_name, fs_root=fs_root
         )
         for var_name in var_names_to_keep
     }
@@ -119,7 +113,6 @@ def virtual_vars_from_kerchunk_refs(
 def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] = [],
-    virtual_array_class: type = ManifestArray,
     indexes: MutableMapping[str, Index] | None = None,
     fs_root: str | None = None,
 ) -> Dataset:
@@ -128,13 +121,10 @@ def dataset_from_kerchunk_refs(
 
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
     vars = virtual_vars_from_kerchunk_refs(
-        refs, drop_variables, virtual_array_class, fs_root=fs_root
+        refs, drop_variables, fs_root=fs_root
     )
     ds_attrs = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
@@ -156,7 +146,6 @@ def dataset_from_kerchunk_refs(
 def variable_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     var_name: str,
-    virtual_array_class,
     fs_root: str | None = None,
 ) -> Variable:
     """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
@@ -167,13 +156,13 @@ def variable_from_kerchunk_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+        varr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
     elif len(zarray.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
         shape = determine_chunk_grid_shape(zarray.shape, zarray.chunks)
         manifest = ChunkManifest(entries={}, shape=shape)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+        varr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
