@@ -195,7 +195,7 @@ def netcdf4_virtual_dataset(netcdf4_file):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
 
-    with open_virtual_dataset(netcdf4_file) as ds:
+    with open_virtual_dataset(netcdf4_file, loadable_variables=[]) as ds:
         yield ds
 
 
