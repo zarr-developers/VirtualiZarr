@@ -32,7 +32,7 @@ class ManifestArray:
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the metadata of a zarr array and the manifest of chunks.
 
         Parameters
         ----------

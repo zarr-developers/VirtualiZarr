@@ -235,8 +235,8 @@ def variable_from_kerchunk_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
-        varr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-    elif len(zarray.shape) != 0:
+        varr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
 
@@ -245,7 +245,7 @@ def variable_from_kerchunk_refs(
             metadata.chunks,
         )
         manifest = ChunkManifest(entries={}, shape=shape)
-        varr = ManifestArray(zarray=zarray, chunkmanifest=manifest)
+        varr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
