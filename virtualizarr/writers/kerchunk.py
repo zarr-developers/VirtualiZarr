@@ -105,9 +105,12 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             for chunk_key, entry in marr.manifest.dict().items()
         }
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
+        zattrs = {**var.attrs, **var.encoding}
     else:
+        from xarray.backends.zarr import encode_zarr_variable
         from zarr.core.metadata.v2 import ArrayV2Metadata
 
+        var = encode_zarr_variable(var)
         try:
             np_arr = var.to_numpy()
         except AttributeError as e:
@@ -146,11 +149,11 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             order="C",
             fill_value=None,
         )
+        zattrs = {**var.attrs}
 
     zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
-    zattrs = {**var.attrs, **var.encoding}
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 
