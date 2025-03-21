@@ -162,7 +162,7 @@ class TestRoundtrip:
                 xrt.assert_allclose(roundtrip, ds)
 
                 # TODO fails with ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-                #assert ds["air"].attrs == roundtrip["air"].attrs
+                # assert ds["air"].attrs == roundtrip["air"].attrs
 
                 # assert coordinate attributes are maintained
                 for coord in ds.coords:
