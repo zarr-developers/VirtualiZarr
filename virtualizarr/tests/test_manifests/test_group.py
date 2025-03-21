@@ -19,7 +19,7 @@ def manifest_array(array_v3_metadata):
     return ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
 
 
-class TestManifestgGroup:
+class TestManifestGroup:
     def test_manifest_array(self, array_v3_metadata, manifest_array):
         var = "foo"
         manifest_group = ManifestGroup(

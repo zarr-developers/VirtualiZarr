@@ -244,12 +244,15 @@ class ManifestStore(Store):
         # docstring inherited
         import obstore as obs
 
-        if "zarr.json" in key:
+        if key.endswith("zarr.json"):
             return get_zarr_metadata(self._manifest_group, key)
         var, chunk_key = parse_manifest_index(key)
-        path = self._manifest_group._manifest_dict[var]._manifest._paths[*chunk_key]
-        offset = self._manifest_group._manifest_dict[var]._manifest._offsets[*chunk_key]
-        length = self._manifest_group._manifest_dict[var]._manifest._lengths[*chunk_key]
+        marr = self._manifest_group._manifest_dict[var]
+        manifest = marr._manifest
+
+        path = manifest._paths[*chunk_key]
+        offset = manifest._offsets[*chunk_key]
+        length = manifest._lengths[*chunk_key]
         store_request = find_matching_store(stores=self._stores, request_key=path)
         # Get the  configured object store instance that matches the path
         store = self._stores[store_request.store_id]
