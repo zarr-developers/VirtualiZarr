@@ -1,4 +1,5 @@
 (usage)=
+
 # Usage
 
 This page explains how to use VirtualiZarr today, by introducing the key concepts one-by-one.
@@ -42,6 +43,7 @@ Printing this "virtual dataset" shows that although it is an instance of `xarray
 ```python
 vds
 ```
+
 ```
 <xarray.Dataset> Size: 31MB
 Dimensions:  (lat: 25, lon: 53, time: 2920)
@@ -68,12 +70,15 @@ As the manifest contains only addresses at which to find large binary chunks, th
 ```python
 ds.nbytes
 ```
+
 ```
 30975672
 ```
+
 ```python
 vds.virtualize.nbytes
 ```
+
 ```
 23704
 ```
@@ -118,6 +123,7 @@ marr = vds['air'].data
 manifest = marr.manifest
 manifest.dict()
 ```
+
 ```python
 {'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
@@ -133,20 +139,49 @@ A Zarr array is defined not just by the location of its constituent chunk data, 
 ```python
 marr
 ```
+
 ```
 ManifestArray<shape=(2920, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 ```
+
 ```python
 marr.manifest
 ```
+
 ```
 ChunkManifest<shape=(1, 1, 1)>
 ```
+
 ```python
-marr.zarray
+marr.metadata
 ```
+
 ```
-ZArray(shape=(2920, 25, 53), chunks=(2920, 25, 53), dtype=int16, compressor=None, filters=None, fill_value=None)
+ArrayV3Metadata(shape=(2920, 25, 53),
+                data_type=<DataType.float64: 'float64'>,
+                chunk_grid=RegularChunkGrid(chunk_shape=(2920, 25, 53)),
+                chunk_key_encoding=DefaultChunkKeyEncoding(name='default',
+                                                           separator='/'),
+                fill_value=np.float64(-327.67),
+                codecs=(FixedScaleOffset(codec_name='numcodecs.fixedscaleoffset', codec_config={'scale': 100.0, 'offset': 0, 'dtype': '<f8', 'astype': '<i2'}),
+                        BytesCodec(endian=<Endian.little: 'little'>)),
+                attributes={'GRIB_id': 11,
+                            'GRIB_name': 'TMP',
+                            'actual_range': [185.16000366210938,
+                                             322.1000061035156],
+                            'dataset': 'NMC Reanalysis',
+                            'level_desc': 'Surface',
+                            'long_name': '4xDaily Air temperature at sigma '
+                                         'level 995',
+                            'parent_stat': 'Other',
+                            'precision': 2,
+                            'statistic': 'Individual Obs',
+                            'units': 'degK',
+                            'var_desc': 'Air temperature'},
+                dimension_names=None,
+                zarr_format=3,
+                node_type='array',
+                storage_transformers=())
 ```
 
 A `ManifestArray` can therefore be thought of as a virtualized representation of a single Zarr array.
@@ -159,12 +194,15 @@ import numpy as np
 concatenated = np.concatenate([marr, marr], axis=0)
 concatenated
 ```
+
 ```
 ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 ```
+
 ```python
 concatenated.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
  '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
@@ -181,6 +219,7 @@ Remember that you cannot load values from a `ManifestArray` directly.
 ```python
 vds['air'].values
 ```
+
 ```python
 NotImplementedError: ManifestArrays can't be converted into numpy arrays or pandas Index objects
 ```
@@ -208,6 +247,7 @@ Which variables to open this way can be specified using the `loadable_variables`
 ```python
 vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
 ```
+
 ```python
 <xarray.Dataset> Size: 31MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -224,9 +264,11 @@ Attributes:
     platform:     Model
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
 ```
+
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
 
 Loading variables can be useful in a few scenarios:
+
 1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
 2. You want in-memory indexes to use with `xr.combine_by_coords`,
 3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
@@ -254,6 +296,7 @@ vds = open_virtual_dataset(
     decode_times=True,
 )
 ```
+
 ```python
 <xarray.Dataset> Size: 31MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -304,6 +347,7 @@ As we know the correct order a priori, we can just combine along one dimension u
 combined_vds = xr.concat([vds1, vds2], dim='time')
 combined_vds
 ```
+
 ```
 <xarray.Dataset> Size: 31MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -326,6 +370,7 @@ We can see that the resulting combined manifest has two chunks, as expected.
 ```python
 combined_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
@@ -377,6 +422,7 @@ Notice we don't have to specify the concatenation dimension explicitly - xarray 
 ```python
 combined_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
@@ -433,11 +479,11 @@ We can also write these references out as an [IcechunkStore](https://icechunk.io
 ```python
 # create an icechunk repository, session and write the virtual dataset to the session
 import icechunk
-storage = local_filesystem_storage("./local/icechunk/store")
+storage = icechunk.local_filesystem_storage("./local/icechunk/store")
 
 # By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
 repo = icechunk.Repository.create(storage)
-session = repo.writeable_session("main")
+session = repo.writable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
 vds1.virtualize.to_icechunk(session.store)
@@ -459,7 +505,6 @@ session.commit("Appended second dataset")
 See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
 icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr
 
-
 ## Opening Kerchunk references as virtual datasets
 
 You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. This may be useful for converting existing Kerchunk formatted references to storage formats like [Icechunk](https://icechunk.io/).
@@ -470,9 +515,9 @@ vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
 
-One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the fsspec filesystem which the filepath was defined relative to.
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the `fsspec` filesystem which the filepath was defined relative to.
 
-You can dis-ambiguate kerchunk references containing relative paths by passing the `fs_root` kwarg to `virtual_backend_kwargs`.
+You can dis-ambuiguate kerchunk references containing relative paths by passing the `fs_root` kwarg to `virtual_backend_kwargs`.
 
 ```python
 # file `relative_refs.json` contains a path like './file.nc'
@@ -507,10 +552,12 @@ def local_to_s3_url(old_local_path: str) -> str:
     filename = Path(old_local_path).name
     return str(new_s3_bucket_url / filename)
 ```
+
 ```python
 renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
 renamed_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'http://s3.amazonaws.com/my_bucket/air.nc', 'offset': 15419, 'length': 7738000}}
 ```

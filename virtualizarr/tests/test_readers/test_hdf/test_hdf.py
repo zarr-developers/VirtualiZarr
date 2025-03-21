@@ -116,7 +116,7 @@ class TestDatasetToVariable:
         var = HDFVirtualBackend._dataset_to_variable(
             scalar_fill_value_hdf5_file, ds, group=""
         )
-        assert var.data.zarray.fill_value == 42
+        assert var.data.metadata.fill_value == 42
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         f = h5py.File(cf_fill_value_hdf5_file)
