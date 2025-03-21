@@ -68,6 +68,7 @@ class TestManifestStore:
         assert manifest_store.supports_listing
         assert not manifest_store.supports_deletes
         assert not manifest_store.supports_writes
+        assert not manifest_store.supports_partial_writes
 
     async def test_get_data(self, manifest_store):
         observed = await manifest_store.get(
@@ -131,3 +132,11 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store) -> None:
         observed = await _collect_aiterator(manifest_store.list_dir(""))
         assert observed == ("zarr.json", "foo", "bar")
+
+    async def test_store_raises(self, manifest_store) -> None:
+        with pytest.raises(NotImplementedError):
+            await manifest_store.set("foo/zarr.json", 1)
+        with pytest.raises(NotImplementedError):
+            await manifest_store.set_if_not_exists("foo/zarr.json", 1)
+        with pytest.raises(NotImplementedError):
+            await manifest_store.delete("foo")
