@@ -7,6 +7,7 @@ from typing import (
 )
 
 import xarray as xr
+import xarray.indexes
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
@@ -14,7 +15,7 @@ from virtualizarr.utils import _FsspecFSFromFilepath
 def construct_fully_virtual_dataset(
     virtual_vars: Mapping[str, xr.Variable],
     coord_names: Iterable[str] | None = None,
-    attrs: dict[str, Any] = None,
+    attrs: dict[str, Any] | None = None,
 ) -> xr.Dataset:
     """Construct a fully virtual Dataset from constituent parts."""
 
@@ -40,7 +41,7 @@ def replace_virtual_with_loadable_vars(
     fully_virtual_dataset: xr.Dataset,
     filepath: str,  # TODO won't need this after #473 because the filepaths will be in the ManifestStore
     group: str | None = None,
-    loadable_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
     reader_options: Optional[dict] = None,
@@ -54,18 +55,19 @@ def replace_virtual_with_loadable_vars(
 
     # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
     loadable_ds = xr.open_dataset(
-        fpath,
+        fpath,  # type: ignore[arg-type]
         group=group,
         decode_times=decode_times,
     )
 
+    var_names_to_load: list[Hashable]
     if isinstance(loadable_variables, list):
-        var_names_to_load: list[str] = loadable_variables
+        var_names_to_load = list(loadable_variables)
     elif loadable_variables is None:
         # If `loadable_variables`` is None then we have to explicitly match default behaviour of xarray
         # i.e. load and create indexes only for dimension coordinate variables.
         # We already have all the indexes and variables we should be keeping - we just need to distinguish them.
-        var_names_to_load: list[str] = [
+        var_names_to_load = [
             name for name, var in loadable_ds.variables.items() if var.dims == (name,)
         ]
     else:
@@ -133,7 +135,7 @@ def separate_coords(
                     # in which case we need to keep it and add the corresponding indexes explicitly
                     coord_vars[str(name)] = var
                     # TODO this seems suspect - will it handle datetimes?
-                    indexes[name] = xr.PandasIndex(var, dim1d)
+                    indexes[name] = xarray.indexes.PandasIndex(var, dim1d)
             else:
                 coord_vars[name] = var
         else:
