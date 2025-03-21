@@ -240,9 +240,12 @@ class TestReadFromURL:
                 "grib",
                 "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
             ),
-            (
+            pytest.param(
                 "netcdf3",
                 "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
+                marks=pytest.mark.xfail(
+                    reason="Big endian not yet supported by zarr-python 3.0"
+                ),  # https://github.com/zarr-developers/zarr-python/issues/2324
             ),
             (
                 "netcdf4",
@@ -268,9 +271,14 @@ class TestReadFromURL:
             pytest.param(
                 "fits",
                 "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-                marks=pytest.mark.skipif(
-                    not has_astropy, reason="package astropy is not available"
-                ),
+                marks=[
+                    pytest.mark.skipif(
+                        not has_astropy, reason="package astropy is not available"
+                    ),
+                    pytest.mark.xfail(
+                        reason="Big endian not yet supported by zarr-python 3.0"
+                    ),  # https://github.com/zarr-developers/zarr-python/issues/2324
+                ],
             ),
             (
                 "jpg",
@@ -279,6 +287,8 @@ class TestReadFromURL:
         ],
     )
     def test_read_from_url(self, hdf_backend, filetype, url):
+        if filetype == "netcdf3":
+            pytest.importorskip("scipy")
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
                 open_virtual_dataset(url, reader_options={})
