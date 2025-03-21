@@ -222,7 +222,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
 
-        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
         refs = vds.virtualize.to_kerchunk(format="dict")
         expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")

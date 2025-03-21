@@ -79,7 +79,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     ) as vds:
         refs = vds.virtualize.to_kerchunk(format="dict")
 
-        # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert refs == expected
         assert refs["refs"]["air/0.0.0"] == expected["refs"]["air/0.0.0"]
         assert refs["refs"]["lon/0"] == expected["refs"]["lon/0"]
