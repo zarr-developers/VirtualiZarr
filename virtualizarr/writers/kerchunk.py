@@ -130,6 +130,9 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
                 )
             if "calendar" in var.encoding:
                 np_arr = CFDatetimeCoder().encode(var.copy(), name=var_name).values
+                dtype = var.encoding.get("dtype", None)
+                if dtype and np_arr.dtype != dtype:
+                    np_arr = np.asarray(np_arr, dtype=dtype)
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
