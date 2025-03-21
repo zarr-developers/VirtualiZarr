@@ -72,7 +72,7 @@ class TestEquals:
         assert result.all()
 
     def test_not_equal_chunk_entries(self, array_v3_metadata):
-        # both manifest arrays in this example have the same zarray properties
+        # both manifest arrays in this example have the same metadata
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
         metadata = array_v3_metadata(shape=shape, chunks=chunks)
@@ -263,7 +263,7 @@ class TestConcat:
 
 class TestStack:
     def test_stack(self, array_v3_metadata):
-        # both manifest arrays in this example have the same zarray properties
+        # both manifest arrays in this example have the same metadata
         chunks = (5, 10)
         shape = (5, 20)
         codecs = [ARRAYBYTES_CODEC, ZLIB_CODEC]
