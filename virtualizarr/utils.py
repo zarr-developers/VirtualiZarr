@@ -106,22 +106,6 @@ def soft_import(name: str, reason: str, strict: Optional[bool] = True):
         else:
             return None
 
-# TODO move this and determine_chunk_grid_shape to manifests.utils.py
-def ceildiv(a: int, b: int) -> int:
-    """
-    Ceiling division operator for integers.
-
-    See https://stackoverflow.com/questions/14822184/is-there-a-ceiling-equivalent-of-operator-in-python
-    """
-    return -(a // -b)
-
-
-def determine_chunk_grid_shape(
-    shape: tuple[int, ...], chunks: tuple[int, ...]
-) -> tuple[int, ...]:
-    """Calculate the shape of the chunk grid based on array shape and chunk size."""
-    return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
-
 
 def convert_v3_to_v2_metadata(
     v3_metadata: ArrayV3Metadata, fill_value: Any = None

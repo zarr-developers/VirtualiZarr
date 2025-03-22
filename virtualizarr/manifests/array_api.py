@@ -2,16 +2,8 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
 
-from virtualizarr.utils import determine_chunk_grid_shape
-
-from .manifest import ChunkManifest
-from .utils import (
-    check_combinable_zarr_arrays,
-    check_same_ndims,
-    check_same_shapes,
-    check_same_shapes_except_on_concat_axis,
-    copy_and_replace_metadata,
-)
+from virtualizarr.manifests.manifest import ChunkManifest
+import virtualizarr.manifests.utils as utils
 
 if TYPE_CHECKING:
     from .array import ManifestArray
@@ -65,9 +57,9 @@ def concatenate(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    check_combinable_zarr_arrays(arrays)
+    utils.check_combinable_zarr_arrays(arrays)
 
-    check_same_ndims([arr.ndim for arr in arrays])
+    utils.check_same_ndims([arr.ndim for arr in arrays])
 
     # Ensure we handle axis being passed as a negative integer
     first_arr = arrays[0]
@@ -75,7 +67,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+    utils.check_same_shapes_except_on_concat_axis(arr_shapes, axis)
 
     # find what new array shape must be
     new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])
@@ -102,7 +94,7 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    new_metadata = copy_and_replace_metadata(
+    new_metadata = utils.copy_and_replace_metadata(
         old_metadata=first_arr.metadata, new_shape=new_shape
     )
 
@@ -128,11 +120,11 @@ def stack(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    check_combinable_zarr_arrays(arrays)
+    utils.check_combinable_zarr_arrays(arrays)
 
-    check_same_ndims([arr.ndim for arr in arrays])
+    utils.check_same_ndims([arr.ndim for arr in arrays])
     arr_shapes = [arr.shape for arr in arrays]
-    check_same_shapes(arr_shapes)
+    utils.check_same_shapes(arr_shapes)
 
     # Ensure we handle axis being passed as a negative integer
     first_arr = arrays[0]
@@ -172,7 +164,7 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_metadata = copy_and_replace_metadata(
+    new_metadata = utils.copy_and_replace_metadata(
         old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
     )
 
@@ -212,7 +204,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     )
 
     # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
+    new_chunk_grid_shape = utils.determine_chunk_grid_shape(new_shape, new_chunk_shape)
 
     # do broadcasting of entries in manifest
     broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
@@ -237,7 +229,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_metadata = copy_and_replace_metadata(
+    new_metadata = utils.copy_and_replace_metadata(
         old_metadata=x.metadata,
         new_shape=list(new_shape),
         new_chunks=list(new_chunk_shape),
