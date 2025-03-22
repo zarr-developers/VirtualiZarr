@@ -1,18 +1,18 @@
 from typing import Any, Mapping, MutableMapping, cast
 
 import numpy as np
-from xarray.core.indexes import Index
 from xarray import Dataset, Variable
+from xarray.core.indexes import Index
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
+import virtualizarr.manifests.utils as utils
 from virtualizarr.codecs import (
     numcodec_config_to_configurable,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
-import virtualizarr.manifests.utils as utils
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,

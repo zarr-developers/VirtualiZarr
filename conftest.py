@@ -12,10 +12,11 @@ import pytest
 import xarray as xr
 from xarray.core.variable import Variable
 
+import virtualizarr.manifests.utils as utils
+
 # Local imports
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
-import virtualizarr.manifests.utils as utils
 
 
 # Pytest configuration

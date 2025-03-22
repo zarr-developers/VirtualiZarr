@@ -2,8 +2,8 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
 
-from virtualizarr.manifests.manifest import ChunkManifest
 import virtualizarr.manifests.utils as utils
+from virtualizarr.manifests.manifest import ChunkManifest
 
 if TYPE_CHECKING:
     from .array import ManifestArray
