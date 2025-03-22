@@ -235,7 +235,7 @@ class ManifestArray:
         print(f"{selection=}")
 
         # TODO validate the selection, and identify if the selection can't be represented as a BasicIndexer
-        # TODO will this expand trailing ellipses?
+        # TODO will this expand trailing ellipses? (it should)
         indexer = BasicIndexer(
             selection,
             self.shape,

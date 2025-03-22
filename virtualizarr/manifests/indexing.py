@@ -40,6 +40,9 @@ def array_indexer_to_chunk_grid_indexer(
     if not all(is_complete_chunk for _, _, _, is_complete_chunk in indexer):
         raise SubChunkIndexingError()
 
+    if indexer.drop_axes:
+        raise NotImplementedError
+
     # TODO does the array shape have to match the indexer shape? Should this have been checked already?
     chunk_grid_dim_indexers: list[IntDimIndexer | SliceDimIndexer] = []
     for (
@@ -55,14 +58,10 @@ def array_indexer_to_chunk_grid_indexer(
     ):
         chunk_grid_dim_indexer: IntDimIndexer | SliceDimIndexer
         if isinstance(dim_indexer, IntDimIndexer):
-            print(f"{dim_len=}")
-            if dim_chunk_len == 1:
-                chunk_grid_dim_indexer = dim_indexer
-            else:
-                raise SubChunkIndexingError
+            chunk_grid_dim_indexer = array_int_indexer_to_chunk_grid_int_indexer(dim_indexer)
 
         elif isinstance(dim_indexer, SliceDimIndexer):
-            dim_indexer = array_slice_to_chunk_grid_slice(dim_indexer)
+            chunk_grid_dim_indexer = array_slice_indexer_to_chunk_grid_slice_indexer(dim_indexer)
 
         chunk_grid_dim_indexers.append(chunk_grid_dim_indexer)
 
@@ -81,8 +80,27 @@ def array_indexer_to_chunk_grid_indexer(
     return chunk_grid_indexer
 
 
-def array_slice_to_chunk_grid_slice(
-    array_slice: SliceDimIndexer,
+def array_int_indexer_to_chunk_grid_int_indexer(
+    array_int_indexer: IntDimIndexer,
+) -> IntDimIndexer:
+    """
+    Translate an integer indexer into an array into a corresponding integer indexer into the underlying chunk grid.
+
+    Will raise on any array indexer that would require slicing within individual chunks.
+    """
+    if array_int_indexer.dim_chunk_len == 1:
+        # degenerate case where array space == chunk grid space, so array indexer == chunk grid indexer
+        # TODO pull out the degenerate case for both ints and slices?
+        chunk_grid_dim_indexer = array_int_indexer
+    else:
+        # TODO what about case of array of integers that don't split up chunks?
+        raise SubChunkIndexingError
+    
+    return chunk_grid_dim_indexer
+
+
+def array_slice_indexer_to_chunk_grid_slice_indexer(
+    arr_slice_dim_indexer: SliceDimIndexer,
 ) -> SliceDimIndexer:
     """
     Translate a slice into an array into a corresponding slice into the underlying chunk grid.
@@ -90,38 +108,43 @@ def array_slice_to_chunk_grid_slice(
     Will raise on any array slices that would require slicing within individual chunks.
     """
 
-    arr_length = array_slice.dim_len
-    chunk_length = array_slice.dim_chunk_len
+    arr_length = arr_slice_dim_indexer.dim_len
+    chunk_length = arr_slice_dim_indexer.dim_chunk_len
 
     if chunk_length == 1:
-        # alot of indexing is possible only in this case, because this is basically just a normal array along that axis
-        chunk_slice = array_slice
-        return chunk_slice
+        # degenerate case where array space == chunk grid space, so array indexer == chunk grid indexer
+        chunk_slice = slice(
+            arr_slice_dim_indexer.start,
+            arr_slice_dim_indexer.stop,
+            arr_slice_dim_indexer.step,
+        )
 
     # Check that start of slice aligns with start of a chunk
-    if array_slice.start % chunk_length != 0:
-        raise IndexError(
+    if arr_slice_dim_indexer.start % chunk_length != 0:
+        raise SubChunkIndexingError(
             f"Cannot index ManifestArray axis of length {arr_length} and chunk length {chunk_length} with {array_slice} as slice would split individual chunks"
         )
 
     # Check that slice spans integer number of chunks
-    slice_length = array_slice.stop - array_slice.start
+    slice_length = arr_slice_dim_indexer.stop - arr_slice_dim_indexer.start
     if slice_length % chunk_length != 0:
-        raise IndexError(
+        raise SubChunkIndexingError(
             f"Cannot index ManifestArray axis of length {arr_length} and chunk length {chunk_length} with {array_slice} as slice would split individual chunks"
         )
 
-    index_of_first_chunk = int(array_slice.start / chunk_length)
+    index_of_first_chunk = int(arr_slice_dim_indexer.start / chunk_length)
     n_chunks = int(slice_length / chunk_length)
 
     chunk_slice = slice(index_of_first_chunk, index_of_first_chunk + n_chunks, 1)
 
-    return SliceDimIndexer(
+    chunk_grid_slice_dim_indexer = SliceDimIndexer(
         dim_sel=chunk_slice,
         # TODO which dim does this refer to? That of the chunk grid?
         dim_len=...,
         dim_chunk_len=...,
     )
+
+    return chunk_grid_slice_dim_indexer
 
 
 def indexer_to_selection(indexer: BasicIndexer) -> BasicSelection:

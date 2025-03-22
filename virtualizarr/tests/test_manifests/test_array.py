@@ -374,10 +374,24 @@ class TestIndexing:
     @pytest.mark.parametrize(
         "in_shape, in_chunks, selection, out_shape, out_chunks",
         [
+            # single-dim integer selection
             ((2,), (1,), 0, (1,), (1,)),
             ((2,), (1,), 1, (1,), (1,)),
+            # multi-dim integer selection
+            ((2, 2), (1, 1), (0, 0), (1, 1), (1, 1)),
+            # drop axes
+            ((2, 2), (1, 2), (0,), (2,), (2,)),
+            ((2, 2), (1, 2), (1,), (2,), (2,)),
+            # single-dim slicing selection
+            ((2,), (1,), ..., (2,), (1,)),
+            # TODO: drop axes
+            ((2,), (1,), slice(0, 1), (1,), (1,)),
+            ((2,), (1,), slice(1, 2), (1,), (1,)),
+            ((2,), (1,), slice(0, 2), (2,), (1,)),
             ((8,), (2,), slice(0, 4), (4,), (2,)),
             ((2,), (2,), slice(2, 4), (2,), (2,)),
+            # TODO: multi-dim slicing selection
+            # TODO: mixed integer and slicing selection
         ],
     )
     def test_slice_aligned_with_chunks(
