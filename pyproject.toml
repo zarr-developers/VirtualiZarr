@@ -27,6 +27,7 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.0.2",
+    "icechunk>=0.2.5",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -95,7 +96,6 @@ upstream = [
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
-    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
 ]
 docs = [
     "sphinx",

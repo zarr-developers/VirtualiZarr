@@ -369,11 +369,20 @@ def test_refuse_combine(array_v3_metadata):
 
 
 class TestIndexing:
-    def test_slice_aligned_with_chunks(self):
-        marr = create_manifestarray(shape=(4,), chunks=(2,))
-        marr[0:2]
-        marr[2:4]
-        marr[0:4]
+    def test_slice_aligned_with_chunks(self, manifest_array):
+        marr = manifest_array(shape=(4,), chunks=(2,))
+
+        subarr = marr[0:4]
+        assert isinstance(subarr, ManifestArray)
+        assert subarr.metadata == marr.metadata
+        assert subarr.chunks == marr.chunks
+        assert subarr.shape == (4,)
+
+        subarr = marr[0:2]
+        subarr = marr[2:4]
+        
+    def test_slice_misaligned_with_chunks(self, manifest_array):
+        marr = manifest_array(shape=(4,), chunks=(2,))
 
         with pytest.raises(
             NotImplementedError, match="slice would split individual chunks"
