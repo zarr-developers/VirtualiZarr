@@ -381,7 +381,7 @@ class TestIndexing:
 
         subarr = marr[0:6]
         subarr = marr[2:4]
-        
+
     def test_slice_misaligned_with_chunks(self, manifest_array):
         marr = manifest_array(shape=(4,), chunks=(2,))
 

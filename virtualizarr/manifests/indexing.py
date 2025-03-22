@@ -1,15 +1,10 @@
-from types import NoneType, EllipsisType
-from typing import Union
+from zarr.core.indexing import BasicIndexer, IntDimIndexer, SliceDimIndexer
 
 from virtualizarr.utils import determine_chunk_grid_shape
 
-from zarr.core.indexing import BasicIndexer, IntDimIndexer, SliceDimIndexer
-
-
 
 # TODO write a custom message for this
-class SubChunkIndexingError(IndexError):
-    ...
+class SubChunkIndexingError(IndexError): ...
 
 
 def array_indexer_to_chunk_grid_indexer(
@@ -31,7 +26,7 @@ def array_indexer_to_chunk_grid_indexer(
     # TODO move this check outside? Because we can arbitrarily index into uncompressed arrays...
     if not all(is_complete_chunk for _, _, _, is_complete_chunk in indexer):
         raise SubChunkIndexingError()
-    
+
     array_shape = indexer.shape
     chunk_shape = indexer.chunk_grid.chunk_shape
     chunk_grid_shape = determine_chunk_grid_shape(array_shape, chunk_shape)
@@ -49,7 +44,7 @@ def array_indexer_to_chunk_grid_indexer(
                 chunk_grid_dim_indexer = dim_indexer
             else:
                 raise SubChunkIndexingError
-        
+
         elif isinstance(dim_indexer, SliceDimIndexer):
             dim_indexer = array_slice_to_chunk_grid_slice(dim_indexer)
 
@@ -57,7 +52,9 @@ def array_indexer_to_chunk_grid_indexer(
 
     obj = BasicIndexer.__new__()
     obj.dim_indexers = chunk_grid_dim_indexers
-    obj.shape = tuple(s.nitems for s in chunk_grid_dim_indexers if not isinstance(s, IntDimIndexer))
+    obj.shape = tuple(
+        s.nitems for s in chunk_grid_dim_indexers if not isinstance(s, IntDimIndexer)
+    )
     obj.drop_axes = ()
 
     return obj
@@ -99,7 +96,7 @@ def array_slice_to_chunk_grid_slice(
     chunk_slice = slice(index_of_first_chunk, index_of_first_chunk + n_chunks, 1)
 
     return SliceDimIndexer(
-        dim_sel=chunk_slice, 
+        dim_sel=chunk_slice,
         # TODO which dim does this refer to? That of the chunk grid?
         dim_len=...,
         dim_chunk_len=...,

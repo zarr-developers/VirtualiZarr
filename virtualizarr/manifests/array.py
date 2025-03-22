@@ -3,17 +3,16 @@ from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 from zarr.core.indexing import BasicIndexer
+from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
+import virtualizarr.manifests.indexing as indexing
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-import virtualizarr.manifests.utils as utils
-import virtualizarr.manifests.indexing as indexing
-
 
 
 class ManifestArray:
@@ -222,7 +221,7 @@ class ManifestArray:
     ) -> "ManifestArray":
         """
         Slice this ManifestArray by indexing in array element space (as opposed to in chunk grid space).
-        
+
         Only supports indexing where slices are aligned exactly with chunk boundaries.
 
         Effectively, this means that the following indexing modes are supported:
@@ -238,8 +237,8 @@ class ManifestArray:
         # TODO validate the selection, and identify if the selection can't be represented as a BasicIndexer
         # TODO will this expand trailing ellipses?
         indexer = BasicIndexer(
-            selection, 
-            self.shape, 
+            selection,
+            self.shape,
             self.metadata.chunk_grid,
         )
 
@@ -247,7 +246,7 @@ class ManifestArray:
         chunk_grid_indexer = indexing.array_indexer_to_chunk_grid_indexer(indexer)
 
         print(f"{chunk_grid_indexer=}")
-        
+
         # TODO translate new chunk_grid_indexer BasicIndexer into normal Selection that numpy can understand
 
         # do slicing of entries in manifest
@@ -264,9 +263,10 @@ class ManifestArray:
 
         # TODO deduce the new array shape from the new chunk grid shape
 
-
         # chunk sizes are unchanged by slicing that aligns with chunk boundaries
-        new_metadata = utils.copy_and_replace_metadata(self.metadata, new_shape=new_arr_shape)
+        new_metadata = utils.copy_and_replace_metadata(
+            self.metadata, new_shape=new_arr_shape
+        )
 
         return ManifestArray(chunkmanifest=sliced_manifest, metadata=new_metadata)
 

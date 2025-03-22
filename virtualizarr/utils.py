@@ -106,6 +106,7 @@ def soft_import(name: str, reason: str, strict: Optional[bool] = True):
         else:
             return None
 
+
 # TODO move this and determine_chunk_grid_shape to manifests.utils.py
 def ceildiv(a: int, b: int) -> int:
     """
