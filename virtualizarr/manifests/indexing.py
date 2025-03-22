@@ -58,10 +58,14 @@ def array_indexer_to_chunk_grid_indexer(
     ):
         chunk_grid_dim_indexer: IntDimIndexer | SliceDimIndexer
         if isinstance(dim_indexer, IntDimIndexer):
-            chunk_grid_dim_indexer = array_int_indexer_to_chunk_grid_int_indexer(dim_indexer)
+            chunk_grid_dim_indexer = array_int_indexer_to_chunk_grid_int_indexer(
+                dim_indexer
+            )
 
         elif isinstance(dim_indexer, SliceDimIndexer):
-            chunk_grid_dim_indexer = array_slice_indexer_to_chunk_grid_slice_indexer(dim_indexer)
+            chunk_grid_dim_indexer = array_slice_indexer_to_chunk_grid_slice_indexer(
+                dim_indexer
+            )
 
         chunk_grid_dim_indexers.append(chunk_grid_dim_indexer)
 
@@ -95,7 +99,7 @@ def array_int_indexer_to_chunk_grid_int_indexer(
     else:
         # TODO what about case of array of integers that don't split up chunks?
         raise SubChunkIndexingError
-    
+
     return chunk_grid_dim_indexer
 
 
