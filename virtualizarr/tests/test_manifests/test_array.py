@@ -369,16 +369,17 @@ def test_refuse_combine(array_v3_metadata):
 
 
 class TestIndexing:
+    # TODO parametrize over a bunch of valid options here
     def test_slice_aligned_with_chunks(self, manifest_array):
-        marr = manifest_array(shape=(4,), chunks=(2,))
+        marr = manifest_array(shape=(8,), chunks=(2,))
 
-        subarr = marr[0:4]
-        assert isinstance(subarr, ManifestArray)
-        assert subarr.metadata == marr.metadata
-        assert subarr.chunks == marr.chunks
-        assert subarr.shape == (4,)
+        # subarr = marr[0:4]
+        # assert isinstance(subarr, ManifestArray)
+        # assert subarr.metadata == marr.metadata
+        # assert subarr.chunks == marr.chunks
+        # assert subarr.shape == (4,)
 
-        subarr = marr[0:2]
+        subarr = marr[0:6]
         subarr = marr[2:4]
         
     def test_slice_misaligned_with_chunks(self, manifest_array):

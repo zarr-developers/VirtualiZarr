@@ -1,9 +1,10 @@
 import warnings
-from types import EllipsisType, NoneType
+from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
+from zarr.core.indexing import BasicIndexer
 
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
@@ -12,6 +13,7 @@ from virtualizarr.manifests.array_api import (
 from virtualizarr.manifests.manifest import ChunkManifest
 import virtualizarr.manifests.utils as utils
 import virtualizarr.manifests.indexing as indexing
+
 
 
 class ManifestArray:
@@ -208,7 +210,7 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key: Union[
+        selection: Union[
             int,
             slice,
             EllipsisType,
@@ -223,37 +225,45 @@ class ManifestArray:
         
         Only supports indexing where slices are aligned exactly with chunk boundaries.
 
+        Effectively, this means that the following indexing modes are supported:
+
+           - integer indexing
+           - slice indexing
+           - mixed slice and integer indexing
+
         Follows the array API standard otherwise.
         """
-        indexer = key
+        print(f"{selection=}")
 
-        indexer_nd: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]
-        if isinstance(indexer, (int, slice, EllipsisType, NoneType, np.ndarray)):
-            indexer_nd = (indexer,)
-        else:
-            indexer_nd = indexer
+        # TODO validate the selection, and identify if the selection can't be represented as a BasicIndexer
+        # TODO will this expand trailing ellipses?
+        indexer = BasicIndexer(
+            selection, 
+            self.shape, 
+            self.metadata.chunk_grid,
+        )
 
-        # _validate_indexer(indexer)
+        # TODO is this where we would differ codepath for an uncompressed array?
+        chunk_grid_indexer = indexing.array_indexer_to_chunk_grid_indexer(indexer)
 
-        indexer_nd = indexing.possibly_expand_trailing_ellipses(indexer_nd, self.ndim)
-
-        if len(indexer_nd) != self.ndim:
-            raise ValueError(
-                f"Invalid indexer for array with ndim={self.ndim}: {indexer_nd}"
-            )
-
-        chunk_indexer, new_arr_shape = indexing.array_indexer_to_chunk_grid_indexer()
+        print(f"{chunk_grid_indexer=}")
+        
+        # TODO translate new chunk_grid_indexer BasicIndexer into normal Selection that numpy can understand
 
         # do slicing of entries in manifest
-        # TODO add ChunkManifest.__getitem__ for this
-        sliced_paths = self.manifest._paths[chunk_indexer]
-        sliced_offsets = self.manifest._offsets[chunk_indexer]
-        sliced_lengths = self.manifest._lengths[chunk_indexer]
+        # TODO add ChunkManifest.__getitem__ for this?
+        # TODO or add some kind of dedicated method that can't be confused with the API of Mapping
+        sliced_paths = self.manifest._paths[chunk_grid_indexer]
+        sliced_offsets = self.manifest._offsets[chunk_grid_indexer]
+        sliced_lengths = self.manifest._lengths[chunk_grid_indexer]
         sliced_manifest = ChunkManifest.from_arrays(
             paths=sliced_paths,
             offsets=sliced_offsets,
             lengths=sliced_lengths,
         )
+
+        # TODO deduce the new array shape from the new chunk grid shape
+
 
         # chunk sizes are unchanged by slicing that aligns with chunk boundaries
         new_metadata = utils.copy_and_replace_metadata(self.metadata, new_shape=new_arr_shape)
