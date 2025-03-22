@@ -187,3 +187,29 @@ def copy_and_replace_metadata(
     # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
     new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
     return new_metadata
+
+
+def ceildiv(a: int, b: int) -> int:
+    """
+    Ceiling division operator for integers.
+
+    See https://stackoverflow.com/questions/14822184/is-there-a-ceiling-equivalent-of-operator-in-python
+    """
+    return -(a // -b)
+
+
+def determine_chunk_grid_shape(
+    shape: tuple[int, ...], chunks: tuple[int, ...]
+) -> tuple[int, ...]:
+    """Calculate the shape of the chunk grid based on array shape and chunk size."""
+    return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
+
+
+def determine_array_shape(
+    chunk_grid_shape: tuple[int, ...],
+    chunk_shape: tuple[int, ...],
+) -> tuple[int, ...]:
+    return tuple(
+        dim_chunk_grid * dim_chunk_len
+        for dim_chunk_grid, dim_chunk_len in zip(chunk_grid_shape, chunk_shape)
+    )

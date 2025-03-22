@@ -1,9 +1,13 @@
 import warnings
+from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
+from zarr.core.indexing import BasicIndexer
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
+import virtualizarr.manifests.indexing as indexing
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
@@ -205,36 +209,82 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key,
+        selection: Union[
+            int,
+            slice,
+            EllipsisType,
+            None,
+            tuple[Union[int, slice, EllipsisType, None], ...],
+            np.ndarray,
+        ],
         /,
     ) -> "ManifestArray":
         """
-        Only supports extremely limited indexing.
+        Slice this ManifestArray by indexing in array element space (as opposed to in chunk grid space).
 
-        Only here because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
+        Only supports indexing where slices are aligned exactly with chunk boundaries.
+
+        Effectively, this means that the following indexing modes are supported:
+
+           - integer indexing
+           - slice indexing
+           - mixed slice and integer indexing
+
+        Follows the array API standard otherwise.
         """
-        from xarray.core.indexing import BasicIndexer
+        print(f"{selection=}")
 
-        if isinstance(key, BasicIndexer):
-            indexer = key.tuple
-        else:
-            indexer = key
+        # TODO validate the selection, and identify if the selection can't be represented as a BasicIndexer
+        # TODO will this expand trailing ellipses? (it should)
+        indexer = BasicIndexer(
+            selection,
+            self.shape,
+            self.metadata.chunk_grid,
+        )
 
-        indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
+        # TODO is this where we would differ codepath for an uncompressed array?
+        chunk_grid_indexer = indexing.array_indexer_to_chunk_grid_indexer(
+            indexer=indexer,
+            arr_shape=self.shape,
+            chunk_shape=self.chunks,
+        )
 
-        if len(indexer) != self.ndim:
-            raise ValueError(
-                f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
-            )
+        print(f"{chunk_grid_indexer=}")
 
-        if all(
-            isinstance(axis_indexer, slice) and axis_indexer == slice(None)
-            for axis_indexer in indexer
-        ):
-            # indexer is all slice(None)'s, so this is a no-op
-            return self
-        else:
-            raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+        # TODO translate new chunk_grid_indexer BasicIndexer into normal Selection that numpy can understand
+        chunk_grid_selection = indexing.indexer_to_selection(chunk_grid_indexer)
+
+        print(f"{chunk_grid_selection=}")
+
+        # do slicing of entries in manifest
+        # TODO add ChunkManifest.__getitem__ for this?
+        # TODO or add some kind of dedicated method that can't be confused with the API of Mapping
+        sliced_paths = self.manifest._paths[chunk_grid_selection]
+        sliced_offsets = self.manifest._offsets[chunk_grid_selection]
+        sliced_lengths = self.manifest._lengths[chunk_grid_selection]
+        print(f"{sliced_paths=}")
+        sliced_manifest = ChunkManifest.from_arrays(
+            paths=sliced_paths,
+            offsets=sliced_offsets,
+            lengths=sliced_lengths,
+        )
+
+        print(f"{sliced_manifest=}")
+
+        new_arr_shape = utils.determine_array_shape(
+            chunk_grid_shape=sliced_manifest.shape_chunk_grid,
+            chunk_shape=self.chunks,
+        )
+
+        print(f"{new_arr_shape=}")
+
+        # chunk sizes are unchanged by slicing that aligns with chunk boundaries
+        new_metadata = utils.copy_and_replace_metadata(
+            self.metadata,
+            new_shape=new_arr_shape,
+        )
+
+        return ManifestArray(chunkmanifest=sliced_manifest, metadata=new_metadata)
 
     def rename_paths(
         self,
@@ -275,12 +325,3 @@ class ManifestArray:
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
-
-
-def _possibly_expand_trailing_ellipsis(key, ndim: int):
-    if key[-1] == ...:
-        extra_slices_needed = ndim - (len(key) - 1)
-        *indexer, ellipsis = key
-        return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
-    else:
-        return key

@@ -1,25 +1,23 @@
 from typing import Any, Mapping, MutableMapping, cast
 
 import numpy as np
-from xarray import Dataset
+from xarray import Dataset, Variable
 from xarray.core.indexes import Index
-from xarray.core.variable import Variable
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
+import virtualizarr.manifests.utils as utils
 from virtualizarr.codecs import (
     numcodec_config_to_configurable,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
-from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import determine_chunk_grid_shape
 
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
@@ -84,7 +82,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     numcodec_configs = [
         numcodec_config_to_configurable(config) for config in codec_configs
     ]
-    return create_v3_array_metadata(
+    return utils.create_v3_array_metadata(
         chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
         data_type=dtype,
         codecs=numcodec_configs,
@@ -236,7 +234,7 @@ def variable_from_kerchunk_refs(
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
 
-        shape = determine_chunk_grid_shape(
+        shape = utils.determine_chunk_grid_shape(
             metadata.shape,
             metadata.chunks,
         )

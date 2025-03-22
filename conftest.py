@@ -12,11 +12,11 @@ import pytest
 import xarray as xr
 from xarray.core.variable import Variable
 
+import virtualizarr.manifests.utils as utils
+
 # Local imports
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
-from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.utils import ceildiv
 
 
 # Pytest configuration
@@ -76,7 +76,7 @@ def _generate_chunk_entries(
         Mapping of chunk keys to entry dictionaries
     """
     chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
+        utils.ceildiv(axis_length, chunk_length)
         for axis_length, chunk_length in zip(shape, chunks)
     )
 
@@ -261,7 +261,7 @@ def array_v3_metadata():
         fill_value: int | None = None,
     ):
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
-        return create_v3_array_metadata(
+        return utils.create_v3_array_metadata(
             shape=shape,
             chunk_shape=chunks,
             data_type=data_type,

@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+import virtualizarr.manifests.utils as utils
 from conftest import (
     ARRAYBYTES_CODEC,
     ZLIB_CODEC,
@@ -366,3 +367,68 @@ def test_refuse_combine(array_v3_metadata):
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
+
+
+class TestIndexing:
+    # TODO parametrize over a bunch of valid options here
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, selection, out_shape, out_chunks",
+        [
+            # single-dim integer selection
+            ((2,), (1,), 0, (1,), (1,)),
+            ((2,), (1,), 1, (1,), (1,)),
+            # multi-dim integer selection
+            ((2, 2), (1, 1), (0, 0), (1, 1), (1, 1)),
+            # drop axes
+            ((2, 2), (1, 2), (0,), (2,), (2,)),
+            ((2, 2), (1, 2), (1,), (2,), (2,)),
+            # single-dim slicing selection
+            ((2,), (1,), ..., (2,), (1,)),
+            # TODO: drop axes
+            ((2,), (1,), slice(0, 1), (1,), (1,)),
+            ((2,), (1,), slice(1, 2), (1,), (1,)),
+            ((2,), (1,), slice(0, 2), (2,), (1,)),
+            ((8,), (2,), slice(0, 4), (4,), (2,)),
+            ((2,), (2,), slice(2, 4), (2,), (2,)),
+            # TODO: multi-dim slicing selection
+            # TODO: mixed integer and slicing selection
+        ],
+    )
+    def test_slice_aligned_with_chunks(
+        self, manifest_array, in_shape, in_chunks, selection, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+
+        subarr = marr[selection]
+
+        assert isinstance(subarr, ManifestArray)
+        assert subarr.shape == out_shape
+        assert subarr.chunks == out_chunks
+
+        # all metadata should be the same except for shape (and possibly chunks?)
+        expected_metadata = utils.copy_and_replace_metadata(
+            marr.metadata,
+            new_shape=out_shape,
+        )
+        # expected_metadata.chunks = out_chunks
+        assert subarr.metadata == expected_metadata
+
+    def test_slice_concat_roundtrip(self): ...
+
+    def test_slice_misaligned_with_chunks(self, manifest_array):
+        marr = manifest_array(shape=(4,), chunks=(2,))
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0]
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0:1]
+
+        with pytest.raises(
+            NotImplementedError, match="slice would split individual chunks"
+        ):
+            marr[0:3]
