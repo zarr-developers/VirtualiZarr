@@ -3,17 +3,16 @@ from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 from zarr.core.indexing import BasicIndexer
+from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
+import virtualizarr.manifests.indexing as indexing
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-import virtualizarr.manifests.utils as utils
-import virtualizarr.manifests.indexing as indexing
-
 
 
 class ManifestArray:
@@ -222,7 +221,7 @@ class ManifestArray:
     ) -> "ManifestArray":
         """
         Slice this ManifestArray by indexing in array element space (as opposed to in chunk grid space).
-        
+
         Only supports indexing where slices are aligned exactly with chunk boundaries.
 
         Effectively, this means that the following indexing modes are supported:
@@ -238,35 +237,52 @@ class ManifestArray:
         # TODO validate the selection, and identify if the selection can't be represented as a BasicIndexer
         # TODO will this expand trailing ellipses?
         indexer = BasicIndexer(
-            selection, 
-            self.shape, 
+            selection,
+            self.shape,
             self.metadata.chunk_grid,
         )
 
         # TODO is this where we would differ codepath for an uncompressed array?
-        chunk_grid_indexer = indexing.array_indexer_to_chunk_grid_indexer(indexer)
+        chunk_grid_indexer = indexing.array_indexer_to_chunk_grid_indexer(
+            indexer=indexer,
+            arr_shape=self.shape,
+            chunk_shape=self.chunks,
+        )
 
         print(f"{chunk_grid_indexer=}")
-        
+
         # TODO translate new chunk_grid_indexer BasicIndexer into normal Selection that numpy can understand
+        chunk_grid_selection = indexing.indexer_to_selection(chunk_grid_indexer)
+
+        print(f"{chunk_grid_selection=}")
 
         # do slicing of entries in manifest
         # TODO add ChunkManifest.__getitem__ for this?
         # TODO or add some kind of dedicated method that can't be confused with the API of Mapping
-        sliced_paths = self.manifest._paths[chunk_grid_indexer]
-        sliced_offsets = self.manifest._offsets[chunk_grid_indexer]
-        sliced_lengths = self.manifest._lengths[chunk_grid_indexer]
+        sliced_paths = self.manifest._paths[chunk_grid_selection]
+        sliced_offsets = self.manifest._offsets[chunk_grid_selection]
+        sliced_lengths = self.manifest._lengths[chunk_grid_selection]
+        print(f"{sliced_paths=}")
         sliced_manifest = ChunkManifest.from_arrays(
             paths=sliced_paths,
             offsets=sliced_offsets,
             lengths=sliced_lengths,
         )
 
-        # TODO deduce the new array shape from the new chunk grid shape
+        print(f"{sliced_manifest=}")
 
+        new_arr_shape = utils.determine_array_shape(
+            chunk_grid_shape=sliced_manifest.shape_chunk_grid,
+            chunk_shape=self.chunks,
+        )
+
+        print(f"{new_arr_shape=}")
 
         # chunk sizes are unchanged by slicing that aligns with chunk boundaries
-        new_metadata = utils.copy_and_replace_metadata(self.metadata, new_shape=new_arr_shape)
+        new_metadata = utils.copy_and_replace_metadata(
+            self.metadata,
+            new_shape=new_arr_shape,
+        )
 
         return ManifestArray(chunkmanifest=sliced_manifest, metadata=new_metadata)
 

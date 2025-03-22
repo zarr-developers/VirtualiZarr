@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+import virtualizarr.manifests.utils as utils
 from conftest import (
     ARRAYBYTES_CODEC,
     ZLIB_CODEC,
@@ -370,18 +371,36 @@ def test_refuse_combine(array_v3_metadata):
 
 class TestIndexing:
     # TODO parametrize over a bunch of valid options here
-    def test_slice_aligned_with_chunks(self, manifest_array):
-        marr = manifest_array(shape=(8,), chunks=(2,))
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, selection, out_shape, out_chunks",
+        [
+            ((2,), (1,), 0, (1,), (1,)),
+            ((2,), (1,), 1, (1,), (1,)),
+            ((8,), (2,), slice(0, 4), (4,), (2,)),
+            ((2,), (2,), slice(2, 4), (2,), (2,)),
+        ],
+    )
+    def test_slice_aligned_with_chunks(
+        self, manifest_array, in_shape, in_chunks, selection, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
 
-        # subarr = marr[0:4]
-        # assert isinstance(subarr, ManifestArray)
-        # assert subarr.metadata == marr.metadata
-        # assert subarr.chunks == marr.chunks
-        # assert subarr.shape == (4,)
+        subarr = marr[selection]
 
-        subarr = marr[0:6]
-        subarr = marr[2:4]
-        
+        assert isinstance(subarr, ManifestArray)
+        assert subarr.shape == out_shape
+        assert subarr.chunks == out_chunks
+
+        # all metadata should be the same except for shape (and possibly chunks?)
+        expected_metadata = utils.copy_and_replace_metadata(
+            marr.metadata,
+            new_shape=out_shape,
+        )
+        # expected_metadata.chunks = out_chunks
+        assert subarr.metadata == expected_metadata
+
+    def test_slice_concat_roundtrip(self): ...
+
     def test_slice_misaligned_with_chunks(self, manifest_array):
         marr = manifest_array(shape=(4,), chunks=(2,))
 
