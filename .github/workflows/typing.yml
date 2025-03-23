@@ -30,7 +30,8 @@ jobs:
           pixi-version: v0.41.4
       - name: List installed libraries
         run: |
-          pixi run -e test pip list
+          pixi install --environment test
+          pixi list --environment test
       - name: Type check
         run: |
           pixi run -e test run-mypy

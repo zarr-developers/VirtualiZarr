@@ -35,7 +35,8 @@ jobs:
 
       - name: List installed libraries
         run: |
-          pixi run -e ${{ matrix.environment }} pip list
+          pixi install --environment ${{ matrix.environment }}
+          pixi list --environment ${{ matrix.environment }}
 
       - name: Running Tests
         run: |
