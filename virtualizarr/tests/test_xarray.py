@@ -37,7 +37,7 @@ def test_wrapping(array_v3_metadata):
 
 
 class TestEquals:
-    # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
+    # regression test for GH29 https://github.com/zarr-developers/VirtualiZarr/issues/29
     def test_equals(self, array_v3_metadata):
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
