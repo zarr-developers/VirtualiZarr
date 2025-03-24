@@ -180,6 +180,9 @@ class ManifestStore(Store):
     stores : dict[prefix, obstore.store.ObjectStore]
         A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
+        The prefixes are matched to the URIs in the ManifestArrays to determine which store to
+        use for making requests.
+
     Warnings
     --------
     ManifestStore is experimental and subject to API changes without notice. Please
@@ -202,6 +205,18 @@ class ManifestStore(Store):
         *,
         stores: StoreDict,
     ) -> None:
+        """Instantiate a new ManifestStore
+
+        Parameters
+        ----------
+        manifest_group : ManifestGroup
+            Manifest Group containing Group metadata and mapping variable names to ManifestArrays
+        stores : dict[prefix, obstore.store.ObjectStore]
+            A mapping of url prefixes to obstore Store instances set up with the proper credentials.
+
+            The prefixes are matched to the URIs in the ManifestArrays to determine which store to
+            use for making requests.
+        """
         for store in stores.values():
             if not store.__class__.__module__.startswith("obstore"):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
