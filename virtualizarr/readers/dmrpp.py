@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Hashable, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -10,9 +10,9 @@ from xarray import Coordinates, Dataset, Index, Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.common import VirtualBackend
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -27,15 +27,26 @@ class DMRPPVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables=drop_variables,
-            loadable_variables=loadable_variables,
-        )
-
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "DMR++ reader does not understand any virtual_backend_kwargs"
             )
+
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
+
+        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
+        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
+        if loadable_variables is None or indexes is None:
+            warnings.warn(
+                "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
+                "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
+                "To silence this warning pass `loadable_variables` explicitly.",
+                UserWarning,
+            )
+            loadable_variables = []
+            indexes = {}
 
         if loadable_variables != [] or decode_times or indexes is None:
             raise NotImplementedError(
@@ -56,7 +67,7 @@ class DMRPPVirtualBackend(VirtualBackend):
         )
         vds = parser.parse_dataset(group=group, indexes=indexes)
 
-        return vds.drop_vars(drop_variables)
+        return vds.drop_vars(_drop_vars)
 
 
 class DMRParser:
@@ -148,7 +159,7 @@ class DMRParser:
             Data variables:
                 d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
 
-        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp", indexes={})
+        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp")
         >>> vds2
         <xarray.Dataset> Size: 4MB
             Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
