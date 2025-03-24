@@ -23,14 +23,14 @@ class TestManifestGroup:
     def test_manifest_array(self, array_v3_metadata, manifest_array):
         var = "foo"
         manifest_group = ManifestGroup(
-            manifest_dict={var: manifest_array}, attributes={}
+            manifest_arrays={var: manifest_array}, attributes={}
         )
-        assert isinstance(manifest_group._manifest_dict, dict)
-        assert isinstance(manifest_group._manifest_dict[var], ManifestArray)
+        assert isinstance(manifest_group._manifest_arrays, dict)
+        assert isinstance(manifest_group._manifest_arrays[var], ManifestArray)
         assert isinstance(manifest_group._metadata, GroupMetadata)
 
     def test_manifest_repr(self, manifest_array):
         manifest_group = ManifestGroup(
-            manifest_dict={"foo": manifest_array}, attributes={}
+            manifest_arrays={"foo": manifest_array}, attributes={}
         )
         assert str(manifest_group)

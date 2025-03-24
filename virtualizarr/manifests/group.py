@@ -4,7 +4,7 @@ from zarr.core.group import GroupMetadata
 
 from virtualizarr.manifests import ManifestArray
 
-ManifestDict: TypeAlias = dict[str, ManifestArray]
+ManifestArrayVariableMapping: TypeAlias = dict[str, ManifestArray]
 
 
 class ManifestGroup:
@@ -12,12 +12,12 @@ class ManifestGroup:
     Virtualized representation of multiple ManifestArrays as a Zarr Group.
     """
 
-    _manifest_dict: ManifestDict
+    _manifest_arrays: ManifestArrayVariableMapping
     _metadata: GroupMetadata
 
     def __init__(
         self,
-        manifest_dict: ManifestDict,
+        manifest_arrays: ManifestArrayVariableMapping,
         attributes: dict,
     ) -> None:
         """
@@ -26,11 +26,13 @@ class ManifestGroup:
         Parameters
         ----------
         attributes : attributes to include in Group metadata
-        manifest_dict : ManifestDict
+        manifest_dict : ManifestArrayVariableMapping
         """
 
         self._metadata = GroupMetadata(attributes=attributes)
-        self._manifest_dict = manifest_dict
+        self._manifest_arrays = manifest_arrays
 
     def __str__(self) -> str:
-        return f"ManifestGroup({self._manifest_dict}, {self._metadata})"
+        return (
+            f"ManifestArrayVariableMapping({self._manifest_arrays}, {self._metadata})"
+        )

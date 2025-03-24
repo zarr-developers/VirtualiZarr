@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from zarr.core.buffer import default_buffer_prototype
 
-from virtualizarr.manifests.group import ManifestDict
+from virtualizarr.manifests.group import ManifestArrayVariableMapping
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -57,14 +57,14 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-async def list_dir_from_manifest_dict(
-    manifest_arrays: ManifestDict, prefix: str
+async def list_dir_from_manifest_arrays(
+    manifest_arrays: ManifestArrayVariableMapping, prefix: str
 ) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
     ----------
-    manifest_arrays : ManifestDict
+    manifest_arrays : ManifestArrayVariableMapping
     prefix : str
 
 
@@ -102,7 +102,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
     else:
         var, _ = key.split("/")
-        metadata = manifest_group._manifest_dict[var].metadata.to_dict()
+        metadata = manifest_group._manifest_arrays[var].metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
@@ -250,7 +250,7 @@ class ManifestStore(Store):
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._manifest_group, key)
         var, chunk_key = parse_manifest_index(key)
-        marr = self._manifest_group._manifest_dict[var]
+        marr = self._manifest_group._manifest_arrays[var]
         manifest = marr._manifest
 
         path = manifest._paths[*chunk_key]
@@ -336,7 +336,7 @@ class ManifestStore(Store):
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
         yield "zarr.json"
-        for k in self._manifest_group._manifest_dict.keys():
+        for k in self._manifest_group._manifest_arrays.keys():
             yield k
 
 
