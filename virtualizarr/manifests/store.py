@@ -202,20 +202,8 @@ class ManifestStore(Store):
         *,
         stores: StoreDict,
     ) -> None:
-        import obstore as obs
-
         for store in stores.values():
-            if not isinstance(
-                store,
-                (
-                    obs.store.AzureStore,
-                    obs.store.GCSStore,
-                    obs.store.HTTPStore,
-                    obs.store.S3Store,
-                    obs.store.LocalStore,
-                    obs.store.MemoryStore,
-                ),
-            ):
+            if not store.__class__.__module__.startswith("obstore"):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
         # TODO: Don't allow stores with prefix
         # TODO: Type check the manifest arrays
