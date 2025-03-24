@@ -528,7 +528,6 @@ class TestAppend:
             xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with encoding, it succeeds
-    @pytest.mark.xfail
     @pytest.mark.asyncio
     async def test_append_with_multiple_root_arrays(
         self,
