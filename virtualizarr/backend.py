@@ -161,7 +161,6 @@ def open_virtual_dataset(
             stacklevel=2,
         )
 
-
     if reader_options is None:
         reader_options = {}
 
