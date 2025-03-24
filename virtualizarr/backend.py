@@ -409,8 +409,7 @@ def open_virtual_mfdataset(
             )
         else:
             raise ValueError(
-                f"{combine} is an invalid option for the keyword argument"
-                " ``combine``"
+                f"{combine} is an invalid option for the keyword argument ``combine``"
             )
     except ValueError:
         for vds in virtual_datasets:

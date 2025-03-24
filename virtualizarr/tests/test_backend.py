@@ -15,17 +15,16 @@ from virtualizarr.backend import (
     VirtualBackend,
     automatically_determine_filetype,
 )
-
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
-    requires_kerchunk,
-    requires_lithops,
     parametrize_over_hdf_backends,
     requires_hdf5plugin,
     requires_imagecodecs,
+    requires_kerchunk,
+    requires_lithops,
     requires_network,
     requires_s3fs,
     requires_scipy,
