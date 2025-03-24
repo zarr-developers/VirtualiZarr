@@ -161,10 +161,6 @@ def open_virtual_dataset(
             stacklevel=2,
         )
 
-    # drop_variables, loadable_variables = check_for_collisions(
-    #     drop_variables,
-    #     loadable_variables,
-    # )
 
     if reader_options is None:
         reader_options = {}
