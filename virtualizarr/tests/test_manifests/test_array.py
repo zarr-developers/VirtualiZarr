@@ -101,8 +101,12 @@ class TestEquals:
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
-        metadata1 = array_v3_metadata(shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32('nan'))
-        metadata2 = array_v3_metadata(shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32('nan'))
+        metadata1 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
+        metadata2 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
         marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest)
         marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest)
 

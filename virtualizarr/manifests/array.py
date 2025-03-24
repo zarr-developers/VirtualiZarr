@@ -3,8 +3,8 @@ from typing import Any, Callable, Union
 
 import numpy as np
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
-import virtualizarr.manifests.utils as utils
 
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
