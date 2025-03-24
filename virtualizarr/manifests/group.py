@@ -12,6 +12,7 @@ class ManifestGroup:
     Virtualized representation of multiple ManifestArrays as a Zarr Group.
     """
 
+    # TODO: Consider refactoring according to https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2007805272
     _manifest_arrays: ManifestArrayVariableMapping
     _metadata: GroupMetadata
 
