@@ -137,7 +137,7 @@ def parse_manifest_index(
     return var, indexes
 
 
-def find_matching_store(stores: dict[str, Any], request_key: str) -> StoreRequest:
+def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
     """
     Find the matching store based on the store keys and the beginning of the URI strings,
     to fetch data from the appropriately configured ObjectStore.
