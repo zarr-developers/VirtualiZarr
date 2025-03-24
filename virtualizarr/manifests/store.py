@@ -169,7 +169,8 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
 
 class ManifestStore(Store):
     """A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
-    from the Zarr API are redirected using `ManifestArrays <https://virtualizarr.readthedocs.io/en/stable/generated/virtualizarr.manifests.ManifestArray.html#virtualizarr.manifests.ManifestArray>`_,
+    from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
+    multiple :class:`virtualizarr.manifests.ManifestArray`,
     allowing for virtually interfacing with underlying data in other file format.
 
 
@@ -177,7 +178,7 @@ class ManifestStore(Store):
     ----------
     manifest_group : ManifestGroup
         Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-    stores : dict[prefix, obstore.store.ObjectStore]
+    stores : dict[prefix, :class:`obstore.store.ObjectStore`]
         A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
         The prefixes are matched to the URIs in the ManifestArrays to determine which store to
@@ -211,7 +212,7 @@ class ManifestStore(Store):
         ----------
         manifest_group : ManifestGroup
             Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        stores : dict[prefix, obstore.store.ObjectStore]
+        stores : dict[prefix, :class:`obstore.store.ObjectStore`]
             A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
             The prefixes are matched to the URIs in the ManifestArrays to determine which store to
