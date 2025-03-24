@@ -20,6 +20,9 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
+- Fixed bug causing ManifestArrays to compare as not equal when they were actually identical (:issue:`501`, :pull:`502`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
 Documentation
 ~~~~~~~~~~~~~
 

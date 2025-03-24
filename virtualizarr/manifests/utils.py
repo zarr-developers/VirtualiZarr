@@ -122,6 +122,24 @@ def check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
             )
 
 
+# TODO remove this once https://github.com/zarr-developers/zarr-python/issues/2929 is solved upstream
+def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -> bool:
+    """Checks the metadata of two zarr arrays are identical, including special treatment for NaN fill_values."""
+    metadata_dict1 = metadata1.to_dict()
+    metadata_dict2 = metadata2.to_dict()
+
+    # fill_value is a special case because numpy NaNs cannot be compared using __eq__, see https://stackoverflow.com/a/10059796
+    fill_value1 = metadata_dict1.pop("fill_value")
+    fill_value2 = metadata_dict2.pop("fill_value")
+    if np.isnan(fill_value1) and np.isnan(fill_value2):  # type: ignore[arg-type]
+        fill_values_equal = fill_value1.dtype == fill_value2.dtype  # type: ignore[union-attr]
+    else:
+        fill_values_equal = fill_value1 == fill_value2
+
+    # everything else in ArrayV3Metadata is a string, Enum, or Dataclass
+    return fill_values_equal and metadata_dict1 == metadata_dict2
+
+
 def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
     new_l = list(t)
     new_l.pop(pos)
