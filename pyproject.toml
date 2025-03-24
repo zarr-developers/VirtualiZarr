@@ -39,7 +39,7 @@ remote = [
     "s3fs",
 ]
 obstore = [
-    "obstore @ git+https://github.com/developmentseed/obstore@main#subdirectory=obstore",
+    "obstore",
 ]
 # non-kerchunk-based readers
 hdf = [
