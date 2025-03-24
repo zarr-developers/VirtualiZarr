@@ -28,16 +28,6 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.)
 
-```{note}
-In future we would like for it to be possible to just use `xr.open_dataset`, e.g.
-
-    import virtualizarr
-
-    vds = xr.open_dataset('air.nc', engine='virtualizarr')
-
-but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
-```
-
 Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 ```python
@@ -211,7 +201,7 @@ concatenated.manifest.dict()
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
 
 ```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5).
 ```
 
 Remember that you cannot load values from a `ManifestArray` directly.
@@ -227,7 +217,7 @@ NotImplementedError: ManifestArrays can't be converted into numpy arrays or pand
 The whole point is to manipulate references to the data without actually loading any data.
 
 ```{note}
-You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/TomNicholas/VirtualiZarr/issues/51)).
+You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
 ```
 
 ## Virtual Datasets as Zarr Groups
@@ -382,20 +372,6 @@ combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='mini
 ```
 
 In N-dimensions the datasets would need to be passed as an N-deep nested list-of-lists, see the [xarray docs](https://docs.xarray.dev/en/stable/user-guide/combining.html#combining-along-multiple-dimensions).
-
-```{note}
-In future we would like for it to be possible to just use `xr.open_mfdataset` to open the files and combine them in one go, e.g.
-
-    vds = xr.open_mfdataset(
-        ['air1.nc', 'air2.nc'],
-        combine='nested',
-        concat_dim=['time'],
-        coords='minimal',
-        compat='override',
-    )
-
-but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
-```
 
 ```{note}
 For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).

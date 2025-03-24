@@ -264,7 +264,7 @@ def full_like(
 
     Returns a numpy array instead of a ManifestArray.
 
-    Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
+    Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
     """
     return np.full(
         shape=x.shape,
@@ -278,7 +278,7 @@ def isnan(x: "ManifestArray", /) -> np.ndarray:
     """
     Returns a numpy array of all False.
 
-    Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
+    Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
     """
     return _isnan(x.shape)
 
