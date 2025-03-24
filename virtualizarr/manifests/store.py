@@ -64,7 +64,7 @@ async def list_dir_from_manifest_dict(
 
     Parameters
     ----------
-    vd : xarray DataArray or Dataset
+    manifest_arrays : ManifestDict
     prefix : str
 
 
@@ -88,7 +88,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
 
     Parameters
     ----------
-    vd : xarray DataArray or Dataset
+    manifest_group : ManifestGroup
     key : str
 
     Returns
@@ -121,6 +121,7 @@ def parse_manifest_index(
     Parameters
     ----------
     key : str
+    chunk_key_encoding : str
 
     Returns
     -------
@@ -144,7 +145,7 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
 
     Parameters:
     -----------
-    stores : dict
+    stores : StoreDict
         A dictionary with URI prefixes for different stores as keys
     request_key : str
         A string to match against the dictionary keys
@@ -171,6 +172,8 @@ class ManifestStore(Store):
 
     Parameters
     ----------
+    manifest_group : ManifestGroup
+        Manifest Group containing Group metadata and mapping variable names to ManifestArrays
     stores : dict[prefix, obstore.store.ObjectStore]
         A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
