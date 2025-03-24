@@ -51,8 +51,8 @@ if TYPE_CHECKING:
 class StoreRequest:
     """Dataclass for matching a key to the store instance"""
 
-    store_id: str
-    """The ID of a store."""
+    store: ObjectStore
+    """The ObjectStore instance to use for making the request."""
     key: str
     """The key within the store to request."""
 
@@ -160,7 +160,7 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
     # Check each key to see if it's a prefix of the uri_string
     for key in sorted_keys:
         if request_key.startswith(key):
-            return StoreRequest(store_id=key, key=request_key[len(key) :])
+            return StoreRequest(store=stores[key], key=request_key[len(key) :])
     # if no match is found, raise an error
     raise ValueError(
         f"Expected the one of stores.keys() to match the data prefix, got {stores.keys()} and {request_key}"
@@ -204,7 +204,7 @@ class ManifestStore(Store):
         self,
         manifest_group: ManifestGroup,
         *,
-        stores: StoreDict,
+        stores: StoreDict,  # TODO: Consider using a sequence of tuples rather than a dict (see https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2010717898).
     ) -> None:
         """Instantiate a new ManifestStore
 
@@ -263,9 +263,8 @@ class ManifestStore(Store):
         path = manifest._paths[*chunk_key]
         offset = manifest._offsets[*chunk_key]
         length = manifest._lengths[*chunk_key]
-        store_request = find_matching_store(stores=self._stores, request_key=path)
         # Get the  configured object store instance that matches the path
-        store = self._stores[store_request.store_id]
+        store_request = find_matching_store(stores=self._stores, request_key=path)
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -274,7 +273,7 @@ class ManifestStore(Store):
         # Actually get the bytes
         try:
             bytes = await obs.get_range_async(
-                store,
+                store_request.store,
                 store_request.key,
                 start=byte_range.start,
                 end=byte_range.end,
