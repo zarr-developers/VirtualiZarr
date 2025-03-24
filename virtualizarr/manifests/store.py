@@ -168,7 +168,10 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
 
 
 class ManifestStore(Store):
-    """A Zarr store that uses obstore for fast read/write from AWS, GCP, Azure.
+    """A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
+    from the Zarr API are redirected using `ManifestArrays <https://virtualizarr.readthedocs.io/en/stable/generated/virtualizarr.manifests.ManifestArray.html#virtualizarr.manifests.ManifestArray>`_,
+    allowing for virtually interfacing with underlying data in other file format.
+
 
     Parameters
     ----------
