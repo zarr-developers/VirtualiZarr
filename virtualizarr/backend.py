@@ -15,7 +15,7 @@ from typing import (
 
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
-from xarray.core.combine import _infer_concat_order_from_positions, _nested_combine
+from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
