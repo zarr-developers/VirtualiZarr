@@ -131,8 +131,8 @@ def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -
     # fill_value is a special case because numpy NaNs cannot be compared using __eq__, see https://stackoverflow.com/a/10059796
     fill_value1 = metadata_dict1.pop("fill_value")
     fill_value2 = metadata_dict2.pop("fill_value")
-    if np.isnan(fill_value1) and np.isnan(fill_value2):
-        fill_values_equal = fill_value1.dtype == fill_value2.dtype
+    if np.isnan(fill_value1) and np.isnan(fill_value2):  # type: ignore[arg-type]
+        fill_values_equal = fill_value1.dtype == fill_value2.dtype  # type: ignore[union-attr]
     else:
         fill_values_equal = fill_value1 == fill_value2
 
