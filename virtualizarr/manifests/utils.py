@@ -122,7 +122,7 @@ def check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
             )
 
 
-# TODO upstream this into zarr-python?
+# TODO remove this once https://github.com/zarr-developers/zarr-python/issues/2929 is solved upstream
 def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -> bool:
     """Checks the metadata of two zarr arrays are identical, including special treatment for NaN fill_values."""
     metadata_dict1 = metadata1.to_dict()
