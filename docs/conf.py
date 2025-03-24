@@ -40,6 +40,7 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "zarr": ("https://zarr.readthedocs.io/en/stable/", None),
     "xarray": ("https://docs.xarray.dev/en/stable/", None),
+    "obstore": ("https://developmentseed.org/obstore/latest/", None),
 }
 
 # Add any paths that contain templates here, relative to this directory.
