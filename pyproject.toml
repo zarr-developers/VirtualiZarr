@@ -20,7 +20,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.1.1",
+    #"xarray>=2025.3.0",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
@@ -85,7 +85,7 @@ all_writers = [
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
 upstream = [
-    'xarray @ git+https://github.com/pydata/xarray',
+    #'xarray @ git+https://github.com/pydata/xarray',
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
@@ -95,7 +95,7 @@ upstream = [
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
-    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+    #'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
 ]
 docs = [
     "sphinx",
