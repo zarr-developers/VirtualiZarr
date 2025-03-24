@@ -14,42 +14,102 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2024.10.0",
+    "xarray>=2025.1.1",
     "numpy>=2.0.0",
-    "packaging",
     "universal-pathlib",
-    "numcodecs",
+    "numcodecs>=0.15.1",
     "ujson",
+    "packaging",
+    "zarr>=3.0.2",
 ]
 
+# Dependency sets under optional-dependencies are available via PyPI
 [project.optional-dependencies]
-hdf_reader = [
+# for creating virtual datasets from objects on remote storage
+remote = [
     "fsspec",
+    "requests",
+    "aiohttp",
+    "s3fs",
+]
+
+# non-kerchunk-based readers
+hdf = [
+    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "numcodecs"
 ]
-icechunk = [
-    "icechunk>=0.1.0a7",
-]
-test = [
-    "codecov",
-    "fastparquet",
-    "fsspec",
+
+# kerchunk-based readers
+hdf5 = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
     "h5py",
-    "kerchunk>=0.2.5",
+]
+netcdf3 = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "scipy",
+]
+fits = [
+    "virtualizarr[remote]",
+    "kerchunk>=0.2.8",
+    "astropy",
+]
+all_readers = [
+    "virtualizarr[hdf]",
+    "virtualizarr[hdf5]",
+    "virtualizarr[netcdf3]",
+    "virtualizarr[fits]",
+]
+
+# writers
+icechunk = [
+    "icechunk>=0.2.4",
+]
+kerchunk = ["fastparquet"]
+
+all_writers = [
+    "virtualizarr[icechunk]",
+    "virtualizarr[kerchunk]",
+]
+
+# Dependency sets under dependencies-groups are NOT available via PyPI
+[dependency-groups]
+upstream = [
+    'xarray @ git+https://github.com/pydata/xarray',
+    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
+    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
+    'ujson @ git+https://github.com/ultrajson/ultrajson',
+    'zarr @ git+https://github.com/zarr-developers/zarr-python',
+    # optional dependencies
+    'astropy @ git+https://github.com/astropy/astropy',
+    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
+    's3fs @ git+https://github.com/fsspec/s3fs',
+    'kerchunk @ git+https://github.com/fsspec/kerchunk',
+    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+]
+docs = [
+    "sphinx",
+    "myst_nb",
+    "pydata_sphinx_theme",
+    "sphinx_copybutton",
+    "sphinx_design",
+    "sphinx_togglebutton",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinx-autodoc-typehints",
+]
+dev = [
+    "codecov",
     "mypy",
-    "netcdf4",
-    "numcodecs",
     "pandas-stubs",
     "pooch",
     "pre-commit",
@@ -64,8 +124,8 @@ test = [
 ]
 
 [project.urls]
-Home = "https://github.com/TomNicholas/VirtualiZarr"
-Documentation = "https://github.com/TomNicholas/VirtualiZarr/blob/main/README.md"
+Home = "https://github.com/zarr-developers/VirtualiZarr"
+Documentation = "https://github.com/zarr-developers/VirtualiZarr/blob/main/README.md"
 
 [build-system]
 requires = [
@@ -74,6 +134,60 @@ requires = [
     "setuptools_scm[toml]>=7.0",
     "check-manifest"
 ]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+# Add the editable project pip install to the default group
+[tool.pixi.pypi-dependencies]
+virtualizarr = { path = ".", editable = true }
+
+# Define a feature set for Python 3.11
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+# Define a feature set for Python 3.12
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+# Install NetCDF and HDF5 from conda-forge for extra plugin capabilities
+[tool.pixi.feature.hdf5-lib.dependencies]
+netcdf4 = ">=1.7.2,<2"
+hdf5 = ">=1.14.4,<2"
+h5netcdf = ">=1.5.0,<2"
+
+[tool.pixi.feature.icechunk-dev.dependencies]
+rust = "*"
+
+# Define commands to run within the test environments
+[tool.pixi.feature.dev.tasks]
+run-mypy = { cmd = "mypy virtualizarr" }
+run-tests = { cmd = "pytest --run-network-tests --verbose" }
+run-tests-no-network = { cmd = "pytest" }
+run-tests-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+
+# Define which features and groups to include in different pixi (similar to conda) environments)
+[tool.pixi.environments]
+min-deps = ["dev", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
+# Inherit from min-deps to get all the test commands, along with optional dependencies
+test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib"]
+test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py311"] # test against python 3.11
+test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312"] # test against python 3.12
+upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "all_readers", "all_writers"]
+docs = ["docs"]
+
+
+
+
+# Define commands to run within the docs environment
+[tool.pixi.feature.docs.tasks]
+build-docs = { cmd = "make html", cwd = "docs" }
+serve-docs = { cmd = "sphinx-autobuild docs docs/_build --host 0.0.0.0" }
+readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTHEDOCS_OUTPUT/html"
 
 [tool.setuptools_scm]
 fallback_version = "9999"
@@ -104,18 +218,23 @@ ignore_missing_imports = true
 module = "ujson.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "zarr.*"
+ignore_missing_imports = true
+
 [tool.ruff]
 # Same as Black.
 line-length = 88
 indent-width = 4
-target-version = "py39"
+target-version = "py310"
 
 exclude = [
     "docs",
-    ".eggs"]
+    ".eggs"
+]
 
 [tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
 select = ["E4", "E7", "E9", "F", "I"]
@@ -144,7 +263,27 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 known-first-party = ["virtualizarr"]
 
+[tool.coverage.run]
+include = ["virtualizarr/"]
+omit = ["conftest.py", "virtualizarr/tests/*"]
+
 [tool.pytest.ini_options]
+# See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
+# Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
+#
+#    PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope"
+#    is unset. The event loop scope for asynchronous fixtures will default to the fixture
+#    caching scope. Future versions of pytest-asyncio will default the loop scope for
+#    asynchronous fixtures to function scope. Set the default fixture loop scope
+#    explicitly in order to avoid unexpected behavior in the future. Valid fixture loop
+#    scopes are: "function", "class", "module", "package", "session"
+#
+asyncio_default_fixture_loop_scope = "session"
 markers = [
+    # Although we may not use pytest.mark.flaky, some of our test modules import
+    # from xarray.tests, and xarray.tests.__init__.py references pytest.mark.flaky.
+    # Therefore, without the "flaky" marker below, during test execution, we see
+    # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
+    "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
 ]

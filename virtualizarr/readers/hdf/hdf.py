@@ -1,17 +1,29 @@
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import xarray as xr
-from xarray import Dataset, Index, Variable
+from xarray.backends.zarr import FillValueCoder
 
+from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
     ManifestArray,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import (
     VirtualBackend,
     construct_virtual_dataset,
@@ -20,19 +32,30 @@ from virtualizarr.readers.common import (
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
-from virtualizarr.zarr import ZArray
-
-if TYPE_CHECKING:
-    import h5py  # type: ignore
-    from h5py import Dataset, Group  # type: ignore
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
-if h5py:
-    Dataset = h5py.Dataset  # type: ignore
-    Group = h5py.Group  # type: ignore
+
+
+if TYPE_CHECKING:
+    from h5py import Dataset as H5Dataset  # type: ignore[import-untyped]
+    from h5py import Group as H5Group  # type: ignore[import-untyped]
 else:
-    Dataset = dict()  # type: ignore
-    Group = dict()  # type: ignore
+    H5Dataset: Any = None
+    H5Group: Any = None
+
+FillValueType = Union[
+    int,
+    float,
+    bool,
+    complex,
+    str,
+    np.integer,
+    np.floating,
+    np.bool_,
+    np.complexfloating,
+    bytes,  # For fixed-length string storage
+    Tuple[bytes, int],  # Structured type
+]
 
 
 class HDFVirtualBackend(VirtualBackend):
@@ -43,10 +66,12 @@ class HDFVirtualBackend(VirtualBackend):
         drop_variables: Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> xr.Dataset:
+        if h5py is None:
+            raise ImportError("h5py is required for using the HDFVirtualBackend")
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "HDF reader does not understand any virtual_backend_kwargs"
@@ -92,7 +117,10 @@ class HDFVirtualBackend(VirtualBackend):
         )
 
     @staticmethod
-    def _dataset_chunk_manifest(path: str, dataset: Dataset) -> Optional[ChunkManifest]:
+    def _dataset_chunk_manifest(
+        path: str,
+        dataset: H5Dataset,
+    ) -> Optional[ChunkManifest]:
         """
         Generate ChunkManifest for HDF5 dataset.
 
@@ -116,7 +144,7 @@ class HDFVirtualBackend(VirtualBackend):
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
 
-                chunk_entry = ChunkEntry.with_validation(
+                chunk_entry: ChunkEntry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
                     path=path, offset=dsid.get_offset(), length=dsid.get_storage_size()
                 )
                 chunk_key = ChunkKey(key)
@@ -160,7 +188,7 @@ class HDFVirtualBackend(VirtualBackend):
             return chunk_manifest
 
     @staticmethod
-    def _dataset_dims(dataset: Dataset) -> Union[List[str], List[None]]:
+    def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
         """
         Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -172,10 +200,12 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
         Returns
         -------
-        list
+        list[str]
             List with HDF5 path names of dimension scales attached to input
             dataset.
         """
@@ -199,10 +229,37 @@ class HDFVirtualBackend(VirtualBackend):
                     # In this case, we mimic netCDF4 and assign phony dimension names.
                     # See https://github.com/fsspec/kerchunk/issues/41
                     dims.append(f"phony_dim_{n}")
-        return dims
+
+        if not group.endswith("/"):
+            group += "/"
+
+        return [dim.removeprefix(group) for dim in dims]
 
     @staticmethod
-    def _extract_attrs(h5obj: Union[Dataset, Group]):
+    def _extract_cf_fill_value(
+        h5obj: Union[H5Dataset, H5Group],
+    ) -> Optional[FillValueType]:
+        """
+        Convert the _FillValue attribute from an HDF5 group or dataset into
+        encoding.
+
+        Parameters
+        ----------
+        h5obj : h5py.Group or h5py.Dataset
+            An h5py group or dataset.
+        """
+        fillvalue = None
+        for n, v in h5obj.attrs.items():
+            if n == "_FillValue":
+                if isinstance(v, np.ndarray) and v.size == 1:
+                    fillvalue = v.item()
+                else:
+                    fillvalue = v
+                fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)  # type: ignore[arg-type]
+        return fillvalue
+
+    @staticmethod
+    def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
         """
         Extract attributes from an HDF5 group or dataset.
 
@@ -225,14 +282,14 @@ class HDFVirtualBackend(VirtualBackend):
         for n, v in h5obj.attrs.items():
             if n in _HIDDEN_ATTRS:
                 continue
+            if n == "_FillValue":
+                continue
             # Fix some attribute values to avoid JSON encoding exceptions...
             if isinstance(v, bytes):
                 v = v.decode("utf-8") or " "
             elif isinstance(v, (np.ndarray, np.number, np.bool_)):
                 if v.dtype.kind == "S":
                     v = v.astype(str)
-                if n == "_FillValue":
-                    continue
                 elif v.size == 1:
                     v = v.flatten()[0]
                     if isinstance(v, (np.ndarray, np.number, np.bool_)):
@@ -243,12 +300,15 @@ class HDFVirtualBackend(VirtualBackend):
                 v = ""
             if v == "DIMENSION_SCALE":
                 continue
-
             attrs[n] = v
         return attrs
 
     @staticmethod
-    def _dataset_to_variable(path: str, dataset: Dataset) -> Optional[Variable]:
+    def _dataset_to_variable(
+        path: str,
+        dataset: H5Dataset,
+        group: str,
+    ) -> Optional[xr.Variable]:
         """
         Extract an xarray Variable with ManifestArray data from an h5py dataset
 
@@ -256,53 +316,50 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         dataset : h5py.Dataset
             An h5py dataset.
+        group : str
+            Name of the group containing this h5py.Dataset.
 
         Returns
         -------
         list: xarray.Variable
             A list of xarray variables.
-
         """
-        # This chunk determination logic mirrors zarr-python's create
-        # https://github.com/zarr-developers/zarr-python/blob/main/zarr/creation.py#L62-L66
-
         chunks = dataset.chunks if dataset.chunks else dataset.shape
         codecs = codecs_from_dataset(dataset)
         cfcodec = cfcodec_from_dataset(dataset)
         attrs = HDFVirtualBackend._extract_attrs(dataset)
+        cf_fill_value = HDFVirtualBackend._extract_cf_fill_value(dataset)
+        attrs.pop("_FillValue", None)
+
         if cfcodec:
             codecs.insert(0, cfcodec["codec"])
             dtype = cfcodec["target_dtype"]
             attrs.pop("scale_factor", None)
             attrs.pop("add_offset", None)
-            fill_value = cfcodec["codec"].decode(dataset.fillvalue)
         else:
             dtype = dataset.dtype
-            fill_value = dataset.fillvalue
-        if isinstance(fill_value, np.ndarray):
-            fill_value = fill_value[0]
-        if np.isnan(fill_value):
-            fill_value = float("nan")
-        if isinstance(fill_value, np.generic):
-            fill_value = fill_value.item()
-        filters = [codec.get_config() for codec in codecs]
-        zarray = ZArray(
-            chunks=chunks,  # type: ignore
-            compressor=None,
-            dtype=dtype,
-            fill_value=fill_value,
-            filters=filters,
-            order="C",
+
+        codec_configs = [
+            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
+        ]
+
+        fill_value = dataset.fillvalue.item()
+        metadata = create_v3_array_metadata(
             shape=dataset.shape,
-            zarr_format=2,
+            data_type=dtype,
+            chunk_shape=chunks,
+            fill_value=fill_value,
+            codecs=codec_configs,
         )
-        dims = HDFVirtualBackend._dataset_dims(dataset)
+        dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         if manifest:
-            marray = ManifestArray(zarray=zarray, chunkmanifest=manifest)
-            variable = Variable(data=marray, dims=dims, attrs=attrs)
+            marray = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+            variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
         else:
-            variable = Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)
+            variable = xr.Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)
+        if cf_fill_value is not None:
+            variable.encoding["_FillValue"] = cf_fill_value
         return variable
 
     @staticmethod
@@ -313,7 +370,7 @@ class HDFVirtualBackend(VirtualBackend):
         reader_options: Optional[dict] = {
             "storage_options": {"key": "", "secret": "", "anon": True}
         },
-    ) -> Dict[str, Variable]:
+    ) -> Dict[str, xr.Variable]:
         """
         Extract xarray Variables with ManifestArray data from an HDF file or group
 
@@ -321,42 +378,50 @@ class HDFVirtualBackend(VirtualBackend):
         ----------
         path: str
             The path of the hdf5 file.
-        group: str
-            The name of the group for which to extract variables.
+        group: str, optional
+            The name of the group for which to extract variables. None refers to the root group.
         drop_variables: list of str
             A list of variable names to skip extracting.
         reader_options: dict
-            A dictionary of reader options passed to fsspec when opening the
-            file.
+            A dictionary of reader options passed to fsspec when opening the file.
 
         Returns
         -------
         dict
             A dictionary of Xarray Variables with the variable names as keys.
-
         """
         if drop_variables is None:
             drop_variables = []
+
         open_file = _FsspecFSFromFilepath(
             filepath=path, reader_options=reader_options
         ).open_file()
         f = h5py.File(open_file, mode="r")
-        if group:
+
+        if group is not None and group != "":
             g = f[group]
+            group_name = group
             if not isinstance(g, h5py.Group):
                 raise ValueError("The provided group is not an HDF group")
         else:
-            g = f
+            g = f["/"]
+            group_name = "/"
+
         variables = {}
+        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
+            group=g
+        )
+        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
         for key in g.keys():
             if key not in drop_variables:
-                if isinstance(g[key], Dataset):
-                    variable = HDFVirtualBackend._dataset_to_variable(path, g[key])
+                if isinstance(g[key], h5py.Dataset):
+                    variable = HDFVirtualBackend._dataset_to_variable(
+                        path=path,
+                        dataset=g[key],
+                        group=group_name,
+                    )
                     if variable is not None:
                         variables[key] = variable
-                else:
-                    raise NotImplementedError("Nested groups are not yet supported")
-
         return variables
 
     @staticmethod
@@ -379,3 +444,17 @@ class HDFVirtualBackend(VirtualBackend):
             g = f
         attrs = HDFVirtualBackend._extract_attrs(g)
         return attrs
+
+    @staticmethod
+    def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
+        dimension_names = []
+        non_coordinate_dimension_variables = []
+        for name, obj in group.items():
+            if "_Netcdf4Dimid" in obj.attrs:
+                dimension_names.append(name)
+        for name, obj in group.items():
+            if type(obj) is h5py.Dataset:
+                if obj.id.get_storage_size() == 0 and name in dimension_names:
+                    non_coordinate_dimension_variables.append(name)
+
+        return non_coordinate_dimension_variables

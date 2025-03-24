@@ -42,7 +42,7 @@ class FITSVirtualBackend(VirtualBackend):
 
         # TODO This wouldn't work until either you had an xarray backend for FITS installed, or issue #124 is implemented to load data from ManifestArrays directly
         # TODO Once we have one of those we can use ``maybe_open_loadable_vars_and_indexes`` here
-        if loadable_variables != [] or indexes != {} or decode_times:
+        if loadable_variables or indexes:
             raise NotImplementedError(
                 "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
             )

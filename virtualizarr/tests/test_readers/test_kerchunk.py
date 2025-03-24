@@ -7,7 +7,7 @@ import ujson
 
 from virtualizarr.backend import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.tests import has_fastparquet, requires_kerchunk
 
 
 def gen_ds_refs(
@@ -73,10 +73,11 @@ def test_dataset_from_df_refs(refs_file_factory):
     assert vda.chunks == (2, 3)
     assert vda.dtype == np.dtype("<i8")
 
-    assert vda.data.zarray.compressor is None
-    assert vda.data.zarray.filters is None
-    assert vda.data.zarray.fill_value == 0
-    assert vda.data.zarray.order == "C"
+    assert vda.data.metadata.codecs[0].to_dict() == {
+        "configuration": {"endian": "little"},
+        "name": "bytes",
+    }
+    assert vda.data.metadata.fill_value == 0
 
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
@@ -84,13 +85,13 @@ def test_dataset_from_df_refs(refs_file_factory):
 
 
 def test_dataset_from_df_refs_with_filters(refs_file_factory):
-    filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
+    compressor = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
-        "compressor": None,
+        "compressor": compressor,
         "dtype": "<i8",
         "fill_value": None,
-        "filters": filters,
+        "filters": None,
         "order": "C",
         "shape": [2, 3],
         "zarr_format": 2,
@@ -100,7 +101,10 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     vds = open_virtual_dataset(refs_file, filetype="kerchunk")
 
     vda = vds["a"]
-    assert vda.data.zarray.filters == filters
+    assert vda.data.metadata.codecs[1].to_dict() == {
+        "name": "numcodecs.shuffle",
+        "configuration": {"elementsize": 4},
+    }
 
 
 def test_empty_chunk_manifest(refs_file_factory):
@@ -177,7 +181,7 @@ def test_handle_relative_paths(refs_file_factory):
 @requires_kerchunk
 @pytest.mark.parametrize(
     "reference_format",
-    ["json", "parquet", "invalid"],
+    ["json", "invalid", *(["parquet"] if has_fastparquet else [])],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
@@ -218,7 +222,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
 
-        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
         refs = vds.virtualize.to_kerchunk(format="dict")
         expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
@@ -248,3 +252,14 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
         open_virtual_dataset(
             filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
+
+
+@pytest.mark.parametrize("drop_variables", ["a", ["a"]])
+def test_drop_variables(refs_file_factory, drop_variables):
+    refs_file = refs_file_factory()
+
+    vds = open_virtual_dataset(
+        refs_file, filetype="kerchunk", drop_variables=drop_variables
+    )
+
+    assert all(var not in vds for var in drop_variables)

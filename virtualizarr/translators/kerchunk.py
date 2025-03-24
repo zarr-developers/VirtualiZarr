@@ -1,24 +1,102 @@
 from typing import Any, Mapping, MutableMapping, cast
 
+import numpy as np
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
+from zarr.core.common import JSON
+from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata.v2 import ArrayV2Metadata
 
+from virtualizarr.codecs import (
+    numcodec_config_to_configurable,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.zarr import ZArray, ZAttrs, determine_chunk_grid_shape
+from virtualizarr.utils import determine_chunk_grid_shape
+
+
+def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
+    """Convert V2 metadata to kerchunk JSON format."""
+    import json
+
+    from virtualizarr.writers.kerchunk import NumpyEncoder
+
+    zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
+    if v2_metadata.filters:
+        zarray_dict["filters"] = [
+            # we could also cast to json, but get_config is intended for serialization
+            codec.get_config()
+            for codec in v2_metadata.filters
+            if codec is not None
+        ]  # type: ignore[assignment]
+    if v2_metadata.compressor:
+        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore[assignment]
+
+    return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
+
+
+def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+    """
+    Convert a decoded zarr array (.zarray) reference to an ArrayV3Metadata object.
+    This function processes the given decoded Zarr array reference dictionary,
+    to construct and return an ArrayV3Metadata object based on the provided information.
+
+    Parameters:
+    ----------
+    decoded_arr_refs_zarray : dict
+        A dictionary containing the decoded Zarr array reference information.
+        Expected keys include "dtype", "fill_value", "zarr_format", "filters",
+        "compressor", "chunks", and "shape".
+    Returns:
+    -------
+    ArrayV3Metadata
+
+    Raises:
+    ------
+    ValueError
+        If the Zarr format specified in the input dictionary is not 2 or 3.
+    """
+    # coerce type of fill_value as kerchunk can be inconsistent with this
+    dtype = np.dtype(decoded_arr_refs_zarray["dtype"])
+    fill_value = decoded_arr_refs_zarray["fill_value"]
+    if np.issubdtype(dtype, np.floating) and (
+        fill_value is None or fill_value == "NaN" or fill_value == "nan"
+    ):
+        fill_value = np.nan
+
+    zarr_format = int(decoded_arr_refs_zarray["zarr_format"])
+    if zarr_format not in (2, 3):
+        raise ValueError(f"Zarr format must be 2 or 3, but got {zarr_format}")
+    filters = (
+        decoded_arr_refs_zarray.get("filters", []) or []
+    )  # Ensure filters is a list
+    compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
+
+    # Ensure compressor is a list before unpacking
+    codec_configs = [*filters, *(compressor if compressor is not None else [])]
+    numcodec_configs = [
+        numcodec_config_to_configurable(config) for config in codec_configs
+    ]
+    return create_v3_array_metadata(
+        chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
+        data_type=dtype,
+        codecs=numcodec_configs,
+        fill_value=fill_value,
+        shape=tuple(decoded_arr_refs_zarray["shape"]),
+    )
 
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
     vds_refs: KerchunkStoreRefs,
     loadable_variables,
     drop_variables,
-    virtual_array_class=ManifestArray,
     fs_root: str | None = None,
 ) -> tuple[Mapping[str, Variable], dict[str, Any], list[str]]:
     """
@@ -34,7 +112,6 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
         drop_variables=drop_variables + loadable_variables,
-        virtual_array_class=virtual_array_class,
         fs_root=fs_root,
     )
     ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
@@ -85,7 +162,6 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
 def virtual_vars_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] | None = None,
-    virtual_array_class=ManifestArray,
     fs_root: str | None = None,
 ) -> dict[str, Variable]:
     """
@@ -95,9 +171,6 @@ def virtual_vars_from_kerchunk_refs(
     ----------
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
     var_names = find_var_names(refs)
@@ -108,9 +181,7 @@ def virtual_vars_from_kerchunk_refs(
     ]
 
     vars = {
-        var_name: variable_from_kerchunk_refs(
-            refs, var_name, virtual_array_class, fs_root=fs_root
-        )
+        var_name: variable_from_kerchunk_refs(refs, var_name, fs_root=fs_root)
         for var_name in var_names_to_keep
     }
     return vars
@@ -119,7 +190,6 @@ def virtual_vars_from_kerchunk_refs(
 def dataset_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     drop_variables: list[str] = [],
-    virtual_array_class: type = ManifestArray,
     indexes: MutableMapping[str, Index] | None = None,
     fs_root: str | None = None,
 ) -> Dataset:
@@ -128,14 +198,9 @@ def dataset_from_kerchunk_refs(
 
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     """
 
-    vars = virtual_vars_from_kerchunk_refs(
-        refs, drop_variables, virtual_array_class, fs_root=fs_root
-    )
+    vars = virtual_vars_from_kerchunk_refs(refs, drop_variables, fs_root=fs_root)
     ds_attrs = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
     coord_names = ds_attrs.pop("coordinates", [])
 
@@ -156,29 +221,32 @@ def dataset_from_kerchunk_refs(
 def variable_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     var_name: str,
-    virtual_array_class,
     fs_root: str | None = None,
 ) -> Variable:
     """Create a single xarray Variable by reading specific keys of a kerchunk references dict."""
 
     arr_refs = extract_array_refs(refs, var_name)
-    chunk_dict, zarray, zattrs = parse_array_refs(arr_refs)
+    chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
-    elif len(zarray.shape) != 0:
+        varr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
-        shape = determine_chunk_grid_shape(zarray.shape, zarray.chunks)
+
+        shape = determine_chunk_grid_shape(
+            metadata.shape,
+            metadata.chunks,
+        )
         manifest = ChunkManifest(entries={}, shape=shape)
-        varr = virtual_array_class(zarray=zarray, chunkmanifest=manifest)
+        varr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     else:
         # This means we encountered a scalar variable of dimension 0,
         # very likely that it actually has no numeric value and its only purpose
         # is to communicate dataset attributes.
-        varr = zarray.fill_value
+        varr = metadata.fill_value
 
     return Variable(data=varr, dims=dims, attrs=zattrs)
 
@@ -263,12 +331,12 @@ def extract_array_refs(
 
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
-) -> tuple[dict, ZArray, ZAttrs]:
-    zarray = ZArray.from_kerchunk_refs(arr_refs.pop(".zarray"))
+) -> tuple[dict, ArrayV3Metadata, dict[str, JSON]]:
+    metadata = from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
     chunk_dict = arr_refs
 
-    return chunk_dict, zarray, zattrs
+    return chunk_dict, metadata, zattrs
 
 
 def fully_decode_arr_refs(d: dict) -> KerchunkArrRefs:

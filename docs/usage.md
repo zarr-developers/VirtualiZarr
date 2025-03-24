@@ -1,4 +1,5 @@
 (usage)=
+
 # Usage
 
 This page explains how to use VirtualiZarr today, by introducing the key concepts one-by-one.
@@ -27,22 +28,12 @@ vds = open_virtual_dataset('air.nc')
 
 (Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.)
 
-
-```{note}
-In future we would like for it to be possible to just use `xr.open_dataset`, e.g.
-
-    import virtualizarr
-
-    vds = xr.open_dataset('air.nc', engine='virtualizarr')
-
-but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
-```
-
 Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, it does not contain numpy or dask arrays, but instead it wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
 ```python
 vds
 ```
+
 ```
 <xarray.Dataset> Size: 8MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -69,12 +60,15 @@ As the manifest contains only addresses at which to find large binary chunks, th
 ```python
 ds.nbytes
 ```
+
 ```
 30975672
 ```
+
 ```python
 vds.virtualize.nbytes
 ```
+
 ```
 128
 ```
@@ -119,6 +113,7 @@ marr = vds['air'].data
 manifest = marr.manifest
 manifest.dict()
 ```
+
 ```python
 {'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
 ```
@@ -134,20 +129,49 @@ A Zarr array is defined not just by the location of its constituent chunk data, 
 ```python
 marr
 ```
+
 ```
 ManifestArray<shape=(2920, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 ```
+
 ```python
 marr.manifest
 ```
+
 ```
 ChunkManifest<shape=(1, 1, 1)>
 ```
+
 ```python
-marr.zarray
+marr.metadata
 ```
+
 ```
-ZArray(shape=(2920, 25, 53), chunks=(2920, 25, 53), dtype=int16, compressor=None, filters=None, fill_value=None)
+ArrayV3Metadata(shape=(2920, 25, 53),
+                data_type=<DataType.float64: 'float64'>,
+                chunk_grid=RegularChunkGrid(chunk_shape=(2920, 25, 53)),
+                chunk_key_encoding=DefaultChunkKeyEncoding(name='default',
+                                                           separator='/'),
+                fill_value=np.float64(-327.67),
+                codecs=(FixedScaleOffset(codec_name='numcodecs.fixedscaleoffset', codec_config={'scale': 100.0, 'offset': 0, 'dtype': '<f8', 'astype': '<i2'}),
+                        BytesCodec(endian=<Endian.little: 'little'>)),
+                attributes={'GRIB_id': 11,
+                            'GRIB_name': 'TMP',
+                            'actual_range': [185.16000366210938,
+                                             322.1000061035156],
+                            'dataset': 'NMC Reanalysis',
+                            'level_desc': 'Surface',
+                            'long_name': '4xDaily Air temperature at sigma '
+                                         'level 995',
+                            'parent_stat': 'Other',
+                            'precision': 2,
+                            'statistic': 'Individual Obs',
+                            'units': 'degK',
+                            'var_desc': 'Air temperature'},
+                dimension_names=None,
+                zarr_format=3,
+                node_type='array',
+                storage_transformers=())
 ```
 
 A `ManifestArray` can therefore be thought of as a virtualized representation of a single Zarr array.
@@ -160,12 +184,15 @@ import numpy as np
 concatenated = np.concatenate([marr, marr], axis=0)
 concatenated
 ```
+
 ```
 ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
 ```
+
 ```python
 concatenated.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
  '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
@@ -174,7 +201,7 @@ concatenated.manifest.dict()
 This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
 
 ```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/TomNicholas/VirtualiZarr/issues/5).
+As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5).
 ```
 
 Remember that you cannot load values from a `ManifestArray` directly.
@@ -182,6 +209,7 @@ Remember that you cannot load values from a `ManifestArray` directly.
 ```python
 vds['air'].values
 ```
+
 ```python
 NotImplementedError: ManifestArrays can't be converted into numpy arrays or pandas Index objects
 ```
@@ -189,7 +217,7 @@ NotImplementedError: ManifestArrays can't be converted into numpy arrays or pand
 The whole point is to manipulate references to the data without actually loading any data.
 
 ```{note}
-You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/TomNicholas/VirtualiZarr/issues/51)).
+You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
 ```
 
 ## Virtual Datasets as Zarr Groups
@@ -207,6 +235,7 @@ Whilst the values of virtual variables (i.e. those backed by `ManifestArray` obj
 ```python
 vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
 ```
+
 ```python
 <xarray.Dataset> Size: 31MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -223,13 +252,23 @@ Attributes:
     references:   http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanaly...
     title:        4x daily NMC reanalysis (1948)
 ```
+
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
 
 Loading variables can be useful in a few scenarios:
+
 1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. You want in-memory indexes to use with ``xr.combine_by_coords``,
-3. Storing a variable on-disk as a set of references would be inefficient, e.g. because each chunk is very small (saving the values like this is similar to kerchunk's concept of "inlining" data),
-4. The variable has complicated encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding.
+2. You want in-memory indexes to use with `xr.combine_by_coords`,
+3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
+4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
+5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data).
+
+### Loading low-dimensional coordinates
+
+In general, it is recommended to load all of your low-dimensional coordinates.
+This will slow down your initial opening of the individual virtual datasets, but by loading your coordinates into memory, they can be inlined in the reference file for fast reads of the virtualized store.
+However, doing this for coordinates that are N-dimensional might use a lot of storage duplicating them.
+Also, anything duplicated could become out of sync with the referenced original files, especially if not using a transactional storage engine like `Icechunk`.
 
 ### CF-encoded time variables
 
@@ -242,6 +281,7 @@ vds = open_virtual_dataset(
     decode_times=True,
 )
 ```
+
 ```python
 <xarray.Dataset> Size: 31MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -292,6 +332,7 @@ As we know the correct order a priori, we can just combine along one dimension u
 combined_vds = xr.concat([vds1, vds2], dim='time', coords='minimal', compat='override')
 combined_vds
 ```
+
 ```
 <xarray.Dataset> Size: 8MB
 Dimensions:  (time: 2920, lat: 25, lon: 53)
@@ -314,6 +355,7 @@ We can see that the resulting combined manifest has two chunks, as expected.
 ```python
 combined_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
@@ -332,20 +374,6 @@ combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'], coords='mini
 In N-dimensions the datasets would need to be passed as an N-deep nested list-of-lists, see the [xarray docs](https://docs.xarray.dev/en/stable/user-guide/combining.html#combining-along-multiple-dimensions).
 
 ```{note}
-In future we would like for it to be possible to just use `xr.open_mfdataset` to open the files and combine them in one go, e.g.
-
-    vds = xr.open_mfdataset(
-        ['air1.nc', 'air2.nc'],
-        combine='nested',
-        concat_dim=['time'],
-        coords='minimal',
-        compat='override',
-    )
-
-but this requires some [upstream changes](https://github.com/TomNicholas/VirtualiZarr/issues/35) in xarray.
-```
-
-```{note}
 For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. Without indexes we can avoid loading any data whatsoever from the files. However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 
 By default indexes are created for 1-dimensional ``loadable_variables`` whose name matches their only dimension (i.e. "dimension coordinates"), but if you wish you can load variables without creating any indexes by passing ``indexes={}`` to ``open_virtual_dataset``.
@@ -362,11 +390,12 @@ vds2 = open_virtual_dataset('air2.nc', loadable_variables=['time', 'lat', 'lon']
 combined_vds = xr.combine_by_coords([vds2, vds1], coords='minimal', compat='override')
 ```
 
-Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional ``time`` coordinate has ascending values:
+Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional `time` coordinate has ascending values:
 
 ```python
 combined_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'file:///work/data/air1.nc', 'offset': 15419, 'length': 3869000},
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
@@ -374,7 +403,7 @@ combined_vds['air'].data.manifest.dict()
 
 ### Ordering using metadata
 
-TODO: Use preprocess to create a new index from the metadata. Requires ``open_virtual_mfdataset`` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
+TODO: Use preprocess to create a new index from the metadata. Requires `open_virtual_mfdataset` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
 
 ## Writing virtual stores to disk
 
@@ -418,45 +447,36 @@ By default references are placed in separate parquet file when the total number 
 
 ### Writing to an Icechunk Store
 
-We can also write these references out as an [IcechunkStore](https://icechunk.io/). `Icechunk` is a Open-source, cloud-native transactional tensor storage engine that is compatible with zarr version 3. To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`vds.virtualize.to_icechunk <virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
+We can also write these references out as an [IcechunkStore](https://icechunk.io/). `Icechunk` is an open-source, cloud-native transactional tensor storage engine that is compatible with Zarr version 3. To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`vds.virtualize.to_icechunk <virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
 
 ```python
-# create an icechunk store
-from icechunk import IcechunkStore, StorageConfig, StoreConfig, VirtualRefConfig
-storage = StorageConfig.filesystem(str('combined'))
-store = IcechunkStore.create(storage=storage, mode="w", config=StoreConfig(
-    virtual_ref_config=VirtualRefConfig.s3_anonymous(region='us-east-1'),
-))
+# create an icechunk repository, session and write the virtual dataset to the session
+import icechunk
+storage = icechunk.local_filesystem_storage("./local/icechunk/store")
 
-combined_vds.virtualize.to_icechunk(store)
+# By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
+repo = icechunk.Repository.create(storage)
+session = repo.writable_session("main")
+
+# write the virtual dataset to the session with the IcechunkStore
+vds1.virtualize.to_icechunk(session.store)
+session.commit("Wrote first dataset")
+```
+
+#### Append to an existing Icechunk Store
+
+You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument. This is especially useful for datasets that grow over time. Note that Zarr does not currently support concatenating datasets with different codecs or chunk shapes.
+
+```python
+session = repo.writeable_session("main")
+
+# write the virtual dataset to the session with the IcechunkStore
+vds2.virtualize.to_icechunk(session.store, append_dim="time")
+session.commit("Appended second dataset")
 ```
 
 See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr) for more details.
-
-### Writing as Zarr
-
-Alternatively, we can write these references out as an actual Zarr store, at least one that is compliant with the [proposed "Chunk Manifest" ZEP](https://github.com/zarr-developers/zarr-specs/issues/287). To do this we simply use the {py:meth}`vds.virtualize.to_zarr <virtualizarr.VirtualiZarrDatasetAccessor.to_zarr>` accessor method.
-
-```python
-combined_vds.virtualize.to_zarr('combined.zarr')
-```
-
-The result is a zarr v3 store on disk which contains the chunk manifest information written out as `manifest.json` files, so the store looks like this:
-
-```
-combined/zarr.json  <- group metadata
-combined/air/zarr.json  <- array metadata
-combined/air/manifest.json <- array manifest
-...
-```
-
-The advantage of this format is that any zarr v3 reader that understands the chunk manifest ZEP could read from this store, no matter what language it is written in (e.g. via `zarr-python`, `zarr-js`, or rust). This reading would also not require `fsspec`.
-
-```{note}
-Currently there are not yet any zarr v3 readers which understand the chunk manifest ZEP, so until then this feature cannot be used for data processing.
-
-This store can however be read by {py:func}`~virtualizarr.open_virtual_dataset`, by passing `filetype="zarr_v3"`.
-```
+icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr
 
 ## Opening Kerchunk references as virtual datasets
 
@@ -468,9 +488,9 @@ vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
 
-One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the ``fsspec`` filesystem which the filepath was defined relative to.
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as icechunk's format) is that paths in kerchunk references can be relative paths. Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the `fsspec` filesystem which the filepath was defined relative to.
 
-You can dis-ambuiguate kerchunk references containing relative paths by passing the ``fs_root`` kwarg to ``virtual_backend_kwargs``.
+You can dis-ambuiguate kerchunk references containing relative paths by passing the `fs_root` kwarg to `virtual_backend_kwargs`.
 
 ```python
 # file `relative_refs.json` contains a path like './file.nc'
@@ -484,7 +504,7 @@ vds = open_virtual_dataset(
 # the path in the virtual dataset will now be 'file:///some_directory/file.nc'
 ```
 
-Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the ``kerchunk`` library alone.
+Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.
 
 ## Rewriting existing manifests
 
@@ -505,10 +525,12 @@ def local_to_s3_url(old_local_path: str) -> str:
     filename = Path(old_local_path).name
     return str(new_s3_bucket_url / filename)
 ```
+
 ```python
 renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
 renamed_vds['air'].data.manifest.dict()
 ```
+
 ```
 {'0.0.0': {'path': 'http://s3.amazonaws.com/my_bucket/air.nc', 'offset': 15419, 'length': 7738000}}
 ```

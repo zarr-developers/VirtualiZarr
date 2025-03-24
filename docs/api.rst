@@ -30,7 +30,6 @@ Serialization
     :toctree: generated/
 
     VirtualiZarrDatasetAccessor.to_kerchunk
-    VirtualiZarrDatasetAccessor.to_zarr
     VirtualiZarrDatasetAccessor.to_icechunk
 
 Information

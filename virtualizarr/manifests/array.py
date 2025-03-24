@@ -2,13 +2,13 @@ import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
+from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.zarr import ZArray
 
 
 class ManifestArray:
@@ -24,27 +24,32 @@ class ManifestArray:
     """
 
     _manifest: ChunkManifest
-    _zarray: ZArray
+    _metadata: ArrayV3Metadata
 
     def __init__(
         self,
-        zarray: ZArray | dict,
+        metadata: ArrayV3Metadata | dict,
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the metadata of a zarr array and the manifest of chunks.
 
         Parameters
         ----------
-        zarray : dict or ZArray
+        metadata : dict or ArrayV3Metadata
         chunkmanifest : dict or ChunkManifest
         """
 
-        if isinstance(zarray, ZArray):
-            _zarray = zarray
+        if isinstance(metadata, ArrayV3Metadata):
+            _metadata = metadata
         else:
             # try unpacking the dict
-            _zarray = ZArray(**zarray)
+            _metadata = ArrayV3Metadata(**metadata)
+
+        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
+            raise NotImplementedError(
+                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
+            )
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
@@ -55,10 +60,10 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
-        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
+        # TODO check that the metadata shape and chunkmanifest shape are consistent with one another
         # TODO also cover the special case of scalar arrays
 
-        self._zarray = _zarray
+        self._metadata = _metadata
         self._manifest = _chunkmanifest
 
     @property
@@ -66,21 +71,27 @@ class ManifestArray:
         return self._manifest
 
     @property
-    def zarray(self) -> ZArray:
-        return self._zarray
+    def metadata(self) -> ArrayV3Metadata:
+        return self._metadata
 
     @property
     def chunks(self) -> tuple[int, ...]:
-        return tuple(self.zarray.chunks)
+        """
+        Individual chunk size by number of elements.
+        """
+        return self._metadata.chunks
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self.zarray.dtype
-        return np.dtype(dtype_str)
+        dtype_str = self.metadata.data_type
+        return dtype_str.to_numpy()
 
     @property
     def shape(self) -> tuple[int, ...]:
-        return tuple(int(length) for length in list(self.zarray.shape))
+        """
+        Array shape by number of elements along each dimension.
+        """
+        return self.metadata.shape
 
     @property
     def ndim(self) -> int:
@@ -155,7 +166,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if self.zarray != other.zarray:
+        if self.metadata != other.metadata:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:
@@ -263,7 +274,7 @@ class ManifestArray:
         ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
-        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
+        return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):

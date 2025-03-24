@@ -17,15 +17,13 @@ from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
-    HDF5VirtualBackend,
+    HDFVirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
-    ZarrV3VirtualBackend,
 )
 from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
@@ -42,11 +40,10 @@ if TYPE_CHECKING:
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
-    "zarr_v3": ZarrV3VirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
+    "hdf5": HDFVirtualBackend,
+    "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
-    "hdf5": HDF5VirtualBackend,
-    "netcdf4": HDF5VirtualBackend,  # note this is the same as for hdf5
     "netcdf3": NetCDF3VirtualBackend,
     "tiff": TIFFVirtualBackend,
     "fits": FITSVirtualBackend,
@@ -68,9 +65,7 @@ class FileType(AutoName):
     grib = auto()
     tiff = auto()
     fits = auto()
-    zarr = auto()
     dmrpp = auto()
-    zarr_v3 = auto()
     kerchunk = auto()
 
 
@@ -129,10 +124,9 @@ def open_virtual_dataset(
     decode_times: bool | None = None,
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
-    virtual_array_class=ManifestArray,
-    virtual_backend_kwargs: Optional[dict] = None,
-    reader_options: Optional[dict] = None,
-    backend: Optional[VirtualBackend] = None,
+    virtual_backend_kwargs: dict | None = None,
+    reader_options: dict | None = None,
+    backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
     Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
@@ -145,26 +139,23 @@ def open_virtual_dataset(
     ----------
     filepath : str, default None
         File path to open as a set of virtualized zarr arrays.
-    filetype : FileType, default None
+    filetype : FileType or str, default None
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
-        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'zarr_v3', 'kerchunk'}.
+        Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
     group : str, default is None
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
-        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
-        Default is to open all variables as virtual arrays (i.e. ManifestArray).
+        Variables in the file to open as lazy numpy/dask arrays instead of instances of `ManifestArray`.
+        Default is to open all variables as virtual variables (i.e. as ManifestArrays).
     decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
         To avoid creating any indexes, pass indexes={}.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     virtual_backend_kwargs: dict, default is None
         Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
     reader_options: dict, default {}
@@ -190,22 +181,22 @@ def open_virtual_dataset(
         loadable_variables,
     )
 
-    if virtual_array_class is not ManifestArray:
-        raise NotImplementedError()
-
     if reader_options is None:
         reader_options = {}
 
     if backend and filetype:
         raise ValueError("Cannot pass both a filetype and an explicit VirtualBackend")
 
-    if filetype is not None:
-        # if filetype is user defined, convert to FileType
-        filetype = FileType(filetype)
-    else:
+    if filetype is None:
         filetype = automatically_determine_filetype(
             filepath=filepath, reader_options=reader_options
         )
+    elif isinstance(filetype, str):
+        # if filetype is a user defined string, convert to FileType
+        filetype = FileType(filetype.lower())
+    elif not isinstance(filetype, FileType):
+        raise ValueError("Filetype must be a valid string or FileType")
+
     if backend:
         backend_cls = backend
     else:

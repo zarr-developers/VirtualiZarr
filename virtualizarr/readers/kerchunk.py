@@ -38,7 +38,7 @@ class KerchunkVirtualBackend(VirtualBackend):
         if group:
             raise NotImplementedError()
 
-        loadable_variables, drop_variables = check_for_collisions(
+        drop_variables, loadable_variables = check_for_collisions(
             drop_variables=drop_variables,
             loadable_variables=loadable_variables,
         )

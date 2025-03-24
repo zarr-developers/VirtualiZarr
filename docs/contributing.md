@@ -6,16 +6,51 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
-```bash
-mamba env create -f ci/environment.yml
-mamba activate virtualizarr-tests
-pre-commit install
-# git checkout -b new-feature
-python -m pip install -e . --no-deps
-python -m pytest ./virtualizarr --run-network-tests --cov=./ --cov-report=xml --verbose
+```{important}
+:name: dependencies
+We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
 ```
 
-The `--run-network-tests` argument is optional - it will run additional tests that require downloading files over the network. Skip this if you want the tests to run faster or you have no internet access.
+Run tests with the `pixi run --environment test run-tests` command. Some tests require downloading files over the network.
+Use the `run-tests-no-network` task if you want to run tests faster or have no internet access:
+
+```bash
+# Run all tests
+pixi run --environment test run-tests
+# Skip tests that require a network connection
+pixi run --environment test run-tests-no-network
+```
+
+You can also run tests in other environments:
+
+```bash
+pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
+pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
+# List which versions are installed in the `min-deps` environment
+pixi list --environment min-deps
+```
+
+Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
+coverage report locally, if you wish (CI will automatically do so).  Here are some
+examples:
+
+```bash
+pixi run --environment test run-tests-cov              # Terminal report showing missing coverage
+pixi run --environment test run-tests-html-cov         # HTML report written to htmlcov/index.html
+```
+
+Rather than using pixi tasks (essentially aliases for running commands in a given shell), you can explicitly start
+a shell within a given environment and execute `pytest` (or other commands) directly:
+
+```bash
+# Start a shell within the environment
+pixi shell --environment test
+# Run the tests
+pytest virtualizarr
+# Exit the shell
+exit
+```
+
 
 ## Contributing documentation
 
@@ -24,13 +59,14 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 ### Build the documentation locally
 
 ```bash
-mamba env create -f ci/doc.yml
-mamba activate virtualizarr-docs
-python -m pip install -e .  # From project's root - needed to generate API docs
-cd docs # From project's root
-rm -rf generated
-make clean
-make html
+pixi install --environment docs
+pixi run build-docs
+```
+Pixi can also be used to serve continuously updating version of the documentation during development at [http://0.0.0.0:8000/](http://0.0.0.0:8000/).
+This can be done by navigating to [http://0.0.0.0:8000/](http://0.0.0.0:8000/) in your browser after running:
+
+```bash
+pixi run serve-docs
 ```
 
 ### Access the documentation locally
@@ -51,5 +87,5 @@ Anyone with commit privileges to the repository can issue a release, and you sho
 8. Edit the draft release notes for consistency.
 9. Select 'Publish' to publish the release. This should automatically upload the new release to [PyPI](https://pypi.org/project/virtualizarr/) and [conda-forge](https://anaconda.org/conda-forge/virtualizarr).
 10. Check that this has run successfully (PyPI should show the new version number very quickly, but conda-forge might take several hours).
-11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future.
+11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future. See [this commit](https://github.com/zarr-developers/VirtualiZarr/commit/e3912f08e22f2e3230af6eb1a2aacb5728822fa1) for an example (you can assume the next release will be numbered `vX.Y.Z+1`, but the number doesn't actually matter).
 12. (Optional) Advertise the release on social media 📣
