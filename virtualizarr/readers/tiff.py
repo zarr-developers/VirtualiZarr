@@ -1,20 +1,19 @@
 import warnings
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.common import (
-    VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
 )
 from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.utils import check_for_collisions
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -36,10 +35,6 @@ class TIFFVirtualBackend(VirtualBackend):
 
         from kerchunk.tiff import tiff_to_zarr
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables=drop_variables, loadable_variables=loadable_variables
-        )
-
         if reader_options is None:
             reader_options = {}
 
@@ -47,6 +42,10 @@ class TIFFVirtualBackend(VirtualBackend):
         warnings.warn(
             "storage_options have been dropped from reader_options as they are not supported by kerchunk.tiff.tiff_to_zarr",
             UserWarning,
+        )
+
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
         )
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
@@ -58,25 +57,23 @@ class TIFFVirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
-        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
-            filepath,
-            loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            drop_variables=drop_variables,
-            indexes=indexes,
-            group=group,
-            decode_times=decode_times,
-        )
-
-        return construct_virtual_dataset(
+        fully_virtual_dataset = construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
-            loadable_vars=loadable_vars,
-            indexes=indexes,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        vds = replace_virtual_with_loadable_vars(
+            fully_virtual_dataset,
+            filepath,
+            group=group,
+            loadable_variables=loadable_variables,
+            reader_options=reader_options,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
+
+        return vds.drop_vars(_drop_vars)

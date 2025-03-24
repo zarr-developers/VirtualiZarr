@@ -95,8 +95,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
 
 def virtual_vars_and_metadata_from_kerchunk_refs(
     vds_refs: KerchunkStoreRefs,
-    loadable_variables,
-    drop_variables,
+    drop_variables: list[str] | None = None,
     fs_root: str | None = None,
 ) -> tuple[Mapping[str, Variable], dict[str, Any], list[str]]:
     """
@@ -104,6 +103,8 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
     Parameters
     ----------
+    drop_variables
+        Variables in the file to not bother generating chunk metadata for.
     fs_root
         The root of the fsspec filesystem on which these references were generated.
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
@@ -111,7 +112,7 @@ def virtual_vars_and_metadata_from_kerchunk_refs(
 
     virtual_vars = virtual_vars_from_kerchunk_refs(
         vds_refs,
-        drop_variables=drop_variables + loadable_variables,
+        drop_variables=drop_variables,
         fs_root=fs_root,
     )
     ds_attrs = fully_decode_arr_refs(vds_refs["refs"]).get(".zattrs", {})
@@ -261,7 +262,8 @@ def manifest_from_kerchunk_chunk_dict(
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
             raise NotImplementedError(
-                "Reading inlined reference data is currently not supported. [ToDo]"
+                "Reading inlined reference data is currently not supported."
+                "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
             )
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
