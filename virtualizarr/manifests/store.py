@@ -289,6 +289,7 @@ class ManifestStore(Store):
         key_ranges: Iterable[tuple[str, ByteRequest | None]],
     ) -> list[Buffer | None]:
         # docstring inherited
+        # TODO: Implement using private functions from the upstream Zarr obstore integration
         raise NotImplementedError
 
     async def exists(self, key: str) -> bool:
