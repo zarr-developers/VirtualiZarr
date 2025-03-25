@@ -572,10 +572,6 @@ class TestOpenVirtualMFDataset:
             dim="time",
         )
 
-        # TODO this assertion unintentially triggers loading, see issue #354
-        # xrt.assert_identical(combined_vds.coords.variables['lat'], expected_vds.coords.variables['lat'])
-
-        # TODO I have no idea why this assertion fails for all the coords - everything about the coords looks identical
         xrt.assert_identical(combined_vds, expected_vds)
 
         # test combine by coords using in-memory indexes
