@@ -124,7 +124,7 @@ dev = [
     "s3fs",
     "scipy",
     "lithops",
-    "distributed",
+    "dask",
     "virtualizarr[hdf]"
 ]
 
