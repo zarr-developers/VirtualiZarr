@@ -113,10 +113,11 @@ dev = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
-    "pytest-cov",
-    "pytest-mypy",
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mypy",
+    "pytest-xdist",
     "ruff",
     "s3fs",
 ]
@@ -161,11 +162,11 @@ rust = "*"
 # Define commands to run within the test environments
 [tool.pixi.feature.dev.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
-run-tests = { cmd = "pytest --run-network-tests --verbose" }
-run-tests-no-network = { cmd = "pytest" }
-run-tests-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
-run-tests-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-tests = { cmd = "pytest -n auto --run-network-tests --verbose" }
+run-tests-no-network = { cmd = "pytest -n auto" }
+run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
