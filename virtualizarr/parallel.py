@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional
 
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 # TODO the DaskDelayedExecutor class could ideally be upstreamed into dask
+# TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
 
 
 class SerialExecutor(Executor):
@@ -180,4 +181,107 @@ class DaskDelayedExecutor(Executor):
             Whether to wait for pending futures (always True for serial executor))
         """
         # For Dask.delayed, shutdown is essentially a no-op
+        pass
+
+
+class LithopsEagerFunctionExecutor(Executor):
+    """
+    Lithops-based function executor which follows the concurrent.futures.Executor API.
+
+    Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
+    """
+
+    def __init__(self, **kwargs):
+        import lithops
+
+        # Create Lithops client with optional configuration
+        self.lithops_client = lithops.FunctionExecutor(**kwargs)
+
+        # Track submitted futures
+        self._futures = []
+
+    def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Future:
+        """
+        Submit a task to be computed using lithops.
+
+        Parameters
+        ----------
+        fn
+            The callable to execute
+        args
+            Positional arguments for the callable
+        kwargs
+            Keyword arguments for the callable
+
+        Returns
+        -------
+        A concurrent.futures.Future representing the result of the execution
+        """
+
+        # Create a concurrent.futures Future to maintain interface compatibility
+        future = Future()
+
+        try:
+            # Submit to Lithops
+            lithops_future = self.lithops_client.call_async(fn, *args, **kwargs)
+
+            # Add a callback to set the result or exception
+            def _on_done(lithops_result):
+                try:
+                    result = lithops_result.result()
+                    future.set_result(result)
+                except Exception as e:
+                    future.set_exception(e)
+
+            # Register the callback
+            lithops_future.add_done_callback(_on_done)
+        except Exception as e:
+            # If submission fails, set exception immediately
+            future.set_exception(e)
+
+        # Track the future
+        self._futures.append(future)
+
+        return future
+
+    def map(
+        self, fn: Callable, *iterables: Any, timeout: Optional[float] = None
+    ) -> Any:
+        """
+        Apply a function to an iterable using lithops.
+
+        Only needed because lithops.FunctionExecutor.map returns futures, unlike ``concurrent.futures.Executor.map``.
+
+        Parameters
+        ----------
+        fn
+            Function to apply to each item
+        iterables
+            Iterables to process
+        timeout
+            Optional timeout (ignored in serial execution)
+
+        Returns
+        -------
+        Generator of results
+        """
+        import lithops
+
+        fexec = lithops.FunctionExecutor()
+
+        futures = fexec.map(fn, *iterables)
+        results = fexec.get_result(futures)
+
+        return results
+
+    def shutdown(self, wait: bool = True) -> None:
+        """
+        Shutdown the executor.
+
+        Parameters
+        ----------
+        wait
+            Whether to wait for pending futures.
+        """
+        # Should this call lithops .clean() method?
         pass
