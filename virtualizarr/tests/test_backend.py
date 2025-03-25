@@ -597,7 +597,9 @@ class TestOpenVirtualMFDataset:
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
-    @pytest.mark.xfail(reason="Bug in lithops where it complains __call__() method doesn't exist on func when it does exist")
+    @pytest.mark.xfail(
+        reason="Bug in lithops where it complains __call__() method doesn't exist on func when it does exist"
+    )
     @requires_lithops
     def test_lithops(self, netcdf4_files_factory, hdf_backend):
         # by default this will use the lithops LocalHost executor

@@ -1,9 +1,10 @@
-from typing import Literal, Callable, Any, Optional
 from concurrent.futures import Executor, Future
+from typing import Any, Callable, Literal, Optional
 
 import xarray as xr
 
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
+
 
 def execute(
     func: Callable[[str], xr.Dataset],
@@ -12,7 +13,7 @@ def execute(
 ) -> list[xr.Dataset]:
     """
     Map a function over a set of filepaths and execute it with one of a range of parallel executors.
-    
+
     Parameters
     ----------
     paths
@@ -44,20 +45,12 @@ def execute(
 
 def select_executor(parallel: Literal["lithops", "dask", False] | Executor) -> Executor:
     """Choose from a range of parallel executors, or pass your own."""
-    
+
     executor: Executor
     if parallel == "dask":
-        import dask
+        from dask.distributed import Client
 
-        # TODO what is the dask executor?
-        executor = ...
-        raise NotImplementedError
-
-        # # wrap the open_dataset, getattr, and preprocess with delayed
-        # open_ = dask.delayed(open_virtual_dataset)
-        # getattr_ = dask.delayed(getattr)
-        # if preprocess is not None:
-        #     preprocess = dask.delayed(preprocess)
+        executor = Client
     elif parallel == "lithops":
         import lithops
 
@@ -71,18 +64,19 @@ def select_executor(parallel: Literal["lithops", "dask", False] | Executor) -> E
         # TODO change the default to use a ThreadPoolExecutor instead?
     else:
         raise ValueError(
-            f"Unrecognized option for ``parallel`` kwarg to ``open_mfdatset``: {parallel}."
+            f"Unrecognized option for ``parallel`` kwarg to ``open_virtual_mfdataset``: {parallel}."
             "Expected one of ``'dask'``, ``'lithops'``, ``False``, or an instance of a subclass of ``concurrent.futures.Executor``."
         )
-    
+
     return executor
 
 
 class SerialExecutor(Executor):
     """
-    A custom Executor that runs tasks sequentially, mimicking the 
-    concurrent.futures.Executor interface.
+    A custom Executor that runs tasks sequentially, mimicking the
+    concurrent.futures.Executor interface. Useful as a default and for debugging.
     """
+
     def __init__(self):
         # Track submitted futures to maintain interface compatibility
         self._futures = []
@@ -92,7 +86,7 @@ class SerialExecutor(Executor):
         Submit a callable to be executed.
 
         Unlike parallel executors, this runs the task immediately and sequentially.
-        
+
         Parameters
         ----------
         fn
@@ -101,33 +95,35 @@ class SerialExecutor(Executor):
             Positional arguments for the callable
         kwargs
             Keyword arguments for the callable
-        
+
         Returns
         -------
         A Future representing the result of the execution
         """
         # Create a future to maintain interface compatibility
         future = Future()
-        
+
         try:
             # Execute the function immediately
             result = fn(*args, **kwargs)
-            
+
             # Set the result of the future
             future.set_result(result)
         except Exception as e:
             # If an exception occurs, set it on the future
             future.set_exception(e)
-        
+
         # Keep track of futures for potential cleanup
         self._futures.append(future)
-        
+
         return future
 
-    def map(self, fn: Callable, *iterables: Any, timeout: Optional[float] = None) -> Any:
+    def map(
+        self, fn: Callable, *iterables: Any, timeout: Optional[float] = None
+    ) -> Any:
         """
         Execute a function over an iterable sequentially.
-        
+
         Parameters
         ----------
         fn
@@ -136,7 +132,7 @@ class SerialExecutor(Executor):
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
-        
+
         Returns
         -------
         Generator of results
@@ -146,7 +142,7 @@ class SerialExecutor(Executor):
     def shutdown(self, wait: bool = True) -> None:
         """
         Shutdown the executor.
-        
+
         Parameters
         ----------
         wait
@@ -154,4 +150,3 @@ class SerialExecutor(Executor):
         """
         # In a serial executor, shutdown is a no-op
         pass
-

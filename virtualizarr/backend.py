@@ -296,7 +296,7 @@ def open_virtual_mfdataset(
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?
 
-    # TODO list kwargs passed to open_virtual_dataset explicitly?
+    # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
     paths = _find_absolute_paths(paths)
 
@@ -304,6 +304,7 @@ def open_virtual_mfdataset(
         raise OSError("no files to open")
 
     if preprocess:
+        # TODO
         raise NotImplementedError
 
     paths1d: list[str]
