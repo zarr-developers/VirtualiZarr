@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,10 +22,8 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
     parametrize_over_hdf_backends,
-    requires_dask,
     requires_hdf5plugin,
     requires_imagecodecs,
-    requires_lithops,
     requires_network,
     requires_s3fs,
     requires_scipy,
@@ -506,12 +505,22 @@ class TestLoadVirtualDataset:
             assert vds.scalar.attrs == {"scalar": "true"}
 
 
-# TODO consolidate these by parameterizing over parallel kwarg once they all work
 @requires_hdf5plugin
 @requires_imagecodecs
 @parametrize_over_hdf_backends
+@pytest.mark.parametrize(
+    "parallel",
+    [
+        False,
+        ThreadPoolExecutor,
+        # pytest.param(DaskDelayedExecutor, marks=requires_dask),
+        # pytest.param(DaskDistributedExecutor, marks=requires_dask_distributed),
+        # TODO use lithops.RetryingFunctionExecutor instead?
+        # pytest.param(LithopsExecutor, marks=requires_lithops),
+    ],
+)
 class TestOpenVirtualMFDataset:
-    def test_serial(self, netcdf4_files_factory, hdf_backend):
+    def test_parallel_open(self, netcdf4_files_factory, hdf_backend, parallel):
         filepath1, filepath2 = netcdf4_files_factory()
 
         # test combine nested without in-memory indexes
@@ -520,7 +529,7 @@ class TestOpenVirtualMFDataset:
             combine="nested",
             concat_dim="time",
             backend=hdf_backend,
-            parallel=False,
+            parallel=parallel,
         )
         vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
@@ -532,7 +541,7 @@ class TestOpenVirtualMFDataset:
             [filepath1, filepath2],
             combine="by_coords",
             backend=hdf_backend,
-            parallel=False,
+            parallel=parallel,
         )
         vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
@@ -548,101 +557,6 @@ class TestOpenVirtualMFDataset:
             file_glob,
             combine="by_coords",
             backend=hdf_backend,
-            parallel=False,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-    @requires_dask
-    def test_dask(self, netcdf4_files_factory, hdf_backend):
-        filepath1, filepath2 = netcdf4_files_factory()
-
-        # test combine nested without in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            combine="nested",
-            concat_dim="time",
-            parallel="dask",
-            backend=hdf_backend,
-        )
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
-        expected_vds = xr.concat(
-            [vds1, vds2],
-            dim="time",
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        # test combine by coords using in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            combine="by_coords",
-            parallel="dask",
-            backend=hdf_backend,
-        )
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
-        expected_vds = xr.concat(
-            [vds1, vds2],
-            dim="time",
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        # test combine by coords again using in-memory indexes but for a glob
-        file_glob = Path(filepath1).parent.glob("air*.nc")
-        combined_vds = open_virtual_mfdataset(
-            file_glob,
-            combine="by_coords",
-            parallel="dask",
-            backend=hdf_backend,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-    @pytest.mark.xfail(
-        reason="Bug in lithops where it complains __call__() method doesn't exist on func when it does exist"
-    )
-    @requires_lithops
-    def test_lithops(self, netcdf4_files_factory, hdf_backend):
-        # by default this will use the lithops LocalHost executor
-
-        filepath1, filepath2 = netcdf4_files_factory()
-
-        # test combine nested without in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            combine="nested",
-            concat_dim="time",
-            parallel="lithops",
-            backend=hdf_backend,
-        )
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
-        expected_vds = xr.concat(
-            [vds1, vds2],
-            dim="time",
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        # test combine by coords using in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            combine="by_coords",
-            parallel="lithops",
-            backend=hdf_backend,
-        )
-        vds1 = open_virtual_dataset(filepath1)
-        vds2 = open_virtual_dataset(filepath2)
-        expected_vds = xr.concat(
-            [vds1, vds2],
-            dim="time",
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        # test combine by coords again using in-memory indexes but for a glob
-        file_glob = Path(filepath1).parent.glob("air*.nc")
-        combined_vds = open_virtual_mfdataset(
-            file_glob,
-            combine="by_coords",
-            parallel="lithops",
-            backend=hdf_backend,
+            parallel=parallel,
         )
         xrt.assert_identical(combined_vds, expected_vds)

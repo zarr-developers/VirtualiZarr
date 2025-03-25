@@ -1,49 +1,10 @@
 from concurrent.futures import Executor, Future
 from typing import Any, Callable, Literal, Optional
 
-import xarray as xr
-
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 
 
-def execute(
-    func: Callable[[str], xr.Dataset],
-    paths: list[str],
-    parallel: Literal["lithops", "dask", False] | Executor,
-) -> list[xr.Dataset]:
-    """
-    Map a function over a set of filepaths and execute it with one of a range of parallel executors.
-
-    Parameters
-    ----------
-    paths
-    func
-    parallel
-        Choice of how to parallelize execution. Passing False
-    """
-    executor: Executor = select_executor(parallel=parallel)
-
-    # wait for all the serverless workers to finish, and send their resulting virtual datasets back to the client
-    with executor() as exec:
-        results = list(exec.map(func, paths))
-
-    # if parallel == "dask":
-    #     virtual_datasets = [open_(p, **kwargs) for p in paths1d]
-    #     closers = [getattr_(ds, "_close") for ds in virtual_datasets]
-    #     if preprocess is not None:
-    #         virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
-
-    #     # calling compute here will return the datasets/file_objs lists,
-    #     # the underlying datasets will still be stored as dask arrays
-    #     virtual_datasets, closers = dask.compute(virtual_datasets, closers)
-    # elif parallel == "lithops":
-
-    # TODO add file closers
-
-    return results
-
-
-def select_executor(parallel: Literal["lithops", "dask", False] | Executor) -> Executor:
+def get_executor(parallel: Literal[False] | Executor) -> Executor:
     """Choose from a range of parallel executors, or pass your own."""
 
     executor: Executor
@@ -63,10 +24,7 @@ def select_executor(parallel: Literal["lithops", "dask", False] | Executor) -> E
         executor = SerialExecutor
         # TODO change the default to use a ThreadPoolExecutor instead?
     else:
-        raise ValueError(
-            f"Unrecognized option for ``parallel`` kwarg to ``open_virtual_mfdataset``: {parallel}."
-            "Expected one of ``'dask'``, ``'lithops'``, ``False``, or an instance of a subclass of ``concurrent.futures.Executor``."
-        )
+        raise ValueError(f"Unrecognized option for ``parallel`` kwarg: {parallel}.")
 
     return executor
 

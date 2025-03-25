@@ -19,7 +19,7 @@ from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.parallel import execute
+from virtualizarr.parallel import SerialExecutor
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -238,7 +238,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["lithops", "dask", False] | Executor = False,
+    parallel: Literal[False] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -329,11 +329,17 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    virtual_datasets = execute(
-        func=functools.partial(open_virtual_dataset, **kwargs),
-        paths=paths1d,
-        parallel=parallel,
-    )
+    executor: Executor = SerialExecutor if parallel is False else parallel
+    with executor() as exec:
+        # wait for all the workers to finish, and send their resulting virtual datasets back to the client
+        virtual_datasets = list(
+            exec.map(
+                functools.partial(open_virtual_dataset, **kwargs),
+                paths1d,
+            )
+        )
+
+    # TODO add file closers
 
     # Combine all datasets, closing them in case of a ValueError
     try:
