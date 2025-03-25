@@ -13,7 +13,7 @@ class ManifestGroup:
     """
 
     # TODO: Consider refactoring according to https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2007805272
-    _manifest_arrays: ManifestArrayVariableMapping
+    _manifest_arrays: Mapping[str, ManifestArray]
     _metadata: GroupMetadata
 
     def __init__(
@@ -35,5 +35,5 @@ class ManifestGroup:
 
     def __str__(self) -> str:
         return (
-            f"ManifestArrayVariableMapping({self._manifest_arrays}, {self._metadata})"
+            f"ManifestGroup(manifest_arrays={self._manifest_arrays}, metadata={self._metadata})"
         )
