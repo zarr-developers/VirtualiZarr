@@ -1,32 +1,7 @@
 from concurrent.futures import Executor, Future
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Optional
 
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
-
-
-def get_executor(parallel: Literal[False] | Executor) -> Executor:
-    """Choose from a range of parallel executors, or pass your own."""
-
-    executor: Executor
-    if parallel == "dask":
-        from dask.distributed import Client
-
-        executor = Client
-    elif parallel == "lithops":
-        import lithops
-
-        # TODO use RetryingFunctionExecutor instead?
-        # TODO what's the easiest way to pass the lithops config in?
-        executor = lithops.FunctionExecutor
-    elif isinstance(parallel, Executor):
-        executor = parallel
-    elif parallel is False:
-        executor = SerialExecutor
-        # TODO change the default to use a ThreadPoolExecutor instead?
-    else:
-        raise ValueError(f"Unrecognized option for ``parallel`` kwarg: {parallel}.")
-
-    return executor
 
 
 class SerialExecutor(Executor):
