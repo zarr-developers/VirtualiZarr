@@ -86,6 +86,7 @@ def automatically_determine_filetype(
     # TODO this should ideally handle every filetype that we have a reader for, not just kerchunk
 
     # TODO how do we handle kerchunk json / parquet here?
+    print(f"{filepath=}")
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
@@ -270,10 +271,11 @@ def open_virtual_mfdataset(
         Same as in xarray.open_mfdataset
     combine
         Same as in xarray.open_mfdataset
-    parallel : 'dask', 'lithops', or False
+    parallel : instance of a subclass of ``concurrent.futures.Executor``, or False
         Specify whether the open and preprocess steps of this function will be
-        performed in parallel using ``dask.delayed``, in parallel using ``lithops.map``, or in serial.
-        Default is False.
+        performed in parallel using any executor compatible with the ``concurrent.futures`` interface
+        (such as those provided by Lithops), or in serial.
+        Default is False, which will execute these steps in serial.
     join
         Same as in xarray.open_mfdataset
     attrs_file
@@ -331,7 +333,7 @@ def open_virtual_mfdataset(
 
     executor: Executor = SerialExecutor if parallel is False else parallel
     with executor() as exec:
-        # wait for all the workers to finish, and send their resulting virtual datasets back to the client
+        # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
                 functools.partial(open_virtual_dataset, **kwargs),
