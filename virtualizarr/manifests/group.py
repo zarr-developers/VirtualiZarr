@@ -34,6 +34,4 @@ class ManifestGroup:
         self._manifest_arrays = manifest_arrays
 
     def __str__(self) -> str:
-        return (
-            f"ManifestGroup(manifest_arrays={self._manifest_arrays}, metadata={self._metadata})"
-        )
+        return f"ManifestGroup(manifest_arrays={self._manifest_arrays}, metadata={self._metadata})"
