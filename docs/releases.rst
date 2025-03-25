@@ -9,6 +9,8 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added experimental ManifestStore (:pull:`490`).
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
