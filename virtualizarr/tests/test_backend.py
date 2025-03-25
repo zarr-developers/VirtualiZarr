@@ -21,6 +21,7 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
     parametrize_over_hdf_backends,
+    requires_dask,
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_lithops,
@@ -548,8 +549,50 @@ class TestOpenVirtualMFDataset:
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
-    # @requires_dask
-    def test_dask(self, netcdf4_files_factory, hdf_backend): ...
+    @requires_dask
+    def test_dask(self, netcdf4_files_factory, hdf_backend):
+        filepath1, filepath2 = netcdf4_files_factory()
+
+        # test combine nested without in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="nested",
+            concat_dim="time",
+            parallel="dask",
+            backend=hdf_backend,
+        )
+        vds1 = open_virtual_dataset(filepath1)
+        vds2 = open_virtual_dataset(filepath2)
+        expected_vds = xr.concat(
+            [vds1, vds2],
+            dim="time",
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords using in-memory indexes
+        combined_vds = open_virtual_mfdataset(
+            [filepath1, filepath2],
+            combine="by_coords",
+            parallel="dask",
+            backend=hdf_backend,
+        )
+        vds1 = open_virtual_dataset(filepath1)
+        vds2 = open_virtual_dataset(filepath2)
+        expected_vds = xr.concat(
+            [vds1, vds2],
+            dim="time",
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
+
+        # test combine by coords again using in-memory indexes but for a glob
+        file_glob = Path(filepath1).parent.glob("air*.nc")
+        combined_vds = open_virtual_mfdataset(
+            file_glob,
+            combine="by_coords",
+            parallel="dask",
+            backend=hdf_backend,
+        )
+        xrt.assert_identical(combined_vds, expected_vds)
 
     @requires_lithops
     def test_lithops(self, netcdf4_files_factory, hdf_backend):
@@ -571,7 +614,6 @@ class TestOpenVirtualMFDataset:
             [vds1, vds2],
             dim="time",
         )
-
         xrt.assert_identical(combined_vds, expected_vds)
 
         # test combine by coords using in-memory indexes
