@@ -3,9 +3,9 @@ import pandas as pd
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
+from virtualizarr.tests.conftest import ARRAYBYTES_CODEC
 from virtualizarr.utils import convert_v3_to_v2_metadata
 
 

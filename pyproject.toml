@@ -109,6 +109,8 @@ docs = [
 ]
 dev = [
     "codecov",
+    "docker",
+    "minio",
     "mypy",
     "pandas-stubs",
     "pooch",
@@ -161,11 +163,11 @@ rust = "*"
 # Define commands to run within the test environments
 [tool.pixi.feature.dev.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
-run-tests = { cmd = "pytest --run-network-tests --verbose" }
+run-tests = { cmd = "pytest --run-network-tests --run-minio-tests --verbose" }
 run-tests-no-network = { cmd = "pytest" }
-run-tests-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
-run-tests-html-cov = { cmd = "pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-tests-cov = { cmd = "pytest --run-network-tests --run-minio-tests --verbose --cov=virtualizarr --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest --run-network-tests --run-minio-tests --verbose --cov=virtualizarr --cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest --run-network-tests --run-minio-tests --verbose --cov=virtualizarr --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
@@ -284,4 +286,5 @@ markers = [
     # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
     "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
+    "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
 ]
