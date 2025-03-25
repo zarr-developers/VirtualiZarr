@@ -17,7 +17,7 @@ from virtualizarr.backend import (
     automatically_determine_filetype,
 )
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.parallel import DaskDelayedExecutor
+from virtualizarr.parallel import DaskDelayedExecutor, LithopsEagerFunctionExecutor
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
@@ -31,14 +31,6 @@ from virtualizarr.tests import (
     requires_s3fs,
     requires_scipy,
 )
-
-try:
-    # TODO use lithops.RetryingFunctionExecutor instead?
-    from lithops import FunctionExecutor as LithopsFunctionExecutor
-except ImportError:
-
-    class LithopsFunctionExecutor:
-        pass
 
 
 @requires_scipy
@@ -526,7 +518,7 @@ class TestLoadVirtualDataset:
         ThreadPoolExecutor,
         pytest.param(DaskDelayedExecutor, marks=requires_dask),
         pytest.param(
-            LithopsFunctionExecutor,
+            LithopsEagerFunctionExecutor,
             marks=[
                 requires_lithops,
                 pytest.mark.xfail(
