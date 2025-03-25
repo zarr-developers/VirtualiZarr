@@ -24,10 +24,19 @@ from virtualizarr.tests import (
     parametrize_over_hdf_backends,
     requires_hdf5plugin,
     requires_imagecodecs,
+    requires_lithops,
     requires_network,
     requires_s3fs,
     requires_scipy,
 )
+
+try:
+    # TODO use lithops.RetryingFunctionExecutor instead?
+    from lithops import FunctionExecutor as LithopsFunctionExecutor
+except ImportError:
+
+    class LithopsFunctionExecutor:
+        pass
 
 
 @requires_scipy
@@ -515,8 +524,15 @@ class TestLoadVirtualDataset:
         ThreadPoolExecutor,
         # pytest.param(DaskDelayedExecutor, marks=requires_dask),
         # pytest.param(DaskDistributedExecutor, marks=requires_dask_distributed),
-        # TODO use lithops.RetryingFunctionExecutor instead?
-        # pytest.param(LithopsExecutor, marks=requires_lithops),
+        pytest.param(
+            LithopsFunctionExecutor,
+            marks=[
+                requires_lithops,
+                pytest.mark.xfail(
+                    reason="Lithops bug where it incorrectly complains that the __call__() method is not defined"
+                ),
+            ],
+        ),
     ],
 )
 class TestOpenVirtualMFDataset:
