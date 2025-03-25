@@ -14,7 +14,6 @@ from typing import (
     TypeVar,
 )
 
-import numpy as np
 from xarray import Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -57,39 +56,39 @@ async def _concurrent_map(
         )
 
 
-async def build_chunk_manifest(
+async def get_chunk_mapping_prefix(
     zarr_array: zarr.AsyncArray, prefix: str, filepath: str
+) -> dict:
+    """Create a dictionary to pass into ChunkManifest __init__"""
+
+    # TODO: For when we want to support reading V2 we should parse the /c/ piece of the path differantly.
+    prefix = zarr_array.name + "/c/"
+    prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+    _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+    dict_keys = [x[0].split(prefix)[1].replace("/", ".") for x in prefix_keys]
+
+    _paths = [filepath] * len(_lengths)
+    _offsets = [0] * len(_lengths)
+
+    return {
+        key: {"path": path, "offset": offset, "length": length}
+        for key, path, offset, length in zip(
+            dict_keys,
+            _paths,
+            _offsets,
+            _lengths,
+        )
+    }
+
+
+async def build_chunk_manifest(
+    zarr_array: zarr.AsyncArray, filepath: str
 ) -> ChunkManifest:
-    """Build a ChunkManifest with the from_arrays method"""
-
-    key_tuples = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-
-    filepath_list = [filepath] * len(key_tuples)
-
-    def combine_path_chunk(filepath: str, chunk_key: str):
-        return filepath + "/" + chunk_key
-
-    vectorized_chunk_path_combine_func = np.vectorize(
-        combine_path_chunk, otypes=[np.dtypes.StringDType()]
+    """Build a ChunkManifest from a dictionary"""
+    chunk_map = await get_chunk_mapping_prefix(
+        zarr_array, prefix=f"{zarr_array.name}/c", filepath=filepath
     )
-
-    # turn the tuples of chunks to a flattened list with :list(sum(key_tuples, ()))
-    _paths = vectorized_chunk_path_combine_func(
-        filepath_list, list(sum(key_tuples, ()))
-    )
-
-    # _offsets: np.ndarray[Any, np.dtype[np.uint64]]
-    _offsets = np.array([0] * len(_paths), dtype=np.uint64)
-
-    # _lengths: np.ndarray[Any, np.dtype[np.uint64]]
-    lengths = await _concurrent_map((key_tuples), zarr_array.store.getsize)
-    _lengths = np.array(lengths, dtype=np.uint64)
-
-    return ChunkManifest.from_arrays(
-        paths=_paths,  # type: ignore
-        offsets=_offsets,
-        lengths=_lengths,
-    )
+    return ChunkManifest(chunk_map)
 
 
 async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
@@ -141,17 +140,9 @@ async def build_zarray_metadata(zarr_array: zarr.AsyncArray[Any]):
 async def virtual_variable_from_zarr_array(
     zarr_array: zarr.AsyncArray[Any], filepath: str
 ):
-    zarr_prefix = zarr_array.basename
-
-    if zarr_array.metadata.zarr_format == 3:
-        # if we have Zarr format/version 3, we add /c/ to the chunk paths
-        zarr_prefix = f"{zarr_prefix}/c"
-
     zarray_array_dict = await build_zarray_metadata(zarr_array=zarr_array)
 
-    chunk_manifest = await build_chunk_manifest(
-        zarr_array, prefix=zarr_prefix, filepath=filepath
-    )
+    chunk_manifest = await build_chunk_manifest(zarr_array, filepath=filepath)
     manifest_array = ManifestArray(
         metadata=zarray_array_dict["zarray_array"], chunkmanifest=chunk_manifest
     )

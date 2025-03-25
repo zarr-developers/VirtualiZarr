@@ -39,7 +39,7 @@ def pytest_runtest_setup(item):
 
 def _xarray_subset():
     ds = xr.tutorial.open_dataset("air_temperature")
-    return ds.isel(time=slice(0, 10), lat=slice(0, 9), lon=slice(0, 18))
+    return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
 
 
 @pytest.fixture(params=[2, 3])

@@ -20,8 +20,6 @@ from virtualizarr.tests import requires_network
     indirect=True,
 )
 class TestOpenVirtualDatasetZarr:
-
-
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check that loadable variables works
         vds = open_virtual_dataset(
@@ -38,9 +36,9 @@ class TestOpenVirtualDatasetZarr:
         assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
-        vds = open_virtual_dataset(filepath=zarr_store, indexes={})        
-        assert '0/0/0' in vds['air'].data.manifest.dict().keys()
-        
+        vds = open_virtual_dataset(filepath=zarr_store, indexes={})
+        assert "0.0.0" in vds["air"].data.manifest.dict().keys()
+
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
         import zarr
 
@@ -67,4 +65,3 @@ class TestOpenVirtualDatasetZarr:
 
             # compare manifest array ArrayV3Metadata
             assert zg[array].metadata == vds[array].data.metadata
-
