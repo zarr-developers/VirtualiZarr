@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import Mapping, TypeAlias
 
 from zarr.core.group import GroupMetadata
 
