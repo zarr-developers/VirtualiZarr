@@ -40,6 +40,8 @@ has_tifffile, requires_tifffile = _importorskip("tifffile")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_zarr_python, requires_zarr_python = _importorskip("zarr")
+has_dask, requires_dask = _importorskip("dask")
+has_dask_distributed, requires_dask_distributed = _importorskip("distributed")
 
 parametrize_over_hdf_backends = pytest.mark.parametrize(
     "hdf_backend",

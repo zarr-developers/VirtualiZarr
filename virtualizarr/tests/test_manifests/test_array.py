@@ -95,6 +95,24 @@ class TestEquals:
     @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self): ...
 
+    def test_equals_nan_fill_value(self, array_v3_metadata):
+        # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/501
+        chunks_dict = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        metadata1 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
+        metadata2 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
+        marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest)
+        marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest)
+
+        result = marr1 == marr2
+        assert result.all()
+
 
 class TestBroadcast:
     def test_broadcast_existing_axis(self, manifest_array):

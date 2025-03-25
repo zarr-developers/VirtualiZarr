@@ -1,6 +1,8 @@
+import functools
 import os
 import warnings
 from collections.abc import Iterable, Mapping
+from concurrent.futures import Executor
 from enum import Enum, auto
 from pathlib import Path
 from typing import (
@@ -15,8 +17,9 @@ from typing import (
 
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
-from xarray.core.combine import _infer_concat_order_from_positions, _nested_combine
+from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
+from virtualizarr.parallel import SerialExecutor
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -25,8 +28,8 @@ from virtualizarr.readers import (
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
 )
-from virtualizarr.readers.common import VirtualBackend
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -129,11 +132,13 @@ def open_virtual_dataset(
     backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
-    Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
+    Open a file or store as an xarray.Dataset wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
-
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+    Some variables can be opened as loadable lazy numpy arrays. This can be controlled explicitly using the ``loadable_variables`` keyword argument.
+    By default this will be the same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+    name matches the name of their only dimension (also known as "dimension coordinates").
+    Pandas indexes will also now be created by default for these loadable variables, but this can be controlled by passing a value for the ``indexes`` keyword argument.
+    To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -175,11 +180,6 @@ def open_virtual_dataset(
             DeprecationWarning,
             stacklevel=2,
         )
-
-    drop_variables, loadable_variables = check_for_collisions(
-        drop_variables,
-        loadable_variables,
-    )
 
     if reader_options is None:
         reader_options = {}
@@ -238,7 +238,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["lithops", "dask", False] = False,
+    parallel: Literal[False] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -296,12 +296,16 @@ def open_virtual_mfdataset(
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?
 
-    # TODO list kwargs passed to open_virtual_dataset explicitly?
+    # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
     paths = _find_absolute_paths(paths)
 
     if not paths:
         raise OSError("no files to open")
+
+    if preprocess:
+        # TODO
+        raise NotImplementedError
 
     paths1d: list[str]
     if combine == "nested":
@@ -325,61 +329,17 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    if parallel == "dask":
-        import dask
-
-        # wrap the open_dataset, getattr, and preprocess with delayed
-        open_ = dask.delayed(open_virtual_dataset)
-        getattr_ = dask.delayed(getattr)
-        if preprocess is not None:
-            preprocess = dask.delayed(preprocess)
-    elif parallel == "lithops":
-        import lithops
-
-        # TODO use RetryingFunctionExecutor instead?
-        # TODO what's the easiest way to pass the lithops config in?
-        fn_exec = lithops.FunctionExecutor()
-
-        # lithops doesn't have a delayed primitive
-        open_ = open_virtual_dataset
-        # TODO I don't know how best to chain this with the getattr, or if that closing stuff is even necessary for virtual datasets
-        # getattr_ = getattr
-    elif parallel is not False:
-        raise ValueError(
-            f"{parallel} is an invalid option for the keyword argument ``parallel``"
+    executor: Executor = SerialExecutor if parallel is False else parallel
+    with executor() as exec:
+        # wait for all the workers to finish, and send their resulting virtual datasets back to the client
+        virtual_datasets = list(
+            exec.map(
+                functools.partial(open_virtual_dataset, **kwargs),
+                paths1d,
+            )
         )
-    else:
-        open_ = open_virtual_dataset
-        getattr_ = getattr
 
-    if parallel == "dask":
-        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
-        if preprocess is not None:
-            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
-
-        # calling compute here will return the datasets/file_objs lists,
-        # the underlying datasets will still be stored as dask arrays
-        virtual_datasets, closers = dask.compute(virtual_datasets, closers)
-    elif parallel == "lithops":
-
-        def generate_refs(path):
-            # allows passing the open_virtual_dataset function to lithops without evaluating it
-            vds = open_(path, **kwargs)
-            # TODO perhaps we should just load the loadable_vars here and close before returning?
-            return vds
-
-        futures = fn_exec.map(generate_refs, paths1d)
-
-        # wait for all the serverless workers to finish, and send their resulting virtual datasets back to the client
-        # TODO do we need download_results?
-        completed_futures, _ = fn_exec.wait(futures, download_results=True)
-        virtual_datasets = completed_futures.get_result()
-    elif parallel is False:
-        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
-        if preprocess is not None:
-            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
+    # TODO add file closers
 
     # Combine all datasets, closing them in case of a ValueError
     try:

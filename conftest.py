@@ -195,7 +195,7 @@ def netcdf4_virtual_dataset(netcdf4_file):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
 
-    with open_virtual_dataset(netcdf4_file, indexes={}) as ds:
+    with open_virtual_dataset(netcdf4_file, loadable_variables=[]) as ds:
         yield ds
 
 
@@ -258,7 +258,7 @@ def array_v3_metadata():
         chunks: tuple = (5, 5),
         data_type: np.dtype = np.dtype("int32"),
         codecs: list[dict] | None = None,
-        fill_value: int | None = None,
+        fill_value: int | float | None = None,
     ):
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
         return create_v3_array_metadata(

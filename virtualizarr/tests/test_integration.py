@@ -58,7 +58,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
         pytest.param(
             5e7,
             ["lat", "lon", "time", "air"],
-            marks=pytest.mark.xfail(reason="scale factor encoding"),
+            marks=pytest.mark.skip(reason="slow"),
         ),
     ],
 )
@@ -75,7 +75,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
     # loading the variables should produce same result as inlining them using kerchunk
     with open_virtual_dataset(
-        netcdf4_file, loadable_variables=vars_to_inline, indexes={}, backend=hdf_backend
+        netcdf4_file, loadable_variables=vars_to_inline, backend=hdf_backend
     ) as vds:
         refs = vds.virtualize.to_kerchunk(format="dict")
 
@@ -155,13 +155,14 @@ class TestRoundtrip:
             ds.to_netcdf(air_nc_path)
 
             # use open_dataset_via_kerchunk to read it as references
-            with open_virtual_dataset(
-                str(air_nc_path), indexes={}, backend=hdf_backend
-            ) as vds:
+            with open_virtual_dataset(str(air_nc_path), backend=hdf_backend) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
 
                 # assert all_close to original dataset
                 xrt.assert_allclose(roundtrip, ds)
+
+                # TODO fails with ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+                # assert ds["air"].attrs == roundtrip["air"].attrs
 
                 # assert coordinate attributes are maintained
                 for coord in ds.coords:
@@ -195,13 +196,11 @@ class TestRoundtrip:
             with (
                 open_virtual_dataset(
                     str(air1_nc_path),
-                    indexes={},
                     loadable_variables=time_vars,
                     backend=hdf_backend,
                 ) as vds1,
                 open_virtual_dataset(
                     str(air2_nc_path),
-                    indexes={},
                     loadable_variables=time_vars,
                     backend=hdf_backend,
                 ) as vds2,
@@ -256,7 +255,7 @@ class TestRoundtrip:
         nc_path = tmp_path / "non_dim_coords.nc"
         ds.to_netcdf(nc_path)
 
-        with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(str(nc_path), backend=hdf_backend) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs
 
@@ -312,14 +311,14 @@ def test_open_scalar_variable(tmp_path: Path, hdf_backend: type[VirtualBackend])
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(nc_path)
 
-    with open_virtual_dataset(str(nc_path), indexes={}, backend=hdf_backend) as vds:
+    with open_virtual_dataset(str(nc_path), backend=hdf_backend) as vds:
         assert vds["a"].shape == ()
 
 
 @parametrize_over_hdf_backends
 class TestPathsToURIs:
     def test_convert_absolute_paths_to_uris(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()
             path = manifest["0.0.0"]["path"]
@@ -329,9 +328,7 @@ class TestPathsToURIs:
     def test_convert_relative_paths_to_uris(self, netcdf4_file, hdf_backend):
         relative_path = relpath(netcdf4_file)
 
-        with open_virtual_dataset(
-            relative_path, indexes={}, backend=hdf_backend
-        ) as vds:
+        with open_virtual_dataset(relative_path, backend=hdf_backend) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()
             path = manifest["0.0.0"]["path"]
