@@ -187,7 +187,7 @@ class DaskDelayedExecutor(Executor):
 class LithopsEagerFunctionExecutor(Executor):
     """
     Lithops-based function executor which follows the concurrent.futures.Executor API.
-    
+
     Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
     """
 
@@ -196,7 +196,7 @@ class LithopsEagerFunctionExecutor(Executor):
 
         # Create Lithops client with optional configuration
         self.lithops_client = lithops.FunctionExecutor(**kwargs)
-        
+
         # Track submitted futures
         self._futures = []
 
@@ -217,15 +217,14 @@ class LithopsEagerFunctionExecutor(Executor):
         -------
         A concurrent.futures.Future representing the result of the execution
         """
-        import lithops
 
         # Create a concurrent.futures Future to maintain interface compatibility
         future = Future()
-        
+
         try:
             # Submit to Lithops
             lithops_future = self.lithops_client.call_async(fn, *args, **kwargs)
-            
+
             # Add a callback to set the result or exception
             def _on_done(lithops_result):
                 try:
@@ -233,16 +232,16 @@ class LithopsEagerFunctionExecutor(Executor):
                     future.set_result(result)
                 except Exception as e:
                     future.set_exception(e)
-            
+
             # Register the callback
             lithops_future.add_done_callback(_on_done)
         except Exception as e:
             # If submission fails, set exception immediately
             future.set_exception(e)
-        
+
         # Track the future
         self._futures.append(future)
-        
+
         return future
 
     def map(
