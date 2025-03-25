@@ -520,6 +520,7 @@ class TestOpenVirtualMFDataset:
             combine="nested",
             concat_dim="time",
             backend=hdf_backend,
+            parallel=False,
         )
         vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
@@ -531,6 +532,7 @@ class TestOpenVirtualMFDataset:
             [filepath1, filepath2],
             combine="by_coords",
             backend=hdf_backend,
+            parallel=False,
         )
         vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
@@ -546,6 +548,7 @@ class TestOpenVirtualMFDataset:
             file_glob,
             combine="by_coords",
             backend=hdf_backend,
+            parallel=False,
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
@@ -594,6 +597,7 @@ class TestOpenVirtualMFDataset:
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
+    @pytest.mark.xfail(reason="Bug in lithops where it complains __call__() method doesn't exist on func when it does exist")
     @requires_lithops
     def test_lithops(self, netcdf4_files_factory, hdf_backend):
         # by default this will use the lithops LocalHost executor

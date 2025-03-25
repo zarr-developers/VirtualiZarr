@@ -1,6 +1,8 @@
+import functools
 import os
 import warnings
 from collections.abc import Iterable, Mapping
+from concurrent.futures import Executor
 from enum import Enum, auto
 from pathlib import Path
 from typing import (
@@ -17,6 +19,7 @@ from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
+from virtualizarr.parallel import execute
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -235,7 +238,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["lithops", "dask", False] = False,
+    parallel: Literal["lithops", "dask", False] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -300,6 +303,9 @@ def open_virtual_mfdataset(
     if not paths:
         raise OSError("no files to open")
 
+    if preprocess:
+        raise NotImplementedError
+
     paths1d: list[str]
     if combine == "nested":
         if isinstance(concat_dim, str | DataArray) or concat_dim is None:
@@ -322,61 +328,11 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    if parallel == "dask":
-        import dask
-
-        # wrap the open_dataset, getattr, and preprocess with delayed
-        open_ = dask.delayed(open_virtual_dataset)
-        getattr_ = dask.delayed(getattr)
-        if preprocess is not None:
-            preprocess = dask.delayed(preprocess)
-    elif parallel == "lithops":
-        import lithops
-
-        # TODO use RetryingFunctionExecutor instead?
-        # TODO what's the easiest way to pass the lithops config in?
-        fn_exec = lithops.FunctionExecutor()
-
-        # lithops doesn't have a delayed primitive
-        open_ = open_virtual_dataset
-        # TODO I don't know how best to chain this with the getattr, or if that closing stuff is even necessary for virtual datasets
-        # getattr_ = getattr
-    elif parallel is not False:
-        raise ValueError(
-            f"{parallel} is an invalid option for the keyword argument ``parallel``"
-        )
-    else:
-        open_ = open_virtual_dataset
-        getattr_ = getattr
-
-    if parallel == "dask":
-        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
-        if preprocess is not None:
-            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
-
-        # calling compute here will return the datasets/file_objs lists,
-        # the underlying datasets will still be stored as dask arrays
-        virtual_datasets, closers = dask.compute(virtual_datasets, closers)
-    elif parallel == "lithops":
-
-        def generate_refs(path):
-            # allows passing the open_virtual_dataset function to lithops without evaluating it
-            vds = open_(path, **kwargs)
-            # TODO perhaps we should just load the loadable_vars here and close before returning?
-            return vds
-
-        futures = fn_exec.map(generate_refs, paths1d)
-
-        # wait for all the serverless workers to finish, and send their resulting virtual datasets back to the client
-        # TODO do we need download_results?
-        completed_futures, _ = fn_exec.wait(futures, download_results=True)
-        virtual_datasets = completed_futures.get_result()
-    elif parallel is False:
-        virtual_datasets = [open_(p, **kwargs) for p in paths1d]
-        closers = [getattr_(ds, "_close") for ds in virtual_datasets]
-        if preprocess is not None:
-            virtual_datasets = [preprocess(ds) for ds in virtual_datasets]
+    virtual_datasets = execute(
+        func=functools.partial(open_virtual_dataset, **kwargs),
+        paths=paths1d,
+        parallel=parallel,
+    )
 
     # Combine all datasets, closing them in case of a ValueError
     try:
