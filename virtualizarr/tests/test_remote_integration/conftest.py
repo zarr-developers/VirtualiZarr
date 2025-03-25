@@ -2,7 +2,10 @@ import time
 
 import pytest
 
+from virtualizarr.tests import requires_minio
 
+
+@requires_minio
 @pytest.fixture(scope="session")
 def container():
     import docker
@@ -32,6 +35,7 @@ def container():
     minio_container.remove()
 
 
+@requires_minio
 @pytest.fixture(scope="session")
 def minio_bucket(container):
     # Setup with guidance from https://medium.com/@sant1/using-minio-with-docker-and-python-cbbad397cb5d

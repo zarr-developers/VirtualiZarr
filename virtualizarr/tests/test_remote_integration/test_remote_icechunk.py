@@ -10,12 +10,15 @@ import xarray as xr
 import zarr
 from zarr.core.metadata import ArrayV3Metadata
 
+from virtualizarr.tests import requires_minio
+
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
         IcechunkStore,
     )
 
 
+@requires_minio
 @pytest.fixture(scope="function")
 def icechunk_miniostore(minio_bucket) -> "IcechunkStore":
     # Based on https://github.com/earth-mover/icechunk/blob/3374ca4968e0989b78643f57c8dda1fee0e8da2e/icechunk-python/tests/test_gc.py
@@ -40,6 +43,7 @@ def icechunk_miniostore(minio_bucket) -> "IcechunkStore":
     return session.store
 
 
+@requires_minio
 @pytest.mark.parametrize("group_path", [None, "", "/a", "a", "/a/b", "a/b", "a/b/"])
 def test_write_new_virtual_variable(
     icechunk_miniostore: "IcechunkStore",
