@@ -181,8 +181,8 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 @pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
-    expected = open_virtual_dataset(data_url, indexes={})
+    result = open_virtual_dataset(dmrpp_url, filetype="dmrpp", loadable_variables=[])
+    expected = open_virtual_dataset(data_url, loadable_variables=[])
     xr.testing.assert_identical(result, expected)
 
 
@@ -429,7 +429,7 @@ class TestRelativePaths:
         basic_dmrpp_temp_filepath: Path,
     ):
         vds = open_virtual_dataset(
-            str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
+            str(basic_dmrpp_temp_filepath), loadable_variables=[], filetype="dmrpp"
         )
         path = vds["x"].data.manifest["0"]["path"]
 
@@ -447,7 +447,7 @@ class TestRelativePaths:
         )
 
         vds = open_virtual_dataset(
-            relative_dmrpp_filepath, indexes={}, filetype="dmrpp"
+            relative_dmrpp_filepath, loadable_variables=[], filetype="dmrpp"
         )
         path = vds["x"].data.manifest["0"]["path"]
 
@@ -458,11 +458,11 @@ class TestRelativePaths:
         assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", ["mask", ["data", "mask"]])
+@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
 def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
     vds = open_virtual_dataset(
         str(basic_dmrpp_temp_filepath),
-        indexes={},
+        loadable_variables=[],
         filetype="dmrpp",
         drop_variables=drop_variables,
     )

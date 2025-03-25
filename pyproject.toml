@@ -116,6 +116,7 @@ dev = [
     "pytest-cov",
     "pytest-mypy",
     "pytest",
+    "pytest-asyncio",
     "ruff",
     "s3fs",
     "scipy",

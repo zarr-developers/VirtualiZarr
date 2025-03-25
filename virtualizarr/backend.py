@@ -25,8 +25,8 @@ from virtualizarr.readers import (
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
 )
-from virtualizarr.readers.common import VirtualBackend
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -129,11 +129,13 @@ def open_virtual_dataset(
     backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
-    Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
+    Open a file or store as an xarray.Dataset wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
-
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+    Some variables can be opened as loadable lazy numpy arrays. This can be controlled explicitly using the ``loadable_variables`` keyword argument.
+    By default this will be the same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+    name matches the name of their only dimension (also known as "dimension coordinates").
+    Pandas indexes will also now be created by default for these loadable variables, but this can be controlled by passing a value for the ``indexes`` keyword argument.
+    To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -175,11 +177,6 @@ def open_virtual_dataset(
             DeprecationWarning,
             stacklevel=2,
         )
-
-    drop_variables, loadable_variables = check_for_collisions(
-        drop_variables,
-        loadable_variables,
-    )
 
     if reader_options is None:
         reader_options = {}

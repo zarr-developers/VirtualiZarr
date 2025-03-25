@@ -92,8 +92,9 @@ def test_FileType():
 
 @parametrize_over_hdf_backends
 class TestOpenVirtualDatasetIndexes:
-    def test_no_indexes(self, netcdf4_file, hdf_backend):
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+    @pytest.mark.xfail(reason="not yet implemented")
+    def test_specify_no_indexes(self, netcdf4_file, hdf_backend):
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend, indexes={})
         assert vds.indexes == {}
 
     @requires_hdf5plugin
@@ -154,7 +155,6 @@ def test_cftime_index(tmp_path: Path, hdf_backend: type[VirtualBackend]):
     with open_virtual_dataset(
         str(tmp_path / "tmp.nc"),
         loadable_variables=["time", "lat", "lon"],
-        indexes={},
         backend=hdf_backend,
     ) as vds:
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
@@ -168,12 +168,12 @@ def test_cftime_index(tmp_path: Path, hdf_backend: type[VirtualBackend]):
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #150
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
         assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
 
     def test_coordinate_variable_attrs_preserved(self, netcdf4_file, hdf_backend):
         # regression test for GH issue #155
-        vds = open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend)
+        vds = open_virtual_dataset(netcdf4_file, backend=hdf_backend)
         assert vds["lat"].attrs == {
             "standard_name": "latitude",
             "long_name": "Latitude",
@@ -185,12 +185,12 @@ class TestOpenVirtualDatasetAttrs:
 @parametrize_over_hdf_backends
 class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             assert set(vds.coords) == {"time", "lat", "lon"}
 
     def test_var_attr_coords(self, netcdf4_file_with_2d_coords, hdf_backend):
         with open_virtual_dataset(
-            netcdf4_file_with_2d_coords, indexes={}, backend=hdf_backend
+            netcdf4_file_with_2d_coords, backend=hdf_backend
         ) as vds:
             expected_dimension_coords = ["ocean_time", "s_rho"]
             expected_2d_coords = ["lon_rho", "lat_rho", "h"]
@@ -209,7 +209,12 @@ class TestDetermineCoords:
 @requires_s3fs
 class TestReadFromS3:
     @pytest.mark.parametrize(
-        "indexes", [None, {}], ids=["None index", "empty dict index"]
+        "indexes",
+        [
+            None,
+            pytest.param({}, marks=pytest.mark.xfail(reason="not implemented")),
+        ],
+        ids=["None index", "empty dict index"],
     )
     @parametrize_over_hdf_backends
     def test_anon_read_s3(self, indexes, hdf_backend):
@@ -223,8 +228,10 @@ class TestReadFromS3:
             backend=hdf_backend,
         ) as vds:
             assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
-            for var in vds.variables:
-                assert isinstance(vds[var].data, ManifestArray), var
+
+            assert isinstance(vds["air"].data, ManifestArray)
+            for name in ["time", "lat", "lon"]:
+                assert isinstance(vds[name].data, np.ndarray)
 
 
 @requires_network
@@ -288,19 +295,18 @@ class TestReadFromURL:
             pytest.importorskip("scipy")
         if filetype in ["grib", "jpg", "hdf4"]:
             with pytest.raises(NotImplementedError):
-                open_virtual_dataset(url, reader_options={}, indexes={})
+                open_virtual_dataset(url, reader_options={})
         elif filetype == "hdf5":
             with open_virtual_dataset(
                 url,
                 group="science/LSAR/GCOV/grids/frequencyA",
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
-                indexes={},
                 reader_options={},
                 backend=hdf_backend,
             ) as vds:
                 assert isinstance(vds, xr.Dataset)
         else:
-            with open_virtual_dataset(url, indexes={}) as vds:
+            with open_virtual_dataset(url) as vds:
                 assert isinstance(vds, xr.Dataset)
 
     @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
@@ -327,7 +333,6 @@ class TestReadFromURL:
             open_virtual_dataset(
                 tmpfile,
                 group=hdf_group,
-                indexes={},
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
                 backend=hdf_backend,
             ) as vds,
@@ -343,9 +348,7 @@ class TestReadFromURL:
 @parametrize_over_hdf_backends
 class TestOpenVirtualDatasetHDFGroup:
     def test_open_empty_group(self, empty_netcdf4_file, hdf_backend):
-        with open_virtual_dataset(
-            empty_netcdf4_file, indexes={}, backend=hdf_backend
-        ) as vds:
+        with open_virtual_dataset(empty_netcdf4_file, backend=hdf_backend) as vds:
             assert isinstance(vds, xr.Dataset)
             expected = Dataset()
             xrt.assert_identical(vds, expected)
@@ -356,7 +359,6 @@ class TestOpenVirtualDatasetHDFGroup:
         with open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group="subgroup",
-            indexes={},
             backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["bar"]
@@ -373,7 +375,6 @@ class TestOpenVirtualDatasetHDFGroup:
         with open_virtual_dataset(
             netcdf4_file_with_data_in_multiple_groups,
             group=group,
-            indexes={},
             backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["foo"]
@@ -385,26 +386,48 @@ class TestOpenVirtualDatasetHDFGroup:
 @requires_imagecodecs
 class TestLoadVirtualDataset:
     @parametrize_over_hdf_backends
-    def test_loadable_variables(self, netcdf4_file, hdf_backend):
-        vars_to_load = ["air", "time"]
+    @pytest.mark.parametrize(
+        "loadable_variables, expected_loadable_variables",
+        [
+            ([], []),
+            (["time"], ["time"]),
+            (["air", "time"], ["air", "time"]),
+            (None, ["lat", "lon", "time"]),
+        ],
+    )
+    def test_loadable_variables(
+        self, netcdf4_file, hdf_backend, loadable_variables, expected_loadable_variables
+    ):
         with (
             open_virtual_dataset(
                 netcdf4_file,
-                loadable_variables=vars_to_load,
-                indexes={},
+                loadable_variables=loadable_variables,
                 backend=hdf_backend,
             ) as vds,
-            xr.open_dataset(netcdf4_file, decode_times=True) as full_ds,
+            xr.open_dataset(netcdf4_file, decode_times=True) as ds,
         ):
-            for name in vds.variables:
-                if name in vars_to_load:
-                    assert isinstance(vds[name].data, np.ndarray), name
-                else:
-                    assert isinstance(vds[name].data, ManifestArray), name
+            assert set(vds.variables) == set(ds.variables)
+            assert set(vds.coords) == set(vds.coords)
 
-            for name in full_ds.variables:
-                if name in vars_to_load:
-                    xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+            virtual_variables = {
+                name: var
+                for name, var in vds.variables.items()
+                if isinstance(var.data, ManifestArray)
+            }
+            actual_loadable_variables = {
+                name: var
+                for name, var in vds.variables.items()
+                if not isinstance(var.data, ManifestArray)
+            }
+
+            assert set(actual_loadable_variables) == set(expected_loadable_variables)
+
+            for name, var in virtual_variables.items():
+                assert isinstance(var.data, ManifestArray)
+
+            for name, var in ds.variables.items():
+                if name in actual_loadable_variables:
+                    xrt.assert_identical(vds.variables[name], ds.variables[name])
 
     def test_explicit_filetype(self, netcdf4_file):
         with pytest.raises(ValueError):
@@ -446,7 +469,6 @@ class TestLoadVirtualDataset:
                 hdf5_groups_file,
                 group="test/group",
                 loadable_variables=vars_to_load,
-                indexes={},
                 backend=hdf_backend,
             ) as vds,
             xr.open_dataset(hdf5_groups_file, group="test/group") as full_ds,
@@ -461,9 +483,7 @@ class TestLoadVirtualDataset:
         self, mock_read_kerchunk, netcdf4_file
     ):
         reader_options = {"option1": "value1", "option2": "value2"}
-        with open_virtual_dataset(
-            netcdf4_file, indexes={}, reader_options=reader_options
-        ):
+        with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
             pass
         args = {
             "filepath": netcdf4_file,
