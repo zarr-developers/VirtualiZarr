@@ -522,7 +522,7 @@ class TestLoadVirtualDataset:
             marks=[
                 requires_lithops,
                 pytest.mark.xfail(
-                    reason="Lithops bug where it incorrectly complains that the __call__() method is not defined"
+                    reason="Lithops bug - see https://github.com/lithops-cloud/lithops/issues/1428"
                 ),
             ],
         ),
@@ -568,4 +568,4 @@ class TestOpenVirtualMFDataset:
             backend=hdf_backend,
             parallel=parallel,
         )
-        xrt.assert_identical(combined_vds, expected_vds)
+        xrt.assert_identical(combined_vds, expected_vds

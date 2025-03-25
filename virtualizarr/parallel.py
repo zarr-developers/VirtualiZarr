@@ -185,7 +185,11 @@ class DaskDelayedExecutor(Executor):
 
 
 class LithopsEagerFunctionExecutor(Executor):
-    """Lithops-based function executor which follows the concurrent.futures.Executor API."""
+    """
+    Lithops-based function executor which follows the concurrent.futures.Executor API.
+    
+    Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
+    """
 
     def __init__(self, **kwargs):
         import lithops
