@@ -22,6 +22,7 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     has_astropy,
     parametrize_over_hdf_backends,
+    requires_dask_distributed,
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_lithops,
@@ -36,6 +37,14 @@ try:
 except ImportError:
 
     class LithopsFunctionExecutor:
+        pass
+
+
+try:
+    from distributed import Client as DaskDistributedExecutor
+except ImportError:
+
+    class DaskDistributedExecutor:
         pass
 
 
@@ -523,7 +532,7 @@ class TestLoadVirtualDataset:
         False,
         ThreadPoolExecutor,
         # pytest.param(DaskDelayedExecutor, marks=requires_dask),
-        # pytest.param(DaskDistributedExecutor, marks=requires_dask_distributed),
+        pytest.param(DaskDistributedExecutor, marks=requires_dask_distributed),
         pytest.param(
             LithopsFunctionExecutor,
             marks=[

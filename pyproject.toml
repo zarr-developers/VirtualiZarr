@@ -121,7 +121,8 @@ dev = [
     "s3fs",
     "scipy",
     "lithops",
-    "virtualizarr[hdf_reader]"
+    "distributed",
+    "virtualizarr[hdf]"
 ]
 
 [project.urls]
