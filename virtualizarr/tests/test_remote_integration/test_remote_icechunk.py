@@ -13,12 +13,11 @@ from zarr.core.metadata import ArrayV3Metadata
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
         IcechunkStore,
-        Storage,
     )
 
 
 @pytest.fixture(scope="function")
-def icechunk_miniostore(minio_bucket) -> "Storage":
+def icechunk_miniostore(minio_bucket) -> "IcechunkStore":
     # Based on https://github.com/earth-mover/icechunk/blob/3374ca4968e0989b78643f57c8dda1fee0e8da2e/icechunk-python/tests/test_gc.py
     import icechunk as ic
 
