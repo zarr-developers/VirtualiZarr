@@ -22,6 +22,7 @@ def container():
     time.sleep(3)  # give it time to boot
     # enter
     yield {
+        "port": port,
         "endpoint": f"http://localhost:{port}",
         "username": "minioadmin",
         "password": "minioadmin",
@@ -45,6 +46,7 @@ def minio_bucket(container):
     )
     client.make_bucket("mybucket")
     yield {
+        "port": container["port"],
         "username": container["username"],
         "password": container["password"],
         "bucket": "mybucket",

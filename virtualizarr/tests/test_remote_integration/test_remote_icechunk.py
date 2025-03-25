@@ -25,7 +25,7 @@ def icechunk_miniostore(minio_bucket) -> "IcechunkStore":
 
     repo = ic.Repository.create(
         storage=ic.s3_storage(
-            endpoint_url="http://localhost:9000",
+            endpoint_url=f"http://localhost:{minio_bucket['port']}",
             allow_http=True,
             force_path_style=True,
             region="us-east-1",
