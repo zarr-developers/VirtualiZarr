@@ -22,8 +22,7 @@ from virtualizarr.tests import (
 
 
 @pytest.fixture()
-@requires_obstore
-def filepath(tmpdir):
+def local_file(tmpdir):
     import obstore as obs
 
     store = obs.store.LocalStore(prefix=tmpdir)
@@ -36,16 +35,15 @@ def filepath(tmpdir):
     return f"{tmpdir}/{filepath}"
 
 
-@requires_obstore
 @pytest.fixture()
-def manifest_store(filepath, array_v3_metadata):
+def local_store(local_file, array_v3_metadata):
     import obstore as obs
 
     chunk_dict = {
-        "0.0": {"path": f"file://{filepath}", "offset": 0, "length": 4},
-        "0.1": {"path": f"file://{filepath}", "offset": 4, "length": 4},
-        "1.0": {"path": f"file://{filepath}", "offset": 8, "length": 4},
-        "1.1": {"path": f"file://{filepath}", "offset": 12, "length": 4},
+        "0.0": {"path": f"file://{local_file}", "offset": 0, "length": 4},
+        "0.1": {"path": f"file://{local_file}", "offset": 4, "length": 4},
+        "1.0": {"path": f"file://{local_file}", "offset": 8, "length": 4},
+        "1.1": {"path": f"file://{local_file}", "offset": 12, "length": 4},
     }
     manifest = ChunkManifest(entries=chunk_dict)
     chunks = (1, 4)
@@ -60,46 +58,98 @@ def manifest_store(filepath, array_v3_metadata):
     )
 
 
-@pytest.mark.asyncio
+@pytest.fixture()
+def s3_store(minio_bucket, array_v3_metadata):
+    import obstore as obs
+
+    store = obs.store.S3Store(
+        minio_bucket["bucket"],
+        aws_endpoint=minio_bucket["endpoint"],
+        access_key_id=minio_bucket["username"],
+        secret_access_key=minio_bucket["password"],
+        virtual_hosted_style_request=False,
+        client_options={"allow_http": True},
+    )
+    filepath = "data.tmp"
+    obs.put(
+        store,
+        filepath,
+        b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
+    )
+    chunk_dict = {
+        "0.0": {
+            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
+            "offset": 0,
+            "length": 4,
+        },
+        "0.1": {
+            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
+            "offset": 4,
+            "length": 4,
+        },
+        "1.0": {
+            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
+            "offset": 8,
+            "length": 4,
+        },
+        "1.1": {
+            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
+            "offset": 12,
+            "length": 4,
+        },
+    }
+    manifest = ChunkManifest(entries=chunk_dict)
+    chunks = (1, 4)
+    shape = (2, 8)
+    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
+    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    manifest_group = ManifestGroup(
+        {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
+    )
+    return ManifestStore(stores={"s3://": store}, manifest_group=manifest_group)
+
+
 @requires_obstore
 class TestManifestStore:
-    def test_manifest_store_properties(self, manifest_store):
-        assert manifest_store.read_only
-        assert manifest_store.supports_listing
-        assert not manifest_store.supports_deletes
-        assert not manifest_store.supports_writes
-        assert not manifest_store.supports_partial_writes
+    def test_manifest_store_properties(self, local_store):
+        assert local_store.read_only
+        assert local_store.supports_listing
+        assert not local_store.supports_deletes
+        assert not local_store.supports_writes
+        assert not local_store.supports_partial_writes
 
-    async def test_get_data(self, manifest_store):
-        observed = await manifest_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
-        )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
+    async def test_get_data(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
-        observed = await manifest_store.get(
-            "foo/c/1.0", prototype=default_buffer_prototype()
-        )
+        observed = await store.get("foo/c/1.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x09\x10\x11\x12"
-        observed = await manifest_store.get(
+        observed = await store.get(
             "foo/c/0.0",
             prototype=default_buffer_prototype(),
             byte_range=RangeByteRequest(start=1, end=2),
         )
         assert observed.to_bytes() == b"\x02"
-        observed = await manifest_store.get(
+        observed = await store.get(
             "foo/c/0.0",
             prototype=default_buffer_prototype(),
             byte_range=OffsetByteRequest(offset=1),
         )
         assert observed.to_bytes() == b"\x02\x03\x04"
-        observed = await manifest_store.get(
+        observed = await store.get(
             "foo/c/0.0",
             prototype=default_buffer_prototype(),
             byte_range=SuffixByteRequest(suffix=2),
         )
         assert observed.to_bytes() == b"\x03\x04"
 
-    async def test_get_metadata(self, manifest_store):
-        observed = await manifest_store.get(
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("manifest_store", ["local_store"])
+    async def test_get_metadata(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        observed = await store.get(
             "foo/zarr.json", prototype=default_buffer_prototype()
         )
         metadata = json.loads(observed.to_bytes())
@@ -107,19 +157,17 @@ class TestManifestStore:
         assert metadata["node_type"] == "array"
         assert metadata["zarr_format"] == 3
 
-        observed = await manifest_store.get(
-            "zarr.json", prototype=default_buffer_prototype()
-        )
+        observed = await store.get("zarr.json", prototype=default_buffer_prototype())
         metadata = json.loads(observed.to_bytes())
         assert metadata["node_type"] == "group"
         assert metadata["zarr_format"] == 3
         assert metadata["attributes"]["Zarr"] == "Hooray!"
 
-    async def test_pickling(self, manifest_store):
-        new_store = pickle.loads(pickle.dumps(manifest_store))
+    async def test_pickling(self, local_store):
+        new_store = pickle.loads(pickle.dumps(local_store))
         assert isinstance(new_store, ManifestStore)
         # Check new store works
-        observed = await manifest_store.get(
+        observed = await local_store.get(
             "foo/c/0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
@@ -129,14 +177,17 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
 
-    async def test_list_dir(self, manifest_store) -> None:
-        observed = await _collect_aiterator(manifest_store.list_dir(""))
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("manifest_store", ["local_store"])
+    async def test_list_dir(self, manifest_store, request) -> None:
+        store = request.getfixturevalue(manifest_store)
+        observed = await _collect_aiterator(store.list_dir(""))
         assert observed == ("zarr.json", "foo", "bar")
 
-    async def test_store_raises(self, manifest_store) -> None:
+    async def test_store_raises(self, local_store) -> None:
         with pytest.raises(NotImplementedError):
-            await manifest_store.set("foo/zarr.json", 1)
+            await local_store.set("foo/zarr.json", 1)
         with pytest.raises(NotImplementedError):
-            await manifest_store.set_if_not_exists("foo/zarr.json", 1)
+            await local_store.set_if_not_exists("foo/zarr.json", 1)
         with pytest.raises(NotImplementedError):
-            await manifest_store.delete("foo")
+            await local_store.delete("foo")
