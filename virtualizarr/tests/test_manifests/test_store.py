@@ -16,7 +16,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.tests import requires_minio, requires_obstore
+from virtualizarr.tests import requires_obstore
 
 
 @pytest.fixture()
@@ -109,9 +109,11 @@ class TestManifestStore:
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
 
-    @requires_minio
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+    )
     async def test_get_data(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
         observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
@@ -137,9 +139,11 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x03\x04"
 
-    @requires_minio
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+    )
     async def test_get_metadata(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
         observed = await store.get(
@@ -171,9 +175,11 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
 
-    @requires_minio
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+    )
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))

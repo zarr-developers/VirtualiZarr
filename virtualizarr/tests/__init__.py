@@ -7,7 +7,6 @@ from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 
 requires_network = pytest.mark.network
-requires_minio = pytest.mark.minio
 
 
 def _importorskip(
