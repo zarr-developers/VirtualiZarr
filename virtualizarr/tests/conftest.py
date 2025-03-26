@@ -7,7 +7,6 @@ from xarray.core.variable import Variable
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.tests import requires_minio
 
 
 @pytest.fixture
@@ -28,7 +27,6 @@ def vds_with_manifest_arrays(array_v3_metadata) -> Dataset:
     return Dataset({"a": var}, attrs={"something": 0})
 
 
-@requires_minio
 @pytest.fixture(scope="session")
 def container():
     import docker
@@ -58,7 +56,6 @@ def container():
     minio_container.remove()
 
 
-@requires_minio
 @pytest.fixture(scope="session")
 def minio_bucket(container):
     # Setup with guidance from https://medium.com/@sant1/using-minio-with-docker-and-python-cbbad397cb5d

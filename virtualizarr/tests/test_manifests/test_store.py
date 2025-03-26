@@ -16,13 +16,11 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.tests import (
-    requires_obstore,
-)
+from virtualizarr.tests import requires_minio, requires_obstore
 
 
 @pytest.fixture()
-def local_file(tmpdir):
+def local_store(tmpdir, array_v3_metadata):
     import obstore as obs
 
     store = obs.store.LocalStore(prefix=tmpdir)
@@ -32,18 +30,11 @@ def local_file(tmpdir):
         filepath,
         b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
     )
-    return f"{tmpdir}/{filepath}"
-
-
-@pytest.fixture()
-def local_store(local_file, array_v3_metadata):
-    import obstore as obs
-
     chunk_dict = {
-        "0.0": {"path": f"file://{local_file}", "offset": 0, "length": 4},
-        "0.1": {"path": f"file://{local_file}", "offset": 4, "length": 4},
-        "1.0": {"path": f"file://{local_file}", "offset": 8, "length": 4},
-        "1.1": {"path": f"file://{local_file}", "offset": 12, "length": 4},
+        "0.0": {"path": f"file://{tmpdir}/{filepath}", "offset": 0, "length": 4},
+        "0.1": {"path": f"file://{tmpdir}/{filepath}", "offset": 4, "length": 4},
+        "1.0": {"path": f"file://{tmpdir}/{filepath}", "offset": 8, "length": 4},
+        "1.1": {"path": f"file://{tmpdir}/{filepath}", "offset": 12, "length": 4},
     }
     manifest = ChunkManifest(entries=chunk_dict)
     chunks = (1, 4)
@@ -118,6 +109,7 @@ class TestManifestStore:
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
 
+    @requires_minio
     @pytest.mark.asyncio
     @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
     async def test_get_data(self, manifest_store, request):
@@ -145,8 +137,9 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x03\x04"
 
+    @requires_minio
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("manifest_store", ["local_store"])
+    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
     async def test_get_metadata(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
         observed = await store.get(
@@ -163,6 +156,7 @@ class TestManifestStore:
         assert metadata["zarr_format"] == 3
         assert metadata["attributes"]["Zarr"] == "Hooray!"
 
+    @pytest.mark.asyncio
     async def test_pickling(self, local_store):
         new_store = pickle.loads(pickle.dumps(local_store))
         assert isinstance(new_store, ManifestStore)
@@ -177,13 +171,15 @@ class TestManifestStore:
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
 
+    @requires_minio
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("manifest_store", ["local_store"])
+    @pytest.mark.parametrize("manifest_store", ["local_store", "s3_store"])
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
         assert observed == ("zarr.json", "foo", "bar")
 
+    @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:
         with pytest.raises(NotImplementedError):
             await local_store.set("foo/zarr.json", 1)
