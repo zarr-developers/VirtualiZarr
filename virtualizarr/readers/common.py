@@ -1,53 +1,55 @@
-from abc import ABC
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, Mapping
 from typing import (
     Any,
     Hashable,
+    MutableMapping,
     Optional,
 )
 
-import xarray  # noqa
-from xarray import (
-    Coordinates,
-    Dataset,
-    DataTree,
-    Index,
-    IndexVariable,
-    Variable,
-    open_dataset,
-)
-from xarray.core.indexes import PandasIndex
+import xarray as xr
+import xarray.indexes
 
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 
-def maybe_open_loadable_vars_and_indexes(
-    filepath: str,
-    loadable_variables,
-    reader_options,
-    drop_variables,
-    indexes,
-    group,
-    decode_times,
-) -> tuple[Mapping[str, Variable], Mapping[str, Index]]:
-    """
-    Open selected variables and indexes using xarray.
+def construct_fully_virtual_dataset(
+    virtual_vars: Mapping[str, xr.Variable],
+    coord_names: Iterable[str] | None = None,
+    attrs: dict[str, Any] | None = None,
+) -> xr.Dataset:
+    """Construct a fully virtual Dataset from constituent parts."""
 
-    Relies on xr.open_dataset and its auto-detection of filetypes to find the correct installed backend.
-    """
+    data_vars, coords = separate_coords(
+        vars=virtual_vars,
+        indexes={},  # we specifically avoid creating any indexes yet to avoid loading any data
+        coord_names=coord_names,
+    )
 
-    if loadable_variables == [] and indexes == {}:
-        # no need to even attempt to open the file using xarray
-        return {}, {}
+    vds = xr.Dataset(
+        data_vars=data_vars,
+        coords=coords,
+        attrs=attrs,
+    )
 
-    # TODO We are reading a bunch of stuff we know we won't need here, e.g. all of the data variables...
-    # TODO It would also be nice if we could somehow consolidate this with the reading of the kerchunk references
-    # TODO Really we probably want a dedicated backend that iterates over all variables only once
-    # TODO See issue #124 for a suggestion of how to avoid calling xarray here.
+    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+
+    return vds
+
+
+# TODO reimplement this using ManifestStore (GH #473)
+def replace_virtual_with_loadable_vars(
+    fully_virtual_dataset: xr.Dataset,
+    filepath: str,  # TODO won't need this after #473 because the filepaths will be in the ManifestStore
+    group: str | None = None,
+    loadable_variables: Iterable[Hashable] | None = None,
+    decode_times: bool | None = None,
+    indexes: Mapping[str, xr.Index] | None = None,
+    reader_options: Optional[dict] = None,
+) -> xr.Dataset:
+    if indexes is not None:
+        raise NotImplementedError()
 
     fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
-
-    # Updates the Xarray open_dataset kwargs if Zarr
 
     if fpath.upath.suffix == ".zarr":
         engine = "zarr"
@@ -57,73 +59,56 @@ def maybe_open_loadable_vars_and_indexes(
         engine = None
         xr_input = fpath.open_file()  # type: ignore
 
-    ds = open_dataset(
+    # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
+    loadable_ds = xr.open_dataset(
         xr_input,  # type: ignore[arg-type]
-        drop_variables=drop_variables,
         group=group,
         decode_times=decode_times,
         engine=engine,
     )
 
-    if indexes is None:
-        # add default indexes by reading data from file
-        # but avoid creating an in-memory index for virtual variables by default
-        indexes = {
-            name: index
-            for name, index in ds.xindexes.items()
-            if name in loadable_variables
-        }
-    elif indexes != {}:
-        # TODO allow manual specification of index objects
-        raise NotImplementedError()
+    var_names_to_load: list[Hashable]
+    if isinstance(loadable_variables, list):
+        var_names_to_load = list(loadable_variables)
+    elif loadable_variables is None:
+        # If `loadable_variables`` is None then we have to explicitly match default behaviour of xarray
+        # i.e. load and create indexes only for dimension coordinate variables.
+        # We already have all the indexes and variables we should be keeping - we just need to distinguish them.
+        var_names_to_load = [
+            name for name, var in loadable_ds.variables.items() if var.dims == (name,)
+        ]
     else:
-        indexes = dict(**indexes)  # for type hinting: to allow mutation
+        raise ValueError(
+            f"loadable_variables must be an iterable of string variable names, or None, but got type {type(loadable_variables)}"
+        )
 
-    # TODO we should drop these earlier by using drop_variables
-    loadable_vars = {
-        str(name): var
-        for name, var in ds.variables.items()
-        if name in loadable_variables
-    }
-
-    # if we only read the indexes we can just close the file right away as nothing is lazy
-    if loadable_vars == {}:
-        ds.close()
-        # fpath.close()
-
-    return loadable_vars, indexes
-
-
-def construct_virtual_dataset(
-    virtual_vars,
-    loadable_vars,
-    indexes,
-    coord_names,
-    attrs,
-) -> Dataset:
-    """Construct a virtual Datset from consistuent parts."""
-
-    vars = {**virtual_vars, **loadable_vars}
-
-    data_vars, coords = separate_coords(vars, indexes, coord_names)
-
-    vds = Dataset(
-        data_vars,
-        coords=coords,
-        # indexes={},  # TODO should be added in a later version of xarray
-        attrs=attrs,
+    # this will automatically keep any IndexVariables needed for loadable 1D coordinates
+    loadable_var_names_to_drop = set(loadable_ds.variables).difference(
+        var_names_to_load
+    )
+    ds_loadable_to_keep = loadable_ds.drop_vars(
+        loadable_var_names_to_drop, errors="ignore"
     )
 
-    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
+    ds_virtual_to_keep = fully_virtual_dataset.drop_vars(
+        var_names_to_load, errors="ignore"
+    )
 
-    return vds
+    # we don't need `compat` or `join` kwargs here because there should be no variables with the same name in both datasets
+    return xr.merge(
+        [
+            ds_loadable_to_keep,
+            ds_virtual_to_keep,
+        ],
+    )
 
 
+# TODO this probably doesn't need to actually support indexes != {}
 def separate_coords(
-    vars: Mapping[str, Variable],
-    indexes: MutableMapping[str, Index],
+    vars: Mapping[str, xr.Variable],
+    indexes: MutableMapping[str, xr.Index],
     coord_names: Iterable[str] | None = None,
-) -> tuple[dict[str, Variable], Coordinates]:
+) -> tuple[dict[str, xr.Variable], xr.Coordinates]:
     """
     Try to generate a set of coordinates that won't cause xarray to automatically build a pandas.Index for the 1D coordinates.
 
@@ -138,7 +123,7 @@ def separate_coords(
     # split data and coordinate variables (promote dimension coordinates)
     data_vars = {}
     coord_vars: dict[
-        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | Variable
+        str, tuple[Hashable, Any, dict[Any, Any], dict[Any, Any]] | xr.Variable
     ] = {}
     found_coord_names: set[str] = set()
     # Search through variable attributes for coordinate names
@@ -152,45 +137,17 @@ def separate_coords(
                 dim1d, *_ = var.dims
                 coord_vars[name] = (dim1d, var.data, var.attrs, var.encoding)
 
-                if isinstance(var, IndexVariable):
+                if isinstance(var, xr.IndexVariable):
                     # unless variable actually already is a loaded IndexVariable,
                     # in which case we need to keep it and add the corresponding indexes explicitly
                     coord_vars[str(name)] = var
                     # TODO this seems suspect - will it handle datetimes?
-                    indexes[name] = PandasIndex(var, dim1d)
+                    indexes[name] = xarray.indexes.PandasIndex(var, dim1d)
             else:
                 coord_vars[name] = var
         else:
             data_vars[name] = var
 
-    coords = Coordinates(coord_vars, indexes=indexes)
+    coords = xr.Coordinates(coord_vars, indexes=indexes)
 
     return data_vars, coords
-
-
-class VirtualBackend(ABC):
-    @staticmethod
-    def open_virtual_dataset(
-        filepath: str,
-        group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> Dataset:
-        raise NotImplementedError()
-
-    @staticmethod
-    def open_virtual_datatree(
-        path: str,
-        group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> DataTree:
-        raise NotImplementedError()

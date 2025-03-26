@@ -8,6 +8,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Hashable,
     Iterable,
     Mapping,
     Optional,
@@ -19,12 +20,11 @@ from xarray import Dataset, Index, Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.common import (
-    VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
 )
-from virtualizarr.utils import check_for_collisions
 from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE
 
 if TYPE_CHECKING:
@@ -61,19 +61,19 @@ async def get_chunk_mapping_prefix(
 ) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
-    # TODO: For when we want to support reading V2 we should parse the /c/ piece of the path differantly.
+    # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
     prefix = zarr_array.name + "/c/"
     prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
     _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
-    dict_keys = [x[0].split(prefix)[1].replace("/", ".") for x in prefix_keys]
+    chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
+    _dict_keys = [key.replace("/", ".") for key in chunk_keys]
+    _paths = [filepath + prefix + key for key in chunk_keys]
 
-    _paths = [filepath] * len(_lengths)
     _offsets = [0] * len(_lengths)
-
     return {
         key: {"path": path, "offset": offset, "length": length}
         for key, path, offset, length in zip(
-            dict_keys,
+            _dict_keys,
             _paths,
             _offsets,
             _lengths,
@@ -158,22 +158,21 @@ async def virtual_dataset_from_zarr_group(
     filepath: str,
     group: str,
     drop_variables: Iterable[str] | None = [],
-    virtual_variables: Iterable[str] | None = [],
     loadable_variables: Iterable[str] | None = [],
     decode_times: bool | None = None,
     indexes: Mapping[str, Index] | None = None,
     reader_options: dict = {},
 ):
-    # appease the mypy gods
-    if virtual_variables is None:
-        virtual_variables = []
-    if drop_variables is None:
-        drop_variables = []
+    zarr_array_keys = [key async for key in zarr_group.array_keys()]
+
+    if loadable_variables is None:
+        loadable_variables = []
 
     virtual_zarr_arrays = await asyncio.gather(
-        *[zarr_group.getitem(var) for var in virtual_variables]
+        *[zarr_group.getitem(var) for var in zarr_array_keys]
     )
 
+    # Xarray Variable backed by manifest array
     virtual_variable_arrays = await asyncio.gather(
         *[
             virtual_variable_from_zarr_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
@@ -198,25 +197,23 @@ async def virtual_dataset_from_zarr_group(
         )
     )
 
-    non_loadable_variables = list(set(virtual_variables).union(set(drop_variables)))
-
-    loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
-        filepath,
-        loadable_variables=loadable_variables,
-        reader_options=reader_options,
-        drop_variables=non_loadable_variables,
-        indexes=indexes,
-        group=group,
-        decode_times=decode_times,
-    )
-
-    return construct_virtual_dataset(
+    fully_virtual_dataset = construct_fully_virtual_dataset(
         virtual_vars=virtual_variable_array_mapping,
-        loadable_vars=loadable_vars,
-        indexes=indexes,
         coord_names=coord_names,
         attrs=zarr_group.attrs,
     )
+
+    vds = replace_virtual_with_loadable_vars(
+        fully_virtual_dataset,
+        filepath,
+        group=group,
+        loadable_variables=loadable_variables,
+        reader_options=reader_options,
+        indexes=indexes,
+        decode_times=decode_times,
+    )
+
+    return vds.drop_vars(drop_variables)
 
 
 class ZarrVirtualBackend(VirtualBackend):
@@ -249,10 +246,8 @@ class ZarrVirtualBackend(VirtualBackend):
                 raise NotImplementedError(
                     "Zarr reader does not understand any virtual_backend_kwargs"
                 )
-
-            drop_variables, loadable_variables = check_for_collisions(
-                drop_variables,
-                loadable_variables,
+            _drop_vars: list[Hashable] = (
+                [] if drop_variables is None else list(drop_variables)
             )
 
             filepath = validate_and_normalize_path_to_uri(
@@ -268,23 +263,11 @@ class ZarrVirtualBackend(VirtualBackend):
                 mode="r",
             )
 
-            zarr_array_keys = [key async for key in zg.array_keys()]
-
-            missing_vars = set(loadable_variables) - set(zarr_array_keys)
-            if missing_vars:
-                raise ValueError(
-                    f"Some loadable variables specified are not present in this zarr store: {missing_vars}"
-                )
-            virtual_vars = list(
-                set(zarr_array_keys) - set(loadable_variables) - set(drop_variables)
-            )
-
             return await virtual_dataset_from_zarr_group(
                 zarr_group=zg,
                 filepath=filepath,
                 group=group,
-                virtual_variables=virtual_vars,
-                drop_variables=drop_variables,
+                drop_variables=_drop_vars,
                 loadable_variables=loadable_variables,
                 decode_times=decode_times,
                 indexes=indexes,

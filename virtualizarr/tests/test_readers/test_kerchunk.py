@@ -198,7 +198,8 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
         with pytest.raises(ValueError):
             open_virtual_dataset(
-                filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+                filepath=ref_filepath.as_posix(),
+                filetype="kerchunk",
             )
 
     else:
@@ -219,10 +220,11 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
 
         vds = open_virtual_dataset(
-            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+            filepath=ref_filepath.as_posix(),
+            filetype="kerchunk",
         )
 
-        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
+        # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
         refs = vds.virtualize.to_kerchunk(format="dict")
         expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
@@ -248,9 +250,13 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     with open(ref_filepath, "w") as json_file:
         ujson.dump(netcdf4_inlined_ref, json_file)
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(
+        NotImplementedError,
+        match="Reading inlined reference data is currently not supported",
+    ):
         open_virtual_dataset(
-            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
+            filepath=ref_filepath.as_posix(),
+            filetype="kerchunk",
         )
 
 

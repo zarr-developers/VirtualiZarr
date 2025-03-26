@@ -9,7 +9,6 @@ from typing import (
 
 from xarray import Dataset, Index
 
-from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -19,8 +18,8 @@ from virtualizarr.readers import (
     TIFFVirtualBackend,
     ZarrVirtualBackend,
 )
-from virtualizarr.readers.common import VirtualBackend
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
@@ -110,17 +109,18 @@ def open_virtual_dataset(
     decode_times: bool | None = None,
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, Index] | None = None,
-    virtual_array_class=ManifestArray,
     virtual_backend_kwargs: dict | None = None,
     reader_options: dict | None = None,
     backend: type[VirtualBackend] | None = None,
 ) -> Dataset:
     """
-    Open a file or store as an xarray Dataset wrapping virtualized zarr arrays.
+    Open a file or store as an xarray.Dataset wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
-
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+    Some variables can be opened as loadable lazy numpy arrays. This can be controlled explicitly using the ``loadable_variables`` keyword argument.
+    By default this will be the same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+    name matches the name of their only dimension (also known as "dimension coordinates").
+    Pandas indexes will also now be created by default for these loadable variables, but this can be controlled by passing a value for the ``indexes`` keyword argument.
+    To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -135,17 +135,14 @@ def open_virtual_dataset(
     drop_variables: list[str], default is None
         Variables in the file to drop before returning.
     loadable_variables: list[str], default is None
-        Variables in the file to open as lazy numpy/dask arrays instead of instances of virtual_array_class.
-        Default is to open all variables as virtual arrays (i.e. ManifestArray).
+        Variables in the file to open as lazy numpy/dask arrays instead of instances of `ManifestArray`.
+        Default is to open all variables as virtual variables (i.e. as ManifestArrays).
     decode_times: bool | None, default is None
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
     indexes : Mapping[str, Index], default is None
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
         To avoid creating any indexes, pass indexes={}.
-    virtual_array_class
-        Virtual array class to use to represent the references to the chunks in each on-disk array.
-        Currently can only be ManifestArray, but once VirtualZarrArray is implemented the default should be changed to that.
     virtual_backend_kwargs: dict, default is None
         Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
     reader_options: dict, default {}
@@ -165,14 +162,6 @@ def open_virtual_dataset(
             DeprecationWarning,
             stacklevel=2,
         )
-
-    drop_variables, loadable_variables = check_for_collisions(
-        drop_variables,
-        loadable_variables,
-    )
-
-    if virtual_array_class is not ManifestArray:
-        raise NotImplementedError()
 
     if reader_options is None:
         reader_options = {}

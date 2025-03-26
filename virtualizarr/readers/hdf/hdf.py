@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Hashable,
     Iterable,
     List,
     Mapping,
@@ -24,14 +25,14 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.common import (
-    VirtualBackend,
-    construct_virtual_dataset,
-    maybe_open_loadable_vars_and_indexes,
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
 )
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions, soft_import
+from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -77,30 +78,19 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables,
-            loadable_variables,
-        )
-
         filepath = validate_and_normalize_path_to_uri(
             filepath, fs_root=Path.cwd().as_uri()
         )
 
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
+
+        # TODO provide a way to drop a variable _before_ h5py attempts to inspect it?
         virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
             path=filepath,
             group=group,
-            drop_variables=drop_variables + loadable_variables,
             reader_options=reader_options,
-        )
-
-        loadable_vars, indexes = maybe_open_loadable_vars_and_indexes(
-            filepath,
-            loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            drop_variables=drop_variables,
-            indexes=indexes,
-            group=group,
-            decode_times=decode_times,
         )
 
         attrs = HDFVirtualBackend._get_group_attrs(
@@ -108,13 +98,24 @@ class HDFVirtualBackend(VirtualBackend):
         )
         coordinates_attr = attrs.pop("coordinates", "")
         coord_names = coordinates_attr.split()
-        return construct_virtual_dataset(
+
+        fully_virtual_dataset = construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
-            loadable_vars=loadable_vars,
-            indexes=indexes,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        vds = replace_virtual_with_loadable_vars(
+            fully_virtual_dataset,
+            filepath,
+            group=group,
+            loadable_variables=loadable_variables,
+            reader_options=reader_options,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
+
+        return vds.drop_vars(_drop_vars)
 
     @staticmethod
     def _dataset_chunk_manifest(

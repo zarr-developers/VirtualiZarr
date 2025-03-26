@@ -72,7 +72,7 @@ class TestEquals:
         assert result.all()
 
     def test_not_equal_chunk_entries(self, array_v3_metadata):
-        # both manifest arrays in this example have the same zarray properties
+        # both manifest arrays in this example have the same metadata
         chunks = (5, 1, 10)
         shape = (5, 2, 20)
         metadata = array_v3_metadata(shape=shape, chunks=chunks)
@@ -94,6 +94,24 @@ class TestEquals:
 
     @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self): ...
+
+    def test_equals_nan_fill_value(self, array_v3_metadata):
+        # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/501
+        chunks_dict = {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        metadata1 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
+        metadata2 = array_v3_metadata(
+            shape=(2,), chunks=(2,), data_type=np.float32, fill_value=np.float32("nan")
+        )
+        marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest)
+        marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest)
+
+        result = marr1 == marr2
+        assert result.all()
 
 
 class TestBroadcast:
@@ -263,7 +281,7 @@ class TestConcat:
 
 class TestStack:
     def test_stack(self, array_v3_metadata):
-        # both manifest arrays in this example have the same zarray properties
+        # both manifest arrays in this example have the same metadata
         chunks = (5, 10)
         shape = (5, 20)
         codecs = [ARRAYBYTES_CODEC, ZLIB_CODEC]

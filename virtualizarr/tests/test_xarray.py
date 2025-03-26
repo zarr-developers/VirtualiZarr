@@ -37,7 +37,7 @@ def test_wrapping(array_v3_metadata):
 
 
 class TestEquals:
-    # regression test for GH29 https://github.com/TomNicholas/VirtualiZarr/issues/29
+    # regression test for GH29 https://github.com/zarr-developers/VirtualiZarr/issues/29
     def test_equals(self, array_v3_metadata):
         chunks_dict1 = {
             "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
@@ -231,7 +231,7 @@ class TestCombineUsingIndexes:
 @parametrize_over_hdf_backends
 class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
@@ -246,7 +246,7 @@ class TestRenamePaths:
             filename = Path(old_local_path).name
             return str(new_s3_bucket_url + filename)
 
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
@@ -254,7 +254,7 @@ class TestRenamePaths:
             )
 
     def test_invalid_type(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, indexes={}, backend=hdf_backend) as vds:
+        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
             with pytest.raises(TypeError):
                 vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
@@ -265,7 +265,6 @@ class TestRenamePaths:
     ):
         with open_virtual_dataset(
             netcdf4_file,
-            indexes={},
             loadable_variables=["lat", "lon"],
             backend=hdf_backend,
         ) as vds:

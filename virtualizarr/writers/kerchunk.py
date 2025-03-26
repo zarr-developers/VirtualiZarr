@@ -3,9 +3,9 @@ import json
 from typing import cast
 
 import numpy as np
-from xarray import Dataset
+from xarray import Dataset, Variable
 from xarray.coding.times import CFDatetimeCoder
-from xarray.core.variable import Variable
+from xarray.conventions import encode_dataset_coordinates
 
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
@@ -53,8 +53,11 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
 
     import ujson
 
+    # xarray's .to_zarr() does this, so we need to do it for kerchunk too
+    variables, attrs = encode_dataset_coordinates(ds)
+
     all_arr_refs = {}
-    for var_name, var in ds.variables.items():
+    for var_name, var in variables.items():
         arr_refs = variable_to_kerchunk_arr_refs(var, str(var_name))
 
         prepended_with_var_name = {
@@ -62,18 +65,11 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
         }
         all_arr_refs.update(prepended_with_var_name)
 
-    zattrs = ds.attrs
-    if ds.coords:
-        coord_names = [str(x) for x in ds.coords]
-        # this weird concatenated string instead of a list of strings is inconsistent with how other features in the kerchunk references format are stored
-        # see https://github.com/zarr-developers/VirtualiZarr/issues/105#issuecomment-2187266739
-        zattrs["coordinates"] = " ".join(coord_names)
-
     ds_refs = {
         "version": 1,
         "refs": {
             ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(zattrs),
+            ".zattrs": ujson.dumps(attrs),
             **all_arr_refs,
         },
     }
@@ -109,9 +105,12 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             for chunk_key, entry in marr.manifest.dict().items()
         }
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
+        zattrs = {**var.attrs, **var.encoding}
     else:
+        from xarray.backends.zarr import encode_zarr_variable
         from zarr.core.metadata.v2 import ArrayV2Metadata
 
+        var = encode_zarr_variable(var)
         try:
             np_arr = var.to_numpy()
         except AttributeError as e:
@@ -130,6 +129,9 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
                 )
             if "calendar" in var.encoding:
                 np_arr = CFDatetimeCoder().encode(var.copy(), name=var_name).values
+                dtype = var.encoding.get("dtype", None)
+                if dtype and np_arr.dtype != dtype:
+                    np_arr = np.asarray(np_arr, dtype=dtype)
 
         # This encoding is what kerchunk does when it "inlines" data, see https://github.com/fsspec/kerchunk/blob/a0c4f3b828d37f6d07995925b324595af68c4a19/kerchunk/hdf.py#L472
         byte_data = np_arr.tobytes()
@@ -147,11 +149,11 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
             order="C",
             fill_value=None,
         )
+        zattrs = {**var.attrs}
 
     zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
-    zattrs = {**var.attrs, **var.encoding}
     zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
     arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
 

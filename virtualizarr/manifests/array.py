@@ -4,6 +4,7 @@ from typing import Any, Callable, Union
 import numpy as np
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
@@ -32,7 +33,7 @@ class ManifestArray:
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the metadata of a zarr array and the manifest of chunks.
 
         Parameters
         ----------
@@ -166,7 +167,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if self.metadata != other.metadata:
+        if not utils.metadata_identical(self.metadata, other.metadata):
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:

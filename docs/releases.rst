@@ -11,15 +11,29 @@ New Features
 
 - Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+- Added experimental ManifestStore (:pull:`490`).
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
+
+- Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
+  same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+  name matches the name of their only dimension (also known as "dimension coordinates").
+  Pandas indexes will also now be created by default for these loadable variables.
+  This is intended to provide a more friendly default, as often you will want these small variables to be loaded
+  (or "inlined", for efficiency of storage in icechunk/kerchunk), and you will also want to have in-memory indexes for these variables
+  (to allow `xarray.combine_by_coords` to sort using them).
+  The old behaviour is equivalent to passing ``loadable_variables=[]`` and ``indexes={}``.
+  (:issue:`335`, :pull:`477`) by `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
 
 Bug fixes
 ~~~~~~~~~
+
+- Fixed bug causing ManifestArrays to compare as not equal when they were actually identical (:issue:`501`, :pull:`502`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~

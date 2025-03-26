@@ -23,27 +23,25 @@ class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check that loadable variables works
         vds = open_virtual_dataset(
-            filepath=zarr_store, loadable_variables=loadable_variables, indexes={}
+            filepath=zarr_store, loadable_variables=loadable_variables
         )
         assert isinstance(vds["time"].data, np.ndarray)
         assert isinstance(vds["air"].data, np.ndarray)
 
     def test_drop_variables(self, zarr_store, drop_variables=["air"]):
         # check variable is dropped
-        vds = open_virtual_dataset(
-            filepath=zarr_store, drop_variables=drop_variables, indexes={}
-        )
+        vds = open_virtual_dataset(filepath=zarr_store, drop_variables=drop_variables)
         assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
-        vds = open_virtual_dataset(filepath=zarr_store, indexes={})
+        vds = open_virtual_dataset(filepath=zarr_store)
         assert "0.0.0" in vds["air"].data.manifest.dict().keys()
 
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
         import zarr
 
         zg = zarr.open_group(zarr_store)
-        vds = open_virtual_dataset(filepath=zarr_store, indexes={})
+        vds = open_virtual_dataset(filepath=zarr_store)
 
         non_var_arrays = ["time", "lat", "lon"]
 
