@@ -53,7 +53,11 @@ def replace_virtual_with_loadable_vars(
 
     if fpath.upath.suffix == ".zarr":
         loadable_ds = xr.open_zarr(
-            fpath.upath, consolidated=False, group=group, decode_times=decode_times, chunks=None,
+            fpath.upath,
+            consolidated=False,
+            group=group,
+            decode_times=decode_times,
+            chunks=None,
         )
     else:
         # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473

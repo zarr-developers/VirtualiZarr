@@ -12,21 +12,20 @@ from typing import (
 )
 
 from xarray import Dataset, Index, Variable
+from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.vendor.zarr.core.common import _concurrent_map
 from virtualizarr.readers.common import (
     construct_fully_virtual_dataset,
     replace_virtual_with_loadable_vars,
 )
+from virtualizarr.vendor.zarr.core.common import _concurrent_map
 from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE
-from zarr.core.metadata import ArrayV3Metadata
 
 if TYPE_CHECKING:
     import zarr
-
 
 
 async def get_chunk_mapping_prefix(
@@ -64,8 +63,7 @@ async def build_chunk_manifest(
     return ChunkManifest(chunk_map)
 
 
-def get_metadata(zarr_array: zarr.AsyncArray[Any])-> ArrayV3Metadata:
-
+def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
     fill_value = zarr_array.metadata.fill_value
     if fill_value is not None:
         fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
@@ -73,7 +71,7 @@ def get_metadata(zarr_array: zarr.AsyncArray[Any])-> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
 
     if zarr_format == 2:
-        # TODO: Once we want to support V2, we will have to deconstruct the 
+        # TODO: Once we want to support V2, we will have to deconstruct the
         # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
         raise NotImplementedError("Reading Zarr V2 currently not supported.")
 
@@ -82,7 +80,6 @@ def get_metadata(zarr_array: zarr.AsyncArray[Any])-> ArrayV3Metadata:
 
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
-
 
 
 async def virtual_variable_from_zarr_array(
