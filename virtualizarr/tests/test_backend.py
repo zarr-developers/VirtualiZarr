@@ -17,7 +17,6 @@ from virtualizarr.backend import (
     automatically_determine_filetype,
 )
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.parallel import DaskDelayedExecutor, LithopsEagerFunctionExecutor
 from virtualizarr.readers import HDF5VirtualBackend
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
@@ -511,24 +510,39 @@ class TestLoadVirtualDataset:
 @requires_hdf5plugin
 @requires_imagecodecs
 @parametrize_over_hdf_backends
-@pytest.mark.parametrize(
-    "parallel",
-    [
-        False,
-        ThreadPoolExecutor,
-        pytest.param(DaskDelayedExecutor, marks=requires_dask),
-        pytest.param(
-            LithopsEagerFunctionExecutor,
-            marks=[
-                requires_lithops,
-                pytest.mark.xfail(
-                    reason="Lithops bug - see https://github.com/lithops-cloud/lithops/issues/1428"
-                ),
-            ],
-        ),
-    ],
-)
 class TestOpenVirtualMFDataset:
+    @pytest.mark.parametrize("invalid_parallel", ["ray", Dataset])
+    def test_invalid_parallel_kwarg(
+        self, netcdf4_files_factory, invalid_parallel, hdf_backend
+    ):
+        filepath1, filepath2 = netcdf4_files_factory()
+
+        with pytest.raises(ValueError, match="Unrecognized argument"):
+            open_virtual_mfdataset(
+                [filepath1, filepath2],
+                combine="nested",
+                concat_dim="time",
+                backend=hdf_backend,
+                parallel=invalid_parallel,
+            )
+
+    @pytest.mark.parametrize(
+        "parallel",
+        [
+            False,
+            ThreadPoolExecutor,
+            pytest.param("dask", marks=requires_dask),
+            pytest.param(
+                "lithops",
+                marks=[
+                    requires_lithops,
+                    pytest.mark.xfail(
+                        reason="Lithops bug - see https://github.com/lithops-cloud/lithops/issues/1428"
+                    ),
+                ],
+            ),
+        ],
+    )
     def test_parallel_open(self, netcdf4_files_factory, hdf_backend, parallel):
         filepath1, filepath2 = netcdf4_files_factory()
 
@@ -568,4 +582,4 @@ class TestOpenVirtualMFDataset:
             backend=hdf_backend,
             parallel=parallel,
         )
-        xrt.assert_identical(combined_vds, expected_vds
+        xrt.assert_identical(combined_vds, expected_vds)

@@ -1,10 +1,29 @@
+import inspect
 import warnings
 from concurrent.futures import Executor, Future
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 # TODO the DaskDelayedExecutor class could ideally be upstreamed into dask
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
+
+
+def get_executor(parallel: Literal["dask", "lithops"] | Executor | False) -> Executor:
+    """Get an executor that follows the concurrent.futures.Executor ABC API."""
+
+    if parallel == "dask":
+        return DaskDelayedExecutor
+    elif parallel == "lithops":
+        return LithopsEagerFunctionExecutor
+    elif parallel is False:
+        return SerialExecutor
+    elif inspect.isclass(parallel) and issubclass(parallel, Executor):
+        return parallel
+    else:
+        raise ValueError(
+            f"Unrecognized argument to ``parallel``: {parallel}"
+            "Please supply either ``'dask'``, ``'lithops'``, ``False``, or a concrete subclass of ``concurrent.futures.Executor``."
+        )
 
 
 class SerialExecutor(Executor):
@@ -187,7 +206,7 @@ class DaskDelayedExecutor(Executor):
 class LithopsEagerFunctionExecutor(Executor):
     """
     Lithops-based function executor which follows the concurrent.futures.Executor API.
-    
+
     Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
     """
 
@@ -196,7 +215,7 @@ class LithopsEagerFunctionExecutor(Executor):
 
         # Create Lithops client with optional configuration
         self.lithops_client = lithops.FunctionExecutor(**kwargs)
-        
+
         # Track submitted futures
         self._futures = []
 
@@ -217,15 +236,14 @@ class LithopsEagerFunctionExecutor(Executor):
         -------
         A concurrent.futures.Future representing the result of the execution
         """
-        import lithops
 
         # Create a concurrent.futures Future to maintain interface compatibility
         future = Future()
-        
+
         try:
             # Submit to Lithops
             lithops_future = self.lithops_client.call_async(fn, *args, **kwargs)
-            
+
             # Add a callback to set the result or exception
             def _on_done(lithops_result):
                 try:
@@ -233,16 +251,16 @@ class LithopsEagerFunctionExecutor(Executor):
                     future.set_result(result)
                 except Exception as e:
                     future.set_exception(e)
-            
+
             # Register the callback
             lithops_future.add_done_callback(_on_done)
         except Exception as e:
             # If submission fails, set exception immediately
             future.set_exception(e)
-        
+
         # Track the future
         self._futures.append(future)
-        
+
         return future
 
     def map(

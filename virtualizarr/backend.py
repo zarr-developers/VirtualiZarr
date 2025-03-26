@@ -19,7 +19,7 @@ from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.parallel import SerialExecutor
+from virtualizarr.parallel import get_executor
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -331,7 +331,7 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    executor: Executor = SerialExecutor if parallel is False else parallel
+    executor = get_executor(parallel=parallel)
     with executor() as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
