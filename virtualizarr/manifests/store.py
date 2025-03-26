@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from zarr.core.buffer import default_buffer_prototype
 
 from virtualizarr.manifests.group import ManifestArrayVariableMapping
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
+from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore

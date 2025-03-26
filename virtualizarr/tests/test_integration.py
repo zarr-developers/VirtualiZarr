@@ -176,12 +176,10 @@ class TestRoundtrip:
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(str(air_nc_path), backend=hdf_backend) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
-
                 # assert all_close to original dataset
                 xrt.assert_allclose(roundtrip, ds)
 
-                # TODO fails with ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
-                # assert ds["air"].attrs == roundtrip["air"].attrs
+                assert ds["air"].attrs == roundtrip["air"].attrs
 
                 # assert coordinate attributes are maintained
                 for coord in ds.coords:

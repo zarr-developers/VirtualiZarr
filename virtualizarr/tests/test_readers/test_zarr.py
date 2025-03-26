@@ -26,7 +26,7 @@ class TestOpenVirtualDatasetZarr:
             filepath=zarr_store, loadable_variables=loadable_variables
         )
         assert isinstance(vds["time"].data, np.ndarray)
-        assert isinstance(vds["air"].data, np.ndarray)
+        assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
 
     def test_drop_variables(self, zarr_store, drop_variables=["air"]):
         # check variable is dropped

@@ -52,20 +52,16 @@ def replace_virtual_with_loadable_vars(
     fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
     if fpath.upath.suffix == ".zarr":
-        engine = "zarr"
-        xr_input = fpath.upath
-
+        loadable_ds = xr.open_zarr(
+            fpath.upath, consolidated=False, group=group, decode_times=decode_times, chunks=None,
+        )
     else:
-        engine = None
-        xr_input = fpath.open_file()  # type: ignore
-
-    # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
-    loadable_ds = xr.open_dataset(
-        xr_input,  # type: ignore[arg-type]
-        group=group,
-        decode_times=decode_times,
-        engine=engine,
-    )
+        # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
+        loadable_ds = xr.open_dataset(
+            fpath.open_file(),  # type: ignore[arg-type]
+            group=group,
+            decode_times=decode_times,
+        )
 
     var_names_to_load: list[Hashable]
     if isinstance(loadable_variables, list):
