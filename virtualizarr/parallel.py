@@ -1,11 +1,15 @@
 import inspect
 import warnings
 from concurrent.futures import Executor, Future
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Iterable, Iterator, Literal, TypeVar
 
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 # TODO the DaskDelayedExecutor class could ideally be upstreamed into dask
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
+
+
+# Type variable for return type
+T = TypeVar("T")
 
 
 def get_executor(
@@ -36,9 +40,9 @@ class SerialExecutor(Executor):
 
     def __init__(self):
         # Track submitted futures to maintain interface compatibility
-        self._futures = []
+        self._futures: list[Future] = []
 
-    def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Future:
+    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
         """
         Submit a callable to be executed.
 
@@ -76,8 +80,12 @@ class SerialExecutor(Executor):
         return future
 
     def map(
-        self, fn: Callable, *iterables: Any, timeout: Optional[float] = None
-    ) -> Any:
+        self,
+        fn: Callable[..., T],
+        *iterables: Iterable[Any],
+        timeout: float | None = None,
+        chunksize: int = 1,
+    ) -> Iterator[T]:
         """
         Execute a function over an iterable sequentially.
 
@@ -96,7 +104,7 @@ class SerialExecutor(Executor):
         """
         return map(fn, *iterables)
 
-    def shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
         """
         Shutdown the executor.
 
@@ -120,9 +128,9 @@ class DaskDelayedExecutor(Executor):
         """Initialize the Dask Delayed Executor."""
 
         # Track submitted futures
-        self._futures = []
+        self._futures: list[Future] = []
 
-    def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Future:
+    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
         """
         Submit a task to be computed with dask.delayed.
 
@@ -139,13 +147,13 @@ class DaskDelayedExecutor(Executor):
         -------
         A Future representing the result of the execution
         """
-        import dask
+        import dask  # type: ignore[import-untyped]
 
         # Create a delayed computation
         delayed_task = dask.delayed(fn)(*args, **kwargs)
 
         # Create a concurrent.futures Future to maintain interface compatibility
-        future = Future()
+        future: Future = Future()
 
         try:
             # Compute the result
@@ -163,8 +171,12 @@ class DaskDelayedExecutor(Executor):
         return future
 
     def map(
-        self, fn: Callable, *iterables: Any, timeout: Optional[float] = None
-    ) -> Any:
+        self,
+        fn: Callable[..., T],
+        *iterables: Iterable[Any],
+        timeout: float | None = None,
+        chunksize: int = 1,
+    ) -> Iterator[T]:
         """
         Apply a function to an iterable using dask.delayed.
 
@@ -181,7 +193,7 @@ class DaskDelayedExecutor(Executor):
         -------
         Generator of results
         """
-        import dask
+        import dask  # type: ignore[import-untyped]
 
         if timeout is not None:
             warnings.warn("Timeout parameter is not directly supported by Dask delayed")
@@ -190,9 +202,9 @@ class DaskDelayedExecutor(Executor):
         delayed_tasks = [dask.delayed(fn)(*items) for items in zip(*iterables)]
 
         # Compute all tasks
-        return list(dask.compute(*delayed_tasks))
+        return iter(dask.compute(*delayed_tasks))
 
-    def shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
         """
         Shutdown the executor
 
@@ -213,15 +225,15 @@ class LithopsEagerFunctionExecutor(Executor):
     """
 
     def __init__(self, **kwargs):
-        import lithops
+        import lithops  # type: ignore[import-untyped]
 
         # Create Lithops client with optional configuration
         self.lithops_client = lithops.FunctionExecutor(**kwargs)
 
         # Track submitted futures
-        self._futures = []
+        self._futures: list[Future] = []
 
-    def submit(self, fn: Callable, *args: Any, **kwargs: Any) -> Future:
+    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
         """
         Submit a task to be computed using lithops.
 
@@ -240,7 +252,7 @@ class LithopsEagerFunctionExecutor(Executor):
         """
 
         # Create a concurrent.futures Future to maintain interface compatibility
-        future = Future()
+        future: Future = Future()
 
         try:
             # Submit to Lithops
@@ -266,8 +278,12 @@ class LithopsEagerFunctionExecutor(Executor):
         return future
 
     def map(
-        self, fn: Callable, *iterables: Any, timeout: Optional[float] = None
-    ) -> Any:
+        self,
+        fn: Callable[..., T],
+        *iterables: Iterable[Any],
+        timeout: float | None = None,
+        chunksize: int = 1,
+    ) -> Iterator[T]:
         """
         Apply a function to an iterable using lithops.
 
@@ -286,7 +302,7 @@ class LithopsEagerFunctionExecutor(Executor):
         -------
         Generator of results
         """
-        import lithops
+        import lithops  # type: ignore[import-untyped]
 
         fexec = lithops.FunctionExecutor()
 
@@ -295,7 +311,7 @@ class LithopsEagerFunctionExecutor(Executor):
 
         return results
 
-    def shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
         """
         Shutdown the executor.
 
