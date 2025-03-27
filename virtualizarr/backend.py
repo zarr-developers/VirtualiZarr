@@ -17,6 +17,7 @@ from typing import (
 
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
+from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.parallel import get_executor
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
         CombineAttrsOptions,
         CompatOptions,
         JoinOptions,
-        NestedSequence,
     )
 
 
@@ -239,13 +239,14 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal[False] | Executor = False,
+    parallel: Literal["dask", "lithops", False] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
     **kwargs,
 ) -> Dataset:
-    """Open multiple files as a single virtual dataset.
+    """
+    Open multiple files as a single virtual dataset.
 
     If combine='by_coords' then the function ``combine_by_coords`` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
@@ -271,10 +272,10 @@ def open_virtual_mfdataset(
         Same as in xarray.open_mfdataset
     combine
         Same as in xarray.open_mfdataset
-    parallel : instance of a subclass of ``concurrent.futures.Executor``, or False
+    parallel : "dask", "lithops", False, or instance of a subclass of ``concurrent.futures.Executor``
         Specify whether the open and preprocess steps of this function will be
-        performed in parallel using any executor compatible with the ``concurrent.futures`` interface
-        (such as those provided by Lithops), or in serial.
+        performed in parallel using lithops, dask.delayed, or any executor compatible
+        with the ``concurrent.futures`` interface, or in serial.
         Default is False, which will execute these steps in serial.
     join
         Same as in xarray.open_mfdataset
@@ -300,7 +301,7 @@ def open_virtual_mfdataset(
 
     # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
-    paths = _find_absolute_paths(paths)
+    paths = cast(NestedSequence[str], _find_absolute_paths(paths))
 
     if not paths:
         raise OSError("no files to open")

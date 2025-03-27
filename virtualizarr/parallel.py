@@ -8,7 +8,9 @@ from typing import Any, Callable, Literal, Optional
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
 
 
-def get_executor(parallel: Literal["dask", "lithops"] | Executor | False) -> Executor:
+def get_executor(
+    parallel: Literal["dask", "lithops"] | Executor | Literal[False],
+) -> type[Executor]:
     """Get an executor that follows the concurrent.futures.Executor ABC API."""
 
     if parallel == "dask":
@@ -56,7 +58,7 @@ class SerialExecutor(Executor):
         A Future representing the result of the execution
         """
         # Create a future to maintain interface compatibility
-        future = Future()
+        future: Future = Future()
 
         try:
             # Execute the function immediately

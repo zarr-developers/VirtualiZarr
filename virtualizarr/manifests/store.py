@@ -42,7 +42,7 @@ from virtualizarr.manifests.group import ManifestArrayVariableMapping
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
-    from obstore.store import ObjectStore
+    from obstore.store import ObjectStore  # type: ignore[import-not-found]
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
 
