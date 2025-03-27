@@ -21,6 +21,36 @@ if TYPE_CHECKING:
 
 from dataclasses import dataclass, field
 
+if TYPE_CHECKING:
+    import fsspec.core
+    import fsspec.spec
+    from obstore import ReadableFile
+    from obstore.store import ObjectStore
+
+    # See pangeo_forge_recipes.storage
+    OpenFileType = Union[
+        fsspec.core.OpenFile, fsspec.spec.AbstractBufferedFile, io.IOBase
+    ]
+
+
+class ObstoreReader:
+    _reader: ReadableFile
+
+    def __init__(self, store: ObjectStore, path: str) -> None:
+        import obstore as obs
+
+        self._reader = obs.open_reader(store, path)
+
+    def read(self, size: int, /) -> bytes:
+        return self._reader.read(size).to_bytes()
+
+    def seek(self, offset: int, whence: int = 0, /):
+        # TODO: Check on default for whence
+        return self._reader.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._reader.tell()
+
 
 @dataclass
 class _FsspecFSFromFilepath:

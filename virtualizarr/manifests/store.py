@@ -107,9 +107,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
-def parse_manifest_index(
-    key: str, chunk_key_encoding: str = "."
-) -> tuple[str, tuple[int, ...]]:
+def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
     """
     Splits `key` provided to a zarr store into the variable indicated
     by the first part and the chunk index from the 3rd through last parts,
@@ -121,22 +119,21 @@ def parse_manifest_index(
 
     Parameters
     ----------
-    key : str
+    chunk_str : str
     chunk_key_encoding : str
 
     Returns
     -------
-    ManifestIndex
+    tuple containing chunk indexes
     """
     parts = key.split("/")
-    var = parts[0]
     # Assume "c" is the second part
     # TODO: Handle scalar array case with "c" holds the data
     if chunk_key_encoding == "/":
         indexes = tuple(int(ind) for ind in parts[2:])
     else:
         indexes = tuple(int(ind) for ind in parts[2].split(chunk_key_encoding))
-    return var, indexes
+    return indexes
 
 
 def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
@@ -258,13 +255,15 @@ class ManifestStore(Store):
 
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._manifest_group, key)
-        var, chunk_key = parse_manifest_index(key)
+        var = key.split("/")[0]
         marr = self._manifest_group._manifest_arrays[var]
         manifest = marr._manifest
-
-        path = manifest._paths[*chunk_key]
-        offset = manifest._offsets[*chunk_key]
-        length = manifest._lengths[*chunk_key]
+        chunk_indexes = parse_manifest_index(
+            key, marr.metadata.chunk_key_encoding.separator
+        )
+        path = manifest._paths[*chunk_indexes]
+        offset = manifest._offsets[*chunk_indexes]
+        length = manifest._lengths[*chunk_indexes]
         # Get the  configured object store instance that matches the path
         store_request = find_matching_store(stores=self._stores, request_key=path)
         # Transform the input byte range to account for the chunk location in the file
