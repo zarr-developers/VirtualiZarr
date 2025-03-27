@@ -212,32 +212,19 @@ files = "virtualizarr/**/*.py"
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = "fsspec.*"
+module = [
+    "docker",
+    "fsspec.*",
+    "h5py",
+    "kerchunk.*",
+    "minio",
+    "numcodecs.*",
+    "ujson",
+    "zarr",
+]
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "numcodecs.*"
-ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "kerchunk.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "ujson.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "zarr.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "docker.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "minio.*"
-ignore_missing_imports = true
 
 [tool.ruff]
 # Same as Black.
