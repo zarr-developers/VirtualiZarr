@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import json
 import pickle
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 from zarr.abc.store import (
@@ -18,23 +21,49 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.tests import requires_obstore
 
+if TYPE_CHECKING:
+    from obstore.store import ObjectStore
 
-@pytest.fixture()
-def local_store(tmpdir, array_v3_metadata):
+
+def _generate_manifest_store(
+    store: ObjectStore, *, prefix: str, filepath: str, array_v3_metadata: Callable
+) -> ManifestStore:
+    """
+    Generate a ManifestStore for testing.
+
+    This puts a sequence of 16 bytes in a file, which can simulate storing
+    4 contiguous uncompressed 4-byte chunks (or 8 2-byte chunks, etc). This
+    provides an easily understandable structure for testing ManifestStore's
+    ability to redirect Zarr chunk key requests and extract subsets of the file.
+
+    Parameters:
+    -----------
+    store : ObjectStore
+        ObjectStore instance for holding the file
+    prefix : str
+        Prefix to use to identify the ObjectStore in the ManifestStore
+    filepath : str
+        Filepath for storing temporary testing file
+    array_v3_metadata : callable
+        Function for generating V3 array metadata with sensible defaults.
+        This is passed in as a argument because pytest fixtures aren't meant to
+        be imported directly.
+    Returns:
+    --------
+    ManifestStore
+    """
     import obstore as obs
 
-    store = obs.store.LocalStore(prefix=tmpdir)
-    filepath = "data.tmp"
     obs.put(
         store,
         filepath,
         b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
     )
     chunk_dict = {
-        "0.0": {"path": f"file://{tmpdir}/{filepath}", "offset": 0, "length": 4},
-        "0.1": {"path": f"file://{tmpdir}/{filepath}", "offset": 4, "length": 4},
-        "1.0": {"path": f"file://{tmpdir}/{filepath}", "offset": 8, "length": 4},
-        "1.1": {"path": f"file://{tmpdir}/{filepath}", "offset": 12, "length": 4},
+        "0.0": {"path": f"{prefix}/{filepath}", "offset": 0, "length": 4},
+        "0.1": {"path": f"{prefix}/{filepath}", "offset": 4, "length": 4},
+        "1.0": {"path": f"{prefix}/{filepath}", "offset": 8, "length": 4},
+        "1.1": {"path": f"{prefix}/{filepath}", "offset": 12, "length": 4},
     }
     manifest = ChunkManifest(entries=chunk_dict)
     chunks = (1, 4)
@@ -44,8 +73,21 @@ def local_store(tmpdir, array_v3_metadata):
     manifest_group = ManifestGroup(
         {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
     )
-    return ManifestStore(
-        stores={"file://": obs.store.LocalStore()}, manifest_group=manifest_group
+    return ManifestStore(stores={prefix: store}, manifest_group=manifest_group)
+
+
+@pytest.fixture()
+def local_store(tmpdir, array_v3_metadata):
+    import obstore as obs
+
+    store = obs.store.LocalStore()
+    filepath = f"{tmpdir}/data.tmp"
+    prefix = "file://"
+    return _generate_manifest_store(
+        store=store,
+        prefix=prefix,
+        filepath=filepath,
+        array_v3_metadata=array_v3_metadata,
     )
 
 
@@ -62,42 +104,13 @@ def s3_store(minio_bucket, array_v3_metadata):
         client_options={"allow_http": True},
     )
     filepath = "data.tmp"
-    obs.put(
-        store,
-        filepath,
-        b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
+    prefix = f"s3://{minio_bucket['bucket']}"
+    return _generate_manifest_store(
+        store=store,
+        prefix=prefix,
+        filepath=filepath,
+        array_v3_metadata=array_v3_metadata,
     )
-    chunk_dict = {
-        "0.0": {
-            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
-            "offset": 0,
-            "length": 4,
-        },
-        "0.1": {
-            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
-            "offset": 4,
-            "length": 4,
-        },
-        "1.0": {
-            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
-            "offset": 8,
-            "length": 4,
-        },
-        "1.1": {
-            "path": f"s3://{minio_bucket['bucket']}/{filepath}",
-            "offset": 12,
-            "length": 4,
-        },
-    }
-    manifest = ChunkManifest(entries=chunk_dict)
-    chunks = (1, 4)
-    shape = (2, 8)
-    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
-    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
-    manifest_group = ManifestGroup(
-        {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
-    )
-    return ManifestStore(stores={"s3://": store}, manifest_group=manifest_group)
 
 
 @requires_obstore
