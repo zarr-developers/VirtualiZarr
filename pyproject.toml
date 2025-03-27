@@ -171,9 +171,9 @@ rust = "*"
 run-mypy = { cmd = "mypy virtualizarr" }
 run-tests = { cmd = "pytest -n auto --run-network-tests --verbose" }
 run-tests-no-network = { cmd = "pytest -n auto" }
-run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
-run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose--cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
@@ -196,7 +196,7 @@ readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTH
 # Define commands to run within the docs environment
 [tool.pixi.feature.minio.tasks]
 run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose" }
-run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose --cov=virtualizarr --cov-report=xml" }
+run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
@@ -270,6 +270,11 @@ known-first-party = ["virtualizarr"]
 [tool.coverage.run]
 include = ["virtualizarr/"]
 omit = ["conftest.py", "virtualizarr/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if TYPE_CHECKING:",
+]
 
 [tool.pytest.ini_options]
 # See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
