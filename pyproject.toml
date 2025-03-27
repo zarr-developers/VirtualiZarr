@@ -172,7 +172,7 @@ run-mypy = { cmd = "mypy virtualizarr" }
 run-tests = { cmd = "pytest -n auto --run-network-tests --verbose" }
 run-tests-no-network = { cmd = "pytest -n auto" }
 run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose--cov-report=xml" }
+run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=xml" }
 run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
