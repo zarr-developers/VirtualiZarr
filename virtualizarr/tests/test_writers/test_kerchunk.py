@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
-
+import pytest
 from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
@@ -147,8 +147,13 @@ class TestAccessor:
             "raw": {0: None, 1: None},
         }
 
+@pytest.mark.xfail(reason = "numcodecs.errors.UnknownCodecError: codec not available: 'None'")
+def test_convert_v3_to_v2_metadata_get_codec_failure(array_v3_metadata):
+    v3_metadata = array_v3_metadata(shape=(2920, 25, 53), chunks=(730, 13, 27), codecs=({'name': 'bytes', 'configuration': {'endian': 'little'}}, {'name': 'zstd', 'configuration': {'level': 0, 'checksum': False}}))
+    assert convert_v3_to_v2_metadata(v3_metadata)
 
 def testconvert_v3_to_v2_metadata(array_v3_metadata):
+    
     shape = (5, 20)
     chunks = (5, 10)
     codecs = [
