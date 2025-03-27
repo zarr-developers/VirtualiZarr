@@ -32,6 +32,8 @@ jobs:
         with:
           pixi-version: v0.41.4
           environments: ${{ matrix.environment }}
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
       - name: List installed libraries
         run: |
