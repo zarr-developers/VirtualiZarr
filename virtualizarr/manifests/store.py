@@ -114,9 +114,6 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     which can be used to index into the ndarrays containing paths, offsets,
     and lengths in ManifestArrays.
 
-    Currently only works for 1d+ arrays with a tree depth of one from the
-    root Zarr group.
-
     Parameters
     ----------
     chunk_str : str
@@ -126,14 +123,13 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     -------
     tuple containing chunk indexes
     """
-    parts = key.split("/")
-    # Assume "c" is the second part
-    # TODO: Handle scalar array case with "c" holds the data
-    if chunk_key_encoding == "/":
-        indexes = tuple(int(ind) for ind in parts[2:])
-    else:
-        indexes = tuple(int(ind) for ind in parts[2].split(chunk_key_encoding))
-    return indexes
+    if key.endswith("c"):
+        # Scalar arrays hold the data in the "c" key
+        return (0,)
+    parts = key.split(
+        f"c{chunk_key_encoding}"
+    )  # Use c. or c/ to separate data indexes from group names
+    return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
 def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
