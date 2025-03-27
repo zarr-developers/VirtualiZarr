@@ -42,8 +42,8 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
 
 if TYPE_CHECKING:
-    from h5py import Dataset as H5Dataset  # type: ignore[import-untyped]
-    from h5py import Group as H5Group  # type: ignore[import-untyped]
+    from h5py import Dataset as H5Dataset
+    from h5py import Group as H5Group
     from obstore.store import ObjectStore
 
 FillValueType = Union[
