@@ -19,7 +19,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.tests import requires_obstore
+from virtualizarr.tests import requires_minio, requires_obstore
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore
@@ -125,7 +125,7 @@ class TestManifestStore:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",
-        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+        ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
     async def test_get_data(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
@@ -155,7 +155,7 @@ class TestManifestStore:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",
-        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+        ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
     async def test_get_metadata(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
@@ -191,7 +191,7 @@ class TestManifestStore:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",
-        ["local_store", pytest.param("s3_store", marks=pytest.mark.minio)],
+        ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
