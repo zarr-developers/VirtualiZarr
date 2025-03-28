@@ -127,8 +127,8 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
         # Scalar arrays hold the data in the "c" key
         return (0,)
     parts = key.split(
-        f"c{chunk_key_encoding}"
-    )  # Use c. or c/ to separate data indexes from group names
+        "c/"
+    )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 

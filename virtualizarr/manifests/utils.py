@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 import numpy as np
 from zarr import Array
+from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
@@ -14,6 +15,7 @@ def create_v3_array_metadata(
     shape: tuple[int, ...],
     data_type: np.dtype,
     chunk_shape: tuple[int, ...],
+    chunk_key_encoding: ChunkKeyEncodingLike = {"name": "default"},
     fill_value: Any = None,
     codecs: Optional[list[Dict[str, Any]]] = None,
     attributes: Optional[Dict[str, Any]] = None,
@@ -52,7 +54,7 @@ def create_v3_array_metadata(
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
         },
-        chunk_key_encoding={"name": "default"},
+        chunk_key_encoding=chunk_key_encoding,
         fill_value=fill_value,
         codecs=convert_to_codec_pipeline(
             codecs=codecs or [],
