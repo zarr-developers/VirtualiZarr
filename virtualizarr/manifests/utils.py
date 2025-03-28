@@ -33,6 +33,8 @@ def create_v3_array_metadata(
         The numpy dtype of the array
     chunk_shape : tuple[int, ...]
         The shape of each chunk
+    chunk_key_encoding : ChunkKeyEncodingLike
+        The mapping from chunk grid cell coordinates to keys.
     fill_value : Any, optional
         The fill value for the array
     codecs : list[Dict[str, Any]], optional
