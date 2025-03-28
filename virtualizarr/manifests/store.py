@@ -116,7 +116,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     Parameters
     ----------
-    chunk_str : str
+    key : str
     chunk_key_encoding : str
 
     Returns
