@@ -1,3 +1,4 @@
+import functools
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -507,13 +508,19 @@ class TestLoadVirtualDataset:
             assert vds.scalar.attrs == {"scalar": "true"}
 
 
+preprocess_func = functools.partial(
+    xr.Dataset.rename_vars,
+    air="nair",
+)
+
+
 @requires_hdf5plugin
 @requires_imagecodecs
 @parametrize_over_hdf_backends
 class TestOpenVirtualMFDataset:
-    @pytest.mark.parametrize("invalid_parallel", ["ray", Dataset])
+    @pytest.mark.parametrize("invalid_parallel_kwarg", ["ray", Dataset])
     def test_invalid_parallel_kwarg(
-        self, netcdf4_files_factory, invalid_parallel, hdf_backend
+        self, netcdf4_files_factory, invalid_parallel_kwarg, hdf_backend
     ):
         filepath1, filepath2 = netcdf4_files_factory()
 
@@ -523,7 +530,7 @@ class TestOpenVirtualMFDataset:
                 combine="nested",
                 concat_dim="time",
                 backend=hdf_backend,
-                parallel=invalid_parallel,
+                parallel=invalid_parallel_kwarg,
             )
 
     @pytest.mark.parametrize(
@@ -532,23 +539,26 @@ class TestOpenVirtualMFDataset:
             False,
             ThreadPoolExecutor,
             pytest.param("dask", marks=requires_dask),
-            pytest.param(
-                "lithops",
-                marks=[
-                    requires_lithops,
-                    pytest.mark.xfail(
-                        reason="Lithops bug - see https://github.com/lithops-cloud/lithops/issues/1428"
-                    ),
-                ],
-            ),
+            pytest.param("lithops", marks=requires_lithops),
         ],
     )
-    def test_parallel_open(self, netcdf4_files_factory, hdf_backend, parallel):
+    @pytest.mark.parametrize(
+        "preprocess",
+        [
+            None,
+            preprocess_func,
+        ],
+    )
+    def test_parallel_open(
+        self, netcdf4_files_factory, hdf_backend, parallel, preprocess
+    ):
         filepath1, filepath2 = netcdf4_files_factory()
         vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
         vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
-        
+
         expected_vds = xr.concat([vds1, vds2], dim="time")
+        if preprocess:
+            expected_vds = preprocess_func(expected_vds)
 
         # test combine nested without in-memory indexes
         combined_vds = open_virtual_mfdataset(
@@ -557,6 +567,7 @@ class TestOpenVirtualMFDataset:
             concat_dim="time",
             backend=hdf_backend,
             parallel=parallel,
+            preprocess=preprocess,
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
@@ -566,6 +577,7 @@ class TestOpenVirtualMFDataset:
             combine="by_coords",
             backend=hdf_backend,
             parallel=parallel,
+            preprocess=preprocess,
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
@@ -576,5 +588,6 @@ class TestOpenVirtualMFDataset:
             combine="by_coords",
             backend=hdf_backend,
             parallel=parallel,
+            preprocess=preprocess,
         )
         xrt.assert_identical(combined_vds, expected_vds)

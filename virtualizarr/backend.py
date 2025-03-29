@@ -1,4 +1,3 @@
-import functools
 import os
 import warnings
 from collections.abc import Iterable, Mapping
@@ -15,6 +14,7 @@ from typing import (
     cast,
 )
 
+import xarray as xr
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
@@ -306,10 +306,6 @@ def open_virtual_mfdataset(
     if not paths:
         raise OSError("no files to open")
 
-    if preprocess:
-        # TODO
-        raise NotImplementedError
-
     paths1d: list[str]
     if combine == "nested":
         if isinstance(concat_dim, str | DataArray) or concat_dim is None:
@@ -332,12 +328,29 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
+    # TODO this refactored preprocess and executor logic should be upstreamed into xarray - see https://github.com/pydata/xarray/pull/9932
+
+    if preprocess:
+        # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
+
+        def _open_and_preprocess(path: str) -> xr.Dataset:
+            ds = open_virtual_dataset(path, **kwargs)
+            return preprocess(ds)
+
+        open_func = _open_and_preprocess
+    else:
+
+        def _open(path: str) -> xr.Dataset:
+            return open_virtual_dataset(path, **kwargs)
+
+        open_func = _open
+
     executor = get_executor(parallel=parallel)
     with executor() as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
-                functools.partial(open_virtual_dataset, **kwargs),
+                open_func,
                 paths1d,
             )
         )
@@ -388,6 +401,6 @@ def open_virtual_mfdataset(
         combined_vds.attrs = virtual_datasets[paths1d.index(attrs_file)].attrs
 
     # TODO should we just immediately close everything?
-    # TODO We should have already read everything we're ever going to read into memory at this point
+    # TODO If loadable_variables is eager then we should have already read everything we're ever going to read into memory at this point
 
     return combined_vds
