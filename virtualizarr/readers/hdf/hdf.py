@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
     Dict,
     Hashable,
     Iterable,
@@ -38,11 +39,8 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
 
 if TYPE_CHECKING:
-    from h5py import Dataset as H5Dataset  # type: ignore[import-untyped]
-    from h5py import Group as H5Group  # type: ignore[import-untyped]
-else:
-    H5Dataset: Any = None
-    H5Group: Any = None
+    from h5py import Dataset as H5Dataset
+    from h5py import Group as H5Group
 
 FillValueType = Union[
     int,

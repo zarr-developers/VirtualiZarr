@@ -3,6 +3,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from zarr.abc.store import (
     ByteRequest,
@@ -160,7 +161,8 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
     # Check each key to see if it's a prefix of the uri_string
     for key in sorted_keys:
         if request_key.startswith(key):
-            return StoreRequest(store=stores[key], key=request_key[len(key) :])
+            parsed_key = urlparse(request_key)
+            return StoreRequest(store=stores[key], key=parsed_key.path)
     # if no match is found, raise an error
     raise ValueError(
         f"Expected the one of stores.keys() to match the data prefix, got {stores.keys()} and {request_key}"

@@ -27,6 +27,11 @@ def pytest_addoption(parser):
         action="store_true",
         help="runs tests requiring a network connection",
     )
+    parser.addoption(
+        "--run-minio-tests",
+        action="store_true",
+        help="runs tests requiring docker and minio",
+    )
 
 
 def pytest_runtest_setup(item):
@@ -35,6 +40,8 @@ def pytest_runtest_setup(item):
         pytest.skip(
             "set --run-network-tests to run tests requiring an internet connection"
         )
+    if "minio" in item.keywords and not item.config.getoption("--run-minio-tests"):
+        pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
 
 
 # Common codec configurations
