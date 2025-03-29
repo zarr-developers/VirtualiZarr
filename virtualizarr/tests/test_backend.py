@@ -560,7 +560,7 @@ class TestOpenVirtualMFDataset:
         if preprocess:
             expected_vds = preprocess_func(expected_vds)
 
-        # test combine nested without in-memory indexes
+        # test combine nested, which doesn't use in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
             combine="nested",
