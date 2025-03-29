@@ -119,16 +119,11 @@ dev = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
-    "pytest",
-    "pytest-asyncio",
     "pytest-xdist",
     "ruff",
     "s3fs",
-    "scipy",
     "lithops",
     "dask",
-    "virtualizarr[hdf]",
-    "obstore>=0.5.1",
 ]
 
 [project.urls]
