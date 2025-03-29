@@ -10,6 +10,8 @@ New Features
 ~~~~~~~~~~~~
 
 - Added experimental ManifestStore (:pull:`490`).
+- Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~

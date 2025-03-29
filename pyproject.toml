@@ -127,7 +127,8 @@ dev = [
     "scipy",
     "lithops",
     "dask",
-    "virtualizarr[hdf]"
+    "virtualizarr[hdf]",
+    "obstore>=0.5.1",
 ]
 
 [project.urls]

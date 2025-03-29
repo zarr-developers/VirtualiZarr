@@ -1,4 +1,3 @@
-import functools
 import os
 import warnings
 from collections.abc import Iterable, Mapping
@@ -15,11 +14,13 @@ from typing import (
     cast,
 )
 
+import xarray as xr
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
+from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.parallel import SerialExecutor
+from virtualizarr.parallel import get_executor
 from virtualizarr.readers import (
     DMRPPVirtualBackend,
     FITSVirtualBackend,
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
         CombineAttrsOptions,
         CompatOptions,
         JoinOptions,
-        NestedSequence,
     )
 
 
@@ -239,13 +239,14 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal[False] | Executor = False,
+    parallel: Literal["dask", "lithops", False] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
     **kwargs,
 ) -> Dataset:
-    """Open multiple files as a single virtual dataset.
+    """
+    Open multiple files as a single virtual dataset.
 
     If combine='by_coords' then the function ``combine_by_coords`` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
@@ -271,10 +272,10 @@ def open_virtual_mfdataset(
         Same as in xarray.open_mfdataset
     combine
         Same as in xarray.open_mfdataset
-    parallel : instance of a subclass of ``concurrent.futures.Executor``, or False
+    parallel : "dask", "lithops", False, or instance of a subclass of ``concurrent.futures.Executor``
         Specify whether the open and preprocess steps of this function will be
-        performed in parallel using any executor compatible with the ``concurrent.futures`` interface
-        (such as those provided by Lithops), or in serial.
+        performed in parallel using lithops, dask.delayed, or any executor compatible
+        with the ``concurrent.futures`` interface, or in serial.
         Default is False, which will execute these steps in serial.
     join
         Same as in xarray.open_mfdataset
@@ -300,14 +301,10 @@ def open_virtual_mfdataset(
 
     # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
-    paths = _find_absolute_paths(paths)
+    paths = cast(NestedSequence[str], _find_absolute_paths(paths))
 
     if not paths:
         raise OSError("no files to open")
-
-    if preprocess:
-        # TODO
-        raise NotImplementedError
 
     paths1d: list[str]
     if combine == "nested":
@@ -331,12 +328,29 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    executor: Executor = SerialExecutor if parallel is False else parallel
+    # TODO this refactored preprocess and executor logic should be upstreamed into xarray - see https://github.com/pydata/xarray/pull/9932
+
+    if preprocess:
+        # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
+
+        def _open_and_preprocess(path: str) -> xr.Dataset:
+            ds = open_virtual_dataset(path, **kwargs)
+            return preprocess(ds)
+
+        open_func = _open_and_preprocess
+    else:
+
+        def _open(path: str) -> xr.Dataset:
+            return open_virtual_dataset(path, **kwargs)
+
+        open_func = _open
+
+    executor = get_executor(parallel=parallel)
     with executor() as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
-                functools.partial(open_virtual_dataset, **kwargs),
+                open_func,
                 paths1d,
             )
         )
@@ -387,6 +401,6 @@ def open_virtual_mfdataset(
         combined_vds.attrs = virtual_datasets[paths1d.index(attrs_file)].attrs
 
     # TODO should we just immediately close everything?
-    # TODO We should have already read everything we're ever going to read into memory at this point
+    # TODO If loadable_variables is eager then we should have already read everything we're ever going to read into memory at this point
 
     return combined_vds
