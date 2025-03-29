@@ -545,6 +545,10 @@ class TestOpenVirtualMFDataset:
     )
     def test_parallel_open(self, netcdf4_files_factory, hdf_backend, parallel):
         filepath1, filepath2 = netcdf4_files_factory()
+        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
+        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        
+        expected_vds = xr.concat([vds1, vds2], dim="time")
 
         # test combine nested without in-memory indexes
         combined_vds = open_virtual_mfdataset(
@@ -554,9 +558,6 @@ class TestOpenVirtualMFDataset:
             backend=hdf_backend,
             parallel=parallel,
         )
-        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
-        expected_vds = xr.concat([vds1, vds2], dim="time")
         xrt.assert_identical(combined_vds, expected_vds)
 
         # test combine by coords using in-memory indexes
@@ -565,12 +566,6 @@ class TestOpenVirtualMFDataset:
             combine="by_coords",
             backend=hdf_backend,
             parallel=parallel,
-        )
-        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
-        expected_vds = xr.concat(
-            [vds1, vds2],
-            dim="time",
         )
         xrt.assert_identical(combined_vds, expected_vds)
 
