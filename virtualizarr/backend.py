@@ -86,7 +86,6 @@ def automatically_determine_filetype(
     # TODO this should ideally handle every filetype that we have a reader for, not just kerchunk
 
     # TODO how do we handle kerchunk json / parquet here?
-    print(f"{filepath=}")
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
