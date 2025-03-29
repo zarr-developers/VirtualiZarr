@@ -158,6 +158,11 @@ python = "3.11.*"
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
+# Define a feature set for S3 testing with MinIO
+[tool.pixi.feature.minio.pypi-dependencies]
+"docker" = "*"
+"minio" = "*"
+
 # Install NetCDF and HDF5 from conda-forge for extra plugin capabilities
 [tool.pixi.feature.hdf5-lib.dependencies]
 netcdf4 = ">=1.7.2,<2"
@@ -168,33 +173,36 @@ h5netcdf = ">=1.5.0,<2"
 rust = "*"
 
 # Define commands to run within the test environments
-[tool.pixi.feature.dev.tasks]
+[tool.pixi.feature.test.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
 run-tests = { cmd = "pytest -n auto --run-network-tests --verbose" }
 run-tests-no-network = { cmd = "pytest -n auto" }
-run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
-run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
-min-deps = ["dev", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
+min-deps = ["dev", "test", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
-test-py311 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
-test-py312 = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
-upstream = ["dev", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
+test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
+test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
+upstream = ["dev", "test", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
 docs = ["docs"]
-
-
-
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
 build-docs = { cmd = "make html", cwd = "docs" }
 serve-docs = { cmd = "sphinx-autobuild docs docs/_build --host 0.0.0.0" }
 readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTHEDOCS_OUTPUT/html"
+
+# Define commands to run within the docs environment
+[tool.pixi.feature.minio.tasks]
+run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose" }
+run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
@@ -210,24 +218,19 @@ files = "virtualizarr/**/*.py"
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = "fsspec.*"
+module = [
+    "docker",
+    "fsspec.*",
+    "h5py",
+    "kerchunk.*",
+    "minio",
+    "numcodecs.*",
+    "ujson",
+    "zarr",
+]
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "numcodecs.*"
-ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "kerchunk.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "ujson.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "zarr.*"
-ignore_missing_imports = true
 
 [tool.ruff]
 # Same as Black.
@@ -274,6 +277,11 @@ known-first-party = ["virtualizarr"]
 include = ["virtualizarr/"]
 omit = ["conftest.py", "virtualizarr/tests/*"]
 
+[tool.coverage.report]
+exclude_lines = [
+    "if TYPE_CHECKING:",
+]
+
 [tool.pytest.ini_options]
 # See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
 # Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
@@ -293,4 +301,5 @@ markers = [
     # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
     "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
+    "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
 ]
