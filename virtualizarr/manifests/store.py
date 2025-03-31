@@ -14,6 +14,7 @@ from zarr.abc.store import (
 )
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
+import xarray as xr
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
@@ -355,9 +356,11 @@ class ManifestStore(Store):
 
     def to_virtual_dataset(self, group="") -> xr.Dataset:
         """
-        Wrap the contents of one group into a virtual xarray dataset, containing only virtual variables.
+        Create a "virtual" xarray dataset containing the contents of one zarr group.
 
-        All variables in the returned Dataset will wrap ManifestArray objects.
+        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
+        
+        Will ignore the contents of any other groups in the store.
 
         Parameters
         ----------
@@ -369,17 +372,11 @@ class ManifestStore(Store):
         """
 
         if group:
-            raise NotImplementedError("ManifestStore does not yet support multiple groups")
+            raise NotImplementedError("ManifestStore does not yet support nested groups")
         else:
-            manifestgroup = self._manifest_group
+            manifestgroup = self._group
 
-        attrs = ...
-        virtual_vars = {name: var for }
-
-        # TODO must make sure not to create indexes
-        return xr.Dataset(
-
-        )
+        return manifestgroup.as_virtual_dataset()
 
 
 def _transform_byte_range(

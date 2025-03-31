@@ -4,6 +4,7 @@ import textwrap
 from typing import Iterator, Mapping
 
 from zarr.core.group import GroupMetadata
+import xarray as xr
 
 from virtualizarr.manifests import ManifestArray
 
@@ -105,3 +106,13 @@ class ManifestGroup(
             )
             """
         )
+
+    def as_virtual_dataset(self) -> xr.Dataset:
+        """
+        Create a "virtual" xarray dataset containing the contents of one zarr group.
+
+        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
+        """
+
+        virtual_vars = {name: marr.as_virtual_var() for name, marr in self.arrays}
+        raise NotImplementedError()
