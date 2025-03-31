@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from typing import TYPE_CHECKING, List, Tuple, Union
 
@@ -7,25 +9,20 @@ from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
 from xarray.coding.variables import _choose_float_dtype
 
-from virtualizarr.utils import soft_import
-
-if TYPE_CHECKING:
-    import h5py  # type: ignore
-    from h5py import Dataset, Group  # type: ignore
 from virtualizarr.readers.common import (
     CFCodec,
     ShuffleProperties,
     ZlibProperties,
     ZstdProperties,
 )
+from virtualizarr.utils import soft_import
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
-if h5py:
-    Dataset = h5py.Dataset
-    Group = h5py.Group
-else:
-    Dataset = dict()
-    Group = dict()
+
+
+if TYPE_CHECKING:
+    from h5py import Dataset
+
 
 hdf5plugin = soft_import(
     "hdf5plugin", "For reading hdf files with filters", strict=False
@@ -33,7 +30,6 @@ hdf5plugin = soft_import(
 imagecodecs = soft_import(
     "imagecodecs", "For reading hdf files with filters", strict=False
 )
-
 
 _non_standard_filters = {
     "gzip": "zlib",

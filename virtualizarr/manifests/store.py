@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -15,6 +15,7 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
 
+from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 
 
 __all__ = ["ManifestStore"]
+
 
 _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     FileNotFoundError,
@@ -39,7 +41,6 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from zarr.core.buffer import default_buffer_prototype
 
-from virtualizarr.manifests.group import ManifestArrayVariableMapping
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -59,20 +60,20 @@ class StoreRequest:
 
 
 async def list_dir_from_manifest_arrays(
-    manifest_arrays: ManifestArrayVariableMapping, prefix: str
+    arrays: Mapping[str, ManifestArray], prefix: str
 ) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
     ----------
-    manifest_arrays : ManifestArrayVariableMapping
+    arrays : Mapping[str, ManifestArrays]
     prefix : str
-
 
     Returns
     -------
     AsyncIterator[str]
     """
+    # TODO shouldn't this just accept a ManifestGroup instead?
     # Start with expected group level metadata
     raise NotImplementedError
 
@@ -99,11 +100,11 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
 
     if key == "zarr.json":
-        metadata = manifest_group._metadata.to_dict()
+        metadata = manifest_group.metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
     else:
         var, _ = key.split("/")
-        metadata = manifest_group._manifest_arrays[var].metadata.to_dict()
+        metadata = manifest_group.arrays[var].metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
@@ -170,16 +171,17 @@ def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
 
 
 class ManifestStore(Store):
-    """A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
+    """
+    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
     from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
     multiple :class:`virtualizarr.manifests.ManifestArray`,
     allowing for virtually interfacing with underlying data in other file format.
 
-
     Parameters
     ----------
-    manifest_group : ManifestGroup
-        Manifest Group containing Group metadata and mapping variable names to ManifestArrays
+    group : ManifestGroup
+        Root group of the store.
+        Contains group metadata, ManifestArrays, and any subgroups.
     stores : dict[prefix, :class:`obstore.store.ObjectStore`]
         A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
@@ -196,7 +198,7 @@ class ManifestStore(Store):
     Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
-    _manifest_group: ManifestGroup
+    _group: ManifestGroup
     _stores: StoreDict
 
     def __eq__(self, value: object):
@@ -204,7 +206,7 @@ class ManifestStore(Store):
 
     def __init__(
         self,
-        manifest_group: ManifestGroup,
+        group: ManifestGroup,
         *,
         stores: StoreDict,  # TODO: Consider using a sequence of tuples rather than a dict (see https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2010717898).
     ) -> None:
@@ -223,14 +225,17 @@ class ManifestStore(Store):
         for store in stores.values():
             if not store.__class__.__module__.startswith("obstore"):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
+
         # TODO: Don't allow stores with prefix
-        # TODO: Type check the manifest arrays
+        if not isinstance(group, ManifestGroup):
+            raise TypeError
+
         super().__init__(read_only=True)
         self._stores = stores
-        self._manifest_group = manifest_group
+        self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore({self._manifest_group}, {self._stores})"
+        return f"ManifestStore(group={self._group}, stores={self._stores})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
@@ -257,10 +262,10 @@ class ManifestStore(Store):
         import obstore as obs
 
         if key.endswith("zarr.json"):
-            return get_zarr_metadata(self._manifest_group, key)
+            return get_zarr_metadata(self._group, key)
         var, chunk_key = parse_manifest_index(key)
-        marr = self._manifest_group._manifest_arrays[var]
-        manifest = marr._manifest
+        marr = self._group.arrays[var]
+        manifest = marr.manifest
 
         path = manifest._paths[*chunk_key]
         offset = manifest._offsets[*chunk_key]
@@ -345,7 +350,7 @@ class ManifestStore(Store):
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
         yield "zarr.json"
-        for k in self._manifest_group._manifest_arrays.keys():
+        for k in self._group.arrays.keys():
             yield k
 
 
