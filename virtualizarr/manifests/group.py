@@ -21,19 +21,19 @@ class ManifestGroup(
         self,
         arrays: Mapping[str, ManifestArray] | None = None,
         groups: Mapping[str, "ManifestGroup"] | None = None,
-        # TODO rename attributes to metadata
-        attributes: dict = None,
+        attributes: dict | None = None,
     ) -> None:
         """
-        Create a ManifestGroup from the dictionary of ManifestArrays and the group / dataset level metadata
+        Create a ManifestGroup containing ManifestArrays and/or sub-groups, as well as any group-level metadata.
 
         Parameters
         ----------
-        arrays : Mapping[str, ManifestArray]
-        groups : Mapping[str, ManifestGroup]
-        metadata : dict
-            Zarr attributes to use as zarr group metadata.
+        arrays : Mapping[str, ManifestArray], optional
+        groups : Mapping[str, ManifestGroup], optional
+        attributes : dict, optional
+            Zarr attributes to add as zarr group metadata.
         """
+        # TODO does the attributes argument need to be mandatory?
         self._metadata = GroupMetadata(attributes=attributes)
 
         _arrays: Mapping[str, ManifestArray] = {} if arrays is None else arrays
@@ -53,7 +53,7 @@ class ManifestGroup(
         # TODO type check groups passed
 
         # TODO check that all arrays have the same shapes or dimensions?
-        # Technically that's allowed by the zarr model, so we should theoretically only check that upon converting to
+        # Technically that's allowed by the zarr model, so we should theoretically only check that upon converting to xarray
 
         colliding_names = set(_arrays.keys()).intersection(set(_groups.keys()))
         if colliding_names:
@@ -70,15 +70,17 @@ class ManifestGroup(
 
     @property
     def arrays(self) -> dict[str, ManifestArray]:
+        """ManifestArrays contained in this group."""
         return {k: v for k, v in self._members.items() if isinstance(v, ManifestArray)}
 
     @property
     def groups(self) -> dict[str, "ManifestGroup"]:
+        """Subgroups contained in this group."""
         return {k: v for k, v in self._members.items() if isinstance(v, ManifestGroup)}
 
     def __getitem__(self, path: str) -> "ManifestArray | ManifestGroup":
         """Obtain a group member."""
-        if path.contains("/"):
+        if "/" in path:
             raise ValueError(
                 f"ManifestGroup.__getitem__ can only be used to get immediate subgroups and subarrays, but received multi-part path {path}"
             )
