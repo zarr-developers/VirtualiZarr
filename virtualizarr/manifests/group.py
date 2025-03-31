@@ -18,7 +18,7 @@ class ManifestGroup:
 
     def __init__(
         self,
-        manifest_arrays: ManifestArrayVariableMapping,
+        manifest_arrays: Mapping[str, ManifestArray],
         attributes: dict,
     ) -> None:
         """

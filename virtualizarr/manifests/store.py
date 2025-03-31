@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -15,7 +15,10 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
 
+import xarray as xr
+
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.manifests.array import ManifestArray
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
@@ -23,6 +26,7 @@ if TYPE_CHECKING:
 
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
+
 
 
 __all__ = ["ManifestStore"]
@@ -39,7 +43,6 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from zarr.core.buffer import default_buffer_prototype
 
-from virtualizarr.manifests.group import ManifestArrayVariableMapping
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -59,15 +62,14 @@ class StoreRequest:
 
 
 async def list_dir_from_manifest_arrays(
-    manifest_arrays: ManifestArrayVariableMapping, prefix: str
+    manifest_arrays: Mapping[str, ManifestArray], prefix: str
 ) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
     ----------
-    manifest_arrays : ManifestArrayVariableMapping
+    manifest_arrays : Mapping
     prefix : str
-
 
     Returns
     -------
