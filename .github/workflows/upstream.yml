@@ -1,4 +1,4 @@
-name: CI
+name: Upstream
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     - 'docs/**'
   pull_request:
     branches: [ "main" , "develop"]
+    types: [ labeled ]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -17,15 +18,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  test-upstream:
     name: ${{ matrix.environment }}-build
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'test-upstream')
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
-        environment: [test-py311, test-py312, min-deps, minio]
+        environment: [upstream]
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.3

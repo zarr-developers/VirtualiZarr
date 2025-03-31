@@ -68,3 +68,4 @@ class TestToXarray:
         assert isinstance(vv.data, ManifestArray)
 
         # TODO test coordinates
+
