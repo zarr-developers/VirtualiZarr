@@ -187,6 +187,3 @@ examples/
 # python virtual environment
 .venv
 venv
-
-# Pixi lock file (because it changes with every upstream commit)
-pixi.lock
