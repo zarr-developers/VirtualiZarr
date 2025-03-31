@@ -15,10 +15,8 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
 
-import xarray as xr
-
-from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.array import ManifestArray
+from virtualizarr.manifests.group import ManifestGroup
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
@@ -28,8 +26,8 @@ if TYPE_CHECKING:
     from zarr.core.common import BytesLike
 
 
-
 __all__ = ["ManifestStore"]
+
 
 _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     FileNotFoundError,
@@ -62,19 +60,20 @@ class StoreRequest:
 
 
 async def list_dir_from_manifest_arrays(
-    manifest_arrays: Mapping[str, ManifestArray], prefix: str
+    arrays: Mapping[str, ManifestArray], prefix: str
 ) -> AsyncGenerator[str]:
     """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
 
     Parameters
     ----------
-    manifest_arrays : Mapping
+    arrays : Mapping[str, ManifestArrays]
     prefix : str
 
     Returns
     -------
     AsyncIterator[str]
     """
+    # TODO shouldn't this just accept a ManifestGroup instead?
     # Start with expected group level metadata
     raise NotImplementedError
 
@@ -105,7 +104,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
     else:
         var, _ = key.split("/")
-        metadata = manifest_group._manifest_arrays[var].metadata.to_dict()
+        metadata = manifest_group._arrays[var].metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
@@ -261,7 +260,7 @@ class ManifestStore(Store):
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._manifest_group, key)
         var, chunk_key = parse_manifest_index(key)
-        marr = self._manifest_group._manifest_arrays[var]
+        marr = self._manifest_group._arrays[var]
         manifest = marr._manifest
 
         path = manifest._paths[*chunk_key]
@@ -347,7 +346,7 @@ class ManifestStore(Store):
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
         yield "zarr.json"
-        for k in self._manifest_group._manifest_arrays.keys():
+        for k in self._manifest_group._arrays.keys():
             yield k
 
 
