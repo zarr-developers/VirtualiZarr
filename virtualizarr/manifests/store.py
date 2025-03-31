@@ -353,6 +353,34 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
+    def to_virtual_dataset(self, group="") -> xr.Dataset:
+        """
+        Wrap the contents of one group into a virtual xarray dataset, containing only virtual variables.
+
+        All variables in the returned Dataset will wrap ManifestArray objects.
+
+        Parameters
+        ----------
+        group : str
+        
+        Returns
+        -------
+        vds : xarray.Dataset
+        """
+
+        if group:
+            raise NotImplementedError("ManifestStore does not yet support multiple groups")
+        else:
+            manifestgroup = self._manifest_group
+
+        attrs = ...
+        virtual_vars = {name: var for }
+
+        # TODO must make sure not to create indexes
+        return xr.Dataset(
+
+        )
+
 
 def _transform_byte_range(
     byte_range: ByteRequest | None, *, chunk_start: int, chunk_end_exclusive: int
