@@ -71,7 +71,8 @@ def _generate_manifest_store(
     array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(
-        {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
+        arrays={"foo": manifest_array, "bar": manifest_array},
+        attributes={"Zarr": "Hooray!"},
     )
     return ManifestStore(stores={prefix: store}, manifest_group=manifest_group)
 

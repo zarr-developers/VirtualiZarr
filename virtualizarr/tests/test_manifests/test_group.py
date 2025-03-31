@@ -23,8 +23,8 @@ class TestManifestGroup:
     def test_manifest_array(self, array_v3_metadata, manifest_array):
         var = "foo"
         manifest_group = ManifestGroup(arrays={var: manifest_array}, attributes={})
-        assert isinstance(manifest_group._arrays, dict)
-        assert isinstance(manifest_group._arrays[var], ManifestArray)
+        assert isinstance(manifest_group.arrays, dict)
+        assert isinstance(manifest_group.arrays[var], ManifestArray)
         assert isinstance(manifest_group.metadata, GroupMetadata)
 
     def test_manifest_repr(self, manifest_array):
