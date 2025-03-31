@@ -66,11 +66,16 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
+tif = [
+    "obstore>=0.5.1",
+    "async-tiff @ git+https://github.com/developmentseed/async-tiff#subdirectory=python",
+]
 all_readers = [
     "virtualizarr[hdf]",
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
+    "virtualizarr[tif]",
 ]
 
 # writers
@@ -168,6 +173,9 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+[tool.pixi.feature.rio.dependencies]
+rioxarray = "*"
+
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
@@ -181,12 +189,12 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
-test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
+test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore",  "tif", "rio"]
+test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "rio", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "tif", "rio", "py312"] # test against python 3.12
 minio = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
 upstream = ["dev", "test", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
+all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore",  "tif", "rio", "all_readers", "all_writers"]
 docs = ["docs"]
 
 # Define commands to run within the docs environment
@@ -222,7 +230,9 @@ module = [
     "minio",
     "numcodecs.*",
     "ujson",
-    "zarr",
+    "zarr.*",
+    "async_tiff.*",
+    "obstore.*",
 ]
 ignore_missing_imports = true
 
