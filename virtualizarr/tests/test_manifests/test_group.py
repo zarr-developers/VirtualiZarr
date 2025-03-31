@@ -22,12 +22,18 @@ def manifest_array(array_v3_metadata):
 
 
 class TestManifestGroup:
-    def test_manifest_array(self, array_v3_metadata, manifest_array):
+    def test_group_containing_array(self, manifest_array):
         var = "foo"
         manifest_group = ManifestGroup(arrays={var: manifest_array}, attributes={})
-        assert isinstance(manifest_group.arrays, dict)
-        assert isinstance(manifest_group.arrays[var], ManifestArray)
+
+        assert manifest_group.arrays == {var: manifest_array}
+        assert manifest_group.groups == {}
+        assert isinstance(manifest_group[var], ManifestArray)
+        with pytest.raises(KeyError):
+            manifest_group["bar"]
         assert isinstance(manifest_group.metadata, GroupMetadata)
+        assert len(manifest_group) == 1
+        assert list(manifest_group) == [var]
 
     def test_manifest_repr(self, manifest_array):
         manifest_group = ManifestGroup(arrays={"foo": manifest_array}, attributes={})
