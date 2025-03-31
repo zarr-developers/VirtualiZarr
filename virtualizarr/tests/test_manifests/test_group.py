@@ -1,3 +1,5 @@
+import textwrap
+
 import pytest
 from zarr.core.group import GroupMetadata
 
@@ -29,4 +31,13 @@ class TestManifestGroup:
 
     def test_manifest_repr(self, manifest_array):
         manifest_group = ManifestGroup(arrays={"foo": manifest_array}, attributes={})
-        assert str(manifest_group)
+        expected_repr = textwrap.dedent(
+            """
+            ManifestGroup(
+                arrays={'foo': ManifestArray<shape=(5, 2, 20), dtype=int32, chunks=(5, 1, 10)>},
+                groups={},
+                metadata=GroupMetadata(attributes={}, zarr_format=3, consolidated_metadata=None, node_type='group'),
+            )
+            """
+        )
+        assert repr(manifest_group) == expected_repr

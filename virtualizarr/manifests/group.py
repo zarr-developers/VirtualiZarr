@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from typing import Iterator, Mapping
 
 from zarr.core.group import GroupMetadata
@@ -29,11 +30,12 @@ class ManifestGroup(
         Parameters
         ----------
         arrays : Mapping[str, ManifestArray], optional
+            ManifestArray objects to represent virtual zarr arrays.
         groups : Mapping[str, ManifestGroup], optional
+            ManifestGroup objects to represent virtual zarr subgroups.
         attributes : dict, optional
             Zarr attributes to add as zarr group metadata.
         """
-        # TODO does the attributes argument need to be mandatory?
         self._metadata = GroupMetadata(attributes=attributes)
 
         _arrays: Mapping[str, ManifestArray] = {} if arrays is None else arrays
@@ -93,5 +95,13 @@ class ManifestGroup(
     def __len__(self) -> int:
         return len(self._members)
 
-    def __str__(self) -> str:
-        return f"ManifestGroup(arrays={self.arrays}, groups={self.groups}, metadata={self.metadata})"
+    def __repr__(self) -> str:
+        return textwrap.dedent(
+            f"""
+            ManifestGroup(
+                arrays={self.arrays},
+                groups={self.groups},
+                metadata={self.metadata},
+            )
+            """
+        )
