@@ -17,7 +17,11 @@ def manifest_array(array_v3_metadata):
     manifest = ChunkManifest(entries=chunk_dict)
     chunks = (5, 1, 10)
     shape = (5, 2, 20)
-    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
+    array_metadata = array_v3_metadata(
+        shape=shape,
+        chunks=chunks,
+        dimension_names=["x", "y", "z"],
+    )
     return ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
 
 
@@ -47,3 +51,20 @@ class TestManifestGroup:
             """
         )
         assert repr(manifest_group) == expected_repr
+
+
+class TestToXarray:
+    def test_single_group_to_dataset(self, manifest_array):
+        manifest_group = ManifestGroup(
+            arrays={"foo": manifest_array}, attributes={"ham": "eggs"}
+        )
+
+        vds = manifest_group.to_virtual_dataset()
+        assert list(vds.variables) == ["foo"]
+        assert vds.attrs == {"ham": "eggs"}
+        assert list(vds.dims) == ["x", "y", "z"]
+
+        vv = vds.variables["foo"]
+        assert isinstance(vv.data, ManifestArray)
+
+        # TODO test coordinates

@@ -19,6 +19,10 @@ import xarray as xr
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
+from virtualizarr.common import (
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
+)
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -27,10 +31,6 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.readers.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, soft_import

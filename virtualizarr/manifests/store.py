@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
+import xarray as xr
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -14,7 +15,6 @@ from zarr.abc.store import (
 )
 from zarr.core.buffer import Buffer
 from zarr.core.buffer.core import BufferPrototype
-import xarray as xr
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
@@ -359,20 +359,22 @@ class ManifestStore(Store):
         Create a "virtual" xarray dataset containing the contents of one zarr group.
 
         All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
-        
+
         Will ignore the contents of any other groups in the store.
 
         Parameters
         ----------
         group : str
-        
+
         Returns
         -------
         vds : xarray.Dataset
         """
 
         if group:
-            raise NotImplementedError("ManifestStore does not yet support nested groups")
+            raise NotImplementedError(
+                "ManifestStore does not yet support nested groups"
+            )
         else:
             manifestgroup = self._group
 

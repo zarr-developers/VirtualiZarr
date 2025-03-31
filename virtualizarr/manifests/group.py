@@ -3,8 +3,8 @@ from __future__ import annotations
 import textwrap
 from typing import Iterator, Mapping
 
-from zarr.core.group import GroupMetadata
 import xarray as xr
+from zarr.core.group import GroupMetadata
 
 from virtualizarr.manifests import ManifestArray
 
@@ -107,12 +107,27 @@ class ManifestGroup(
             """
         )
 
-    def as_virtual_dataset(self) -> xr.Dataset:
+    def to_virtual_dataset(self) -> xr.Dataset:
         """
-        Create a "virtual" xarray dataset containing the contents of one zarr group.
+        Create a "virtual" xarray.Dataset containing the contents of one zarr group.
 
         All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
         """
 
-        virtual_vars = {name: marr.as_virtual_var() for name, marr in self.arrays}
-        raise NotImplementedError()
+        from virtualizarr.common import construct_fully_virtual_dataset
+
+        # The xarray data model stores coordinate names outside of the arbitrary extra metadata it can store on a Dataset,
+        # so to avoid that information being duplicated we strip it from the zarr group attributes before storing it.
+        metadata_dict = self.metadata.to_dict()
+        attributes = metadata_dict["attributes"]
+        coord_names = attributes.pop("coordinates", [])
+
+        virtual_vars = {
+            name: marr.to_virtual_variable() for name, marr in self.arrays.items()
+        }
+
+        return construct_fully_virtual_dataset(
+            virtual_vars=virtual_vars,
+            coord_names=coord_names,
+            attrs=attributes,
+        )
