@@ -37,12 +37,13 @@ has_fastparquet, requires_fastparquet = _importorskip("fastparquet")
 has_s3fs, requires_s3fs = _importorskip("s3fs")
 has_lithops, requires_lithops = _importorskip("lithops")
 has_scipy, requires_scipy = _importorskip("scipy")
-has_tifffile, requires_tifffile = _importorskip("tifffile")
+has_asynctiff, requires_asynctiff = _importorskip("async_tiff")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_zarr_python, requires_zarr_python = _importorskip("zarr")
 has_dask, requires_dask = _importorskip("dask")
 has_obstore, requires_obstore = _importorskip("obstore")
+has_rioxarray, requires_rioxarray = _importorskip("rioxarray")
 
 parametrize_over_hdf_backends = pytest.mark.parametrize(
     "hdf_backend",
