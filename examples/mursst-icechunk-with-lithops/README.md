@@ -84,13 +84,19 @@ Options:
 #### Writing Data to Icechunk
 
 ```bash
-python main.py write_to_icechunk --start_date 2022-01-01 --end_date 2022-01-02
+python main.py write_to_icechunk --start_date 2023-04-23 --end_date 2023-09-03 --append_dim time
 ```
 
 #### Calculating the Mean of the Icechunk Store
 
 ```bash
-python main.py calc_icechunk_store_mean --start_date 2022-01-01 --end_date 2022-01-31
+python main.py calc_icechunk_store_mean --start_date 2005-09-12 --end_date 2005-09-14
+```
+
+#### Calculating the Mean of the Icechunk Store
+
+```bash
+python main.py calc_original_files_mean --start_date 2005-09-12 --end_date 2005-09-14
 ```
 
 #### Checking Data Store Access
