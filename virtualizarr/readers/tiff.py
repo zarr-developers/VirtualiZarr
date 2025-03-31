@@ -27,8 +27,10 @@ from virtualizarr.readers.api import (
 
 if TYPE_CHECKING:
     from async_tiff import TIFF, ImageFileDirectory
-    from obstore.store import ObjectStore
+    from obstore.store import AzureStore, GCSStore, HTTPStore, LocalStore, S3Store
     from zarr.core.abc.store import Store
+
+    SupportedStore = AzureStore | GCSStore | HTTPStore | S3Store | LocalStore
 
 
 import numpy as np
@@ -80,7 +82,7 @@ class TIFFVirtualBackend(VirtualBackend):
         )
 
     @staticmethod
-    async def _open_tiff(*, path: str, store: ObjectStore) -> TIFF:
+    async def _open_tiff(*, path: str, store: SupportedStore) -> TIFF:
         from async_tiff import TIFF
 
         return await TIFF.open(path, store=store)
@@ -118,7 +120,7 @@ class TIFFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _construct_manifest_group(
-        store: ObjectStore,
+        store: SupportedStore,
         path: str,
         *,
         group: str | None = None,
@@ -129,24 +131,24 @@ class TIFFVirtualBackend(VirtualBackend):
         # TODO: Make an async approach
         tiff = sync(TIFFVirtualBackend._open_tiff(store=store, path=path))
         attrs: dict[str, Any] = {}
-        manifest_dict = {}
+        manifest_arrays = {}
         if group:
-            manifest_dict[group] = TIFFVirtualBackend._construct_manifest_array(
+            manifest_arrays[group] = TIFFVirtualBackend._construct_manifest_array(
                 ifd=tiff.ifds[int(group)], path=path
             )
         else:
             for ind, ifd in enumerate(tiff.ifds):
-                manifest_dict[str(ind)] = TIFFVirtualBackend._construct_manifest_array(
-                    ifd=ifd, path=path
+                manifest_arrays[str(ind)] = (
+                    TIFFVirtualBackend._construct_manifest_array(ifd=ifd, path=path)
                 )
-        return ManifestGroup(manifest_dict=manifest_dict, attributes=attrs)
+        return ManifestGroup(arrays=manifest_arrays, attributes=attrs)
 
     @staticmethod
     def _create_manifest_store(
         filepath: str,
         group: str,
         file_id: str,
-        object_store: ObjectStore,
+        object_store: SupportedStore,
     ) -> Store:
         # TODO: Make this less sketchy, but it's better to use an AsyncTIFF store rather than an obstore store
         from async_tiff.store import LocalStore as ATStore
@@ -159,9 +161,7 @@ class TIFFVirtualBackend(VirtualBackend):
             store=at_store, path=filepath, group=group
         )
         # Convert to a manifest store
-        return ManifestStore(
-            stores={file_id: object_store}, manifest_group=manifest_group
-        )
+        return ManifestStore(stores={file_id: object_store}, group=manifest_group)
 
     @staticmethod
     def open_virtual_dataset(

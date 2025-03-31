@@ -100,7 +100,6 @@ upstream = [
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
-    's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
 ]
