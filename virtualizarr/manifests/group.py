@@ -42,5 +42,10 @@ class ManifestGroup:
 
         self._arrays = arrays
 
+    @property
+    def metadata(self) -> GroupMetadata:
+        """Zarr group metadata."""
+        return self._metadata
+
     def __str__(self) -> str:
-        return f"ManifestGroup(arrays={self._arrays}, metadata={self._metadata})"
+        return f"ManifestGroup(arrays={self._arrays}, metadata={self.metadata})"

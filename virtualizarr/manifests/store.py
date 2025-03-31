@@ -100,7 +100,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
 
     if key == "zarr.json":
-        metadata = manifest_group._metadata.to_dict()
+        metadata = manifest_group.metadata.to_dict()
         return dict_to_buffer(metadata, prototype=default_buffer_prototype())
     else:
         var, _ = key.split("/")

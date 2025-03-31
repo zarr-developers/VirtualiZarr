@@ -25,7 +25,7 @@ class TestManifestGroup:
         manifest_group = ManifestGroup(arrays={var: manifest_array}, attributes={})
         assert isinstance(manifest_group._arrays, dict)
         assert isinstance(manifest_group._arrays[var], ManifestArray)
-        assert isinstance(manifest_group._metadata, GroupMetadata)
+        assert isinstance(manifest_group.metadata, GroupMetadata)
 
     def test_manifest_repr(self, manifest_array):
         manifest_group = ManifestGroup(arrays={"foo": manifest_array}, attributes={})
