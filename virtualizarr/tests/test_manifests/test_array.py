@@ -384,3 +384,27 @@ def test_refuse_combine(array_v3_metadata):
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
+
+
+def test_to_xarray(array_v3_metadata):
+    chunks = (5, 10)
+    shape = (5, 20)
+    metadata = array_v3_metadata(
+        shape=shape,
+        chunks=chunks,
+        attributes={"ham": "sandwich"},
+        dimension_names=["x", "y"],
+    )
+    chunks_dict = {
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
+    }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+    vv = marr.to_virtual_variable()
+    assert isinstance(vv.data, ManifestArray)
+    assert vv.dims == ("x", "y")
+    assert vv.data.metadata.dimension_names is None
+    assert vv.attrs == {"ham": "sandwich"}
+    assert vv.data.metadata.attributes == {}
