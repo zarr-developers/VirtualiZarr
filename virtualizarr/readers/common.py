@@ -1,15 +1,33 @@
+import dataclasses
 from collections.abc import Iterable, Mapping
-from typing import (
-    Any,
-    Hashable,
-    MutableMapping,
-    Optional,
-)
+from typing import Any, Hashable, MutableMapping, Optional, TypedDict
 
+import numpy as np
 import xarray as xr
 import xarray.indexes
+from numcodecs.abc import Codec
 
 from virtualizarr.utils import _FsspecFSFromFilepath
+
+
+@dataclasses.dataclass
+class ZstdProperties:
+    level: int
+
+
+@dataclasses.dataclass
+class ShuffleProperties:
+    elementsize: int
+
+
+@dataclasses.dataclass
+class ZlibProperties:
+    level: int
+
+
+class CFCodec(TypedDict):
+    target_dtype: np.dtype
+    codec: Codec
 
 
 def construct_fully_virtual_dataset(
