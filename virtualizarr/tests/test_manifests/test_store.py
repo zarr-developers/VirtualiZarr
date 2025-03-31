@@ -74,7 +74,7 @@ def _generate_manifest_store(
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    return ManifestStore(stores={prefix: store}, manifest_group=manifest_group)
+    return ManifestStore(stores={prefix: store}, group=manifest_group)
 
 
 @pytest.fixture()

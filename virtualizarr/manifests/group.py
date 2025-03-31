@@ -31,10 +31,9 @@ class ManifestGroup(
         ----------
         arrays : Mapping[str, ManifestArray]
         groups : Mapping[str, ManifestGroup]
-        attributes : dict
+        metadata : dict
             Zarr attributes to use as zarr group metadata.
         """
-
         self._metadata = GroupMetadata(attributes=attributes)
 
         _arrays: Mapping[str, ManifestArray] = {} if arrays is None else arrays
@@ -56,7 +55,11 @@ class ManifestGroup(
         # TODO check that all arrays have the same shapes or dimensions?
         # Technically that's allowed by the zarr model, so we should theoretically only check that upon converting to
 
-        # TODO check for name collisions
+        colliding_names = set(_arrays.keys()).intersection(set(_groups.keys()))
+        if colliding_names:
+            raise ValueError(
+                f"Some names collide as they are present in both the array and group keys: {colliding_names}"
+            )
 
         self._members = {**_arrays, **_groups}
 
