@@ -44,6 +44,8 @@ from virtualizarr.readers.common import (
 def _get_dtype(sample_format, bits_per_sample):
     if sample_format[0] == 1 and bits_per_sample[0] == 16:
         return np.dtype(np.uint16)
+    elif bits_per_sample[0] == 64:  # TODO: Check if sample_format matters here
+        return np.dtype(np.float64)
     else:
         raise NotImplementedError
 
