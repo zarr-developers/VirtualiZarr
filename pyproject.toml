@@ -66,7 +66,7 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
-tif = [
+tiff = [
     "obstore>=0.5.1",
     "async-tiff @ git+https://github.com/developmentseed/async-tiff#subdirectory=python",
 ]
