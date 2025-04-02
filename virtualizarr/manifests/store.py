@@ -126,7 +126,9 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     """
     if key.endswith("c"):
         # Scalar arrays hold the data in the "c" key
-        return (0,)
+        raise NotImplementedError(
+            "Scalar arrays are not yet supported by ManifestStore"
+        )
     parts = key.split(
         "c/"
     )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
