@@ -228,7 +228,7 @@ class HDFVirtualBackend(VirtualBackend):
     def _dataset_chunk_manifest(
         path: str,
         dataset: H5Dataset,
-    ) -> Optional[ChunkManifest]:
+    ) -> ChunkManifest:
         """
         Generate ChunkManifest for HDF5 dataset.
 
@@ -247,7 +247,7 @@ class HDFVirtualBackend(VirtualBackend):
         dsid = dataset.id
         if dataset.chunks is None:
             if dsid.get_offset() is None:
-                return None
+                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
             else:
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
@@ -258,42 +258,42 @@ class HDFVirtualBackend(VirtualBackend):
                 chunk_key = ChunkKey(key)
                 chunk_entries = {chunk_key: chunk_entry}
                 chunk_manifest = ChunkManifest(entries=chunk_entries)
-                return chunk_manifest
         else:
             num_chunks = dsid.get_num_chunks()
             if num_chunks == 0:
-                raise ValueError("The dataset is chunked but contains no chunks")
-            shape = tuple(
-                math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
-            )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
-            offsets = np.empty(shape, dtype=np.uint64)
-            lengths = np.empty(shape, dtype=np.uint64)
-
-            def get_key(blob):
-                return tuple(
-                    [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
-                )
-
-            def add_chunk_info(blob):
-                key = get_key(blob)
-                paths[key] = path
-                offsets[key] = blob.byte_offset
-                lengths[key] = blob.size
-
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
+                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape) 
             else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+                shape = tuple(
+                    math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
+                )
+                paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
+                offsets = np.empty(shape, dtype=np.uint64)
+                lengths = np.empty(shape, dtype=np.uint64)
 
-            chunk_manifest = ChunkManifest.from_arrays(
-                paths=paths,  # type: ignore
-                offsets=offsets,
-                lengths=lengths,
-            )
-            return chunk_manifest
+                def get_key(blob):
+                    return tuple(
+                        [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
+                    )
+
+                def add_chunk_info(blob):
+                    key = get_key(blob)
+                    paths[key] = path
+                    offsets[key] = blob.byte_offset
+                    lengths[key] = blob.size
+
+                has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
+                if has_chunk_iter:
+                    dsid.chunk_iter(add_chunk_info)
+                else:
+                    for index in range(num_chunks):
+                        add_chunk_info(dsid.get_chunk_info(index))
+
+                chunk_manifest = ChunkManifest.from_arrays(
+                    paths=paths,  # type: ignore
+                    offsets=offsets,
+                    lengths=lengths,
+                )
+        return chunk_manifest
 
     @staticmethod
     def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
