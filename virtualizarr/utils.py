@@ -2,24 +2,13 @@ from __future__ import annotations
 
 import importlib
 import io
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
 from virtualizarr.codecs import extract_codecs, get_codec_config
-
-if TYPE_CHECKING:
-    import fsspec.core
-    import fsspec.spec
-
-    # See pangeo_forge_recipes.storage
-    OpenFileType = Union[
-        fsspec.core.OpenFile, fsspec.spec.AbstractBufferedFile, io.IOBase
-    ]
-
-
-from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
     import fsspec.core
