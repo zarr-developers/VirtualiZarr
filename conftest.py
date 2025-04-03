@@ -292,11 +292,14 @@ def manifest_array(array_v3_metadata):
     """
 
     def _manifest_array(
-        shape: tuple = (5, 5),
-        chunks: tuple = (5, 5),
+        shape: tuple = (5, 2),
+        chunks: tuple = (5, 2),
         codecs: list[dict] | None = [ARRAYBYTES_CODEC, ZLIB_CODEC],
+        dimension_names: Iterable[str] | None = None,
     ):
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, codecs=codecs, dimension_names=dimension_names
+        )
         entries = _generate_chunk_entries(shape, chunks, _entry_from_chunk_key)
         chunkmanifest = ChunkManifest(entries=entries)
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
