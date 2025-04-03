@@ -51,6 +51,13 @@ pytest virtualizarr
 exit
 ```
 
+If you run into issues with the development environment, here are some recommending steps:
+- Update pixi using `pixi self-update` and then retry the development workflow.
+- Clean up environments using `pixi clean` and then retry the development workflow.
+- Manually find and clean the cache dir listed in `pixi info` and then retry the development workflow.
+- Ask for help in the [VirtualiZarr channel of the Earthmover community slack](https://earthmover-community.slack.com/archives/C08EXCE8ZQX).
+
+
 
 ## Contributing documentation
 

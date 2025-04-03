@@ -42,7 +42,7 @@ def create_v3_array_metadata(
     attributes : Dict[str, Any], optional
         Additional attributes for the array
     dimension_names : tuple[str], optional
-         Names of the dimensions
+        Names of the dimensions
 
     Returns
     -------
