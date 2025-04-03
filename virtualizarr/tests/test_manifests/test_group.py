@@ -1,3 +1,5 @@
+import textwrap
+
 import pytest
 from zarr.core.group import GroupMetadata
 
@@ -20,17 +22,28 @@ def manifest_array(array_v3_metadata):
 
 
 class TestManifestGroup:
-    def test_manifest_array(self, array_v3_metadata, manifest_array):
+    def test_group_containing_array(self, manifest_array):
         var = "foo"
-        manifest_group = ManifestGroup(
-            manifest_arrays={var: manifest_array}, attributes={}
-        )
-        assert isinstance(manifest_group._manifest_arrays, dict)
-        assert isinstance(manifest_group._manifest_arrays[var], ManifestArray)
-        assert isinstance(manifest_group._metadata, GroupMetadata)
+        manifest_group = ManifestGroup(arrays={var: manifest_array}, attributes={})
+
+        assert manifest_group.arrays == {var: manifest_array}
+        assert manifest_group.groups == {}
+        assert isinstance(manifest_group[var], ManifestArray)
+        with pytest.raises(KeyError):
+            manifest_group["bar"]
+        assert isinstance(manifest_group.metadata, GroupMetadata)
+        assert len(manifest_group) == 1
+        assert list(manifest_group) == [var]
 
     def test_manifest_repr(self, manifest_array):
-        manifest_group = ManifestGroup(
-            manifest_arrays={"foo": manifest_array}, attributes={}
+        manifest_group = ManifestGroup(arrays={"foo": manifest_array}, attributes={})
+        expected_repr = textwrap.dedent(
+            """
+            ManifestGroup(
+                arrays={'foo': ManifestArray<shape=(5, 2, 20), dtype=int32, chunks=(5, 1, 10)>},
+                groups={},
+                metadata=GroupMetadata(attributes={}, zarr_format=3, consolidated_metadata=None, node_type='group'),
+            )
+            """
         )
-        assert str(manifest_group)
+        assert repr(manifest_group) == expected_repr

@@ -14,6 +14,7 @@ comment:
   require_changes: true  # if true: only post the comment if coverage changes
   branches:               # branch names that can post comment
     - "main"
+    - "develop"
 ignore:
   - "conftest.py"
   - "virtualizarr/tests"  # ignore folders and all its contents

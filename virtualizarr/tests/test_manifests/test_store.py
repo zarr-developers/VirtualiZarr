@@ -79,9 +79,10 @@ def _generate_manifest_store(
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(
-        {"foo": manifest_array, "bar": manifest_array}, attributes={"Zarr": "Hooray!"}
+        arrays={"foo": manifest_array, "bar": manifest_array},
+        attributes={"Zarr": "Hooray!"},
     )
-    return ManifestStore(stores={prefix: store}, manifest_group=manifest_group)
+    return ManifestStore(stores={prefix: store}, group=manifest_group)
 
 
 @pytest.fixture()

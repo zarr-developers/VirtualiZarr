@@ -150,7 +150,7 @@ class HDFVirtualBackend(VirtualBackend):
                     )
                     if variable is not None:
                         manifest_dict[key] = variable
-        return ManifestGroup(manifest_arrays=manifest_dict, attributes=attrs)
+        return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
     @staticmethod
     def _create_manifest_store(
@@ -165,7 +165,7 @@ class HDFVirtualBackend(VirtualBackend):
             store=store, filepath=filepath, group=group
         )
         # Convert to a manifest store
-        return ManifestStore(stores={prefix: store}, manifest_group=manifest_group)
+        return ManifestStore(stores={prefix: store}, group=manifest_group)
 
     @staticmethod
     def open_virtual_dataset(
