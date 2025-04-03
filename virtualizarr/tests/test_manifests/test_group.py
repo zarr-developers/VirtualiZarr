@@ -38,18 +38,31 @@ class TestManifestGroup:
 
 class TestToXarray:
     def test_single_group_to_dataset(self, manifest_array):
-        marr = manifest_array(shape=(3, 2), chunks=(3, 2), dimension_names=["x", "y"])
-        manifest_group = ManifestGroup(arrays={"foo": marr}, attributes={"ham": "eggs"})
+        marr1 = manifest_array(
+            shape=(3, 2, 5), chunks=(1, 2, 1), dimension_names=["x", "y", "t"]
+        )
+        marr2 = manifest_array(shape=(3, 2), chunks=(1, 2), dimension_names=["x", "y"])
+        marr3 = manifest_array(shape=(5,), chunks=(5,), dimension_names=["t"])
+
+        manifest_group = ManifestGroup(
+            arrays={
+                "T": marr1,  # data variable
+                "elevation": marr2,  # 2D coordinate
+                "t": marr3,  # 1D dimension coordinate
+            },
+            attributes={"coordinates": "elevation t", "ham": "eggs"},
+        )
 
         vds = manifest_group.to_virtual_dataset()
-        assert list(vds.variables) == ["foo"]
+        assert list(vds.variables) == ["T", "elevation", "t"]
         assert vds.attrs == {"ham": "eggs"}
-        assert list(vds.dims) == ["x", "y"]
+        assert list(vds.dims) == ["x", "y", "t"]
 
-        vv = vds.variables["foo"]
+        vv = vds.variables["T"]
         assert isinstance(vv.data, ManifestArray)
-        assert list(vv.dims) == ["x", "y"]
+        assert list(vv.dims) == ["x", "y", "t"]
         # check dims info is not duplicated in two places
         assert vv.data.metadata.dimension_names is None
+        assert vv.attrs == {}
 
-        # TODO test coordinates
+        assert list(vds.coords) == ["elevation", "t"]
