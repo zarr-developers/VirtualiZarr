@@ -378,7 +378,7 @@ class ManifestStore(Store):
         else:
             manifestgroup = self._group
 
-        return manifestgroup.as_virtual_dataset()
+        return manifestgroup.to_virtual_dataset()
 
 
 def _transform_byte_range(
