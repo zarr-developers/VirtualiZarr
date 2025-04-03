@@ -2,13 +2,12 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 from zarr import Array
+from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
 from zarr.core.metadata.v3 import (
     ArrayV3Metadata,
     parse_dimension_names,
     parse_shapelike,
 )
-from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
-
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
