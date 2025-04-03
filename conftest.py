@@ -3,7 +3,7 @@
 # Standard library imports
 import itertools
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 # Third-party imports
 import h5py  # type: ignore[import]
@@ -266,6 +266,8 @@ def array_v3_metadata():
         data_type: np.dtype = np.dtype("int32"),
         codecs: list[dict] | None = None,
         fill_value: int | float | None = None,
+        attributes: dict | None = None,
+        dimension_names: Iterable[str] | None = None,
     ):
         codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
         return create_v3_array_metadata(
@@ -274,6 +276,8 @@ def array_v3_metadata():
             data_type=data_type,
             codecs=codecs,
             fill_value=fill_value or 0,
+            attributes=attributes,
+            dimension_names=dimension_names,
         )
 
     return _create_metadata
@@ -288,11 +292,14 @@ def manifest_array(array_v3_metadata):
     """
 
     def _manifest_array(
-        shape: tuple = (5, 5),
-        chunks: tuple = (5, 5),
+        shape: tuple = (5, 2),
+        chunks: tuple = (5, 2),
         codecs: list[dict] | None = [ARRAYBYTES_CODEC, ZLIB_CODEC],
+        dimension_names: Iterable[str] | None = None,
     ):
-        metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, codecs=codecs, dimension_names=dimension_names
+        )
         entries = _generate_chunk_entries(shape, chunks, _entry_from_chunk_key)
         chunkmanifest = ChunkManifest(entries=entries)
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
