@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import pickle
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 from zarr.abc.store import (
     OffsetByteRequest,
@@ -19,6 +20,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import requires_minio, requires_obstore
 
 if TYPE_CHECKING:
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def _generate_manifest_store(
-    store: ObjectStore, *, prefix: str, filepath: str, array_v3_metadata: Callable
+    store: ObjectStore, *, prefix: str, filepath: str
 ) -> ManifestStore:
     """
     Generate a ManifestStore for testing.
@@ -66,9 +68,15 @@ def _generate_manifest_store(
         "1.1": {"path": f"{prefix}/{filepath}", "offset": 12, "length": 4},
     }
     manifest = ChunkManifest(entries=chunk_dict)
-    chunks = (1, 4)
-    shape = (2, 8)
-    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
+    codecs = [{"configuration": {"endian": "little"}, "name": "bytes"}]
+    array_metadata = create_v3_array_metadata(
+        shape=(4, 4),
+        chunk_shape=(2, 2),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(
         arrays={"foo": manifest_array, "bar": manifest_array},
@@ -78,7 +86,7 @@ def _generate_manifest_store(
 
 
 @pytest.fixture()
-def local_store(tmpdir, array_v3_metadata):
+def local_store(tmpdir):
     import obstore as obs
 
     store = obs.store.LocalStore()
@@ -88,12 +96,11 @@ def local_store(tmpdir, array_v3_metadata):
         store=store,
         prefix=prefix,
         filepath=filepath,
-        array_v3_metadata=array_v3_metadata,
     )
 
 
 @pytest.fixture()
-def s3_store(minio_bucket, array_v3_metadata):
+def s3_store(minio_bucket):
     import obstore as obs
 
     store = obs.store.S3Store(
@@ -110,7 +117,6 @@ def s3_store(minio_bucket, array_v3_metadata):
         store=store,
         prefix=prefix,
         filepath=filepath,
-        array_v3_metadata=array_v3_metadata,
     )
 
 
@@ -164,7 +170,7 @@ class TestManifestStore:
             "foo/zarr.json", prototype=default_buffer_prototype()
         )
         metadata = json.loads(observed.to_bytes())
-        assert metadata["chunk_grid"]["configuration"]["chunk_shape"] == [1, 4]
+        assert metadata["chunk_grid"]["configuration"]["chunk_shape"] == [2, 2]
         assert metadata["node_type"] == "array"
         assert metadata["zarr_format"] == 3
 
