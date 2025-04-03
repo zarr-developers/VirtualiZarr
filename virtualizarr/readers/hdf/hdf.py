@@ -261,7 +261,7 @@ class HDFVirtualBackend(VirtualBackend):
         else:
             num_chunks = dsid.get_num_chunks()
             if num_chunks == 0:
-                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape) 
+                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
             else:
                 shape = tuple(
                     math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
