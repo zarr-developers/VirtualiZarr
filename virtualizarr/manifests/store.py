@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
+import xarray as xr
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -126,7 +127,9 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     """
     if key.endswith("c"):
         # Scalar arrays hold the data in the "c" key
-        return (0,)
+        raise NotImplementedError(
+            "Scalar arrays are not yet supported by ManifestStore"
+        )
     parts = key.split(
         "c/"
     )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
@@ -348,6 +351,32 @@ class ManifestStore(Store):
         yield "zarr.json"
         for k in self._group.arrays.keys():
             yield k
+
+    def to_virtual_dataset(self, group="") -> xr.Dataset:
+        """
+        Create a "virtual" xarray dataset containing the contents of one zarr group.
+
+        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
+
+        Will ignore the contents of any other groups in the store.
+
+        Parameters
+        ----------
+        group : str
+
+        Returns
+        -------
+        vds : xarray.Dataset
+        """
+
+        if group:
+            raise NotImplementedError(
+                "ManifestStore does not yet support nested groups"
+            )
+        else:
+            manifestgroup = self._group
+
+        return manifestgroup.to_virtual_dataset()
 
 
 def _transform_byte_range(

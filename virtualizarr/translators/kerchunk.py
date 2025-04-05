@@ -11,10 +11,10 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 from virtualizarr.codecs import (
     numcodec_config_to_configurable,
 )
+from virtualizarr.common import separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
