@@ -40,6 +40,8 @@ Documentation
 
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+- Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
