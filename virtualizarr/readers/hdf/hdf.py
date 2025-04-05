@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Dict,
     Hashable,
     Iterable,
@@ -19,18 +20,20 @@ import xarray as xr
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
+from virtualizarr.common import (
+    construct_fully_virtual_dataset,
+    replace_virtual_with_loadable_vars,
+)
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
     ManifestArray,
+    ManifestGroup,
+    ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.readers.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
@@ -41,6 +44,7 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
+    from obstore.store import ObjectStore
 
 FillValueType = Union[
     int,
@@ -58,6 +62,111 @@ FillValueType = Union[
 
 
 class HDFVirtualBackend(VirtualBackend):
+    @staticmethod
+    def _construct_manifest_array(
+        path: str,
+        dataset: H5Dataset,
+        group: str,
+    ) -> ManifestArray:
+        """
+        Construct a ManifestArray from an h5py dataset
+        Parameters
+        ----------
+        path: str
+            The path of the hdf5 file.
+        dataset : h5py.Dataset
+            An h5py dataset.
+        group : str
+            Name of the group containing this h5py.Dataset.
+        Returns
+        -------
+        ManifestArray
+        """
+        chunks = dataset.chunks if dataset.chunks else dataset.shape
+        codecs = codecs_from_dataset(dataset)
+        attrs = HDFVirtualBackend._extract_attrs(dataset)
+        dtype = dataset.dtype
+
+        codec_configs = [
+            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
+        ]
+
+        fill_value = dataset.fillvalue.item()
+        dims = tuple(HDFVirtualBackend._dataset_dims(dataset, group=group))
+        metadata = create_v3_array_metadata(
+            shape=dataset.shape,
+            data_type=dtype,
+            chunk_shape=chunks,
+            fill_value=fill_value,
+            codecs=codec_configs,
+            dimension_names=dims,
+            attributes=attrs,
+        )
+
+        manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
+        return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+    @staticmethod
+    def _construct_manifest_group(
+        store: ObjectStore,
+        filepath: str,
+        *,
+        group: str | None = None,
+        drop_variables: Optional[List[str]] = None,
+    ) -> ManifestGroup:
+        """
+        Construct a virtual Group from a HDF dataset.
+        """
+        from virtualizarr.utils import ObstoreReader
+
+        if drop_variables is None:
+            drop_variables = []
+
+        reader = ObstoreReader(store=store, path=filepath)
+        f = h5py.File(reader, mode="r")
+
+        if group is not None and group != "":
+            g = f[group]
+            group_name = group
+            if not isinstance(g, h5py.Group):
+                raise ValueError("The provided group is not an HDF group")
+        else:
+            g = f["/"]
+            group_name = "/"
+
+        manifest_dict = {}
+        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
+            group=g
+        )
+        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
+        attrs: dict[str, Any] = {}
+        for key in g.keys():
+            if key not in drop_variables:
+                if isinstance(g[key], h5py.Dataset):
+                    variable = HDFVirtualBackend._construct_manifest_array(
+                        path=filepath,
+                        dataset=g[key],
+                        group=group_name,
+                    )
+                    if variable is not None:
+                        manifest_dict[key] = variable
+        return ManifestGroup(arrays=manifest_dict, attributes=attrs)
+
+    @staticmethod
+    def _create_manifest_store(
+        filepath: str,
+        *,
+        prefix: str,
+        store: ObjectStore,
+        group: str | None = None,
+    ) -> ManifestStore:
+        # Create a group containing dataset level metadata and all the manifest arrays
+        manifest_group = HDFVirtualBackend._construct_manifest_group(
+            store=store, filepath=filepath, group=group
+        )
+        # Convert to a manifest store
+        return ManifestStore(stores={prefix: store}, group=manifest_group)
+
     @staticmethod
     def open_virtual_dataset(
         filepath: str,
@@ -119,7 +228,7 @@ class HDFVirtualBackend(VirtualBackend):
     def _dataset_chunk_manifest(
         path: str,
         dataset: H5Dataset,
-    ) -> Optional[ChunkManifest]:
+    ) -> ChunkManifest:
         """
         Generate ChunkManifest for HDF5 dataset.
 
@@ -138,7 +247,7 @@ class HDFVirtualBackend(VirtualBackend):
         dsid = dataset.id
         if dataset.chunks is None:
             if dsid.get_offset() is None:
-                return None
+                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
             else:
                 key_list = [0] * (len(dataset.shape) or 1)
                 key = ".".join(map(str, key_list))
@@ -149,42 +258,42 @@ class HDFVirtualBackend(VirtualBackend):
                 chunk_key = ChunkKey(key)
                 chunk_entries = {chunk_key: chunk_entry}
                 chunk_manifest = ChunkManifest(entries=chunk_entries)
-                return chunk_manifest
         else:
             num_chunks = dsid.get_num_chunks()
             if num_chunks == 0:
-                raise ValueError("The dataset is chunked but contains no chunks")
-            shape = tuple(
-                math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
-            )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
-            offsets = np.empty(shape, dtype=np.uint64)
-            lengths = np.empty(shape, dtype=np.uint64)
-
-            def get_key(blob):
-                return tuple(
-                    [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
-                )
-
-            def add_chunk_info(blob):
-                key = get_key(blob)
-                paths[key] = path
-                offsets[key] = blob.byte_offset
-                lengths[key] = blob.size
-
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
+                chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
             else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+                shape = tuple(
+                    math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
+                )
+                paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
+                offsets = np.empty(shape, dtype=np.uint64)
+                lengths = np.empty(shape, dtype=np.uint64)
 
-            chunk_manifest = ChunkManifest.from_arrays(
-                paths=paths,  # type: ignore
-                offsets=offsets,
-                lengths=lengths,
-            )
-            return chunk_manifest
+                def get_key(blob):
+                    return tuple(
+                        [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
+                    )
+
+                def add_chunk_info(blob):
+                    key = get_key(blob)
+                    paths[key] = path
+                    offsets[key] = blob.byte_offset
+                    lengths[key] = blob.size
+
+                has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
+                if has_chunk_iter:
+                    dsid.chunk_iter(add_chunk_info)
+                else:
+                    for index in range(num_chunks):
+                        add_chunk_info(dsid.get_chunk_info(index))
+
+                chunk_manifest = ChunkManifest.from_arrays(
+                    paths=paths,  # type: ignore
+                    offsets=offsets,
+                    lengths=lengths,
+                )
+        return chunk_manifest
 
     @staticmethod
     def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:

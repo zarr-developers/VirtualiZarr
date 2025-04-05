@@ -16,19 +16,18 @@ class TestDatasetChunkManifest:
     def test_empty_chunks(self, empty_chunks_hdf5_file):
         f = h5py.File(empty_chunks_hdf5_file)
         ds = f["data"]
-        with pytest.raises(ValueError, match="chunked but contains no chunks"):
-            HDFVirtualBackend._dataset_chunk_manifest(
-                path=empty_chunks_hdf5_file, dataset=ds
-            )
+        manifest = HDFVirtualBackend._dataset_chunk_manifest(
+            path=empty_chunks_hdf5_file, dataset=ds
+        )
+        assert manifest.shape_chunk_grid == (0,)
 
-    @pytest.mark.skip("Need to differentiate non coordinate dimensions from empty")
     def test_empty_dataset(self, empty_dataset_hdf5_file):
         f = h5py.File(empty_dataset_hdf5_file)
         ds = f["data"]
-        with pytest.raises(ValueError, match="no space allocated in the file"):
-            HDFVirtualBackend._dataset_chunk_manifest(
-                path=empty_dataset_hdf5_file, dataset=ds
-            )
+        manifest = HDFVirtualBackend._dataset_chunk_manifest(
+            path=empty_dataset_hdf5_file, dataset=ds
+        )
+        assert manifest.shape_chunk_grid == (0,)
 
     def test_no_chunking(self, no_chunks_hdf5_file):
         f = h5py.File(no_chunks_hdf5_file)

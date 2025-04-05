@@ -2,6 +2,7 @@ import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
+import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
 import virtualizarr.manifests.utils as utils
@@ -276,6 +277,30 @@ class ManifestArray:
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
+
+    def to_virtual_variable(self) -> xr.Variable:
+        """
+        Create a "virtual" xarray.Variable containing the contents of one zarr array.
+
+        The returned variable will be "virtual", i.e. it will wrap a single ManifestArray object.
+        """
+
+        # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
+        # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
+        dims = self.metadata.dimension_names
+        attrs = self.metadata.attributes
+        stripped_metadata = utils.copy_and_replace_metadata(
+            self.metadata, new_dimension_names=None, new_attributes={}
+        )
+        stripped_marr = ManifestArray(
+            chunkmanifest=self.manifest, metadata=stripped_metadata
+        )
+
+        return xr.Variable(
+            data=stripped_marr,
+            dims=dims,
+            attrs=attrs,
+        )
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):
