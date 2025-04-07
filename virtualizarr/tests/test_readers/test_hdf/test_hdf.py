@@ -218,3 +218,14 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+def test_imagecodecs_registry(filter_encoded_hdf5_file):
+    open_virtual_dataset(
+        filter_encoded_hdf5_file,
+        backend=HDFVirtualBackend,
+    )
+
+
