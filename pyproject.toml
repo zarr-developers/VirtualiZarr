@@ -135,7 +135,7 @@ requires = [
     "setuptools>=61.0.0",
     "wheel",
     "setuptools_scm[toml]>=7.0",
-    "check-manifest"
+    "check-manifest",
 ]
 
 [tool.pixi.project]
@@ -171,8 +171,10 @@ rust = "*"
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]
 run-mypy = { cmd = "mypy virtualizarr" }
-run-tests = { cmd = "pytest -n auto --run-network-tests --verbose" }
-run-tests-no-network = { cmd = "pytest -n auto" }
+# Using '--dist loadscope' (rather than default of '--dist load' when '-n auto'
+# is used), reduces test hangs that appear to be macOS-related.
+run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose" }
+run-tests-no-network = { cmd = "pytest -n auto --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=xml" }
 run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov-report=html" }
@@ -225,8 +227,6 @@ module = [
     "zarr",
 ]
 ignore_missing_imports = true
-
-
 
 [tool.ruff]
 # Same as Black.
