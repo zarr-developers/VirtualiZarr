@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
-import xarray as xr
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -48,6 +47,8 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore  # type: ignore[import-not-found]
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
+
+    import xarray as xr
 
 
 @dataclass
@@ -352,7 +353,11 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
-    def to_virtual_dataset(self, group="") -> xr.Dataset:
+    def to_virtual_dataset(
+        self, 
+        group="",
+        loadable_variables: Iterable[str] | None = None,
+    ) -> "xr.Dataset":
         """
         Create a "virtual" xarray dataset containing the contents of one zarr group.
 
@@ -360,14 +365,19 @@ class ManifestStore(Store):
 
         Will ignore the contents of any other groups in the store.
 
+        Requires xarray.
+
         Parameters
         ----------
         group : str
+        loadable_variables : Iterable[str], optional
 
         Returns
         -------
         vds : xarray.Dataset
         """
+
+        import xarray as xr
 
         if group:
             raise NotImplementedError(
@@ -376,7 +386,21 @@ class ManifestStore(Store):
         else:
             manifestgroup = self._group
 
-        return manifestgroup.to_virtual_dataset()
+        fully_virtual_ds = manifestgroup.to_virtual_dataset()
+
+        # TODO drop the non-loadable variables here
+        loadable_ds = xr.open_zarr(
+            self,
+            group=group,
+            zarr_version=3,
+            consolidated=False,
+            drop_variables=...,
+        )
+
+        return xr.merge(
+            fully_virtual_ds.drop_vars(loadable_variables), 
+            loadable_ds,
+        )
 
 
 def _transform_byte_range(
