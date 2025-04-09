@@ -18,6 +18,7 @@ from zarr.core.buffer.core import BufferPrototype
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
@@ -357,6 +358,8 @@ class ManifestStore(Store):
         self, 
         group="",
         loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
     ) -> "xr.Dataset":
         """
         Create a "virtual" xarray dataset containing the contents of one zarr group.
@@ -376,30 +379,13 @@ class ManifestStore(Store):
         -------
         vds : xarray.Dataset
         """
+        
+        from virtualizarr.xarray import construct_virtual_dataset
 
-        import xarray as xr
-
-        if group:
-            raise NotImplementedError(
-                "ManifestStore does not yet support nested groups"
-            )
-        else:
-            manifestgroup = self._group
-
-        fully_virtual_ds = manifestgroup.to_virtual_dataset()
-
-        # TODO drop the non-loadable variables here
-        loadable_ds = xr.open_zarr(
-            self,
+        return construct_virtual_dataset(
+            manifest_store=self,
             group=group,
-            zarr_version=3,
-            consolidated=False,
-            drop_variables=...,
-        )
-
-        return xr.merge(
-            fully_virtual_ds.drop_vars(loadable_variables), 
-            loadable_ds,
+            loadable_variables=loadable_variables,
         )
 
 

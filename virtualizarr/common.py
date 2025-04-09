@@ -3,13 +3,12 @@ from typing import (
     Any,
     Hashable,
     MutableMapping,
-    Optional,
 )
 
 import xarray as xr
 import xarray.indexes
 
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.manifests import ManifestStore
 
 
 def construct_fully_virtual_dataset(
@@ -31,33 +30,35 @@ def construct_fully_virtual_dataset(
         attrs=attrs,
     )
 
-    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
-
     return vds
 
 
-# TODO reimplement this using ManifestStore (GH #473)
 def replace_virtual_with_loadable_vars(
-    fully_virtual_dataset: xr.Dataset,
-    filepath: str,  # TODO won't need this after #473 because the filepaths will be in the ManifestStore
+    manifest_store: ManifestStore,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
-    reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
+    
+    if group:
+        raise NotImplementedError(
+            "ManifestStore does not yet support nested groups"
+        )
+    else:
+        manifestgroup = manifest_store._group
+    
+    fully_virtual_ds = manifestgroup.to_virtual_dataset()
+
     if indexes is not None:
         raise NotImplementedError()
 
-    fpath = _FsspecFSFromFilepath(
-        filepath=filepath, reader_options=reader_options
-    ).open_file()
-
-    # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
-    with xr.open_dataset(
-        fpath,  # type: ignore[arg-type]
+    with xr.open_zarr(
+        manifest_store,
         group=group,
         decode_times=decode_times,
+        consolidated=False,
+        zarr_format=3,
     ) as loadable_ds:
         var_names_to_load: list[Hashable]
 
