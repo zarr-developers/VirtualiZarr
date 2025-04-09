@@ -409,7 +409,7 @@ class TestLoadVirtualDataset:
             xr.open_dataset(netcdf4_file, decode_times=True) as ds,
         ):
             assert set(vds.variables) == set(ds.variables)
-            assert set(vds.coords) == set(vds.coords)
+            assert set(vds.coords) == set(ds.coords)
 
             virtual_variables = {
                 name: var
@@ -424,7 +424,7 @@ class TestLoadVirtualDataset:
 
             assert set(actual_loadable_variables) == set(expected_loadable_variables)
 
-            for name, var in virtual_variables.items():
+            for var in virtual_variables.values():
                 assert isinstance(var.data, ManifestArray)
 
             for name, var in ds.variables.items():
