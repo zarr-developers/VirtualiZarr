@@ -21,8 +21,7 @@ from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
+    get_loadable_variables,
 )
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -139,7 +138,8 @@ class HDFVirtualBackend(VirtualBackend):
             group=g
         )
         drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
-        attrs: dict[str, Any] = {}
+        # attrs: dict[str, Any] = {}
+        attrs = HDFVirtualBackend._extract_attrs(g)
         for key in g.keys():
             if key not in drop_variables:
                 if isinstance(g[key], h5py.Dataset):
@@ -151,7 +151,7 @@ class HDFVirtualBackend(VirtualBackend):
                     if variable is not None:
                         manifest_dict[key] = variable
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
-
+        
     @staticmethod
     def _create_manifest_store(
         filepath: str,
@@ -159,10 +159,11 @@ class HDFVirtualBackend(VirtualBackend):
         prefix: str,
         store: ObjectStore,
         group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         manifest_group = HDFVirtualBackend._construct_manifest_group(
-            store=store, filepath=filepath, group=group
+            store=store, filepath=filepath, group=group, drop_variables=drop_variables,
         )
         # Convert to a manifest store
         return ManifestStore(stores={prefix: store}, group=manifest_group)
@@ -185,45 +186,34 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
-        )
+        # filepath = validate_and_normalize_path_to_uri(
+            # filepath, fs_root=Path.cwd().as_uri()
+        # )
 
         _drop_vars: list[Hashable] = (
             [] if drop_variables is None else list(drop_variables)
         )
-
-        # TODO provide a way to drop a variable _before_ h5py attempts to inspect it?
-        virtual_vars = HDFVirtualBackend._virtual_vars_from_hdf(
-            path=filepath,
+        from obstore.store import LocalStore
+        manifest_store = HDFVirtualBackend._create_manifest_store(
+            filepath=filepath,
+            store=LocalStore(),
+            prefix="file://",
+            drop_variables=_drop_vars,
             group=group,
-            reader_options=reader_options,
         )
-
-        attrs = HDFVirtualBackend._get_group_attrs(
-            path=filepath, reader_options=reader_options, group=group
-        )
-        coordinates_attr = attrs.pop("coordinates", "")
-        coord_names = coordinates_attr.split()
-
-        fully_virtual_dataset = construct_fully_virtual_dataset(
-            virtual_vars=virtual_vars,
-            coord_names=coord_names,
-            attrs=attrs,
-        )
-
-        vds = replace_virtual_with_loadable_vars(
-            fully_virtual_dataset,
-            filepath,
-            group=group,
+        ds_virtual = manifest_store.to_virtual_dataset()
+        _loadable_vars = get_loadable_variables(
+            dataset=ds_virtual,
             loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            indexes=indexes,
-            decode_times=decode_times,
         )
-
-        return vds.drop_vars(_drop_vars)
-
+        non_loadable_vars = set(ds_virtual.variables).difference(_loadable_vars)
+        ds_loadable = xr.open_zarr(
+            manifest_store, consolidated=False, zarr_format=3, drop_variables=non_loadable_vars
+        )
+        ds_virtual = ds_virtual.drop_vars(_loadable_vars)
+        ds = xr.merge([ds_virtual, ds_loadable])
+        return ds
+        
     @staticmethod
     def _dataset_chunk_manifest(
         path: str,

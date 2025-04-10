@@ -59,26 +59,10 @@ def replace_virtual_with_loadable_vars(
         group=group,
         decode_times=decode_times,
     ) as loadable_ds:
-        var_names_to_load: list[Hashable]
-
-        if isinstance(loadable_variables, list):
-            var_names_to_load = list(loadable_variables)
-        elif loadable_variables is None:
-            # If `loadable_variables` is None, then we have to explicitly match default
-            # behaviour of xarray, i.e., load and create indexes only for dimension
-            # coordinate variables.  We already have all the indexes and variables
-            # we should be keeping - we just need to distinguish them.
-            var_names_to_load = [
-                name
-                for name, var in loadable_ds.variables.items()
-                if var.dims == (name,)
-            ]
-        else:
-            raise ValueError(
-                "loadable_variables must be an iterable of string variable names,"
-                f" or None, but got type {type(loadable_variables)}"
-            )
-
+        var_names_to_load = get_loadable_variables(
+            dataset=loadable_ds,
+            loadable_variables=loadable_variables
+        )
         # this will automatically keep any IndexVariables needed for loadable 1D coordinates
         loadable_var_names_to_drop = set(loadable_ds.variables).difference(
             var_names_to_load
@@ -98,6 +82,34 @@ def replace_virtual_with_loadable_vars(
                 ds_virtual_to_keep,
             ],
         )
+
+def get_loadable_variables( 
+    dataset: xr.Dataset, 
+    loadable_variables: Iterable[Hashable] | None = None,
+) -> Iterable[Hashable]:
+    var_names_to_load: list[Hashable]
+
+    if isinstance(loadable_variables, list):
+        var_names_to_load = list(loadable_variables)
+    elif loadable_variables is None:
+        # If `loadable_variables` is None, then we have to explicitly match default
+        # behaviour of xarray, i.e., load and create indexes only for dimension
+        # coordinate variables.  We already have all the indexes and variables
+        # we should be keeping - we just need to distinguish them.
+        var_names_to_load = [
+            name
+            for name, var in dataset.variables.items()
+            if var.dims == (name,)
+        ]
+    else:
+        raise ValueError(
+            "loadable_variables must be an iterable of string variable names,"
+            f" or None, but got type {type(loadable_variables)}"
+        )
+    non_loadable_vars = set(dataset.variables).difference(
+        var_names_to_load
+    )
+    return var_names_to_load
 
 
 # TODO this probably doesn't need to actually support indexes != {}
