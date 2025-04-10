@@ -3,13 +3,13 @@ from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
-from virtualizarr.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
+)
+from virtualizarr.xarray import (
+    construct_fully_virtual_dataset,
+    construct_virtual_dataset,
 )
 
 
@@ -55,9 +55,9 @@ class NetCDF3VirtualBackend(VirtualBackend):
             attrs=attrs,
         )
 
-        vds = replace_virtual_with_loadable_vars(
-            fully_virtual_dataset,
-            filepath,
+        vds = construct_virtual_dataset(
+            fully_virtual_ds=fully_virtual_dataset,
+            filepath=filepath,
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,

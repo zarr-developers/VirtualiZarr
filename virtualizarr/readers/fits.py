@@ -3,7 +3,6 @@ from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
-from virtualizarr.common import construct_fully_virtual_dataset
 from virtualizarr.readers.api import (
     VirtualBackend,
 )
@@ -12,6 +11,7 @@ from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
+from virtualizarr.xarray import construct_fully_virtual_dataset
 
 
 class FITSVirtualBackend(VirtualBackend):
