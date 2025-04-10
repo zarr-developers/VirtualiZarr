@@ -21,10 +21,11 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.tests import requires_minio, requires_obstore
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
+    requires_minio,
+    requires_obstore,
 )
 
 if TYPE_CHECKING:
@@ -233,7 +234,9 @@ class TestToVirtualXarray:
             (None, ["t"]),
         ],
     )
-    def test_single_group_to_dataset(self, manifest_array, loadable_variables, expected_loadable_variables):
+    def test_single_group_to_dataset(
+        self, manifest_array, loadable_variables, expected_loadable_variables
+    ):
         import obstore as obs
 
         marr1 = manifest_array(
@@ -253,7 +256,6 @@ class TestToVirtualXarray:
 
         local_store = obs.store.LocalStore()
         manifest_store = ManifestStore(manifest_group, stores={"file://": local_store})
-
 
         vds = manifest_store.to_virtual_dataset(loadable_variables=loadable_variables)
         assert set(vds.variables) == set(["T", "elevation", "t"])
