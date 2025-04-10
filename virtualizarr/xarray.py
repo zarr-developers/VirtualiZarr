@@ -3,12 +3,14 @@ from typing import (
     Any,
     Hashable,
     MutableMapping,
+    Optional,
 )
 
 import xarray as xr
 import xarray.indexes
 
 from virtualizarr.manifests import ManifestStore
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 
 def construct_fully_virtual_dataset(
@@ -34,72 +36,108 @@ def construct_fully_virtual_dataset(
 
 
 def construct_virtual_dataset(
-    manifest_store: ManifestStore,
+    manifest_store: ManifestStore | None = None,
+    # TODO remove filepath option once all readers use ManifestStore approach
+    fully_virtual_ds: xr.Dataset | None = None,
+    filepath: str | None = None,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
+    reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
-    Construct a fully or partly virtual dataset from a ManifestStore, containing the contents of one group.
+    Construct a fully or partly virtual dataset from a ManifestStore (or filepath for backwards compatibility),
+    containing the contents of one group.
+
+    Accepts EITHER manifest_store OR fully_virtual_ds and filepath. The latter option should be removed once all readers use ManifestStore approach.
     """
-
-    if group:
-        raise NotImplementedError("ManifestStore does not yet support nested groups")
-    else:
-        manifestgroup = manifest_store._group
-
-    fully_virtual_ds = manifestgroup.to_virtual_dataset()
 
     if indexes is not None:
         raise NotImplementedError()
 
-    with xr.open_zarr(
-        manifest_store,
-        group=group,
-        decode_times=decode_times,
-        consolidated=False,
-        zarr_format=3,
-    ) as loadable_ds:
-        var_names_to_load: list[Hashable]
-
-        if isinstance(loadable_variables, list):
-            var_names_to_load = list(loadable_variables)
-        elif loadable_variables is None:
-            # If `loadable_variables` is None, then we have to explicitly match default
-            # behaviour of xarray, i.e., load and create indexes only for dimension
-            # coordinate variables.  We already have all the indexes and variables
-            # we should be keeping - we just need to distinguish them.
-            var_names_to_load = [
-                name
-                for name, var in loadable_ds.variables.items()
-                if var.dims == (name,)
-            ]
+    if manifest_store:
+        if group:
+            raise NotImplementedError(
+                "ManifestStore does not yet support nested groups"
+            )
         else:
-            raise ValueError(
-                "loadable_variables must be an iterable of string variable names,"
-                f" or None, but got type {type(loadable_variables)}"
+            manifestgroup = manifest_store._group
+
+        fully_virtual_ds = manifestgroup.to_virtual_dataset()
+
+        with xr.open_zarr(
+            manifest_store,
+            group=group,
+            decode_times=decode_times,
+            consolidated=False,
+            zarr_format=3,
+        ) as loadable_ds:
+            return replace_virtual_with_loadable_vars(
+                fully_virtual_ds, loadable_ds, loadable_variables
             )
 
-        # this will automatically keep any IndexVariables needed for loadable 1D coordinates
-        loadable_var_names_to_drop = set(loadable_ds.variables).difference(
-            var_names_to_load
-        )
-        ds_loadable_to_keep = loadable_ds.drop_vars(
-            loadable_var_names_to_drop, errors="ignore"
+    else:
+        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+
+        fpath = _FsspecFSFromFilepath(
+            filepath=filepath, reader_options=reader_options
+        ).open_file()
+
+        with xr.open_dataset(
+            fpath,  # type: ignore[arg-type]
+            group=group,
+            decode_times=decode_times,
+        ) as loadable_ds:
+            return replace_virtual_with_loadable_vars(
+                fully_virtual_ds, loadable_ds, loadable_variables
+            )
+
+
+def replace_virtual_with_loadable_vars(
+    fully_virtual_ds: xr.Dataset,
+    loadable_ds: xr.Dataset,
+    loadable_variables: Iterable[Hashable] | None = None,
+) -> xr.Dataset:
+    """
+    Merge a fully virtual and the corresponding fully loadable dataset, keeping only `loadable_variables` from the latter (plus defaults needed for indexes).
+    """
+
+    var_names_to_load: list[Hashable]
+
+    if isinstance(loadable_variables, list):
+        var_names_to_load = list(loadable_variables)
+    elif loadable_variables is None:
+        # If `loadable_variables` is None, then we have to explicitly match default
+        # behaviour of xarray, i.e., load and create indexes only for dimension
+        # coordinate variables.  We already have all the indexes and variables
+        # we should be keeping - we just need to distinguish them.
+        var_names_to_load = [
+            name for name, var in loadable_ds.variables.items() if var.dims == (name,)
+        ]
+    else:
+        raise ValueError(
+            "loadable_variables must be an iterable of string variable names,"
+            f" or None, but got type {type(loadable_variables)}"
         )
 
-        ds_virtual_to_keep = fully_virtual_ds.drop_vars(
-            var_names_to_load, errors="ignore"
-        )
+    # this will automatically keep any IndexVariables needed for loadable 1D coordinates
+    loadable_var_names_to_drop = set(loadable_ds.variables).difference(
+        var_names_to_load
+    )
+    ds_loadable_to_keep = loadable_ds.drop_vars(
+        loadable_var_names_to_drop, errors="ignore"
+    )
 
-        # we don't need `compat` or `join` kwargs here because there should be no variables with the same name in both datasets
-        return xr.merge(
-            [
-                ds_loadable_to_keep,
-                ds_virtual_to_keep,
-            ],
-        )
+    ds_virtual_to_keep = fully_virtual_ds.drop_vars(var_names_to_load, errors="ignore")
+
+    # we don't need `compat` or `join` kwargs here because there should be no variables with the same name in both datasets
+    return xr.merge(
+        [
+            ds_loadable_to_keep,
+            ds_virtual_to_keep,
+        ],
+    )
 
 
 # TODO this probably doesn't need to actually support indexes != {}
