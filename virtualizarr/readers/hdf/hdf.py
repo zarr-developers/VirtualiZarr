@@ -20,10 +20,6 @@ import xarray as xr
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
-from virtualizarr.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -37,6 +33,10 @@ from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
+from virtualizarr.xarray import (
+    construct_fully_virtual_dataset,
+    construct_virtual_dataset,
+)
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -212,9 +212,9 @@ class HDFVirtualBackend(VirtualBackend):
             attrs=attrs,
         )
 
-        vds = replace_virtual_with_loadable_vars(
-            fully_virtual_dataset,
-            filepath,
+        vds = construct_virtual_dataset(
+            fully_virtual_ds=fully_virtual_dataset,
+            filepath=filepath,
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,

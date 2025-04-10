@@ -114,7 +114,7 @@ class ManifestGroup(
         All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
         """
 
-        from virtualizarr.common import construct_fully_virtual_dataset
+        from virtualizarr.xarray import construct_fully_virtual_dataset
 
         # The xarray data model stores coordinate names outside of the arbitrary extra metadata it can store on a Dataset,
         # so to avoid that information being duplicated we strip it from the zarr group attributes before storing it.

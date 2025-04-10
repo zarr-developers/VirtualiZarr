@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
-import xarray as xr
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -48,6 +47,8 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore  # type: ignore[import-not-found]
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
+
+    import xarray as xr
 
 
 @dataclass
@@ -352,31 +353,39 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
-    def to_virtual_dataset(self, group="") -> xr.Dataset:
+    def to_virtual_dataset(
+        self,
+        group="",
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
+    ) -> "xr.Dataset":
         """
         Create a "virtual" xarray dataset containing the contents of one zarr group.
 
-        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
-
         Will ignore the contents of any other groups in the store.
+
+        Requires xarray.
 
         Parameters
         ----------
         group : str
+        loadable_variables : Iterable[str], optional
 
         Returns
         -------
         vds : xarray.Dataset
         """
 
-        if group:
-            raise NotImplementedError(
-                "ManifestStore does not yet support nested groups"
-            )
-        else:
-            manifestgroup = self._group
+        from virtualizarr.xarray import construct_virtual_dataset
 
-        return manifestgroup.to_virtual_dataset()
+        return construct_virtual_dataset(
+            manifest_store=self,
+            group=group,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
 
 
 def _transform_byte_range(
