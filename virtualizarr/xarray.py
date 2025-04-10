@@ -82,7 +82,8 @@ def construct_virtual_dataset(
         # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
 
         fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
+            filepath=filepath,  # type: ignore[arg-type]
+            reader_options=reader_options,
         ).open_file()
 
         with xr.open_dataset(
@@ -91,7 +92,9 @@ def construct_virtual_dataset(
             decode_times=decode_times,
         ) as loadable_ds:
             return replace_virtual_with_loadable_vars(
-                fully_virtual_ds, loadable_ds, loadable_variables
+                fully_virtual_ds,  # type: ignore[arg-type]
+                loadable_ds,
+                loadable_variables,
             )
 
 
