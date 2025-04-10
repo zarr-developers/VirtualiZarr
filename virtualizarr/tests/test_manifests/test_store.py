@@ -22,6 +22,10 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import requires_minio, requires_obstore
+from virtualizarr.tests import (
+    requires_hdf5plugin,
+    requires_imagecodecs,
+)
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore
@@ -216,8 +220,20 @@ class TestManifestStore:
 
 
 @requires_obstore
+@requires_hdf5plugin
+@requires_imagecodecs
 class TestToVirtualXarray:
-    def test_single_group_to_dataset(self, manifest_array):
+    @pytest.mark.parametrize(
+        "loadable_variables, expected_loadable_variables",
+        [
+            ([], []),
+            (["t"], ["t"]),
+            (["T", "t"], ["T", "t"]),
+            (["T", "elevation"], ["T", "elevation"]),
+            (None, ["t"]),
+        ],
+    )
+    def test_single_group_to_dataset(self, manifest_array, loadable_variables, expected_loadable_variables):
         import obstore as obs
 
         marr1 = manifest_array(
@@ -238,16 +254,20 @@ class TestToVirtualXarray:
         local_store = obs.store.LocalStore()
         manifest_store = ManifestStore(manifest_group, stores={"file://": local_store})
 
-        vds = manifest_store.to_virtual_dataset()
-        assert list(vds.variables) == ["T", "elevation", "t"]
+
+        vds = manifest_store.to_virtual_dataset(loadable_variables=loadable_variables)
+        assert set(vds.variables) == set(["T", "elevation", "t"])
         assert vds.attrs == {"ham": "eggs"}
-        assert list(vds.dims) == ["x", "y", "t"]
+        assert set(vds.dims) == set(["x", "y", "t"])
+        assert set(vds.coords) == set(["elevation", "t"])
 
-        vv = vds.variables["T"]
-        assert isinstance(vv.data, ManifestArray)
-        assert list(vv.dims) == ["x", "y", "t"]
-        # check dims info is not duplicated in two places
-        assert vv.data.metadata.dimension_names is None
-        assert vv.attrs == {}
-
-        assert list(vds.coords) == ["elevation", "t"]
+        var_name = "T"
+        var = vds.variables[var_name]
+        assert set(var.dims) == set(["x", "y", "t"])
+        if var_name in expected_loadable_variables:
+            assert isinstance(var.data, np.ndarray)
+        else:
+            assert isinstance(var.data, ManifestArray)
+            # check dims info is not duplicated in two places
+            assert var.data.metadata.dimension_names is None
+            assert var.attrs == {}

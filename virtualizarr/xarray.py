@@ -69,9 +69,10 @@ def construct_virtual_dataset(
         with xr.open_zarr(
             manifest_store,
             group=group,
-            decode_times=decode_times,
             consolidated=False,
             zarr_format=3,
+            chunks=None,
+            decode_times=decode_times,
         ) as loadable_ds:
             return replace_virtual_with_loadable_vars(
                 fully_virtual_ds, loadable_ds, loadable_variables

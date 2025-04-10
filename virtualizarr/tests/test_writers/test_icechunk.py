@@ -13,7 +13,7 @@ import xarray as xr
 import zarr
 from zarr.core.metadata import ArrayV3Metadata
 
-from virtualizarr.common import separate_coords
+from virtualizarr.xarray import separate_coords
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import generate_chunk_key
 
