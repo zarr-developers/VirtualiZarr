@@ -60,6 +60,8 @@ Internal Changes
     - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).
     - zarr-python 3.0 does not yet support datetime and timedelta data types (`zarr-python issue #2616 <https://github.com/zarr-developers/zarr-python/issues/2616>`_).
 - The continuous integration workflows and developer environment now use `pixi <https://pixi.sh/latest/>`_ (:pull:`407`).
+- Added `loadable_variables` kwarg to :py:meth:`ManifestStore.to_virtual_dataset`.
+  (:pull:`543`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.3.2:
 
