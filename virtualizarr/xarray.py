@@ -33,21 +33,22 @@ def construct_fully_virtual_dataset(
     return vds
 
 
-def replace_virtual_with_loadable_vars(
+def construct_virtual_dataset(
     manifest_store: ManifestStore,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
-    
+    """
+    Construct a fully or partly virtual dataset from a ManifestStore, containing the contents of one group.
+    """
+
     if group:
-        raise NotImplementedError(
-            "ManifestStore does not yet support nested groups"
-        )
+        raise NotImplementedError("ManifestStore does not yet support nested groups")
     else:
         manifestgroup = manifest_store._group
-    
+
     fully_virtual_ds = manifestgroup.to_virtual_dataset()
 
     if indexes is not None:
@@ -88,7 +89,7 @@ def replace_virtual_with_loadable_vars(
             loadable_var_names_to_drop, errors="ignore"
         )
 
-        ds_virtual_to_keep = fully_virtual_dataset.drop_vars(
+        ds_virtual_to_keep = fully_virtual_ds.drop_vars(
             var_names_to_load, errors="ignore"
         )
 

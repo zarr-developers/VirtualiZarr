@@ -18,7 +18,6 @@ from zarr.core.buffer.core import BufferPrototype
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 
-
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
@@ -355,7 +354,7 @@ class ManifestStore(Store):
             yield k
 
     def to_virtual_dataset(
-        self, 
+        self,
         group="",
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
@@ -363,8 +362,6 @@ class ManifestStore(Store):
     ) -> "xr.Dataset":
         """
         Create a "virtual" xarray dataset containing the contents of one zarr group.
-
-        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
 
         Will ignore the contents of any other groups in the store.
 
@@ -379,13 +376,15 @@ class ManifestStore(Store):
         -------
         vds : xarray.Dataset
         """
-        
+
         from virtualizarr.xarray import construct_virtual_dataset
 
         return construct_virtual_dataset(
             manifest_store=self,
             group=group,
             loadable_variables=loadable_variables,
+            indexes=indexes,
+            decode_times=decode_times,
         )
 
 
