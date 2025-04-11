@@ -4,9 +4,9 @@ name = "virtualizarr"
 description = "Create virtual Zarr stores from archival data using xarray API"
 readme = "README.md"
 authors = [
-    {name = "Thomas Nicholas", email = "tom@earthmover.io"}
-    {name = "Max Jones", email = "max@developmentseed.org"}
-    {name = "Raphael Hagen", email = "raphael@carbonplan.org"}
+    {name = "Thomas Nicholas", email = "tom@earthmover.io"},
+    {name = "Max Jones", email = "max@developmentseed.org"},
+    {name = "Raphael Hagen", email = "raphael@carbonplan.org"},
 ]
 license = {text = "Apache-2"}
 classifiers = [
