@@ -3,11 +3,11 @@ from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.readers.api import (
     VirtualBackend,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.manifests import ManifestStore
 
 
 class FITSVirtualBackend(VirtualBackend):
@@ -36,22 +36,16 @@ class FITSVirtualBackend(VirtualBackend):
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 
-        # both group=None and group='' mean to read root group
-        if group:
-            refs = extract_group(refs, group)
-
-        # TODO This wouldn't work until either you had an xarray backend for FITS installed, or issue #124 is implemented to load data from ManifestArrays directly
-        if loadable_variables or indexes:
-            raise NotImplementedError(
-                "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
-            )
-
-        manifeststore = ManifestStore._from_kerchunk_refs(
+        manifeststore = ManifestStore.from_kerchunk_refs(
             refs,
+            group=group,
             fs_root=Path.cwd().as_uri(),
         )
 
-        # TODO pass indexes={}?
-        vds = manifeststore.to_virtual_dataset(group=group)
+        vds = manifeststore.to_virtual_dataset(
+            group=group,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
+        )
 
         return vds.drop_vars(_drop_vars)
