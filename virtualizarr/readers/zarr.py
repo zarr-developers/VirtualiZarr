@@ -114,6 +114,8 @@ async def virtual_dataset_from_zarr_group(
     if loadable_variables is None:
         loadable_variables = []
 
+    _drop_vars: list[Hashable] = [] if drop_variables is None else list(drop_variables)
+
     virtual_zarr_arrays = await asyncio.gather(
         *[zarr_group.getitem(var) for var in zarr_array_keys]
     )
@@ -159,7 +161,7 @@ async def virtual_dataset_from_zarr_group(
         decode_times=decode_times,
     )
 
-    return vds.drop_vars(drop_variables)
+    return vds.drop_vars(_drop_vars)
 
 
 class ZarrVirtualBackend(VirtualBackend):
@@ -192,12 +194,13 @@ class ZarrVirtualBackend(VirtualBackend):
                 raise NotImplementedError(
                     "Zarr reader does not understand any virtual_backend_kwargs"
                 )
-            _drop_vars: list[Hashable] = (
-                [] if drop_variables is None else list(drop_variables)
-            )
 
             filepath = validate_and_normalize_path_to_uri(
                 filepath, fs_root=Path.cwd().as_uri()
+            )
+
+            _drop_vars: list[Hashable] = (
+                [] if drop_variables is None else list(drop_variables)
             )
 
             if reader_options is None:
