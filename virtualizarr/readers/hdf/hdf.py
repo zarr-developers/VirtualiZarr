@@ -4,8 +4,6 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Dict,
     Hashable,
     Iterable,
     List,
@@ -334,29 +332,6 @@ class HDFVirtualBackend(VirtualBackend):
         return [dim.removeprefix(group) for dim in dims]
 
     @staticmethod
-    def _extract_cf_fill_value(
-        h5obj: Union[H5Dataset, H5Group],
-    ) -> Optional[FillValueType]:
-        """
-        Convert the _FillValue attribute from an HDF5 group or dataset into
-        encoding.
-
-        Parameters
-        ----------
-        h5obj : h5py.Group or h5py.Dataset
-            An h5py group or dataset.
-        """
-        fillvalue = None
-        for n, v in h5obj.attrs.items():
-            if n == "_FillValue":
-                if isinstance(v, np.ndarray) and v.size == 1:
-                    fillvalue = v.item()
-                else:
-                    fillvalue = v
-                fillvalue = FillValueCoder.encode(fillvalue, h5obj.dtype)  # type: ignore[arg-type]
-        return fillvalue
-
-    @staticmethod
     def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
         """
         Extract attributes from an HDF5 group or dataset.
@@ -381,7 +356,9 @@ class HDFVirtualBackend(VirtualBackend):
             if n in _HIDDEN_ATTRS:
                 continue
             if n == "_FillValue":
-                continue
+                if isinstance(v, np.ndarray) and v.size == 1:
+                    v = v.item()
+                v = FillValueCoder.encode(v, h5obj.dtype)  # type: ignore[arg-type]
             # Fix some attribute values to avoid JSON encoding exceptions...
             if isinstance(v, bytes):
                 v = v.decode("utf-8") or " "
@@ -399,148 +376,6 @@ class HDFVirtualBackend(VirtualBackend):
             if v == "DIMENSION_SCALE":
                 continue
             attrs[n] = v
-        return attrs
-
-    @staticmethod
-    def _dataset_to_variable(
-        path: str,
-        dataset: H5Dataset,
-        group: str,
-    ) -> Optional[xr.Variable]:
-        """
-        Extract an xarray Variable with ManifestArray data from an h5py dataset
-
-        Parameters
-        ----------
-        dataset : h5py.Dataset
-            An h5py dataset.
-        group : str
-            Name of the group containing this h5py.Dataset.
-
-        Returns
-        -------
-        list: xarray.Variable
-            A list of xarray variables.
-        """
-        chunks = dataset.chunks if dataset.chunks else dataset.shape
-        codecs = codecs_from_dataset(dataset)
-        cfcodec = cfcodec_from_dataset(dataset)
-        attrs = HDFVirtualBackend._extract_attrs(dataset)
-        cf_fill_value = HDFVirtualBackend._extract_cf_fill_value(dataset)
-        attrs.pop("_FillValue", None)
-
-        if cfcodec:
-            codecs.insert(0, cfcodec["codec"])
-            dtype = cfcodec["target_dtype"]
-            attrs.pop("scale_factor", None)
-            attrs.pop("add_offset", None)
-        else:
-            dtype = dataset.dtype
-
-        codec_configs = [
-            numcodec_config_to_configurable(codec.get_config()) for codec in codecs
-        ]
-
-        fill_value = dataset.fillvalue.item()
-        metadata = create_v3_array_metadata(
-            shape=dataset.shape,
-            data_type=dtype,
-            chunk_shape=chunks,
-            fill_value=fill_value,
-            codecs=codec_configs,
-        )
-        dims = HDFVirtualBackend._dataset_dims(dataset, group=group)
-        manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
-        if manifest:
-            marray = ManifestArray(metadata=metadata, chunkmanifest=manifest)
-            variable = xr.Variable(data=marray, dims=dims, attrs=attrs)
-        else:
-            variable = xr.Variable(data=np.empty(dataset.shape), dims=dims, attrs=attrs)
-        if cf_fill_value is not None:
-            variable.encoding["_FillValue"] = cf_fill_value
-        return variable
-
-    @staticmethod
-    def _virtual_vars_from_hdf(
-        path: str,
-        group: Optional[str] = None,
-        drop_variables: Optional[List[str]] = None,
-        reader_options: Optional[dict] = {
-            "storage_options": {"key": "", "secret": "", "anon": True}
-        },
-    ) -> Dict[str, xr.Variable]:
-        """
-        Extract xarray Variables with ManifestArray data from an HDF file or group
-
-        Parameters
-        ----------
-        path: str
-            The path of the hdf5 file.
-        group: str, optional
-            The name of the group for which to extract variables. None refers to the root group.
-        drop_variables: list of str
-            A list of variable names to skip extracting.
-        reader_options: dict
-            A dictionary of reader options passed to fsspec when opening the file.
-
-        Returns
-        -------
-        dict
-            A dictionary of Xarray Variables with the variable names as keys.
-        """
-        if drop_variables is None:
-            drop_variables = []
-
-        open_file = _FsspecFSFromFilepath(
-            filepath=path, reader_options=reader_options
-        ).open_file()
-        f = h5py.File(open_file, mode="r")
-
-        if group is not None and group != "":
-            g = f[group]
-            group_name = group
-            if not isinstance(g, h5py.Group):
-                raise ValueError("The provided group is not an HDF group")
-        else:
-            g = f["/"]
-            group_name = "/"
-
-        variables = {}
-        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
-            group=g
-        )
-        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
-        for key in g.keys():
-            if key not in drop_variables:
-                if isinstance(g[key], h5py.Dataset):
-                    variable = HDFVirtualBackend._dataset_to_variable(
-                        path=path,
-                        dataset=g[key],
-                        group=group_name,
-                    )
-                    if variable is not None:
-                        variables[key] = variable
-        return variables
-
-    @staticmethod
-    def _get_group_attrs(
-        path: str,
-        group: Optional[str] = None,
-        reader_options: Optional[dict] = {
-            "storage_options": {"key": "", "secret": "", "anon": True}
-        },
-    ):
-        open_file = _FsspecFSFromFilepath(
-            filepath=path, reader_options=reader_options
-        ).open_file()
-        f = h5py.File(open_file, mode="r")
-        if group:
-            g = f[group]
-            if not isinstance(g, h5py.Group):
-                raise ValueError("The provided group is not an HDF group")
-        else:
-            g = f
-        attrs = HDFVirtualBackend._extract_attrs(g)
         return attrs
 
     @staticmethod

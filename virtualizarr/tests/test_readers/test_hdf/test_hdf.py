@@ -1,6 +1,7 @@
 import h5py  # type: ignore
 import numpy as np
 import pytest
+from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.readers.hdf import HDFVirtualBackend
@@ -84,38 +85,38 @@ class TestDatasetDims:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-class TestDatasetToVariable:
+class TestDatasetToManifestArray:
     def test_chunked_dataset(self, chunked_dimensions_netcdf4_file):
         f = h5py.File(chunked_dimensions_netcdf4_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             chunked_dimensions_netcdf4_file, ds, group=""
         )
-        assert var.chunks == (50, 50)
+        assert ma.chunks == (50, 50)
 
     def test_not_chunked_dataset(self, single_dimension_scale_hdf5_file):
         f = h5py.File(single_dimension_scale_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             single_dimension_scale_hdf5_file, ds, group=""
         )
-        assert var.chunks == (2,)
+        assert ma.chunks == (2,)
 
     def test_dataset_attributes(self, string_attributes_hdf5_file):
         f = h5py.File(string_attributes_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             string_attributes_hdf5_file, ds, group=""
         )
-        assert var.attrs["attribute_name"] == "attribute_name"
+        assert ma.metadata.attributes["attribute_name"] == "attribute_name"
 
     def test_scalar_fill_value(self, scalar_fill_value_hdf5_file):
         f = h5py.File(scalar_fill_value_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             scalar_fill_value_hdf5_file, ds, group=""
         )
-        assert var.data.metadata.fill_value == 42
+        assert ma.metadata.fill_value == 42
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         f = h5py.File(cf_fill_value_hdf5_file)
@@ -126,18 +127,18 @@ class TestDatasetToVariable:
             pytest.xfail(
                 "To fix, structured dtype fill value encoding for Zarr backend"
             )
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             cf_fill_value_hdf5_file, ds, group=""
         )
-        assert "_FillValue" in var.encoding
+        assert "_FillValue" in ma.metadata.attributes
 
     def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
         f = h5py.File(cf_array_fill_value_hdf5_file)
         ds = f["data"]
-        var = HDFVirtualBackend._dataset_to_variable(
+        ma = HDFVirtualBackend._construct_manifest_array(
             cf_array_fill_value_hdf5_file, ds, group=""
         )
-        assert not isinstance(var.encoding["_FillValue"], np.ndarray)
+        assert not isinstance(ma.metadata.attributes["_FillValue"], np.ndarray)
 
 
 @requires_hdf5plugin
@@ -160,42 +161,54 @@ class TestExtractAttributes:
         attrs = HDFVirtualBackend._extract_attrs(ds)
         assert len(attrs.keys()) == 2
 
-
 @requires_hdf5plugin
 @requires_imagecodecs
-class TestVirtualVarsFromHDF:
+class TestManifestGroupFromHDF:
     def test_variable_with_dimensions(self, chunked_dimensions_netcdf4_file):
-        variables = HDFVirtualBackend._virtual_vars_from_hdf(
-            chunked_dimensions_netcdf4_file
+        store = LocalStore()
+        manifest_group = HDFVirtualBackend._construct_manifest_group(
+            store=store,
+            filepath=chunked_dimensions_netcdf4_file,
         )
-        assert len(variables) == 3
+        assert len(manifest_group.arrays) == 3
 
     def test_nested_groups_are_ignored(self, nested_group_hdf5_file):
-        variables = HDFVirtualBackend._virtual_vars_from_hdf(
-            path=nested_group_hdf5_file, group="group"
+        store = LocalStore()
+        manifest_group = HDFVirtualBackend._construct_manifest_group(
+            store=store,
+            filepath=nested_group_hdf5_file,
+            group="group",
         )
-        assert len(variables) == 1
+        assert len(manifest_group.arrays) == 1
 
     def test_drop_variables(self, multiple_datasets_hdf5_file):
-        variables = HDFVirtualBackend._virtual_vars_from_hdf(
-            path=multiple_datasets_hdf5_file, drop_variables=["data2"]
+        store = LocalStore()
+        manifest_group = HDFVirtualBackend._construct_manifest_group(
+            store=store,
+            filepath=multiple_datasets_hdf5_file,
+            drop_variables=["data2"],
         )
-        assert "data2" not in variables.keys()
+        assert "data2" not in manifest_group.arrays.keys()
 
     def test_dataset_in_group(self, group_hdf5_file):
-        variables = HDFVirtualBackend._virtual_vars_from_hdf(
-            path=group_hdf5_file, group="group"
+        store = LocalStore()
+        manifest_group = HDFVirtualBackend._construct_manifest_group(
+            store=store,
+            filepath=group_hdf5_file,
+            group="group",
         )
-        assert len(variables) == 1
+        assert len(manifest_group.arrays) == 1
 
     def test_non_group_error(self, group_hdf5_file):
+        store = LocalStore()
         with pytest.raises(ValueError):
-            HDFVirtualBackend._virtual_vars_from_hdf(
-                path=group_hdf5_file, group="group/data"
+            HDFVirtualBackend._construct_manifest_group(
+                store=store,
+                filepath=group_hdf5_file,
+                group="group/data",
             )
 
 
-@pytest.mark.xfail(reason="no idea")
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestOpenVirtualDataset:
