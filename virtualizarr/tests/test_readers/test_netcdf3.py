@@ -1,4 +1,3 @@
-import pytest
 import xarray as xr
 import xarray.testing as xrt
 
