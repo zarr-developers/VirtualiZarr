@@ -6,10 +6,13 @@ on:
   # push:
   #   branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main" , "develop"]
 
 permissions:
   contents: read
+
+env:
+  PIP_ROOT_USER_ACTION: ignore
 
 jobs:
   build-artifacts:

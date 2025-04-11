@@ -1,10 +1,80 @@
 Release notes
 =============
 
-.. _v1.2.1:
+.. _v1.3.3:
 
-v1.2.1 (unreleased)
+v1.3.3 (unreleased)
 -------------------
+
+New Features
+~~~~~~~~~~~~
+
+- Added experimental ManifestStore (:pull:`490`).
+- Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added :py:func:`datatree_to_icechunk` function for writing an ``xarray.DataTree`` to
+  an Icechunk store (:issue:`244`).  By `Chuck Daniels <https://github.com/chuckwondo>`_.
+- Added a ``.virtualize`` custom accessor to ``xarray.DataTree``, exposing the method
+  :py:meth:`xarray.DataTree.virtualize.to_icechunk()` for writing an ``xarray.DataTree``
+  to an Icechunk store (:issue:`244`).  By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
+  same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
+  name matches the name of their only dimension (also known as "dimension coordinates").
+  Pandas indexes will also now be created by default for these loadable variables.
+  This is intended to provide a more friendly default, as often you will want these small variables to be loaded
+  (or "inlined", for efficiency of storage in icechunk/kerchunk), and you will also want to have in-memory indexes for these variables
+  (to allow `xarray.combine_by_coords` to sort using them).
+  The old behaviour is equivalent to passing ``loadable_variables=[]`` and ``indexes={}``.
+  (:issue:`335`, :pull:`477`) by `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed bug causing ManifestArrays to compare as not equal when they were actually identical (:issue:`501`, :pull:`502`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Documentation
+~~~~~~~~~~~~~
+
+- Added MUR SST virtual and zarr icechunk store generation using lithops example.
+  (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+- Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- `ManifestArrays` now internally use `zarr.core.metadata.v3.ArrayV3Metadata <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/metadata/v3.py>`_. This replaces the `ZArray` class that was previously used to store metadata about manifest arrays. (:pull:`429`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_. Notable internal changes:
+    - Make zarr-python a required dependency with a minimum version `>=3.0.2`.
+    - Specify a minimum numcodecs version of `>=0.15.1`.
+    - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
+    - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
+      - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see `parse_named_configuration <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130>`_) to valid Zarr V3 codec classes.
+    - Reader changes are minimal.
+    - Writer changes:
+      - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
+    - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).
+    - zarr-python 3.0 does not yet support datetime and timedelta data types (`zarr-python issue #2616 <https://github.com/zarr-developers/zarr-python/issues/2616>`_).
+- The continuous integration workflows and developer environment now use `pixi <https://pixi.sh/latest/>`_ (:pull:`407`).
+- Added `loadable_variables` kwarg to :py:meth:`ManifestStore.to_virtual_dataset`.
+  (:pull:`543`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+.. _v1.3.2:
+
+v1.3.2 (3rd Mar 2025)
+---------------------
+
+Small release which fixes a problem causing the docs to be out of date, fixes some issues in the tests with unclosed file handles, but also increases the performance of writing large numbers of virtual references to Icechunk!
 
 New Features
 ~~~~~~~~~~~~
@@ -12,9 +82,98 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- Minimum supported version of Icechunk is now `v0.2.4` (:pull:`462`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+- Updates `store.set_virtual_ref` to `store.set_virtual_refs` in `write_manifest_virtual_refs` (:pull:`443`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+.. _v1.3.1:
+
+v1.3.1 (18th Feb 2025)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+- Examples use new Icechunk syntax
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- Reading and writing Zarr chunk manifest formats are no longer supported.
+  (:issue:`359`), (:pull:`426`). By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+
+Deprecations
+~~~~~~~~~~~~
+
+Bug fixes
+~~~~~~~~~
+
+Documentation
+~~~~~~~~~~~~~
+
+Internal Changes
+~~~~~~~~~~~~~~~~
+
+.. _v1.3.0:
+
+v1.3.0 (3rd Feb 2025)
+---------------------
+
+This release stabilises our dependencies - you can now use released versions of VirtualiZarr, Kerchunk, and Icechunk all in the same environment!
+
+It also fixes a number of bugs, adds minor features, changes the default reader for HDF/netCDF4 files, and includes refactors to reduce code redundancy with zarr-python v3. You can also choose which sets of dependencies you want at installation time.
+
+New Features
+~~~~~~~~~~~~
+
+- Optional dependencies can now be installed in groups via pip. See the installation docs.
+  (:pull:`309`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added a ``.nbytes`` accessor method which displays the bytes needed to hold the virtual references in memory.
+  (:issue:`167`, :pull:`227`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Upgrade icechunk dependency to ``>=0.1.0a12``. (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
+- Sync with Icechunk v0.1.0a8  (:pull:`368`) By `Matthew Iannucci <https://github.com/mpiannucci>`. This also adds support
+  for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
+  is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
+  underlying data has changed since the virtual references were written.
+- Add ``group=None`` keyword-only parameter to the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method to allow writing to a nested group
+  at a specified group path (rather than defaulting to the root group, when no group is
+  specified).  (:issue:`341`) By `Chuck Daniels <https://github.com/chuckwondo>`_.
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
 - Passing ``group=None`` (the default) to ``open_virtual_dataset`` for a file with multiple groups no longer raises an error, instead it gives you the root group.
   This new behaviour is more consistent with ``xarray.open_dataset``.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Indexes are now created by default for any loadable one-dimensional coordinate variables.
+  Also a warning is no longer thrown when ``indexes=None`` is passed to ``open_virtual_dataset``, and the recommendations in the docs updated to match.
+  This also means that ``xarray.combine_by_coords`` will now work when the necessary dimension coordinates are specified in ``loadable_variables``.
+  (:issue:`18`, :pull:`357`, :pull:`358`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- The ``append_dim`` and ``last_updated_at`` parameters of the
+  ``VirtualiZarrDatasetAccessor.to_icechunk`` method are now keyword-only parameters,
+  rather than positional or keyword.  This change is breaking _only_ where arguments for
+  these parameters are currently given positionally.  (:issue:`341`) By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
+- The default backend for netCDF4 and HDF5 is now the custom ``HDFVirtualBackend`` replacing
+  the previous default which was a wrapper around the kerchunk backend.
+  (:issue:`374`, :pull:`395`) By `Julia Signell <https://github.com/jsignell>`_.
+- Optional dependency on kerchunk is now the newly-released v0.2.8. This release of kerchunk is compatible with zarr-python v3.0.0,
+  which means a released version of kerchunk can now be used with both VirtualiZarr and Icechunk.
+  (:issue:`392`, :pull:`406`, :pull:`412``) By `Julia Signell <https://github.com/jsignell>`_ and `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -23,7 +182,13 @@ Bug fixes
 ~~~~~~~~~
 
 - Fix bug preventing generating references for the root group of a file when a subgroup exists.
-  (:issue:`336`, :pull:`337`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+  (:issue:`336`, :pull:`338`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in HDF reader where dimension names of dimensions in a subgroup would be incorrect.
+  (:issue:`364`, :pull:`366`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Fix bug in dmrpp reader so _FillValue is included in variables' encodings.
+  (:pull:`369`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+- Fix bug passing arguments to FITS reader, and test it on Hubble Space Telescope data.
+  (:pull:`363`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Documentation
 ~~~~~~~~~~~~~
@@ -33,6 +198,8 @@ Documentation
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
+
+- Add netCDF3 test. (:pull:`397`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.2.0:
 
@@ -57,6 +224,10 @@ Breaking changes
 
 - Minimum required version of Xarray is now v2024.10.0.
   (:pull:`284`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Icechunk is now v0.1.1.
+  (:pull:`419`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Minimum required version of Kerchunk is now v0.2.8.
+  (:pull:`406`) By `Julia Signell <https://github.com/jsignell>`_.
 - Opening kerchunk-formatted references from disk which contain relative paths now requires passing the ``fs_root`` keyword argument via ``virtual_backend_kwargs``.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 

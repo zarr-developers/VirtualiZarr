@@ -1,4 +1,5 @@
 import warnings
+from pathlib import Path
 
 import h5py  # type: ignore
 import numpy as np
@@ -132,23 +133,27 @@ def group_hdf5_file(tmpdir):
 
 
 @pytest.fixture
-def nested_group_hdf5_file(tmpdir):
-    filepath = f"{tmpdir}/nested_group.nc"
-    f = h5py.File(filepath, "w")
-    g = f.create_group("group")
-    data = np.random.random((10, 10))
-    g.create_dataset("data", data=data)
-    g.create_group("nested_group")
+def nested_group_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "nested_group.nc")
+
+    with h5py.File(filepath, "w") as f:
+        g = f.create_group("group")
+        data = np.random.random((10, 10))
+        g.create_dataset("data", data=data)
+        g.create_group("nested_group")
+
     return filepath
 
 
 @pytest.fixture
-def multiple_datasets_hdf5_file(tmpdir):
-    filepath = f"{tmpdir}/multiple_datasets.nc"
-    f = h5py.File(filepath, "w")
-    data = np.random.random((10, 10))
-    f.create_dataset(name="data", data=data, chunks=None)
-    f.create_dataset(name="data2", data=data, chunks=None)
+def multiple_datasets_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "multiple_datasets.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np.random.random((10, 10))
+        f.create_dataset(name="data", data=data, chunks=None)
+        f.create_dataset(name="data2", data=data, chunks=None)
+
     return filepath
 
 
@@ -158,44 +163,56 @@ def np_uncompressed():
 
 
 @pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd", "shuffle"])
-def filter_encoded_hdf5_file(tmpdir, np_uncompressed, request):
-    filepath = f"{tmpdir}/{request.param}.nc"
-    f = h5py.File(filepath, "w")
-    if request.param == "gzip":
-        f.create_dataset(
-            name="data", data=np_uncompressed, compression="gzip", compression_opts=1
-        )
-    if request.param == "blosc_lz4":
-        f.create_dataset(
-            name="data",
-            data=np_uncompressed,
-            **hdf5plugin.Blosc(cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE),
-        )
-    if request.param == "lz4":
-        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.LZ4(nbytes=0))
-    if request.param == "bzip2":
-        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.BZip2())
-    if request.param == "zstd":
-        f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.Zstd(clevel=2))
-    if request.param == "shuffle":
-        f.create_dataset(name="data", data=np_uncompressed, shuffle=True)
+def filter_encoded_hdf5_file(tmp_path: Path, np_uncompressed, request) -> str:
+    assert hdf5plugin is not None  # make type-checkers happy
+    filepath = str(tmp_path / f"{request.param}.nc")
+
+    with h5py.File(filepath, "w") as f:
+        if request.param == "gzip":
+            f.create_dataset(
+                name="data",
+                data=np_uncompressed,
+                compression="gzip",
+                compression_opts=1,
+            )
+        if request.param == "blosc_lz4":
+            f.create_dataset(
+                name="data",
+                data=np_uncompressed,
+                **hdf5plugin.Blosc(
+                    cname="lz4", clevel=9, shuffle=hdf5plugin.Blosc.SHUFFLE
+                ),
+            )
+        if request.param == "lz4":
+            f.create_dataset(
+                name="data", data=np_uncompressed, **hdf5plugin.LZ4(nbytes=0)
+            )
+        if request.param == "bzip2":
+            f.create_dataset(name="data", data=np_uncompressed, **hdf5plugin.BZip2())
+        if request.param == "zstd":
+            f.create_dataset(
+                name="data", data=np_uncompressed, **hdf5plugin.Zstd(clevel=2)
+            )
+        if request.param == "shuffle":
+            f.create_dataset(name="data", data=np_uncompressed, shuffle=True)
 
     return filepath
 
 
 @pytest.fixture(params=["gzip"])
-def filter_encoded_roundtrip_hdf5_file(tmpdir, request):
-    ds = xr.tutorial.open_dataset("air_temperature")
-    encoding = {}
-    if request.param == "gzip":
-        encoding_config = {"zlib": True, "complevel": 1}
+def filter_encoded_roundtrip_hdf5_file(tmp_path: Path, request) -> str:
+    with xr.tutorial.open_dataset("air_temperature") as ds:
+        encoding = {}
+        if request.param == "gzip":
+            encoding_config = {"zlib": True, "complevel": 1}
 
-    for var_name in ds.variables:
-        encoding[var_name] = encoding_config
+        for var_name in ds.variables:
+            encoding[var_name] = encoding_config
 
-    filepath = f"{tmpdir}/{request.param}_xarray.nc"
-    ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
-    return filepath
+        filepath = tmp_path / f"{request.param}_xarray.nc"
+        ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
+
+        return str(filepath)
 
 
 @pytest.fixture()
@@ -239,12 +256,14 @@ def offset():
 
 
 @pytest.fixture
-def add_offset_hdf5_file(tmpdir, np_uncompressed_int16, offset):
-    filepath = f"{tmpdir}/offset.nc"
-    f = h5py.File(filepath, "w")
-    data = np_uncompressed_int16 - offset
-    f.create_dataset(name="data", data=data, chunks=True)
-    f["data"].attrs.create(name="add_offset", data=offset)
+def add_offset_hdf5_file(tmp_path: Path, np_uncompressed_int16, offset) -> str:
+    filepath = str(tmp_path / "offset.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np_uncompressed_int16 - offset
+        f.create_dataset(name="data", data=data, chunks=True)
+        f["data"].attrs.create(name="add_offset", data=offset)
+
     return filepath
 
 
@@ -254,13 +273,17 @@ def scale_factor():
 
 
 @pytest.fixture
-def scale_add_offset_hdf5_file(tmpdir, np_uncompressed_int16, offset, scale_factor):
-    filepath = f"{tmpdir}/scale_offset.nc"
-    f = h5py.File(filepath, "w")
-    data = (np_uncompressed_int16 - offset) / scale_factor
-    f.create_dataset(name="data", data=data, chunks=True)
-    f["data"].attrs.create(name="add_offset", data=offset)
-    f["data"].attrs.create(name="scale_factor", data=np.array([scale_factor]))
+def scale_add_offset_hdf5_file(
+    tmp_path: Path, np_uncompressed_int16, offset, scale_factor
+) -> str:
+    filepath = str(tmp_path / "scale_offset.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = (np_uncompressed_int16 - offset) / scale_factor
+        f.create_dataset(name="data", data=data, chunks=True)
+        f["data"].attrs.create(name="add_offset", data=offset)
+        f["data"].attrs.create(name="scale_factor", data=np.array([scale_factor]))
+
     return filepath
 
 
@@ -306,19 +329,107 @@ def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
 
     from random import randint
 
-    filepath = f"{tmpdir}/{request.param}_{randint(0,100)}_cf_roundtrip.nc"
+    filepath = f"{tmpdir}/{request.param}_{randint(0, 100)}_cf_roundtrip.nc"
     ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
 
     return filepath
 
 
 @pytest.fixture
-def root_coordinates_hdf5_file(tmpdir, np_uncompressed_int16):
-    filepath = f"{tmpdir}/coordinates.nc"
-    f = h5py.File(filepath, "w")
-    data = np.random.random((100, 100))
-    f.create_dataset(name="data", data=data, chunks=True)
-    f.create_dataset(name="lat", data=data)
-    f.create_dataset(name="lon", data=data)
-    f.attrs.create(name="coordinates", data="lat lon")
+def root_coordinates_hdf5_file(tmp_path: Path, np_uncompressed_int16) -> str:
+    filepath = str(tmp_path / "coordinates.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np.random.random((100, 100))
+        f.create_dataset(name="data", data=data, chunks=True)
+        f.create_dataset(name="lat", data=data)
+        f.create_dataset(name="lon", data=data)
+        f.attrs.create(name="coordinates", data="lat lon")
+
+    return filepath
+
+
+@pytest.fixture
+def netcdf3_file(tmp_path: Path) -> Path:
+    ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
+
+    filepath = tmp_path / "file.nc"
+    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+
+    return filepath
+
+
+@pytest.fixture
+def non_coord_dim(tmpdir):
+    filepath = f"{tmpdir}/non_coord_dim.nc"
+    ds = create_test_data(dim_sizes=(20, 80, 10))
+    ds = ds.drop_dims("dim3")
+    ds.to_netcdf(filepath, engine="netcdf4")
+    return filepath
+
+
+@pytest.fixture
+def scalar_fill_value_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "scalar_fill_value.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np.random.randint(0, 10, size=(5))
+        fill_value = 42
+        f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
+
+    return filepath
+
+
+compound_dtype = np.dtype(
+    [
+        ("id", "i4"),  # 4-byte integer
+        ("temperature", "f4"),  # 4-byte float
+    ]
+)
+
+compound_data = np.array(
+    [
+        (1, 98.6),
+        (2, 101.3),
+    ],
+    dtype=compound_dtype,
+)
+
+compound_fill = (-9999, -9999.0)
+
+fill_values = [
+    {"fill_value": -9999, "data": np.random.randint(0, 10, size=(5))},
+    {"fill_value": -9999.0, "data": np.random.random(5)},
+    {"fill_value": np.nan, "data": np.random.random(5)},
+    {"fill_value": False, "data": np.array([True, False, False, True, True])},
+    {"fill_value": "NaN", "data": np.array(["three"], dtype="S10")},
+    {"fill_value": compound_fill, "data": compound_data},
+]
+
+
+@pytest.fixture(params=fill_values)
+def cf_fill_value_hdf5_file(tmp_path: Path, request) -> str:
+    filepath = str(tmp_path / "cf_fill_value.nc")
+
+    with h5py.File(filepath, "w") as f:
+        dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
+        dim_scale = f.create_dataset(
+            name="dim_scale", data=request.param["data"], chunks=True
+        )
+        dim_scale.make_scale()
+        dset.dims[0].attach_scale(dim_scale)
+        dset.attrs["_FillValue"] = request.param["fill_value"]
+
+    return filepath
+
+
+@pytest.fixture
+def cf_array_fill_value_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "cf_array_fill_value.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np.random.random(5)
+        dset = f.create_dataset(name="data", data=data, chunks=True)
+        dset.attrs["_FillValue"] = np.array([np.nan])
+
     return filepath

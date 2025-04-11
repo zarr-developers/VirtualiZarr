@@ -161,3 +161,32 @@ cython_debug/
 virtualizarr/_version.py
 docs/generated/
 examples/
+
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
+
+### VisualStudioCode ###
+.vscode
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+.ionide
+
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
+
+# Pixi folder
+.pixi/
+
+# python virtual environment
+.venv
+venv
+
+# Pixi lock file (because it changes with every upstream commit)
+pixi.lock

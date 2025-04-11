@@ -20,7 +20,6 @@ Reading
 
     open_virtual_dataset
 
-
 Serialization
 -------------
 
@@ -30,8 +29,18 @@ Serialization
     :toctree: generated/
 
     VirtualiZarrDatasetAccessor.to_kerchunk
-    VirtualiZarrDatasetAccessor.to_zarr
     VirtualiZarrDatasetAccessor.to_icechunk
+    VirtualiZarrDataTreeAccessor.to_icechunk
+
+Information
+-----------
+
+.. currentmodule:: virtualizarr.accessor
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    VirtualiZarrDatasetAccessor.nbytes
 
 Rewriting
 ---------

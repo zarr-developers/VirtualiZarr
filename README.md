@@ -8,27 +8,28 @@
 [![pre-commit Enabled](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![Apache 2.0 License](https://img.shields.io/badge/license-Apache%202-cb2533.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Versions](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/zarr-developers/VirtualiZarr/main/pyproject.toml&logo=Python&logoColor=gold&label=Python)](https://docs.python.org)
-
+[![slack](https://img.shields.io/badge/slack-virtualizarr-purple.svg?logo=slack)](https://earthmover-community.slack.com/archives/C08EXCE8ZQX)
 [![Latest Release](https://img.shields.io/github/v/release/zarr-developers/VirtualiZarr)](https://github.com/zarr-developers/VirtualiZarr/releases)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/virtualizarr?label=pypi%7Cdownloads)](https://pypistats.org/packages/virtualizarr)
 [![Conda - Downloads](https://img.shields.io/conda/d/conda-forge/virtualizarr
 )](https://anaconda.org/conda-forge/virtualizarr)
 
-## Cloud-Optimize your Scientific Data as Virtual Zarr stores, using xarray syntax.
 
-The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in legacy pre-Cloud file formats such as netCDF.
+## Cloud-Optimize your Scientific Data as a Virtual Zarr Datacube, using Xarray syntax.
 
-**VirtualiZarr[^2] makes it easy to create "Virtual" Zarr stores, allowing performant access to legacy data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
+The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in archival pre-Cloud file formats such as netCDF.
+
+**VirtualiZarr[^2] makes it easy to create "Virtual" Zarr datacubes, allowing performant access to archival data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
 
 Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/index.html).
 
 ### Features
 
-* Create virtual references pointing to bytes inside a legacy file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
-* Supports a [range of legacy file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
-* [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger store using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html),
+* Create virtual references pointing to bytes inside an archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets).
+* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5, and has a pluggable system for supporting new formats.
+* [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger datacube using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html).
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
-* Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
+* Users access the virtual datacube simply as a single zarr-compatible store using [`xarray.open_zarr`](https://docs.xarray.dev/en/stable/generated/xarray.open_zarr.html).
 
 ### Inspired by Kerchunk
 
@@ -61,7 +62,7 @@ If you see other opportunities then we would love to hear your ideas!
 
 ### Credits
 
-This package was originally developed by [Tom Nicholas](https://github.com/TomNicholas) whilst working at [[C]Worthy](cworthy.org), who deserve credit for allowing him to prioritise a generalizable open-source solution to the dataset virtualization problem. VirtualiZarr is now a community-owned multi-stakeholder project.
+This package was originally developed by [Tom Nicholas](https://github.com/TomNicholas) whilst working at [[C]Worthy](https://cworthy.org), who deserve credit for allowing him to prioritise a generalizable open-source solution to the dataset virtualization problem. VirtualiZarr is now a community-owned multi-stakeholder project.
 
 ### Licence
 
@@ -71,4 +72,4 @@ Apache 2.0
 
 [^1]: [_Cloud-Native Repositories for Big Scientific Data_, Abernathey et. al., _Computing in Science & Engineering_.](https://ieeexplore.ieee.org/abstract/document/9354557)
 
-[^2]: (Pronounced like "virtualizer" but more piratey 🦜)
+[^2]: (Pronounced "Virtual-Eye-Zarr" - like "virtualizer" but more piratey 🦜)

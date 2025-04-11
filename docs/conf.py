@@ -19,6 +19,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.extlinks",
+    "sphinx.ext.intersphinx",
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "sphinx_design",
@@ -29,6 +30,17 @@ extlinks = {
     "issue": ("https://github.com/zarr-developers/virtualizarr/issues/%s", "GH%s"),
     "pull": ("https://github.com/zarr-developers/virtualizarr/pull/%s", "PR%s"),
     "discussion": ("https://github.com/zarr-developers/virtualizarr/discussions/%s", "D%s"),
+}
+
+# Example configuration for intersphinx: refer to the Python standard library.
+# use in refs e.g:
+# :ref:`comparison manual <python:comparisons>`
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "zarr": ("https://zarr.readthedocs.io/en/stable/", None),
+    "xarray": ("https://docs.xarray.dev/en/stable/", None),
+    "obstore": ("https://developmentseed.org/obstore/latest/", None),
 }
 
 # Add any paths that contain templates here, relative to this directory.

@@ -1,17 +1,16 @@
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
-from virtualizarr.readers.common import (
-    VirtualBackend,
-    construct_virtual_dataset,
-    open_loadable_vars_and_indexes,
-)
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.translators.kerchunk import (
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
-from virtualizarr.utils import check_for_collisions
+from virtualizarr.xarray import (
+    construct_fully_virtual_dataset,
+    construct_virtual_dataset,
+)
 
 
 class NetCDF3VirtualBackend(VirtualBackend):
@@ -33,9 +32,8 @@ class NetCDF3VirtualBackend(VirtualBackend):
                 "netcdf3 reader does not understand any virtual_backend_kwargs"
             )
 
-        drop_variables, loadable_variables = check_for_collisions(
-            drop_variables,
-            loadable_variables,
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
         )
 
         refs = NetCDF3ToZarr(filepath, inline_threshold=0, **reader_options).translate()
@@ -48,25 +46,23 @@ class NetCDF3VirtualBackend(VirtualBackend):
 
         virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
             refs,
-            loadable_variables,
-            drop_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
-        loadable_vars, indexes = open_loadable_vars_and_indexes(
-            filepath,
-            loadable_variables=loadable_variables,
-            reader_options=reader_options,
-            drop_variables=drop_variables,
-            indexes=indexes,
-            group=group,
-            decode_times=decode_times,
-        )
-
-        return construct_virtual_dataset(
+        fully_virtual_dataset = construct_fully_virtual_dataset(
             virtual_vars=virtual_vars,
-            loadable_vars=loadable_vars,
-            indexes=indexes,
             coord_names=coord_names,
             attrs=attrs,
         )
+
+        vds = construct_virtual_dataset(
+            fully_virtual_ds=fully_virtual_dataset,
+            filepath=filepath,
+            group=group,
+            loadable_variables=loadable_variables,
+            reader_options=reader_options,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
+
+        return vds.drop_vars(_drop_vars)

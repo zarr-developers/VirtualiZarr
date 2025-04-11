@@ -1,14 +1,15 @@
-from typing import Iterable, Mapping, Optional
+import warnings
+from typing import Hashable, Iterable, Mapping, Optional
 
 import ujson
 from xarray import Dataset, Index
 
-from virtualizarr.readers.common import VirtualBackend
+from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.utils import _FsspecFSFromFilepath
 
 
 class KerchunkVirtualBackend(VirtualBackend):
@@ -28,6 +29,10 @@ class KerchunkVirtualBackend(VirtualBackend):
         if virtual_backend_kwargs is None:
             virtual_backend_kwargs = {}
 
+        _drop_vars: list[Hashable] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
+
         fs_root = virtual_backend_kwargs.pop("fs_root", None)
 
         if virtual_backend_kwargs:
@@ -38,13 +43,20 @@ class KerchunkVirtualBackend(VirtualBackend):
         if group:
             raise NotImplementedError()
 
-        loadable_variables, drop_variables = check_for_collisions(
-            drop_variables=drop_variables,
-            loadable_variables=loadable_variables,
-        )
-
         if loadable_variables or indexes or decode_times:
             raise NotImplementedError()
+
+        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables`` kwarg,
+        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
+        if loadable_variables is None or indexes is None:
+            warnings.warn(
+                "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
+                "As this is unlikely to be the desired behaviour when opening a Kerchunk file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
+                "To silence this warning pass `loadable_variables` explicitly.",
+                UserWarning,
+            )
+            loadable_variables = []
+            indexes = {}
 
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
 
@@ -80,4 +92,4 @@ class KerchunkVirtualBackend(VirtualBackend):
             )
 
         # TODO would be more efficient to drop these before converting them into ManifestArrays, i.e. drop them from the kerchunk refs dict
-        return vds.drop_vars(drop_variables)
+        return vds.drop_vars(_drop_vars)

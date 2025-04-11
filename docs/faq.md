@@ -2,11 +2,32 @@
 
 ## Usage questions
 
+### Can my specific data be virtualized?
+
+Depends on some details of your data.
+
+VirtualiZarr works by mapping your data to the zarr data model from whatever data model is used by the format it was saved in.
+This means that if your data contains anything that cannot be represented within the zarr data model, it cannot be virtualized.
+
+When virtualizing multi-file datasets, it is sometimes the case that it is possible to virtualize one file, but not possible to virtualize all the files together as part of one datacube, because of inconsistencies _between_ the files. The following restrictions apply across every file in the datacube you wish to create!
+
+The main restrictions of the zarr data model are:
+- **Recognized format** - Firstly, there must be a virtualizarr reader that understands how to parse the file format that your data is in. The VirtualiZarr package ships with readers for a number of common formats, if your data is not supported you may first have to write your own dedicated virtualizarr reader which understands your format.
+- **Rectilinear arrays** - The zarr data model is one of a set of rectilinear arrays, so your data must be decodable as a set of rectilinear arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to a rectilinear array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
+- **Homogeneous chunking** - The zarr data model assumes that every chunk of data in a single array has the same chunk shape. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent chunking your data cannot be virtualized. This is a big restriction, and there are plans to relax it in future, by adding support for variable-length chunks to the zarr data model.
+- **Homogenous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. or multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
+- **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
+- **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
+
+If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
+
+Sometimes you can get around some of these restrictions for specific variables by loading them into memory instead of virtualizing them - see the section in the usage docs about loadable variables.
+
 ### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
 Potentially yes.
 
-Let's say you have a bunch of legacy files (e.g. netCDF) which together tile along one or more dimensions to form a large dataset.
+Let's say you have a bunch of archival files (e.g. netCDF) which together tile along one or more dimensions to form a large dataset.
 Let's also imagine you already know how to use xarray to open these files and combine the opened dataset objects into one complete dataset.
 (If you don't then read the [xarray docs page on combining data](https://docs.xarray.dev/en/stable/user-guide/combining.html).)
 
@@ -60,7 +81,7 @@ No! VirtualiZarr can (well, [soon will be able to](https://github.com/zarr-devel
 
 ### Can I add a new reader for my custom file format?
 
-There are a lot of legacy file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples).
+There are a lot of archival file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples).
 VirtualiZarr ships with some readers for common formats (e.g. netCDF/HDF5), but you may want to write your own reader for some other file format.
 
 VirtualiZarr is designed in a way to make this as straightforward as possible.
@@ -73,15 +94,15 @@ Currently if you want to call your new reader from `virtualizarr.open_virtual_da
 
 ## How does this actually work?
 
-I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of legacy files in some other format as a series of steps:
+I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:
 
-1) **Read byte ranges** - We use various [virtualizarr readers](https://github.com/zarr-developers/VirtualiZarr/tree/main/virtualizarr/readers) to determine which byte ranges within a given legacy file would have to be read in order to get a specific chunk of data we want. Several of these readers work by calling one of the [kerchunk file format backends](https://fsspec.github.io/kerchunk/reference.html#file-format-backends) and parsing the output.
+1) **Read byte ranges** - We use various [virtualizarr readers](https://github.com/zarr-developers/VirtualiZarr/tree/main/virtualizarr/readers) to determine which byte ranges within a given archival file would have to be read in order to get a specific chunk of data we want. Several of these readers work by calling one of the [kerchunk file format backends](https://fsspec.github.io/kerchunk/reference.html#file-format-backends) and parsing the output.
 2) **Construct a representation of a single file (or array within a file)** - Kerchunk's backends return a nested dictionary representing an entire file, but we instead immediately parse this dict and wrap it up into a set of `ManifestArray` objects. The record of where to look to find the file and the byte ranges is stored under the `ManifestArray.manifest` attribute, in a `ChunkManifest` object. Both steps (1) and (2) are handled by the `virtualizarr.open_virtual_dataset`, which returns one `xarray.Dataset` object for the given file, which wraps multiple `ManifestArray` instances (as opposed to e.g. numpy/dask arrays).
 3) **Deduce the concatenation order** - The desired order of concatenation can either be inferred from the order in which the datasets are supplied (which is what `xr.combined_nested` assumes), or it can be read from the coordinate data in the files (which is what `xr.combine_by_coords` does). If the ordering information is not present as a coordinate (e.g. because it's in the filename), a pre-processing step might be required.
 4) **Check that the desired concatenation is valid** - Whether called explicitly by the user or implicitly via `xr.combine_nested/combine_by_coords/open_mfdataset`, `xr.concat` is used to concatenate/stack the wrapped `ManifestArray` objects. When doing this xarray will spend time checking that the array objects and any coordinate indexes can be safely aligned and concatenated. Along with opening files, and loading coordinates in step (3), this is the main reason why `xr.open_mfdataset` can take a long time to return a dataset created from a large number of files.
 5) **Combine into one big dataset** - `xr.concat` dispatches to the `concat/stack` methods of the underlying `ManifestArray` objects. These perform concatenation by merging their respective Chunk Manifests. Using xarray's `combine_*` methods means that we can handle multi-dimensional concatenations as well as merging many different variables.
 6) **Serialize the combined result to disk** - The resultant `xr.Dataset` object wraps `ManifestArray` objects which contain the complete list of byte ranges for every chunk we might want to read. We now serialize this information to disk, either using the [Kerchunk specification](https://fsspec.github.io/kerchunk/spec.html#version-1), or the [Icechunk specification](https://icechunk.io/spec/).
-7) **Open the virtualized dataset from disk** - The virtualized zarr store can now be read from disk, avoiding redoing all the work we did above and instead just opening all the virtualized data immediately. Chunk reads will be redirected to read the corresponding bytes in the original legacy files.
+7) **Open the virtualized dataset from disk** - The virtualized zarr store can now be read from disk, avoiding redoing all the work we did above and instead just opening all the virtualized data immediately. Chunk reads will be redirected to read the corresponding bytes in the original archival files.
 
 The above steps could also be performed using the `kerchunk` library alone, but because (3), (4), (5), and (6) are all performed by the `kerchunk.combine.MultiZarrToZarr` function, and no internal abstractions are exposed, kerchunk's design is much less modular, and the use cases are limited by kerchunk's API surface.
 
