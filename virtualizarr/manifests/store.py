@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pickle
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import AsyncGenerator, Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Mapping, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -12,36 +13,12 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer
+from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.buffer.core import BufferPrototype
+from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
-    from typing import Any
-
-    from zarr.core.buffer import BufferPrototype
-    from zarr.core.common import BytesLike
-
-
-__all__ = ["ManifestStore"]
-
-
-_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
-    FileNotFoundError,
-    IsADirectoryError,
-    NotADirectoryError,
-)
-
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
-
-from zarr.core.buffer import default_buffer_prototype
-
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -52,6 +29,16 @@ if TYPE_CHECKING:
     import xarray as xr
 
     from virtualizarr.translators.kerchunk import KerchunkStoreRefs
+
+
+__all__ = ["ManifestStore"]
+
+
+_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
+    FileNotFoundError,
+    IsADirectoryError,
+    NotADirectoryError,
+)
 
 
 @dataclass
@@ -357,13 +344,10 @@ class ManifestStore(Store):
             yield k
 
     @classmethod
-    def _from_kerchunk_refs(
-        cls,
-        refs: KerchunkStoreRefs
-    ) -> ManifestStore:
+    def _from_kerchunk_refs(cls, refs: KerchunkStoreRefs) -> ManifestStore:
         """Construct a ManifestStore from a dictionary of kerchunk references."""
         # TODO change this to a public method which understands kerchunk json/parquet filepaths?
-        
+
         from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 
         return manifeststore_from_kerchunk_refs(refs)
