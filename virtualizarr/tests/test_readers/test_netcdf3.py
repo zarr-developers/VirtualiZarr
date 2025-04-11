@@ -8,9 +8,6 @@ from virtualizarr.tests import requires_scipy
 
 
 @requires_scipy
-@pytest.mark.xfail(
-    reason="Big endian not yet supported by zarr-python 3.0"
-)  # https://github.com/zarr-developers/zarr-python/issues/2324
 def test_read_netcdf3(netcdf3_file, array_v3_metadata):
     filepath = str(netcdf3_file)
     vds = open_virtual_dataset(filepath)
