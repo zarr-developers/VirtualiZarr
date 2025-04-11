@@ -18,6 +18,7 @@ from zarr.core.buffer.core import BufferPrototype
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
@@ -49,6 +50,8 @@ if TYPE_CHECKING:
     StoreDict: TypeAlias = dict[str, ObjectStore]
 
     import xarray as xr
+
+    from virtualizarr.translators.kerchunk import KerchunkStoreRefs
 
 
 @dataclass
@@ -352,6 +355,18 @@ class ManifestStore(Store):
         yield "zarr.json"
         for k in self._group.arrays.keys():
             yield k
+
+    @classmethod
+    def _from_kerchunk_refs(
+        cls,
+        refs: KerchunkStoreRefs
+    ) -> ManifestStore:
+        """Construct a ManifestStore from a dictionary of kerchunk references."""
+        # TODO change this to a public method which understands kerchunk json/parquet filepaths?
+        
+        from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+
+        return manifeststore_from_kerchunk_refs(refs)
 
     def to_virtual_dataset(
         self,
