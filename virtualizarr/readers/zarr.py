@@ -17,11 +17,11 @@ from zarr.core.metadata import ArrayV3Metadata
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.readers.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
+from virtualizarr.xarray import (
+    construct_fully_virtual_dataset,
+    construct_virtual_dataset,
+)
 from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE
 
 if TYPE_CHECKING:
@@ -149,9 +149,9 @@ async def virtual_dataset_from_zarr_group(
         attrs=zarr_group.attrs,
     )
 
-    vds = replace_virtual_with_loadable_vars(
-        fully_virtual_dataset,
-        filepath,
+    vds = construct_virtual_dataset(
+        fully_virtual_ds=fully_virtual_dataset,
+        filepath=filepath,
         group=group,
         loadable_variables=loadable_variables,
         reader_options=reader_options,

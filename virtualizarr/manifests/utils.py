@@ -22,7 +22,6 @@ def create_v3_array_metadata(
     chunk_key_encoding: ChunkKeyEncodingLike = {"name": "default"},
     fill_value: Any = None,
     codecs: Optional[list[Dict[str, Any]]] = None,
-    dimension_names: Optional[tuple[str, ...]] | None = None,
     attributes: Optional[Dict[str, Any]] = None,
     dimension_names: Iterable[str] | None = None,
 ) -> ArrayV3Metadata:

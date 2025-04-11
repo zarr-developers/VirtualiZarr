@@ -13,12 +13,9 @@ from virtualizarr.codecs import extract_codecs, get_codec_config
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
-<<<<<<< HEAD
     import upath
-=======
     from obstore import ReadableFile
     from obstore.store import ObjectStore
->>>>>>> develop
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[

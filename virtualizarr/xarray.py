@@ -91,10 +91,10 @@ def construct_virtual_dataset(
                 chunks=None,
             ) as loadable_ds:
                 return replace_virtual_with_loadable_vars(
-                fully_virtual_ds,  # type: ignore[arg-type]
-                loadable_ds,
-                loadable_variables,
-            )
+                    fully_virtual_ds,  # type: ignore[arg-type]
+                    loadable_ds,
+                    loadable_variables,
+                )
         else:
             # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
             with xr.open_dataset(
@@ -103,10 +103,10 @@ def construct_virtual_dataset(
                 decode_times=decode_times,
             ) as loadable_ds:
                 return replace_virtual_with_loadable_vars(
-                fully_virtual_ds,  # type: ignore[arg-type]
-                loadable_ds,
-                loadable_variables,
-            )
+                    fully_virtual_ds,  # type: ignore[arg-type]
+                    loadable_ds,
+                    loadable_variables,
+                )
 
 
 def replace_virtual_with_loadable_vars(
