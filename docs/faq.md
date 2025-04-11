@@ -2,6 +2,27 @@
 
 ## Usage questions
 
+### Can my specific data be virtualized?
+
+Depends on some details of your data.
+
+VirtualiZarr works by mapping your data to the zarr data model from whatever data model is used by the format it was saved in.
+This means that if your data contains anything that cannot be represented within the zarr data model, it cannot be virtualized.
+
+When virtualizing multi-file datasets, it is sometimes the case that it is possible to virtualize one file, but not possible to virtualize all the files together as part of one datacube, because of inconsistencies _between_ the files. The following restrictions apply across every file in the datacube you wish to create!
+
+The main restrictions of the zarr data model are:
+- **Recognized format** - Firstly, there must be a virtualizarr reader that understands how to parse the file format that your data is in. The VirtualiZarr package ships with readers for a number of common formats, if your data is not supported you may first have to write your own dedicated virtualizarr reader which understands your format.
+- **Rectilinear arrays** - The zarr data model is one of a set of rectilinear arrays, so your data must be decodable as a set of rectilinear arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to a rectilinear array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
+- **Homogeneous chunking** - The zarr data model assumes that every chunk of data in a single array has the same chunk shape. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent chunking your data cannot be virtualized. This is a big restriction, and there are plans to relax it in future, by adding support for variable-length chunks to the zarr data model.
+- **Homogenous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. or multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
+- **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
+- **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
+
+If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
+
+Sometimes you can get around some of these restrictions for specific variables by loading them into memory instead of virtualizing them - see the section in the usage docs about loadable variables.
+
 ### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
 Potentially yes.

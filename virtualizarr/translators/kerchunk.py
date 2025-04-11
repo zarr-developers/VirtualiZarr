@@ -14,12 +14,12 @@ from virtualizarr.codecs import (
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.common import separate_coords
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
 from virtualizarr.utils import determine_chunk_grid_shape
+from virtualizarr.xarray import separate_coords
 
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:

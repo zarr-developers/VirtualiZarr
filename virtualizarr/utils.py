@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import io
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
@@ -12,7 +13,12 @@ from virtualizarr.codecs import extract_codecs, get_codec_config
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
+<<<<<<< HEAD
     import upath
+=======
+    from obstore import ReadableFile
+    from obstore.store import ObjectStore
+>>>>>>> develop
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[
@@ -20,7 +26,23 @@ if TYPE_CHECKING:
     ]
 
 
-from dataclasses import dataclass, field
+class ObstoreReader:
+    _reader: ReadableFile
+
+    def __init__(self, store: ObjectStore, path: str) -> None:
+        import obstore as obs
+
+        self._reader = obs.open_reader(store, path)
+
+    def read(self, size: int, /) -> bytes:
+        return self._reader.read(size).to_bytes()
+
+    def seek(self, offset: int, whence: int = 0, /):
+        # TODO: Check on default for whence
+        return self._reader.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._reader.tell()
 
 
 @dataclass

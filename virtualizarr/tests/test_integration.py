@@ -1,6 +1,7 @@
+from collections.abc import Mapping
 from os.path import relpath
 from pathlib import Path
-from typing import Callable, Concatenate, TypeAlias
+from typing import Any, Callable, Concatenate, TypeAlias, overload
 
 import numpy as np
 import pytest
@@ -23,7 +24,9 @@ from virtualizarr.translators.kerchunk import (
     dataset_from_kerchunk_refs,
 )
 
-RoundtripFunction: TypeAlias = Callable[Concatenate[xr.Dataset, Path, ...], xr.Dataset]
+RoundtripFunction: TypeAlias = Callable[
+    Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
+]
 
 
 def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
@@ -111,7 +114,22 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
 
 
-def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
+@overload
+def roundtrip_as_in_memory_icechunk(
+    vdata: xr.Dataset, tmp_path: Path, **kwargs
+) -> xr.Dataset: ...
+@overload
+def roundtrip_as_in_memory_icechunk(
+    vdata: xr.DataTree, tmp_path: Path, **kwargs
+) -> xr.DataTree: ...
+
+
+def roundtrip_as_in_memory_icechunk(
+    vdata: xr.Dataset | xr.DataTree,
+    tmp_path: Path,
+    virtualize_kwargs: Mapping[str, Any] | None = None,
+    **kwargs,
+) -> xr.Dataset | xr.DataTree:
     from icechunk import Repository, Storage
 
     # create an in-memory icechunk store
@@ -120,7 +138,17 @@ def roundtrip_as_in_memory_icechunk(vds: xr.Dataset, tmpdir, **kwargs):
     session = repo.writable_session("main")
 
     # write those references to an icechunk store
-    vds.virtualize.to_icechunk(session.store)
+    vdata.virtualize.to_icechunk(session.store, **(virtualize_kwargs or {}))
+
+    if isinstance(vdata, xr.DataTree):
+        # read the dataset from icechunk
+        return xr.open_datatree(
+            session.store,  # type: ignore
+            engine="zarr",
+            zarr_format=3,
+            consolidated=False,
+            **kwargs,
+        )
 
     # read the dataset from icechunk
     return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
@@ -236,16 +264,14 @@ class TestRoundtrip:
 
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=decode_times)
 
-                if decode_times is False:
-                    # assert all_close to original dataset
-                    xrt.assert_allclose(roundtrip, ds)
+                # assert all_close to original dataset
+                xrt.assert_allclose(roundtrip, ds)
 
-                    # assert coordinate attributes are maintained
-                    for coord in ds.coords:
-                        assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
-                else:
-                    # they are very very close! But assert_allclose doesn't seem to work on datetimes
-                    assert (roundtrip.time - ds.time).sum() == 0
+                # assert coordinate attributes are maintained
+                for coord in ds.coords:
+                    assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+
+                if decode_times:
                     assert roundtrip.time.dtype == ds.time.dtype
                     assert roundtrip.time.encoding["units"] == ds.time.encoding["units"]
                     assert (
@@ -318,6 +344,102 @@ class TestRoundtrip:
         roundtrip = roundtrip_func(vds, tmpdir)
 
         assert roundtrip.a.attrs == vds.a.attrs
+
+
+@parametrize_over_hdf_backends
+@pytest.mark.parametrize(
+    "roundtrip_func", [roundtrip_as_in_memory_icechunk] if has_icechunk else []
+)
+@pytest.mark.parametrize("decode_times", (False, True))
+@pytest.mark.parametrize("time_vars", ([], ["time"]))
+@pytest.mark.parametrize("inherit", (False, True))
+def test_datatree_roundtrip(
+    tmp_path: Path,
+    roundtrip_func: RoundtripFunction,
+    hdf_backend: type[VirtualBackend],
+    decode_times: bool,
+    time_vars: list[str],
+    inherit: bool,
+):
+    # set up example xarray dataset
+    with xr.tutorial.open_dataset("air_temperature", decode_times=decode_times) as ds:
+        # split into two datasets
+        ds1 = ds.isel(time=slice(None, 1460))
+        ds2 = ds.isel(time=slice(1460, None))
+
+        # save it to disk as netCDF (in temporary directory)
+        air1_nc_path = tmp_path / "air1.nc"
+        air2_nc_path = tmp_path / "air2.nc"
+        ds1.to_netcdf(air1_nc_path)
+        ds2.to_netcdf(air2_nc_path)
+
+        # use open_dataset_via_kerchunk to read it as references
+        with (
+            open_virtual_dataset(
+                str(air1_nc_path),
+                loadable_variables=time_vars,
+                decode_times=decode_times,
+                backend=hdf_backend,
+            ) as vds1,
+            open_virtual_dataset(
+                str(air2_nc_path),
+                loadable_variables=time_vars,
+                decode_times=decode_times,
+                backend=hdf_backend,
+            ) as vds2,
+        ):
+            if not decode_times or not time_vars:
+                assert vds1.time.dtype == np.dtype("float32")
+                assert vds2.time.dtype == np.dtype("float32")
+            else:
+                assert vds1.time.dtype == np.dtype("<M8[ns]")
+                assert vds2.time.dtype == np.dtype("<M8[ns]")
+                assert "units" in vds1.time.encoding
+                assert "units" in vds2.time.encoding
+                assert "calendar" in vds1.time.encoding
+                assert "calendar" in vds2.time.encoding
+
+            vdt = xr.DataTree.from_dict({"/vds1": vds1, "/nested/vds2": vds2})
+
+            with roundtrip_func(
+                vdt,
+                tmp_path,
+                virtualize_kwargs=dict(write_inherited_coords=inherit),
+                decode_times=decode_times,
+            ) as roundtrip:
+                assert isinstance(roundtrip, xr.DataTree)
+
+                # assert all_close to original dataset
+                roundtrip_vds1 = roundtrip["/vds1"].to_dataset()
+                roundtrip_vds2 = roundtrip["/nested/vds2"].to_dataset()
+                xrt.assert_allclose(roundtrip_vds1, ds1)
+                xrt.assert_allclose(roundtrip_vds2, ds2)
+
+                # assert coordinate attributes are maintained
+                for coord in ds1.coords:
+                    assert ds1.coords[coord].attrs == roundtrip_vds1.coords[coord].attrs
+                for coord in ds2.coords:
+                    assert ds2.coords[coord].attrs == roundtrip_vds2.coords[coord].attrs
+
+                if decode_times:
+                    assert roundtrip_vds1.time.dtype == ds1.time.dtype
+                    assert roundtrip_vds2.time.dtype == ds2.time.dtype
+                    assert (
+                        roundtrip_vds1.time.encoding["units"]
+                        == ds1.time.encoding["units"]
+                    )
+                    assert (
+                        roundtrip_vds2.time.encoding["units"]
+                        == ds2.time.encoding["units"]
+                    )
+                    assert (
+                        roundtrip_vds1.time.encoding["calendar"]
+                        == ds1.time.encoding["calendar"]
+                    )
+                    assert (
+                        roundtrip_vds2.time.encoding["calendar"]
+                        == ds2.time.encoding["calendar"]
+                    )
 
 
 @parametrize_over_hdf_backends

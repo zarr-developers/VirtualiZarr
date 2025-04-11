@@ -5,15 +5,15 @@ from typing import Hashable, Iterable, Mapping, Optional
 from xarray import Dataset, Index
 
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.readers.common import (
-    construct_fully_virtual_dataset,
-    replace_virtual_with_loadable_vars,
-)
 from virtualizarr.translators.kerchunk import (
     extract_group,
     virtual_vars_and_metadata_from_kerchunk_refs,
 )
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
+from virtualizarr.xarray import (
+    construct_fully_virtual_dataset,
+    construct_virtual_dataset,
+)
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -66,9 +66,9 @@ class TIFFVirtualBackend(VirtualBackend):
             attrs=attrs,
         )
 
-        vds = replace_virtual_with_loadable_vars(
-            fully_virtual_dataset,
-            filepath,
+        vds = construct_virtual_dataset(
+            fully_virtual_ds=fully_virtual_dataset,
+            filepath=filepath,
             group=group,
             loadable_variables=loadable_variables,
             reader_options=reader_options,

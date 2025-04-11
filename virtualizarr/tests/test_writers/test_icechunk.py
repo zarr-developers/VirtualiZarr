@@ -14,8 +14,8 @@ import zarr
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.readers.common import separate_coords
 from virtualizarr.writers.icechunk import generate_chunk_key
+from virtualizarr.xarray import separate_coords
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]

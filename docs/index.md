@@ -83,6 +83,7 @@ faq
 api
 releases
 contributing
+core_team_guide
 ```
 
 ## References

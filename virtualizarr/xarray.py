@@ -9,6 +9,7 @@ from typing import (
 import xarray as xr
 import xarray.indexes
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.utils import _FsspecFSFromFilepath
 
 
@@ -31,55 +32,108 @@ def construct_fully_virtual_dataset(
         attrs=attrs,
     )
 
-    # TODO we should probably also use vds.set_close() to tell xarray how to close the file we opened
-
     return vds
 
 
-# TODO reimplement this using ManifestStore (GH #473)
-def replace_virtual_with_loadable_vars(
-    fully_virtual_dataset: xr.Dataset,
-    filepath: str,  # TODO won't need this after #473 because the filepaths will be in the ManifestStore
+def construct_virtual_dataset(
+    manifest_store: ManifestStore | None = None,
+    # TODO remove filepath option once all readers use ManifestStore approach
+    fully_virtual_ds: xr.Dataset | None = None,
+    filepath: str | None = None,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
+    """
+    Construct a fully or partly virtual dataset from a ManifestStore (or filepath for backwards compatibility),
+    containing the contents of one group.
+
+    Accepts EITHER manifest_store OR fully_virtual_ds and filepath. The latter option should be removed once all readers use ManifestStore approach.
+    """
+
     if indexes is not None:
         raise NotImplementedError()
 
-    fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
+    if manifest_store:
+        if group:
+            raise NotImplementedError(
+                "ManifestStore does not yet support nested groups"
+            )
+        else:
+            manifestgroup = manifest_store._group
 
-    if fpath.upath.suffix == ".zarr":
-        loadable_ds = xr.open_zarr(
-            fpath.upath,
+        fully_virtual_ds = manifestgroup.to_virtual_dataset()
+
+        with xr.open_zarr(
+            manifest_store,
+            group=group,
             consolidated=False,
-            group=group,
-            decode_times=decode_times,
+            zarr_format=3,
             chunks=None,
-        )
-    else:
-        # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
-        loadable_ds = xr.open_dataset(
-            fpath.open_file(),  # type: ignore[arg-type]
-            group=group,
             decode_times=decode_times,
-        )
+        ) as loadable_ds:
+            return replace_virtual_with_loadable_vars(
+                fully_virtual_ds, loadable_ds, loadable_variables
+            )
+
+    else:
+        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+
+        fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
+        if fpath.upath.suffix == ".zarr":
+            with xr.open_zarr(
+                fpath.upath,
+                consolidated=False,
+                group=group,
+                decode_times=decode_times,
+                chunks=None,
+            ) as loadable_ds:
+                return replace_virtual_with_loadable_vars(
+                fully_virtual_ds,  # type: ignore[arg-type]
+                loadable_ds,
+                loadable_variables,
+            )
+        else:
+            # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
+            with xr.open_dataset(
+                fpath.open_file(),  # type: ignore[arg-type]
+                group=group,
+                decode_times=decode_times,
+            ) as loadable_ds:
+                return replace_virtual_with_loadable_vars(
+                fully_virtual_ds,  # type: ignore[arg-type]
+                loadable_ds,
+                loadable_variables,
+            )
+
+
+def replace_virtual_with_loadable_vars(
+    fully_virtual_ds: xr.Dataset,
+    loadable_ds: xr.Dataset,
+    loadable_variables: Iterable[Hashable] | None = None,
+) -> xr.Dataset:
+    """
+    Merge a fully virtual and the corresponding fully loadable dataset, keeping only `loadable_variables` from the latter (plus defaults needed for indexes).
+    """
 
     var_names_to_load: list[Hashable]
+
     if isinstance(loadable_variables, list):
         var_names_to_load = list(loadable_variables)
     elif loadable_variables is None:
-        # If `loadable_variables`` is None then we have to explicitly match default behaviour of xarray
-        # i.e. load and create indexes only for dimension coordinate variables.
-        # We already have all the indexes and variables we should be keeping - we just need to distinguish them.
+        # If `loadable_variables` is None, then we have to explicitly match default
+        # behaviour of xarray, i.e., load and create indexes only for dimension
+        # coordinate variables.  We already have all the indexes and variables
+        # we should be keeping - we just need to distinguish them.
         var_names_to_load = [
             name for name, var in loadable_ds.variables.items() if var.dims == (name,)
         ]
     else:
         raise ValueError(
-            f"loadable_variables must be an iterable of string variable names, or None, but got type {type(loadable_variables)}"
+            "loadable_variables must be an iterable of string variable names,"
+            f" or None, but got type {type(loadable_variables)}"
         )
 
     # this will automatically keep any IndexVariables needed for loadable 1D coordinates
@@ -90,9 +144,7 @@ def replace_virtual_with_loadable_vars(
         loadable_var_names_to_drop, errors="ignore"
     )
 
-    ds_virtual_to_keep = fully_virtual_dataset.drop_vars(
-        var_names_to_load, errors="ignore"
-    )
+    ds_virtual_to_keep = fully_virtual_ds.drop_vars(var_names_to_load, errors="ignore")
 
     # we don't need `compat` or `join` kwargs here because there should be no variables with the same name in both datasets
     return xr.merge(

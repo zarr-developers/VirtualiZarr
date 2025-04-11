@@ -30,6 +30,7 @@ Serialization
 
     VirtualiZarrDatasetAccessor.to_kerchunk
     VirtualiZarrDatasetAccessor.to_icechunk
+    VirtualiZarrDataTreeAccessor.to_icechunk
 
 Information
 -----------

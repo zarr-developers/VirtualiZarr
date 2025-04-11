@@ -1,36 +1,36 @@
+import textwrap
+
 import pytest
 from zarr.core.group import GroupMetadata
 
-from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestGroup
-
-
-@pytest.fixture
-def manifest_array(array_v3_metadata):
-    chunk_dict = {
-        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-    }
-    manifest = ChunkManifest(entries=chunk_dict)
-    chunks = (5, 1, 10)
-    shape = (5, 2, 20)
-    array_metadata = array_v3_metadata(shape=shape, chunks=chunks)
-    return ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+from virtualizarr.manifests import ManifestArray, ManifestGroup
 
 
 class TestManifestGroup:
-    def test_manifest_array(self, array_v3_metadata, manifest_array):
+    def test_group_containing_array(self, manifest_array):
         var = "foo"
-        manifest_group = ManifestGroup(
-            manifest_arrays={var: manifest_array}, attributes={}
-        )
-        assert isinstance(manifest_group._manifest_arrays, dict)
-        assert isinstance(manifest_group._manifest_arrays[var], ManifestArray)
-        assert isinstance(manifest_group._metadata, GroupMetadata)
+        marr = manifest_array()
+        manifest_group = ManifestGroup(arrays={var: marr}, attributes={})
+
+        assert manifest_group.arrays == {var: marr}
+        assert manifest_group.groups == {}
+        assert isinstance(manifest_group[var], ManifestArray)
+        with pytest.raises(KeyError):
+            manifest_group["bar"]
+        assert isinstance(manifest_group.metadata, GroupMetadata)
+        assert len(manifest_group) == 1
+        assert list(manifest_group) == [var]
 
     def test_manifest_repr(self, manifest_array):
-        manifest_group = ManifestGroup(
-            manifest_arrays={"foo": manifest_array}, attributes={}
+        marr = manifest_array(shape=(5, 2), chunks=(5, 2))
+        manifest_group = ManifestGroup(arrays={"foo": marr}, attributes={})
+        expected_repr = textwrap.dedent(
+            """
+            ManifestGroup(
+                arrays={'foo': ManifestArray<shape=(5, 2), dtype=int32, chunks=(5, 2)>},
+                groups={},
+                metadata=GroupMetadata(attributes={}, zarr_format=3, consolidated_metadata=None, node_type='group'),
+            )
+            """
         )
-        assert str(manifest_group)
+        assert repr(manifest_group) == expected_repr

@@ -12,6 +12,16 @@ New Features
 - Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 - Added experimental ManifestStore (:pull:`490`).
+- Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added :py:func:`datatree_to_icechunk` function for writing an ``xarray.DataTree`` to
+  an Icechunk store (:issue:`244`).  By `Chuck Daniels <https://github.com/chuckwondo>`_.
+- Added a ``.virtualize`` custom accessor to ``xarray.DataTree``, exposing the method
+  :py:meth:`xarray.DataTree.virtualize.to_icechunk()` for writing an ``xarray.DataTree``
+  to an Icechunk store (:issue:`244`).  By
+  `Chuck Daniels <https://github.com/chuckwondo>`_.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
@@ -40,6 +50,8 @@ Documentation
 
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
+- Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
@@ -56,6 +68,8 @@ Internal Changes
     - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).
     - zarr-python 3.0 does not yet support datetime and timedelta data types (`zarr-python issue #2616 <https://github.com/zarr-developers/zarr-python/issues/2616>`_).
 - The continuous integration workflows and developer environment now use `pixi <https://pixi.sh/latest/>`_ (:pull:`407`).
+- Added `loadable_variables` kwarg to :py:meth:`ManifestStore.to_virtual_dataset`.
+  (:pull:`543`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.3.2:
 

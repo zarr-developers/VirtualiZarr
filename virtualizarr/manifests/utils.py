@@ -1,8 +1,13 @@
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 from zarr import Array
-from zarr.core.metadata.v3 import ArrayV3Metadata
+from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
+from zarr.core.metadata.v3 import (
+    ArrayV3Metadata,
+    parse_dimension_names,
+    parse_shapelike,
+)
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
@@ -14,10 +19,12 @@ def create_v3_array_metadata(
     shape: tuple[int, ...],
     data_type: np.dtype,
     chunk_shape: tuple[int, ...],
+    chunk_key_encoding: ChunkKeyEncodingLike = {"name": "default"},
     fill_value: Any = None,
     codecs: Optional[list[Dict[str, Any]]] = None,
     dimension_names: Optional[tuple[str, ...]] | None = None,
     attributes: Optional[Dict[str, Any]] = None,
+    dimension_names: Iterable[str] | None = None,
 ) -> ArrayV3Metadata:
     """
     Create an ArrayV3Metadata instance with standard configuration.
@@ -31,12 +38,16 @@ def create_v3_array_metadata(
         The numpy dtype of the array
     chunk_shape : tuple[int, ...]
         The shape of each chunk
+    chunk_key_encoding : ChunkKeyEncodingLike
+        The mapping from chunk grid cell coordinates to keys.
     fill_value : Any, optional
         The fill value for the array
     codecs : list[Dict[str, Any]], optional
         List of codec configurations
     attributes : Dict[str, Any], optional
         Additional attributes for the array
+    dimension_names : tuple[str], optional
+        Names of the dimensions
 
     Returns
     -------
@@ -50,7 +61,7 @@ def create_v3_array_metadata(
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
         },
-        chunk_key_encoding={"name": "default"},
+        chunk_key_encoding=chunk_key_encoding,
         fill_value=fill_value,
         codecs=convert_to_codec_pipeline(
             codecs=codecs or [],
@@ -192,17 +203,29 @@ def copy_and_replace_metadata(
     old_metadata: ArrayV3Metadata,
     new_shape: list[int] | None = None,
     new_chunks: list[int] | None = None,
+    new_dimension_names: Iterable[str] | None | Literal["default"] = "default",
+    new_attributes: dict | None = None,
 ) -> ArrayV3Metadata:
     """
     Update metadata to reflect a new shape and/or chunk shape.
     """
+    # TODO this should really be upstreamed into zarr-python
+
     metadata_copy = old_metadata.to_dict().copy()
-    metadata_copy["shape"] = new_shape  # type: ignore[assignment]
+
+    if new_shape is not None:
+        metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
     if new_chunks is not None:
         metadata_copy["chunk_grid"] = {
             "name": "regular",
             "configuration": {"chunk_shape": tuple(new_chunks)},
         }
+    if new_dimension_names != "default":
+        # need the option to use the literal string "default" as a sentinel value because None is a valid choice for zarr dimension_names
+        metadata_copy["dimension_names"] = parse_dimension_names(new_dimension_names)
+    if new_attributes is not None:
+        metadata_copy["attributes"] = new_attributes
+
     # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
     new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
     return new_metadata
