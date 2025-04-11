@@ -26,7 +26,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    #"zarr>=3.0.2",
+    "zarr>=3.0.2",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -91,7 +91,7 @@ upstream = [
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
-    'zarr @ git+https://github.com/d-v-b/zarr-python@feat/fixed-length-strings',
+    'zarr @ git+https://github.com/ianhi/zarr-python@feat/fixed-length-strings',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
