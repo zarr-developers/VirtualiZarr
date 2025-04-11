@@ -91,7 +91,7 @@ upstream = [
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
-    'zarr @ git+https://github.com/zarr-developers/zarr-python',
+    'zarr @ git+https://github.com/d-v-b/zarr-python@feat/fixed-length-strings',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     'fsspec @ git+https://github.com/fsspec/filesystem_spec',
