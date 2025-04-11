@@ -84,10 +84,24 @@ class HDFVirtualBackend(VirtualBackend):
         attrs = HDFVirtualBackend._extract_attrs(dataset)
         dtype = dataset.dtype
 
+        # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
+        # cfcodec = cfcodec_from_dataset(dataset)
+        # if cfcodec:
+            # codecs.insert(0, cfcodec["codec"])
+            # dtype = cfcodec["target_dtype"]
+            # attrs.pop("scale_factor", None)
+            # attrs.pop("add_offset", None)
+        # else:
+            # dtype = dataset.dtype
+
+        if "_FillValue" in attrs:
+            encoded_cf_fill_value = HDFVirtualBackend._encode_cf_fill_value(attrs["_FillValue"], dtype)
+            attrs["_FillValue"] = encoded_cf_fill_value
+
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-
+        
         fill_value = dataset.fillvalue.item()
         dims = tuple(HDFVirtualBackend._dataset_dims(dataset, group=group))
         metadata = create_v3_array_metadata(
@@ -99,6 +113,7 @@ class HDFVirtualBackend(VirtualBackend):
             dimension_names=dims,
             attributes=attrs,
         )
+        
 
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         return ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -136,7 +151,6 @@ class HDFVirtualBackend(VirtualBackend):
             group=g
         )
         drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
-        # attrs: dict[str, Any] = {}
         attrs = HDFVirtualBackend._extract_attrs(g)
         for key in g.keys():
             if key not in drop_variables:
@@ -356,9 +370,7 @@ class HDFVirtualBackend(VirtualBackend):
             if n in _HIDDEN_ATTRS:
                 continue
             if n == "_FillValue":
-                if isinstance(v, np.ndarray) and v.size == 1:
-                    v = v.item()
-                v = FillValueCoder.encode(v, h5obj.dtype)  # type: ignore[arg-type]
+                v = v
             # Fix some attribute values to avoid JSON encoding exceptions...
             if isinstance(v, bytes):
                 v = v.decode("utf-8") or " "
@@ -391,3 +403,26 @@ class HDFVirtualBackend(VirtualBackend):
                     non_coordinate_dimension_variables.append(name)
 
         return non_coordinate_dimension_variables
+
+    @staticmethod
+    def _encode_cf_fill_value(
+        fill_value: Union[np.ndarray, np.generic],
+        target_dtype: np.dtype,
+    ) -> FillValueType:
+        """
+        Convert the _FillValue attribute from an HDF5 group or dataset into
+        one properly encoded for the target dtype.
+
+        Parameters
+        ----------
+        fill_value
+            An ndarray or value.
+        target_dtype
+            The target dtype of the ManifestArray that will use the _FillValue
+        """
+        if isinstance(fill_value, np.ndarray) and fill_value.size == 1:
+            fillvalue = fill_value.item()
+        else:
+            fillvalue = fill_value
+        encoded_fillvalue = FillValueCoder.encode(fillvalue, target_dtype)
+        return encoded_fillvalue
