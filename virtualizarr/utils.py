@@ -80,9 +80,6 @@ class _FsspecFSFromFilepath:
         """Returns a mapper for use with Zarr"""
         return self.fs.get_mapper(self.filepath)
 
-    def filepath(self):
-        return upath.as_uri()
-
     def __post_init__(self) -> None:
         """Initialize the fsspec filesystem object"""
         import fsspec
