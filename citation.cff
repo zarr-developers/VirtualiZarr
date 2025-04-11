@@ -5,5 +5,20 @@ authors:
   given-names: "Thomas"
   orcid: "https://orcid.org/0000-0002-2176-0530"
 - family-names: "Hagen"
-  given-names: "Raphael"
-  orcid: ""
+  given-names: "Norland"
+- name: Sean Harkins
+  orcid: 0000-0000-0000-0000
+- name: Aimee Barciauskas
+  orcid: https://orcid.org/0000-0002-3158-9554
+- name: Max Jones
+  orcid: https://orcid.org/0000-0003-0180-8928
+- name: Julia Signell
+  orcid: https://orcid.org/0000-0002-4120-3192
+- name: Ayush Nag
+  orcid: https://orcid.org/0009-0008-1790-597X
+- name: Gustavo Hidalgo
+  orcid: 0000-0000-0000-0000
+- name: Tom Augspurger
+  orcid: https://orcid.org/0000-0002-8136-7087
+- name: Ryan Abernathey
+  orcid: https://orcid.org/0000-0001-5999-4917
