@@ -57,7 +57,7 @@ class _FsspecFSFromFilepath:
 
     """
 
-    filepath: str | None
+    filepath: str
     reader_options: Optional[dict] = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
     upath: upath.core.UPath = field(init=False)
