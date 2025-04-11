@@ -6,12 +6,8 @@ from xarray import Dataset, Index
 from virtualizarr.readers.api import (
     VirtualBackend,
 )
-from virtualizarr.translators.kerchunk import (
-    extract_group,
-    virtual_vars_and_metadata_from_kerchunk_refs,
-)
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.xarray import construct_fully_virtual_dataset
+from virtualizarr.manifests import ManifestStore
 
 
 class FITSVirtualBackend(VirtualBackend):
@@ -50,15 +46,12 @@ class FITSVirtualBackend(VirtualBackend):
                 "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
             )
 
-        virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
+        manifeststore = ManifestStore._from_kerchunk_refs(
             refs,
             fs_root=Path.cwd().as_uri(),
         )
 
-        vds = construct_fully_virtual_dataset(
-            virtual_vars=virtual_vars,
-            coord_names=coord_names,
-            attrs=attrs,
-        )
+        # TODO pass indexes={}?
+        vds = manifeststore.to_virtual_dataset(group=group)
 
         return vds.drop_vars(_drop_vars)
