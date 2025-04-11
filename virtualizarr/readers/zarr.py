@@ -167,7 +167,7 @@ class ZarrVirtualBackend(VirtualBackend):
     def open_virtual_dataset(
         filepath: str,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        drop_variables: str | Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
         indexes: Mapping[str, Index] | None = None,
