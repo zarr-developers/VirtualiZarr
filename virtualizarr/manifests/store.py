@@ -147,12 +147,14 @@ def _default_object_store(
 
     parsed = urlparse(filepath)
     if parsed.scheme == "s3":
+        if not config:
+            config["skip_signature"] = True
+        config["virtual_hosted_style_request"] = True
+        config["client_options"] = {"allow_http": True}
+        config["virtual_hosted_style_request"] = False
         bucket = parsed.netloc
         return f"s3://{bucket}", obs.store.S3Store(
             bucket=bucket,
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            client_options={"allow_http": True},
             **config,
         )
     elif parsed.scheme == "":
