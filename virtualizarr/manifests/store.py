@@ -53,23 +53,6 @@ if TYPE_CHECKING:
     import xarray as xr
 
 
-def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
-    # TODO: Support storage configuration
-    import obstore as obs
-
-    parsed = urlparse(filepath)
-    if parsed.scheme == "s3":
-        bucket = parsed.netloc
-        return f"s3://{bucket}", obs.store.S3Store(
-            bucket=bucket,
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            client_options={"allow_http": True},
-        )
-    elif parsed.scheme == "":
-        return "file://", obs.store.LocalStore()
-
-
 @dataclass
 class StoreRequest:
     """Dataclass for matching a key to the store instance"""
@@ -156,34 +139,26 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
-    """
-    Find the matching store based on the store keys and the beginning of the URI strings,
-    to fetch data from the appropriately configured ObjectStore.
+def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
+    # TODO: Maybe support storage configuration
+    import obstore as obs
 
-    Parameters:
-    -----------
-    stores : StoreDict
-        A dictionary with URI prefixes for different stores as keys
-    request_key : str
-        A string to match against the dictionary keys
+    parsed = urlparse(filepath)
+    if parsed.scheme == "s3":
+        bucket = parsed.netloc
+        return f"s3://{bucket}", obs.store.S3Store(
+            bucket=bucket,
+            skip_signature=True,
+            virtual_hosted_style_request=False,
+            client_options={"allow_http": True},
+        )
+    elif parsed.scheme == "":
+        return "file://", obs.store.LocalStore()
 
-    Returns:
-    --------
-    StoreRequest
-    """
-    # Sort keys by length in descending order to ensure longer, more specific matches take precedence
-    sorted_keys = sorted(stores.keys(), key=len, reverse=True)
 
-    # Check each key to see if it's a prefix of the uri_string
-    for key in sorted_keys:
-        if request_key.startswith(key):
-            parsed_key = urlparse(request_key)
-            return StoreRequest(store=stores[key], key=parsed_key.path)
-    # if no match is found, raise an error
-    raise ValueError(
-        f"Expected the one of stores.keys() to match the data prefix, got {stores.keys()} and {request_key}"
-    )
+def _sort_stores_by_prefix_length(input_dict):
+    sorted_items = sorted(input_dict.items(), key=lambda x: len(x[0]), reverse=True)
+    return dict(sorted_items)
 
 
 class ManifestStore(Store):
@@ -247,7 +222,7 @@ class ManifestStore(Store):
             raise TypeError
 
         super().__init__(read_only=True)
-        self._stores = stores
+        self._stores = _sort_stores_by_prefix_length(stores)
         self._group = group
 
     def __str__(self) -> str:
@@ -290,7 +265,7 @@ class ManifestStore(Store):
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
         # Get the  configured object store instance that matches the path
-        store_request = find_matching_store(stores=self._stores, request_key=path)
+        store_request = self._find_matching_store(request_key=path)
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -405,6 +380,39 @@ class ManifestStore(Store):
             indexes=indexes,
             decode_times=decode_times,
         )
+
+    def _find_matching_store(self, request_key: str) -> StoreRequest:
+        """
+        Find the matching store based on the store keys and the beginning of the URI strings,
+        to fetch data from the appropriately configured ObjectStore.
+
+        Parameters:
+        -----------
+        stores : StoreDict
+            A dictionary with URI prefixes for different stores as keys
+        request_key : str
+            A string to match against the dictionary keys
+
+        Returns:
+        --------
+        StoreRequest
+        """
+
+        # Check each key to see if it's a prefix of the uri_string
+        parsed_request_key = urlparse(request_key)
+        for prefix in self._stores.keys():
+            if request_key.startswith(prefix):
+                # Return an existing configured store and parsed request path
+                return StoreRequest(
+                    store=self._stores[prefix], key=parsed_request_key.path
+                )
+        # Use anonymous default stores if not in pre-configured stores
+        prefix, store = _default_object_store(request_key)
+        # Add to stores for future use
+        self._stores[prefix] = store
+        self._stores = _sort_stores_by_prefix_length(self._stores)
+        # Return the new store and and parsed request path
+        return StoreRequest(store=store, key=parsed_request_key.path)
 
 
 def _transform_byte_range(
