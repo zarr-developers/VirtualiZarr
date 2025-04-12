@@ -91,7 +91,7 @@ async def virtual_variable_from_zarr_array(
     manifest_array = ManifestArray(
         metadata=array_metadata, chunkmanifest=chunk_manifest
     )
-    # TODO: After ManifestStore reader refactor, this won't be the responsability of the Zarr reader #Issue 498.
+    # TODO: After ManifestStore reader refactor, this won't be the responsibility of the Zarr reader #Issue 498.
     return Variable(
         dims=zarr_array.metadata.dimension_names,
         data=manifest_array,
