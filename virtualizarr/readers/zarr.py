@@ -11,6 +11,7 @@ from typing import (
     Optional,
 )
 
+import numpy as np
 from xarray import Dataset, Index, Variable
 from zarr.core.metadata import ArrayV3Metadata
 
@@ -22,7 +23,22 @@ from virtualizarr.xarray import (
     construct_fully_virtual_dataset,
     construct_virtual_dataset,
 )
-from virtualizarr.zarr import ZARR_DEFAULT_FILL_VALUE
+
+if TYPE_CHECKING:
+    pass
+
+FillValueT = bool | str | float | int | list | None
+
+ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
+    # numpy dtypes's hierarchy lets us avoid checking for all the widths
+    # https://numpy.org/doc/stable/reference/arrays.scalars.html
+    np.dtype("bool").kind: False,
+    np.dtype("int").kind: 0,
+    np.dtype("float").kind: 0.0,
+    np.dtype("complex").kind: [0.0, 0.0],
+    np.dtype("datetime64").kind: 0,
+}
+
 
 if TYPE_CHECKING:
     import zarr

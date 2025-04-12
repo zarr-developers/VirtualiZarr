@@ -183,11 +183,9 @@ def convert_v3_to_v2_metadata(
                 "others will be ignored. This may affect data compatibility.",
                 UserWarning,
             )
-
         compressor_config = get_codec_config(bytes_compressors[0])
 
     # Handle filter configurations
-
     filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
 
     v2_metadata = ArrayV2Metadata(
