@@ -4,8 +4,8 @@ from typing import Hashable, Iterable, Mapping, Optional
 import ujson
 from xarray import Dataset, Index
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.translators.kerchunk import dataset_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
@@ -72,11 +72,7 @@ class KerchunkVirtualBackend(VirtualBackend):
             # is there a better / more preformant way to extract this?
             array_refs = {k: lrm[k] for k in lrm.keys()}
 
-            full_reference = {"refs": array_refs}
-
-            vds = dataset_from_kerchunk_refs(
-                KerchunkStoreRefs(full_reference), fs_root=fs_root
-            )
+            refs = KerchunkStoreRefs({"refs": array_refs})
 
         # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
         # https://fsspec.github.io/kerchunk/spec.html
@@ -84,12 +80,22 @@ class KerchunkVirtualBackend(VirtualBackend):
             with fs.open_file() as of:
                 refs = ujson.load(of)
 
-            vds = dataset_from_kerchunk_refs(KerchunkStoreRefs(refs), fs_root=fs_root)
-
         else:
             raise ValueError(
                 "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. If your Kerchunk generated references are saved in parquet format, make sure the file extension is `.parquet`. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
             )
+
+        manifeststore = ManifestStore.from_kerchunk_refs(
+            refs,
+            group=group,
+            fs_root=fs_root,
+        )
+
+        vds = manifeststore.to_virtual_dataset(
+            group=group,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
+        )
 
         # TODO would be more efficient to drop these before converting them into ManifestArrays, i.e. drop them from the kerchunk refs dict
         return vds.drop_vars(_drop_vars)
