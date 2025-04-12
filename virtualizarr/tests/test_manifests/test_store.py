@@ -127,6 +127,7 @@ def s3_store(minio_bucket):
 
 
 @requires_obstore
+@requires_minio
 def test_default_object_store_s3(minio_bucket):
     from obstore.store import S3Store
 

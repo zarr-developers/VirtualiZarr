@@ -6,6 +6,7 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
+    requires_minio,
     requires_obstore,
 )
 
@@ -40,6 +41,7 @@ class TestHDFManifestStore:
         )
         xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
+    @requires_minio
     @requires_obstore
     def test_default_store_s3(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
         store = HDFVirtualBackend._create_manifest_store(
