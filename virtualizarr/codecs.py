@@ -98,6 +98,15 @@ def get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
         return codec.codec_config
     elif hasattr(codec, "get_config"):
         return codec.get_config()
+    elif hasattr(codec, "_zstd_codec"):
+        # related issue: https://github.com/zarr-developers/VirtualiZarr/issues/514
+        # very silly workaround. codec.to_dict for zstd gives:
+        # {'name': 'zstd', 'configuration': {'level': 0, 'checksum': False}}
+        # which when passed through ArrayV2Metadata -> numcodecs.get_codec gives the error:
+        # *** numcodecs.errors.UnknownCodecError: codec not available: 'None'
+        # if codec._zstd_codec.get_config() : {'id': 'zstd', 'level': 0, 'checksum': False}
+        # is passed to numcodecs.get_codec. It works fine.
+        return codec._zstd_codec.get_config()
     elif hasattr(codec, "to_dict"):
         return codec.to_dict()
     else:
