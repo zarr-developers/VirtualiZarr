@@ -118,7 +118,7 @@ def s3_store(minio_bucket):
         client_options={"allow_http": True},
     )
     filepath = "data.tmp"
-    prefix = f"s3://{minio_bucket['bucket']}/data/"
+    prefix = f"s3://{minio_bucket['bucket']}"
     return _generate_manifest_store(
         store=store,
         prefix=prefix,
