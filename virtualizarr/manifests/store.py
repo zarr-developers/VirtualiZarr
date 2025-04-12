@@ -44,11 +44,28 @@ from zarr.core.buffer import default_buffer_prototype
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
-    from obstore.store import ObjectStore  # type: ignore[import-not-found]
+    from obstore.store import (
+        ObjectStore,  # type: ignore[import-not-found]
+    )
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
 
     import xarray as xr
+
+
+def _default_object_store(filepath: str, **kwargs) -> ObjectStore:
+    # TODO: Replace **kwargs with S3Config | GCSConfig (e.g., https://developmentseed.org/obstore/latest/api/store/aws/#obstore.store.S3Config)
+    import obstore as obs
+
+    parsed = urlparse(filepath)
+    if parsed.scheme == "s3":
+        if not kwargs:
+            kwargs = {"skip_signature": True}
+        kwargs["virtual_hosted_style_request"] = False
+        kwargs["client_options"] = {"allow_http": True}
+        return obs.store.S3Store(bucket=parsed.netloc, **kwargs)
+    elif parsed.scheme == "":
+        return obs.store.LocalStore()
 
 
 @dataclass
