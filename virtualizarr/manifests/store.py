@@ -14,7 +14,6 @@ from zarr.abc.store import (
     SuffixByteRequest,
 )
 from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
-from zarr.core.buffer.core import BufferPrototype
 from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
