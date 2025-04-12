@@ -80,6 +80,10 @@ def construct_virtual_dataset(
 
     else:
         # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+        if not filepath:
+            raise ValueError(
+                "if using pre-manifest store approach, a filepath is required."
+            )
 
         fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
         if fpath.upath.suffix == ".zarr":

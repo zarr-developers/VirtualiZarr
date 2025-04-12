@@ -59,9 +59,7 @@ class KerchunkVirtualBackend(VirtualBackend):
             indexes = {}
 
         fs = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
-        import ipdb
 
-        ipdb.set_trace()
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
         if fs.filepath.endswith(".parquet") and fs.fs.isfile(
             f"{fs.filepath}/.zmetadata"
