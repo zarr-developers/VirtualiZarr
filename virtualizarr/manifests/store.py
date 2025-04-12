@@ -222,7 +222,7 @@ class ManifestStore(Store):
         self,
         group: ManifestGroup,
         *,
-        stores: StoreDict,  # TODO: Consider using a sequence of tuples rather than a dict (see https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2010717898).
+        stores: StoreDict,
     ) -> None:
         """Instantiate a new ManifestStore
 
