@@ -53,19 +53,20 @@ if TYPE_CHECKING:
     import xarray as xr
 
 
-def _default_object_store(filepath: str, **kwargs) -> ObjectStore:
+def _default_object_store(filepath: str, **kwargs) -> tuple[str, ObjectStore]:
     # TODO: Replace **kwargs with S3Config | GCSConfig (e.g., https://developmentseed.org/obstore/latest/api/store/aws/#obstore.store.S3Config)
     import obstore as obs
 
     parsed = urlparse(filepath)
     if parsed.scheme == "s3":
+        bucket = parsed.netloc
         if not kwargs:
             kwargs = {"skip_signature": True}
         kwargs["virtual_hosted_style_request"] = False
         kwargs["client_options"] = {"allow_http": True}
-        return obs.store.S3Store(bucket=parsed.netloc, **kwargs)
+        return f"s3://{bucket}", obs.store.S3Store(bucket=bucket, **kwargs)
     elif parsed.scheme == "":
-        return obs.store.LocalStore()
+        return "file://", obs.store.LocalStore()
 
 
 @dataclass
@@ -222,7 +223,7 @@ class ManifestStore(Store):
         self,
         group: ManifestGroup,
         *,
-        stores: StoreDict,
+        stores: StoreDict = {},
     ) -> None:
         """Instantiate a new ManifestStore
 

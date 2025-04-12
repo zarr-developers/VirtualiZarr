@@ -131,11 +131,12 @@ def test_default_object_store_s3(minio_bucket):
     from obstore.store import S3Store
 
     filepath = f"s3://{minio_bucket['bucket']}/data/data.tmp"
-    store = _default_object_store(
+    prefix, store = _default_object_store(
         filepath,
         access_key_id=minio_bucket["username"],
         secret_access_key=minio_bucket["password"],
     )
+    assert prefix == f"s3://{minio_bucket['bucket']}"
     assert isinstance(store, S3Store)
 
 
@@ -144,7 +145,8 @@ def test_default_object_store_local(tmpdir):
     from obstore.store import LocalStore
 
     filepath = f"{tmpdir}/data.tmp"
-    store = _default_object_store(filepath)
+    prefix, store = _default_object_store(filepath)
+    assert prefix == "file://"
     assert isinstance(store, LocalStore)
 
 
