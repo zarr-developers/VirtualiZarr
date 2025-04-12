@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable
     from typing import Any
 
+    from obstore.store import S3Config
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
 
@@ -139,8 +140,9 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
-    # TODO: Maybe support storage configuration
+def _default_object_store(
+    filepath: str, config: Optional[S3Config] = {}
+) -> tuple[str, ObjectStore]:
     import obstore as obs
 
     parsed = urlparse(filepath)
@@ -151,6 +153,7 @@ def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
             skip_signature=True,
             virtual_hosted_style_request=False,
             client_options={"allow_http": True},
+            **config,
         )
     elif parsed.scheme == "":
         return "file://", obs.store.LocalStore()
@@ -406,7 +409,7 @@ class ManifestStore(Store):
                 return StoreRequest(
                     store=self._stores[prefix], key=parsed_request_key.path
                 )
-        # Use anonymous default stores if not in pre-configured stores
+        # Use anonymous default store if not in pre-configured stores
         prefix, store = _default_object_store(request_key)
         # Add to stores for future use
         self._stores[prefix] = store

@@ -28,6 +28,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.store import _default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
@@ -44,7 +45,7 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore.store import ObjectStore
+    from obstore.store import ObjectStore, S3Config
 
 FillValueType = Union[
     int,
@@ -156,11 +157,16 @@ class HDFVirtualBackend(VirtualBackend):
     def _create_manifest_store(
         filepath: str,
         *,
-        prefix: str,
-        store: ObjectStore,
-        group: str | None = None,
+        prefix: Optional[
+            str
+        ] = None,  # TODO: Improve typing to specify the prefix and store must both be provided or None
+        store: Optional[ObjectStore] = None,
+        config: Optional[S3Config] = {},
+        group: Optional[str] = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
+        if not store:
+            prefix, store = _default_object_store(filepath, config=config)
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store, filepath=filepath, group=group
         )

@@ -1,3 +1,4 @@
+import json
 import time
 
 import pytest
@@ -37,7 +38,7 @@ def minio_bucket(container):
     # Setup with guidance from https://medium.com/@sant1/using-minio-with-docker-and-python-cbbad397cb5d
     from minio import Minio
 
-    bucket = "mybucket"
+    bucket = "my-bucket"
     filename = "test.nc"
     # Initialize MinIO client
     client = Minio(
@@ -47,6 +48,28 @@ def minio_bucket(container):
         secure=False,
     )
     client.make_bucket(bucket)
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": ["s3:GetBucketLocation", "s3:ListBucket"],
+                "Resource": "arn:aws:s3:::my-bucket",
+            },
+            {
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectRetention",
+                    "s3:GetObjectLegalHold",
+                ],
+                "Resource": "arn:aws:s3:::my-bucket/*",
+            },
+        ],
+    }
+    client.set_bucket_policy(bucket, json.dumps(policy))
     yield {
         "port": container["port"],
         "endpoint": container["endpoint"],

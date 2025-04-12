@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -38,3 +39,13 @@ class TestHDFManifestStore:
             store, engine="zarr", consolidated=False, zarr_format=3
         )
         xr.testing.assert_allclose(basic_ds, rountripped_ds)
+
+    @requires_obstore
+    def test_default_store_s3(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
+        store = HDFVirtualBackend._create_manifest_store(
+            filepath=chunked_roundtrip_hdf5_s3_file,
+            config={"endpoint": minio_bucket["endpoint"]},
+        )
+        vds = store.to_virtual_dataset()
+        assert vds.dims == {"phony_dim_0": 5}
+        assert isinstance(vds["data"].data, ManifestArray)
