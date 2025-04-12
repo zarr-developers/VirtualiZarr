@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    overload,
 )
 
 import numpy as np
@@ -153,13 +154,28 @@ class HDFVirtualBackend(VirtualBackend):
                         manifest_dict[key] = variable
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
+    @overload
+    def _create_manifest_store(
+        filepath: str,
+        *,
+        prefix: str,
+        store: ObjectStore,
+        group: Optional[str] = None,
+    ) -> ManifestStore: ...
+
+    @overload
+    def _create_manifest_store(
+        filepath: str,
+        *,
+        config: Optional[S3Config] = {},
+        group: Optional[str] = None,
+    ) -> ManifestStore: ...
+
     @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
-        prefix: Optional[
-            str
-        ] = None,  # TODO: Improve typing to specify the prefix and store must both be provided or None
+        prefix: Optional[str] = None,
         store: Optional[ObjectStore] = None,
         config: Optional[S3Config] = {},
         group: Optional[str] = None,
