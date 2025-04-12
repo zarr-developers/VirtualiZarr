@@ -133,8 +133,6 @@ def test_default_object_store_s3(minio_bucket):
     filepath = f"s3://{minio_bucket['bucket']}/data/data.tmp"
     prefix, store = _default_object_store(
         filepath,
-        access_key_id=minio_bucket["username"],
-        secret_access_key=minio_bucket["password"],
     )
     assert prefix == f"s3://{minio_bucket['bucket']}"
     assert isinstance(store, S3Store)
