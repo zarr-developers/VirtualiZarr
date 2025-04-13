@@ -155,39 +155,41 @@ class HDFVirtualBackend(VirtualBackend):
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
     @overload
+    @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
         prefix: str,
-        store: ObjectStore,
-        group: Optional[str] = None,
+        store: ObjectStore | None = None,
+        group: str | None = None,
     ) -> ManifestStore: ...
 
     @overload
+    @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
-        config: Optional[S3Config] = {},
-        group: Optional[str] = None,
+        config: S3Config | None = None,
+        group: str | None = None,
     ) -> ManifestStore: ...
 
     @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
-        prefix: Optional[str] = None,
-        store: Optional[ObjectStore] = None,
-        config: Optional[S3Config] = {},
-        group: Optional[str] = None,
+        prefix: str | None = None,
+        store: ObjectStore | None = None,
+        config: S3Config | None = None,
+        group: str | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         if not store:
-            prefix, store = _default_object_store(filepath, config=config)
+            prefix, store = _default_object_store(filepath, config=config)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store, filepath=filepath, group=group
         )
         # Convert to a manifest store
-        return ManifestStore(stores={prefix: store}, group=manifest_group)
+        return ManifestStore(stores={prefix: store}, group=manifest_group)  # type: ignore
 
     @staticmethod
     def open_virtual_dataset(
