@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Literal, overload
 
-from xarray import Dataset, register_dataset_accessor
+import xarray as xr
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
-@register_dataset_accessor("virtualize")
+@xr.register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
@@ -20,8 +20,8 @@ class VirtualiZarrDatasetAccessor:
     Methods on this object are called via `ds.virtualize.{method}`.
     """
 
-    def __init__(self, ds: Dataset):
-        self.ds: Dataset = ds
+    def __init__(self, ds: xr.Dataset):
+        self.ds: xr.Dataset = ds
 
     def to_icechunk(
         self,
@@ -171,7 +171,7 @@ class VirtualiZarrDatasetAccessor:
     def rename_paths(
         self,
         new: str | Callable[[str], str],
-    ) -> Dataset:
+    ) -> xr.Dataset:
         """
         Rename paths to chunks in every ManifestArray in this dataset.
 
@@ -231,4 +231,77 @@ class VirtualiZarrDatasetAccessor:
             if isinstance(var.data, ManifestArray)
             else var.nbytes
             for var in self.ds.variables.values()
+        )
+
+
+@xr.register_datatree_accessor("virtualize")
+class VirtualiZarrDataTreeAccessor:
+    """
+    Xarray accessor for writing out virtual datatrees to disk.
+
+    Methods on this object are called via `dt.virtualize.{method}`.
+    """
+
+    def __init__(self, dt: xr.DataTree):
+        self.dt = dt
+
+    def to_icechunk(
+        self,
+        store: "IcechunkStore",
+        *,
+        write_inherited_coords: bool = False,
+        last_updated_at: datetime | None = None,
+    ) -> None:
+        """
+        Write an xarray DataTree to an Icechunk store.
+
+        Any variables backed by ManifestArray objects will be be written as virtual
+        references. Any other variables will be loaded into memory before their binary
+        chunk data is written into the store.
+
+        If ``last_updated_at`` is provided, it will be used as a checksum for any
+        virtual chunks written to the store with this operation.  At read time, if any
+        of the virtual chunks have been updated since this provided datetime, an error
+        will be raised.  This protects against reading outdated virtual chunks that have
+        been updated since the last read.  When not provided, no check is performed.
+        This value is stored in Icechunk with seconds precision, so be sure to take that
+        into account when providing this value.
+
+        Parameters
+        ----------
+        store: IcechunkStore
+            Store to write dataset into.
+        write_inherited_coords : bool, default: False
+            If ``True``, replicate inherited coordinates on all descendant nodes.
+            Otherwise, only write coordinates at the level at which they are
+            originally defined. This saves disk space, but requires opening the
+            full tree to load inherited coordinates.
+        last_updated_at: datetime, optional
+            Datetime to use as a checksum for any virtual chunks written to the store
+            with this operation.  When not provided, no check is performed.
+
+        Raises
+        ------
+        ValueError
+            If the store is read-only.
+
+        Examples
+        --------
+        To ensure an error is raised if the files containing referenced virtual chunks
+        are modified at any time from now on, pass the current time to
+        ``last_updated_at``.
+
+        >>> from datetime import datetime
+        >>> vdt.virtualize.to_icechunk(  # doctest: +SKIP
+        ...     icechunkstore,
+        ...     last_updated_at=datetime.now(),
+        ... )
+        """
+        from virtualizarr.writers.icechunk import datatree_to_icechunk
+
+        datatree_to_icechunk(
+            self.dt,
+            store,
+            write_inherited_coords=write_inherited_coords,
+            last_updated_at=last_updated_at,
         )

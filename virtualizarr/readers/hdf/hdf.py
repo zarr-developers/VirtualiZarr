@@ -18,9 +18,6 @@ import xarray as xr
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
-from virtualizarr.common import (
-    get_loadable_variables,
-)
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -34,6 +31,7 @@ from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
+
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -213,17 +211,10 @@ class HDFVirtualBackend(VirtualBackend):
             drop_variables=_drop_vars,
             group=group,
         )
-        ds_virtual = manifest_store.to_virtual_dataset()
-        _loadable_vars = get_loadable_variables(
-            dataset=ds_virtual,
+        ds = manifest_store.to_virtual_dataset(
             loadable_variables=loadable_variables,
+            decode_times=decode_times
         )
-        non_loadable_vars = set(ds_virtual.variables).difference(_loadable_vars)
-        ds_loadable = xr.open_zarr(
-            manifest_store, consolidated=False, zarr_format=3, drop_variables=non_loadable_vars
-        )
-        ds_virtual = ds_virtual.drop_vars(_loadable_vars)
-        ds = xr.merge([ds_virtual, ds_loadable])
         return ds
         
     @staticmethod
