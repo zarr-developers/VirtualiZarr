@@ -161,6 +161,7 @@ class TestExtractAttributes:
         attrs = HDFVirtualBackend._extract_attrs(ds)
         assert len(attrs.keys()) == 2
 
+
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestManifestGroupFromHDF:

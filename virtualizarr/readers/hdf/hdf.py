@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Hashable,
@@ -25,13 +24,11 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
+from virtualizarr.readers.hdf.filters import codecs_from_dataset
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath, soft_import
-
+from virtualizarr.utils import soft_import
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -85,21 +82,23 @@ class HDFVirtualBackend(VirtualBackend):
         # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
         # cfcodec = cfcodec_from_dataset(dataset)
         # if cfcodec:
-            # codecs.insert(0, cfcodec["codec"])
-            # dtype = cfcodec["target_dtype"]
-            # attrs.pop("scale_factor", None)
-            # attrs.pop("add_offset", None)
+        # codecs.insert(0, cfcodec["codec"])
+        # dtype = cfcodec["target_dtype"]
+        # attrs.pop("scale_factor", None)
+        # attrs.pop("add_offset", None)
         # else:
-            # dtype = dataset.dtype
+        # dtype = dataset.dtype
 
         if "_FillValue" in attrs:
-            encoded_cf_fill_value = HDFVirtualBackend._encode_cf_fill_value(attrs["_FillValue"], dtype)
+            encoded_cf_fill_value = HDFVirtualBackend._encode_cf_fill_value(
+                attrs["_FillValue"], dtype
+            )
             attrs["_FillValue"] = encoded_cf_fill_value
 
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-        
+
         fill_value = dataset.fillvalue.item()
         dims = tuple(HDFVirtualBackend._dataset_dims(dataset, group=group))
         metadata = create_v3_array_metadata(
@@ -111,7 +110,6 @@ class HDFVirtualBackend(VirtualBackend):
             dimension_names=dims,
             attributes=attrs,
         )
-        
 
         manifest = HDFVirtualBackend._dataset_chunk_manifest(path, dataset)
         return ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -161,7 +159,7 @@ class HDFVirtualBackend(VirtualBackend):
                     if variable is not None:
                         manifest_dict[key] = variable
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
-        
+
     @staticmethod
     def _create_manifest_store(
         filepath: str,
@@ -173,7 +171,10 @@ class HDFVirtualBackend(VirtualBackend):
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         manifest_group = HDFVirtualBackend._construct_manifest_group(
-            store=store, filepath=filepath, group=group, drop_variables=drop_variables,
+            store=store,
+            filepath=filepath,
+            group=group,
+            drop_variables=drop_variables,
         )
         # Convert to a manifest store
         return ManifestStore(stores={prefix: store}, group=manifest_group)
@@ -197,13 +198,14 @@ class HDFVirtualBackend(VirtualBackend):
             )
 
         # filepath = validate_and_normalize_path_to_uri(
-            # filepath, fs_root=Path.cwd().as_uri()
+        # filepath, fs_root=Path.cwd().as_uri()
         # )
 
         _drop_vars: list[Hashable] = (
             [] if drop_variables is None else list(drop_variables)
         )
         from obstore.store import LocalStore
+
         manifest_store = HDFVirtualBackend._create_manifest_store(
             filepath=filepath,
             store=LocalStore(),
@@ -212,11 +214,10 @@ class HDFVirtualBackend(VirtualBackend):
             group=group,
         )
         ds = manifest_store.to_virtual_dataset(
-            loadable_variables=loadable_variables,
-            decode_times=decode_times
+            loadable_variables=loadable_variables, decode_times=decode_times
         )
         return ds
-        
+
     @staticmethod
     def _dataset_chunk_manifest(
         path: str,
