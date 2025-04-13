@@ -159,6 +159,8 @@ def _default_object_store(
         )
     elif parsed.scheme == "":
         return "file://", obs.store.LocalStore()
+    else:
+        raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
 def _sort_stores_by_prefix_length(input_dict):
