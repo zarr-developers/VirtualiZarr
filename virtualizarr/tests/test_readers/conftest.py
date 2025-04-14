@@ -433,3 +433,16 @@ def cf_array_fill_value_hdf5_file(tmp_path: Path) -> str:
         dset.attrs["_FillValue"] = np.array([np.nan])
 
     return filepath
+
+@pytest.fixture
+def bytes_fillvalue_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "bytes_fillvalue.nc") 
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            "data",
+            shape=(5,),
+            dtype=h5py.string_dtype(encoding="ascii"),
+            fillvalue=b"default"
+        )
+    return filepath

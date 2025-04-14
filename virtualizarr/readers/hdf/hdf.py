@@ -90,8 +90,10 @@ class HDFVirtualBackend(VirtualBackend):
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-
-        fill_value = dataset.fillvalue.item()
+        if isinstance(dataset.fillvalue, (bytes)):
+            fill_value = dataset.fillvalue
+        else:
+            fill_value = dataset.fillvalue.item()
         dims = tuple(HDFVirtualBackend._dataset_dims(dataset, group=group))
         metadata = create_v3_array_metadata(
             shape=dataset.shape,
@@ -450,8 +452,10 @@ class HDFVirtualBackend(VirtualBackend):
         codec_configs = [
             numcodec_config_to_configurable(codec.get_config()) for codec in codecs
         ]
-
-        fill_value = dataset.fillvalue.item()
+        if isinstance(dataset.fillvalue, (bytes)):
+            fill_value = dataset.fillvalue
+        else:
+            fill_value = dataset.fillvalue.item()
         metadata = create_v3_array_metadata(
             shape=dataset.shape,
             data_type=dtype,

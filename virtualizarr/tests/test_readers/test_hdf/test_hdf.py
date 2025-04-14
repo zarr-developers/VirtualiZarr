@@ -206,6 +206,13 @@ class TestOpenVirtualDataset:
         vds = HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
         assert set(vds.coords) == {"lat", "lon"}
 
+    def test_bytes_fillvalue(
+        self,
+        bytes_fillvalue_hdf5_file,
+    ):
+        vds = HDFVirtualBackend.open_virtual_dataset(bytes_fillvalue_hdf5_file)
+        print(vds["data"])
+
 
 @requires_hdf5plugin
 @requires_imagecodecs
@@ -218,3 +225,13 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
+
+
+# @pytest.mark.xfail(reason="Dtype not yet supported in Zarr v3")
+@requires_hdf5plugin
+def test_bytes_fillvalue(
+    bytes_fillvalue_hdf5_file,
+):
+    vds = HDFVirtualBackend.open_virtual_dataset(bytes_fillvalue_hdf5_file)
+    print(vds["data"])
+
