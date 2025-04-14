@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    overload,
 )
 
 import numpy as np
@@ -24,6 +25,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.store import _default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import codecs_from_dataset
@@ -36,7 +38,7 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore.store import ObjectStore
+    from obstore.store import ObjectStore, S3Config
 
 FillValueType = Union[
     int,
@@ -160,16 +162,40 @@ class HDFVirtualBackend(VirtualBackend):
                         manifest_dict[key] = variable
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
+    @overload
     @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
         prefix: str,
-        store: ObjectStore,
+        store: ObjectStore | None = None,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+    ) -> ManifestStore: ...
+
+    @overload
+    @staticmethod
+    def _create_manifest_store(
+        filepath: str,
+        *,
+        config: S3Config | None = None,
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+    ) -> ManifestStore: ...
+
+    @staticmethod
+    def _create_manifest_store(
+        filepath: str,
+        *,
+        prefix: str | None = None,
+        store: ObjectStore | None = None,
+        config: S3Config | None = None,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
+        if not store:
+            prefix, store = _default_object_store(filepath, config=config)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
             filepath=filepath,
@@ -177,7 +203,7 @@ class HDFVirtualBackend(VirtualBackend):
             drop_variables=drop_variables,
         )
         # Convert to a manifest store
-        return ManifestStore(stores={prefix: store}, group=manifest_group)
+        return ManifestStore(stores={prefix: store}, group=manifest_group)  # type: ignore
 
     @staticmethod
     def open_virtual_dataset(
@@ -197,19 +223,12 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        # filepath = validate_and_normalize_path_to_uri(
-        # filepath, fs_root=Path.cwd().as_uri()
-        # )
-
         _drop_vars: list[Hashable] = (
             [] if drop_variables is None else list(drop_variables)
         )
-        from obstore.store import LocalStore
 
         manifest_store = HDFVirtualBackend._create_manifest_store(
             filepath=filepath,
-            store=LocalStore(),
-            prefix="file://",
             drop_variables=_drop_vars,
             group=group,
         )
