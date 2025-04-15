@@ -141,26 +141,25 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 
 def _default_object_store(
-    filepath: str, config: Optional[S3Config] = {}
+    filepath: str, config: S3Config | None = None
 ) -> tuple[str, ObjectStore]:
     import obstore as obs
 
     parsed = urlparse(filepath)
+
+    if parsed.scheme == "":
+        return "file://", obs.store.LocalStore()
     if parsed.scheme == "s3":
-        if not config:
-            config["skip_signature"] = True
-        config["virtual_hosted_style_request"] = True
-        config["client_options"] = {"allow_http": True}
+        config = config or {"skip_signature": True}
         config["virtual_hosted_style_request"] = False
         bucket = parsed.netloc
         return f"s3://{bucket}", obs.store.S3Store(
-            bucket=bucket,
-            **config,
+            bucket,
+            client_options={"allow_http": True},
+            config=config,
         )
-    elif parsed.scheme == "":
-        return "file://", obs.store.LocalStore()
-    else:
-        raise NotImplementedError(f"{parsed.scheme} is not yet supported")
+
+    raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
 def _sort_stores_by_prefix_length(input_dict):
@@ -206,7 +205,7 @@ class ManifestStore(Store):
         self,
         group: ManifestGroup,
         *,
-        stores: StoreDict = {},
+        stores: StoreDict | None = None,
     ) -> None:
         """Instantiate a new ManifestStore
 
@@ -395,8 +394,6 @@ class ManifestStore(Store):
 
         Parameters:
         -----------
-        stores : StoreDict
-            A dictionary with URI prefixes for different stores as keys
         request_key : str
             A string to match against the dictionary keys
 
@@ -407,12 +404,10 @@ class ManifestStore(Store):
 
         # Check each key to see if it's a prefix of the uri_string
         parsed_request_key = urlparse(request_key)
-        for prefix in self._stores.keys():
+        for prefix, store in self._stores.items():
             if request_key.startswith(prefix):
                 # Return an existing configured store and parsed request path
-                return StoreRequest(
-                    store=self._stores[prefix], key=parsed_request_key.path
-                )
+                return StoreRequest(store=store, key=parsed_request_key.path)
         # Use anonymous default store if not in pre-configured stores
         prefix, store = _default_object_store(request_key)
         # Add to stores for future use
