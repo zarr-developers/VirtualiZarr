@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
