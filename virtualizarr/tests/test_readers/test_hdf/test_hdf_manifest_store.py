@@ -52,11 +52,34 @@ class TestHDFManifestStore:
 
     @requires_minio
     @requires_obstore
-    def test_default_store_s3(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
+    def test_store(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
+        import obstore as obs
+
+        s3store = obs.store.S3Store(
+            bucket=minio_bucket["bucket"],
+            config={
+                "endpoint": minio_bucket["endpoint"],
+                "virtual_hosted_style_request": False,
+                "skip_signature": True,
+            },
+            client_options={"allow_http": True},
+        )
         store = HDFVirtualBackend._create_manifest_store(
             filepath=chunked_roundtrip_hdf5_s3_file,
-            config={"endpoint": minio_bucket["endpoint"], "skip_signature": True},
+            store=s3store,
+            prefix=f"s3://{minio_bucket}",
         )
         vds = store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)
+
+    @requires_obstore
+    def test_default_store(self):
+        store = HDFVirtualBackend._create_manifest_store(
+            filepath="s3://carbonplan-share/virtualizarr/local.nc",
+        )
+        vds = store.to_virtual_dataset()
+        assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+        assert isinstance(vds["air"].data, ManifestArray)
+        for name in ["time", "lat", "lon"]:
+            assert isinstance(vds[name].data, np.ndarray)

@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     import xarray as xr
     from obstore.store import (
         ObjectStore,  # type: ignore[import-not-found]
-        S3Config,
     )
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
@@ -134,9 +133,14 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-def _default_object_store(
-    filepath: str, config: S3Config | None = None
-) -> tuple[str, ObjectStore]:
+def _find_bucket_region(bucket_name: str) -> str:
+    import requests
+
+    resp = requests.head(f"https://{bucket_name}.s3.amazonaws.com")
+    return resp.headers["x-amz-bucket-region"]
+
+
+def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
     import obstore as obs
 
     parsed = urlparse(filepath)
@@ -144,13 +148,13 @@ def _default_object_store(
     if parsed.scheme in ["", "file"]:
         return "file://", obs.store.LocalStore()
     if parsed.scheme == "s3":
-        config = config or {"skip_signature": True}
-        config["virtual_hosted_style_request"] = False
         bucket = parsed.netloc
         return f"s3://{bucket}", obs.store.S3Store(
-            bucket,
+            bucket=bucket,
             client_options={"allow_http": True},
-            config=config,
+            skip_signature=True,
+            virtual_hosted_style_request=False,
+            region=_find_bucket_region(bucket),
         )
 
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")

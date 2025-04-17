@@ -46,7 +46,7 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore.store import ObjectStore, S3Config
+    from obstore.store import ObjectStore
 
 FillValueType = Union[
     int,
@@ -169,7 +169,6 @@ class HDFVirtualBackend(VirtualBackend):
     def _create_manifest_store(
         filepath: str,
         *,
-        config: S3Config | None = None,
         group: str | None = None,
     ) -> ManifestStore: ...
 
@@ -179,12 +178,11 @@ class HDFVirtualBackend(VirtualBackend):
         *,
         prefix: str | None = None,
         store: ObjectStore | None = None,
-        config: S3Config | None = None,
         group: str | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         if not store:
-            prefix, store = _default_object_store(filepath, config=config)  # type: ignore
+            prefix, store = _default_object_store(filepath)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store, filepath=filepath, group=group
         )
