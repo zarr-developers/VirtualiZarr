@@ -163,7 +163,7 @@ def _sort_stores_by_prefix_length(input_dict):
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps a URL to an ObjectStore instance, and allows ManifestStores to read from different ObjectStore instances.
+    ObjectStoreRegistry maps URLs to ObjectStore instances, and allows ManifestStores to read from different ObjectStore instances.
     """
 
     _stores: dict[str, ObjectStore]
@@ -178,6 +178,8 @@ class ObjectStoreRegistry:
 
     def register_store(self, url: str, store: ObjectStore):
         """
+        Register a store using the given url
+
         If a store with the same key existed before, it is replaced
         """
         self._stores[url] = store
@@ -189,6 +191,9 @@ class ObjectStoreRegistry:
 
             - URL with scheme file:/// or no scheme will return the default LocalFS store
             - URL with scheme s3://bucket/ will return the S3 store
+
+        If no `ObjectStore` is found for the `url`, ad-hoc discovery may be executed depending on the
+        `url`. An `ObjectStore` may be lazily created and registered.
 
         Parameters:
         -----------
