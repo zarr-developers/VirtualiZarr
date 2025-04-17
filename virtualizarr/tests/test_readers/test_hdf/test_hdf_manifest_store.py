@@ -27,14 +27,12 @@ def basic_ds():
 @requires_obstore
 class TestHDFManifestStore:
     def test_rountrip_simple_virtualdataset(self, tmpdir, basic_ds):
-        from obstore.store import LocalStore
-
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
         store = HDFVirtualBackend._create_manifest_store(
-            filepath=filepath, store=LocalStore(), prefix="file://"
+            filepath=filepath,
         )
         rountripped_ds = xr.open_dataset(
             store, engine="zarr", consolidated=False, zarr_format=3
