@@ -318,8 +318,8 @@ class ManifestStore(Store):
         length = manifest._lengths[*chunk_indexes]
         # Get the configured object store instance that matches the path
         store = self._store_registry.get_store(path)
-        # Truncate key to match ManifestArray expectations
-        key = urlparse(key).path
+        # Truncate path to match Obstore expectations
+        key = urlparse(path).path
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
