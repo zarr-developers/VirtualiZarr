@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pickle
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -19,13 +19,16 @@ from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
+    from collections.abc import AsyncGenerator, Iterable, Mapping
     from typing import Any
 
-    from obstore.store import S3Config
+    import xarray as xr
+    from obstore.store import (
+        ObjectStore,  # type: ignore[import-not-found]
+        S3Config,
+    )
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
-
 
 __all__ = ["ManifestStore"]
 
@@ -43,12 +46,6 @@ from typing import TYPE_CHECKING, Any
 from zarr.core.buffer import default_buffer_prototype
 
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
-
-if TYPE_CHECKING:
-    import xarray as xr
-    from obstore.store import (
-        ObjectStore,  # type: ignore[import-not-found]
-    )
 
 
 @dataclass
@@ -139,7 +136,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 def _default_object_store(
     filepath: str, config: S3Config | None = None
-) -> dict[str, ObjectStore]:
+) -> tuple[str, ObjectStore]:
     import obstore as obs
 
     parsed = urlparse(filepath)
@@ -202,19 +199,17 @@ class ObjectStoreRegistry:
         --------
         StoreRequest
         """
-
         # Check each key to see if it's a prefix of the uri_string
-        parsed_request_key = urlparse(url)
         for prefix, store in self._stores.items():
             if url.startswith(prefix):
                 # Return an existing configured store and parsed request path
-                return StoreRequest(store=store, key=parsed_request_key.path)
+                return store
         # Use anonymous default store if not in pre-configured stores
         prefix, store = _default_object_store(url)
         # Register for future use
         self.register_store(prefix, store)
         # Return the new store and and parsed request path
-        return StoreRequest(store=store, key=parsed_request_key.path)
+        return store
 
 
 class ManifestStore(Store):
@@ -252,7 +247,7 @@ class ManifestStore(Store):
         NotImplementedError
 
     def __init__(
-        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry = None
+        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry | None = None
     ) -> None:
         """Instantiate a new ManifestStore
 
@@ -316,8 +311,10 @@ class ManifestStore(Store):
         path = manifest._paths[*chunk_indexes]
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
-        # Get the  configured object store instance that matches the path
-        store_request = self._store_registry.get_store(path)
+        # Get the configured object store instance that matches the path
+        store = self._store_registry.get_store(path)
+        # Truncate key to match ManifestArray expectations
+        key = urlparse(key).path
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -326,8 +323,8 @@ class ManifestStore(Store):
         # Actually get the bytes
         try:
             bytes = await obs.get_range_async(
-                store_request.store,
-                store_request.key,
+                store,
+                key,
                 start=byte_range.start,
                 end=byte_range.end,
             )
