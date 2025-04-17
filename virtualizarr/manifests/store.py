@@ -38,20 +38,17 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
 
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from zarr.core.buffer import default_buffer_prototype
 
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
+    import xarray as xr
     from obstore.store import (
         ObjectStore,  # type: ignore[import-not-found]
     )
-
-    StoreDict: TypeAlias = dict[str, ObjectStore]
-
-    import xarray as xr
 
 
 @dataclass
@@ -142,12 +139,12 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 def _default_object_store(
     filepath: str, config: S3Config | None = None
-) -> tuple[str, ObjectStore]:
+) -> dict[str, ObjectStore]:
     import obstore as obs
 
     parsed = urlparse(filepath)
 
-    if parsed.scheme == "":
+    if parsed.scheme in ["", "file"]:
         return "file://", obs.store.LocalStore()
     if parsed.scheme == "s3":
         config = config or {"skip_signature": True}
@@ -165,6 +162,59 @@ def _default_object_store(
 def _sort_stores_by_prefix_length(input_dict):
     sorted_items = sorted(input_dict.items(), key=lambda x: len(x[0]), reverse=True)
     return dict(sorted_items)
+
+
+class ObjectStoreRegistry:
+    """
+    ObjectStoreRegistry maps a URL to an ObjectStore instance, and allows ManifestStores to read from different ObjectStore instances.
+    """
+
+    _stores: dict[str, ObjectStore]
+
+    @classmethod
+    def __init__(self, stores: dict | None = None):
+        stores = stores or {}
+        for store in stores.values():
+            if not store.__class__.__module__.startswith("obstore"):
+                raise TypeError(f"expected ObjectStore class, got {store!r}")
+        self._stores = _sort_stores_by_prefix_length(stores)
+
+    def register_store(self, url: str, store: ObjectStore):
+        """
+        If a store with the same key existed before, it is replaced
+        """
+        self._stores[url] = store
+        self._stores = _sort_stores_by_prefix_length(self._stores)
+
+    def get_store(self, url: str) -> ObjectStore:
+        """
+        Get a suitable store for the provided URL. For example:
+
+            - URL with scheme file:/// or no scheme will return the default LocalFS store
+            - URL with scheme s3://bucket/ will return the S3 store
+
+        Parameters:
+        -----------
+        url : str
+            A url to identify the appropriate object_store instance
+
+        Returns:
+        --------
+        StoreRequest
+        """
+
+        # Check each key to see if it's a prefix of the uri_string
+        parsed_request_key = urlparse(url)
+        for prefix, store in self._stores.items():
+            if url.startswith(prefix):
+                # Return an existing configured store and parsed request path
+                return StoreRequest(store=store, key=parsed_request_key.path)
+        # Use anonymous default store if not in pre-configured stores
+        prefix, store = _default_object_store(url)
+        # Register for future use
+        self.register_store(prefix, store)
+        # Return the new store and and parsed request path
+        return StoreRequest(store=store, key=parsed_request_key.path)
 
 
 class ManifestStore(Store):
@@ -196,16 +246,13 @@ class ManifestStore(Store):
     """
 
     _group: ManifestGroup
-    _stores: StoreDict
+    _store_registry: ObjectStoreRegistry
 
     def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
-        self,
-        group: ManifestGroup,
-        *,
-        stores: StoreDict | None = None,
+        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry = None
     ) -> None:
         """Instantiate a new ManifestStore
 
@@ -219,34 +266,33 @@ class ManifestStore(Store):
             The prefixes are matched to the URIs in the ManifestArrays to determine which store to
             use for making requests.
         """
-        for store in stores.values():
-            if not store.__class__.__module__.startswith("obstore"):
-                raise TypeError(f"expected ObjectStore class, got {store!r}")
 
         # TODO: Don't allow stores with prefix
         if not isinstance(group, ManifestGroup):
             raise TypeError
 
         super().__init__(read_only=True)
-        self._stores = _sort_stores_by_prefix_length(stores)
+        if store_registry is None:
+            store_registry = ObjectStoreRegistry()
+        self._store_registry = store_registry
         self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore(group={self._group}, stores={self._stores})"
+        return f"ManifestStore(group={self._group}, stores={self._store_registry})"
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
-        stores = state["_stores"].copy()
+        stores = state["_store_registry"]._stores.copy()
         for k, v in stores.items():
             stores[k] = pickle.dumps(v)
-        state["_stores"] = stores
+        state["_store_registry"] = stores
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_stores"].copy()
+        stores = state["_store_registry"].copy()
         for k, v in stores.items():
             stores[k] = pickle.loads(v)
-        state["_stores"] = stores
+        state["_store_registry"] = ObjectStoreRegistry(stores)
         self.__dict__.update(state)
 
     async def get(
@@ -271,7 +317,7 @@ class ManifestStore(Store):
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
         # Get the  configured object store instance that matches the path
-        store_request = self._find_matching_store(request_key=path)
+        store_request = self._store_registry.get_store(path)
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -386,35 +432,6 @@ class ManifestStore(Store):
             indexes=indexes,
             decode_times=decode_times,
         )
-
-    def _find_matching_store(self, request_key: str) -> StoreRequest:
-        """
-        Find the matching store based on the store keys and the beginning of the URI strings,
-        to fetch data from the appropriately configured ObjectStore.
-
-        Parameters:
-        -----------
-        request_key : str
-            A string to match against the dictionary keys
-
-        Returns:
-        --------
-        StoreRequest
-        """
-
-        # Check each key to see if it's a prefix of the uri_string
-        parsed_request_key = urlparse(request_key)
-        for prefix, store in self._stores.items():
-            if request_key.startswith(prefix):
-                # Return an existing configured store and parsed request path
-                return StoreRequest(store=store, key=parsed_request_key.path)
-        # Use anonymous default store if not in pre-configured stores
-        prefix, store = _default_object_store(request_key)
-        # Add to stores for future use
-        self._stores[prefix] = store
-        self._stores = _sort_stores_by_prefix_length(self._stores)
-        # Return the new store and and parsed request path
-        return StoreRequest(store=store, key=parsed_request_key.path)
 
 
 def _transform_byte_range(
