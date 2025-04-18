@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pickle
-from collections.abc import Iterable
-from typing import TYPE_CHECKING
+from collections.abc import AsyncGenerator, Iterable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -12,11 +13,12 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer
+from zarr.core.buffer import Buffer, default_buffer_prototype
 from zarr.core.buffer.core import BufferPrototype
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable, Mapping
@@ -37,14 +39,6 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     IsADirectoryError,
     NotADirectoryError,
 )
-
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
-
-from zarr.core.buffer import default_buffer_prototype
-
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
 
 @dataclass
