@@ -49,7 +49,9 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
     # Note: zarr_array.name for a given array returns a string with a leading '/'.
-    prefix = zarr_array.name.strip("/") + "/c/"
+    # TODO: leading / or no
+
+    prefix = zarr_array.name + "/c/"
     prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
 
     _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
