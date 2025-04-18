@@ -223,11 +223,9 @@ class ManifestStore(Store):
     group : ManifestGroup
         Root group of the store.
         Contains group metadata, ManifestArrays, and any subgroups.
-    stores : dict[prefix, :class:`obstore.store.ObjectStore`]
-        A mapping of url prefixes to obstore Store instances set up with the proper credentials.
-
-        The prefixes are matched to the URIs in the ManifestArrays to determine which store to
-        use for making requests.
+    store_registry : ObjectStoreRegistry
+        ObjectStoreRegistry that maps the URL scheme and netloc to ObjectStore instances,
+        allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
     --------
@@ -254,11 +252,9 @@ class ManifestStore(Store):
         ----------
         manifest_group : ManifestGroup
             Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        stores : ObjectStoreRegistry
-            A mapping of url prefixes to obstore Store instances set up with the proper credentials.
-
-            The prefixes are matched to the URIs in the ManifestArrays to determine which store to
-            use for making requests.
+        store_registry : ObjectStoreRegistry
+            A registry mapping the URL scheme and netloc to ObjectStore instances,
+            allowing ManifestStores to read from different ObjectStore instances.
         """
 
         # TODO: Don't allow stores with prefix
