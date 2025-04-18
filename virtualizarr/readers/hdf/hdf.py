@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Hashable,
@@ -24,6 +25,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.store import ObjectStoreRegistry, default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
@@ -199,6 +201,10 @@ class HDFVirtualBackend(VirtualBackend):
             raise NotImplementedError(
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
+
+        filepath = validate_and_normalize_path_to_uri(
+            filepath, fs_root=Path.cwd().as_uri()
+        )
 
         _drop_vars: list[Hashable] = (
             [] if drop_variables is None else list(drop_variables)
