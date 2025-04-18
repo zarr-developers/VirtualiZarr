@@ -168,7 +168,7 @@ class HDFVirtualBackend(VirtualBackend):
         )
         registry = ObjectStoreRegistry({filepath: store})
         # Convert to a manifest store
-        return ManifestStore(store_registry=registry, group=manifest_group)  # type: ignore
+        return ManifestStore(store_registry=registry, group=manifest_group)
 
     @staticmethod
     def open_virtual_dataset(
