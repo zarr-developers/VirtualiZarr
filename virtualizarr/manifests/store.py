@@ -173,7 +173,7 @@ class ObjectStoreRegistry:
     _stores: dict[str, ObjectStore]
 
     @classmethod
-    def __init__(self, stores: dict | None = None):
+    def __init__(self, stores: dict[str, ObjectStore] | None = None):
         stores = stores or {}
         for store in stores.values():
             if not store.__class__.__module__.startswith("obstore"):
