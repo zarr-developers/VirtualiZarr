@@ -13,7 +13,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    overload,
 )
 
 import numpy as np
@@ -29,7 +28,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.store import ObjectStoreRegistry, _default_object_store
+from virtualizarr.manifests.store import ObjectStoreRegistry, default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
@@ -154,39 +153,20 @@ class HDFVirtualBackend(VirtualBackend):
                         manifest_dict[key] = variable
         return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
-    @overload
     @staticmethod
     def _create_manifest_store(
         filepath: str,
         *,
-        prefix: str,
-        store: ObjectStore | None = None,
-        group: str | None = None,
-    ) -> ManifestStore: ...
-
-    @overload
-    @staticmethod
-    def _create_manifest_store(
-        filepath: str,
-        *,
-        group: str | None = None,
-    ) -> ManifestStore: ...
-
-    @staticmethod
-    def _create_manifest_store(
-        filepath: str,
-        *,
-        prefix: str | None = None,
         store: ObjectStore | None = None,
         group: str | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         if not store:
-            prefix, store = _default_object_store(filepath)  # type: ignore
+            store = default_object_store(filepath)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store, filepath=filepath, group=group
         )
-        registry = ObjectStoreRegistry({prefix: store})
+        registry = ObjectStoreRegistry({filepath: store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)  # type: ignore
 

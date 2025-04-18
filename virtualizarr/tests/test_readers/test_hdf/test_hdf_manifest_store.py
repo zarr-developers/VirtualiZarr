@@ -67,7 +67,6 @@ class TestHDFManifestStore:
         store = HDFVirtualBackend._create_manifest_store(
             filepath=chunked_roundtrip_hdf5_s3_file,
             store=s3store,
-            prefix=f"s3://{minio_bucket}",
         )
         vds = store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}

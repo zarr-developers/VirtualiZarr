@@ -21,7 +21,7 @@ from virtualizarr.manifests import (
     ManifestStore,
     ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import _default_object_store
+from virtualizarr.manifests.store import default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -134,10 +134,9 @@ def test_default_object_store_s3(minio_bucket):
     from obstore.store import S3Store
 
     filepath = f"s3://{minio_bucket['bucket']}/data/data.tmp"
-    prefix, store = _default_object_store(
+    store = default_object_store(
         filepath,
     )
-    assert prefix == f"s3://{minio_bucket['bucket']}"
     assert isinstance(store, S3Store)
 
 
@@ -146,8 +145,7 @@ def test_default_object_store_local(tmpdir):
     from obstore.store import LocalStore
 
     filepath = f"{tmpdir}/data.tmp"
-    prefix, store = _default_object_store(filepath)
-    assert prefix == "file://"
+    store = default_object_store(filepath)
     assert isinstance(store, LocalStore)
 
 

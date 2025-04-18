@@ -140,16 +140,16 @@ def _find_bucket_region(bucket_name: str) -> str:
     return resp.headers["x-amz-bucket-region"]
 
 
-def _default_object_store(filepath: str) -> tuple[str, ObjectStore]:
+def default_object_store(filepath: str) -> ObjectStore:
     import obstore as obs
 
     parsed = urlparse(filepath)
 
     if parsed.scheme in ["", "file"]:
-        return "file://", obs.store.LocalStore()
+        return obs.store.LocalStore()
     if parsed.scheme == "s3":
         bucket = parsed.netloc
-        return f"s3://{bucket}", obs.store.S3Store(
+        return obs.store.S3Store(
             bucket=bucket,
             client_options={"allow_http": True},
             skip_signature=True,
@@ -167,7 +167,7 @@ def _sort_stores_by_prefix_length(input_dict):
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps URLs to ObjectStore instances, and allows ManifestStores to read from different ObjectStore instances.
+    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances, and allows ManifestStores to read from different ObjectStore instances.
     """
 
     _stores: dict[str, ObjectStore]
@@ -178,7 +178,7 @@ class ObjectStoreRegistry:
         for store in stores.values():
             if not store.__class__.__module__.startswith("obstore"):
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
-        self._stores = _sort_stores_by_prefix_length(stores)
+        self._stores = stores
 
     def register_store(self, url: str, store: ObjectStore):
         """
@@ -186,8 +186,9 @@ class ObjectStoreRegistry:
 
         If a store with the same key existed before, it is replaced
         """
-        self._stores[url] = store
-        self._stores = _sort_stores_by_prefix_length(self._stores)
+        parsed = urlparse(url)
+        scheme = parsed.scheme or "file"
+        self._stores[f"{scheme}://{parsed.netloc}"] = store
 
     def get_store(self, url: str) -> ObjectStore:
         """
@@ -202,22 +203,16 @@ class ObjectStoreRegistry:
         Parameters:
         -----------
         url : str
-            A url to identify the appropriate object_store instance
-
+            A url to identify the appropriate object_store instance based on the URL scheme and netloc.
         Returns:
         --------
         StoreRequest
         """
-        # Check each key to see if it's a prefix of the uri_string
-        for prefix, store in self._stores.items():
-            if url.startswith(prefix):
-                # Return an existing configured store and parsed request path
-                return store
-        # Use anonymous default store if not in pre-configured stores
-        prefix, store = _default_object_store(url)
-        # Register for future use
-        self.register_store(prefix, store)
-        # Return the new store and and parsed request path
+        parsed = urlparse(url)
+        store = self._stores.get(f"{parsed.scheme}://{parsed.netloc}")
+        if not store:
+            store = default_object_store(url)
+            self.register_store(url, store)
         return store
 
 
