@@ -201,8 +201,8 @@ readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTH
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.minio.tasks]
-run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose" }
-run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py --run-minio-tests --verbose --cov-report=xml" }
+run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_readers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose" }
+run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_readers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
@@ -227,6 +227,7 @@ module = [
     "numcodecs.*",
     "ujson",
     "zarr",
+    "requests",
 ]
 ignore_missing_imports = true
 
@@ -272,7 +273,6 @@ line-ending = "auto"
 known-first-party = ["virtualizarr"]
 
 [tool.coverage.run]
-include = ["virtualizarr/"]
 omit = ["conftest.py", "virtualizarr/tests/*"]
 
 [tool.coverage.report]

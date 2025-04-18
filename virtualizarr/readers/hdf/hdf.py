@@ -28,6 +28,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.store import ObjectStoreRegistry, default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import cfcodec_from_dataset, codecs_from_dataset
@@ -156,16 +157,18 @@ class HDFVirtualBackend(VirtualBackend):
     def _create_manifest_store(
         filepath: str,
         *,
-        prefix: str,
-        store: ObjectStore,
+        store: ObjectStore | None = None,
         group: str | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
+        if not store:
+            store = default_object_store(filepath)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store, filepath=filepath, group=group
         )
+        registry = ObjectStoreRegistry({filepath: store})
         # Convert to a manifest store
-        return ManifestStore(stores={prefix: store}, group=manifest_group)
+        return ManifestStore(store_registry=registry, group=manifest_group)
 
     @staticmethod
     def open_virtual_dataset(
