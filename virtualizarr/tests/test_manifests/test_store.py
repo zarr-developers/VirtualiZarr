@@ -19,8 +19,9 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
+    ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import _default_object_store
+from virtualizarr.manifests.store import default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -88,7 +89,8 @@ def _generate_manifest_store(
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    return ManifestStore(stores={prefix: store}, group=manifest_group)
+    registry = ObjectStoreRegistry({prefix: store})
+    return ManifestStore(store_registry=registry, group=manifest_group)
 
 
 @pytest.fixture()
@@ -132,10 +134,9 @@ def test_default_object_store_s3(minio_bucket):
     from obstore.store import S3Store
 
     filepath = f"s3://{minio_bucket['bucket']}/data/data.tmp"
-    prefix, store = _default_object_store(
+    store = default_object_store(
         filepath,
     )
-    assert prefix == f"s3://{minio_bucket['bucket']}"
     assert isinstance(store, S3Store)
 
 
@@ -144,8 +145,7 @@ def test_default_object_store_local(tmpdir):
     from obstore.store import LocalStore
 
     filepath = f"{tmpdir}/data.tmp"
-    prefix, store = _default_object_store(filepath)
-    assert prefix == "file://"
+    store = default_object_store(filepath)
     assert isinstance(store, LocalStore)
 
 
@@ -261,8 +261,6 @@ class TestToVirtualXarray:
     def test_single_group_to_dataset(
         self, manifest_array, loadable_variables, expected_loadable_variables
     ):
-        import obstore as obs
-
         marr1 = manifest_array(
             shape=(3, 2, 5), chunks=(1, 2, 1), dimension_names=["x", "y", "t"]
         )
@@ -278,8 +276,7 @@ class TestToVirtualXarray:
             attributes={"coordinates": "elevation t", "ham": "eggs"},
         )
 
-        local_store = obs.store.LocalStore()
-        manifest_store = ManifestStore(manifest_group, stores={"file://": local_store})
+        manifest_store = ManifestStore(manifest_group)
 
         vds = manifest_store.to_virtual_dataset(loadable_variables=loadable_variables)
         assert set(vds.variables) == set(["T", "elevation", "t"])
