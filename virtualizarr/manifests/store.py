@@ -160,11 +160,6 @@ def default_object_store(filepath: str) -> ObjectStore:
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
-def _sort_stores_by_prefix_length(input_dict):
-    sorted_items = sorted(input_dict.items(), key=lambda x: len(x[0]), reverse=True)
-    return dict(sorted_items)
-
-
 class ObjectStoreRegistry:
     """
     ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances, and allows ManifestStores to read from different ObjectStore instances.
@@ -253,13 +248,13 @@ class ManifestStore(Store):
     def __init__(
         self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry | None = None
     ) -> None:
-        """Instantiate a new ManifestStore
+        """Instantiate a new ManifestStore.
 
         Parameters
         ----------
         manifest_group : ManifestGroup
             Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        stores : dict[prefix, :class:`obstore.store.ObjectStore`]
+        stores : ObjectStoreRegistry
             A mapping of url prefixes to obstore Store instances set up with the proper credentials.
 
             The prefixes are matched to the URIs in the ManifestArrays to determine which store to
