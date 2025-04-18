@@ -156,7 +156,8 @@ def default_object_store(filepath: str) -> ObjectStore:
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances, and allows ManifestStores to read from different ObjectStore instances.
+    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances. This register allows
+    Zarr Store implementations (e.g., ManifestStore) to read from different ObjectStore instances.
     """
 
     _stores: dict[str, ObjectStore]
