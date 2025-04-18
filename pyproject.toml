@@ -52,6 +52,10 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
     "obstore>=0.5.1",
 ]
+safetensors = [
+    "safetensors",
+    "ml-dtypes",
+]
 
 # kerchunk-based readers
 hdf5 = [
@@ -71,6 +75,7 @@ fits = [
 ]
 all_readers = [
     "virtualizarr[hdf]",
+    "virtualizarr[safetensors]",
     "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
@@ -176,7 +181,7 @@ rust = "*"
 run-mypy = { cmd = "mypy virtualizarr" }
 # Using '--dist loadscope' (rather than default of '--dist load' when '-n auto'
 # is used), reduces test hangs that appear to be macOS-related.
-run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --durations=10" }
+run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose" }
 run-tests-no-network = { cmd = "pytest -n auto --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
@@ -186,12 +191,12 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
-test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
-upstream = ["dev", "test", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
+test = ["dev", "test", "remote", "hdf", "safetensors", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
+test-py311 = ["dev", "test", "remote", "hdf", "safetensors", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "safetensors", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "safetensors", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
+upstream = ["dev", "test", "hdf", "safetensors", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+all = ["dev", "test", "remote", "hdf", "safetensors", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
 docs = ["docs"]
 
 # Define commands to run within the docs environment
