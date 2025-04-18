@@ -21,7 +21,7 @@ from virtualizarr.tests import requires_network
 )
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
-        # check that loadable variables works
+        # check loadable variables
         vds = open_virtual_dataset(
             filepath=zarr_store, loadable_variables=loadable_variables
         )

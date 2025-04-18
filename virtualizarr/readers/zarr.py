@@ -44,15 +44,16 @@ if TYPE_CHECKING:
     import zarr
 
 
-async def get_chunk_mapping_prefix(
-    zarr_array: zarr.AsyncArray, prefix: str, filepath: str
-) -> dict:
+async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
-    prefix = zarr_array.name + "/c/"
+    # Note: zarr_array.name for a given array returns a string with a leading '/'.
+    prefix = zarr_array.name.strip("/") + "/c/"
     prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+
     _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+
     chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
     _dict_keys = [key.replace("/", ".") for key in chunk_keys]
     _paths = [filepath + prefix + key for key in chunk_keys]
@@ -73,9 +74,7 @@ async def build_chunk_manifest(
     zarr_array: zarr.AsyncArray, filepath: str
 ) -> ChunkManifest:
     """Build a ChunkManifest from a dictionary"""
-    chunk_map = await get_chunk_mapping_prefix(
-        zarr_array, prefix=f"{zarr_array.name}/c", filepath=filepath
-    )
+    chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, filepath=filepath)
     return ChunkManifest(chunk_map)
 
 
