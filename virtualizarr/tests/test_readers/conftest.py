@@ -433,3 +433,20 @@ def cf_array_fill_value_hdf5_file(tmp_path: Path) -> str:
         dset.attrs["_FillValue"] = np.array([np.nan])
 
     return filepath
+
+
+@pytest.fixture()
+def chunked_roundtrip_hdf5_s3_file(minio_bucket, cf_array_fill_value_hdf5_file):
+    import obstore as obs
+
+    store = obs.store.S3Store(
+        minio_bucket["bucket"],
+        aws_endpoint=minio_bucket["endpoint"],
+        access_key_id=minio_bucket["username"],
+        secret_access_key=minio_bucket["password"],
+        virtual_hosted_style_request=False,
+        client_options={"allow_http": True},
+    )
+    filepath = "data/cf_array_fill_value.nc"
+    obs.put(store, filepath, cf_array_fill_value_hdf5_file)
+    return f"s3://{minio_bucket['bucket']}/{filepath}"
