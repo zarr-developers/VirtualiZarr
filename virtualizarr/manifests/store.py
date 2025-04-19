@@ -41,10 +41,7 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
 )
 
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
-
-from zarr.core.buffer import default_buffer_prototype
 
 from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
