@@ -50,7 +50,7 @@ hdf = [
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "obstore",
+    "obstore>=0.5.1",
 ]
 
 # kerchunk-based readers
