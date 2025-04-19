@@ -4,7 +4,6 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Hashable,
     Iterable,
     List,
     Mapping,
@@ -123,7 +122,7 @@ class HDFVirtualBackend(VirtualBackend):
         filepath: str,
         *,
         group: str | None = None,
-        drop_variables: Optional[List[str]] = None,
+        drop_variables: Optional[Iterable[str]] = None,
     ) -> ManifestGroup:
         """
         Construct a virtual Group from a HDF dataset.
@@ -149,7 +148,7 @@ class HDFVirtualBackend(VirtualBackend):
         non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
             group=g
         )
-        drop_variables = list(set(drop_variables + non_coordinate_dimesion_vars))
+        drop_variables = list(set(list(drop_variables) + non_coordinate_dimesion_vars))
         attrs = HDFVirtualBackend._extract_attrs(g)
         for key in g.keys():
             if key not in drop_variables:
@@ -206,7 +205,7 @@ class HDFVirtualBackend(VirtualBackend):
             filepath, fs_root=Path.cwd().as_uri()
         )
 
-        _drop_vars: list[Hashable] = (
+        _drop_vars: Iterable[str] = (
             [] if drop_variables is None else list(drop_variables)
         )
 
@@ -414,7 +413,9 @@ class HDFVirtualBackend(VirtualBackend):
         target_dtype
             The target dtype of the ManifestArray that will use the _FillValue
         """
-        if isinstance(fill_value, np.ndarray) and fill_value.size == 1:
+        if isinstance(fill_value, (np.ndarray, np.generic)):
+            if isinstance(fill_value, np.ndarray) and fill_value.size > 1:
+                raise ValueError("Expected a scalar")
             fillvalue = fill_value.item()
         else:
             fillvalue = fill_value
