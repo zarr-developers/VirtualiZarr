@@ -148,7 +148,7 @@ class HDFVirtualBackend(VirtualBackend):
         non_coordinate_dimension_vars = (
             HDFVirtualBackend._find_non_coord_dimension_vars(group=g)
         )
-        drop_variables = list(set(list(drop_variables) + non_coordinate_dimesion_vars))
+        drop_variables = list(set(list(drop_variables) + non_coordinate_dimension_vars))
         attrs = HDFVirtualBackend._extract_attrs(g)
         for key in g.keys():
             if key not in drop_variables:
