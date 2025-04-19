@@ -145,7 +145,7 @@ class HDFVirtualBackend(VirtualBackend):
             group_name = "/"
 
         manifest_dict = {}
-        non_coordinate_dimesion_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
+        non_coordinate_dimension_vars = HDFVirtualBackend._find_non_coord_dimension_vars(
             group=g
         )
         drop_variables = list(set(list(drop_variables) + non_coordinate_dimesion_vars))
