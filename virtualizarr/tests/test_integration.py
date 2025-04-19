@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from os.path import relpath
 from pathlib import Path
-from typing import Any, Callable, Concatenate, TypeAlias, overload
+from typing import Any, Callable, Concatenate, TypeAlias
 
 import numpy as np
 import pytest
@@ -112,16 +112,6 @@ def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
 
     # use fsspec to read the dataset from disk via the kerchunk references
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
-
-
-@overload
-def roundtrip_as_in_memory_icechunk(
-    vdata: xr.Dataset, tmp_path: Path, **kwargs
-) -> xr.Dataset: ...
-@overload
-def roundtrip_as_in_memory_icechunk(
-    vdata: xr.DataTree, tmp_path: Path, **kwargs
-) -> xr.DataTree: ...
 
 
 def roundtrip_as_in_memory_icechunk(
