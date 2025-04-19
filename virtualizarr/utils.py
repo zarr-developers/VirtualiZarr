@@ -4,6 +4,7 @@ import importlib
 import io
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from urllib.parse import urlparse
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
@@ -28,7 +29,9 @@ class ObstoreReader:
     def __init__(self, store: ObjectStore, path: str) -> None:
         import obstore as obs
 
-        self._reader = obs.open_reader(store, path)
+        parsed = urlparse(path)
+
+        self._reader = obs.open_reader(store, parsed.path)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
