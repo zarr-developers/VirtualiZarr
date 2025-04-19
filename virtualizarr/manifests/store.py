@@ -52,25 +52,6 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-async def list_dir_from_manifest_arrays(
-    arrays: Mapping[str, ManifestArray], prefix: str
-) -> AsyncGenerator[str]:
-    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
-
-    Parameters
-    ----------
-    arrays : Mapping[str, ManifestArrays]
-    prefix : str
-
-    Returns
-    -------
-    AsyncIterator[str]
-    """
-    # TODO shouldn't this just accept a ManifestGroup instead?
-    # Start with expected group level metadata
-    raise NotImplementedError
-
-
 def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     """
     Generate the expected Zarr V3 metadata from a virtual dataset.
