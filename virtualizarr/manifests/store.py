@@ -18,7 +18,7 @@ from zarr.core.buffer.core import BufferPrototype
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
+from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable, Mapping
@@ -39,18 +39,6 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     IsADirectoryError,
     NotADirectoryError,
 )
-
-from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any, TypeAlias
-
-from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
-
-if TYPE_CHECKING:
-    from obstore.store import ObjectStore  # type: ignore[import-not-found]
-
-    StoreDict: TypeAlias = dict[str, ObjectStore]
-
-    import xarray as xr
 
 
 @dataclass
