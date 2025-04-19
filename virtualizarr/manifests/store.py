@@ -368,35 +368,6 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
-    @classmethod
-    def from_kerchunk_refs(
-        cls,
-        refs: KerchunkStoreRefs,
-        group: str | None = None,
-        fs_root: str | None = None,
-    ) -> ManifestStore:
-        """
-        Construct a ManifestStore from a dictionary of kerchunk references.
-
-        Parameters
-        ----------
-        refs: dict
-            The Kerchunk references, as a dictionary.
-        group: string, optional
-        fs_root: string, optional
-            The root of the fsspec filesystem on which these references were generated.
-            Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
-        """
-        # TODO teach this method to understand kerchunk json/parquet filepaths too?
-
-        from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
-
-        return manifeststore_from_kerchunk_refs(
-            refs,
-            group=group,
-            fs_root=fs_root,
-        )
-
     def to_virtual_dataset(
         self,
         group="",

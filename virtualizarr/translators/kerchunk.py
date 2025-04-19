@@ -99,6 +99,21 @@ def manifeststore_from_kerchunk_refs(
     group: str | None = None,
     fs_root: str | None = None,
 ) -> ManifestStore:
+    """
+    Construct a ManifestStore from a dictionary of kerchunk references.
+
+    Parameters
+    ----------
+    refs: dict
+        The Kerchunk references, as a dictionary.
+    group: string, optional
+        Default is to build a store from the root group.
+    fs_root: string, optional
+        The root of the fsspec filesystem on which these references were generated.
+        Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+    """
+    # TODO teach this method to understand kerchunk json/parquet filepaths too? Then it would be a full "reader"
+
     # both group=None and group='' mean to read root group
     if group:
         refs = extract_group(refs, group)
