@@ -220,7 +220,9 @@ class HDFVirtualBackend(VirtualBackend):
             group=group,
         )
         ds = manifest_store.to_virtual_dataset(
-            loadable_variables=loadable_variables, decode_times=decode_times
+            loadable_variables=loadable_variables,
+            decode_times=decode_times,
+            indexes=indexes,
         )
         return ds
 
