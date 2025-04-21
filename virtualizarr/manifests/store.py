@@ -150,7 +150,9 @@ def default_object_store(filepath: str) -> ObjectStore:
             virtual_hosted_style_request=False,
             region=_find_bucket_region(bucket),
         )
-
+    if parsed.scheme in ["http", "https"]:
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        return obs.store.HTTPStore.from_url(base_url)
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
