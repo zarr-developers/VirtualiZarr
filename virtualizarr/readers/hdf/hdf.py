@@ -145,6 +145,11 @@ class HDFVirtualBackend(VirtualBackend):
             group_name = "/"
 
         manifest_dict = {}
+        # Several of our test fixtures which use xr.tutorial data have
+        # non coord dimensions serialized using big endian dtypes which are not
+        # yet supported in zarr-python v3.  We'll drop these variables for the
+        # moment until big endian support is included upstream.)
+
         non_coordinate_dimension_vars = (
             HDFVirtualBackend._find_non_coord_dimension_vars(group=g)
         )

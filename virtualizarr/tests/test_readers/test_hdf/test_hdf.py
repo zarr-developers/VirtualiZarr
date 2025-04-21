@@ -220,6 +220,14 @@ class TestOpenVirtualDataset:
         vds = HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
         assert set(vds.coords) == {"lat", "lon"}
 
+    @pytest.mark.xfail(reason="Requires Zarr v3 big endian dtype support")
+    def test_big_endian(
+        self,
+        big_endian_dtype_hdf5_file,
+    ):
+        vds = HDFVirtualBackend.open_virtual_dataset(big_endian_dtype_hdf5_file)
+        print(vds)
+
 
 @requires_hdf5plugin
 @requires_imagecodecs
