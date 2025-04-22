@@ -131,7 +131,7 @@ async def _construct_manifest_group(
         *[zarr_group.getitem(var) for var in zarr_array_keys if var not in _drop_vars]
     )
 
-    # Xarray Variable backed by manifest array
+ 
     manifest_arrays = await asyncio.gather(
         *[
             _construct_manifest_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
