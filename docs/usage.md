@@ -89,6 +89,28 @@ aws_credentials = {"key": ..., "secret": ...}
 vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
 ```
 
+### Opening different file formats
+
+VirtualiZarr automatically detects the file format based on the file extension or content. Currently supported formats include:
+
+- **NetCDF/HDF5**: Scientific data formats (NetCDF3, NetCDF4/HDF5)
+- **DMRPP**: OPeNDAP Data Access Protocol responses
+- **FITS**: Astronomical data in Flexible Image Transport System format
+- **TIFF**: Tagged Image File Format for geospatial and scientific imagery
+- **SafeTensors**: ML model weights format (`*.safetensors`), see the [SafeTensors guide](safetensors.md) for details
+- **Kerchunk references**: Previously created virtualized references
+
+Each format has specific readers optimized for its structure. For SafeTensors files, additional options like custom dimension naming are available:
+
+```python
+# Open a SafeTensors file with custom dimension names
+custom_dims = {"weight": ["input_features", "output_features"]}
+vds = open_virtual_dataset(
+    "model.safetensors",
+    virtual_backend_kwargs={"dimension_names": custom_dims}
+)
+```
+
 ## Chunk Manifests
 
 In the Zarr model N-dimensional arrays are stored as a series of compressed chunks, each labelled by a chunk key which indicates its position in the array. Whilst conventionally each of these Zarr chunks are a separate compressed binary file stored within a Zarr Store, there is no reason why these chunks could not actually already exist as part of another file (e.g. a netCDF file), and be loaded by reading a specific byte range from this pre-existing file.

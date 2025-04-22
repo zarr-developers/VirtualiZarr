@@ -92,6 +92,10 @@ You can also use this approach to write a reader that starts from a kerchunk-for
 
 Currently if you want to call your new reader from `virtualizarr.open_virtual_dataset` you would need to open a PR to this repository, but we plan to generalize this system to allow 3rd party libraries to plug in via an entrypoint (see [issue #245](https://github.com/zarr-developers/VirtualiZarr/issues/245)).
 
+### What ML/AI model formats are supported?
+
+VirtualiZarr has built-in support for [SafeTensors](safetensors.md) files, which are commonly used for storing ML model weights in a safe, efficient format.
+
 ## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:

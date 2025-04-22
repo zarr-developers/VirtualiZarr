@@ -2,15 +2,10 @@ import json
 import struct
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from urllib.parse import urlparse
 
 import numpy as np
-from obstore.store import (
-    HTTPStore,
-    LocalStore,
-    ObjectStore,  # type: ignore[import-not-found]
-)
 from xarray import Dataset, Index
 
 from virtualizarr.manifests import (
@@ -25,6 +20,11 @@ from virtualizarr.manifests.store import default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.types import ChunkKey
+
+if TYPE_CHECKING:
+    from obstore.store import (
+        ObjectStore,  # type: ignore[import-not-found]
+    )
 
 
 class SafeTensorsVirtualBackend(VirtualBackend):
@@ -67,7 +67,7 @@ class SafeTensorsVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _parse_safetensors_header(
-        filepath: str, store: ObjectStore
+        filepath: str, store: "ObjectStore"
     ) -> tuple[dict[str, Any], int]:
         """
         Parse the header of a SafeTensors file to extract metadata.
@@ -131,7 +131,7 @@ class SafeTensorsVirtualBackend(VirtualBackend):
     def _create_manifest_group(
         filepath: str,
         drop_variables: list,
-        store: ObjectStore,
+        store: "ObjectStore",
         dimension_names: Optional[Dict[str, list[str]]] = None,
     ) -> ManifestGroup:
         """
@@ -207,8 +207,11 @@ class SafeTensorsVirtualBackend(VirtualBackend):
 
         data_start = 8 + header_size
 
+        def should_skip_tensor(tensor_name: str, drop_variables: list) -> bool:
+            return tensor_name == "__metadata__" or tensor_name in drop_variables
+
         for tensor_name, tensor_info in header.items():
-            if tensor_name == "__metadata__" or tensor_name in drop_variables:
+            if should_skip_tensor(tensor_name, drop_variables):
                 continue
 
             dtype_str = tensor_info["dtype"]
@@ -328,6 +331,11 @@ class SafeTensorsVirtualBackend(VirtualBackend):
         ...     revision="v2.0"
         ... )
         """
+        from obstore.store import (
+            HTTPStore,
+            LocalStore,
+        )
+
         store_registry = ObjectStoreRegistry()
         store = default_object_store(filepath)
 
@@ -517,6 +525,20 @@ class SafeTensorsVirtualBackend(VirtualBackend):
         SafeTensors files store tensors as contiguous binary data. This method creates
         a chunk manifest that points to the exact location of a tensor within the file,
         treating the entire tensor as a single chunk for efficient memory mapping.
+
+        The structure of the variable names within a Safetensors file often reflects a
+        hierarchical organization, commonly represented using a dot separator (e.g.,
+        'a.b.c'). While this structure could naturally map to a nested format like Zarr
+        groups (e.g., a/b/c), the dominant framework for using these models, PyTorch,
+        utilizes a flattened dictionary structure (a 'state dict') where these dot-separated
+        names serve as keys.
+
+        To ease integration with PyTorch's expected format, ChunkManifests are currently a
+        flattened dictionary where the keys are the dot-separated variable names.
+
+        Further consideration could be given to optionally returning the data as an
+        xarray.DataTree to better represent the inherent hierarchical structure, but
+        this has been deferred to prioritize compatibility with PyTorch workflows.
 
         Parameters
         ----------

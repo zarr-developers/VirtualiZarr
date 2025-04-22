@@ -4,7 +4,8 @@ The SafeTensors reader in VirtualiZarr allows you to reference tensors stored in
 
 ## What is SafeTensors Format?
 
-SafeTensors is a file format for storing tensors (multidimensional arrays) that offers several advantages:
+SafeTensors is a file format developed by HuggingFace for storing tensors (multidimensional arrays)
+that offers several advantages:
 - Safe: No use of pickle, eliminating security concerns
 - Efficient: Zero-copy access for fast loading
 - Simple: Straightforward binary format with JSON header
@@ -18,7 +19,8 @@ The format consists of:
 ## How VirtualiZarr's SafeTensors Reader Works
 
 VirtualiZarr's SafeTensors reader allows you to:
-- Work with the tensors as xarray DataArrays with named dimensions
+- Create "virtual" Zarr stores pointing to chunks of data inside SafeTensors files
+- Open the virtual zarr stores as xarray DataArrays with named dimensions
 - Access specific slices of tensors from cloud storage
 - Preserve metadata from the original SafeTensors file
 
@@ -35,10 +37,6 @@ vds = vz.open_virtual_dataset("model.safetensors")
 # Access tensors as xarray variables
 weight = vds["weight"]
 bias = vds["bias"]
-
-# Convert to numpy arrays when needed
-weight_array = weight.values
-bias_array = bias.values
 ```
 
 ## Custom Dimension Names
@@ -84,7 +82,7 @@ large_tensor = vds["large_tensor"]
 
 The SafeTensors reader supports reading from the HuggingFace Hub:
 ```python
-# S3
+# HuggingFace Hub
 vds = vz.open_virtual_dataset(
     "https://huggingface.co/openai-community/gpt2/model.safetensors",
     virtual_backend_kwargs={"revision": "main"}

@@ -55,6 +55,7 @@ hdf = [
 safetensors = [
     "safetensors",
     "ml-dtypes",
+    "obstore>=0.5.1",
 ]
 
 # kerchunk-based readers
@@ -181,7 +182,7 @@ rust = "*"
 run-mypy = { cmd = "mypy virtualizarr" }
 # Using '--dist loadscope' (rather than default of '--dist load' when '-n auto'
 # is used), reduces test hangs that appear to be macOS-related.
-run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose" }
+run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose  --durations=10" }
 run-tests-no-network = { cmd = "pytest -n auto --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }

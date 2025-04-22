@@ -9,87 +9,73 @@ import tempfile
 import numpy as np
 import pytest
 
+pytest.importorskip("safetensors")
+
+from safetensors.numpy import save_file
+
 from virtualizarr import open_virtual_dataset
 from virtualizarr.backend import FileType
 from virtualizarr.readers.safetensors import SafeTensorsVirtualBackend
 from virtualizarr.tests import requires_network
 
-try:
-    from safetensors.numpy import save_file
-
-    HAS_SAFETENSORS = True
-except ImportError:
-    HAS_SAFETENSORS = False
-
 
 @pytest.fixture
-def sample_safetensors_file():
+def sample_safetensors_file(tmp_path):
     """Create a sample SafeTensors file for testing."""
-    if not HAS_SAFETENSORS:
-        pytest.skip("safetensors not installed")
 
-    with tempfile.NamedTemporaryFile(suffix=".safetensors", delete=False) as tmpfile:
-        filepath = tmpfile.name
+    filepath = str(tmp_path / "test.safetensors")
 
-        # TO DO: after zarr supports dtype extensions, test bfloat16 here
-        tensors = {
-            "tensor1": np.ones((10, 10), dtype=np.float32),
-            "tensor2": np.zeros((5, 5), dtype=np.float32),
-            "tensor3": np.arange(100, dtype=np.float32).reshape(10, 10),
-        }
+    # TO DO: after zarr supports dtype extensions, test bfloat16 here
+    tensors = {
+        "tensor1": np.ones((10, 10), dtype=np.float32),
+        "tensor2": np.zeros((5, 5), dtype=np.float32),
+        "tensor3": np.arange(100, dtype=np.float32).reshape(10, 10),
+    }
 
-        metadata = {
-            "framework": "numpy",
-            "version": "1.0",
-            "created_by": "virtualizarr_test",
-        }
+    metadata = {
+        "framework": "numpy",
+        "version": "1.0",
+        "created_by": "virtualizarr_test",
+    }
 
-        save_file(tensors, filepath, metadata=metadata)
+    save_file(tensors, filepath, metadata=metadata)
 
     yield filepath
-
-    os.unlink(filepath)
 
 
 @pytest.fixture
-def sample_safetensors_file_with_complex_metadata():
+def sample_safetensors_file_with_complex_metadata(tmp_path):
     """Create a sample SafeTensors file with complex metadata for testing."""
-    if not HAS_SAFETENSORS:
-        pytest.skip("safetensors not installed")
 
-    with tempfile.NamedTemporaryFile(suffix=".safetensors", delete=False) as tmpfile:
-        filepath = tmpfile.name
+    filepath = str(tmp_path / "test.safetensors")
 
-        tensors = {
-            "weight": np.random.randn(10, 20).astype(np.float32),
-            "bias": np.random.randn(20).astype(np.float32),
-        }
+    tensors = {
+        "weight": np.random.randn(10, 20).astype(np.float32),
+        "bias": np.random.randn(20).astype(np.float32),
+    }
 
-        # Convert complex nested metadata to strings as required by safetensors
-        model_info = {
-            "name": "test_model",
-            "version": "1.0",
-            "parameters": 220,
-            "layers": [
-                {"name": "layer1", "type": "linear"},
-                {"name": "layer2", "type": "activation"},
-            ],
-        }
-        training = {"epochs": 10, "optimizer": "adam", "learning_rate": 0.001}
+    # Convert complex nested metadata to strings as required by safetensors
+    model_info = {
+        "name": "test_model",
+        "version": "1.0",
+        "parameters": 220,
+        "layers": [
+            {"name": "layer1", "type": "linear"},
+            {"name": "layer2", "type": "activation"},
+        ],
+    }
+    training = {"epochs": 10, "optimizer": "adam", "learning_rate": 0.001}
 
-        metadata = {
-            "model_info": json.dumps(model_info),
-            "training": json.dumps(training),
-        }
+    metadata = {
+        "model_info": json.dumps(model_info),
+        "training": json.dumps(training),
+    }
 
-        save_file(tensors, filepath, metadata=metadata)
+    save_file(tensors, filepath, metadata=metadata)
 
     yield filepath
 
-    os.unlink(filepath)
 
-
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_reader_registration():
     """Test that the SafeTensors reader is properly registered in VirtualiZarr."""
     from virtualizarr.backend import VIRTUAL_BACKENDS
@@ -98,7 +84,6 @@ def test_reader_registration():
     assert VIRTUAL_BACKENDS["safetensors"] == SafeTensorsVirtualBackend
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_file_detection(sample_safetensors_file):
     """Test that VirtualiZarr correctly identifies the file as a SafeTensors file."""
     from virtualizarr.backend import automatically_determine_filetype
@@ -107,7 +92,6 @@ def test_file_detection(sample_safetensors_file):
     assert filetype == FileType.safetensors
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_open_virtual_dataset(sample_safetensors_file):
     """Test opening a SafeTensors file as a virtual dataset."""
     vds = open_virtual_dataset(sample_safetensors_file)
@@ -119,7 +103,6 @@ def test_open_virtual_dataset(sample_safetensors_file):
     assert vds["tensor3"].shape == (10, 10)
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_tensor_values(sample_safetensors_file):
     """Test that the tensor values are correctly read."""
 
@@ -141,7 +124,6 @@ def test_tensor_values(sample_safetensors_file):
     np.testing.assert_array_equal(tensor3, expected_tensor3)
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_custom_dimension_names(sample_safetensors_file):
     """Test specifying custom dimension names when opening a SafeTensors file."""
 
@@ -157,7 +139,6 @@ def test_custom_dimension_names(sample_safetensors_file):
     assert vds["tensor3"].dims == ("tensor3_dim_0", "tensor3_dim_1")
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_invalid_dimension_names(sample_safetensors_file):
     """Test error handling for invalid dimension names."""
 
@@ -165,16 +146,13 @@ def test_invalid_dimension_names(sample_safetensors_file):
         "tensor1": ["dim_x", "dim_y", "dim_z"]  # tensor1 is 2D but we provide 3 names
     }
 
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ValueError, match="has 3 names, but tensor has 2 dimensions"):
         _ = open_virtual_dataset(
             sample_safetensors_file,
             virtual_backend_kwargs={"dimension_names": invalid_dims},
         )
 
-    assert "has 3 names, but tensor has 2 dimensions" in str(excinfo.value)
 
-
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_metadata_preservation(sample_safetensors_file):
     """Test preservation of metadata from SafeTensors file."""
 
@@ -185,7 +163,6 @@ def test_metadata_preservation(sample_safetensors_file):
     assert vds.attrs["created_by"] == "virtualizarr_test"
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_complex_metadata(sample_safetensors_file_with_complex_metadata):
     """Test handling of complex nested metadata."""
 
@@ -209,7 +186,6 @@ def test_complex_metadata(sample_safetensors_file_with_complex_metadata):
     assert vds["bias"].attrs["original_safetensors_dtype"] == "F32"
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_enhanced_metadata(sample_safetensors_file):
     """Test that enhanced metadata is correctly created and preserved."""
 
@@ -220,7 +196,6 @@ def test_enhanced_metadata(sample_safetensors_file):
     assert vds["tensor3"].attrs["original_safetensors_dtype"] == "F32"
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_relative_path_handling(sample_safetensors_file):
     """Test that relative paths to SafeTensors files are handled correctly."""
     import os
@@ -252,8 +227,6 @@ def test_relative_path_handling(sample_safetensors_file):
 @pytest.fixture
 def sample_safetensors_file_with_many_small_tensors():
     """Create a sample SafeTensors file with many small tensors for testing."""
-    if not HAS_SAFETENSORS:
-        pytest.skip("safetensors not installed")
 
     with tempfile.NamedTemporaryFile(suffix=".safetensors", delete=False) as tmpfile:
         filepath = tmpfile.name
@@ -278,7 +251,6 @@ def sample_safetensors_file_with_many_small_tensors():
     os.unlink(filepath)
 
 
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_many_small_tensors(sample_safetensors_file_with_many_small_tensors):
     """Test handling a SafeTensors file with many small tensors."""
 
@@ -320,7 +292,6 @@ def test_many_small_tensors(sample_safetensors_file_with_many_small_tensors):
 
 
 @requires_network
-@pytest.mark.skipif(not HAS_SAFETENSORS, reason="safetensors not installed")
 def test_open_huggingface_safetensors():
     """Test opening a SafeTensors file from Hugging Face Hub with metadata inspection only."""
 
