@@ -21,7 +21,7 @@ RUN mkdir -p ${FUNCTION_DIR}
 # Update pip
 RUN pip install --upgrade --ignore-installed pip wheel six setuptools \
     && pip install --upgrade --no-cache-dir --ignore-installed \
-        awslambdaric \    
+        awslambdaric \
         boto3 \
         redis \
         httplib2 \
@@ -67,7 +67,7 @@ RUN pip install \
     imagecodecs-numcodecs==2024.6.1 \
     obstore>=0.5.1 \
     git+https://github.com/zarr-developers/VirtualiZarr.git@develop
-    
+
 # Entry point configuration for AWS Lambda
 ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
 CMD [ "handler.entry_point.lambda_handler" ]

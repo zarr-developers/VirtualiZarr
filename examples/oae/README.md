@@ -1,6 +1,6 @@
 ## Docker
 
-Build the runtime with 
+Build the runtime with
 
 ```bash
 lithops runtime build -b aws_lambda -f ./docker/Dockerfile virtualizarr-runtime
