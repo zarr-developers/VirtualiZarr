@@ -16,7 +16,6 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
-from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.vendor.zarr.metadata import dict_to_buffer
 
@@ -28,8 +27,6 @@ if TYPE_CHECKING:
     StoreDict: TypeAlias = dict[str, ObjectStore]
 
     import xarray as xr
-
-    from virtualizarr.translators.kerchunk import KerchunkStoreRefs
 
 
 __all__ = ["ManifestStore"]
@@ -176,7 +173,7 @@ class ObjectStoreRegistry:
         -----------
         url : str
             A url to identify the appropriate object_store instance based on the URL scheme and netloc.
-        
+
         Returns:
         --------
         StoreRequest
@@ -191,8 +188,8 @@ class ObjectStoreRegistry:
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. 
-    
+    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure.
+
     The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
     multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
 
