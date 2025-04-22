@@ -162,6 +162,15 @@ def test_default_object_store_local(tmpdir):
 
 
 @requires_obstore
+def test_default_region_raises():
+    file = "s3://cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+    with pytest.raises(
+        ValueError, match="Unable to automatically determine region for bucket*"
+    ):
+        default_object_store(file)
+
+
+@requires_obstore
 class TestManifestStore:
     def test_manifest_store_properties(self, local_store):
         assert local_store.read_only
