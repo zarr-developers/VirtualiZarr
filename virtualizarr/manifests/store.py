@@ -152,7 +152,7 @@ def default_object_store(
     if parsed.scheme == "s3":
         if store_config is None:
             # TODO override only kwargs that were set explicity, and keep other defaults?
-            bucket = (parsed.netloc,)
+            bucket = parsed.netloc
             region = _find_bucket_region(bucket)
             store_config = dict(
                 bucket=bucket,
