@@ -41,7 +41,7 @@ class TestOpenVirtualDatasetZarr:
         import zarr
 
         zg = zarr.open_group(zarr_store)
-        vds = open_virtual_dataset(filepath=zarr_store)
+        vds = open_virtual_dataset(filepath=zarr_store, loadable_variables=[])
 
         non_var_arrays = ["time", "lat", "lon"]
 
@@ -60,6 +60,16 @@ class TestOpenVirtualDatasetZarr:
         for array in arrays:
             # check manifest array ArrayV3Metadata dtype
             assert isinstance(vds[array].data, ManifestArray)
-
             # compare manifest array ArrayV3Metadata
-            assert zg[array].metadata == vds[array].data.metadata
+            expected = zg[array].metadata.to_dict()
+            # Check attributes
+            assert expected["attributes"] == vds[array].attrs
+            assert expected["dimension_names"] == vds[array].dims
+            expected.pop(
+                "dimension_names"
+            )  # dimension_names are removed in conversion to virtual variable
+            expected[
+                "attributes"
+            ] = {}  # attributes are removed in conversion to virtual variable
+            actual = vds[array].data.metadata.to_dict()
+            assert expected == actual

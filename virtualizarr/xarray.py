@@ -77,40 +77,22 @@ def construct_virtual_dataset(
             return replace_virtual_with_loadable_vars(
                 fully_virtual_ds, loadable_ds, loadable_variables
             )
-
     else:
-        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
-        if not filepath:
-            raise ValueError(
-                "if using pre-manifest store approach, a filepath is required."
-            )
+        fpath = _FsspecFSFromFilepath(
+            filepath=filepath,  # type: ignore[arg-type]
+            reader_options=reader_options,
+        ).open_file()
 
-        fpath = _FsspecFSFromFilepath(filepath=filepath, reader_options=reader_options)
-        if fpath.upath.suffix == ".zarr":
-            with xr.open_zarr(
-                fpath.upath,
-                consolidated=False,
-                group=group,
-                decode_times=decode_times,
-                chunks=None,
-            ) as loadable_ds:
-                return replace_virtual_with_loadable_vars(
-                    fully_virtual_ds,  # type: ignore[arg-type]
-                    loadable_ds,
-                    loadable_variables,
-                )
-        else:
-            # TODO replace with only opening specific variables via `open_zarr(ManifestStore)` in #473
-            with xr.open_dataset(
-                fpath.open_file(),  # type: ignore[arg-type]
-                group=group,
-                decode_times=decode_times,
-            ) as loadable_ds:
-                return replace_virtual_with_loadable_vars(
-                    fully_virtual_ds,  # type: ignore[arg-type]
-                    loadable_ds,
-                    loadable_variables,
-                )
+        with xr.open_dataset(
+            fpath,  # type: ignore[arg-type]
+            group=group,
+            decode_times=decode_times,
+        ) as loadable_ds:
+            return replace_virtual_with_loadable_vars(
+                fully_virtual_ds,  # type: ignore[arg-type]
+                loadable_ds,
+                loadable_variables,
+            )
 
 
 def replace_virtual_with_loadable_vars(
