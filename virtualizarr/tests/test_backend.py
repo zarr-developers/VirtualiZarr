@@ -28,6 +28,7 @@ from virtualizarr.tests import (
     requires_imagecodecs,
     requires_lithops,
     requires_network,
+    requires_obstore,
     requires_s3fs,
     requires_scipy,
 )
@@ -345,6 +346,41 @@ class TestReadFromURL:
             with xr.open_dataset(tmpref, engine="kerchunk") as dsV:
                 # xrt.assert_identical(dsXR, dsV) #Attribute order changes
                 xrt.assert_equal(dsXR, dsV)
+
+
+class TestReadFromCustomEndpoint:
+    @requires_obstore
+    def test_obstore(self):
+        # TODO Kyle's demo that obstore alone does work - delete this before merging
+        import obstore
+
+        store = obstore.store.S3Store(
+            "cworthy", endpoint="https://data.source.coop", skip_signature=True
+        )
+        path = "oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+        store.head(path)
+
+    @requires_network
+    @requires_obstore
+    def test_read_from_custom_endpoint(self):
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/559
+
+        path = "s3://us-west-2.opendata.source.coop/cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+
+        # doesn't work with this either
+        # path = "oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+
+        vds = open_virtual_dataset(
+            path,
+            decode_times=False,
+            backend=HDFVirtualBackend,
+            reader_options=dict(
+                bucket="cworthy",
+                endpoint="https://data.source.coop",
+                skip_signature=True,
+            ),
+        )
+        assert isinstance(vds, xr.Dataset)
 
 
 @parametrize_over_hdf_backends
