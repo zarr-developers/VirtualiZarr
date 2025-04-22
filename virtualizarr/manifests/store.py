@@ -176,6 +176,7 @@ class ObjectStoreRegistry:
         -----------
         url : str
             A url to identify the appropriate object_store instance based on the URL scheme and netloc.
+        
         Returns:
         --------
         StoreRequest
@@ -190,10 +191,10 @@ class ObjectStoreRegistry:
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
-    from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`,
-    allowing for virtually interfacing with underlying data in other file format.
+    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. 
+    
+    The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
+    multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------
