@@ -131,7 +131,12 @@ def _find_bucket_region(bucket_name: str) -> str:
     import requests
 
     resp = requests.head(f"https://{bucket_name}.s3.amazonaws.com")
-    return resp.headers["x-amz-bucket-region"]
+    if resp.status_code == 200:
+        return resp.headers["x-amz-bucket-region"]
+    else:
+        raise ValueError(
+            f"Unable to automatically determine region for bucket {bucket_name}"
+        )
 
 
 def default_object_store(filepath: str) -> ObjectStore:
