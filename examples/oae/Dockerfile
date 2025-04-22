@@ -48,11 +48,26 @@ RUN unzip lithops_lambda.zip \
     && mv entry_point.py handler/
 
 # Install packages from specific branches
+# TODO all of these could be replaced with `pip install 'virtualizarr[hdf]'` once I can use a released version
 RUN pip install \
-    git+https://github.com/zarr-developers/VirtualiZarr.git@develop \
+    numpy>=2.0.0 \
+    universal-pathlib \
+    numcodecs>=0.15.1 \
+    ujson \
+    packaging \
+    zarr>=3.0.2 \
+    icechunk \
     s3fs \
-    h5py 
-
+    fsspec \
+    requests \
+    aiohttp \
+    h5py \
+    hdf5plugin \
+    imagecodecs \
+    imagecodecs-numcodecs==2024.6.1 \
+    obstore>=0.5.1 \
+    git+https://github.com/zarr-developers/VirtualiZarr.git@develop
+    
 # Entry point configuration for AWS Lambda
 ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
 CMD [ "handler.entry_point.lambda_handler" ]
