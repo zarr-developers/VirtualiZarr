@@ -365,10 +365,7 @@ class TestReadFromCustomEndpoint:
     def test_read_from_custom_endpoint(self):
         # see https://github.com/zarr-developers/VirtualiZarr/issues/559
 
-        path = "s3://us-west-2.opendata.source.coop/cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
-
-        # doesn't work with this either
-        # path = "oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+        path = "https://data.source.coop/cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
 
         vds = open_virtual_dataset(
             path,
