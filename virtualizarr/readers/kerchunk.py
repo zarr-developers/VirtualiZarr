@@ -4,8 +4,8 @@ from typing import Hashable, Iterable, Mapping, Optional
 import ujson
 from xarray import Dataset, Index
 
-from virtualizarr.manifests import ManifestStore
 from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
@@ -85,7 +85,7 @@ class KerchunkVirtualBackend(VirtualBackend):
                 "The input Kerchunk reference did not seem to be in Kerchunk's JSON or Parquet spec: https://fsspec.github.io/kerchunk/spec.html. If your Kerchunk generated references are saved in parquet format, make sure the file extension is `.parquet`. The Kerchunk format autodetection is quite flaky, so if your reference matches the Kerchunk spec feel free to open an issue: https://github.com/zarr-developers/VirtualiZarr/issues"
             )
 
-        manifeststore = ManifestStore.from_kerchunk_refs(
+        manifeststore = manifeststore_from_kerchunk_refs(
             refs,
             group=group,
             fs_root=fs_root,
