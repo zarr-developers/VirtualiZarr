@@ -139,21 +139,33 @@ def _find_bucket_region(bucket_name: str) -> str:
     return region
 
 
-def default_object_store(filepath: str) -> ObjectStore:
+def default_object_store(
+    uri: str,
+    store_config: dict | None = None,
+) -> ObjectStore:
     import obstore as obs
 
-    parsed = urlparse(filepath)
+    parsed = urlparse(uri)
 
     if parsed.scheme in ["", "file"]:
         return obs.store.LocalStore()
     if parsed.scheme == "s3":
-        bucket = parsed.netloc
+        if store_config is None:
+            # TODO override only kwargs that were set explicity, and keep other defaults?
+            bucket = (parsed.netloc,)
+            region = _find_bucket_region(bucket)
+            store_config = dict(
+                bucket=bucket,
+                client_options={"allow_http": True},
+                skip_signature=True,
+                virtual_hosted_style_request=False,
+                region=region,
+            )
+
+        print(store_config)
+
         return obs.store.S3Store(
-            bucket=bucket,
-            client_options={"allow_http": True},
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            region=_find_bucket_region(bucket),
+            **store_config,
         )
     if parsed.scheme in ["http", "https"]:
         base_url = f"{parsed.scheme}://{parsed.netloc}"

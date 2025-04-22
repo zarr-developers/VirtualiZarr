@@ -174,16 +174,22 @@ class HDFVirtualBackend(VirtualBackend):
         store: ObjectStore | None = None,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
+        store_config: dict | None = None,
     ) -> ManifestStore:
-        # Create a group containing dataset level metadata and all the manifest arrays
         if not store:
-            store = default_object_store(filepath)  # type: ignore
+            store = default_object_store(
+                filepath,  # type: ignore
+                store_config=store_config,
+            )
+
+        # Create a group containing dataset level metadata and all the manifest arrays
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
             filepath=filepath,
             group=group,
             drop_variables=drop_variables,
         )
+
         registry = ObjectStoreRegistry({filepath: store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
@@ -218,6 +224,7 @@ class HDFVirtualBackend(VirtualBackend):
             filepath=filepath,
             drop_variables=_drop_vars,
             group=group,
+            store_config=reader_options,
         )
         ds = manifest_store.to_virtual_dataset(
             loadable_variables=loadable_variables,
