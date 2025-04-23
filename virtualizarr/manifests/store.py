@@ -152,9 +152,13 @@ def default_object_store(filepath: str) -> ObjectStore:
         )
     if parsed.scheme in ["http", "https"]:
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        # TO DO: timeout can be passed here via client_options kwarg e.g. {"timeout":"30s"}
-        # TO DO: how to pass HF token with obstore? requires "authorization": f"Bearer {token}" in header.
-        return obs.store.HTTPStore.from_url(base_url)
+        client_options = {}
+        # TODO: add support and update docs for default_headers when released on obstore
+        # if token := os.environ.get("HF_TOKEN"):
+        #    client_options = {"default_headers": {"authorization": f"Bearer {token}"}}
+        # else:
+        #    client_options = {}
+        return obs.store.HTTPStore.from_url(base_url, client_options=client_options)
 
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
