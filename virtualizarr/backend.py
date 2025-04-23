@@ -164,8 +164,7 @@ def open_virtual_dataset(
     virtual_backend_kwargs: dict, default is None
         Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
     reader_options: dict, default {}
-        Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
-        Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
+        Options to allow reading from remote filesystems. Passed to either kerchunk-based readers or to obstore.
 
     Returns
     -------
