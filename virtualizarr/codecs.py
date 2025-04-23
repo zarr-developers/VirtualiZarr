@@ -94,12 +94,12 @@ def get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
     """
     Extract configuration from a codec, handling both zarr-python and numcodecs codecs.
     """
-    if hasattr(codec, "codec_config"):
+    if hasattr(codec, "to_dict"):
+        return codec.to_dict()
+    elif hasattr(codec, "codec_config"):
         return codec.codec_config
     elif hasattr(codec, "get_config"):
         return codec.get_config()
-    elif hasattr(codec, "to_dict"):
-        return codec.to_dict()
     else:
         raise ValueError(f"Unable to parse codec configuration: {codec}")
 
