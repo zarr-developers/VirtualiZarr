@@ -174,12 +174,12 @@ class HDFVirtualBackend(VirtualBackend):
         store: ObjectStore | None = None,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        store_config: dict | None = None,
+        s3_store_config: dict | None = None,
     ) -> ManifestStore:
         if not store:
             store = default_object_store(
                 filepath,  # type: ignore
-                store_config=store_config,
+                s3_store_config=s3_store_config,
             )
 
         # Create a group containing dataset level metadata and all the manifest arrays
@@ -224,7 +224,7 @@ class HDFVirtualBackend(VirtualBackend):
             filepath=filepath,
             drop_variables=_drop_vars,
             group=group,
-            store_config=reader_options,
+            s3_store_config=reader_options,
         )
         ds = manifest_store.to_virtual_dataset(
             loadable_variables=loadable_variables,
