@@ -162,8 +162,6 @@ def default_object_store(
                 region=region,
             )
 
-        print(store_config)
-
         return obs.store.S3Store(
             **store_config,
         )
