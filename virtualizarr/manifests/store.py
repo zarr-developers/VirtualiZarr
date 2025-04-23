@@ -165,7 +165,9 @@ def default_object_store(
         )
 
     if s3_store_config:
-        raise ValueError(f"s3_store_config cannot be used with a non-s3 url, but got s3_store_config={s3_store_config}")
+        raise ValueError(
+            f"s3_store_config cannot be used with a non-s3 url, but got s3_store_config={s3_store_config}"
+        )
 
     if parsed.scheme in ["", "file"]:
         return obs.store.LocalStore()
