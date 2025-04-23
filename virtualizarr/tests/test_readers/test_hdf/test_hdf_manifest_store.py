@@ -32,7 +32,7 @@ class TestHDFManifestStore:
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
         store = HDFVirtualBackend._create_manifest_store(
-            uri=filepath,
+            filepath=filepath,
         )
         rountripped_ds = xr.open_dataset(
             store, engine="zarr", consolidated=False, zarr_format=3
@@ -44,7 +44,7 @@ class TestHDFManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = HDFVirtualBackend._create_manifest_store(uri=filepath)
+        store = HDFVirtualBackend._create_manifest_store(filepath=filepath)
         rountripped_ds = xr.open_dataset(
             store, engine="zarr", consolidated=False, zarr_format=3
         )
@@ -65,8 +65,26 @@ class TestHDFManifestStore:
             client_options={"allow_http": True},
         )
         store = HDFVirtualBackend._create_manifest_store(
-            uri=chunked_roundtrip_hdf5_s3_file,
+            filepath=chunked_roundtrip_hdf5_s3_file,
             store=s3store,
+        )
+        vds = store.to_virtual_dataset()
+        assert vds.dims == {"phony_dim_0": 5}
+        assert isinstance(vds["data"].data, ManifestArray)
+
+    @requires_minio
+    @requires_obstore
+    def test_store_options(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
+        config = {
+            "bucket": minio_bucket["bucket"],
+            "endpoint": minio_bucket["endpoint"],
+            "virtual_hosted_style_request": False,
+            "skip_signature": True,
+            "client_options": {"allow_http": True},
+        }
+        store = HDFVirtualBackend._create_manifest_store(
+            filepath=chunked_roundtrip_hdf5_s3_file,
+            storage_config=config,
         )
         vds = store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}
@@ -75,7 +93,7 @@ class TestHDFManifestStore:
     @requires_obstore
     def test_default_store(self):
         store = HDFVirtualBackend._create_manifest_store(
-            uri="s3://carbonplan-share/virtualizarr/local.nc",
+            filepath="s3://carbonplan-share/virtualizarr/local.nc",
         )
         vds = store.to_virtual_dataset()
         assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}

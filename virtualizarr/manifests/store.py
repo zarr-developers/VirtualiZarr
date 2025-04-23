@@ -3,7 +3,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -26,7 +26,10 @@ if TYPE_CHECKING:
 
     import xarray as xr
     from obstore.store import (
-        ObjectStore,  # type: ignore[import-not-found]
+        ClientConfig,
+        ObjectStore,
+        RetryConfig,
+        S3Config,
     )
     from zarr.core.buffer import BufferPrototype
     from zarr.core.common import BytesLike
@@ -39,6 +42,13 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     IsADirectoryError,
     NotADirectoryError,
 )
+
+
+class ObjectStoreOptions(TypedDict):
+    config: S3Config
+    client_options: ClientConfig
+    retry_config: RetryConfig
+    credential_provider: callable
 
 
 @dataclass
@@ -139,25 +149,34 @@ def _find_bucket_region(bucket_name: str) -> str:
     return region
 
 
-def default_object_store(filepath: str) -> ObjectStore:
+def default_object_store(
+    filepath: str, storage_config: ObjectStoreOptions | None = None
+) -> ObjectStore:
     import obstore as obs
 
+    storage_config = storage_config or ObjectStoreOptions(
+        client_options={"allow_http": True},
+        config={"skip_signature": True, "virtual_hosted_style_request": True},
+    )
     parsed = urlparse(filepath)
 
     if parsed.scheme in ["", "file"]:
         return obs.store.LocalStore()
     if parsed.scheme == "s3":
-        bucket = parsed.netloc
-        return obs.store.S3Store(
-            bucket=bucket,
+        storage_config = storage_config or ObjectStoreOptions(
             client_options={"allow_http": True},
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            region=_find_bucket_region(bucket),
+            config={
+                "skip_signature": True,
+                "virtual_hosted_style_request": True,
+                "bucket": parsed.netloc,
+                "region": _find_bucket_region(parsed.netloc),
+            },
         )
+        return obs.store.S3Store(**storage_config)
     if parsed.scheme in ["http", "https"]:
+        storage_config = storage_config or {}
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        return obs.store.HTTPStore.from_url(base_url)
+        return obs.store.HTTPStore(base_url, **storage_config)
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 

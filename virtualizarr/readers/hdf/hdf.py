@@ -25,7 +25,11 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.store import ObjectStoreRegistry, default_object_store
+from virtualizarr.manifests.store import (
+    ObjectStoreOptions,
+    ObjectStoreRegistry,
+    default_object_store,
+)
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.readers.hdf.filters import codecs_from_dataset
@@ -169,15 +173,17 @@ class HDFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _create_manifest_store(
-        uri: str,
+        filepath: str,
         *,
         store: ObjectStore | None = None,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
+        storage_config: ObjectStoreOptions | None = None,
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
+        uri = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
         if not store:
-            store = default_object_store(uri)  # type: ignore
+            store = default_object_store(uri, storage_config=storage_config)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
             uri=uri,
@@ -197,7 +203,7 @@ class HDFVirtualBackend(VirtualBackend):
         decode_times: bool | None = None,
         indexes: Mapping[str, xr.Index] | None = None,
         virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
+        reader_options: Optional[ObjectStoreOptions] = None,
     ) -> xr.Dataset:
         if h5py is None:
             raise ImportError("h5py is required for using the HDFVirtualBackend")
@@ -213,9 +219,10 @@ class HDFVirtualBackend(VirtualBackend):
         )
 
         manifest_store = HDFVirtualBackend._create_manifest_store(
-            uri=uri,
+            filepath=uri,
             drop_variables=_drop_vars,
             group=group,
+            storage_config=reader_options,
         )
         ds = manifest_store.to_virtual_dataset(
             loadable_variables=loadable_variables,
