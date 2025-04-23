@@ -27,6 +27,7 @@ from virtualizarr.readers import (
     HDFVirtualBackend,
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
+    SafeTensorsVirtualBackend,
     TIFFVirtualBackend,
 )
 from virtualizarr.readers.api import VirtualBackend
@@ -45,6 +46,7 @@ VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
     "hdf5": HDFVirtualBackend,
+    "safetensors": SafeTensorsVirtualBackend,
     "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
     # all the below call one of the kerchunk backends internally (https://fsspec.github.io/kerchunk/reference.html#file-format-backends)
     "netcdf3": NetCDF3VirtualBackend,
@@ -70,6 +72,7 @@ class FileType(AutoName):
     fits = auto()
     dmrpp = auto()
     kerchunk = auto()
+    safetensors = auto()
 
 
 def automatically_determine_filetype(
@@ -89,6 +92,8 @@ def automatically_determine_filetype(
     if Path(filepath).suffix == ".zarr":
         # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
         raise NotImplementedError()
+    elif Path(filepath).suffix.lower() == ".safetensors":
+        return FileType.safetensors
 
     # Read magic bytes from local or remote file
     fpath = _FsspecFSFromFilepath(

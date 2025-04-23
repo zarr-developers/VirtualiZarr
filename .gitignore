@@ -190,3 +190,6 @@ venv
 
 # Pixi lock file (because it changes with every upstream commit)
 pixi.lock
+
+# AI-assisted code development: https://github.com/ezyang/codemcp
+codemcp*
