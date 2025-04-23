@@ -349,17 +349,6 @@ class TestReadFromURL:
 
 
 class TestReadFromCustomEndpoint:
-    @requires_obstore
-    def test_obstore(self):
-        # TODO Kyle's demo that obstore alone does work - delete this before merging
-        import obstore
-
-        store = obstore.store.S3Store(
-            "cworthy", endpoint="https://data.source.coop", skip_signature=True
-        )
-        path = "oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
-        store.head(path)
-
     @requires_network
     @requires_obstore
     def test_read_from_custom_endpoint(self):
