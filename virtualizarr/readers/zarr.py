@@ -112,9 +112,6 @@ async def _construct_manifest_group(
     group: str | None = None,
 ):
     reader_options = reader_options or {}
-    import ipdb
-
-    ipdb.set_trace()
     zarr_group = await open_group_async(
         filepath,
         storage_options=reader_options.get("storage_options"),
