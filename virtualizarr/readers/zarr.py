@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path  # noqa
 from typing import (
-    TYPE_CHECKING,
     Any,
     Hashable,
     Iterable,
@@ -25,7 +24,6 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
-
 
 FillValueT = bool | str | float | int | list | None
 
