@@ -269,7 +269,7 @@ Internal Changes
   (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
-- File paths in chunk manifests are now always stored as abolute URIs.
+- File paths in chunk manifests are now always stored as absolute URIs.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.1.0:
@@ -294,7 +294,7 @@ New Features
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
-- Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
+- Can write virtual datasets to Icechunk stores using `virtualize.to_icechunk` (:pull:`256`)
   By `Matt Iannucci <https://github.com/mpiannucci>`_.
 
 Breaking changes

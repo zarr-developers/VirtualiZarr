@@ -204,7 +204,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
             f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
         )
 
-    # new chunk_shape is old chunk_shape with singleton dimensions pre-pended
+    # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
     old_chunk_shape = x.chunks
     new_chunk_shape = _prepend_singleton_dimensions(
