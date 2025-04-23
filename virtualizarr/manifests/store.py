@@ -141,16 +141,14 @@ def _find_bucket_region(bucket_name: str) -> str:
 
 def default_object_store(
     uri: str,
-    store_config: dict | None = None,
+    s3_store_config: dict | None = None,
 ) -> ObjectStore:
     import obstore as obs
 
     parsed = urlparse(uri)
 
-    if parsed.scheme in ["", "file"]:
-        return obs.store.LocalStore()
     if parsed.scheme == "s3":
-        if store_config is None:
+        if s3_store_config is None:
             # TODO override only kwargs that were set explicity, and keep other defaults?
             bucket = parsed.netloc
             region = _find_bucket_region(bucket)
@@ -165,9 +163,17 @@ def default_object_store(
         return obs.store.S3Store(
             **store_config,
         )
+
+    if s3_store_config is not None:
+        raise ValueError("s3_store_config cannot be used with a non-s3 url")
+
+    if parsed.scheme in ["", "file"]:
+        return obs.store.LocalStore()
+
     if parsed.scheme in ["http", "https"]:
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         return obs.store.HTTPStore.from_url(base_url)
+
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
