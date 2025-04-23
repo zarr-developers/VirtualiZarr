@@ -169,7 +169,7 @@ class TestManifestGroupFromHDF:
         store = LocalStore()
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
-            filepath=chunked_dimensions_netcdf4_file,
+            uri=chunked_dimensions_netcdf4_file,
         )
         assert len(manifest_group.arrays) == 3
 
@@ -177,7 +177,7 @@ class TestManifestGroupFromHDF:
         store = LocalStore()
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
-            filepath=nested_group_hdf5_file,
+            uri=nested_group_hdf5_file,
             group="group",
         )
         assert len(manifest_group.arrays) == 1
@@ -186,7 +186,7 @@ class TestManifestGroupFromHDF:
         store = LocalStore()
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
-            filepath=multiple_datasets_hdf5_file,
+            uri=multiple_datasets_hdf5_file,
             drop_variables=["data2"],
         )
         assert "data2" not in manifest_group.arrays.keys()
@@ -195,7 +195,7 @@ class TestManifestGroupFromHDF:
         store = LocalStore()
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
-            filepath=group_hdf5_file,
+            uri=group_hdf5_file,
             group="group",
         )
         assert len(manifest_group.arrays) == 1
@@ -205,7 +205,7 @@ class TestManifestGroupFromHDF:
         with pytest.raises(ValueError):
             HDFVirtualBackend._construct_manifest_group(
                 store=store,
-                filepath=group_hdf5_file,
+                uri=group_hdf5_file,
                 group="group/data",
             )
 

@@ -119,7 +119,7 @@ class HDFVirtualBackend(VirtualBackend):
     @staticmethod
     def _construct_manifest_group(
         store: ObjectStore,
-        filepath: str,
+        uri: str,
         *,
         group: str | None = None,
         drop_variables: Optional[Iterable[str]] = None,
@@ -132,7 +132,7 @@ class HDFVirtualBackend(VirtualBackend):
         if drop_variables is None:
             drop_variables = []
 
-        reader = ObstoreReader(store=store, path=filepath)
+        reader = ObstoreReader(store=store, path=uri)
         f = h5py.File(reader, mode="r")
 
         if group is not None and group != "":
@@ -159,7 +159,7 @@ class HDFVirtualBackend(VirtualBackend):
             if key not in drop_variables:
                 if isinstance(g[key], h5py.Dataset):
                     variable = HDFVirtualBackend._construct_manifest_array(
-                        path=filepath,
+                        path=uri,
                         dataset=g[key],
                         group=group_name,
                     )
@@ -169,7 +169,7 @@ class HDFVirtualBackend(VirtualBackend):
 
     @staticmethod
     def _create_manifest_store(
-        filepath: str,
+        uri: str,
         *,
         store: ObjectStore | None = None,
         group: str | None = None,
@@ -177,14 +177,14 @@ class HDFVirtualBackend(VirtualBackend):
     ) -> ManifestStore:
         # Create a group containing dataset level metadata and all the manifest arrays
         if not store:
-            store = default_object_store(filepath)  # type: ignore
+            store = default_object_store(uri)  # type: ignore
         manifest_group = HDFVirtualBackend._construct_manifest_group(
             store=store,
-            filepath=filepath,
+            uri=uri,
             group=group,
             drop_variables=drop_variables,
         )
-        registry = ObjectStoreRegistry({filepath: store})
+        registry = ObjectStoreRegistry({uri: store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 
@@ -206,16 +206,14 @@ class HDFVirtualBackend(VirtualBackend):
                 "HDF reader does not understand any virtual_backend_kwargs"
             )
 
-        filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
-        )
+        uri = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
 
         _drop_vars: Iterable[str] = (
             [] if drop_variables is None else list(drop_variables)
         )
 
         manifest_store = HDFVirtualBackend._create_manifest_store(
-            filepath=filepath,
+            uri=uri,
             drop_variables=_drop_vars,
             group=group,
         )

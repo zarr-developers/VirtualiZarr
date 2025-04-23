@@ -32,7 +32,7 @@ class TestHDFManifestStore:
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
         store = HDFVirtualBackend._create_manifest_store(
-            filepath=filepath,
+            uri=filepath,
         )
         rountripped_ds = xr.open_dataset(
             store, engine="zarr", consolidated=False, zarr_format=3
@@ -44,7 +44,7 @@ class TestHDFManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = HDFVirtualBackend._create_manifest_store(filepath=filepath)
+        store = HDFVirtualBackend._create_manifest_store(uri=filepath)
         rountripped_ds = xr.open_dataset(
             store, engine="zarr", consolidated=False, zarr_format=3
         )
@@ -65,7 +65,7 @@ class TestHDFManifestStore:
             client_options={"allow_http": True},
         )
         store = HDFVirtualBackend._create_manifest_store(
-            filepath=chunked_roundtrip_hdf5_s3_file,
+            uri=chunked_roundtrip_hdf5_s3_file,
             store=s3store,
         )
         vds = store.to_virtual_dataset()
@@ -75,7 +75,7 @@ class TestHDFManifestStore:
     @requires_obstore
     def test_default_store(self):
         store = HDFVirtualBackend._create_manifest_store(
-            filepath="s3://carbonplan-share/virtualizarr/local.nc",
+            uri="s3://carbonplan-share/virtualizarr/local.nc",
         )
         vds = store.to_virtual_dataset()
         assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
