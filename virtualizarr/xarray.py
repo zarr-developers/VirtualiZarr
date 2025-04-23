@@ -78,6 +78,8 @@ def construct_virtual_dataset(
                 fully_virtual_ds, loadable_ds, loadable_variables
             )
     else:
+        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+
         fpath = _FsspecFSFromFilepath(
             filepath=filepath,  # type: ignore[arg-type]
             reader_options=reader_options,
