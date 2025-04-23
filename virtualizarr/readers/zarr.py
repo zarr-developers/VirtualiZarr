@@ -50,17 +50,14 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
-    # Note: zarr_array.name for a given array returns a string with a leading '/'.
-    # TODO: leading / or no
 
-    prefix = zarr_array.name + "/c/"
+    prefix = zarr_array.name.lstrip("/") + "/c/"
     prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-
     _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
 
     chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
     _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-    _paths = [filepath + prefix + key for key in chunk_keys]
+    _paths = [filepath + "/" + prefix + key for key in chunk_keys]
 
     _offsets = [0] * len(_lengths)
     return {
@@ -116,6 +113,9 @@ async def _construct_manifest_group(
     group: str | None = None,
 ):
     reader_options = reader_options or {}
+    import ipdb
+
+    ipdb.set_trace()
     zarr_group = await open_group_async(
         filepath,
         storage_options=reader_options.get("storage_options"),
