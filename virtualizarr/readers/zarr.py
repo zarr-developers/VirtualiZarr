@@ -26,8 +26,6 @@ from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
-if TYPE_CHECKING:
-    pass
 
 FillValueT = bool | str | float | int | list | None
 
