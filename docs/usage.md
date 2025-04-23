@@ -26,7 +26,9 @@ from virtualizarr import open_virtual_dataset
 vds = open_virtual_dataset('air.nc')
 ```
 
-(Notice we did not have to explicitly indicate the file format, as {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.)
+```{note}
+We did not have to explicitly indicate the file format because {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.
+```
 
 Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
 
@@ -89,150 +91,11 @@ aws_credentials = {"key": ..., "secret": ...}
 vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
 ```
 
-## Chunk Manifests
-
-In the Zarr model N-dimensional arrays are stored as a series of compressed chunks, each labelled by a chunk key which indicates its position in the array. Whilst conventionally each of these Zarr chunks are a separate compressed binary file stored within a Zarr Store, there is no reason why these chunks could not actually already exist as part of another file (e.g. a netCDF file), and be loaded by reading a specific byte range from this pre-existing file.
-
-A "Chunk Manifest" is a list of chunk keys and their corresponding byte ranges in specific files, grouped together such that all the chunks form part of one Zarr-like array. For example, a chunk manifest for a 3-dimensional array made up of 4 chunks might look like this:
-
-```python
-{
-    "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-    "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-    "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-    "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-}
-```
-
-Notice that the `"path"` attribute points to a netCDF file `"foo.nc"` stored in a remote S3 bucket. There is no need for the files the chunk manifest refers to to be local.
-
-Our virtual dataset we opened above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
-
-```python
-marr = vds['air'].data
-manifest = marr.manifest
-manifest.dict()
-```
-
-```python
-{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
-```
-
-In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
-
-The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
-
-## `ManifestArray` class
-
-A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`. The {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` class stores both the array-level attributes and the corresponding chunk manifest.
-
-```python
-marr
-```
-
-```
-ManifestArray<shape=(2920, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
-```
-
-```python
-marr.manifest
-```
-
-```
-ChunkManifest<shape=(1, 1, 1)>
-```
-
-```python
-marr.metadata
-```
-
-```
-ArrayV3Metadata(shape=(2920, 25, 53),
-                data_type=<DataType.float64: 'float64'>,
-                chunk_grid=RegularChunkGrid(chunk_shape=(2920, 25, 53)),
-                chunk_key_encoding=DefaultChunkKeyEncoding(name='default',
-                                                           separator='/'),
-                fill_value=np.float64(-327.67),
-                codecs=(FixedScaleOffset(codec_name='numcodecs.fixedscaleoffset', codec_config={'scale': 100.0, 'offset': 0, 'dtype': '<f8', 'astype': '<i2'}),
-                        BytesCodec(endian=<Endian.little: 'little'>)),
-                attributes={'GRIB_id': 11,
-                            'GRIB_name': 'TMP',
-                            'actual_range': [185.16000366210938,
-                                             322.1000061035156],
-                            'dataset': 'NMC Reanalysis',
-                            'level_desc': 'Surface',
-                            'long_name': '4xDaily Air temperature at sigma '
-                                         'level 995',
-                            'parent_stat': 'Other',
-                            'precision': 2,
-                            'statistic': 'Individual Obs',
-                            'units': 'degK',
-                            'var_desc': 'Air temperature'},
-                dimension_names=None,
-                zarr_format=3,
-                node_type='array',
-                storage_transformers=())
-```
-
-A `ManifestArray` can therefore be thought of as a virtualized representation of a single Zarr array.
-
-As it defines various array-like methods, a `ManifestArray` can often be treated like a ["duck array"](https://docs.xarray.dev/en/stable/user-guide/duckarrays.html). In particular, concatenation of multiple `ManifestArray` objects can be done via merging their chunk manifests into one (and re-labelling the chunk keys).
-
-```python
-import numpy as np
-
-concatenated = np.concatenate([marr, marr], axis=0)
-concatenated
-```
-
-```
-ManifestArray<shape=(5840, 25, 53), dtype=int16, chunks=(2920, 25, 53)>
-```
-
-```python
-concatenated.manifest.dict()
-```
-
-```
-{'0.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000},
- '1.0.0': {'path': 'file:///work/data/air.nc', 'offset': 15419, 'length': 7738000}}
-```
-
-This concatenation property is what will allow us to combine the data from multiple netCDF files on disk into a single Zarr store containing arrays of many chunks.
-
-```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects. Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5).
-```
-
-Remember that you cannot load values from a `ManifestArray` directly.
-
-```python
-vds['air'].values
-```
-
-```python
-NotImplementedError: ManifestArrays can't be converted into numpy arrays or pandas Index objects
-```
-
-The whole point is to manipulate references to the data without actually loading any data.
-
-```{note}
-You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
-```
-
-## Virtual Datasets as Zarr Groups
-
-The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
-
-The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
-
-But before we combine our data, we might want to consider loading some variables into memory.
-
 ## Loading variables
 
-Whilst the values of virtual variables (i.e. those backed by `ManifestArray` objects) cannot be loaded into memory, you do have the option of opening specific variables from the file as loadable lazy numpy arrays, just like `xr.open_dataset` normally returns.
+Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory. Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`.
 
-Which variables to open this way can be specified using the `loadable_variables` argument:
+You can use the `loadable_variables` argument to specify variables to load as regular variables rather than virtual variables:
 
 ```python
 vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
@@ -257,14 +120,6 @@ Attributes:
 
 You can see that the dataset contains a mixture of virtual variables backed by `ManifestArray` objects (`lat` and `lon`), and loadable variables backed by (lazy) numpy arrays (`air` and `time`).
 
-Loading variables can be useful in a few scenarios:
-
-1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
-2. You want in-memory indexes to use with `xr.combine_by_coords`,
-3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
-4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
-5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
-
 The default value of `loadable_variables` is `None`, which effectively specifies all the "dimension coordinates" in the file, i.e. all one-dimensional coordinate variables whose name is the same as the name of their dimensions. Xarray indexes will also be automatically created for these variables. Together these defaults mean that your virtual dataset will be opened with the same indexes as it would have been if it had been opened with just `xarray.open_dataset()`.
 
 ```{note}
@@ -272,10 +127,10 @@ In general, it is recommended to load all of your low-dimensional variables.
 
 Whilst this does mean the original data will be duplicated in your new virtual zarr store, by loading your coordinates into memory they can be inlined in the reference file for fast reads from the virtual store.
 
-However, you should not do this for higher-dimensional variables, as then you might use a lot of storage duplicating them, defeating the point of the virtual zarr approach. Also, anything duplicated could become out of sync with the referenced origial files, especially if not using a transactional storage engine like `Icechunk`.
+However, you should not do this for higher-dimensional variables, as then you might use a lot of storage duplicating them, defeating the point of the virtual zarr approach. Also, anything duplicated could become out of sync with the referenced original files, especially if not using a transactional storage engine like `Icechunk`.
 ```
 
-### CF-encoded time variables
+### Loading CF-encoded time variables
 
 To decode time variables according to the CF conventions, you must ensure `time` is one of the `loadable_variables` and the `decode_times` argument of `open_virtual_dataset` is set to `True` (`decode_times` defaults to None).
 
@@ -320,7 +175,9 @@ ds2.to_netcdf('air2.nc')
 
 Note that we have created these in such a way that each dataset has one equally-sized chunk.
 
-TODO: Note about variable-length chunking?
+```{note}
+Currently the virtual approach requires the same chunking and encoding across datasets. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
+```
 
 ### Manual concatenation ordering
 
@@ -457,7 +314,7 @@ We can also write these references out as an [IcechunkStore](https://icechunk.io
 import icechunk
 storage = icechunk.local_filesystem_storage("./local/icechunk/store")
 
-# By default, local virtual references and public remote virtual references can be read wihtout extra configuration.
+# By default, local virtual references and public remote virtual references can be read without extra configuration.
 repo = icechunk.Repository.create(storage)
 session = repo.writable_session("main")
 

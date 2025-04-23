@@ -15,7 +15,7 @@ The main restrictions of the zarr data model are:
 - **Recognized format** - Firstly, there must be a virtualizarr reader that understands how to parse the file format that your data is in. The VirtualiZarr package ships with readers for a number of common formats, if your data is not supported you may first have to write your own dedicated virtualizarr reader which understands your format.
 - **Rectilinear arrays** - The zarr data model is one of a set of rectilinear arrays, so your data must be decodable as a set of rectilinear arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to a rectilinear array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
 - **Homogeneous chunking** - The zarr data model assumes that every chunk of data in a single array has the same chunk shape. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent chunking your data cannot be virtualized. This is a big restriction, and there are plans to relax it in future, by adding support for variable-length chunks to the zarr data model.
-- **Homogenous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. or multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
+- **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. or multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
 - **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
 - **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
 
@@ -92,6 +92,17 @@ You can also use this approach to write a reader that starts from a kerchunk-for
 
 Currently if you want to call your new reader from `virtualizarr.open_virtual_dataset` you would need to open a PR to this repository, but we plan to generalize this system to allow 3rd party libraries to plug in via an entrypoint (see [issue #245](https://github.com/zarr-developers/VirtualiZarr/issues/245)).
 
+### Why would I want to load variables using `loadable_variables`?
+
+Loading variables can be useful in a few scenarios:
+
+1. You need to look at the actual values of a multi-dimensional variable in order to decide what to do next,
+2. You want in-memory indexes to use with `xr.combine_by_coords`,
+3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
+4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
+5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
+
+
 ## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:
@@ -148,6 +159,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.virtualize.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | Zarr v3 store with `manifest.json` files                                 | ❌                                                                                                                                 | `ds.virtualize.to_zarr()`, then read via any Zarr v3 reader which implements the manifest storage transformer ZEP                                |
 | [Icechunk](https://icechunk.io/) store                          | ❌                                                                                                                                 | `ds.virtualize.to_icechunk()`, then read back via xarray (requires zarr-python v3).                                |
+
 
 ## Development
 

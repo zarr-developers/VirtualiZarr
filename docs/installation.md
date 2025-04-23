@@ -26,7 +26,7 @@ The full list of optional dependencies can be seen in the `pyproject.toml` file:
 
 ```{literalinclude} ../pyproject.toml
 :start-at: "[project.optional-dependencies]"
-:end-before: "test ="
+:end-before: "# Dependency sets under dependencies-groups are NOT available via PyPI"
 ```
 
 The compound groups allow you to install multiple sets of dependencies at once, e.g. install every file reader via
