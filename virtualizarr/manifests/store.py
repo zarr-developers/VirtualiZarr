@@ -3,7 +3,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, NotRequired, TypedDict
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -45,10 +45,10 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
 
 
 class ObjectStoreOptions(TypedDict):
-    config: S3Config
-    client_options: ClientConfig
-    retry_config: RetryConfig
-    credential_provider: callable
+    config: NotRequired[S3Config]
+    client_options: NotRequired[ClientConfig]
+    retry_config: NotRequired[RetryConfig]
+    credential_provider: NotRequired[Callable]
 
 
 @dataclass
@@ -175,8 +175,12 @@ def default_object_store(
         return obs.store.S3Store(**storage_config)
     if parsed.scheme in ["http", "https"]:
         storage_config = storage_config or {}
+        if config := storage_config.get("config"):
+            raise ValueError(
+                f"Extra storage option {config} provided for creating HTTPStore from {filepath}"
+            )
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        return obs.store.HTTPStore(base_url, **storage_config)
+        return obs.store.HTTPStore(base_url, **storage_config)  # type: ignore
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 
