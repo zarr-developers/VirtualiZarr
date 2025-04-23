@@ -365,17 +365,15 @@ class TestReadFromCustomEndpoint:
     def test_read_from_custom_endpoint(self):
         # see https://github.com/zarr-developers/VirtualiZarr/issues/559
 
-        path = "https://data.source.coop/cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
-
         vds = open_virtual_dataset(
-            path,
+            "https://data.source.coop/cworthy/oae-efficiency-atlas/data/polygon_masks.nc",
             decode_times=False,
             backend=HDFVirtualBackend,
-            reader_options=dict(
-                bucket="cworthy",
-                endpoint="https://data.source.coop",
-                skip_signature=True,
-            ),
+            reader_options={
+                "bucket": "cworthy",
+                "endpoint": "https://data.source.coop",
+                "skip_signature": True,
+            },
         )
         assert isinstance(vds, xr.Dataset)
 
