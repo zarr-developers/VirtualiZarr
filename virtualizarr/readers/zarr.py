@@ -42,8 +42,7 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
 }
 
 
-if TYPE_CHECKING:
-    import zarr
+import zarr
 
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
