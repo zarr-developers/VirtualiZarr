@@ -3,6 +3,7 @@ import pytest
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.readers.zarr import get_chunk_mapping_prefix
 from virtualizarr.tests import requires_network
 
 
@@ -73,3 +74,33 @@ class TestOpenVirtualDatasetZarr:
             ] = {}  # attributes are removed in conversion to virtual variable
             actual = vds[array].data.metadata.to_dict()
             assert expected == actual
+
+
+@pytest.mark.xfail(reason="WIP - get_chunk_mapping_prefix needs to handle scalar vals")
+def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar):
+    # Use a scalar zarr store with a /c/ representing the scalar:
+    # https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/default/index.html#description
+
+    import asyncio
+
+    asyncio.run(
+        get_chunk_mapping_prefix(
+            zarr_array=zarr_store_scalar, filepath=str(zarr_store_scalar.store_path)
+        )
+    )
+
+    # TODO: Assert this chunk_map for a scalar value makes sense
+
+    #  zarr_array.info
+    # Type               : Array
+    # Zarr format        : 3
+    # Data type          : DataType.int8
+    # Shape              : ()
+    # Chunk shape        : ()
+    # Order              : C
+    # Read-only          : False
+    # Store type         : LocalStore
+    # Filters            : ()
+    # Serializer         : BytesCodec(endian=<Endian.little: 'little'>)
+    # Compressors        : (ZstdCodec(level=0, checksum=False),)
+    # No. bytes          : 1.0
