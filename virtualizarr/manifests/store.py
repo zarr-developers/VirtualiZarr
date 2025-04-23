@@ -154,10 +154,6 @@ def default_object_store(
 ) -> ObjectStore:
     import obstore as obs
 
-    storage_config = storage_config or ObjectStoreOptions(
-        client_options={"allow_http": True},
-        config={"skip_signature": True, "virtual_hosted_style_request": True},
-    )
     parsed = urlparse(filepath)
 
     if parsed.scheme in ["", "file"]:
