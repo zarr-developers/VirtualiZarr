@@ -134,8 +134,6 @@ The whole point is to manipulate references to the data without actually loading
 You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array. We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
 ```
 
-## Virtual Datasets as Zarr Groups
+## `ManifestGroup` group
 
-The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
-
-The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. Whilst the duck-typed `ManifestArray` cannot store all of this information, an `zarr.Group` containing multiple `ManifestArray`s maps neatly to the Zarr model. This is what the `ManifestGroup` represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
