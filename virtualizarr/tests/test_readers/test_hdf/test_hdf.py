@@ -240,3 +240,14 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
         backend=HDFVirtualBackend,
     )
     assert list(vds.dims) == ["dim_0"]
+
+
+def test_caching():
+    vds = open_virtual_dataset(
+        "s3://carbonplan-share/virtualizarr/local.nc",
+        backend=HDFVirtualBackend,
+        virtual_backend_kwargs={"cache": True},
+    )
+    assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+    for name in ["time", "lat", "lon"]:
+        assert isinstance(vds[name].data, np.ndarray)

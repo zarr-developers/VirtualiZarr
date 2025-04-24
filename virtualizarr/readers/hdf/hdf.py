@@ -209,40 +209,45 @@ class HDFVirtualBackend(VirtualBackend):
     ) -> xr.Dataset:
         if h5py is None:
             raise ImportError("h5py is required for using the HDFVirtualBackend")
-        if virtual_backend_kwargs:
-            raise NotImplementedError(
-                "HDF reader does not understand any virtual_backend_kwargs"
-            )
 
         uri = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
-
-        cache = virtual_backend_kwargs.get("cache") if virtual_backend_kwargs else False
-        if cache:
-            store = default_object_store(uri, storage_config=reader_options)  # type: ignore
-            parsed = urlparse(filepath)
-            resp = store.get(parsed.netloc)
-            with tempfile.NamedTemporaryFile() as f:
-                for chunk in resp:
-                    f.write(chunk)
-            filepath = f
 
         _drop_vars: Iterable[str] = (
             [] if drop_variables is None else list(drop_variables)
         )
+        cache = virtual_backend_kwargs.get("cache") if virtual_backend_kwargs else False
+        if cache:
+            import obstore as obs
 
-        manifest_store = HDFVirtualBackend._create_manifest_store(
-            filepath=uri,
-            drop_variables=_drop_vars,
-            group=group,
-            storage_config=reader_options,
-        )
+            store = default_object_store(uri, storage_config=reader_options)  # type: ignore
+            parsed = urlparse(filepath)
+            resp = store.get(parsed.path)
+            tmpfile = tempfile.mktemp(suffix=".nc")
+            with open(tmpfile, "wb") as f:
+                for chunk in resp:
+                    f.write(chunk)
+            store = obs.store.LocalStore()
+            manifest_store = HDFVirtualBackend._create_manifest_store(
+                filepath=f.name,
+                drop_variables=_drop_vars,
+                group=group,
+                storage_config=reader_options,
+            )
+
+        else:
+            manifest_store = HDFVirtualBackend._create_manifest_store(
+                filepath=uri,
+                drop_variables=_drop_vars,
+                group=group,
+                storage_config=reader_options,
+            )
         ds = manifest_store.to_virtual_dataset(
             loadable_variables=loadable_variables,
             decode_times=decode_times,
             indexes=indexes,
         )
         if cache:
-            ds.virtualize.rename_paths(filepath, f)
+            ds.virtualize.rename_paths(filepath)
         return ds
 
     @staticmethod
