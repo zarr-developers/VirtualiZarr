@@ -30,7 +30,7 @@ vds = open_virtual_dataset('air.nc')
 We did not have to explicitly indicate the file format because {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.
 ```
 
-Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects. You can learn more about the `ManifestArray` class in the [Data Structures documentation](data_structures.md).
 
 ```python
 vds
