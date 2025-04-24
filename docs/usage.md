@@ -30,7 +30,7 @@ vds = open_virtual_dataset('air.nc')
 We did not have to explicitly indicate the file format because {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.
 ```
 
-Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects.
+Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects. You can learn more about the `ManifestArray` class in the [Data Structures documentation](data_structures.md).
 
 ```python
 vds
@@ -93,7 +93,8 @@ vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_
 
 ## Loading variables
 
-Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory. Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`.
+Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory. Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`. Loading
+the variables during virtual dataset creation has several benefits detailed in the [FAQ](faq.md#why-would-i-want-to-load-variables-using-loadable-variables).
 
 You can use the `loadable_variables` argument to specify variables to load as regular variables rather than virtual variables:
 
