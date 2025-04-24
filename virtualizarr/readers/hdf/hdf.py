@@ -231,7 +231,7 @@ class HDFVirtualBackend(VirtualBackend):
                 filepath=f.name,
                 drop_variables=_drop_vars,
                 group=group,
-                storage_config=reader_options,
+                store=store,
             )
 
         else:
