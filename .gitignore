@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 virtualizarr/_version.py
 docs/generated/
+docs/jupyter_execute/
 examples/
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode

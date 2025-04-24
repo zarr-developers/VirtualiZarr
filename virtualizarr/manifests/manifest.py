@@ -69,7 +69,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # (empty paths are allowed through as they represent missing chunks)
         return path
 
-    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra depedencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
+    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra dependencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
 
     if path.startswith("http://") or path.startswith("https://"):
         # hopefully would raise if given a malformed URL
@@ -373,7 +373,7 @@ class ChunkManifest:
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
-        # TODO fix bug here - types of path, offset, length shoudl be coerced
+        # TODO fix bug here - types of path, offset, length should be coerced
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:

@@ -141,12 +141,33 @@ def test_default_object_store_s3(minio_bucket):
 
 
 @requires_obstore
+@requires_minio
+def test_default_object_store_http(minio_bucket):
+    from obstore.store import HTTPStore
+
+    filepath = minio_bucket["endpoint"]
+    store = default_object_store(
+        filepath,
+    )
+    assert isinstance(store, HTTPStore)
+
+
+@requires_obstore
 def test_default_object_store_local(tmpdir):
     from obstore.store import LocalStore
 
     filepath = f"{tmpdir}/data.tmp"
     store = default_object_store(filepath)
     assert isinstance(store, LocalStore)
+
+
+@requires_obstore
+def test_default_region_raises():
+    file = "s3://cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
+    with pytest.raises(
+        ValueError, match="Unable to automatically determine region for bucket*"
+    ):
+        default_object_store(file)
 
 
 @requires_obstore
