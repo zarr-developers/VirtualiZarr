@@ -62,8 +62,7 @@ def zarr_store(tmpdir, request):
 def zarr_store_scalar(tmpdir):
     import zarr
 
-    # can/should we create a memorystore instead?
-    store = zarr.storage.LocalStore(str(tmpdir + "/tmp.zarr"))
+    store = zarr.storage.MemoryStore()
     zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype="int8")
     zarr_store_scalar[()] = 42
     return zarr_store_scalar
