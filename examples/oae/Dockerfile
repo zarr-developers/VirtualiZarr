@@ -21,7 +21,7 @@ RUN mkdir -p ${FUNCTION_DIR}
 # Update pip
 RUN pip install --upgrade --ignore-installed pip wheel six setuptools \
     && pip install --upgrade --no-cache-dir --ignore-installed \
-        awslambdaric \    
+        awslambdaric \
         boto3 \
         redis \
         httplib2 \
