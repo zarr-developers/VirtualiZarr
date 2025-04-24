@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import tempfile
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -11,6 +12,7 @@ from typing import (
     Tuple,
     Union,
 )
+from urllib.parse import urlparse
 
 import numpy as np
 import xarray as xr
@@ -214,6 +216,16 @@ class HDFVirtualBackend(VirtualBackend):
 
         uri = validate_and_normalize_path_to_uri(filepath, fs_root=Path.cwd().as_uri())
 
+        cache = virtual_backend_kwargs.get("cache") if virtual_backend_kwargs else False
+        if cache:
+            store = default_object_store(uri, storage_config=reader_options)  # type: ignore
+            parsed = urlparse(filepath)
+            resp = store.get(parsed.netloc)
+            with tempfile.NamedTemporaryFile() as f:
+                for chunk in resp:
+                    f.write(chunk)
+            filepath = f
+
         _drop_vars: Iterable[str] = (
             [] if drop_variables is None else list(drop_variables)
         )
@@ -229,6 +241,8 @@ class HDFVirtualBackend(VirtualBackend):
             decode_times=decode_times,
             indexes=indexes,
         )
+        if cache:
+            ds.virtualize.rename_paths(filepath, f)
         return ds
 
     @staticmethod
