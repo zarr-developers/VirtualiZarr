@@ -162,6 +162,8 @@ Attributes:
 
 ## Combining virtual datasets
 
+With VirtualiZarr, the problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+
 In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
 Let's create two new netCDF files, which we would need to open and concatenate in a specific order to represent our entire dataset.
