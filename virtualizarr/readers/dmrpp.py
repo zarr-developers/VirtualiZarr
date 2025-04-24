@@ -116,7 +116,7 @@ class DMRParser:
         Parameters
         ----------
         root: xml.ElementTree.Element
-            Root of the xml tree struture of a DMR++ file.
+            Root of the xml tree structure of a DMR++ file.
         data_filepath : str, optional
             The path to the actual data file that will be set in the chunk manifests.
             If None, the data file path is taken from the DMR++ file.
@@ -280,7 +280,7 @@ class DMRParser:
         for c in coord_tags:
             if c.text is not None:
                 coord_names.update(c.text.split(" "))
-        # Seperate and parse coords + data variables
+        # Separate and parse coords + data variables
         coord_vars: dict[str, Variable] = {}
         data_vars: dict[str, Variable] = {}
         for var_tag in self._find_var_tags(root):

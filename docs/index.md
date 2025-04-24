@@ -81,6 +81,7 @@ usage
 examples
 faq
 api
+data_structures
 releases
 contributing
 core_team_guide

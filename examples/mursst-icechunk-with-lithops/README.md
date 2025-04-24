@@ -4,7 +4,7 @@ This package provides functionality for processing MUR SST (Multi-scale Ultra-hi
 
 ## Environment + Lithops Setup
 
-1. Set up a Python environment. The below example uses [`uv`](https://docs.astral.sh/uv/), but other environment mangers should work as well:
+1. Set up a Python environment. The below example uses [`uv`](https://docs.astral.sh/uv/), but other environment managers should work as well:
 
 ```sh
 uv venv virtualizarr-lithops --python 3.11
@@ -19,7 +19,7 @@ uv pip install -r requirements.txt
 4. Check and modify as necessary compute and storage backends for [lithops](https://lithops-cloud.github.io/docs/source/configuration.html) in `lithops.yaml`.
 
 
-5. Build the lithops lambda runtime if it does not exist in your target AWS environemnt.
+5. Build the lithops lambda runtime if it does not exist in your target AWS environment.
 ```bash
 export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
 lithops runtime build -b aws_lambda -f Dockerfile vz-runtime
