@@ -247,7 +247,7 @@ class HDFVirtualBackend(VirtualBackend):
             indexes=indexes,
         )
         if cache:
-            ds.virtualize.rename_paths(filepath)
+            ds = ds.virtualize.rename_paths(filepath)
         return ds
 
     @staticmethod
