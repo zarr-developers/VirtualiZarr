@@ -45,14 +45,23 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
+    if zarr_array.shape == ():
+        # If we have a scalar array `c`
+        # https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/default/index.html#description
 
-    prefix = zarr_array.name.lstrip("/") + "/c/"
-    prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-    _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+        prefix = zarr_array.name.lstrip("/") + "/c"
+        prefix_keys = [(prefix,)]
+        _lengths = [await zarr_array.store.getsize("c")]
+        _dict_keys = ["c"]
+        _paths = [filepath + "/" + _dict_keys[0]]
 
-    chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
-    _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-    _paths = [filepath + "/" + prefix + key for key in chunk_keys]
+    else:
+        prefix = zarr_array.name.lstrip("/") + "/c/"
+        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+        _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+        chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
+        _dict_keys = [key.replace("/", ".") for key in chunk_keys]
+        _paths = [filepath + "/" + prefix + key for key in chunk_keys]
 
     _offsets = [0] * len(_lengths)
     return {
