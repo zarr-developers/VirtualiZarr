@@ -158,6 +158,25 @@ def roundtrip_as_in_memory_icechunk(
     ],
 )
 class TestRoundtrip:
+    def test_zarr_roundtrip(
+        self,
+        tmp_path,
+        roundtrip_func: RoundtripFunction,
+    ):
+        air_zarr_path = tmp_path / "air_temperature.zarr"
+        with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
+            # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
+            ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
+            with open_virtual_dataset(str(air_zarr_path)) as vds:
+                roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
+
+                # assert all_close to original dataset
+                xrt.assert_allclose(roundtrip, ds)
+
+                # assert coordinate attributes are maintained
+                for coord in ds.coords:
+                    assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
+
     @parametrize_over_hdf_backends
     def test_roundtrip_no_concat(
         self,
@@ -175,7 +194,6 @@ class TestRoundtrip:
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(str(air_nc_path), backend=hdf_backend) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
-
                 # assert all_close to original dataset
                 xrt.assert_allclose(roundtrip, ds)
 

@@ -44,6 +44,30 @@ def pytest_runtest_setup(item):
         pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
 
 
+def _xarray_subset():
+    ds = xr.tutorial.open_dataset("air_temperature")
+    return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
+
+
+@pytest.fixture(params=[2, 3])
+def zarr_store(tmpdir, request):
+    ds = _xarray_subset()
+    filepath = f"{tmpdir}/air.zarr"
+    ds.to_zarr(filepath, zarr_format=request.param)
+    ds.close()
+    return filepath
+
+
+@pytest.fixture()
+def zarr_store_scalar(tmpdir):
+    import zarr
+
+    store = zarr.storage.MemoryStore()
+    zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype="int8")
+    zarr_store_scalar[()] = 42
+    return zarr_store_scalar
+
+
 # Common codec configurations
 DELTA_CODEC = {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
 ARRAYBYTES_CODEC = {"name": "bytes", "configuration": {"endian": "little"}}

@@ -9,6 +9,8 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
+  (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 - Added experimental ManifestStore (:pull:`490`).
 - Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
   By `Tom Nicholas <https://github.com/TomNicholas>`_.

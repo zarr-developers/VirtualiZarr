@@ -1,4 +1,3 @@
-import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
 from pathlib import PosixPath
@@ -84,7 +83,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         return urlunparse(components)
 
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PosixPath(path).suffix:
+        # Question: This feels fragile, is there a better way to ID a Zarr
+        if not PosixPath(path).suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -96,7 +96,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
         _path = PosixPath(path)
 
-        if not _path.suffix:
+        if not _path.suffix and "zarr" not in path:
             raise ValueError(
                 f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
             )
@@ -435,21 +435,6 @@ class ChunkManifest:
         offsets_equal = (self._offsets == other._offsets).all()
         lengths_equal = (self._lengths == other._lengths).all()
         return paths_equal and offsets_equal and lengths_equal
-
-    @classmethod
-    def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
-        """Create a ChunkManifest from a Zarr manifest.json file."""
-
-        with open(filepath, "r") as manifest_file:
-            entries = json.load(manifest_file)
-
-        return cls(entries=entries)
-
-    def to_zarr_json(self, filepath: str) -> None:
-        """Write the manifest to a Zarr manifest.json file."""
-        entries = self.dict()
-        with open(filepath, "w") as json_file:
-            json.dump(entries, json_file, indent=4, separators=(", ", ": "))
 
     def rename_paths(
         self,

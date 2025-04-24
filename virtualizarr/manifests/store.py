@@ -18,7 +18,7 @@ from zarr.core.buffer.core import BufferPrototype
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
+from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Iterable, Mapping

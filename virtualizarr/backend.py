@@ -28,6 +28,7 @@ from virtualizarr.readers import (
     KerchunkVirtualBackend,
     NetCDF3VirtualBackend,
     TIFFVirtualBackend,
+    ZarrVirtualBackend,
 )
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.utils import _FsspecFSFromFilepath
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
 # TODO add entrypoint to allow external libraries to add to this mapping
 VIRTUAL_BACKENDS = {
     "kerchunk": KerchunkVirtualBackend,
+    "zarr": ZarrVirtualBackend,
     "dmrpp": DMRPPVirtualBackend,
     "hdf5": HDFVirtualBackend,
     "netcdf4": HDFVirtualBackend,  # note this is the same as for hdf5
@@ -70,6 +72,7 @@ class FileType(AutoName):
     fits = auto()
     dmrpp = auto()
     kerchunk = auto()
+    zarr = auto()
 
 
 def automatically_determine_filetype(
@@ -87,8 +90,7 @@ def automatically_determine_filetype(
 
     # TODO how do we handle kerchunk json / parquet here?
     if Path(filepath).suffix == ".zarr":
-        # TODO we could imagine opening an existing zarr store, concatenating it, and writing a new virtual one...
-        raise NotImplementedError()
+        return FileType.zarr
 
     # Read magic bytes from local or remote file
     fpath = _FsspecFSFromFilepath(
