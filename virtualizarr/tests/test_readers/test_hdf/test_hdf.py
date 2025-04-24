@@ -1,6 +1,7 @@
 import h5py  # type: ignore
 import numpy as np
 import pytest
+import xarray as xr
 from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
@@ -243,11 +244,29 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
 
 
 def test_caching():
-    vds = open_virtual_dataset(
+    vds_cache = open_virtual_dataset(
         "s3://carbonplan-share/virtualizarr/local.nc",
         backend=HDFVirtualBackend,
         virtual_backend_kwargs={"cache": True},
     )
-    assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+    assert isinstance(vds_cache, xr.Dataset)
+    assert vds_cache.dims == {"time": 2920, "lat": 25, "lon": 53}
+
+    vds_nocache = open_virtual_dataset(
+        "s3://carbonplan-share/virtualizarr/local.nc",
+        backend=HDFVirtualBackend,
+    )
     for name in ["time", "lat", "lon"]:
-        assert isinstance(vds[name].data, np.ndarray)
+        assert isinstance(vds_cache[name].data, np.ndarray)
+        xr.testing.assert_allclose(vds_cache[name], vds_nocache[name])
+    np.testing.assert_equal(
+        vds_cache["air"].data.manifest._paths, vds_nocache["air"].data.manifest._paths
+    )
+    np.testing.assert_equal(
+        vds_cache["air"].data.manifest._offsets,
+        vds_nocache["air"].data.manifest._offsets,
+    )
+    np.testing.assert_equal(
+        vds_cache["air"].data.manifest._lengths,
+        vds_nocache["air"].data.manifest._lengths,
+    )
