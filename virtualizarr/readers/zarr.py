@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path  # noqa
 from typing import (
+    TYPE_CHECKING,
     Any,
-    Hashable,
     Iterable,
     Mapping,
     Optional,
@@ -12,7 +12,6 @@ from typing import (
 
 import numpy as np
 from xarray import Dataset, Index
-from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import (
@@ -22,8 +21,12 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
+from virtualizarr.manifests.store import default_object_store
 from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
+
+if TYPE_CHECKING:
+    from obstore.store import ObjectStore
 
 FillValueT = bool | str | float | int | list | None
 
@@ -39,6 +42,7 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
 
 
 import zarr
+from zarr.storage import ObjectStore
 
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
@@ -111,27 +115,26 @@ async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: 
 
 async def _construct_manifest_group(
     filepath: str,
+    store: ObjectStore,
     *,
-    reader_options: Optional[dict] = None,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ):
-    reader_options = reader_options or {}
-    zarr_group = await open_group_async(
-        filepath,
-        storage_options=reader_options.get("storage_options"),
-        path=group,
-        mode="r",
-    )
+    from zarr.api.asynchronous import open_group
+
+    zarr_store = ObjectStore(store)
+
+    zarr_group = await open_group(store=zarr_store, path=group, mode="r")
 
     zarr_array_keys = [key async for key in zarr_group.array_keys()]
-
-    _drop_vars: list[Hashable] = [] if drop_variables is None else list(drop_variables)
-
     zarr_arrays = await asyncio.gather(
-        *[zarr_group.getitem(var) for var in zarr_array_keys if var not in _drop_vars]
+        *[
+            zarr_group.getitem(var)
+            for var in zarr_array_keys
+            if var not in drop_variables
+        ]
     )
-
+    # debugging note: these seem right: {'0': {'path': 'file:///private/var/folders/h9/4gj3j0315jzbrn7581t890hc0000gn/T/pytest-of-nrhagen/pytest-51/test_loadable_variables_Zarr_V0/air.zarr/time/c/0', 'offset': 0, 'length': 49}}
     manifest_arrays = await asyncio.gather(
         *[
             _construct_manifest_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
@@ -142,26 +145,31 @@ async def _construct_manifest_group(
     manifest_dict = {
         array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
     }
+
     return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
-def _construct_manifest_store(
+def _create_manifest_store(
     filepath: str,
     *,
-    reader_options: Optional[dict] = None,
+    store: ObjectStore | None = None,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestStore:
     import asyncio
 
+    if not store:
+        store = default_object_store(filepath)  # type: ignore
+
     manifest_group = asyncio.run(
         _construct_manifest_group(
+            store=store,
             filepath=filepath,
             group=group,
             drop_variables=drop_variables,
-            reader_options=reader_options,
         )
     )
+
     return ManifestStore(manifest_group)
 
 
@@ -177,15 +185,19 @@ class ZarrVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        if virtual_backend_kwargs:
+            raise NotImplementedError(
+                "Zarr reader does not understand any virtual_backend_kwargs"
+            )
         filepath = validate_and_normalize_path_to_uri(
             filepath, fs_root=Path.cwd().as_uri()
         )
+        _drop_vars: Iterable[str] = (
+            [] if drop_variables is None else list(drop_variables)
+        )
 
-        manifest_store = _construct_manifest_store(
-            filepath=filepath,
-            group=group,
-            drop_variables=drop_variables,
-            reader_options=reader_options,
+        manifest_store = _create_manifest_store(
+            filepath=filepath, drop_variables=_drop_vars, group=group
         )
 
         ds = manifest_store.to_virtual_dataset(
