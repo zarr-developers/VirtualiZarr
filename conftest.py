@@ -216,12 +216,12 @@ def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
 
 
 @pytest.fixture
-def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str]]:
+def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str, str, str]]:
     """Factory fixture to create multiple NetCDF4 files."""
 
     def create_netcdf4_files(
         encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
         filepath3 = tmp_path / "air3.nc"

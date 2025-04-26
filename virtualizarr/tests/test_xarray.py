@@ -211,7 +211,7 @@ class TestCombine:
 
     def test_2d_combine_by_coords(
         self,
-        netcdf4_files_factory_2d: Callable[[], tuple[str, str]],
+        netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
         hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
@@ -253,7 +253,7 @@ class TestCombine:
 
     def test_2d_combine_nested(
         self,
-        netcdf4_files_factory_2d: Callable[[], tuple[str, str]],
+        netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
         hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
