@@ -1,4 +1,5 @@
 import warnings
+from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -207,7 +208,14 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key,
+        key: Union[
+            int,
+            slice,
+            EllipsisType,
+            None,
+            tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+            np.ndarray,
+        ],
         /,
     ) -> "ManifestArray":
         """
@@ -219,10 +227,24 @@ class ManifestArray:
 
         if isinstance(key, BasicIndexer):
             indexer = key.tuple
-        else:
+        elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
+            indexer = (key,)
+        elif isinstance(key, tuple):
+            for dim_indexer in key:
+                if (
+                    not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
+                    or dim_indexer is None
+                ):
+                    raise TypeError(
+                        f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+                    )
             indexer = key
+        else:
+            raise TypeError(
+                f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+            )
 
-        indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
+        indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
 
         if len(indexer) != self.ndim:
             raise ValueError(
@@ -303,10 +325,26 @@ class ManifestArray:
         )
 
 
-def _possibly_expand_trailing_ellipsis(key, ndim: int):
-    if key[-1] == ...:
-        extra_slices_needed = ndim - (len(key) - 1)
-        *indexer, ellipsis = key
+def _possibly_expand_trailing_ellipsis(
+    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+    ndim: int,
+):
+    """
+    Allows for passing indexers <= the shape of the array, so long as they end with an ellipsis.
+
+    For example:
+
+    marr[3, slice(2), ...]
+
+    where marr.ndim => 3.
+    """
+    final_dim_indexer = indexer[-1]
+    if final_dim_indexer == ...:
+        if len(indexer) > ndim:
+            raise ValueError(f"Invalid indexer for array with ndim={ndim}: {indexer}")
+
+        extra_slices_needed = ndim - (len(indexer) - 1)
+        *indexer, ellipsis = indexer
         return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
     else:
-        return key
+        return indexer
