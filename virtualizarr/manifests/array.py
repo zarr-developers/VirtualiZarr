@@ -225,9 +225,15 @@ class ManifestArray:
         """
         from xarray.core.indexing import BasicIndexer
 
+        # check type is valid
         if isinstance(key, BasicIndexer):
             indexer = key.tuple
         elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
+            if isinstance(key, np.ndarray):
+                raise NotImplementedError(
+                    f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                )
+
             indexer = (key,)
         elif isinstance(key, tuple):
             for dim_indexer in key:
@@ -238,14 +244,20 @@ class ManifestArray:
                     raise TypeError(
                         f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
                     )
+
+                if isinstance(key, np.ndarray):
+                    raise NotImplementedError(
+                        f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                    )
+
             indexer = key
         else:
             raise TypeError(
                 f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
             )
 
+        # check value is valid
         indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
-
         if len(indexer) != self.ndim:
             raise ValueError(
                 f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
