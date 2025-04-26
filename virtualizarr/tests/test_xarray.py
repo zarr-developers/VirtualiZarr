@@ -181,7 +181,7 @@ class TestConcat:
 @requires_hdf5plugin
 @requires_imagecodecs
 @parametrize_over_hdf_backends
-class TestCombineUsingIndexes:
+class TestCombine:
     def test_combine_by_coords(
         self,
         netcdf4_files_factory: Callable[[], tuple[str, str]],
@@ -207,6 +207,94 @@ class TestCombineUsingIndexes:
 
             assert (
                 combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+            )
+
+    def test_2d_combine_by_coords(
+        self,
+        netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
+        hdf_backend: type[VirtualBackend],
+    ):
+        filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
+        with (
+            open_virtual_dataset(
+                filepath1,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds1,
+            open_virtual_dataset(
+                filepath2,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds2,
+            open_virtual_dataset(
+                filepath3,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds3,
+            open_virtual_dataset(
+                filepath4,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds4,
+        ):
+            combined_vds = xr.combine_by_coords(
+                [vds2, vds1, vds4, vds3],
+                coords="minimal",
+                compat="override",
+                join="override",
+            )
+            assert combined_vds.sizes == {"lat": 20, "time": 2920, "lon": 53}
+            assert (
+                combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+            )
+            assert (
+                combined_vds.xindexes["lat"].to_pandas_index().is_monotonic_decreasing
+            )
+
+    def test_2d_combine_nested(
+        self,
+        netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
+        hdf_backend: type[VirtualBackend],
+    ):
+        filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
+        with (
+            open_virtual_dataset(
+                filepath1,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds1,
+            open_virtual_dataset(
+                filepath2,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds2,
+            open_virtual_dataset(
+                filepath3,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds3,
+            open_virtual_dataset(
+                filepath4,
+                backend=hdf_backend,
+                loadable_variables=["time", "lat", "lon"],
+            ) as vds4,
+        ):
+            combined_vds = xr.combine_nested(
+                [
+                    [vds1, vds3],
+                    [vds2, vds4],
+                ],
+                concat_dim=["time", "lat"],
+                coords="minimal",
+                compat="override",
+                join="override",
+            )
+            assert combined_vds.sizes == {"lat": 20, "time": 2920, "lon": 53}
+            assert (
+                combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
+            )
+            assert (
+                combined_vds.xindexes["lat"].to_pandas_index().is_monotonic_decreasing
             )
 
     @pytest.mark.xfail(reason="Not yet implemented, see issue #18")

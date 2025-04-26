@@ -202,12 +202,43 @@ def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
     ) -> tuple[str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
+
         with xr.tutorial.open_dataset("air_temperature") as ds:
             ds1 = ds.isel(time=slice(None, 1460))
             ds2 = ds.isel(time=slice(1460, None))
+
             ds1.to_netcdf(filepath1, encoding=encoding)
             ds2.to_netcdf(filepath2, encoding=encoding)
+
         return str(filepath1), str(filepath2)
+
+    return create_netcdf4_files
+
+
+@pytest.fixture
+def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str, str, str]]:
+    """Factory fixture to create multiple NetCDF4 files."""
+
+    def create_netcdf4_files(
+        encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    ) -> tuple[str, str, str, str]:
+        filepath1 = tmp_path / "air1.nc"
+        filepath2 = tmp_path / "air2.nc"
+        filepath3 = tmp_path / "air3.nc"
+        filepath4 = tmp_path / "air4.nc"
+
+        with xr.tutorial.open_dataset("air_temperature") as ds:
+            ds1 = ds.isel(time=slice(None, 1460), lat=slice(None, 10))
+            ds2 = ds.isel(time=slice(1460, None), lat=slice(None, 10))
+            ds3 = ds.isel(time=slice(None, 1460), lat=slice(10, 20))
+            ds4 = ds.isel(time=slice(1460, None), lat=slice(10, 20))
+
+            ds1.to_netcdf(filepath1, encoding=encoding)
+            ds2.to_netcdf(filepath2, encoding=encoding)
+            ds3.to_netcdf(filepath3, encoding=encoding)
+            ds4.to_netcdf(filepath4, encoding=encoding)
+
+        return str(filepath1), str(filepath2), str(filepath3), str(filepath4)
 
     return create_netcdf4_files
 
