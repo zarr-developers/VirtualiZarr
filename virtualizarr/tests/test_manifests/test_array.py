@@ -401,6 +401,13 @@ class TestIndexing:
         with pytest.raises(ValueError, match="Invalid indexer for array with ndim"):
             marr[dodgy_indexer]
 
+    @pytest.mark.parametrize("dodgy_indexer", [np.ndarray(5)])
+    def test_index_with_numpy_array_notimplemented(self, manifest_array, dodgy_indexer):
+        marr = manifest_array(shape=(4,), chunks=(2,))
+
+        with pytest.raises(NotImplementedError):
+            marr[dodgy_indexer]
+
 
 def test_to_xarray(array_v3_metadata):
     chunks = (5, 10)
