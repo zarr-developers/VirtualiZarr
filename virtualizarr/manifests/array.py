@@ -225,6 +225,7 @@ class ManifestArray:
         """
         from xarray.core.indexing import BasicIndexer
 
+        indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]
         # check type is valid
         if isinstance(key, BasicIndexer):
             indexer = key.tuple
@@ -356,7 +357,7 @@ def _possibly_expand_trailing_ellipsis(
             raise ValueError(f"Invalid indexer for array with ndim={ndim}: {indexer}")
 
         extra_slices_needed = ndim - (len(indexer) - 1)
-        *indexer, ellipsis = indexer
-        return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
+        *indexer_as_list, ellipsis = indexer
+        return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
     else:
         return indexer
