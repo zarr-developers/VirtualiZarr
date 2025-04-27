@@ -302,12 +302,15 @@ class LithopsEagerFunctionExecutor(Executor):
         -------
         Generator of results
         """
-        import lithops  # type: ignore[import-untyped]
+        from lithops.retries import RetryingFunctionExecutor  # type: ignore[import-untyped]
 
-        fexec = lithops.FunctionExecutor()
+        with RetryingFunctionExecutor(self.lithops_client) as fexec:
 
-        futures = fexec.map(fn, *iterables)
-        results = fexec.get_result(futures)
+            # TODO retries should be exposed as a configuration arg in lithops, see https://github.com/lithops-cloud/lithops/issues/1412
+            futures = fexec.map(fn, *iterables, retries=2)
+            finished_futures = fexec.wait(futures)
+
+        results = [future.result() for future in futures]
 
         return results
 
