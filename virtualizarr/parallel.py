@@ -311,7 +311,7 @@ class LithopsEagerFunctionExecutor(Executor):
             futures = fexec.map(fn, *iterables, retries=2)
             finished_futures = fexec.wait(futures)
 
-        results = [future.result() for future in futures]
+        results = [future.result() for future in finished_futures]
 
         return results
 
