@@ -102,7 +102,6 @@ Loading variables can be useful in a few scenarios:
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
 
-
 ## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:

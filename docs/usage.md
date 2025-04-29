@@ -2,7 +2,7 @@
 
 # Usage
 
-This page explains how to use VirtualiZarr.
+This page explains how to use VirtualiZarr. To understand how the functionality actually works, read the page on [Data Structures](data_structures.md).
 
 ## Opening files as virtual datasets
 
