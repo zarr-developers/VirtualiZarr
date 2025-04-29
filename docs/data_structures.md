@@ -1,7 +1,7 @@
 
 # Data structures
 
-This page explains the data structures available as part of VirtualiZarr today, by introducing the key concepts one-by-one.
+This page explains the data structures available as part of VirtualiZarr, by introducing the key concepts one-by-one.
 
 ## Chunk Manifests
 
