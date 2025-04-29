@@ -1,3 +1,4 @@
+(data-structures)=
 
 # Data structures
 
@@ -144,10 +145,26 @@ You also cannot currently index into a `ManifestArray`, as arbitrary indexing wo
 We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
 ```
 
-## Virtual Datasets as Zarr Groups
+## Zarr Groups
 
-The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, and arbitrary dictionary-like attrs on each array. 
-Whilst the duck-typed `ManifestArray` cannot store all of this information, an `xarray.Dataset` wrapping multiple `ManifestArray`s maps neatly to the Zarr model. 
-This is what the virtual dataset we opened represents - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays.
+The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, group-level metadata and metadata on each array. 
+Whilst the a single duck-typed `ManifestArray` cannot store all of this information, a dictionary containing one or more `ManifestArrays` plus something to store the group-level metadata can.
+VirtualiZarr has two different ways of doing this internally, which are used for different purposes.
 
-The problem of combining many archival format files (e.g. netCDF files) into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+## `ManifestGroup` and `ManifestStore` classes
+
+A `ManifestGroup` is a dedicated class that contains multiple `ManifestArray`, plus group-level metadata.
+It is designed to act similar to a Zarr group, such that a named collection of one or more `ManifestGroup` objects can be combined together to form a `ManifestStore`.
+
+The `ManifestStore` (and `ManifestGroup`) classes are only used during `open_virtual_dataset`, to simplify the creation of virtual references and loading of variables from archival file formats. 
+You should therefore only use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom reader](custom_readers.md) for an unsupported archival file format.
+
+## "Virtual" Xarray Datasets
+
+An alternate way to represent the contents of an entire Zarr group is to use an `xarray.Dataset` as the container of one or more `ManifestArray` objects.
+
+This is what the virtual datasets we created in the usage guide represent - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays. 
+Any `ManifestGroup` can be converted to a virtual dataset.
+
+The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
+See the [usage guide on combining virtual datasets](usage.md#combining-virtual-datasets) for more information.
