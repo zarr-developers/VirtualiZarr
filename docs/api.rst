@@ -69,6 +69,20 @@ VirtualiZarr uses these classes to store virtual references internally.
 
     ChunkManifest
     ManifestArray
+    ManifestGroup
+
+Storage
+-------
+
+VirtualiZarr uses these classes to manage data access.
+
+.. currentmodule:: virtualizarr
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    ManifestStore
+    ObjectStoreRegistry
 
 
 Array API

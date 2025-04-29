@@ -233,11 +233,9 @@ class ManifestStore(Store):
     --------
     ManifestStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
-
-    Notes
-    -----
-    Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
+
+    #  Modified from https://github.com/zarr-developers/zarr-python/pull/1661
 
     _group: ManifestGroup
     _store_registry: ObjectStoreRegistry
