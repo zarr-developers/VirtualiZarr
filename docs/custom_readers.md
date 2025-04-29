@@ -2,7 +2,7 @@
 
 # Custom Readers
 
-This page explains how to write a custom reader for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package. 
+This page explains how to write a custom reader for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
 This is advanced material intended for 3rd-party developers, and assumes you have read the page on [Data Structures](data_structures.md).
 
 ## What is a VirtualiZarr reader?
@@ -14,7 +14,7 @@ from virtualizarr.manifests import ManifestStore
 
 def a_custom_reader(path: str, **kwargs) -> ManifestStore:
     # parse the file contents here
-    
+
     # construct the Manifeststore
     manifest_store = ManifestStore(...)
 
@@ -83,7 +83,7 @@ The recommended way to implement a custom reader is simply to parse the given fi
 Generally you want to follow steps like this:
 1. Extract file header or magic bytes to confirm the file passed is the format your reader expects.
 2. Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
-3. For each array in the file: 
+3. For each array in the file:
   4. Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
   5. Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a `ChunkManifest` object.
   6. Create one `ManifestArray` object, using the corresponding `ArrayV3Metadata` and `ChunkManifest` objects.

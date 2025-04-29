@@ -77,8 +77,8 @@ vds.virtualize.nbytes
 
 ```{important} Virtual datasets are not normal xarray datasets!
 
-Although the top-level type is still `xarray.Dataset`, they are intended only as an abstract representation of a set of data files, not as something you can do analysis with. 
-If you try to load, view, or plot any data you will get a `NotImplementedError`. 
+Although the top-level type is still `xarray.Dataset`, they are intended only as an abstract representation of a set of data files, not as something you can do analysis with.
+If you try to load, view, or plot any data you will get a `NotImplementedError`.
 Virtual datasets only support a very limited subset of normal xarray operations, particularly functions and methods for concatenating, merging and extracting variables, as well as operations for renaming dimensions and variables.
 
 _The only use case for a virtual dataset is [combining references](#combining-virtual-datasets) to files before [writing out those references to disk](#writing-virtual-stores-to-disk)._
@@ -95,8 +95,8 @@ vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_
 
 ## Loading variables
 
-Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory. 
-Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`. 
+Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory.
+Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`.
 Loading the variables during virtual dataset creation has several benefits detailed in the [FAQ](faq.md#why-would-i-want-to-load-variables-using-loadable-variables).
 
 You can use the `loadable_variables` argument to specify variables to load as regular variables rather than virtual variables:
@@ -131,7 +131,7 @@ In general, it is recommended to load all of your low-dimensional (e.g scalar an
 
 Whilst this does mean the original data will be duplicated in your new virtual zarr store, by loading your coordinates into memory they can be inlined in the reference file, or be stored as single chunks rather than large numbers of extremely tiny chunks. (Both of which will speed up loading that data back when you re-open the virtual store later.)
 
-However, you should not do this for much higher-dimensional variables, as then you might use a lot of storage duplicating them, defeating the point of the virtual zarr approach. 
+However, you should not do this for much higher-dimensional variables, as then you might use a lot of storage duplicating them, defeating the point of the virtual zarr approach.
 
 Also, anything duplicated could become out of sync with the referenced original files, especially if not using a transactional storage engine such as `Icechunk`.
 ```
@@ -167,8 +167,8 @@ Attributes:
 
 ## Combining virtual datasets
 
-In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`. 
-For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`. 
+In general we should be able to combine all the datasets from our archival files into one using some combination of calls to `xarray.concat` and `xarray.merge`.
+For combining along multiple dimensions in one call we also have `xarray.combine_nested` and `xarray.combine_by_coords`.
 If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
 Let's create two new netCDF files, which we would need to open and concatenate in a specific order to represent our entire dataset.
@@ -189,7 +189,7 @@ Currently the virtual approach requires the same chunking and encoding across da
 
 ### Manual concatenation ordering
 
-The simplest case of concatenation is when you have a set of files and you know the order in which they should be concatenated, _without looking inside the files_. 
+The simplest case of concatenation is when you have a set of files and you know the order in which they should be concatenated, _without looking inside the files_.
 In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
 ```python
@@ -233,7 +233,7 @@ combined_vds['air'].data.manifest.dict()
 ```
 
 ```{note}
-If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another. 
+If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another.
 
 In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 ```
@@ -247,8 +247,8 @@ combined_vds = xr.combine_nested([vds1, vds2], concat_dim=['time'])
 In N-dimensions the datasets would need to be passed as an N-deep nested list-of-lists, see the [xarray docs](https://docs.xarray.dev/en/stable/user-guide/combining.html#combining-along-multiple-dimensions).
 
 ```{note}
-For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them. 
-Without indexes we can avoid loading any data whatsoever from the files. 
+For manual concatenation we can actually avoid creating any xarray indexes, as we won't need them.
+Without indexes we can avoid loading any data whatsoever from the files.
 However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 ```
 
@@ -263,7 +263,7 @@ vds2 = open_virtual_dataset('air2.nc')
 combined_vds = xr.combine_by_coords([vds2, vds1])
 ```
 
-Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us. 
+Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us.
 Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional `time` coordinate has ascending values:
 
 ```python
@@ -299,14 +299,14 @@ These zarr-like references can now be interpreted by [fsspec](https://github.com
 combined_ds = xr.open_dataset('combined.json', engine="kerchunk")
 ```
 
-In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes. 
+In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes.
 This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
 
 ```{note}
 Currently you can only serialize in-memory variables to kerchunk references if they do not have any encoding.
 ```
 
-When you have many chunks, the reference file can get large enough to be unwieldy as JSON. 
+When you have many chunks, the reference file can get large enough to be unwieldy as JSON.
 In that case the references can be instead stored as parquet, which again this uses kerchunk internally.
 
 ```python
@@ -319,13 +319,13 @@ And again we can read these references using the "kerchunk" backend
 combined_ds = xr.open_dataset('combined.parquet', engine="kerchunk")
 ```
 
-By default references are placed in separate parquet files when the total number of references exceeds `record_size`. 
+By default references are placed in separate parquet files when the total number of references exceeds `record_size`.
 If there are fewer than `categorical_threshold` unique urls referenced by a particular variable, url will be stored as a categorical variable.
 
 ### Writing to an Icechunk Store
 
-We can also write these references out as an [IcechunkStore](https://icechunk.io/). 
-`Icechunk` is an open-source, cloud-native transactional tensor storage engine that is fully compatible with Zarr-Python version 3, as it conforms to the Zarr V3 specification. 
+We can also write these references out as an [IcechunkStore](https://icechunk.io/).
+`Icechunk` is an open-source, cloud-native transactional tensor storage engine that is fully compatible with Zarr-Python version 3, as it conforms to the Zarr V3 specification.
 To export our virtual dataset to an `Icechunk` Store, we simply use the {py:meth}`vds.virtualize.to_icechunk <virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk>` accessor method.
 
 ```python
@@ -344,8 +344,8 @@ session.commit("Wrote first dataset")
 
 #### Append to an existing Icechunk Store
 
-You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument. 
-This is especially useful for datasets that grow over time. 
+You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument.
+This is especially useful for datasets that grow over time.
 
 ```{important}
 Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
@@ -363,7 +363,7 @@ See the [Icechunk documentation](https://icechunk.io/icechunk-python/virtual/#cr
 
 ## Opening Kerchunk references as virtual datasets
 
-You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets. 
+You can open existing Kerchunk `json` or `parquet` references as Virtualizarr virtual datasets.
 This may be useful for manipulating them or converting existing kerchunk-formatted references to other reference storage formats such as [Icechunk](https://icechunk.io/).
 
 ```python
@@ -372,7 +372,7 @@ vds = open_virtual_dataset('combined.json', filetype='kerchunk')
 vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
 ```
 
-One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as Icechunk's format) is that paths in kerchunk references can be relative paths. 
+One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as Icechunk's format) is that paths in kerchunk references can be relative paths.
 Opening kerchunk references that contain relative local filepaths therefore requires supplying another piece of information: the directory of the `fsspec` filesystem which the filepath was defined relative to.
 
 You can dis-ambuiguate kerchunk references containing relative paths by passing the `fs_root` kwarg to `virtual_backend_kwargs`.
