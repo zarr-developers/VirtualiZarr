@@ -164,7 +164,11 @@ You should therefore only use `ManifestStore` or `ManifestGroup` directly if you
 An alternate way to represent the contents of an entire Zarr group is to use an `xarray.Dataset` as the container of one or more `ManifestArray` objects.
 
 This is what the virtual datasets we created in the usage guide represent - all the information in one entire Zarr group, but held as references to on-disk chunks instead of as in-memory arrays. 
-Any `ManifestGroup` can be converted to a virtual dataset.
+Any `ManifestGroup` (or single-group `ManifestStore`) can be converted to a virtual dataset.
 
 The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 See the [usage guide on combining virtual datasets](usage.md#combining-virtual-datasets) for more information.
+
+```{note}
+In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.
+```
