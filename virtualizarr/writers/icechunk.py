@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
@@ -328,6 +328,9 @@ def write_manifest_virtual_refs(
         ],
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
+
+    if last_updated_at is None:
+        last_updated_at = datetime.now(timezone.utc)
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
