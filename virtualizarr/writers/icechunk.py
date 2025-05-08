@@ -103,11 +103,7 @@ def dataset_to_icechunk(
     else:
         group_object = Group.from_store(store=store_path, zarr_format=3)
 
-    group_object.update_attributes(
-        {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
-    )
-
-    return write_variables_to_icechunk_group(
+    write_variables_to_icechunk_group(
         ds.variables,
         ds.attrs,
         store=store,
@@ -115,6 +111,16 @@ def dataset_to_icechunk(
         append_dim=append_dim,
         last_updated_at=last_updated_at,
     )
+
+    # note: this must come after writing individual variables else it gets overwritten
+    group_object.update_attributes(
+        {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
+    )
+    # preserve info telling xarray which variables are coordinates
+    if ds.coords:
+        group_object.update_attributes(
+            {"coordinates": " ".join(list(ds.coords))},
+        )
 
 
 def datatree_to_icechunk(
