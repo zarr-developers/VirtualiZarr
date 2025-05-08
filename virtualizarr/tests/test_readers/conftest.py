@@ -450,3 +450,11 @@ def chunked_roundtrip_hdf5_s3_file(minio_bucket, cf_array_fill_value_hdf5_file):
     filepath = "data/cf_array_fill_value.nc"
     obs.put(store, filepath, cf_array_fill_value_hdf5_file)
     return f"s3://{minio_bucket['bucket']}/{filepath}"
+
+
+@pytest.fixture()
+def big_endian_dtype_hdf5_file(tmpdir):
+    filepath = f"{tmpdir}/big_endian.nc"
+    f = h5py.File(filepath, "w")
+    f.create_dataset("data", shape=(10,), dtype=">f4")
+    return filepath

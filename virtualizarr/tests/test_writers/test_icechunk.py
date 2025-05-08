@@ -292,7 +292,7 @@ def test_write_loadable_variable(
         data=np.random.rand(3, 4),
         attrs={"units": "km"},
     )
-    vds = xr.Dataset({"air": la_v}, {"pres": ma_v})
+    vds = xr.Dataset({"air": la_v}, {"pressure": ma_v})
 
     # Icechunk checksums currently store with second precision, so we need to make sure
     # the checksum_date is at least one second in the future
@@ -307,14 +307,14 @@ def test_write_loadable_variable(
     assert air_array.attrs["units"] == "km"
     npt.assert_equal(air_array[:], la_v[:])
 
-    pres_array = root_group["pres"]
-    assert isinstance(pres_array, zarr.Array)
-    assert pres_array.shape == (3, 4)
-    assert pres_array.dtype == np.dtype("int32")
+    pressure_array = root_group["pressure"]
+    assert isinstance(pressure_array, zarr.Array)
+    assert pressure_array.shape == (3, 4)
+    assert pressure_array.dtype == np.dtype("int32")
 
     with xr.open_dataset(simple_netcdf4) as expected_ds:
         expected_array = expected_ds["foo"].to_numpy()
-        npt.assert_equal(pres_array, expected_array)
+        npt.assert_equal(pressure_array, expected_array)
 
 
 def test_checksum(
@@ -346,7 +346,7 @@ def test_checksum(
 
     ma_v = xr.Variable(data=ma, dims=["x", "y"])
 
-    vds = xr.Dataset({"pres": ma_v})
+    vds = xr.Dataset({"pressure": ma_v})
 
     # Icechunk checksums currently store with second precision, so we need to make sure
     # the checksum_date is at least one second in the future
@@ -358,14 +358,14 @@ def test_checksum(
         vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
 
     root_group = zarr.group(store=icechunk_filestore)
-    pres_array = root_group["pres"]
-    assert isinstance(pres_array, zarr.Array)
-    assert pres_array.shape == (3, 4)
-    assert pres_array.dtype == np.dtype("int32")
+    pressure_array = root_group["pressure"]
+    assert isinstance(pressure_array, zarr.Array)
+    assert pressure_array.shape == (3, 4)
+    assert pressure_array.dtype == np.dtype("int32")
 
     with xr.open_dataset(netcdf_path) as expected_ds:
         expected_array = expected_ds["foo"].to_numpy()
-        npt.assert_equal(pres_array, expected_array)
+        npt.assert_equal(pressure_array, expected_array)
 
     # Now we can overwrite the simple_netcdf4 file with new data to make sure that
     # the checksum_date is being used to determine if the data is valid
@@ -378,9 +378,9 @@ def test_checksum(
     # Now if we try to read the data back in, it should fail because the checksum_date
     # is newer than the last_updated_at
     with pytest.raises(IcechunkError):
-        pres_array = root_group["pres"]
-        assert isinstance(pres_array, zarr.Array)
-        npt.assert_equal(pres_array, arr)
+        pressure_array = root_group["pressure"]
+        assert isinstance(pressure_array, zarr.Array)
+        npt.assert_equal(pressure_array, arr)
 
 
 def test_generate_chunk_key_no_offset():

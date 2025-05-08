@@ -9,6 +9,8 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
+  (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 - Added experimental ManifestStore (:pull:`490`).
 - Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
@@ -46,6 +48,8 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
+- Added new docs page on how to write a custom reader for bespoke file formats (:issue:`452`, :pull:`580`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 - Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)
@@ -269,7 +273,7 @@ Internal Changes
   (:pull:`87`) By `Sean Harkins <https://github.com/sharkinsspatial>`_.
 - Support downstream type checking by adding py.typed marker file.
   (:pull:`306`) By `Max Jones <https://github.com/maxrjones>`_.
-- File paths in chunk manifests are now always stored as abolute URIs.
+- File paths in chunk manifests are now always stored as absolute URIs.
   (:pull:`243`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.1.0:
@@ -294,7 +298,7 @@ New Features
   By `Gustavo Hidalgo <https://github.com/ghidalgo3>`_.
 - Support empty files (:pull:`260`)
   By `Justus Magin <https://github.com/keewis>`_.
-- Can write virtual datasets to Icechunk stores using `vitualize.to_icechunk` (:pull:`256`)
+- Can write virtual datasets to Icechunk stores using `virtualize.to_icechunk` (:pull:`256`)
   By `Matt Iannucci <https://github.com/mpiannucci>`_.
 
 Breaking changes

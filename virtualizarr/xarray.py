@@ -77,7 +77,6 @@ def construct_virtual_dataset(
             return replace_virtual_with_loadable_vars(
                 fully_virtual_ds, loadable_ds, loadable_variables
             )
-
     else:
         # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
 

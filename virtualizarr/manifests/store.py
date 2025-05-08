@@ -18,7 +18,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
+from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -113,7 +113,12 @@ def _find_bucket_region(bucket_name: str) -> str:
     import requests
 
     resp = requests.head(f"https://{bucket_name}.s3.amazonaws.com")
-    return resp.headers["x-amz-bucket-region"]
+    region = resp.headers.get("x-amz-bucket-region")
+    if not region:
+        raise ValueError(
+            f"Unable to automatically determine region for bucket {bucket_name}"
+        )
+    return region
 
 
 def default_object_store(filepath: str) -> ObjectStore:
@@ -132,7 +137,9 @@ def default_object_store(filepath: str) -> ObjectStore:
             virtual_hosted_style_request=False,
             region=_find_bucket_region(bucket),
         )
-
+    if parsed.scheme in ["http", "https"]:
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        return obs.store.HTTPStore.from_url(base_url)
     raise NotImplementedError(f"{parsed.scheme} is not yet supported")
 
 

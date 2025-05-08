@@ -11,7 +11,7 @@ repos:
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.11.4
+    rev: v0.11.8
     hooks:
       # Run the linter.
       - id: ruff
@@ -22,3 +22,8 @@ repos:
     rev: ebf0b5e44d67f8beaa1cd13a0d0393ea04c6058d
     hooks:
       - id: validate-cff
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: ["-L", "fo,ihs,kake,te", "-S", "fixture"]

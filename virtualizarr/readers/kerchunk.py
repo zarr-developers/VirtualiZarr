@@ -69,7 +69,7 @@ class KerchunkVirtualBackend(VirtualBackend):
             lrm = LazyReferenceMapper(filepath, fs.fs)
 
             # build reference dict from KV pairs in LazyReferenceMapper
-            # is there a better / more preformant way to extract this?
+            # is there a better / more performant way to extract this?
             array_refs = {k: lrm[k] for k in lrm.keys()}
 
             refs = KerchunkStoreRefs({"refs": array_refs})

@@ -14,6 +14,7 @@ from virtualizarr.codecs import extract_codecs, get_codec_config
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
+    import upath
     from obstore import ReadableFile
     from obstore.store import ObjectStore
 
@@ -62,6 +63,7 @@ class _FsspecFSFromFilepath:
     filepath: str
     reader_options: Optional[dict] = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
+    upath: upath.core.UPath = field(init=False)
 
     def open_file(self) -> OpenFileType:
         """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
@@ -77,18 +79,25 @@ class _FsspecFSFromFilepath:
         with self.open_file() as of:
             return of.read(bytes)
 
+    def get_mapper(self):
+        """Returns a mapper for use with Zarr"""
+        return self.fs.get_mapper(self.filepath)
+
     def __post_init__(self) -> None:
         """Initialize the fsspec filesystem object"""
         import fsspec
         from upath import UPath
 
-        universal_filepath = UPath(self.filepath)
-        protocol = universal_filepath.protocol
+        if not isinstance(self.filepath, UPath):
+            upath = UPath(self.filepath)
+
+        self.upath = upath
+        self.protocol = upath.protocol
 
         self.reader_options = self.reader_options or {}
         storage_options = self.reader_options.get("storage_options", {})  # type: ignore
 
-        self.fs = fsspec.filesystem(protocol, **storage_options)
+        self.fs = fsspec.filesystem(self.protocol, **storage_options)
 
 
 def check_for_collisions(
@@ -168,7 +177,6 @@ def convert_v3_to_v2_metadata(
     array_filters: tuple[ArrayArrayCodec, ...]
     bytes_compressors: tuple[BytesBytesCodec, ...]
     array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
-
     # Handle compressor configuration
     compressor_config: dict[str, Any] | None = None
     if bytes_compressors:
@@ -182,6 +190,7 @@ def convert_v3_to_v2_metadata(
 
     # Handle filter configurations
     filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
+
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
         dtype=v3_metadata.data_type.to_numpy(),
