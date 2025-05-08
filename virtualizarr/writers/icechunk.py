@@ -37,8 +37,7 @@ def dataset_to_icechunk(
     Parameters
     ----------
     ds: xr.Dataset
-        Dataset to write to an Icechunk store. All variables must be backed by
-        ManifestArray objects.
+        Dataset to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
     store: IcechunkStore
         Store to write the dataset to, which must not be read-only.
     group: Optional[str]
