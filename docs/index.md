@@ -82,6 +82,7 @@ examples
 faq
 api
 data_structures
+custom_readers
 releases
 contributing
 core_team_guide
