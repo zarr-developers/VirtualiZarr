@@ -81,8 +81,8 @@ usage
 examples
 faq
 api
-data-structures
-custom-readers
+data_structures
+custom_readers
 releases
 contributing
 core_team_guide
