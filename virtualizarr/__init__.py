@@ -4,8 +4,11 @@ from virtualizarr.accessor import (
     VirtualiZarrDatasetAccessor,
     VirtualiZarrDataTreeAccessor,
 )
-from virtualizarr.backend import open_virtual_dataset, open_virtual_mfdataset
+
+# from virtualizarr.backend import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr.backend import open_virtual_mfdataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.xarray import open_virtual_dataset
 
 try:
     __version__ = _version("virtualizarr")

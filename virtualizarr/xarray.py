@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Hashable,
     MutableMapping,
@@ -8,9 +12,49 @@ from typing import (
 
 import xarray as xr
 import xarray.indexes
+from obstore.store import ObjectStore
 
+from virtualizarr.backends import Backend
 from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.utils import _FsspecFSFromFilepath
+
+if TYPE_CHECKING:
+    from obstore import ReadableFile
+
+def open_virtual_dataset(
+    filepath: str,
+    file: ReadableFile,
+    object_reader: ObjectStore, 
+    backend: Backend,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+    cftime_variables: Iterable[str] | None = None,
+    indexes: Mapping[str, xr.Index] | None = None,
+    backend_kwargs: dict | None = None,
+) -> xr.Dataset:
+    filepath = validate_and_normalize_path_to_uri(
+        filepath, fs_root=Path.cwd().as_uri()
+    )
+
+    _drop_vars: Iterable[str] = (
+        [] if drop_variables is None else list(drop_variables)
+    )
+
+    manifest_store = backend(
+        filepath=filepath,
+        file=file,
+        object_reader=object_reader,
+        **(backend_kwargs or {})
+    )
+
+    ds = manifest_store.to_virtual_dataset(
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        indexes=indexes,
+    )
+    return ds
 
 
 def construct_fully_virtual_dataset(
