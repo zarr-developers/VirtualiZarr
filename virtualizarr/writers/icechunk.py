@@ -210,7 +210,7 @@ def write_virtual_dataset_to_icechunk_group(
     # First write all the non-virtual variables
     if loadable_variables:
         loadable_ds = xr.Dataset(loadable_variables)
-        loadable_ds.to_zarr(
+        loadable_ds.to_zarr(  # type: ignore[call-overload]
             store,
             group=group.name,
             zarr_format=3,
@@ -224,7 +224,7 @@ def write_virtual_dataset_to_icechunk_group(
         write_virtual_variable_to_icechunk(
             store=store,
             group=group,
-            name=name,
+            name=name,  # type: ignore[arg-type]
             var=var,
             append_dim=append_dim,
             last_updated_at=last_updated_at,
