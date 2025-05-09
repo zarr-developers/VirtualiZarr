@@ -255,9 +255,6 @@ However, you should first be confident that the archival files actually do have 
 You can achieve both the opening and combining steps for multiple files in one go by using `open_virtual_mfdataset <virtualizarr.open_virtual_mfdataset>`.
 
 ```python
-vds1 = open_virtual_dataset('air1.nc')
-vds2 = open_virtual_dataset('air2.nc')
-
 combined_vds = xr.open_virtual_mfdataset(['air1.nc', 'air2.nc'], concat_dim='time', combine='nested')
 ```
 
@@ -275,7 +272,8 @@ combined_vds = xr.combine_by_coords([vds2, vds1])
 ```
 
 Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us.
-Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional `time` coordinate has ascending values:
+Even though we actually passed in the virtual datasets in the wrong order just now, they have been combined in the correct order such that the 1-dimensional `time` coordinate has ascending values.
+As a result our chunk manifest still has the chunks listed in the expected order:
 
 ```python
 combined_vds['air'].data.manifest.dict()
