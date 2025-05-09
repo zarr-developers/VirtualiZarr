@@ -284,6 +284,12 @@ combined_vds['air'].data.manifest.dict()
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
+Again, we can achieve both the opening and combining steps for multiple files in one go by using `open_virtual_mfdataset <virtualizarr.open_virtual_mfdataset>`, but this passing `combine='by_coords'`.
+
+```python
+combined_vds = xr.open_virtual_mfdataset(['air2.nc', 'air1.nc'], combine='by_coords')
+```
+
 ### Ordering using metadata
 
 TODO: Use preprocess to create a new index from the metadata. Requires `open_virtual_mfdataset` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
