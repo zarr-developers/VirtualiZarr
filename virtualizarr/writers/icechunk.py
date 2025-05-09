@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
+ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+
+
 def virtual_dataset_to_icechunk(
     vds: xr.Dataset,
     store: "IcechunkStore",
@@ -215,7 +218,7 @@ def write_virtual_dataset_to_icechunk_group(
             append_dim=append_dim,
         )
 
-    # Then finish by writing the virtual variables to the same group
+    # Then write the virtual variables to the same group
     for name, var in virtual_variables.items():
         write_virtual_variable_to_icechunk(
             store=store,
@@ -226,16 +229,29 @@ def write_virtual_dataset_to_icechunk_group(
             last_updated_at=last_updated_at,
         )
 
+    # finish by writing group-level attributes
     # note: group attributes must be set after writing individual variables else it gets overwritten
-    group.update_attributes(
-        {k: encode_zarr_attr_value(v) for k, v in vds.attrs.items()}
+    update_attributes(group, vds.attrs, coords=vds.coords)
+
+
+def update_attributes(zarr_node: Array | Group, attrs: dict, coords=None, encoding=None):
+    """Update metadata attributes of one Zarr node (array or group), to match how xarray does it."""
+
+    zarr_node.update_attributes(
+        {k: encode_zarr_attr_value(v) for k, v in attrs.items()}
     )
 
-    # preserve info telling xarray which variables are coordinates
-    if vds.coords:
-        group.update_attributes(
-            {"coordinates": " ".join(list(vds.coords))},
+    # preserve info telling xarray which variables are coordinates upon re-opening
+    if isinstance(zarr_node, Group) and coords:
+        zarr_node.update_attributes(
+            {"coordinates": " ".join(list(coords))},
         )
+
+    # preserve variable-level encoding
+    if isinstance(zarr_node, Array) and encoding:
+        for k, v in encoding.items():
+            if k in ENCODING_KEYS:
+                zarr_node.attrs[k] = encode_zarr_attr_value(v)
 
 
 def num_chunks(
@@ -332,14 +348,7 @@ def write_virtual_variable_to_icechunk(
             fill_value=metadata.fill_value,
         )
 
-        arr.update_attributes(
-            {k: encode_zarr_attr_value(v) for k, v in var.attrs.items()}
-        )
-
-        _encoding_keys = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
-        for k, v in var.encoding.items():
-            if k in _encoding_keys:
-                arr.attrs[k] = encode_zarr_attr_value(v)
+        update_attributes(arr, var.attrs, encoding=var.encoding)
 
     write_manifest_virtual_refs(
         store=store,
