@@ -426,22 +426,30 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
 
 def test_roundtrip_coords(manifest_array, icechunk_filestore: "IcechunkStore"):
     # regression test for GH issue #574
-    
+
     vds = xr.Dataset(
         data_vars={
-            "data": (["x", "y", "t"], manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1))),
+            "data": (
+                ["x", "y", "t"],
+                manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1)),
+            ),
         },
         coords={
-            "coord_3d": (["x", "y", "t"], manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1))),
+            "coord_3d": (
+                ["x", "y", "t"],
+                manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1)),
+            ),
             "coord_2d": (["x", "y"], manifest_array(shape=(4, 2), chunks=(2, 1))),
             "coord_1d": (["t"], manifest_array(shape=(3,), chunks=(1,))),
             "coord_0d": ([], manifest_array(shape=(), chunks=())),
-        }
+        },
     )
     vds.virtualize.to_icechunk(icechunk_filestore)
-    
+
     roundtrip = xr.open_zarr(icechunk_filestore, consolidated=False)
-    assert set(roundtrip.coords) == set(["coord_3d", "coord_2d", "coord_1d", "coord_0d"])
+    assert set(roundtrip.coords) == set(
+        ["coord_3d", "coord_2d", "coord_1d", "coord_0d"]
+    )
 
 
 class TestAppend:

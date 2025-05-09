@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List, Optional, Union, cast
 import numpy as np
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
+from zarr import Array, Group
 
 from virtualizarr.codecs import get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -15,7 +16,6 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
-from zarr import Array, Group
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -176,7 +176,7 @@ def virtual_datatree_to_icechunk(
         tree = cast(xr.DataTree, subtree)  # subtree is typed as Unknown
         at_root = tree is vdt
         vds = tree.to_dataset(write_inherited_coords or at_root)
-        
+
         store_path = StorePath(store, path="" if at_root else tree.relative_to(vdt))
         group = Group.from_store(store=store_path, zarr_format=3)
 
@@ -195,7 +195,6 @@ def write_virtual_dataset_to_icechunk_group(
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
-
     virtual_variables = {
         name: var
         for name, var in vds.variables.items()
@@ -203,7 +202,9 @@ def write_virtual_dataset_to_icechunk_group(
     }
 
     loadable_variables = {
-        name: var for name, var in vds.variables.items() if name not in virtual_variables
+        name: var
+        for name, var in vds.variables.items()
+        if name not in virtual_variables
     }
 
     # First write all the non-virtual variables
@@ -234,7 +235,9 @@ def write_virtual_dataset_to_icechunk_group(
     update_attributes(group, vds.attrs, coords=vds.coords)
 
 
-def update_attributes(zarr_node: Array | Group, attrs: dict, coords=None, encoding=None):
+def update_attributes(
+    zarr_node: Array | Group, attrs: dict, coords=None, encoding=None
+):
     """Update metadata attributes of one Zarr node (array or group), to match how xarray does it."""
 
     zarr_node.update_attributes(
