@@ -15,14 +15,14 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
+from zarr import Array, Group
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
-    from zarr import Array, Group  # type: ignore
 
 
-def dataset_to_icechunk(
-    ds: xr.Dataset,
+def virtual_dataset_to_icechunk(
+    vds: xr.Dataset,
     store: "IcechunkStore",
     *,
     group: Optional[str] = None,
@@ -30,13 +30,13 @@ def dataset_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """
-    Write an xarray dataset to an Icechunk store.
+    Write an virtual xarray dataset to an Icechunk store.
 
     Both `icechunk` and `zarr` (v3) must be installed.
 
     Parameters
     ----------
-    ds: xr.Dataset
+    vds: xr.Dataset
         Dataset to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
     store: IcechunkStore
         Store to write the dataset to, which must not be read-only.
@@ -90,7 +90,7 @@ def dataset_to_icechunk(
     if store.read_only:
         raise ValueError("supplied store is read-only")
 
-    if append_dim and append_dim not in ds.dims:
+    if append_dim and append_dim not in vds.dims:
         raise ValueError(
             f"append_dim {append_dim!r} does not match any existing dataset dimensions"
         )
@@ -102,28 +102,17 @@ def dataset_to_icechunk(
     else:
         group_object = Group.from_store(store=store_path, zarr_format=3)
 
-    write_variables_to_icechunk_group(
-        ds.variables,
-        ds.attrs,
+    write_virtual_dataset_to_icechunk_group(
+        vds=vds,
         store=store,
         group=group_object,
         append_dim=append_dim,
         last_updated_at=last_updated_at,
     )
 
-    # note: this must come after writing individual variables else it gets overwritten
-    group_object.update_attributes(
-        {k: encode_zarr_attr_value(v) for k, v in ds.attrs.items()}
-    )
-    # preserve info telling xarray which variables are coordinates
-    if ds.coords:
-        group_object.update_attributes(
-            {"coordinates": " ".join(list(ds.coords))},
-        )
 
-
-def datatree_to_icechunk(
-    dt: xr.DataTree,
+def virtual_datatree_to_icechunk(
+    vdt: xr.DataTree,
     store: "IcechunkStore",
     *,
     write_inherited_coords: bool = False,
@@ -136,9 +125,8 @@ def datatree_to_icechunk(
 
     Parameters
     ----------
-    dt: xr.DataTree
-        DataTree to write to an Icechunk store. All variables must be backed by
-        ManifestArray objects.
+    vdt: xr.DataTree
+        DataTree to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
     store: IcechunkStore
         Store to write the dataset to, which must not be read-only.
     write_inherited_coords : bool, default: False
@@ -181,46 +169,46 @@ def datatree_to_icechunk(
     if store.read_only:
         raise ValueError("supplied store is read-only")
 
-    for path, subtree in dt.subtree_with_keys:
+    for path, subtree in vdt.subtree_with_keys:
         tree = cast(xr.DataTree, subtree)  # subtree is typed as Unknown
-        at_root = tree is dt
-        ds = tree.to_dataset(write_inherited_coords or at_root)
-        store_path = StorePath(store, path="" if at_root else tree.relative_to(dt))
+        at_root = tree is vdt
+        vds = tree.to_dataset(write_inherited_coords or at_root)
+        
+        store_path = StorePath(store, path="" if at_root else tree.relative_to(vdt))
         group = Group.from_store(store=store_path, zarr_format=3)
 
-        write_variables_to_icechunk_group(
-            ds.variables,
-            ds.attrs,
+        write_virtual_dataset_to_icechunk_group(
+            vds=vds,
             store=store,
             group=group,
             last_updated_at=last_updated_at,
         )
 
 
-def write_variables_to_icechunk_group(
-    variables,
-    attrs,
-    store,
-    group: "Group",
+def write_virtual_dataset_to_icechunk_group(
+    vds: xr.Dataset,
+    store: "IcechunkStore",
+    group: Group,
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
-):
+) -> None:
     virtual_variables = {
         name: var
-        for name, var in variables.items()
+        for name, var in vds.variables.items()
         if isinstance(var.data, ManifestArray)
     }
 
     loadable_variables = {
-        name: var for name, var in variables.items() if name not in virtual_variables
+        name: var for name, var in vds.variables.items() if name not in virtual_variables
     }
 
     # First write all the non-virtual variables
     # NOTE: We set the attributes of the group before writing the dataset because the dataset
     # will overwrite the root group's attributes with the dataset's attributes. We take advantage
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
-    ds = xr.Dataset(loadable_variables, attrs=attrs)
-    ds.to_zarr(
+    loadable_ds = xr.Dataset(loadable_variables)#, attrs=attrs)
+    # TODO if no loadable_variable then we shouldn't bother with this
+    loadable_ds.to_zarr(
         store,
         group=group.name,
         zarr_format=3,
@@ -240,11 +228,22 @@ def write_variables_to_icechunk_group(
             last_updated_at=last_updated_at,
         )
 
+    # note: group attributes must be set after writing individual variables else it gets overwritten
+    group.update_attributes(
+        {k: encode_zarr_attr_value(v) for k, v in vds.attrs.items()}
+    )
+
+    # preserve info telling xarray which variables are coordinates
+    if vds.coords:
+        group.update_attributes(
+            {"coordinates": " ".join(list(vds.coords))},
+        )
+
 
 def num_chunks(
     array,
     axis: int,
-):
+) -> int:
     return array.shape[axis] // array.chunks[axis]
 
 
