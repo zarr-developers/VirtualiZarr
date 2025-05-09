@@ -78,9 +78,9 @@ class VirtualiZarrDatasetAccessor:
         ...     last_updated_at=datetime.now(),
         ... )
         """
-        from virtualizarr.writers.icechunk import dataset_to_icechunk
+        from virtualizarr.writers.icechunk import virtual_dataset_to_icechunk
 
-        dataset_to_icechunk(
+        virtual_dataset_to_icechunk(
             self.ds,
             store,
             group=group,
@@ -297,9 +297,9 @@ class VirtualiZarrDataTreeAccessor:
         ...     last_updated_at=datetime.now(),
         ... )
         """
-        from virtualizarr.writers.icechunk import datatree_to_icechunk
+        from virtualizarr.writers.icechunk import virtual_datatree_to_icechunk
 
-        datatree_to_icechunk(
+        virtual_datatree_to_icechunk(
             self.dt,
             store,
             write_inherited_coords=write_inherited_coords,
