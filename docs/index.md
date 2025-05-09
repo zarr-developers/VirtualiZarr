@@ -82,6 +82,7 @@ examples
 faq
 api
 data_structures
+scaling
 custom_readers
 releases
 contributing
