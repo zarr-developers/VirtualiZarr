@@ -192,6 +192,7 @@ def write_virtual_dataset_to_icechunk_group(
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
+
     virtual_variables = {
         name: var
         for name, var in vds.variables.items()
@@ -203,19 +204,16 @@ def write_virtual_dataset_to_icechunk_group(
     }
 
     # First write all the non-virtual variables
-    # NOTE: We set the attributes of the group before writing the dataset because the dataset
-    # will overwrite the root group's attributes with the dataset's attributes. We take advantage
-    # of xarrays zarr integration to ignore having to format the attributes ourselves.
-    loadable_ds = xr.Dataset(loadable_variables)#, attrs=attrs)
-    # TODO if no loadable_variable then we shouldn't bother with this
-    loadable_ds.to_zarr(
-        store,
-        group=group.name,
-        zarr_format=3,
-        consolidated=False,
-        mode="a",
-        append_dim=append_dim,
-    )
+    if loadable_variables:
+        loadable_ds = xr.Dataset(loadable_variables)
+        loadable_ds.to_zarr(
+            store,
+            group=group.name,
+            zarr_format=3,
+            consolidated=False,
+            mode="a",
+            append_dim=append_dim,
+        )
 
     # Then finish by writing the virtual variables to the same group
     for name, var in virtual_variables.items():
