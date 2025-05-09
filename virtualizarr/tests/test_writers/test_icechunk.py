@@ -447,9 +447,7 @@ def test_roundtrip_coords(manifest_array, icechunk_filestore: "IcechunkStore"):
     vds.virtualize.to_icechunk(icechunk_filestore)
 
     roundtrip = xr.open_zarr(icechunk_filestore, consolidated=False)
-    assert set(roundtrip.coords) == set(
-        ["coord_3d", "coord_2d", "coord_1d", "coord_0d"]
-    )
+    assert set(roundtrip.coords) == set(vds.coords)
 
 
 class TestAppend:
