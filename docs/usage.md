@@ -252,6 +252,17 @@ Without indexes we can avoid loading any data whatsoever from the files.
 However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 ```
 
+You can achieve both the opening and combining steps for multiple files in one go by using `open_virtual_mfdataset <virtualizarr.open_virtual_mfdataset>`.
+
+```python
+vds1 = open_virtual_dataset('air1.nc')
+vds2 = open_virtual_dataset('air2.nc')
+
+combined_vds = xr.open_virtual_mfdataset(['air1.nc', 'air2.nc'], concat_dim='time', combine='nested')
+```
+
+We passed `combine='nested'` to specify that we want the datasets to be combined in the order they appear, using `xr.combine_nested` under the hood.
+
 ### Ordering by coordinate values
 
 If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
