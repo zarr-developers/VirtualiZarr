@@ -7,8 +7,8 @@ from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
-    requires_obstore,
     requires_network,
+    requires_obstore,
 )
 
 

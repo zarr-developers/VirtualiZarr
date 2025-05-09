@@ -27,8 +27,8 @@ from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_minio,
-    requires_obstore,
     requires_network,
+    requires_obstore,
 )
 
 if TYPE_CHECKING:
