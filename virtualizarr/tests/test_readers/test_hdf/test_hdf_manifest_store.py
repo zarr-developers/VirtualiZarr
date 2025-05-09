@@ -8,6 +8,7 @@ from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
     requires_obstore,
+    requires_network,
 )
 
 
@@ -72,6 +73,7 @@ class TestHDFManifestStore:
         assert vds.dims == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)
 
+    @requires_network
     @requires_obstore
     def test_default_store(self):
         store = HDFVirtualBackend._create_manifest_store(
