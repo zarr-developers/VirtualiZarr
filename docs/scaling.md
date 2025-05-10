@@ -23,24 +23,27 @@ If you don't do these checks now, you might find that you deploy a large amount 
 VirtualiZarr is a tool designed for taking a large number of slow-to-access files (i.e. non-cloud-optimized data) and creating a way to make all subsequent accesses much faster (i.e. a cloud-optimized datacube).
 
 Running `open_virtual_dataset` on just one file can take a while (seconds to minutes), because for data sat in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data. 
-For a full explanation as to why [see this article](https://earthmover.io/blog/fundamentals-what-is-cloud-optimized-scientific-data)).
+(For a full explanation as to why [see this article](https://earthmover.io/blog/fundamentals-what-is-cloud-optimized-scientific-data)).
 In some cases we may find it's easiest to load basically the entire contents of the file in order to virtualize it.
 
 Therefore we should expect that running VirtualiZarr on all our data files will take a long time - we are paying this cost once up front so that our users do not have to pay it again on subsequent data accesses.
 
-However, the `open_virtual_dataset` calls for each file are completely independent, meaning this part of the problem is "embarrasingly parallelizable".
+However, the `open_virtual_dataset` calls for each file are completely independent, meaning that part of the computation is "embarrassingly parallelizable".
 
 ### Map-reduce
 
 The problem of scaling VirtualiZarr is an example of a classic map-reduce problem, with two parts:
 
-1. We first must apply the `open_virtual_dataset` function over every file we want to virtualize - this is the map step, and can be parallelized.
-2. Then we must take all the resultant virtual datasets (one per file), and combine them together into one final virtual dataset (this is the reduce step).
+1. We first must apply the `open_virtual_dataset` function over every file we want to virtualize. This is the map step, and can be parallelized.
+2. Then we must take all the resultant virtual datasets (one per file), and combine them together into one final virtual dataset. This is the reduce step.
 
-Finally we write this single virtual dataset to some persistent format, but this step is rarely the bottleneck.
+Finally we write this single virtual dataset to some persistent format.
+We have already reduced the data, so this step is a third step, the serialization step.
 
-In our case the amount of data being reduced is fairly small - each virtual dataset is hopefully only a few kBs in memory, small enough to send over the network, and even a million of them together would only require a few GB of RAM in total to hold in memory at once.
+In our case the amount of data being reduced is fairly small - each virtual dataset is hopefully only a few kBs in memory, small enough to send over the network.
+Even a million such virtual datasets together would only require a few GB of RAM in total to hold in memory at once.
 This means that as long as we can get all the virtual datasets to be sent back sucessfully, the reduce step can generally be performed in memory on a single small machine, such as a laptop.
+This avoids the need for more complicated parallelization strategies such as a tree-reduce.
 
 ## Parallelization Approaches
 
@@ -81,7 +84,7 @@ The resulting code only takes one function call to generate virtual references i
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=<choice_of_executor>)
 ```
 
-VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's `open_mfdataset`, and so has all the same options for combining.
+VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's `open_mfdataset`, and so accepts all the same keyword argument options for combining.
 
 ## Executors
 
@@ -195,12 +198,36 @@ The Kerchunk Parquet format is more scalable, but you may want to experiment wit
 
 TODO
 
-## Tips
+## Tips for success
 
-### Globbing
+Here are some assorted tips for successfully scaling VirtualiZarr.
 
-### Caching
+### Caching remote files
+
+When you call `open_virtual_dataset` on a remote file, it  needs to extract the metadata and store it in memory (the returned virtual dataset).
+
+One way to do this is to issue HTTP range requests only for each piece of metadata.
+This will download the absolute minimum amount of data in total, but issue a lot of HTTP requests, each of which can take a long time to be returned from high-latency object storage.
+This approach therefore uses the minimum amount of memory on the worker but takes more time.
+
+TODO: Describe how this is the default with obstore
+
+The other extreme is to download the entire file up front.
+This downloads all the metadata by definition, but also all the actual data, which is likely millions of times more than you need for virtualization.
+This approach usually takes a lot less time on the worker but requires the maximum amount of memory - using this approach on every file in the dataset entails downloading the entire dataset across all workers!
+
+TODO: How to enable this by passing `cache=True` to obstore
+
+There are various tricks one can use when fetching metadata, such as pre-fetching, minimum fetch sizes, or read-ahead caching strategies.
+All of these approaches will put your memory requirements somewhere in between the two extremes described above, and are not necessary for successful execution.
+
+Generally if you have access only to a limited amount of RAM you want to avoid caching to avoid running out of memory, whereas if you are able to scale out across many workers (e.g. serverlessly using lithops) your job will complete faster if you cache the files.
+Caching a file onto a worker requires that the memory available on that worker is greater than the size of the file.
 
 ### Batching
 
+You don't need to create and write virtual references for all your files in one go, and it's often better not to.
+
 ### Retries
+
+Sometimes an `open_virtual_dataset` call might fail for a transient reason, such as a failed HTTP request.
