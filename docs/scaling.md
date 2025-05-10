@@ -126,6 +126,19 @@ Using `dask.delayed` allows for parallelizing with any type of dask cluster, inc
 
 ### Lithops
 
+As the map step is totally embarrassingly parallel, it can be performed entirely using serverless functions.
+This approach allows for virtualizing N files in the same time it takes to virtualize 1 file, (assuming you can provision N concurrent serverless functions), avoiding the need to configure, scale, and shutdown a cluster.
+
+You can parallelize VirtualiZarr serverlessly by using the [lithops](http://lithops-cloud.github.io) library.
+Lithops can run on all the main cloud provider's serverless FaaS platforms.
+
+To run on lithops you need to configure lithops for the relevant compute backend (e.g. AWS Lambda), build a runtime using Docker ([example Dockerfile]() with the required dependencies), and ensure the necessary cloud permissions to run are available.
+Then you can use the `virtualizarr.parallel.LithopsEagerFunctionExecutor` simply via
+
+```python
+combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
+```
+
 ### Other
 
 ## Scalability of references formats
