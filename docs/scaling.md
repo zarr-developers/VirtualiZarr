@@ -139,7 +139,24 @@ Then you can use the `virtualizarr.parallel.LithopsEagerFunctionExecutor` simply
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
 ```
 
-### Other
+### Custom Executors
+
+You can also define your own executor to run in some other way, for example on a different serverless platform such as [Modal](https://modal.com).
+
+Your custom executor must inherit from the `concurrent.futures.Executor` ABC, and must implement the `.map` method.
+
+```python
+from concurrent.futures import Executor
+
+class CustomExecutor(Executor):
+    def map(
+        self,
+        fn: Callable,
+        *iterables: Iterable,
+    ) -> Iterator:
+
+combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=CustomExecutor)
+```
 
 ## Scalability of references formats
 
