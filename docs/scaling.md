@@ -42,7 +42,7 @@ Finally we write this single virtual dataset to some persistent format, but this
 In our case the amount of data being reduced is fairly small - each virtual dataset is hopefully only a few kBs in memory, small enough to send over the network, and even a million of them together would only require a few GB of RAM in total to hold in memory at once.
 This means that as long as we can get all the virtual datasets to be sent back sucessfully, the reduce step can generally be performed in memory on a single small machine, such as a laptop.
 
-## Approaches
+## Parallelization Approaches
 
 There are two ways you can implement a map-reduce approach to virtualization in your code.
 The first is to write it yourself, and the second is to use `open_virtual_mfdataset`.
@@ -160,13 +160,25 @@ combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=CustomExecutor)
 
 ## Memory usage
 
-- When generating references
-- When combining references
-- When writing references
+For the virtualization to succeed you need to ensure that your available memory is not exceeded at any point.
+There are 3 points at which this might happen:
+
+1. While generating references
+2. While combining references
+3. While writing references
+
+While generating references each worker calling `open_virtual_dataset` needs to avoid running out of memory.
+This primarily depends on how the file is read - see the section on [Caching](scaling.md#Caching) below.
+
+The combine step happens back on the machine on which `vz.open_virtual_mfdataset` was called, so while combining references that machine must have enough memory to hold all the virtual references at once.
+You can find the in-memory size of the references for a single virtual dataset by calling the `.nbytes` accessor method on it (not to be confused with the `.nbytes` xarray method, which returns the total size if all that data were actually loaded into memory).
+Do this for one file, and multiply by the number of files you have to estimate the total memory required for this step.
+
+Writing the combined virtual references out requires converting them to a different references format, which may have different memory requirements.
 
 ## Scalability of references formats
 
-The map-reduce operation, but you will likely still want to persist the virtual references in some format.
+After the map-reduce operation is complete, you will likely still want to persist the virtual references in some format.
 Depending on the format, this step may also have scalability concerns.
 
 ### Kerchunk
@@ -180,6 +192,8 @@ Persisting large numbers of references in these formats is therefore not recomme
 The Kerchunk Parquet format is more scalable, but you may want to experiment with the  `record_size` and `categorical_threshold` arguments to the virtualizarr `.to_kerchunk` accessor method.
 
 ### Icechunk
+
+TODO
 
 ## Tips
 
