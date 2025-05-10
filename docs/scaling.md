@@ -158,9 +158,26 @@ class CustomExecutor(Executor):
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=CustomExecutor)
 ```
 
+## Memory usage
+
+- When generating references
+- When combining references
+- When writing references
+
 ## Scalability of references formats
 
+The map-reduce operation, but you will likely still want to persist the virtual references in some format.
+Depending on the format, this step may also have scalability concerns.
+
 ### Kerchunk
+
+The Kerchunk references specification supports 3 formats - an in-memory (nested) `dict`, JSON, and Parquet.
+
+Both the in-memory Kerchunk `dict` and Kerchunk JSON formats are extremely inefficient ways to represent virtual references.
+You may well find that a virtual dataset object that easily fits in memory suddenly uses up many times more memory or space on disk when converted to one of these formats.
+Persisting large numbers of references in these formats is therefore not recommended.
+
+The Kerchunk Parquet format is more scalable, but you may want to experiment with the  `record_size` and `categorical_threshold` arguments to the virtualizarr `.to_kerchunk` accessor method.
 
 ### Icechunk
 
