@@ -112,7 +112,17 @@ combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=ThreadPoolExecutor)
 
 This can work well when virtualizing files in remote object storage because it parallelizes the issuing of HTTP GET requests for each file.
 
-### Dask
+### Dask Delayed
+
+You can paralleize using `dask.delayed` automatically by passing `parallel='dask'`.
+This will select the `virtualizarr.parallel.DaskDelayedExecutor`.
+
+```python
+combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='dask')
+```
+
+This uses the same approach that `xarray.open_mfdataset` does when `parallel=True` is passed to it.
+Using `dask.delayed` allows for parallelizing with any type of dask cluster, included a managed [Coiled](http://www.coiled.io) cluster.
 
 ### Lithops
 
