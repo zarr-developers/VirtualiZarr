@@ -252,4 +252,11 @@ Notice this workflow could also be used for appending data only as it becomes av
 
 ### Retries
 
-Sometimes an `open_virtual_dataset` call might fail for a transient reason, such as a failed HTTP request.
+Sometimes an `open_virtual_dataset` call might fail for a transient reason, such as a failed HTTP response from a server.
+In such a scenario automatically retrying the failed call might be enough to obtain success and keep the computation proceeding.
+
+If you are batching your computation then you could retry each loop iteration if any `open_virtual_dataset` calls fail, but that's potentially very inefficient, because that would also retry the successful calls.
+
+Instead what is more efficient is to use per-task retries at te executor level.
+
+TODO: We plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
