@@ -85,21 +85,44 @@ VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's
 
 ## Executors
 
-
+VirtualiZarr comes with a small selection of executors you can choose from when using `open_virtual_mfdataset`.
 
 ```{note}
 If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
 ```
 
+TODO: auto-generate API docs for all the executors here
+
 ### Serial
 
-### Threads
+The simplest executor is the `SerialExecutor`, which executes all the `open_virtual_dataset` calls in serial, not in parallel.
+It is the default executor.
+
+### Threads or Processes
+
+One way to parallelize creating virtual references from a single machine is to across multiple threads or processes.
+For this you can use the `ThreadPoolExecutor` or `ProcessPoolExecutor` class from the `concurrent.futures` module in the python standard library.
+You simply pass the executor class directly via the `parallel` kwarg.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=ThreadPoolExecutor)
+```
+
+This can work well when virtualizing files in remote object storage because it parallelizes the issuing of HTTP GET requests for each file.
 
 ### Dask
 
 ### Lithops
 
 ### Other
+
+## Scalability of references formats
+
+### Kerchunk
+
+### Icechunk
 
 ## Tips
 
