@@ -226,7 +226,29 @@ Caching a file onto a worker requires that the memory available on that worker i
 
 ### Batching
 
-You don't need to create and write virtual references for all your files in one go, and it's often better not to.
+You don't need to create and write virtual references for all your files in one go.
+
+Creating virtual references for subsets of files in batches means the memory requirements for combining and serializing each batch are lower.
+
+Batching also allows you to pick up where you left off.
+This works particularly well with Icechunk, as you can durably commit each batch of references in a separate transaction. 
+
+```python
+import icehunk as ic
+
+repo = ic.open(<repo_url>)
+
+for i, batch in enumerate(file_batches):
+    session = repo.writable_session("main")
+
+    combined_batch_vds = vz.open_virtual_mfdataset(batch)
+    
+    combined_batch_vds.virtualize.to_icechunk(session.store, append_dim=...)
+
+    session.commit(f"wrote virtual references for batch {i}")
+```
+
+Notice this workflow could also be used for appending data only as it becomes available, e.g. by replacing the for loop with a cron job.
 
 ### Retries
 
