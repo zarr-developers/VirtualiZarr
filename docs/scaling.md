@@ -2,33 +2,94 @@
 
 # Scaling
 
-This page explains how to scale up your usage of VirtualiZarr to cloud-optimize large number of files.
+This page explains how to scale up your usage of VirtualiZarr to cloud-optimize large numbers of files.
 
 ## Pre-requisites
 
 Before you attempt to use VirtualiZarr on a large number of files at once, you should check that you can successfully use the library on a small subset of your data.
 
 In particular, you should check that:
-- You can call `open_virtual_dataset` on one of your files.
-- After doing this on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors.
+- You can call `open_virtual_dataset` on one of your files, which requires there to be a reader which can interpret that file format.
+- After calling `open_virtual_dataset` on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
 - You can serialize those virtual references to some format (e.g. Kerchunk/Icechunk) and read the data back.
 - The data you read back is exactly what you would have expected to get if you read the data from the original files.
 
 If you don't do these checks now, you might find that you deploy a large amount of resources to run VirtualiZarr on many files, only to hit a problem that you could have found much earlier.
 
-## The need for parallelization
+## Strategy
 
-- Map-reduce
+### The need for parallelization
 
-## Manual parallelism
+VirtualiZarr is a tool designed for taking a large number of slow-to-access files (i.e. non-cloud-optimized data) and creating a way to make all subsequent accesses much faster (i.e. a cloud-optimized datacube).
 
-- `open_virtual_dataset`
+Running `open_virtual_dataset` on just one file can take a while (seconds to minutes), because for data sat in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data. 
+For a full explanation as to why [see this article](https://earthmover.io/blog/fundamentals-what-is-cloud-optimized-scientific-data)).
+In some cases we may find it's easiest to load basically the entire contents of the file in order to virtualize it.
 
-## The `parallel` kwarg to `open_virtual_mfdataset`
+Therefore we should expect that running VirtualiZarr on all our data files will take a long time - we are paying this cost once up front so that our users do not have to pay it again on subsequent data accesses.
+
+However, the `open_virtual_dataset` calls for each file are completely independent, meaning this part of the problem is "embarrasingly parallelizable".
+
+### Map-reduce
+
+The problem of scaling VirtualiZarr is an example of a classic map-reduce problem, with two parts:
+
+1. We first must apply the `open_virtual_dataset` function over every file we want to virtualize - this is the map step, and can be parallelized.
+2. Then we must take all the resultant virtual datasets (one per file), and combine them together into one final virtual dataset (this is the reduce step).
+
+Finally we write this single virtual dataset to some persistent format, but this step is rarely the bottleneck.
+
+In our case the amount of data being reduced is fairly small - each virtual dataset is hopefully only a few kBs in memory, small enough to send over the network, and even a million of them together would only require a few GB of RAM in total to hold in memory at once.
+This means that as long as we can get all the virtual datasets to be sent back sucessfully, the reduce step can generally be performed in memory on a single small machine, such as a laptop.
+
+## Approaches
+
+There are two ways you can implement a map-reduce approach to virtualization in your code.
+The first is to write it yourself, and the second is to use `open_virtual_mfdataset`.
+
+### Manual parallelism
+
+You are free to call `open_virtual_dataset` on your various files however you like, using any method to apply them, including applying them in parallel.
+
+For example you may want to parallelize using the [dask library](https://www.dask.org/), which you can do by wrapping each call using `dask.delayed` like this:
+
+```python
+import virtualizarr as vz
+import dask
+
+tasks = [dask.delayed(vz.open_virtual_dataset)(path) for path in filepaths]
+virtual_datasets = dask.compute(tasks)
+```
+
+This returns a list of virtual `xr.Dataset` objects, which you can then combine:
+
+```python
+import xarray as xr
+
+combined_vds = xr.combine_by_coords(virtual_datasets)
+```
+
+### The `parallel` kwarg to `open_virtual_mfdataset`
+
+Alternatively, you can use `virtualizarr.open_virtual_mfdataset`'s `parallel` keyword argument.
+
+This argument allows you to conveniently choose from a range of pre-defined parallel execution frameworks, or even pass your own executor.
+
+The resulting code only takes one function call to generate virtual references in parallel and combine them into one virtual dataset.
+
+```python
+combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=<choice_of_executor>)
+```
+
+VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's `open_mfdataset`, and so has all the same options for combining.
 
 ## Executors
 
-If you prefer to do manual parallelism you can import and use these executors directly from `virtualizarr.parallel`.
+
+
+```{note}
+If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
+```
 
 ### Serial
 
@@ -41,6 +102,8 @@ If you prefer to do manual parallelism you can import and use these executors di
 ### Other
 
 ## Tips
+
+### Globbing
 
 ### Caching
 
