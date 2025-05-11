@@ -42,7 +42,7 @@ We have already reduced the data, so this step is a third step, the serializatio
 
 In our case the amount of data being reduced is fairly small - each virtual dataset is hopefully only a few kBs in memory, small enough to send over the network.
 Even a million such virtual datasets together would only require a few GB of RAM in total to hold in memory at once.
-This means that as long as we can get all the virtual datasets to be sent back sucessfully, the reduce step can generally be performed in memory on a single small machine, such as a laptop.
+This means that as long as we can get all the virtual datasets to be sent back successfully, the reduce step can generally be performed in memory on a single small machine, such as a laptop.
 This avoids the need for more complicated parallelization strategies such as a tree-reduce.
 
 ## Parallelization Approaches
@@ -117,7 +117,7 @@ This can work well when virtualizing files in remote object storage because it p
 
 ### Dask Delayed
 
-You can paralleize using `dask.delayed` automatically by passing `parallel='dask'`.
+You can parallelize using `dask.delayed` automatically by passing `parallel='dask'`.
 This will select the `virtualizarr.parallel.DaskDelayedExecutor`.
 
 ```python
