@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Iterator, Mapping
+from time import datetime
+from typing import TYPE_CHECKING, Iterator, Mapping, Optional
 
 import xarray as xr
 from zarr.core.group import GroupMetadata
 
 from virtualizarr.manifests import ManifestArray
+
+if TYPE_CHECKING:
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 class ManifestGroup(
@@ -130,4 +134,71 @@ class ManifestGroup(
             virtual_vars=virtual_vars,
             coord_names=coord_names,
             attrs=attributes,
+        )
+
+    @classmethod
+    def from_virtual_dataset(
+        cls,
+        vds: xr.Dataset,
+    ) -> "ManifestGroup":
+        """
+        Create a new ManifestGroup from a virtual dataset object.
+
+        The virtual dataset should contain only virtual variables, i.e. those backed by ManifestArrays.
+
+        Parameters
+        ----------
+        vds: xr.Dataset
+            Virtual dataset, containing only virtual variables.
+        """
+
+        for name, var in vds.variables.items():
+            if not isinstance(var.data, ManifestArray):
+                raise TypeError(
+                    f"Cannot convert a dataset containing a loadable variable directly to a ManifestGroup, but found variable {name} has type {type(var.data)}"
+                )
+
+        manifestarrays = {name: var.data for name, var in vds.variables.items()}
+
+        attributes = vds.attrs
+        # TODO test this is correct
+        attributes["dimension_names"] = " ".join(list(vds.dims))
+        # TODO test this constructor round-trips coordinates
+        attributes["coordinates"] = " ".join(list(vds.coords))
+
+        return cls(arrays=manifestarrays, attributes=attributes)
+
+    def to_icechunk(
+        store: "IcechunkStore",
+        group: Optional[str] = None,
+        append_dim: Optional[str] = None,
+        last_updated_at: Optional[datetime] = None,
+    ) -> None:
+        """
+        Write the contents of this ManifestGroup into an Icechunk Store as virtual chunks.
+
+        Parameters
+        ----------
+        store: IcechunkStore
+            Store to write dataset into.
+        group: str, optional
+            Path of the group to write the dataset into (default: the root group).
+        append_dim: str, optional
+            Dimension along which to append the virtual dataset.
+        last_updated_at: datetime, optional
+            Datetime to use as a checksum for any virtual chunks written to the store
+            with this operation.  When not provided, no check is performed.
+
+        Raises
+        ------
+        ValueError
+            If the store is read-only.
+        """
+        from virtualizarr.writers.icechunk import write_manifestgroup_to_icechunk
+
+        write_manifestgroup_to_icechunk(
+            store=store,
+            group=group,
+            append_dim=append_dim,
+            last_updated_at=last_updated_at,
         )
