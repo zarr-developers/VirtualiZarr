@@ -304,7 +304,7 @@ TODO: Use preprocess to create a new index from the metadata. Requires `open_vir
 
 Combining a large number (e.g. 1000's) of virtual datasets at once  should be very quick (a few seconds), as we are just manipulating a few kBs of metadata in memory.
 
-However creating 1000's of virtual datasets at once can take a very long time. 
+However creating 1000's of virtual datasets at once can take a very long time.
 (If that was quick there would be little need for this library!)
 See the page on [Scaling](scaling.md) for tips on how to create large numbers of virtual datasets at once.
 

@@ -22,7 +22,7 @@ If you don't do these checks now, you might find that you deploy a large amount 
 
 VirtualiZarr is a tool designed for taking a large number of slow-to-access files (i.e. non-cloud-optimized data) and creating a way to make all subsequent accesses much faster (i.e. a cloud-optimized datacube).
 
-Running `open_virtual_dataset` on just one file can take a while (seconds to minutes), because for data sat in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data. 
+Running `open_virtual_dataset` on just one file can take a while (seconds to minutes), because for data sat in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data.
 (For a full explanation as to why [see this article](https://earthmover.io/blog/fundamentals-what-is-cloud-optimized-scientific-data)).
 In some cases we may find it's easiest to load basically the entire contents of the file in order to virtualize it.
 
@@ -231,7 +231,7 @@ You don't need to create and write virtual references for all your files in one 
 Creating virtual references for subsets of files in batches means the memory requirements for combining and serializing each batch are lower.
 
 Batching also allows you to pick up where you left off.
-This works particularly well with Icechunk, as you can durably commit each batch of references in a separate transaction. 
+This works particularly well with Icechunk, as you can durably commit each batch of references in a separate transaction.
 
 ```python
 import icehunk as ic
@@ -242,7 +242,7 @@ for i, batch in enumerate(file_batches):
     session = repo.writable_session("main")
 
     combined_batch_vds = vz.open_virtual_mfdataset(batch)
-    
+
     combined_batch_vds.virtualize.to_icechunk(session.store, append_dim=...)
 
     session.commit(f"wrote virtual references for batch {i}")
