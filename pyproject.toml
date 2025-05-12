@@ -227,7 +227,7 @@ module = [
     "minio",
     "numcodecs.*",
     "ujson",
-    "zarr",
+    "zarr>=3.0.7",
     "requests",
 ]
 ignore_missing_imports = true
