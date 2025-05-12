@@ -2,7 +2,6 @@ import functools
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -87,12 +86,12 @@ from virtualizarr.tests.utils import obstore_http, obstore_local, obstore_s3
 class TestOpenVirtualDatasetIndexes:
     @pytest.mark.xfail(reason="not yet implemented")
     def test_specify_no_indexes(self, netcdf4_file):
-        backend_args = obstore_local(filepath=netcdf4_file)
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         vds = open_virtual_dataset(
             filepath=netcdf4_file,
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend, 
+            object_reader=object_reader,
+            backend=hdf_backend, 
             indexes={}
         )
         assert vds.indexes == {}
@@ -104,13 +103,13 @@ class TestOpenVirtualDatasetIndexes:
     ):
         loadable_variables = ["time", "lat"]
         
-        backend_args = obstore_local(filepath=netcdf4_file)
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         with (
             open_virtual_dataset(
                 filepath=netcdf4_file,
-                file=backend_args.file,
-                object_reader=backend_args.object_reader,
-                backend=backend,
+                object_reader=object_reader,
+                backend=hdf_backend,
                 indexes=None,
                 loadable_variables=loadable_variables,
             ) as vds,
@@ -155,12 +154,12 @@ def test_cftime_index(tmp_path: Path):
     )
     ds.to_netcdf(filepath)
 
-    backend_args = obstore_local(filepath=filepath)
+    object_reader = obstore_local(filepath=filepath)
+    hdf_backend = backend()
     with open_virtual_dataset(
         filepath=filepath,
-        file=backend_args.file,
-        object_reader=backend_args.object_reader,
-        backend=backend,
+        object_reader=object_reader,
+        backend=hdf_backend,
         loadable_variables=["time", "lat", "lon"],
     ) as vds:
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
@@ -172,24 +171,24 @@ def test_cftime_index(tmp_path: Path):
 
 class TestOpenVirtualDatasetAttrs:
     def test_drop_array_dimensions(self, netcdf4_file):
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         # regression test for GH issue #150
-        backend_args = obstore_local(filepath=netcdf4_file)
         vds = open_virtual_dataset(
             filepath=netcdf4_file, 
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
+            object_reader=object_reader,
+            backend=hdf_backend,
         )
         assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
 
     def test_coordinate_variable_attrs_preserved(self, netcdf4_file):
         # regression test for GH issue #155
-        backend_args = obstore_local(filepath=netcdf4_file)
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         vds = open_virtual_dataset(
             filepath=netcdf4_file, 
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
+            object_reader=object_reader,
+            backend=hdf_backend,
         )
         assert vds["lat"].attrs == {
             "standard_name": "latitude",
@@ -201,22 +200,22 @@ class TestOpenVirtualDatasetAttrs:
 
 class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file):
-        backend_args = obstore_local(filepath=netcdf4_file)
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         with open_virtual_dataset(
             filepath=netcdf4_file, 
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
+            object_reader=object_reader,
+            backend=hdf_backend,
         ) as vds:
             assert set(vds.coords) == {"time", "lat", "lon"}
 
     def test_var_attr_coords(self, netcdf4_file_with_2d_coords):
-        backend_args = obstore_local(filepath=netcdf4_file_with_2d_coords)
+        object_reader = obstore_local(filepath=netcdf4_file_with_2d_coords)
+        hdf_backend = backend()
         with open_virtual_dataset(
             filepath=netcdf4_file_with_2d_coords, 
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
+            object_reader=object_reader,
+            backend=hdf_backend,
 
         ) as vds:
             expected_dimension_coords = ["ocean_time", "s_rho"]
@@ -246,13 +245,13 @@ class TestReadFromS3:
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
         filepath = "s3://carbonplan-share/virtualizarr/local.nc"
-        backend_args = obstore_s3(filepath=filepath, region="us-west-2")
+        object_reader = obstore_s3(filepath=filepath, region="us-west-2")
+        hdf_backend = backend()
         with open_virtual_dataset(
             filepath=filepath,
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
+            object_reader=object_reader,
             indexes=indexes,
-            backend=backend,
+            backend=hdf_backend,
         ) as vds:
             assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
 
@@ -323,14 +322,15 @@ class TestReadFromURL:
             # with pytest.raises(NotImplementedError):
                 # open_virtual_dataset(url, reader_options={})
         elif filetype == "hdf5":
-            backend_args = obstore_http(filepath=url)
-            with open_virtual_dataset(
-                filepath=url,
-                file=backend_args.file,
-                object_reader=backend_args.object_reader,
+            object_reader = obstore_http(filepath=url)
+            hdf_backend = backend(
                 group="science/LSAR/GCOV/grids/frequencyA",
                 drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
-                backend=backend,
+            )
+            with open_virtual_dataset(
+                filepath=url,
+                object_reader=object_reader,
+                backend=hdf_backend,
             ) as vds:
                 assert isinstance(vds, xr.Dataset)
         # else:
@@ -376,26 +376,26 @@ class TestReadFromURL:
 
 class TestOpenVirtualDatasetHDFGroup:
     def test_open_empty_group(self, empty_netcdf4_file):
-        backend_args = obstore_local(filepath=empty_netcdf4_file)
+        object_reader = obstore_local(filepath=empty_netcdf4_file)
+        hdf_backend = backend()
         with open_virtual_dataset(
             filepath=empty_netcdf4_file, 
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend
+            object_reader=object_reader,
+            backend=hdf_backend,
         ) as vds:
             assert isinstance(vds, xr.Dataset)
             expected = Dataset()
             xrt.assert_identical(vds, expected)
 
     def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
-        backend_args = obstore_local(filepath=netcdf4_file_with_data_in_multiple_groups)
-        backend_kwargs = {"group": "subgroup"} 
+        object_reader = obstore_local(filepath=netcdf4_file_with_data_in_multiple_groups)
+        hdf_backend = backend(
+            group = "subgroup"
+        )
         with open_virtual_dataset(
             filepath=netcdf4_file_with_data_in_multiple_groups,
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
-            backend_kwargs=backend_kwargs
+            object_reader=object_reader,
+            backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["bar"]
             assert isinstance(vds["bar"].data, ManifestArray)
@@ -407,14 +407,12 @@ class TestOpenVirtualDatasetHDFGroup:
         netcdf4_file_with_data_in_multiple_groups,
         group,
     ):
-        backend_args = obstore_local(filepath=netcdf4_file_with_data_in_multiple_groups)
-        backend_kwargs = {"group": group} 
+        object_reader = obstore_local(filepath=netcdf4_file_with_data_in_multiple_groups)
+        hdf_backend = backend(group=group)
         with open_virtual_dataset(
             filepath=netcdf4_file_with_data_in_multiple_groups,
-            file=backend_args.file,
-            object_reader=backend_args.object_reader,
-            backend=backend,
-            backend_kwargs=backend_kwargs
+            object_reader=object_reader,
+            backend=hdf_backend,
         ) as vds:
             assert list(vds.variables) == ["foo"]
             assert isinstance(vds["foo"].data, ManifestArray)
@@ -436,14 +434,14 @@ class TestLoadVirtualDataset:
     def test_loadable_variables(
         self, netcdf4_file, loadable_variables, expected_loadable_variables
     ):
-        backend_args = obstore_local(filepath=netcdf4_file)
+        object_reader = obstore_local(filepath=netcdf4_file)
+        hdf_backend = backend()
         with (
             open_virtual_dataset(
                 filepath=netcdf4_file,
-                file=backend_args.file,
-                object_reader=backend_args.object_reader,
+                object_reader=object_reader,
                 loadable_variables=loadable_variables,
-                backend=backend,
+                backend=hdf_backend,
             ) as vds,
             xr.open_dataset(netcdf4_file, decode_times=True) as ds,
         ):
@@ -490,28 +488,24 @@ class TestLoadVirtualDataset:
             # )
 
     def test_group_kwarg(self, hdf5_groups_file):
-        backend_args = obstore_local(filepath=hdf5_groups_file)
-        backend_kwargs = {"group": "doesnt_exist"}
+        object_reader = obstore_local(filepath=hdf5_groups_file)
+        hdf_backend = backend(group="doesnt_exist")
         with pytest.raises(KeyError, match="doesn't exist"):
             with open_virtual_dataset(
                 filepath=hdf5_groups_file,
-                file=backend_args.file,
-                object_reader=backend_args.object_reader,
-                backend=backend,
-                backend_kwargs=backend_kwargs,
+                object_reader=object_reader,
+                backend=hdf_backend,
             ):
                 pass
 
-        backend_kwargs = {"group": "test/group"}
+        hdf_backend = backend(group="test/group")
         vars_to_load = ["air", "time"]
         with (
             open_virtual_dataset(
                 filepath=hdf5_groups_file,
-                file=backend_args.file,
-                object_reader=backend_args.object_reader,
+                object_reader=object_reader,
                 loadable_variables=vars_to_load,
-                backend=backend,
-                backend_kwargs=backend_kwargs,
+                backend=hdf_backend,
             ) as vds,
                 xr.open_dataset(hdf5_groups_file, group="test/group") as full_ds,
         ):
@@ -519,31 +513,41 @@ class TestLoadVirtualDataset:
                 if name in vars_to_load:
                     xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
-    @pytest.mark.xfail(reason="patches a function which no longer exists")
-    @patch("virtualizarr.translators.kerchunk.read_kerchunk_references_from_file")
-    def test_open_virtual_dataset_passes_expected_args(
-        self, mock_read_kerchunk, netcdf4_file
-    ):
-        reader_options = {"option1": "value1", "option2": "value2"}
-        with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
-            pass
-        args = {
-            "filepath": netcdf4_file,
-            "filetype": None,
-            "group": None,
-            "reader_options": reader_options,
-        }
-        mock_read_kerchunk.assert_called_once_with(**args)
+    # @pytest.mark.xfail(reason="patches a function which no longer exists")
+    # @patch("virtualizarr.translators.kerchunk.read_kerchunk_references_from_file")
+    # def test_open_virtual_dataset_passes_expected_args(
+        # self, mock_read_kerchunk, netcdf4_file
+    # ):
+        # reader_options = {"option1": "value1", "option2": "value2"}
+        # with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
+            # pass
+        # args = {
+            # "filepath": netcdf4_file,
+            # "filetype": None,
+            # "group": None,
+            # "reader_options": reader_options,
+        # }
+        # mock_read_kerchunk.assert_called_once_with(**args)
 
-    @parametrize_over_hdf_backends
-    def test_open_dataset_with_empty(self, hdf5_empty, hdf_backend):
-        with open_virtual_dataset(hdf5_empty, backend=hdf_backend) as vds:
+    def test_open_dataset_with_empty(self, hdf5_empty):
+        object_reader = obstore_local(filepath=hdf5_empty)
+        hdf_backend = backend()
+        with open_virtual_dataset(
+            filepath=hdf5_empty,
+            object_reader=object_reader,
+            backend=hdf_backend
+        ) as vds:
             assert vds.empty.dims == ()
             assert vds.empty.attrs == {"empty": "true"}
 
-    @parametrize_over_hdf_backends
-    def test_open_dataset_with_scalar(self, hdf5_scalar, hdf_backend):
-        with open_virtual_dataset(hdf5_scalar, backend=hdf_backend) as vds:
+    def test_open_dataset_with_scalar(self, hdf5_scalar):
+        object_reader = obstore_local(filepath=hdf5_scalar)
+        hdf_backend = backend()
+        with open_virtual_dataset(
+            filepath=hdf5_scalar,
+            object_reader=object_reader,
+            backend=hdf_backend
+        ) as vds:
             assert vds.scalar.dims == ()
             assert vds.scalar.attrs == {"scalar": "true"}
 

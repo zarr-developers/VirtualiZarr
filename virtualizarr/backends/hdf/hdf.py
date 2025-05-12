@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -11,6 +12,7 @@ from typing import (
 )
 
 import numpy as np
+from obstore import open_reader
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
@@ -160,26 +162,35 @@ def _construct_manifest_group(
                     manifest_dict[key] = variable
     return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
-def backend(
-    filepath: str,
-    file: ReadableFile, 
-    object_reader: ObjectStore,
-    *,
-    group: str | None = None,
-    drop_variables: Iterable[str] | None = None,
-) -> ManifestStore:
-    if h5py is None:
-        raise ImportError("h5py is required for using the hdf backend")
-    # Create a group containing dataset level metadata and all the manifest arrays
-    manifest_group = _construct_manifest_group(
-        filepath=filepath,
-        file=file,
-        group=group,
-        drop_variables=drop_variables,
-    )
-    registry = ObjectStoreRegistry({filepath: object_reader})
-    # Convert to a manifest store
-    return ManifestStore(store_registry=registry, group=manifest_group)
+class backend:
+    def __init__(
+        self, 
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+    ):
+        self.group = group
+        self.drop_variables = drop_variables
+
+    def __call__(
+        self,
+        filepath: str,
+        object_reader: ObjectStore,
+    ) -> ManifestStore:
+        if h5py is None:
+            raise ImportError("h5py is required for using the hdf backend")
+        # Create a group containing dataset level metadata and all the manifest arrays
+
+        filename = os.path.basename(filepath) 
+        file = open_reader(store=object_reader, path=filename)
+        manifest_group = _construct_manifest_group(
+            filepath=filepath,
+            file=file,
+            group=self.group,
+            drop_variables=self.drop_variables,
+        )
+        registry = ObjectStoreRegistry({filepath: object_reader})
+        # Convert to a manifest store
+        return ManifestStore(store_registry=registry, group=manifest_group)
 
 def _dataset_chunk_manifest(
     filepath: str,
