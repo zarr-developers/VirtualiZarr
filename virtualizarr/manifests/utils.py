@@ -163,7 +163,8 @@ def check_no_partial_chunks_on_concat_axis(
     """Check that there are no partial chunks along the concatenation axis"""
 
     remainders = [
-        bool(shape[axis] // chunk[axis]) for shape, chunk in zip(shapes, chunks)
+        True if (shape[axis] % chunk[axis]) > 0 else False
+        for shape, chunk in zip(shapes, chunks)
     ]
 
     if any(remainders):
