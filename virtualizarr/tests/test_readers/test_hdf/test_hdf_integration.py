@@ -14,7 +14,6 @@ from virtualizarr.tests import (
 )
 from virtualizarr.tests.test_integration import (
     roundtrip_as_in_memory_icechunk,
-    roundtrip_as_kerchunk_dict,
 )
 
 
@@ -124,7 +123,8 @@ def test_concat_with_partial_boundary_chunks(tmpdir, tmp_path):
         vds[ind] = virtualizarr.open_virtual_dataset(
             f"{tmpdir}/ds{ind}.nc", backend=HDFVirtualBackend
         )
-    vds_combined = xr.concat(list(vds.values()), dim="lat")
-    observed = roundtrip_as_kerchunk_dict(vds_combined, tmp_path).load()
-    expected = xr.concat(list(ds.values()), dim="lat").load()
-    xr.testing.assert_allclose(expected, observed)
+    with pytest.raises(
+        ValueError,
+        match=r"Cannot concatenate arrays with shapes \[(.*?)\]  and chunks \[(.*?)\] because only regular chunk shapes are currently supported\.",
+    ):
+        xr.concat(list(vds.values()), dim="lat")

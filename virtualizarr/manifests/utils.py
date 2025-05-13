@@ -157,6 +157,21 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
     return tuple(new_l)
 
 
+def check_no_partial_chunks_on_concat_axis(
+    shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
+):
+    """Check that there are no partial chunks along the concatenation axis"""
+
+    remainders = [
+        bool(shape[axis] // chunk[axis]) for shape, chunk in zip(shapes, chunks)
+    ]
+
+    if any(remainders):
+        raise ValueError(
+            f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}  and chunks {[chunk for chunk in chunks]} because only regular chunk shapes are currently supported."
+        )
+
+
 def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
     """Check that shapes are compatible for concatenation"""
 
