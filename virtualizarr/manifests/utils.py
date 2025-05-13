@@ -167,10 +167,11 @@ def check_no_partial_chunks_on_concat_axis(
         if shape[axis] % chunk[axis] > 0
     ]
 
-    raise ValueError(
-        "Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, "
-        + f"but these arrays have partial chunks along the concatenation axis: {', '.join(partial_info)}."
-    )
+    if partial_info:
+        raise ValueError(
+            "Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, "
+            + f"but these arrays have partial chunks along the concatenation axis: {', '.join(partial_info)}."
+        )
 
 
 def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
