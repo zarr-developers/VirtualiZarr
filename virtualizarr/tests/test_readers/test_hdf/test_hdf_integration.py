@@ -1,8 +1,6 @@
-import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from dask import array as da
 
 import virtualizarr
 from virtualizarr.readers.hdf import HDFVirtualBackend
@@ -103,28 +101,3 @@ class TestIntegration:
                     vds, tmp_path, decode_times=False
                 )
                 xrt.assert_equal(ds, roundtrip)
-
-
-def chunked_ds(arr):
-    x = da.from_array(arr, chunks=(3, 4))
-    x = xr.DataArray(data=x, dims=("lat", "lon"), name="x")
-    ds = xr.Dataset({"x": x})
-    return ds
-
-
-def test_concat_with_partial_boundary_chunks(tmpdir, tmp_path):
-    "Concatenate two datasets to/from NetCDF with a partial boundary chunk with the HDF reader and ManifestStore"
-    encoding = {"x": {"zlib": False, "chunksizes": (3, 4), "original_shape": (4, 4)}}
-    ds = {}
-    vds = {}
-    for ind, arr in enumerate([np.arange(16), np.arange(16, 32)]):
-        ds[ind] = chunked_ds(arr.reshape(4, 4))
-        ds[ind].to_netcdf(f"{tmpdir}/ds{ind}.nc", encoding=encoding)
-        vds[ind] = virtualizarr.open_virtual_dataset(
-            f"{tmpdir}/ds{ind}.nc", backend=HDFVirtualBackend
-        )
-    with pytest.raises(
-        ValueError,
-        match=r"Cannot concatenate arrays with shapes \[(.*?)\]  and chunks \[(.*?)\] because only regular chunk shapes are currently supported\.",
-    ):
-        xr.concat(list(vds.values()), dim="lat")

@@ -168,7 +168,8 @@ def check_no_partial_chunks_on_concat_axis(
     ]
 
     raise ValueError(
-        f"Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, but these arrays have partial chunks: {', '.join(partial_info)}."
+        "Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, "
+        + f"but these arrays have partial chunks along the concatenation axis: {', '.join(partial_info)}."
     )
 
 

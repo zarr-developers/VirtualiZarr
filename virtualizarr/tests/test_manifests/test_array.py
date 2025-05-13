@@ -385,6 +385,17 @@ def test_refuse_combine(array_v3_metadata):
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
 
+    metadata_variable_chunk = array_v3_metadata(
+        shape=shape,
+        chunks=(4, 1, 19),
+    )
+    marr = ManifestArray(metadata=metadata_variable_chunk, chunkmanifest=chunkmanifest2)
+    with pytest.raises(
+        ValueError,
+        match="Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, but these arrays have partial chunks along the concatenation axis: Array 0 has length 5 which is is not evenly divisible by chunk length 4, Array 1 has length 5 which is is not evenly divisible by chunk length 4.",
+    ):
+        np.concatenate([marr, marr], axis=0)
+
 
 class TestIndexing:
     @pytest.mark.parametrize("dodgy_indexer", ["string", [], (5, "string")])
