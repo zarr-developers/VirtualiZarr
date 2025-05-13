@@ -162,12 +162,11 @@ def check_no_partial_chunks_on_concat_axis(
 ):
     """Check that there are no partial chunks along the concatenation axis"""
 
-    remainders = [
-        True if (shape[axis] % chunk[axis]) > 0 else False
-        for shape, chunk in zip(shapes, chunks)
-    ]
+    partial_chunks = any(
+        shape[axis] % chunk[axis] > 0 for shape, chunk in zip(shapes, chunks)
+    )
 
-    if any(remainders):
+    if partial_chunks:
         raise ValueError(
             f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}  and chunks {[chunk for chunk in chunks]} because only regular chunk shapes are currently supported."
         )
