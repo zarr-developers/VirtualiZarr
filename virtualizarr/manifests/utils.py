@@ -161,17 +161,14 @@ def check_no_partial_chunks_on_concat_axis(
     shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
 ):
     """Check that there are no partial chunks along the concatenation axis"""
-    partial_info = [
-        f"Array {i} has length {shape[axis]} which is is not evenly divisible by chunk length {chunk[axis]}"
-        for i, (shape, chunk) in enumerate(zip(shapes, chunks))
-        if shape[axis] % chunk[axis] > 0
-    ]
-
-    if partial_info:
-        raise ValueError(
-            "Cannot concatenate arrays with partial chunks because only regular chunk grids are supported, "
-            + f"but these arrays have partial chunks along the concatenation axis: {', '.join(partial_info)}."
-        )
+    # loop over the arrays to be concatenated
+    for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        if shape[axis] % chunk_shape[axis] > 0:
+            raise ValueError(
+                "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
+                f"Concat input {i} has array length {shape[axis]} along the concatenation axis which is not "
+                f"evenly divisible by chunk length {chunk_shape[axis]}."
+            )
 
 
 def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):
