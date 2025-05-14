@@ -12,7 +12,6 @@ from typing import (
 )
 
 import numpy as np
-from obstore import open_reader
 from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
@@ -27,7 +26,7 @@ from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.hdf.filters import codecs_from_dataset
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import soft_import
+from virtualizarr.utils import ObstoreReader, soft_import
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
 
@@ -122,13 +121,11 @@ def _construct_manifest_group(
     """
     Construct a virtual Group from a HDF dataset.
     """
-    from virtualizarr.utils import ObstoreReader
 
     if drop_variables is None:
         drop_variables = []
 
-    reader = ObstoreReader(file=file)
-    f = h5py.File(reader, mode="r")
+    f = h5py.File(file, mode="r")
 
     if group is not None and group != "":
         g = f[group]
@@ -181,7 +178,7 @@ class backend:
         # Create a group containing dataset level metadata and all the manifest arrays
 
         filename = os.path.basename(filepath) 
-        file = open_reader(store=object_reader, path=filename)
+        file = ObstoreReader(store=object_reader, path=filename)
         manifest_group = _construct_manifest_group(
             filepath=filepath,
             file=file,

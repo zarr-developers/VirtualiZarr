@@ -1,5 +1,5 @@
-from .hdf import backend
+from .hdf import backend as HDFBackend
 
 __all__ = [
-    "backend"
+    "HDFBackend"
 ]
