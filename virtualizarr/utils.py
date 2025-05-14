@@ -4,6 +4,7 @@ import importlib
 import io
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from urllib.parse import urlparse
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     import fsspec.spec
     import upath
     from obstore import ReadableFile
+    from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
     OpenFileType = Union[
@@ -25,8 +27,12 @@ if TYPE_CHECKING:
 class ObstoreReader:
     _reader: ReadableFile
 
-    def __init__(self, file: ReadableFile) -> None:
-        self._reader = file 
+    def __init__(self, store: ObjectStore, path: str) -> None:
+        import obstore as obs
+
+        parsed = urlparse(path)
+
+        self._reader = obs.open_reader(store, parsed.path)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
@@ -37,6 +43,7 @@ class ObstoreReader:
 
     def tell(self) -> int:
         return self._reader.tell()
+
 
 
 @dataclass
