@@ -3,15 +3,11 @@ from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.readers.api import (
     VirtualBackend,
 )
-from virtualizarr.translators.kerchunk import (
-    extract_group,
-    virtual_vars_and_metadata_from_kerchunk_refs,
-)
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.xarray import construct_fully_virtual_dataset
 
 
 class FITSVirtualBackend(VirtualBackend):
@@ -40,25 +36,16 @@ class FITSVirtualBackend(VirtualBackend):
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": process_file(filepath, **reader_options)})
 
-        # both group=None and group='' mean to read root group
-        if group:
-            refs = extract_group(refs, group)
-
-        # TODO This wouldn't work until either you had an xarray backend for FITS installed, or issue #124 is implemented to load data from ManifestArrays directly
-        if loadable_variables or indexes:
-            raise NotImplementedError(
-                "Cannot load variables or indexes from FITS files as there is no xarray backend engine for FITS"
-            )
-
-        virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
+        manifeststore = ManifestStore.from_kerchunk_refs(
             refs,
+            group=group,
             fs_root=Path.cwd().as_uri(),
         )
 
-        vds = construct_fully_virtual_dataset(
-            virtual_vars=virtual_vars,
-            coord_names=coord_names,
-            attrs=attrs,
+        vds = manifeststore.to_virtual_dataset(
+            group=group,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
         )
 
         return vds.drop_vars(_drop_vars)
