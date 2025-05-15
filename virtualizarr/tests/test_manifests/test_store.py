@@ -19,7 +19,6 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.store import default_object_store
 from virtualizarr.manifests.utils import create_v3_array_metadata
@@ -90,8 +89,7 @@ def _generate_manifest_store(
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    registry = ObjectStoreRegistry({prefix: store})
-    return ManifestStore(store_registry=registry, group=manifest_group)
+    return ManifestStore(store=store, group=manifest_group)
 
 
 @pytest.fixture()
