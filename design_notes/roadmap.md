@@ -71,3 +71,4 @@ Steps within each phase are independent. Moving on to the next phase requires co
     - [ ] Add a simple example of adding a time dimension based on filepath
     - [ ] Add a simple example of virtualizing to Zarr rather than Xarray dataset
     - [ ] Add a simple example over S3 with credentials
+    - [ ] Add example with earthaccess credentials
