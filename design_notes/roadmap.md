@@ -15,7 +15,7 @@ Steps within each phase are independent. Moving on to the next phase requires co
 
 # Phase 3
 - [ ] Remove `StoreRegistry` components from `ObjectStore` (closes [#561](https://github.com/zarr-developers/VirtualiZarr/issues/561), [#559](https://github.com/zarr-developers/VirtualiZarr/issues/559))
-- [ ] Move `virtualizarr/backend.py:open_virtual_mfdataset` to `api.py` and update to use `virtualizarr/api.py:open_virtual_dataset`.
+- [ ] Move `virtualizarr/backend.py:open_virtual_mfdataset` to `api.py` and update according to the [V2 design doc](./v2.md).
 - [ ] Remove `virtualizarr/backend.py`
 
 # Phase 4 (Closes [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400), Closes [#241](https://github.com/zarr-developers/VirtualiZarr/issues/241))
