@@ -6,6 +6,11 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 
+from .kerchunk import backend as KerchunkBackend
+
+__all__ = [
+    "KerchunkBackend"
+]
 
 @runtime_checkable
 class Backend(Protocol):

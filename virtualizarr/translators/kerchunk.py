@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Iterable, cast
 
 import numpy as np
 from zarr.core.common import JSON
@@ -85,12 +85,14 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     numcodec_configs = [
         numcodec_config_to_configurable(config) for config in codec_configs
     ]
+    dimension_names = decoded_arr_refs_zarray["dimension_names"]
     return create_v3_array_metadata(
         chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
         data_type=dtype,
         codecs=numcodec_configs,
         fill_value=fill_value,
         shape=tuple(decoded_arr_refs_zarray["shape"]),
+        dimension_names=dimension_names,
     )
 
 
@@ -98,6 +100,7 @@ def manifeststore_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     group: str | None = None,
     fs_root: str | None = None,
+    drop_variables: Iterable[str] | None = None,
 ) -> ManifestStore:
     """
     Construct a ManifestStore from a dictionary of kerchunk references.
@@ -119,7 +122,8 @@ def manifeststore_from_kerchunk_refs(
         refs = extract_group(refs, group)
 
     arr_names = find_var_names(refs)
-    # TODO do we need drop_variables here?
+    if drop_variables:
+        arr_names = [var for var in arr_names if var not in drop_variables]
 
     # TODO support iterating over multiple nested groups
     marrs = {
@@ -187,7 +191,6 @@ def manifestarray_from_kerchunk_refs(
     # TODO probably need to update internals of this to use ArrayV3Metadata more neatly
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
-    dims = zattrs.pop("_ARRAY_DIMENSIONS")
 
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
@@ -256,7 +259,7 @@ def find_var_names(ds_reference_dict: KerchunkStoreRefs) -> list[str]:
     found_var_names = []
     for key in refs.keys():
         # has to capture "foo/.zarray", but ignore ".zgroup", ".zattrs", and "subgroup/bar/.zarray"
-        # TODO this might be a sign that we should introduce a KerchunkGroupRefs type and cut down the references before getting to this point...
+        # TODO this might be a sign that we shoulzd introduce a KerchunkGroupRefs type and cut down the references before getting to this point...
         if key not in (".zgroup", ".zattrs", ".zmetadata"):
             first_part, second_part, *_ = key.split("/")
             if second_part == ".zarray":
@@ -293,8 +296,11 @@ def extract_array_refs(
 def parse_array_refs(
     arr_refs: KerchunkArrRefs,
 ) -> tuple[dict, ArrayV3Metadata, dict[str, JSON]]:
-    metadata = from_kerchunk_refs(arr_refs.pop(".zarray"))
     zattrs = arr_refs.pop(".zattrs", {})
+    dims = zattrs.pop("_ARRAY_DIMENSIONS")
+    zarray = arr_refs.pop(".zarray")
+    zarray["dimension_names"] = dims
+    metadata = from_kerchunk_refs(zarray)
     chunk_dict = arr_refs
 
     return chunk_dict, metadata, zattrs
