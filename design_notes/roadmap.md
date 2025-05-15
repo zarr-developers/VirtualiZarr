@@ -3,9 +3,9 @@
 Steps within each phase are independent. Moving on to the next phase requires completing all steps from the prior phase.
 # Phase 1
 - [ ] Define the V2 top-level API following preferred structure in [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400)
-- [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/backends/__init__.py to `protocols/parsers.py`
-- [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/xarray.py to  `api/synchronous.py` (in case we  want an async API eventually). (Closes [#553](https://github.com/zarr-developers/VirtualiZarr/issues/553), [#245](https://github.com/zarr-developers/VirtualiZarr/issues/245))
-- [ ] Create V2 version of  `open_virtual_mfdataset` in `api.synchronous.py`
+    - [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/backends/__init__.py to `protocols/parsers.py`
+    - [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/xarray.py to  `api/synchronous.py` (in case we  want an async API eventually). (Closes [#553](https://github.com/zarr-developers/VirtualiZarr/issues/553), [#245](https://github.com/zarr-developers/VirtualiZarr/issues/245))
+    - [ ] Create V2 version of  `open_virtual_mfdataset` in `api.synchronous.py`
 - [ ] Allow instantiating a `ManifestStore` using either an `ObjectStore` or a `StoreRegistry`.
 
 # Phase 2 (Closes [#498](https://github.com/zarr-developers/VirtualiZarr/issues/498))
