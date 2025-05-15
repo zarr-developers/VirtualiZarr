@@ -18,15 +18,9 @@ Steps within each phase are independent. Moving on to the next phase requires co
 - [ ] Move `virtualizarr/backend.py:open_virtual_mfdataset` to `api.py` and update according to the [V2 design doc](./v2.md).
 - [ ] Remove `virtualizarr/backend.py`
 
-# Phase 4 (Closes [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400), Closes [#241](https://github.com/zarr-developers/VirtualiZarr/issues/241))
-- [ ] Move `virtualizarr/tests/` to `tests/`
-- [ ] Move `virtualizarr/xarray.py` to `virtualizarr/_core/xarray.py`
-- [ ] Move `virtualizarr/utils.py` to `virtualizarr/_core/utils.py`
-- [ ] Move `virtualizarr/parallel.py` to `virtualizarr/_core/parallel.py`
-- [ ] Move `virtualizarr/readers/` to `virtualizarr/parsers/`
-- [ ] Move any private components from `virtualizarr/manifests/` to `virtualizarr/_core/manifests`
-- [ ] Move `virtualizarr` to `src/virtualizarr`
-- [ ] Rename `virtualize` accessor to `vz`
+# Phase 4
+- [ ] Rename `virtualize` accessor to `vz` (Closes [#241](https://github.com/zarr-developers/VirtualiZarr/issues/241))
+- [ ] Refactor for dtypes changes and pin minimum Zarr version to 3.1.0
 
 # Phase 5 (documentation)
 - [ ] Create a migration guide
@@ -43,6 +37,15 @@ Steps within each phase are independent. Moving on to the next phase requires co
 - [ ] Create a v2.0 release
 - [ ] Publish one or more blog-posts
 - [ ] Give a Pangeo showcase in the fall
+
+# Phase-independent restructuring (wish-list) (Closes [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400))
+- [ ] Move `virtualizarr/tests/` to `tests/`
+- [ ] Move `virtualizarr/xarray.py` to `virtualizarr/_core/xarray.py`
+- [ ] Move `virtualizarr/utils.py` to `virtualizarr/_core/utils.py`
+- [ ] Move `virtualizarr/parallel.py` to `virtualizarr/_core/parallel.py`
+- [ ] Move `virtualizarr/readers/` to `virtualizarr/parsers/`
+- [ ] Move any private components from `virtualizarr/manifests/` to `virtualizarr/_core/manifests`
+- [ ] Move `virtualizarr` to `src/virtualizarr`
 
 # Phase-independent tasks (wish-list)
 - [ ] Use `store.get_range_async()` rather than `obstore.get_range_async()` in `ManifestStore` to support any `ObjectReader` in the future
