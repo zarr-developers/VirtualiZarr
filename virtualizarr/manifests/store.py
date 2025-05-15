@@ -240,8 +240,8 @@ class ManifestStore(Store):
     """
 
     _group: ManifestGroup
-    _store_registry: ObjectStoreRegistry | None
-    _store: ObjectStore | None
+    _store_registry: ObjectStoreRegistry
+    _store: ObjectStore
 
     def __eq__(self, value: object):
         NotImplementedError
@@ -273,13 +273,10 @@ class ManifestStore(Store):
         super().__init__(read_only=True)
         if store:
             self._store = store
-            self._store_registry = None
         elif store_registry:
             self._store_registry = store_registry
-            self._store = None
         else:
             self._store_registry = ObjectStoreRegistry()
-            self._store = None
         self._group = group
 
     def __str__(self) -> str:
@@ -287,7 +284,7 @@ class ManifestStore(Store):
 
     def __getstate__(self) -> dict[Any, Any]:
         state = self.__dict__.copy()
-        if self._store_registry:
+        if getattr(self, "_store_registry", None):
             stores = state["_store_registry"]._stores.copy()
             for k, v in stores.items():
                 stores[k] = pickle.dumps(v)
@@ -298,7 +295,7 @@ class ManifestStore(Store):
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        if state["_store_registry"]:
+        if getattr(state, "_store_registry", None):
             stores = state["_store_registry"].copy()
             for k, v in stores.items():
                 stores[k] = pickle.loads(v)
@@ -329,7 +326,7 @@ class ManifestStore(Store):
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
         # Get the configured object store instance that matches the path
-        if self._store_registry:
+        if getattr(self, "_store_registry", None):
             store = self._store_registry.get_store(path)
         else:
             store = self._store
