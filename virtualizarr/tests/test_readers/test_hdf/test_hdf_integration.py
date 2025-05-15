@@ -10,7 +10,9 @@ from virtualizarr.tests import (
     requires_imagecodecs,
     requires_kerchunk,
 )
-from virtualizarr.tests.test_integration import roundtrip_as_in_memory_icechunk
+from virtualizarr.tests.test_integration import (
+    roundtrip_as_in_memory_icechunk,
+)
 
 
 @requires_kerchunk
