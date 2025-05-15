@@ -46,7 +46,11 @@ class TestFilterToCodec:
             "shuffle": 2,
             "cname": "lz4",
         }
-        if version.parse(numcodecs.__version__) > version.parse("0.15.1"):
+        if (
+            version.parse("0.16.1")
+            > version.parse(numcodecs.__version__)
+            > version.parse("0.15.1")
+        ):
             expected_config["typesize"] = None
         assert codec.get_config() == expected_config
 
