@@ -295,7 +295,7 @@ class ManifestStore(Store):
         return state
 
     def __setstate__(self, state: dict[Any, Any]) -> None:
-        if getattr(state, "_store_registry", None):
+        if state.get("_store_registry", None):
             stores = state["_store_registry"].copy()
             for k, v in stores.items():
                 stores[k] = pickle.loads(v)
