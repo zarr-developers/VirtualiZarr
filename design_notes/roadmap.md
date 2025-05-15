@@ -3,21 +3,20 @@
 Steps within each phase are independent. Moving on to the next phase requires completing all steps from the prior phase.
 # Phase 1
 - [ ] Define the V2 top-level API following preferred structure in [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400)
-    - [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/backends/__init__.py to `protocols/parsers.py`
-    - [ ] Add new code from https://github.com/zarr-developers/VirtualiZarr/blob/f70240c174ffdec863f8e305436431931f68a525/virtualizarr/xarray.py to  `api/synchronous.py` (in case we  want an async API eventually). (Closes [#553](https://github.com/zarr-developers/VirtualiZarr/issues/553), [#245](https://github.com/zarr-developers/VirtualiZarr/issues/245))
-    - [ ] Create V2 version of  `open_virtual_mfdataset` in `api.synchronous.py`
+    - [ ] Add the parser protocol from [the V2 design doc](./v2.md) to `protocols.py`.
+    - [ ] Add the `open_virtual_dataset` function from the [V2 design doc](./v2.md) to `api.py`. (Closes [#553](https://github.com/zarr-developers/VirtualiZarr/issues/553), [#245](https://github.com/zarr-developers/VirtualiZarr/issues/245))
 - [ ] Allow instantiating a `ManifestStore` using either an `ObjectStore` or a `StoreRegistry`.
 
 # Phase 2 (Closes [#498](https://github.com/zarr-developers/VirtualiZarr/issues/498))
-- [ ] Remove Kerchunk HDF5 reader
+- [ ] Modify HDF tests to not be parameterized over the two readers, to allow separate updates
 - [ ] Modify HDF5 parser to use the code from `api` and `protocols`
 - [ ] Modify the Kerchunk parsers to use the code from `api` and `protocols`
 - [ ] Modify the dmr++ parser to use the code from `api` and `protocols`
 
 # Phase 3
 - [ ] Remove `StoreRegistry` components from `ObjectStore` (closes [#561](https://github.com/zarr-developers/VirtualiZarr/issues/561), [#559](https://github.com/zarr-developers/VirtualiZarr/issues/559))
+- [ ] Move `virtualizarr/backend.py:open_virtual_mfdataset` to `api.py` and update to use `virtualizarr/api.py:open_virtual_dataset`.
 - [ ] Remove `virtualizarr/backend.py`
-- [ ] Check if xarrray assertions no l
 
 # Phase 4 (Closes [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400), Closes [#241](https://github.com/zarr-developers/VirtualiZarr/issues/241))
 - [ ] Move `virtualizarr/tests/` to `tests/`
@@ -37,18 +36,10 @@ Steps within each phase are independent. Moving on to the next phase requires co
 - [ ] Update [FAQ](https://virtualizarr.readthedocs.io/en/latest/faq.html)
 - [ ] Check [data structure](https://virtualizarr.readthedocs.io/en/latest/data_structures.html)
 - [ ] Check [custom readers](https://virtualizarr.readthedocs.io/en/latest/custom_readers.html)
-- [ ] Add [architecture diagram](https://github.com/zarr-developers/VirtualiZarr/issues/225)
 - [ ] Update all usage of readers to parsers [closes #239](https://github.com/zarr-developers/VirtualiZarr/issues/239)
-- [ ] Start a cookbook:
-    - [ ] Add example for HDF5
-    - [ ] Add simple example for Kerchunk readers [closes #488](https://github.com/zarr-developers/VirtualiZarr/issues/448)
-    - [ ] Add a simple example for DMR++
-    - [ ] Add a simple example of adding a time dimension based on filepath
-    - [ ] Add a simple example of virtualizing to Zarr rather than Xarray dataset
-    - [ ] Add a simple example over S3 with credentials
 
 # Phase 6 (release)
-- [ ] Create a pre-release and advertise for trials on Pangeo discourse, Pangeo linkedin, Zarr channels with a request to raise issues
+- [ ] Switch `develop` to `main` and encourage people to try it out before a v2.0 release via the Earthmover channel.
 - [ ] Create a v2.0 release
 - [ ] Publish one or more blog-posts
 - [ ] Give a Pangeo showcase in the fall
@@ -69,3 +60,11 @@ Steps within each phase are independent. Moving on to the next phase requires co
 - [ ] Xarray assertions can trigger loading [#354](https://github.com/zarr-developers/VirtualiZarr/issues/354)
 - [ ] Issue opening kerchunk reference files [#381](https://github.com/zarr-developers/VirtualiZarr/issues/381)
 - [ ] Concatenation of virtual datasets fails due to missing Chunk Manager [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382)
+- [ ] Add [architecture diagram](https://github.com/zarr-developers/VirtualiZarr/issues/225)
+- [ ] Start a cookbook:
+    - [ ] Add example for HDF5
+    - [ ] Add simple example for Kerchunk readers [closes #488](https://github.com/zarr-developers/VirtualiZarr/issues/448)
+    - [ ] Add a simple example for DMR++
+    - [ ] Add a simple example of adding a time dimension based on filepath
+    - [ ] Add a simple example of virtualizing to Zarr rather than Xarray dataset
+    - [ ] Add a simple example over S3 with credentials
