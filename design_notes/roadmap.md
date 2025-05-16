@@ -1,28 +1,22 @@
 ### Roadmap to VirtualiZarr v2.0
 
 Steps within each phase are independent. Moving on to the next phase requires completing all steps from the prior phase.
-# Phase 1
+# Phase 1 Closes [#498](https://github.com/zarr-developers/VirtualiZarr/issues/498))
 - [ ] Define the V2 top-level API following preferred structure in [#400](https://github.com/zarr-developers/VirtualiZarr/issues/400)
     - [ ] Add the parser protocol from [the V2 design doc](./v2.md) to `protocols.py`.
     - [ ] Add the `open_virtual_dataset` function from the [V2 design doc](./v2.md) to `api.py`. (Closes [#553](https://github.com/zarr-developers/VirtualiZarr/issues/553), [#245](https://github.com/zarr-developers/VirtualiZarr/issues/245))
-- [ ] Allow instantiating a `ManifestStore` using either an `ObjectStore` or a `StoreRegistry`.
-
-# Phase 2 (Closes [#498](https://github.com/zarr-developers/VirtualiZarr/issues/498))
 - [ ] Modify HDF tests to not be parameterized over the two readers, to allow separate updates
 - [ ] Modify HDF5 parser to use the code from `api` and `protocols`
 - [ ] Modify the Kerchunk parsers to use the code from `api` and `protocols`
 - [ ] Modify the dmr++ parser to use the code from `api` and `protocols`
+- [ ] Remove `default_store_registry` components from `ObjectStoreRegistry` (closes [#561](https://github.com/zarr-developers/VirtualiZarr/issues/561), [#559](https://github.com/zarr-developers/VirtualiZarr/issues/559))
+- [ ] Modify `virtualizarr.open_virtual_mfdataset` according to the [V2 design doc](./v2.md).
 
-# Phase 3
-- [ ] Remove `StoreRegistry` components from `ObjectStore` (closes [#561](https://github.com/zarr-developers/VirtualiZarr/issues/561), [#559](https://github.com/zarr-developers/VirtualiZarr/issues/559))
-- [ ] Move `virtualizarr/backend.py:open_virtual_mfdataset` to `api.py` and update according to the [V2 design doc](./v2.md).
-- [ ] Remove `virtualizarr/backend.py`
-
-# Phase 4
+# Phase 2
 - [ ] Rename `virtualize` accessor to `vz` (Closes [#241](https://github.com/zarr-developers/VirtualiZarr/issues/241))
 - [ ] Refactor for dtypes changes and pin minimum Zarr version to 3.1.0
 
-# Phase 5 (documentation)
+# Phase 3 (documentation)
 - [ ] Create a migration guide
 - [ ] Update [front-page usage](https://virtualizarr.readthedocs.io/en/latest/index.html#usage)
 - [ ] Update [usage](https://virtualizarr.readthedocs.io/en/latest/usage.html)
@@ -32,7 +26,7 @@ Steps within each phase are independent. Moving on to the next phase requires co
 - [ ] Check [custom readers](https://virtualizarr.readthedocs.io/en/latest/custom_readers.html)
 - [ ] Update all usage of readers to parsers [closes #239](https://github.com/zarr-developers/VirtualiZarr/issues/239)
 
-# Phase 6 (release)
+# Phase 4 (release)
 - [ ] Switch `develop` to `main` and encourage people to try it out before a v2.0 release via the Earthmover channel.
 - [ ] Create a v2.0 release
 - [ ] Publish one or more blog-posts
