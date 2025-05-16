@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 
 def _generate_manifest_store(
-    store: ObjectStore, *, prefix: str, filepath: str
+    store: ObjectStore, *, prefix: str, filepath: str, store_registry: bool = False
 ) -> ManifestStore:
     """
     Generate a ManifestStore for testing.
@@ -90,8 +90,23 @@ def _generate_manifest_store(
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    registry = ObjectStoreRegistry({prefix: store})
-    return ManifestStore(store_registry=registry, group=manifest_group)
+    if store_registry:
+        registry = ObjectStoreRegistry({prefix: store})
+        return ManifestStore(store_registry=registry, group=manifest_group)
+    else:
+        return ManifestStore(store=store, group=manifest_group)
+
+
+@pytest.fixture()
+def local_store_with_registry(tmpdir):
+    import obstore as obs
+
+    store = obs.store.LocalStore()
+    filepath = f"{tmpdir}/data.tmp"
+    prefix = "file://"
+    return _generate_manifest_store(
+        store=store, prefix=prefix, filepath=filepath, store_registry=True
+    )
 
 
 @pytest.fixture()
@@ -238,6 +253,21 @@ class TestManifestStore:
         assert isinstance(new_store, ManifestStore)
         # Check new store works
         observed = await local_store.get(
+            "foo/c/0.0", prototype=default_buffer_prototype()
+        )
+        assert observed.to_bytes() == b"\x01\x02\x03\x04"
+        # Check old store works
+        observed = await new_store.get(
+            "foo/c/0.0", prototype=default_buffer_prototype()
+        )
+        assert observed.to_bytes() == b"\x01\x02\x03\x04"
+
+    @pytest.mark.asyncio
+    async def test_pickling_with_store_registry(self, local_store_with_registry):
+        new_store = pickle.loads(pickle.dumps(local_store_with_registry))
+        assert isinstance(new_store, ManifestStore)
+        # Check new store works
+        observed = await local_store_with_registry.get(
             "foo/c/0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
