@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import pickle
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -15,14 +14,12 @@ from zarr.core.buffer import default_buffer_prototype
 from zarr.core.sync import _collect_aiterator
 
 from virtualizarr.manifests import (
-    ChunkManifest,
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.store import default_object_store
-from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.testing.utils import fake_parser, put_fake_data
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -31,83 +28,6 @@ from virtualizarr.tests import (
     requires_obstore,
 )
 
-if TYPE_CHECKING:
-    from obstore.store import ObjectStore
-
-
-def _generate_manifest_store(
-    store: ObjectStore, *, prefix: str, filepath: str, store_registry: bool = False
-) -> ManifestStore:
-    """
-    Generate a ManifestStore for testing.
-
-    This puts a sequence of 16 bytes in a file, which can simulate storing
-    4 contiguous uncompressed 4-byte chunks (or 8 2-byte chunks, etc). This
-    provides an easily understandable structure for testing ManifestStore's
-    ability to redirect Zarr chunk key requests and extract subsets of the file.
-
-    Parameters:
-    -----------
-    store : ObjectStore
-        ObjectStore instance for holding the file
-    prefix : str
-        Prefix to use to identify the ObjectStore in the ManifestStore
-    filepath : str
-        Filepath for storing temporary testing file
-    array_v3_metadata : callable
-        Function for generating V3 array metadata with sensible defaults.
-        This is passed in as a argument because pytest fixtures aren't meant to
-        be imported directly.
-    Returns:
-    --------
-    ManifestStore
-    """
-    import obstore as obs
-
-    obs.put(
-        store,
-        filepath,
-        b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12\x13\x14\x15\x16",
-    )
-    chunk_dict = {
-        "0.0": {"path": f"{prefix}/{filepath}", "offset": 0, "length": 4},
-        "0.1": {"path": f"{prefix}/{filepath}", "offset": 4, "length": 4},
-        "1.0": {"path": f"{prefix}/{filepath}", "offset": 8, "length": 4},
-        "1.1": {"path": f"{prefix}/{filepath}", "offset": 12, "length": 4},
-    }
-    manifest = ChunkManifest(entries=chunk_dict)
-    codecs = [{"configuration": {"endian": "little"}, "name": "bytes"}]
-    array_metadata = create_v3_array_metadata(
-        shape=(4, 4),
-        chunk_shape=(2, 2),
-        data_type=np.dtype("int32"),
-        codecs=codecs,
-        chunk_key_encoding={"name": "default", "separator": "."},
-        fill_value=0,
-    )
-    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
-    manifest_group = ManifestGroup(
-        arrays={"foo": manifest_array, "bar": manifest_array},
-        attributes={"Zarr": "Hooray!"},
-    )
-    if store_registry:
-        registry = ObjectStoreRegistry({prefix: store})
-        return ManifestStore(store_registry=registry, group=manifest_group)
-    else:
-        return ManifestStore(store=store, group=manifest_group)
-
-
-@pytest.fixture()
-def local_store_with_registry(tmpdir):
-    import obstore as obs
-
-    store = obs.store.LocalStore()
-    filepath = f"{tmpdir}/data.tmp"
-    prefix = "file://"
-    return _generate_manifest_store(
-        store=store, prefix=prefix, filepath=filepath, store_registry=True
-    )
-
 
 @pytest.fixture()
 def local_store(tmpdir):
@@ -115,10 +35,10 @@ def local_store(tmpdir):
 
     store = obs.store.LocalStore()
     filepath = f"{tmpdir}/data.tmp"
-    prefix = "file://"
-    return _generate_manifest_store(
-        store=store,
-        prefix=prefix,
+    put_fake_data(store, filepath=filepath)
+
+    return fake_parser(
+        object_reader=store,
         filepath=filepath,
     )
 
@@ -136,10 +56,10 @@ def s3_store(minio_bucket):
         client_options={"allow_http": True},
     )
     filepath = "data.tmp"
-    prefix = f"s3://{minio_bucket['bucket']}"
-    return _generate_manifest_store(
-        store=store,
-        prefix=prefix,
+    put_fake_data(store, filepath=filepath)
+
+    return fake_parser(
+        object_reader=store,
         filepath=filepath,
     )
 
@@ -253,21 +173,6 @@ class TestManifestStore:
         assert isinstance(new_store, ManifestStore)
         # Check new store works
         observed = await local_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
-        )
-        assert observed.to_bytes() == b"\x01\x02\x03\x04"
-        # Check old store works
-        observed = await new_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
-        )
-        assert observed.to_bytes() == b"\x01\x02\x03\x04"
-
-    @pytest.mark.asyncio
-    async def test_pickling_with_store_registry(self, local_store_with_registry):
-        new_store = pickle.loads(pickle.dumps(local_store_with_registry))
-        assert isinstance(new_store, ManifestStore)
-        # Check new store works
-        observed = await local_store_with_registry.get(
             "foo/c/0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"

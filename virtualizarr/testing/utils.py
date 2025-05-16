@@ -6,6 +6,7 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
+    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 
@@ -74,4 +75,6 @@ def fake_parser(filepath: str, object_reader: ObjectStore) -> ManifestStore:
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    return ManifestStore(store=object_reader, group=manifest_group)
+    registry = ObjectStoreRegistry(stores={filepath: object_reader})
+
+    return ManifestStore(store_registry=registry, group=manifest_group)
