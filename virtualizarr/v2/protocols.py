@@ -14,5 +14,5 @@ class Parser(Protocol):
     def __call__(
         self,
         filepath: str,
-        object_reader: ObjectStore,
+        object_store: ObjectStore,
     ) -> ManifestStore: ...

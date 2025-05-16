@@ -13,5 +13,5 @@ def test_open_virtual_dataset(tmpdir):
     filepath = f"{tmpdir}/data.tmp"
     put_fake_data(store, filepath=filepath)
     assert open_virtual_dataset(
-        filepath=filepath, object_reader=store, parser=fake_parser
+        filepath=filepath, object_store=store, parser=fake_parser
     )

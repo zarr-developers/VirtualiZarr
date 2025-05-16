@@ -34,7 +34,7 @@ def put_fake_data(store: ObjectStore, filepath: str):
     )
 
 
-def fake_parser(filepath: str, object_reader: ObjectStore) -> ManifestStore:
+def fake_parser(filepath: str, object_store: ObjectStore) -> ManifestStore:
     """
     Generate a ManifestStore for testing.
 
@@ -75,6 +75,6 @@ def fake_parser(filepath: str, object_reader: ObjectStore) -> ManifestStore:
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    registry = ObjectStoreRegistry(stores={filepath: object_reader})
+    registry = ObjectStoreRegistry(stores={filepath: object_store})
 
     return ManifestStore(store_registry=registry, group=manifest_group)

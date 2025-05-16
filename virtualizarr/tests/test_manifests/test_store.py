@@ -38,7 +38,7 @@ def local_store(tmpdir):
     put_fake_data(store, filepath=filepath)
 
     return fake_parser(
-        object_reader=store,
+        object_store=store,
         filepath=filepath,
     )
 
@@ -59,7 +59,7 @@ def s3_store(minio_bucket):
     put_fake_data(store, filepath=filepath)
 
     return fake_parser(
-        object_reader=store,
+        object_store=store,
         filepath=filepath,
     )
 

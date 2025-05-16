@@ -11,7 +11,7 @@ from virtualizarr.v2.protocols import Parser
 
 def open_virtual_dataset(
     filepath: str,
-    object_reader: ObjectStore,
+    object_store: ObjectStore,
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
@@ -22,7 +22,7 @@ def open_virtual_dataset(
 
     manifest_store = parser(
         filepath=filepath,
-        object_reader=object_reader,
+        object_store=object_store,
     )
 
     vds = manifest_store.to_virtual_dataset(
