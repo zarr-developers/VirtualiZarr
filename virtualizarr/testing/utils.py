@@ -10,7 +10,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.utils import create_v3_array_metadata
 
 
-def _put_fake_data(store: ObjectStore, filepath: str):
+def put_fake_data(store: ObjectStore, filepath: str):
     """
     Puts a sequence of 16 bytes in a file, which can simulate storing
     4 contiguous uncompressed 4-byte chunks (or 8 2-byte chunks, etc). This
@@ -52,7 +52,6 @@ def fake_parser(filepath: str, object_reader: ObjectStore) -> ManifestStore:
     --------
     ManifestStore
     """
-    _put_fake_data(object_reader, filepath=filepath)
     chunk_dict = {
         "0.0": {"path": filepath, "offset": 0, "length": 4},
         "0.1": {"path": filepath, "offset": 4, "length": 4},
