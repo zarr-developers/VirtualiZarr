@@ -15,7 +15,6 @@ from virtualizarr.backends.hdf import HDFBackend
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.tests import (
     has_astropy,
-    parametrize_over_hdf_backends,
     requires_dask,
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -560,20 +559,22 @@ preprocess_func = functools.partial(
 
 @requires_hdf5plugin
 @requires_imagecodecs
-@parametrize_over_hdf_backends
+# @parametrize_over_hdf_backends
 class TestOpenVirtualMFDataset:
     @pytest.mark.parametrize("invalid_parallel_kwarg", ["ray", Dataset])
     def test_invalid_parallel_kwarg(
-        self, netcdf4_files_factory, invalid_parallel_kwarg, hdf_backend
+        self, netcdf4_files_factory, invalid_parallel_kwarg,
     ):
         filepath1, filepath2 = netcdf4_files_factory()
-
+        store = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
         with pytest.raises(ValueError, match="Unrecognized argument"):
             open_virtual_mfdataset(
                 [filepath1, filepath2],
+                object_reader=store,
+                backend=backend,
                 combine="nested",
                 concat_dim="time",
-                backend=hdf_backend,
                 parallel=invalid_parallel_kwarg,
             )
 
@@ -594,22 +595,36 @@ class TestOpenVirtualMFDataset:
         ],
     )
     def test_parallel_open(
-        self, netcdf4_files_factory, hdf_backend, parallel, preprocess
+        self, netcdf4_files_factory, parallel, preprocess
     ):
         filepath1, filepath2 = netcdf4_files_factory()
-        vds1 = open_virtual_dataset(filepath1, backend=hdf_backend)
-        vds2 = open_virtual_dataset(filepath2, backend=hdf_backend)
+        store1 = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
+        vds1 = open_virtual_dataset(
+            filepath=filepath1, 
+            object_reader=store1,
+            backend=backend
+        )
+        store2 = obstore_local(filepath=filepath2)
+
+        vds2 = open_virtual_dataset(
+            filepath=filepath2, 
+            object_reader=store2,
+            backend=backend,
+        )
 
         expected_vds = xr.concat([vds1, vds2], dim="time")
         if preprocess:
             expected_vds = preprocess_func(expected_vds)
 
+        
         # test combine nested, which doesn't use in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
+            object_reader=store1,
+            backend=backend,
             combine="nested",
             concat_dim="time",
-            backend=hdf_backend,
             parallel=parallel,
             preprocess=preprocess,
         )
@@ -618,8 +633,9 @@ class TestOpenVirtualMFDataset:
         # test combine by coords using in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
+            object_reader=store1,
+            backend=backend,
             combine="by_coords",
-            backend=hdf_backend,
             parallel=parallel,
             preprocess=preprocess,
         )
@@ -629,8 +645,9 @@ class TestOpenVirtualMFDataset:
         file_glob = Path(filepath1).parent.glob("air*.nc")
         combined_vds = open_virtual_mfdataset(
             file_glob,
+            object_reader=store1,
+            backend=backend,
             combine="by_coords",
-            backend=hdf_backend,
             parallel=parallel,
             preprocess=preprocess,
         )

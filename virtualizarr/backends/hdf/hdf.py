@@ -12,6 +12,8 @@ from typing import (
 
 import numpy as np
 
+from virtualizarr.backends.hdf.filters import codecs_from_dataset
+from virtualizarr.backends.utils import encode_cf_fill_value
 from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -22,8 +24,6 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.hdf.filters import codecs_from_dataset
-from virtualizarr.readers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
