@@ -85,6 +85,3 @@ class backend:
             return manifeststore
         else:
             raise ValueError(error_message)
-
-        # TODO would be more efficient to drop these before converting them into ManifestArrays, i.e. drop them from the kerchunk refs dict
-        # return vds.drop_vars(_drop_vars)

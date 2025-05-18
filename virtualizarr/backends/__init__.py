@@ -6,9 +6,11 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 
+from .dmrpp import backend as DMRPPBackend
 from .kerchunk import backend as KerchunkBackend
 
 __all__ = [
+    "DMRPPBackend",
     "KerchunkBackend"
 ]
 

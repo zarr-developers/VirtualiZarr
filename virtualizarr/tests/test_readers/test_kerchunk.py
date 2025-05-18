@@ -9,8 +9,6 @@ from virtualizarr.backends import KerchunkBackend
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
-
-# from virtualizarr.backend import open_virtual_dataset
 from virtualizarr.xarray import open_virtual_dataset
 
 

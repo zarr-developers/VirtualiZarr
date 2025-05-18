@@ -7,12 +7,10 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Tuple,
     Union,
 )
 
 import numpy as np
-from xarray.backends.zarr import FillValueCoder
 
 from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.manifests import (
@@ -25,6 +23,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.readers.hdf.filters import codecs_from_dataset
+from virtualizarr.readers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
@@ -36,21 +35,6 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
     from obstore import ReadableFile
     from obstore.store import ObjectStore
-
-FillValueType = Union[
-    int,
-    float,
-    bool,
-    complex,
-    str,
-    np.integer,
-    np.floating,
-    np.bool_,
-    np.complexfloating,
-    bytes,  # For fixed-length string storage
-    Tuple[bytes, int],  # Structured type
-]
-
 
 def _construct_manifest_array(
     filepath: str,
@@ -87,7 +71,7 @@ def _construct_manifest_array(
     # dtype = dataset.dtype
 
     if "_FillValue" in attrs:
-        encoded_cf_fill_value = _encode_cf_fill_value(
+        encoded_cf_fill_value = encode_cf_fill_value(
             attrs["_FillValue"], dtype
         )
         attrs["_FillValue"] = encoded_cf_fill_value
@@ -350,6 +334,7 @@ def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
         attrs[n] = v
     return attrs
 
+
 def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
     dimension_names = []
     non_coordinate_dimension_variables = []
@@ -363,26 +348,4 @@ def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
 
     return non_coordinate_dimension_variables
 
-def _encode_cf_fill_value(
-    fill_value: Union[np.ndarray, np.generic],
-    target_dtype: np.dtype,
-) -> FillValueType:
-    """
-    Convert the _FillValue attribute from an HDF5 group or dataset into
-    one properly encoded for the target dtype.
 
-    Parameters
-    ----------
-    fill_value
-        An ndarray or value.
-    target_dtype
-        The target dtype of the ManifestArray that will use the _FillValue
-    """
-    if isinstance(fill_value, (np.ndarray, np.generic)):
-        if isinstance(fill_value, np.ndarray) and fill_value.size > 1:
-            raise ValueError("Expected a scalar")
-        fillvalue = fill_value.item()
-    else:
-        fillvalue = fill_value
-    encoded_fillvalue = FillValueCoder.encode(fillvalue, target_dtype)
-    return encoded_fillvalue
