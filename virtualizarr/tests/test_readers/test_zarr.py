@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.backends import ZarrBackend
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.readers.zarr import get_chunk_mapping_prefix
-from virtualizarr.tests import requires_network
+from virtualizarr.tests.utils import obstore_local
 
 
-@requires_network
 @pytest.mark.parametrize(
     "zarr_store",
     [
@@ -23,26 +23,50 @@ from virtualizarr.tests import requires_network
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check loadable variables
+        store = obstore_local(zarr_store)
+        backend = ZarrBackend()
         vds = open_virtual_dataset(
-            filepath=zarr_store, loadable_variables=loadable_variables
+            filepath=zarr_store,
+            object_reader=store,
+            backend=backend,
+            loadable_variables=loadable_variables
         )
         assert isinstance(vds["time"].data, np.ndarray)
         assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
 
     def test_drop_variables(self, zarr_store, drop_variables=["air"]):
+        store = obstore_local(zarr_store)
+        backend = ZarrBackend(drop_variables=drop_variables)
         # check variable is dropped
-        vds = open_virtual_dataset(filepath=zarr_store, drop_variables=drop_variables)
+        vds = open_virtual_dataset(
+            filepath=zarr_store,
+            object_reader=store,
+            backend=backend,
+        )
         assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
-        vds = open_virtual_dataset(filepath=zarr_store)
+        store = obstore_local(zarr_store)
+        backend = ZarrBackend()
+        vds = open_virtual_dataset(
+            filepath=zarr_store,
+            object_reader=store,
+            backend=backend,
+        )
         assert "0.0.0" in vds["air"].data.manifest.dict().keys()
 
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
         import zarr
 
         zg = zarr.open_group(zarr_store)
-        vds = open_virtual_dataset(filepath=zarr_store, loadable_variables=[])
+        store = obstore_local(zarr_store)
+        backend = ZarrBackend()
+        vds = open_virtual_dataset(
+            filepath=zarr_store,
+            object_reader=store,
+            backend=backend,
+            loadable_variables=[],
+        )
 
         non_var_arrays = ["time", "lat", "lon"]
 

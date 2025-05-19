@@ -8,10 +8,12 @@ from virtualizarr.manifests import ManifestStore
 
 from .dmrpp import backend as DMRPPBackend
 from .kerchunk import backend as KerchunkBackend
+from .zarr import backend as ZarrBackend
 
 __all__ = [
     "DMRPPBackend",
-    "KerchunkBackend"
+    "KerchunkBackend",
+    "ZarrBackend",
 ]
 
 @runtime_checkable
