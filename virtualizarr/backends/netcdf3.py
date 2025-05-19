@@ -1,0 +1,38 @@
+from pathlib import Path
+from typing import Iterable, Optional
+
+from obstore.store import ObjectStore
+
+from virtualizarr.manifests import ManifestStore
+from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+
+
+class backend:
+    def __init__(
+        self, 
+        group: str | None = None,
+        drop_variables: Iterable[str] | None = None,
+        reader_options: Optional[dict] = {},
+    ):
+        self.group = group
+        self.drop_variables = drop_variables
+        self.reader_options = reader_options
+
+    def __call__(
+        self,
+        filepath: str,
+        object_reader: ObjectStore,
+    ) -> ManifestStore:
+
+        from kerchunk.netCDF3 import NetCDF3ToZarr
+        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
+        refs = NetCDF3ToZarr(filepath, inline_threshold=0, **self.reader_options).translate()
+
+        manifeststore = manifeststore_from_kerchunk_refs(
+            refs,
+            group=self.group,
+            drop_variables=self.drop_variables,
+            fs_root=Path.cwd().as_uri(),
+        )
+
+        return manifeststore
