@@ -6,13 +6,13 @@ import xarray as xr
 from xarray import open_dataset
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.backend import VirtualBackend
+from virtualizarr.backends.hdf import HDFBackend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import (
-    parametrize_over_hdf_backends,
     requires_hdf5plugin,
     requires_imagecodecs,
 )
+from virtualizarr.tests.utils import obstore_local
 
 
 def test_wrapping(array_v3_metadata):
@@ -180,24 +180,25 @@ class TestConcat:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-@parametrize_over_hdf_backends
 class TestCombine:
     def test_combine_by_coords(
         self,
         netcdf4_files_factory: Callable[[], tuple[str, str]],
-        hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2 = netcdf4_files_factory()
-
+        store = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
         with (
             open_virtual_dataset(
-                filepath1,
-                backend=hdf_backend,
+                filepath=filepath1,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                filepath2,
-                backend=hdf_backend,
+                filepath=filepath2,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds2,
         ):
@@ -212,28 +213,33 @@ class TestCombine:
     def test_2d_combine_by_coords(
         self,
         netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
-        hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
+        store = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
         with (
             open_virtual_dataset(
-                filepath1,
-                backend=hdf_backend,
+                filepath=filepath1,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                filepath2,
-                backend=hdf_backend,
+                filepath=filepath2,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds2,
             open_virtual_dataset(
-                filepath3,
-                backend=hdf_backend,
+                filepath=filepath3,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds3,
             open_virtual_dataset(
-                filepath4,
-                backend=hdf_backend,
+                filepath=filepath4,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds4,
         ):
@@ -254,28 +260,33 @@ class TestCombine:
     def test_2d_combine_nested(
         self,
         netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
-        hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2, filepath3, filepath4 = netcdf4_files_factory_2d()
+        store = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
         with (
             open_virtual_dataset(
-                filepath1,
-                backend=hdf_backend,
+                filepath=filepath1,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                filepath2,
-                backend=hdf_backend,
+                filepath=filepath2,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds2,
             open_virtual_dataset(
-                filepath3,
-                backend=hdf_backend,
+                filepath=filepath3,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds3,
             open_virtual_dataset(
-                filepath4,
-                backend=hdf_backend,
+                filepath=filepath4,
+                object_reader=store,
+                backend=backend,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds4,
         ):
@@ -301,13 +312,21 @@ class TestCombine:
     def test_combine_by_coords_keeping_manifestarrays(
         self,
         netcdf4_files_factory: Callable[[], tuple[str, str]],
-        hdf_backend: type[VirtualBackend],
     ):
         filepath1, filepath2 = netcdf4_files_factory()
-
+        store = obstore_local(filepath=filepath1)
+        backend = HDFBackend()
         with (
-            open_virtual_dataset(filepath1, backend=hdf_backend) as vds1,
-            open_virtual_dataset(filepath2, backend=hdf_backend) as vds2,
+            open_virtual_dataset(
+                filepath=filepath1,
+                object_reader=store,
+                backend=backend
+            ) as vds1,
+            open_virtual_dataset(
+                filepath=filepath2,
+                object_reader=store,
+                backend=backend
+            ) as vds2,
         ):
             combined_vds = xr.combine_by_coords([vds2, vds1])
 
@@ -316,17 +335,23 @@ class TestCombine:
             assert isinstance(combined_vds["lon"].data, ManifestArray)
 
 
-@parametrize_over_hdf_backends
 class TestRenamePaths:
-    def test_rename_to_str(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
+    def test_rename_to_str(self, netcdf4_file):
+        store = obstore_local(netcdf4_file)
+        backend = HDFBackend()
+        with open_virtual_dataset(
+            filepath=netcdf4_file,
+            object_reader=store,
+            backend=backend,
+        ) as vds:
             renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
             )
 
-    def test_rename_using_function(self, netcdf4_file, hdf_backend):
+    def test_rename_using_function(self, netcdf4_file):
+
         def local_to_s3_url(old_local_path: str) -> str:
             from pathlib import Path
 
@@ -334,27 +359,40 @@ class TestRenamePaths:
             filename = Path(old_local_path).name
             return str(new_s3_bucket_url + filename)
 
-        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
+        store = obstore_local(netcdf4_file)
+        backend = HDFBackend()
+        with open_virtual_dataset(
+            filepath=netcdf4_file,
+            object_reader=store,
+            backend=backend,
+        ) as vds:
             renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
             )
 
-    def test_invalid_type(self, netcdf4_file, hdf_backend):
-        with open_virtual_dataset(netcdf4_file, backend=hdf_backend) as vds:
+    def test_invalid_type(self, netcdf4_file):
+        store = obstore_local(netcdf4_file)
+        backend = HDFBackend()
+        with open_virtual_dataset(
+            filepath=netcdf4_file,
+            object_reader=store,
+            backend=backend
+        ) as vds:
             with pytest.raises(TypeError):
                 vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
 
     @requires_hdf5plugin
     @requires_imagecodecs
-    def test_mixture_of_manifestarrays_and_numpy_arrays(
-        self, netcdf4_file, hdf_backend
-    ):
+    def test_mixture_of_manifestarrays_and_numpy_arrays(self, netcdf4_file):
+        store = obstore_local(netcdf4_file)
+        backend = HDFBackend()
         with open_virtual_dataset(
-            netcdf4_file,
+            filepath=netcdf4_file,
+            object_reader=store,
+            backend=backend,
             loadable_variables=["lat", "lon"],
-            backend=hdf_backend,
         ) as vds:
             renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
             assert (
@@ -367,11 +405,23 @@ class TestRenamePaths:
 @requires_hdf5plugin
 @requires_imagecodecs
 def test_nbytes(simple_netcdf4):
-    with open_virtual_dataset(simple_netcdf4) as vds:
+    store = obstore_local(simple_netcdf4)
+    backend = HDFBackend()
+    with open_virtual_dataset(
+        filepath=simple_netcdf4,
+        object_reader=store,
+        backend=backend,
+    ) as vds:
         assert vds.virtualize.nbytes == 32
         assert vds.nbytes == 48
 
-    with open_virtual_dataset(simple_netcdf4, loadable_variables=["foo"]) as vds:
+    with open_virtual_dataset(
+        filepath=simple_netcdf4,
+        object_reader=store,
+        backend=backend,
+        loadable_variables=["foo"]
+    ) as vds:
+
         assert vds.virtualize.nbytes == 48
 
     with open_dataset(simple_netcdf4) as ds:
