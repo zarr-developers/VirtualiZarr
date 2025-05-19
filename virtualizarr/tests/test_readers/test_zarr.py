@@ -23,6 +23,7 @@ from virtualizarr.tests.utils import obstore_local
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check loadable variables
+        print(zarr_store)
         store = obstore_local(zarr_store)
         backend = ZarrBackend()
         vds = open_virtual_dataset(

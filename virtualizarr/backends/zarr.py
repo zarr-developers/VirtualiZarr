@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path  # noqa
 from typing import (
-    TYPE_CHECKING,
     Any,
     Hashable,
     Iterable,
@@ -39,8 +38,6 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
 
 import zarr
 
-if TYPE_CHECKING:
-    from obstore.store import ObjectStore
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
@@ -112,7 +109,7 @@ async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: 
 
 async def _construct_manifest_group(
     filepath: str,
-    store: ObjectStore | zarr.storage.LocalStore,
+    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     *,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
@@ -146,7 +143,7 @@ async def _construct_manifest_group(
 
 def _construct_manifest_store(
     filepath: str,
-    store: ObjectStore | zarr.storage.LocalStore,
+    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestStore:
@@ -175,7 +172,7 @@ class backend:
     def __call__(
         self,
         filepath: str,
-        object_reader: ObjectStore,
+        object_reader: obstore.store.ObjectStore,
     ) -> ManifestStore:
         filepath = validate_and_normalize_path_to_uri(
             filepath, fs_root=Path.cwd().as_uri()
@@ -186,7 +183,9 @@ class backend:
             parsed = urlparse(filepath)
             store = zarr.storage.LocalStore(parsed.path)
         else:
-            store = object_reader
+            store = zarr.storage.ObjectStore(
+                store=object_reader
+            )
         manifest_store = _construct_manifest_store(
             store=store,
             filepath=filepath,

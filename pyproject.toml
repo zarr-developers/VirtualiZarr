@@ -28,7 +28,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.0.2",
+    "zarr>=3.0.7",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
