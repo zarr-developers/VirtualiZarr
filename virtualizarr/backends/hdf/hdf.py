@@ -91,7 +91,6 @@ def _construct_manifest_array(
         dimension_names=dims,
         attributes=attrs,
     )
-
     manifest = _dataset_chunk_manifest(filepath, dataset)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
 

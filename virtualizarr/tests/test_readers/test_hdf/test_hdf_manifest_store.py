@@ -2,13 +2,14 @@ import numpy as np
 import pytest
 import xarray as xr
 
+from virtualizarr.backends.hdf import HDFBackend
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.readers.hdf import HDFVirtualBackend
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
     requires_obstore,
 )
+from virtualizarr.tests.utils import obstore_local
 
 
 @pytest.fixture(name="basic_ds")
@@ -26,16 +27,19 @@ def basic_ds():
 @requires_hdf5plugin
 @requires_obstore
 class TestHDFManifestStore:
-    def test_rountrip_simple_virtualdataset(self, tmpdir, basic_ds):
+    def test_roundtrip_simple_virtualdataset(self, tmpdir, basic_ds):
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = HDFVirtualBackend._create_manifest_store(
+        store = obstore_local(filepath=filepath)
+        backend = HDFBackend()
+        manifest_store = backend(
             filepath=filepath,
+            object_reader=store,
         )
         rountripped_ds = xr.open_dataset(
-            store, engine="zarr", consolidated=False, zarr_format=3
+            manifest_store, engine="zarr", consolidated=False, zarr_format=3
         )
         xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
@@ -44,9 +48,14 @@ class TestHDFManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = HDFVirtualBackend._create_manifest_store(filepath=filepath)
+        store = obstore_local(filepath=filepath)
+        backend = HDFBackend()
+        manifest_store = backend(
+            filepath=filepath,
+            object_reader=store,
+        )
         rountripped_ds = xr.open_dataset(
-            store, engine="zarr", consolidated=False, zarr_format=3
+            manifest_store, engine="zarr", consolidated=False, zarr_format=3
         )
         xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
@@ -64,21 +73,12 @@ class TestHDFManifestStore:
             },
             client_options={"allow_http": True},
         )
-        store = HDFVirtualBackend._create_manifest_store(
+        backend = HDFBackend()
+        manifest_store = backend(
             filepath=chunked_roundtrip_hdf5_s3_file,
-            store=s3store,
+            object_reader=s3store
         )
-        vds = store.to_virtual_dataset()
+        
+        vds = manifest_store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)
-
-    @requires_obstore
-    def test_default_store(self):
-        store = HDFVirtualBackend._create_manifest_store(
-            filepath="s3://carbonplan-share/virtualizarr/local.nc",
-        )
-        vds = store.to_virtual_dataset()
-        assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
-        assert isinstance(vds["air"].data, ManifestArray)
-        for name in ["time", "lat", "lon"]:
-            assert isinstance(vds[name].data, np.ndarray)
