@@ -6,12 +6,14 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 
-from .dmrpp import backend as DMRPPBackend
-from .kerchunk import backend as KerchunkBackend
-from .zarr import backend as ZarrBackend
+from virtualizarr.backends.dmrpp import backend as DMRPPBackend
+from virtualizarr.backends.fits import backend as FITSBackend
+from virtualizarr.backends.kerchunk import backend as KerchunkBackend
+from virtualizarr.backends.zarr import backend as ZarrBackend
 
 __all__ = [
     "DMRPPBackend",
+    "FITSBackend",
     "KerchunkBackend",
     "ZarrBackend",
 ]
