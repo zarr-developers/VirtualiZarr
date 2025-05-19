@@ -3,8 +3,10 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.backends import NetCDF3Backend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_scipy
+from virtualizarr.tests.utils import obstore_local
 
 
 @requires_scipy
@@ -13,7 +15,13 @@ from virtualizarr.tests import requires_scipy
 )  # https://github.com/zarr-developers/zarr-python/issues/2324
 def test_read_netcdf3(netcdf3_file, array_v3_metadata):
     filepath = str(netcdf3_file)
-    vds = open_virtual_dataset(filepath)
+    store = obstore_local(filepath=filepath)
+    backend = NetCDF3Backend()
+    vds = open_virtual_dataset(
+        filepath=filepath,
+        object_reader=store,
+        backend=backend,
+    )
 
     assert isinstance(vds, xr.Dataset)
     assert list(vds.variables.keys()) == ["foo"]

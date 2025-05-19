@@ -3,8 +3,8 @@ import pytest
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.backends import ZarrBackend
+from virtualizarr.backends.zarr import get_chunk_mapping_prefix
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.readers.zarr import get_chunk_mapping_prefix
 from virtualizarr.tests.utils import obstore_local
 
 

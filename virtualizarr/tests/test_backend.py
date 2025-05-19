@@ -23,64 +23,6 @@ from virtualizarr.tests import (
 )
 from virtualizarr.tests.utils import obstore_http, obstore_local, obstore_s3
 
-# @requires_scipy
-# def test_automatically_determine_filetype_netcdf3_netcdf4():
-    # # test the NetCDF3 vs NetCDF4 automatic file type selection
-
-    # ds = xr.Dataset({"a": (["x"], [0, 1])})
-    # netcdf3_file_path = "/tmp/netcdf3.nc"
-    # netcdf4_file_path = "/tmp/netcdf4.nc"
-
-    # # write two version of NetCDF
-    # ds.to_netcdf(netcdf3_file_path, engine="scipy", format="NETCDF3_CLASSIC")
-    # ds.to_netcdf(netcdf4_file_path, engine="h5netcdf")
-
-    # assert FileType("netcdf3") == automatically_determine_filetype(
-        # filepath=netcdf3_file_path
-    # )
-    # assert FileType("hdf5") == automatically_determine_filetype(
-        # filepath=netcdf4_file_path
-    # )
-
-
-# @pytest.mark.parametrize(
-    # "filetype,headerbytes",
-    # [
-        # ("netcdf3", b"CDF"),
-        # ("hdf5", b"\x89HDF"),
-        # ("grib", b"GRIB"),
-        # ("tiff", b"II*"),
-        # ("fits", b"SIMPLE"),
-    # ],
-# )
-# def test_valid_filetype_bytes(tmp_path, filetype, headerbytes):
-    # filepath = tmp_path / "file.abc"
-    # with open(filepath, "wb") as f:
-        # f.write(headerbytes)
-    # assert FileType(filetype) == automatically_determine_filetype(filepath=filepath)
-
-
-# def test_notimplemented_filetype(tmp_path):
-    # for headerbytes in [b"JUNK", b"\x0e\x03\x13\x01"]:
-        # filepath = tmp_path / "file.abc"
-        # with open(filepath, "wb") as f:
-            # f.write(headerbytes)
-        # with pytest.raises(NotImplementedError):
-            # automatically_determine_filetype(filepath=filepath)
-
-
-# def test_FileType():
-    # # tests if FileType converts user supplied strings to correct filetype
-    # assert "netcdf3" == FileType("netcdf3").name
-    # assert "netcdf4" == FileType("netcdf4").name
-    # assert "hdf4" == FileType("hdf4").name
-    # assert "hdf5" == FileType("hdf5").name
-    # assert "grib" == FileType("grib").name
-    # assert "tiff" == FileType("tiff").name
-    # assert "fits" == FileType("fits").name
-    # with pytest.raises(ValueError):
-        # FileType(None)
-
 
 class TestOpenVirtualDatasetIndexes:
     @pytest.mark.xfail(reason="not yet implemented")
@@ -467,24 +409,6 @@ class TestLoadVirtualDataset:
                 if name in actual_loadable_variables:
                     xrt.assert_identical(vds.variables[name], ds.variables[name])
 
-    # def test_explicit_filetype(self, netcdf4_file):
-        # with pytest.raises(ValueError):
-            # open_virtual_dataset(netcdf4_file, filetype="unknown")
-
-        # with pytest.raises(ValueError):
-            # open_virtual_dataset(netcdf4_file, filetype=ManifestArray)  # type: ignore
-
-        # with pytest.raises(NotImplementedError):
-            # open_virtual_dataset(netcdf4_file, filetype="grib")
-
-        # with open_virtual_dataset(netcdf4_file, filetype="netCDF4"):
-            # pass
-
-    # def test_explicit_filetype_and_backend(self, netcdf4_file):
-        # with pytest.raises(ValueError):
-            # open_virtual_dataset(
-                # netcdf4_file, filetype="hdf", backend=HDFVirtualBackend
-            # )
 
     def test_group_kwarg(self, hdf5_groups_file):
         object_reader = obstore_local(filepath=hdf5_groups_file)

@@ -28,7 +28,6 @@ from virtualizarr.backends import Backend
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
-from virtualizarr.utils import _FsspecFSFromFilepath
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -310,46 +309,26 @@ def construct_virtual_dataset(
     if indexes is not None:
         raise NotImplementedError()
 
-    if manifest_store:
-        if group:
-            raise NotImplementedError(
-                "ManifestStore does not yet support nested groups"
-            )
-        else:
-            manifestgroup = manifest_store._group
-
-        fully_virtual_ds = manifestgroup.to_virtual_dataset()
-
-        with xr.open_zarr(
-            manifest_store,
-            group=group,
-            consolidated=False,
-            zarr_format=3,
-            chunks=None,
-            decode_times=decode_times,
-        ) as loadable_ds:
-            return replace_virtual_with_loadable_vars(
-                fully_virtual_ds, loadable_ds, loadable_variables
-            )
+    if group:
+        raise NotImplementedError(
+            "ManifestStore does not yet support nested groups"
+        )
     else:
-        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+        manifestgroup = manifest_store._group
 
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath,  # type: ignore[arg-type]
-            reader_options=reader_options,
-        ).open_file()
+    fully_virtual_ds = manifestgroup.to_virtual_dataset()
 
-        with xr.open_dataset(
-            fpath,  # type: ignore[arg-type]
-            group=group,
-            decode_times=decode_times,
-        ) as loadable_ds:
-            return replace_virtual_with_loadable_vars(
-                fully_virtual_ds,  # type: ignore[arg-type]
-                loadable_ds,
-                loadable_variables,
-            )
-
+    with xr.open_zarr(
+        manifest_store,
+        group=group,
+        consolidated=False,
+        zarr_format=3,
+        chunks=None,
+        decode_times=decode_times,
+    ) as loadable_ds:
+        return replace_virtual_with_loadable_vars(
+            fully_virtual_ds, loadable_ds, loadable_variables
+        )
 
 def replace_virtual_with_loadable_vars(
     fully_virtual_ds: xr.Dataset,
