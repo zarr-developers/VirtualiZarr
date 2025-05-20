@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import ujson
 
-from virtualizarr.backends import KerchunkBackend
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.parsers import KerchunkParser
 from virtualizarr.tests import requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
 from virtualizarr.xarray import open_virtual_dataset
@@ -52,24 +52,24 @@ def refs_file_factory(
 
     def _refs_file(zgroup=None, zarray=None, zattrs=None, chunks=None) -> str:
         refs = gen_ds_refs(zgroup=zgroup, zarray=zarray, zattrs=zattrs, chunks=chunks)
-        filepath = tmp_path / "refs.json"
+        file_url = tmp_path / "refs.json"
 
-        with open(filepath, "w") as json_file:
+        with open(file_url, "w") as json_file:
             ujson.dump(refs, json_file)
 
-        return str(filepath)
+        return str(file_url)
 
     yield _refs_file
 
 
 def test_dataset_from_df_refs(refs_file_factory):
     refs_file = refs_file_factory()
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser()
     vds = open_virtual_dataset(
-        filepath=refs_file,
-        object_reader=store,
-        backend=backend
+        file_url=refs_file,
+        object_store=store,
+        parser=parser
     )
 
     assert "a" in vds
@@ -104,12 +104,12 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
         "zarr_format": 2,
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser()
     vds = open_virtual_dataset(
-        filepath=refs_file,
-        object_reader=store,
-        backend=backend
+        file_url=refs_file,
+        object_store=store,
+        parser=parser
     )
 
     vda = vds["a"]
@@ -131,12 +131,12 @@ def test_empty_chunk_manifest(refs_file_factory):
         "zarr_format": 2,
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray), chunks={})
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser()
     vds = open_virtual_dataset(
-        filepath=refs_file,
-        object_reader=store,
-        backend=backend
+        file_url=refs_file,
+        object_store=store,
+        parser=parser
     )
 
     assert "a" in vds.variables
@@ -148,60 +148,60 @@ def test_empty_chunk_manifest(refs_file_factory):
 def test_handle_relative_paths(refs_file_factory):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
         open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
         )
 
     refs_file = refs_file_factory(chunks={"a/0.0": ["./test1.nc", 6144, 48]})
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
         open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
         )
 
-    backend = KerchunkBackend(fs_root="some_directory/")
+    parser = KerchunkParser(fs_root="some_directory/")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
         open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
         )
 
-    backend = KerchunkBackend(fs_root="/some_directory/file.nc")
+    parser = KerchunkParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
         open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
         )
-    backend = KerchunkBackend(fs_root="/some_directory/")
+    parser = KerchunkParser(fs_root="/some_directory/")
     vds = open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
         )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
     }
 
-    backend = KerchunkBackend(fs_root="file:///some_directory/")
+    parser = KerchunkParser(fs_root="file:///some_directory/")
     vds = open_virtual_dataset(
-            filepath=refs_file,
-            object_reader=store,
-            backend=backend,
+            file_url=refs_file,
+            object_store=store,
+            parser=parser,
     )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
@@ -227,13 +227,13 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         ref_filepath = tmp_path / "ref.csv"
         with open(ref_filepath.as_posix(), mode="w") as of:
             of.write("tmp")
-        store = obstore_local(filepath=ref_filepath)
-        backend = KerchunkBackend()
+        store = obstore_local(file_url=ref_filepath)
+        parser = KerchunkParser()
         with pytest.raises(ValueError):
             open_virtual_dataset(
-                filepath=ref_filepath.as_posix(),
-                object_reader=store,
-                backend=backend,
+                file_url=ref_filepath.as_posix(),
+                object_store=store,
+                parser=parser,
             )
 
     else:
@@ -251,12 +251,12 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             # ref_filepath = tmp_path / "ref.parquet"
             # refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
 
-        store = obstore_local(filepath=ref_filepath.as_posix())
-        backend = KerchunkBackend()
+        store = obstore_local(file_url=ref_filepath.as_posix())
+        parser = KerchunkParser()
         vds = open_virtual_dataset(
-            filepath=ref_filepath.as_posix(),
-            object_reader=store,
-            backend=backend,
+            file_url=ref_filepath.as_posix(),
+            object_store=store,
+            parser=parser,
             loadable_variables=[],
         )
 
@@ -286,27 +286,27 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     with open(ref_filepath, "w") as json_file:
         ujson.dump(netcdf4_inlined_ref, json_file)
 
-    store = obstore_local(filepath=ref_filepath.as_posix())
-    backend = KerchunkBackend()
+    store = obstore_local(file_url=ref_filepath.as_posix())
+    parser = KerchunkParser()
     with pytest.raises(
         NotImplementedError,
         match="Reading inlined reference data is currently not supported",
     ):
         open_virtual_dataset(
-            filepath=ref_filepath.as_posix(),
-            object_reader=store,
-            backend=backend,
+            file_url=ref_filepath.as_posix(),
+            object_store=store,
+            parser=parser,
         )
 
 
 @pytest.mark.parametrize("drop_variables", ["a", ["a"]])
 def test_drop_variables(refs_file_factory, drop_variables):
     refs_file = refs_file_factory()
-    store = obstore_local(filepath=refs_file)
-    backend = KerchunkBackend(drop_variables=drop_variables)
+    store = obstore_local(file_url=refs_file)
+    parser = KerchunkParser(drop_variables=drop_variables)
     vds = open_virtual_dataset(
-        filepath=refs_file,
-        object_reader=store,
-        backend=backend,
+        file_url=refs_file,
+        object_store=store,
+        parser=parser,
     )
     assert all(var not in vds for var in drop_variables)

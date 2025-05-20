@@ -5,15 +5,14 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
-from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
-class backend:
+class Parser:
     def __init__(
         self, 
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        reader_options: Optional[dict] = None,
+        reader_options: Optional[dict] = {},
     ):
         self.group = group
         self.drop_variables = drop_variables
@@ -21,13 +20,13 @@ class backend:
 
     def __call__(
         self,
-        filepath: str,
-        object_reader: ObjectStore,
+        file_url: str,
+        object_store: ObjectStore,
     ) -> ManifestStore:
 
-        from kerchunk.fits import process_file
+        from kerchunk.netCDF3 import NetCDF3ToZarr
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs({"refs": process_file(filepath, **self.reader_options)})
+        refs = NetCDF3ToZarr(file_url, inline_threshold=0, **self.reader_options).translate()
 
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,

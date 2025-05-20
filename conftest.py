@@ -256,15 +256,15 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 def netcdf4_virtual_dataset(netcdf4_file):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
-    from virtualizarr.backends.hdf import HDFBackend
+    from virtualizarr.parsers import HDFParser
     from virtualizarr.tests.utils import obstore_local
 
-    store = obstore_local(filepath=netcdf4_file)
-    backend = HDFBackend()
+    store = obstore_local(file_url=netcdf4_file)
+    parser= HDFParser()
     with open_virtual_dataset(
-        filepath=netcdf4_file,
-        object_reader=store,
-        backend=backend,
+        file_url=netcdf4_file,
+        object_store=store,
+        parser=parser,
         loadable_variables=[],
     ) as ds:
         yield ds

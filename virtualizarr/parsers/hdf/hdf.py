@@ -12,8 +12,6 @@ from typing import (
 
 import numpy as np
 
-from virtualizarr.backends.hdf.filters import codecs_from_dataset
-from virtualizarr.backends.utils import encode_cf_fill_value
 from virtualizarr.codecs import numcodec_config_to_configurable
 from virtualizarr.manifests import (
     ChunkEntry,
@@ -24,6 +22,8 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.parsers.hdf.filters import codecs_from_dataset
+from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
@@ -142,7 +142,7 @@ def _construct_manifest_group(
                     manifest_dict[key] = variable
     return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
-class backend:
+class Parser:
     def __init__(
         self, 
         group: str | None = None,
@@ -153,22 +153,22 @@ class backend:
 
     def __call__(
         self,
-        filepath: str,
-        object_reader: ObjectStore,
+        file_url: str,
+        object_store: ObjectStore,
     ) -> ManifestStore:
         if h5py is None:
-            raise ImportError("h5py is required for using the hdf backend")
+            raise ImportError("h5py is required for using the hdf parser")
         # Create a group containing dataset level metadata and all the manifest arrays
 
-        filename = os.path.basename(filepath) 
-        file = ObstoreReader(store=object_reader, path=filename)
+        filename = os.path.basename(file_url) 
+        file = ObstoreReader(store=object_store, path=filename)
         manifest_group = _construct_manifest_group(
-            filepath=filepath,
+            filepath=file_url,
             file=file,
             group=self.group,
             drop_variables=self.drop_variables,
         )
-        registry = ObjectStoreRegistry({filepath: object_reader})
+        registry = ObjectStoreRegistry({file_url: object_store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 

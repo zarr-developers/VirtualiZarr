@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.backends import ZarrBackend
-from virtualizarr.backends.zarr import get_chunk_mapping_prefix
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.parsers import ZarrParser
+from virtualizarr.parsers.zarr import get_chunk_mapping_prefix
 from virtualizarr.tests.utils import obstore_local
 
 
@@ -25,11 +25,11 @@ class TestOpenVirtualDatasetZarr:
         # check loadable variables
         print(zarr_store)
         store = obstore_local(zarr_store)
-        backend = ZarrBackend()
+        parser = ZarrParser()
         vds = open_virtual_dataset(
-            filepath=zarr_store,
-            object_reader=store,
-            backend=backend,
+            file_url=zarr_store,
+            object_store=store,
+            parser=parser,
             loadable_variables=loadable_variables
         )
         assert isinstance(vds["time"].data, np.ndarray)
@@ -37,22 +37,22 @@ class TestOpenVirtualDatasetZarr:
 
     def test_drop_variables(self, zarr_store, drop_variables=["air"]):
         store = obstore_local(zarr_store)
-        backend = ZarrBackend(drop_variables=drop_variables)
+        parser = ZarrParser(drop_variables=drop_variables)
         # check variable is dropped
         vds = open_virtual_dataset(
-            filepath=zarr_store,
-            object_reader=store,
-            backend=backend,
+            file_url=zarr_store,
+            object_store=store,
+            parser=parser,
         )
         assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
         store = obstore_local(zarr_store)
-        backend = ZarrBackend()
+        parser = ZarrParser()
         vds = open_virtual_dataset(
-            filepath=zarr_store,
-            object_reader=store,
-            backend=backend,
+            file_url=zarr_store,
+            object_store=store,
+            parser=parser,
         )
         assert "0.0.0" in vds["air"].data.manifest.dict().keys()
 
@@ -61,11 +61,11 @@ class TestOpenVirtualDatasetZarr:
 
         zg = zarr.open_group(zarr_store)
         store = obstore_local(zarr_store)
-        backend = ZarrBackend()
+        parser = ZarrParser()
         vds = open_virtual_dataset(
-            filepath=zarr_store,
-            object_reader=store,
-            backend=backend,
+            file_url=zarr_store,
+            object_store=store,
+            parser=parser,
             loadable_variables=[],
         )
 

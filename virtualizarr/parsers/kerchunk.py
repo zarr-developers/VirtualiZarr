@@ -11,7 +11,7 @@ from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 
 
-class backend:
+class Parser:
     def __init__(
         self, 
         group: str | None = None,
@@ -24,8 +24,8 @@ class backend:
 
     def __call__(
         self,
-        filepath: str,
-        object_reader: ObjectStore,
+        file_url: str,
+        object_store: ObjectStore,
     ) -> ManifestStore:
 
 
@@ -41,10 +41,10 @@ class backend:
             # loadable_variables = []
             # indexes = {}
         filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
+            file_url, fs_root=Path.cwd().as_uri()
         )
         filename = os.path.basename(filepath)
-        reader = open_reader(store=object_reader, path=filename)
+        reader = open_reader(store=object_store, path=filename)
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
         # if fs.filepath.endswith(".parquet") and fs.fs.isfile(

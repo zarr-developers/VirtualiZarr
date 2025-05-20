@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from virtualizarr.backends.hdf import HDFBackend
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
@@ -32,11 +32,11 @@ class TestHDFManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = obstore_local(filepath=filepath)
-        backend = HDFBackend()
-        manifest_store = backend(
-            filepath=filepath,
-            object_reader=store,
+        store = obstore_local(file_url=filepath)
+        parser = HDFParser()
+        manifest_store = parser(
+            file_url=filepath,
+            object_store=store,
         )
         rountripped_ds = xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
@@ -48,11 +48,11 @@ class TestHDFManifestStore:
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = obstore_local(filepath=filepath)
-        backend = HDFBackend()
-        manifest_store = backend(
-            filepath=filepath,
-            object_reader=store,
+        store = obstore_local(file_url=filepath)
+        parser = HDFParser()
+        manifest_store = parser(
+            file_url=filepath,
+            object_store=store,
         )
         rountripped_ds = xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
@@ -73,10 +73,10 @@ class TestHDFManifestStore:
             },
             client_options={"allow_http": True},
         )
-        backend = HDFBackend()
-        manifest_store = backend(
-            filepath=chunked_roundtrip_hdf5_s3_file,
-            object_reader=s3store
+        parser = HDFParser()
+        manifest_store = parser(
+            file_url=chunked_roundtrip_hdf5_s3_file,
+            object_store=s3store
         )
         
         vds = manifest_store.to_virtual_dataset()

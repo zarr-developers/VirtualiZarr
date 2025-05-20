@@ -5,14 +5,13 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 import pytest
-import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.backends import DMRPPBackend
-from virtualizarr.backends.dmrpp import DMRParser
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.parsers import DMRPPParser
+from virtualizarr.parsers.dmrpp import DMRParser
 from virtualizarr.tests import requires_network
-from virtualizarr.tests.utils import obstore_local
+from virtualizarr.tests.utils import obstore_http, obstore_local
 from virtualizarr.xarray import open_virtual_dataset
 
 urls = [
@@ -183,9 +182,17 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 @pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, filetype="dmrpp", loadable_variables=[])
-    expected = open_virtual_dataset(data_url, loadable_variables=[])
-    xr.testing.assert_identical(result, expected)
+    store = obstore_http(file_url=dmrpp_url)
+    # parser = DMRPPParser()
+    # result = open_virtual_dataset(
+        # file_url=dmrpp_url,
+        # object_store=store,
+        # parser=parser,
+        # loadable_variables=[]
+    # )
+    # print(result)
+    # expected = open_virtual_dataset(data_url, loadable_variables=[])
+    # xr.testing.assert_identical(result, expected)
 
 
 @pytest.mark.parametrize(
@@ -234,8 +241,8 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
 
 def test_parse_dataset(tmp_path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
-    store = obstore_local(filepath=basic_dmrpp.data_filepath)
-    ms = basic_dmrpp.parse_dataset(object_reader=store)
+    store = obstore_local(file_url=basic_dmrpp.data_filepath)
+    ms = basic_dmrpp.parse_dataset(object_store=store)
     vds = ms.to_virtual_dataset()
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
     assert vds.data_vars.keys() == {"data", "mask"}
@@ -248,12 +255,12 @@ def test_parse_dataset(tmp_path):
     )
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
-        object_reader=store
+        object_store=store
     ).to_virtual_dataset(
         loadable_variables=[]
     )
     vds_root = nested_groups_dmrpp.parse_dataset(
-        group="/", object_reader=store
+        group="/", object_store=store
     ).to_virtual_dataset(
         loadable_variables=[]
     )
@@ -264,7 +271,7 @@ def test_parse_dataset(tmp_path):
 
     vds_g1 = nested_groups_dmrpp.parse_dataset(
         group="/group1",
-        object_reader=store
+        object_store=store
     ).to_virtual_dataset(
         loadable_variables=[]
     )
@@ -273,7 +280,7 @@ def test_parse_dataset(tmp_path):
 
     vds_g2 = nested_groups_dmrpp.parse_dataset(
         group="/group1/group2",
-        object_reader=store
+        object_store=store
     ).to_virtual_dataset(
         loadable_variables=[]
     )
@@ -443,12 +450,12 @@ class TestRelativePaths:
         self,
         basic_dmrpp_temp_filepath: Path,
     ):
-        store = obstore_local(filepath=basic_dmrpp_temp_filepath.as_posix())
-        backend = DMRPPBackend()
+        store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+        parser = DMRPPParser()
         vds = open_virtual_dataset(
-            filepath=basic_dmrpp_temp_filepath.as_posix(),
-            object_reader=store,
-            backend=backend,
+            file_url=basic_dmrpp_temp_filepath.as_posix(),
+            object_store=store,
+            parser=parser,
             loadable_variables=[],
         )
         path = vds["x"].data.manifest["0"]["path"]
@@ -465,12 +472,12 @@ class TestRelativePaths:
         relative_dmrpp_filepath = os.path.relpath(
             str(basic_dmrpp_temp_filepath), start=os.getcwd()
         )
-        store = obstore_local(filepath=relative_dmrpp_filepath)
-        backend = DMRPPBackend()
+        store = obstore_local(file_url=relative_dmrpp_filepath)
+        parser = DMRPPParser()
         vds = open_virtual_dataset(
-            filepath=relative_dmrpp_filepath,
-            object_reader=store,
-            backend=backend,
+            file_url=relative_dmrpp_filepath,
+            object_store=store,
+            parser=parser,
             loadable_variables=[],
         )
         path = vds["x"].data.manifest["0"]["path"]
@@ -484,12 +491,12 @@ class TestRelativePaths:
 
 @pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
 def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
-    store = obstore_local(filepath=basic_dmrpp_temp_filepath.as_posix())
-    backend = DMRPPBackend(drop_variables=drop_variables)
+    store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+    parser = DMRPPParser(drop_variables=drop_variables)
     vds = open_virtual_dataset(
-        filepath=basic_dmrpp_temp_filepath.as_posix(),
-        object_reader=store,
-        backend=backend,
+        file_url=basic_dmrpp_temp_filepath.as_posix(),
+        object_store=store,
+        parser=parser,
         loadable_variables=[],
     )
     assert all(var not in vds for var in drop_variables)

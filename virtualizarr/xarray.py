@@ -24,10 +24,10 @@ from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.backends import Backend
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
+from virtualizarr.parsers import Parser
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -38,9 +38,9 @@ if TYPE_CHECKING:
 
 
 def open_virtual_dataset(
-    filepath: str,
-    object_reader: ObjectStore, 
-    backend: Backend,
+    file_url: str,
+    object_store: ObjectStore, 
+    parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
@@ -48,16 +48,16 @@ def open_virtual_dataset(
     indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
     filepath = validate_and_normalize_path_to_uri(
-        filepath, fs_root=Path.cwd().as_uri()
+        file_url, fs_root=Path.cwd().as_uri()
     )
 
     _drop_vars: Iterable[str] = (
         [] if drop_variables is None else list(drop_variables)
     )
 
-    manifest_store = backend(
-        filepath=filepath,
-        object_reader=object_reader,
+    manifest_store = parser(
+        file_url=filepath,
+        object_store=object_store,
     )
 
     ds = manifest_store.to_virtual_dataset(
@@ -73,8 +73,8 @@ def open_virtual_mfdataset(
     | os.PathLike
     | Sequence[str | os.PathLike]
     | "NestedSequence[str | os.PathLike]",
-    object_reader: ObjectStore, 
-    backend: Backend,
+    object_store: ObjectStore, 
+    parser: Parser,
     concat_dim: (
         str
         | DataArray
@@ -186,9 +186,9 @@ def open_virtual_mfdataset(
         def _open_and_preprocess(path: str) -> xr.Dataset:
              
             ds = open_virtual_dataset(
-                filepath=path, 
-                object_reader=object_reader,
-                backend=backend,
+                file_url=path, 
+                object_store=object_store,
+                parser=parser,
                 **kwargs
             )
             return preprocess(ds)
@@ -198,9 +198,9 @@ def open_virtual_mfdataset(
 
         def _open(path: str) -> xr.Dataset:
             return open_virtual_dataset(
-                filepath=path,
-                object_reader=object_reader,
-                backend=backend,
+                file_url=path,
+                object_store=object_store,
+                parser=parser,
                 **kwargs
             )
 
@@ -292,7 +292,7 @@ def construct_virtual_dataset(
     manifest_store: ManifestStore | None = None,
     # TODO remove filepath option once all readers use ManifestStore approach
     fully_virtual_ds: xr.Dataset | None = None,
-    filepath: str | None = None,
+    file_url: str | None = None,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,

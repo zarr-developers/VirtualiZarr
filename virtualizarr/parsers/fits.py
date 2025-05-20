@@ -8,26 +8,26 @@ from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
-class backend:
+class Parser:
     def __init__(
         self, 
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        remote_options: Optional[dict] = None,
+        reader_options: Optional[dict] = None,
     ):
         self.group = group
         self.drop_variables = drop_variables
-        self.remote_options = remote_options
+        self.reader_options = reader_options
 
     def __call__(
         self,
-        filepath: str,
-        object_reader: ObjectStore,
+        file_url: str,
+        object_store: ObjectStore,
     ) -> ManifestStore:
 
-        from kerchunk.tiff import tiff_to_zarr
+        from kerchunk.fits import process_file
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **self.remote_options)})
+        refs = KerchunkStoreRefs({"refs": process_file(file_url, **self.reader_options)})
 
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,

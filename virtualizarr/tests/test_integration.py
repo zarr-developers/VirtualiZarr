@@ -10,10 +10,9 @@ import xarray.testing as xrt
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
-from virtualizarr.backends import ZarrBackend
-from virtualizarr.backends.hdf import HDFBackend
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
@@ -83,11 +82,11 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     
     # loading the variables should produce same result as inlining them using kerchunk
     store = obstore_local(netcdf4_file)
-    backend = HDFBackend()
+    parser = HDFParser()
     with open_virtual_dataset(
-        filepath=netcdf4_file,
-        object_reader=store,
-        backend=backend,
+        file_url=netcdf4_file,
+        object_store=store,
+        parser=parser,
         loadable_variables=vars_to_inline, 
     ) as vds:
         refs = vds.virtualize.to_kerchunk(format="dict")
@@ -174,15 +173,15 @@ class TestRoundtrip:
         roundtrip_func: RoundtripFunction,
     ):
         air_zarr_path = str(tmp_path / "air_temperature.zarr")
-        store = obstore_local(filepath=air_zarr_path)
-        backend = ZarrBackend()
+        store = obstore_local(file_url=air_zarr_path)
+        parser = ZarrParser()
         with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
             # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
             ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
             with open_virtual_dataset(
-                filepath=air_zarr_path,
-                object_reader=store,
-                backend=backend,
+                file_url=air_zarr_path,
+                object_store=store,
+                parser=parser,
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
 
@@ -205,12 +204,12 @@ class TestRoundtrip:
             # save it to disk as netCDF (in temporary directory)
             ds.to_netcdf(air_nc_path)
             store = obstore_local(air_nc_path)
-            backend = HDFBackend()
+            parser = HDFParser()
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(
-                filepath=air_nc_path,
-                object_reader=store,
-                backend=backend
+                file_url=air_nc_path,
+                object_store=store,
+                parser=parser
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
                 # assert all_close to original dataset
@@ -246,20 +245,20 @@ class TestRoundtrip:
             ds2.to_netcdf(air2_nc_path)
 
             # use open_dataset_via_kerchunk to read it as references
-            backend = HDFBackend()
+            parser = HDFParser()
             store1 = obstore_local(air1_nc_path) 
             store2 = obstore_local(air2_nc_path) 
             with (
                 open_virtual_dataset(
-                    filepath=air1_nc_path,
-                    object_reader=store1,
-                    backend=backend,
+                    file_url=air1_nc_path,
+                    object_store=store1,
+                    parser=parser,
                     loadable_variables=time_vars,
                 ) as vds1,
                 open_virtual_dataset(
-                    filepath=air2_nc_path,
-                    object_reader=store2,
-                    backend=backend,
+                    file_url=air2_nc_path,
+                    object_store=store2,
+                    parser=parser,
                     loadable_variables=time_vars,
                 ) as vds2,
             ):
@@ -310,11 +309,11 @@ class TestRoundtrip:
         ds.to_netcdf(nc_path)
 
         store = obstore_local(nc_path)
-        backend = HDFBackend()
+        parser = HDFParser()
         with open_virtual_dataset(
-            filepath=nc_path, 
-            object_reader=store,
-            backend=backend
+            file_url=nc_path, 
+            object_store=store,
+            parser=parser
         ) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs
@@ -388,22 +387,22 @@ def test_datatree_roundtrip(
         ds1.to_netcdf(air1_nc_path)
         ds2.to_netcdf(air2_nc_path)
 
-        store1 = obstore_local(filepath=air1_nc_path)
-        store2 = obstore_local(filepath=air2_nc_path)
-        backend = HDFBackend()
+        store1 = obstore_local(file_url=air1_nc_path)
+        store2 = obstore_local(file_url=air2_nc_path)
+        parser = HDFParser()
         # use open_dataset_via_kerchunk to read it as references
         with (
             open_virtual_dataset(
-                filepath=air1_nc_path,
-                object_reader=store1,
-                backend=backend,
+                file_url=air1_nc_path,
+                object_store=store1,
+                parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds1,
             open_virtual_dataset(
-                filepath=air2_nc_path,
-                object_reader=store2,
-                backend=backend,
+                file_url=air2_nc_path,
+                object_store=store2,
+                parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds2,
@@ -470,23 +469,23 @@ def test_open_scalar_variable(tmp_path: Path):
     ds.to_netcdf(nc_path)
 
     store = obstore_local(nc_path)
-    backend = HDFBackend()
+    parser = HDFParser()
     with open_virtual_dataset(
-        filepath=nc_path,
-        object_reader=store,
-        backend=backend,
+        file_url=nc_path,
+        object_store=store,
+        parser=parser,
     ) as vds:
         assert vds["a"].shape == ()
 
 
 class TestPathsToURIs:
     def test_convert_absolute_paths_to_uris(self, netcdf4_file):
-        store = obstore_local(filepath=netcdf4_file)
-        backend = HDFBackend()
+        store = obstore_local(file_url=netcdf4_file)
+        parser = HDFParser()
         with open_virtual_dataset(
-            filepath=netcdf4_file,
-            object_reader=store,
-            backend=backend,
+            file_url=netcdf4_file,
+            object_store=store,
+            parser=parser,
         ) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()
@@ -497,11 +496,11 @@ class TestPathsToURIs:
     def test_convert_relative_paths_to_uris(self, netcdf4_file):
         relative_path = relpath(netcdf4_file)
         store = obstore_local(relative_path)
-        backend = HDFBackend()
+        parser = HDFParser()
         with open_virtual_dataset(
-            filepath=relative_path,
-            object_reader=store,
-            backend=backend,
+            file_url=relative_path,
+            object_store=store,
+            parser=parser,
         ) as vds:
             expected_path = Path(netcdf4_file).as_uri()
             manifest = vds["air"].data.manifest.dict()

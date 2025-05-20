@@ -3,7 +3,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.backends.hdf import HDFBackend
+from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_icechunk,
@@ -21,16 +21,16 @@ class TestIntegration:
     def test_filters_h5netcdf_roundtrip(
         self, tmp_path, filter_encoded_roundtrip_hdf5_file
     ):
-        store = obstore_local(filepath=filter_encoded_roundtrip_hdf5_file)
-        backend = HDFBackend()
+        store = obstore_local(file_url=filter_encoded_roundtrip_hdf5_file)
+        parser = HDFParser()
         with (
             xr.open_dataset(
                 filter_encoded_roundtrip_hdf5_file, decode_times=True
             ) as ds,
             open_virtual_dataset(
-                filepath=filter_encoded_roundtrip_hdf5_file,
-                object_reader=store,
-                backend=backend,
+                file_url=filter_encoded_roundtrip_hdf5_file,
+                object_store=store,
+                parser=parser,
                 loadable_variables=["time"],
                 cftime_variables=["time"],
             ) as vds,
@@ -46,14 +46,14 @@ class TestIntegration:
         self, tmp_path, filter_encoded_roundtrip_netcdf4_file
     ):
         filepath = filter_encoded_roundtrip_netcdf4_file["filepath"]
-        store = obstore_local(filepath=filepath)
-        backend = HDFBackend()
+        store = obstore_local(file_url=filepath)
+        parser = HDFParser()
         with (
             xr.open_dataset(filepath) as ds,
             open_virtual_dataset(
-                filepath=filepath,
-                object_reader=store,
-                backend=backend,
+                file_url=filepath,
+                object_store=store,
+                parser=parser,
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
@@ -62,14 +62,14 @@ class TestIntegration:
                 xrt.assert_equal(ds, roundtrip)
 
     def test_filter_and_cf_roundtrip(self, tmp_path, filter_and_cf_roundtrip_hdf5_file):
-        store = obstore_local(filepath=filter_and_cf_roundtrip_hdf5_file)
-        backend = HDFBackend()
+        store = obstore_local(file_url=filter_and_cf_roundtrip_hdf5_file)
+        parser = HDFParser()
         with (
             xr.open_dataset(filter_and_cf_roundtrip_hdf5_file) as ds,
             open_virtual_dataset(
-                filepath=filter_and_cf_roundtrip_hdf5_file,
-                object_reader=store,
-                backend=backend,
+                file_url=filter_and_cf_roundtrip_hdf5_file,
+                object_store=store,
+                parser=parser,
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "filter_cf_kerchunk.json")
@@ -82,14 +82,14 @@ class TestIntegration:
                 )
 
     def test_non_coord_dim_roundtrip(self, tmp_path, non_coord_dim):
-        store = obstore_local(filepath=non_coord_dim)
-        backend = HDFBackend()
+        store = obstore_local(file_url=non_coord_dim)
+        parser = HDFParser()
         with (
             xr.open_dataset(non_coord_dim) as ds,
             open_virtual_dataset(
-                filepath=non_coord_dim,
-                object_reader=store,
-                backend=backend,
+                file_url=non_coord_dim,
+                object_store=store,
+                parser=parser,
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
@@ -99,18 +99,18 @@ class TestIntegration:
 
     @requires_icechunk
     def test_cf_fill_value_roundtrip(self, tmp_path, cf_fill_value_hdf5_file):
-        store = obstore_local(filepath=cf_fill_value_hdf5_file)
-        backend = HDFBackend()
+        store = obstore_local(file_url=cf_fill_value_hdf5_file)
+        parser = HDFParser()
         with xr.open_dataset(cf_fill_value_hdf5_file, engine="h5netcdf") as ds:
             if ds["data"].dtype in [float, object]:
                 pytest.xfail(
                     "TODO: fix handling fixed-length and structured type fill value"
-                    " encoding in xarray zarr backend."
+                    " encoding in xarray zarr parser."
                 )
             with open_virtual_dataset(
-                filepath=cf_fill_value_hdf5_file,
-                object_reader=store,
-                backend=backend,
+                file_url=cf_fill_value_hdf5_file,
+                object_store=store,
+                parser=parser,
             ) as vds:
                 roundtrip = roundtrip_as_in_memory_icechunk(
                     vds, tmp_path, decode_times=False

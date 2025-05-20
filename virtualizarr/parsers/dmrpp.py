@@ -9,7 +9,6 @@ import numpy as np
 from obstore import open_reader
 from obstore.store import ObjectStore
 
-from virtualizarr.backends.utils import encode_cf_fill_value
 from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
@@ -19,10 +18,11 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 
 
-class backend:
+class Parser:
     def __init__(
         self,
         group: str | None = None,
@@ -33,8 +33,8 @@ class backend:
 
     def __call__(
         self,
-        filepath: str,
-        object_reader: ObjectStore,
+        file_url: str,
+        object_store: ObjectStore,
     ) -> ManifestStore:
         # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
         # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
@@ -54,11 +54,11 @@ class backend:
             # )
 
         filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
+            file_url, fs_root=Path.cwd().as_uri()
         )
 
         filename = os.path.basename(filepath)
-        reader = open_reader(store=object_reader, path=filename)
+        reader = open_reader(store=object_store, path=filename)
         file_bytes = reader.read().to_bytes()
         stream = io.BytesIO(file_bytes)
         
@@ -68,7 +68,7 @@ class backend:
             drop_variables=self.drop_variables,
         )
         manifest_store = parser.parse_dataset(
-            object_reader=object_reader,
+            object_store=object_store,
             group=self.group
         )
         return manifest_store
@@ -133,7 +133,7 @@ class DMRParser:
             drop_variables if drop_variables is not None else []
         )
 
-    def parse_dataset(self, object_reader: ObjectStore, group=None,) -> ManifestStore:
+    def parse_dataset(self, object_store: ObjectStore, group=None,) -> ManifestStore:
         """
         Parses the given file and creates a ManifestStore.
 
@@ -166,7 +166,7 @@ class DMRParser:
                     raise ValueError(f"Group {group} not found in DMR++ file")
         else:
             manifest_group = self._parse_dataset(self.root,)
-        registry = ObjectStoreRegistry({self.data_filepath: object_reader})
+        registry = ObjectStoreRegistry({self.data_filepath: object_store})
         return ManifestStore(store_registry=registry, group=manifest_group)
 
 
@@ -398,21 +398,15 @@ class DMRParser:
             )
             attrs["_FillValue"] = encoded_cf_fill_value
 
-        # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
-        # encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
-        # fill_value = attrs.pop("_FillValue", None)
-        # create ManifestArray
         metadata = create_v3_array_metadata(
             shape=shape,
             data_type=dtype,
             chunk_shape=chunks_shape,
-            # fill_value=fill_value,
             codecs=codecs,
             dimension_names=dims,
             attributes=attrs,
         )
         return ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
-        # return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
         """
