@@ -20,6 +20,7 @@ FillValueType = Union[
     Tuple[bytes, int],  # Structured type
 ]
 
+
 def encode_cf_fill_value(
     fill_value: Union[np.ndarray, np.generic],
     target_dtype: np.dtype,

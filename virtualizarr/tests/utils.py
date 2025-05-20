@@ -12,6 +12,7 @@ def obstore_local(file_url: str) -> ObjectStore:
     store = LocalStore(prefix=path.parent)
     return store
 
+
 def obstore_s3(file_url: str, region: str) -> ObjectStore:
     parsed = urlparse(file_url)
     bucket = parsed.netloc
@@ -19,7 +20,8 @@ def obstore_s3(file_url: str, region: str) -> ObjectStore:
     base_path = f"s3://{bucket}/{key_prefix}"
     print(base_path)
     store = from_url(url=base_path, region=region, skip_signature=True)
-    return store 
+    return store
+
 
 def obstore_http(file_url: str) -> ObjectStore:
     parsed = urlparse(file_url)
@@ -28,4 +30,3 @@ def obstore_http(file_url: str) -> ObjectStore:
     print("wat", base_path)
     store = from_url(url=base_path)
     return store
-

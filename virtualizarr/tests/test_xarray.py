@@ -327,14 +327,10 @@ class TestCombine:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1,
-                object_store=store,
-                parser=parser
+                file_url=filepath1, object_store=store, parser=parser
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2,
-                object_store=store,
-                parser=parser
+                file_url=filepath2, object_store=store, parser=parser
             ) as vds2,
         ):
             combined_vds = xr.combine_by_coords([vds2, vds1])
@@ -360,7 +356,6 @@ class TestRenamePaths:
             )
 
     def test_rename_using_function(self, netcdf4_file):
-
         def local_to_s3_url(old_local_path: str) -> str:
             from pathlib import Path
 
@@ -385,9 +380,7 @@ class TestRenamePaths:
         store = obstore_local(netcdf4_file)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
-            object_store=store,
-            parser=parser
+            file_url=netcdf4_file, object_store=store, parser=parser
         ) as vds:
             with pytest.raises(TypeError):
                 vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
@@ -428,9 +421,8 @@ def test_nbytes(simple_netcdf4):
         file_url=simple_netcdf4,
         object_store=store,
         parser=parser,
-        loadable_variables=["foo"]
+        loadable_variables=["foo"],
     ) as vds:
-
         assert vds.virtualize.nbytes == 48
 
     with open_dataset(simple_netcdf4) as ds:
@@ -443,20 +435,15 @@ class TestOpenVirtualDatasetIndexes:
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
         vds = open_virtual_dataset(
-            file_url=netcdf4_file,
-            object_store=object_store,
-            parser=parser, 
-            indexes={}
+            file_url=netcdf4_file, object_store=object_store, parser=parser, indexes={}
         )
         assert vds.indexes == {}
 
     @requires_hdf5plugin
     @requires_imagecodecs
-    def test_create_default_indexes_for_loadable_variables(
-        self, netcdf4_file
-    ):
+    def test_create_default_indexes_for_loadable_variables(self, netcdf4_file):
         loadable_variables = ["time", "lat"]
-        
+
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
         with (
@@ -529,7 +516,7 @@ class TestOpenVirtualDatasetAttrs:
         parser = HDFParser()
         # regression test for GH issue #150
         vds = open_virtual_dataset(
-            file_url=netcdf4_file, 
+            file_url=netcdf4_file,
             object_store=object_store,
             parser=parser,
         )
@@ -540,7 +527,7 @@ class TestOpenVirtualDatasetAttrs:
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
         vds = open_virtual_dataset(
-            file_url=netcdf4_file, 
+            file_url=netcdf4_file,
             object_store=object_store,
             parser=parser,
         )
@@ -557,7 +544,7 @@ class TestDetermineCoords:
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file, 
+            file_url=netcdf4_file,
             object_store=object_store,
             parser=parser,
         ) as vds:
@@ -567,10 +554,9 @@ class TestDetermineCoords:
         object_store = obstore_local(file_url=netcdf4_file_with_2d_coords)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file_with_2d_coords, 
+            file_url=netcdf4_file_with_2d_coords,
             object_store=object_store,
             parser=parser,
-
         ) as vds:
             expected_dimension_coords = ["ocean_time", "s_rho"]
             expected_2d_coords = ["lon_rho", "lat_rho", "h"]
@@ -613,19 +599,14 @@ class TestReadRemote:
             for name in ["time", "lat", "lon"]:
                 assert isinstance(vds[name].data, np.ndarray)
 
-
     @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
     def test_virtualizarr_vs_local_nisar(self):
-
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
         hdf_group = "science/LSAR/GCOV/grids/frequencyA"
         store = obstore_http(file_url=url)
         drop_variables = ["listOfCovarianceTerms", "listOfPolarizations"]
-        parser = HDFParser(
-            group=hdf_group,
-            drop_variables=drop_variables
-        )
+        parser = HDFParser(group=hdf_group, drop_variables=drop_variables)
         with (
             xr.open_dataset(
                 url,
@@ -654,7 +635,7 @@ class TestOpenVirtualDatasetHDFGroup:
         object_store = obstore_local(file_url=empty_netcdf4_file)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=empty_netcdf4_file, 
+            file_url=empty_netcdf4_file,
             object_store=object_store,
             parser=parser,
         ) as vds:
@@ -664,9 +645,7 @@ class TestOpenVirtualDatasetHDFGroup:
 
     def test_open_subgroup(self, netcdf4_file_with_data_in_multiple_groups):
         object_store = obstore_local(file_url=netcdf4_file_with_data_in_multiple_groups)
-        parser = HDFParser(
-            group = "subgroup"
-        )
+        parser = HDFParser(group="subgroup")
         with open_virtual_dataset(
             file_url=netcdf4_file_with_data_in_multiple_groups,
             object_store=object_store,
@@ -743,7 +722,6 @@ class TestLoadVirtualDataset:
                 if name in actual_loadable_variables:
                     xrt.assert_identical(vds.variables[name], ds.variables[name])
 
-
     def test_group_kwarg(self, hdf5_groups_file):
         object_store = obstore_local(file_url=hdf5_groups_file)
         parser = HDFParser(group="doesnt_exist")
@@ -764,7 +742,7 @@ class TestLoadVirtualDataset:
                 loadable_variables=vars_to_load,
                 parser=parser,
             ) as vds,
-                xr.open_dataset(hdf5_groups_file, group="test/group") as full_ds,
+            xr.open_dataset(hdf5_groups_file, group="test/group") as full_ds,
         ):
             for name in full_ds.variables:
                 if name in vars_to_load:
@@ -773,26 +751,24 @@ class TestLoadVirtualDataset:
     # @pytest.mark.xfail(reason="patches a function which no longer exists")
     # @patch("virtualizarr.translators.kerchunk.read_kerchunk_references_from_file")
     # def test_open_virtual_dataset_passes_expected_args(
-        # self, mock_read_kerchunk, netcdf4_file
+    # self, mock_read_kerchunk, netcdf4_file
     # ):
-        # reader_options = {"option1": "value1", "option2": "value2"}
-        # with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
-            # pass
-        # args = {
-            # "file_url": netcdf4_file,
-            # "filetype": None,
-            # "group": None,
-            # "reader_options": reader_options,
-        # }
-        # mock_read_kerchunk.assert_called_once_with(**args)
+    # reader_options = {"option1": "value1", "option2": "value2"}
+    # with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
+    # pass
+    # args = {
+    # "file_url": netcdf4_file,
+    # "filetype": None,
+    # "group": None,
+    # "reader_options": reader_options,
+    # }
+    # mock_read_kerchunk.assert_called_once_with(**args)
 
     def test_open_dataset_with_empty(self, hdf5_empty):
         object_store = obstore_local(file_url=hdf5_empty)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=hdf5_empty,
-            object_store=object_store,
-            parser=parser
+            file_url=hdf5_empty, object_store=object_store, parser=parser
         ) as vds:
             assert vds.empty.dims == ()
             assert vds.empty.attrs == {"empty": "true"}
@@ -801,9 +777,7 @@ class TestLoadVirtualDataset:
         object_store = obstore_local(file_url=hdf5_scalar)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=hdf5_scalar,
-            object_store=object_store,
-            parser=parser
+            file_url=hdf5_scalar, object_store=object_store, parser=parser
         ) as vds:
             assert vds.scalar.dims == ()
             assert vds.scalar.attrs == {"scalar": "true"}
@@ -820,7 +794,9 @@ preprocess_func = functools.partial(
 class TestOpenVirtualMFDataset:
     @pytest.mark.parametrize("invalid_parallel_kwarg", ["ray", Dataset])
     def test_invalid_parallel_kwarg(
-        self, netcdf4_files_factory, invalid_parallel_kwarg,
+        self,
+        netcdf4_files_factory,
+        invalid_parallel_kwarg,
     ):
         filepath1, filepath2 = netcdf4_files_factory()
         store = obstore_local(file_url=filepath1)
@@ -851,21 +827,17 @@ class TestOpenVirtualMFDataset:
             preprocess_func,
         ],
     )
-    def test_parallel_open(
-        self, netcdf4_files_factory, parallel, preprocess
-    ):
+    def test_parallel_open(self, netcdf4_files_factory, parallel, preprocess):
         filepath1, filepath2 = netcdf4_files_factory()
         store1 = obstore_local(file_url=filepath1)
         parser = HDFParser()
         vds1 = open_virtual_dataset(
-            file_url=filepath1, 
-            object_store=store1,
-            parser=parser
+            file_url=filepath1, object_store=store1, parser=parser
         )
         store2 = obstore_local(file_url=filepath2)
 
         vds2 = open_virtual_dataset(
-            file_url=filepath2, 
+            file_url=filepath2,
             object_store=store2,
             parser=parser,
         )
@@ -874,7 +846,6 @@ class TestOpenVirtualMFDataset:
         if preprocess:
             expected_vds = preprocess_func(expected_vds)
 
-        
         # test combine nested, which doesn't use in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],

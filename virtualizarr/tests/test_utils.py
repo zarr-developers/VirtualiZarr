@@ -1,4 +1,3 @@
-
 import numpy as np
 import pytest
 import xarray as xr
@@ -11,6 +10,7 @@ def dataset() -> xr.Dataset:
     return xr.Dataset(
         {"x": xr.DataArray([10, 20, 30], dims="a", coords={"a": [0, 1, 2]})}
     )
+
 
 def test_copy_and_replace_metadata(array_v3_metadata):
     old_metadata = array_v3_metadata(

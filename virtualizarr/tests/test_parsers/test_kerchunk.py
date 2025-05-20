@@ -66,11 +66,7 @@ def test_dataset_from_df_refs(refs_file_factory):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
     parser = KerchunkParser()
-    vds = open_virtual_dataset(
-        file_url=refs_file,
-        object_store=store,
-        parser=parser
-    )
+    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     assert "a" in vds
     vda = vds["a"]
@@ -106,11 +102,7 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
     store = obstore_local(file_url=refs_file)
     parser = KerchunkParser()
-    vds = open_virtual_dataset(
-        file_url=refs_file,
-        object_store=store,
-        parser=parser
-    )
+    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     vda = vds["a"]
     assert vda.data.metadata.codecs[1].to_dict() == {
@@ -133,11 +125,7 @@ def test_empty_chunk_manifest(refs_file_factory):
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray), chunks={})
     store = obstore_local(file_url=refs_file)
     parser = KerchunkParser()
-    vds = open_virtual_dataset(
-        file_url=refs_file,
-        object_store=store,
-        parser=parser
-    )
+    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     assert "a" in vds.variables
     assert isinstance(vds["a"].data, ManifestArray)
@@ -188,10 +176,10 @@ def test_handle_relative_paths(refs_file_factory):
         )
     parser = KerchunkParser(fs_root="/some_directory/")
     vds = open_virtual_dataset(
-            file_url=refs_file,
-            object_store=store,
-            parser=parser,
-        )
+        file_url=refs_file,
+        object_store=store,
+        parser=parser,
+    )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
@@ -199,9 +187,9 @@ def test_handle_relative_paths(refs_file_factory):
 
     parser = KerchunkParser(fs_root="file:///some_directory/")
     vds = open_virtual_dataset(
-            file_url=refs_file,
-            object_store=store,
-            parser=parser,
+        file_url=refs_file,
+        object_store=store,
+        parser=parser,
     )
     vda = vds["a"]
     assert vda.data.manifest.dict() == {
@@ -213,7 +201,7 @@ def test_handle_relative_paths(refs_file_factory):
 @pytest.mark.parametrize(
     "reference_format",
     # ["json", "invali", *(["parquet"] if has_fastparquet else [])],
-    ["json", "invalid"]
+    ["json", "invalid"],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
@@ -246,10 +234,10 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             with open(ref_filepath, "w") as json_file:
                 ujson.dump(example_reference_dict, json_file)
         # if reference_format == "parquet":
-            # from kerchunk.df import refs_to_dataframe
+        # from kerchunk.df import refs_to_dataframe
 
-            # ref_filepath = tmp_path / "ref.parquet"
-            # refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+        # ref_filepath = tmp_path / "ref.parquet"
+        # refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
 
         store = obstore_local(file_url=ref_filepath.as_posix())
         parser = KerchunkParser()

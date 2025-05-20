@@ -36,6 +36,7 @@ def test_read_netcdf3(netcdf3_file, array_v3_metadata):
 
     xrt.assert_identical(vds, expected_vds)
 
+
 @requires_network
 @pytest.mark.xfail(
     reason="Big endian not yet supported by zarr-python 3.0"
@@ -50,5 +51,6 @@ def test_read_http_netcdf3(array_v3_metadata):
         object_store=store,
     )
     assert isinstance(vds, xr.Dataset)
-    
+
+
 # TODO test loading data against xarray backend, see issue #394 for context

@@ -260,7 +260,7 @@ def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr.tests.utils import obstore_local
 
     store = obstore_local(file_url=netcdf4_file)
-    parser= HDFParser()
+    parser = HDFParser()
     with open_virtual_dataset(
         file_url=netcdf4_file,
         object_store=store,

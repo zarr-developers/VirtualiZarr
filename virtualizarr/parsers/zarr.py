@@ -163,7 +163,7 @@ def _construct_manifest_store(
 
 class Parser:
     def __init__(
-        self, 
+        self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
     ):
@@ -178,16 +178,14 @@ class Parser:
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
         )
-        # Temporary handling of local paths with Zarr LocalStore 
+        # Temporary handling of local paths with Zarr LocalStore
         # until zarr-python adopts obstore LocalStore
         store: Union[zarr.storage.LocalStore, zarr.storage.ObjectStore]
         if isinstance(object_store, obstore.store.LocalStore):
             parsed = urlparse(filepath)
             store = zarr.storage.LocalStore(parsed.path)
         else:
-            store = zarr.storage.ObjectStore(
-                store=object_store
-            )
+            store = zarr.storage.ObjectStore(store=object_store)
         manifest_store = _construct_manifest_store(
             store=store,
             filepath=filepath,

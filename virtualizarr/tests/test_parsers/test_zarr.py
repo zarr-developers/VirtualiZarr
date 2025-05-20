@@ -30,7 +30,7 @@ class TestOpenVirtualDatasetZarr:
             file_url=zarr_store,
             object_store=store,
             parser=parser,
-            loadable_variables=loadable_variables
+            loadable_variables=loadable_variables,
         )
         assert isinstance(vds["time"].data, np.ndarray)
         assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)

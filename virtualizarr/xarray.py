@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 def open_virtual_dataset(
     file_url: str,
-    object_store: ObjectStore, 
+    object_store: ObjectStore,
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
@@ -47,13 +47,9 @@ def open_virtual_dataset(
     cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
-    filepath = validate_and_normalize_path_to_uri(
-        file_url, fs_root=Path.cwd().as_uri()
-    )
+    filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
-    _drop_vars: Iterable[str] = (
-        [] if drop_variables is None else list(drop_variables)
-    )
+    _drop_vars: Iterable[str] = [] if drop_variables is None else list(drop_variables)
 
     manifest_store = parser(
         file_url=filepath,
@@ -73,7 +69,7 @@ def open_virtual_mfdataset(
     | os.PathLike
     | Sequence[str | os.PathLike]
     | "NestedSequence[str | os.PathLike]",
-    object_store: ObjectStore, 
+    object_store: ObjectStore,
     parser: Parser,
     concat_dim: (
         str
@@ -184,12 +180,8 @@ def open_virtual_mfdataset(
         # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
 
         def _open_and_preprocess(path: str) -> xr.Dataset:
-             
             ds = open_virtual_dataset(
-                file_url=path, 
-                object_store=object_store,
-                parser=parser,
-                **kwargs
+                file_url=path, object_store=object_store, parser=parser, **kwargs
             )
             return preprocess(ds)
 
@@ -198,10 +190,7 @@ def open_virtual_mfdataset(
 
         def _open(path: str) -> xr.Dataset:
             return open_virtual_dataset(
-                file_url=path,
-                object_store=object_store,
-                parser=parser,
-                **kwargs
+                file_url=path, object_store=object_store, parser=parser, **kwargs
             )
 
         open_func = _open
@@ -266,6 +255,7 @@ def open_virtual_mfdataset(
 
     return combined_vds
 
+
 def construct_fully_virtual_dataset(
     virtual_vars: Mapping[str, xr.Variable],
     coord_names: Iterable[str] | None = None,
@@ -306,9 +296,7 @@ def construct_virtual_dataset(
         raise NotImplementedError()
 
     if group:
-        raise NotImplementedError(
-            "ManifestStore does not yet support nested groups"
-        )
+        raise NotImplementedError("ManifestStore does not yet support nested groups")
     else:
         manifestgroup = manifest_store._group
 
@@ -325,6 +313,7 @@ def construct_virtual_dataset(
         return replace_virtual_with_loadable_vars(
             fully_virtual_ds, loadable_ds, loadable_variables
         )
+
 
 def replace_virtual_with_loadable_vars(
     fully_virtual_ds: xr.Dataset,

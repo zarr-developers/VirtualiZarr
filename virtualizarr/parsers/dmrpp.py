@@ -39,19 +39,19 @@ class Parser:
         # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
         # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
         # if loadable_variables is None or indexes is None:
-            # warnings.warn(
-                # "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
-                # "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
-                # "To silence this warning pass `loadable_variables` explicitly.",
-                # UserWarning,
-            # )
-            # loadable_variables = []
-            # indexes = {}
+        # warnings.warn(
+        # "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
+        # "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
+        # "To silence this warning pass `loadable_variables` explicitly.",
+        # UserWarning,
+        # )
+        # loadable_variables = []
+        # indexes = {}
 
         # if loadable_variables != [] or decode_times or indexes is None:
-            # raise NotImplementedError(
-                # "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
-            # )
+        # raise NotImplementedError(
+        # "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
+        # )
 
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
@@ -61,15 +61,14 @@ class Parser:
         reader = open_reader(store=object_store, path=filename)
         file_bytes = reader.read().to_bytes()
         stream = io.BytesIO(file_bytes)
-        
+
         parser = DMRParser(
             root=ET.parse(stream).getroot(),
             data_filepath=filepath.removesuffix(".dmrpp"),
             drop_variables=self.drop_variables,
         )
         manifest_store = parser.parse_dataset(
-            object_store=object_store,
-            group=self.group
+            object_store=object_store, group=self.group
         )
         return manifest_store
 
@@ -113,7 +112,12 @@ class DMRParser:
     root: ET.Element
     data_filepath: str
 
-    def __init__(self, root: ET.Element, data_filepath: Optional[str] = None, drop_variables: Optional[Iterable[str]] = None,):
+    def __init__(
+        self,
+        root: ET.Element,
+        data_filepath: Optional[str] = None,
+        drop_variables: Optional[Iterable[str]] = None,
+    ):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
 
@@ -129,11 +133,13 @@ class DMRParser:
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
-        self.drop_variables = (
-            drop_variables if drop_variables is not None else []
-        )
+        self.drop_variables = drop_variables if drop_variables is not None else []
 
-    def parse_dataset(self, object_store: ObjectStore, group=None,) -> ManifestStore:
+    def parse_dataset(
+        self,
+        object_store: ObjectStore,
+        group=None,
+    ) -> ManifestStore:
         """
         Parses the given file and creates a ManifestStore.
 
@@ -161,14 +167,17 @@ class DMRParser:
             else:
                 all_groups = self._split_groups(self.root)
                 if group in all_groups:
-                    manifest_group = self._parse_dataset(all_groups[group],)
+                    manifest_group = self._parse_dataset(
+                        all_groups[group],
+                    )
                 else:
                     raise ValueError(f"Group {group} not found in DMR++ file")
         else:
-            manifest_group = self._parse_dataset(self.root,)
+            manifest_group = self._parse_dataset(
+                self.root,
+            )
         registry = ObjectStoreRegistry({self.data_filepath: object_store})
         return ManifestStore(store_registry=registry, group=manifest_group)
-
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
         """
@@ -241,7 +250,8 @@ class DMRParser:
         return group_dict
 
     def _parse_dataset(
-        self, root: ET.Element,
+        self,
+        root: ET.Element,
     ) -> ManifestGroup:
         """
         Parse the dataset using the root element of the DMR++ file.
@@ -255,13 +265,13 @@ class DMRParser:
         -------
         ManifestGroup
         """
-        
+
         manifest_dict: dict[str, ManifestArray] = {}
         for var_tag in self._find_var_tags(root):
             if var_tag.attrib["name"] not in self.drop_variables:
                 variable = self._parse_variable(var_tag)
                 manifest_dict[var_tag.attrib["name"]] = variable
-            
+
         # Attributes
         attrs: dict[str, str] = {}
         # Look for an attribute tag called "HDF5_GLOBAL" and unpack it
@@ -397,9 +407,7 @@ class DMRParser:
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
         if "_FillValue" in attrs:
-            encoded_cf_fill_value = encode_cf_fill_value(
-                attrs["_FillValue"], dtype
-            )
+            encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
             attrs["_FillValue"] = encoded_cf_fill_value
 
         metadata = create_v3_array_metadata(

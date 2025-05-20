@@ -9,7 +9,7 @@ from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 
 class Parser:
     def __init__(
-        self, 
+        self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_options: Optional[dict] = {},
@@ -23,10 +23,12 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-
         from kerchunk.netCDF3 import NetCDF3ToZarr
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = NetCDF3ToZarr(file_url, inline_threshold=0, **self.reader_options).translate()
+        refs = NetCDF3ToZarr(
+            file_url, inline_threshold=0, **self.reader_options
+        ).translate()
 
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,

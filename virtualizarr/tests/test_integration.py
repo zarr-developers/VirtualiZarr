@@ -71,7 +71,9 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     ],
 )
 def test_numpy_arrays_to_inlined_kerchunk_refs(
-    netcdf4_file, inline_threshold, vars_to_inline,
+    netcdf4_file,
+    inline_threshold,
+    vars_to_inline,
 ):
     from kerchunk.hdf import SingleHdf5ToZarr
 
@@ -79,7 +81,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     expected = SingleHdf5ToZarr(
         netcdf4_file, inline_threshold=int(inline_threshold)
     ).translate()
-    
+
     # loading the variables should produce same result as inlining them using kerchunk
     store = obstore_local(netcdf4_file)
     parser = HDFParser()
@@ -87,7 +89,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
         file_url=netcdf4_file,
         object_store=store,
         parser=parser,
-        loadable_variables=vars_to_inline, 
+        loadable_variables=vars_to_inline,
     ) as vds:
         refs = vds.virtualize.to_kerchunk(format="dict")
 
@@ -207,9 +209,7 @@ class TestRoundtrip:
             parser = HDFParser()
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(
-                file_url=air_nc_path,
-                object_store=store,
-                parser=parser
+                file_url=air_nc_path, object_store=store, parser=parser
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
                 # assert all_close to original dataset
@@ -246,8 +246,8 @@ class TestRoundtrip:
 
             # use open_dataset_via_kerchunk to read it as references
             parser = HDFParser()
-            store1 = obstore_local(air1_nc_path) 
-            store2 = obstore_local(air2_nc_path) 
+            store1 = obstore_local(air1_nc_path)
+            store2 = obstore_local(air2_nc_path)
             with (
                 open_virtual_dataset(
                     file_url=air1_nc_path,
@@ -291,9 +291,7 @@ class TestRoundtrip:
                         == ds.time.encoding["calendar"]
                     )
 
-    @pytest.mark.xfail(
-        reason="To fix coordinate behavior with HDF reader"
-    )
+    @pytest.mark.xfail(reason="To fix coordinate behavior with HDF reader")
     def test_non_dimension_coordinates(
         self,
         tmp_path: Path,
@@ -311,9 +309,7 @@ class TestRoundtrip:
         store = obstore_local(nc_path)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=nc_path, 
-            object_store=store,
-            parser=parser
+            file_url=nc_path, object_store=store, parser=parser
         ) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs

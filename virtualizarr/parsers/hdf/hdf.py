@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
     from obstore.store import ObjectStore
 
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -70,9 +71,7 @@ def _construct_manifest_array(
     # dtype = dataset.dtype
 
     if "_FillValue" in attrs:
-        encoded_cf_fill_value = encode_cf_fill_value(
-            attrs["_FillValue"], dtype
-        )
+        encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
     codec_configs = [
@@ -92,6 +91,7 @@ def _construct_manifest_array(
     )
     manifest = _dataset_chunk_manifest(filepath, dataset)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
 
 def _construct_manifest_group(
     filepath: str,
@@ -124,9 +124,7 @@ def _construct_manifest_group(
     # yet supported in zarr-python v3.  We'll drop these variables for the
     # moment until big endian support is included upstream.)
 
-    non_coordinate_dimension_vars = (
-        _find_non_coord_dimension_vars(group=g)
-    )
+    non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
     drop_variables = list(set(list(drop_variables) + non_coordinate_dimension_vars))
     attrs = _extract_attrs(g)
     for key in g.keys():
@@ -141,9 +139,10 @@ def _construct_manifest_group(
                     manifest_dict[key] = variable
     return ManifestGroup(arrays=manifest_dict, attributes=attrs)
 
+
 class Parser:
     def __init__(
-        self, 
+        self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
     ):
@@ -159,7 +158,7 @@ class Parser:
             raise ImportError("h5py is required for using the hdf parser")
         # Create a group containing dataset level metadata and all the manifest arrays
 
-        filename = os.path.basename(file_url) 
+        filename = os.path.basename(file_url)
         reader = ObstoreReader(store=object_store, path=filename)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
@@ -170,6 +169,7 @@ class Parser:
         registry = ObjectStoreRegistry({file_url: object_store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
+
 
 def _dataset_chunk_manifest(
     filepath: str,
@@ -241,6 +241,7 @@ def _dataset_chunk_manifest(
             )
     return chunk_manifest
 
+
 def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
@@ -287,6 +288,7 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
         group += "/"
 
     return [dim.removeprefix(group) for dim in dims]
+
 
 def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
     """
@@ -345,5 +347,3 @@ def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
                 non_coordinate_dimension_variables.append(name)
 
     return non_coordinate_dimension_variables
-
-

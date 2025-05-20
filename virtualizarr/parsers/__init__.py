@@ -21,6 +21,7 @@ __all__ = [
     "ZarrParser",
 ]
 
+
 @runtime_checkable
 class Parser(Protocol):
     def __call__(

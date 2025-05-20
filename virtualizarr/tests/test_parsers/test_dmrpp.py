@@ -183,23 +183,17 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 def test_NASA_dmrpp(data_url, dmrpp_url):
     store = obstore_s3(
-        file_url=dmrpp_url, 
+        file_url=dmrpp_url,
         region="us-west-2",
     )
 
     parser = DMRPPParser()
     result = open_virtual_dataset(
-        file_url=dmrpp_url,
-        object_store=store,
-        parser=parser,
-        loadable_variables=[]
+        file_url=dmrpp_url, object_store=store, parser=parser, loadable_variables=[]
     )
     hdf_parser = HDFParser()
     expected = open_virtual_dataset(
-        file_url=data_url,
-        object_store=store,
-        parser=hdf_parser,
-        loadable_variables=[]
+        file_url=data_url, object_store=store, parser=hdf_parser, loadable_variables=[]
     )
     xr.testing.assert_identical(result, expected)
 
@@ -265,35 +259,25 @@ def test_parse_dataset(tmp_path):
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
         object_store=store
-    ).to_virtual_dataset(
-        loadable_variables=[]
-    )
+    ).to_virtual_dataset(loadable_variables=[])
     vds_root = nested_groups_dmrpp.parse_dataset(
         group="/", object_store=store
-    ).to_virtual_dataset(
-        loadable_variables=[]
-    )
+    ).to_virtual_dataset(loadable_variables=[])
 
     xrt.assert_identical(vds_root_implicit, vds_root)
     assert vds_root.sizes == {"a": 10, "b": 10}
     assert vds_root.coords.keys() == {"a", "b"}
 
     vds_g1 = nested_groups_dmrpp.parse_dataset(
-        group="/group1",
-        object_store=store
-    ).to_virtual_dataset(
-        loadable_variables=[]
-    )
+        group="/group1", object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
     assert vds_g1.sizes == {"x": 720, "y": 1440}
     assert vds_g1.coords.keys() == {"x", "y"}
 
     vds_g2 = nested_groups_dmrpp.parse_dataset(
-        group="/group1/group2",
-        object_store=store
-    ).to_virtual_dataset(
-        loadable_variables=[]
-    )
-    
+        group="/group1/group2", object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
+
     assert vds_g2.sizes == {"x": 720, "y": 1440}
     assert vds_g2.data_vars.keys() == {"area"}
     assert vds_g2.data_vars["area"].dims == ("x", "y")
@@ -338,7 +322,7 @@ def test_parse_variable(tmp_path):
     assert var.metadata.attributes["_FillValue"] == "AAAAAAAA4MA="
     assert var.metadata.attributes["add_offset"] == 298.15
     assert var.metadata.attributes["scale_factor"] == 0.001
-    assert var.metadata.attributes["long_name"] ==  "analysed sea surface temperature"
+    assert var.metadata.attributes["long_name"] == "analysed sea surface temperature"
     assert var.metadata.attributes["items"] == [1, 2, 3]
     assert var.metadata.attributes["coordinates"] == "x y z"
 

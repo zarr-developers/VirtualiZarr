@@ -43,7 +43,6 @@ class ObstoreReader:
         return self._reader.tell()
 
 
-
 def check_for_collisions(
     drop_variables: Iterable[str] | None,
     loadable_variables: Iterable[str] | None,

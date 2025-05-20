@@ -10,7 +10,7 @@ from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 class Parser:
     def __init__(
-        self, 
+        self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         remote_options: Optional[dict] = None,
@@ -24,10 +24,12 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-
         from kerchunk.tiff import tiff_to_zarr
+
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs({"refs": tiff_to_zarr(file_url, **self.remote_options)})
+        refs = KerchunkStoreRefs(
+            {"refs": tiff_to_zarr(file_url, **self.remote_options)}
+        )
 
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,
