@@ -29,6 +29,7 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.0.7",
+    "obstore>=0.5.1",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -40,9 +41,6 @@ remote = [
     "aiohttp",
     "s3fs",
 ]
-obstore = [
-    "obstore>=0.5.1",
-]
 # non-kerchunk-based readers
 hdf = [
     "virtualizarr[remote]",
@@ -50,7 +48,6 @@ hdf = [
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "obstore>=0.5.1",
 ]
 
 # kerchunk-based readers
