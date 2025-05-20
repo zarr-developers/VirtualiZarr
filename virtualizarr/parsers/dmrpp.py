@@ -375,7 +375,7 @@ class DMRParser:
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
-        array_fill_value = 0
+        array_fill_value = np.array(0).astype(dtype)[()]
         if chunks_tag is not None:
             # Chunks
             chunk_dim_text = chunks_tag.findtext(
