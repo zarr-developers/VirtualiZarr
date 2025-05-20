@@ -41,6 +41,9 @@ remote = [
     "aiohttp",
     "s3fs",
 ]
+obstore = [
+    "obstore>=0.5.1",
+]
 # non-kerchunk-based readers
 hdf = [
     "virtualizarr[remote]",
