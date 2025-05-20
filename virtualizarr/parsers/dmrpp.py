@@ -375,6 +375,7 @@ class DMRParser:
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
+        array_fill_value = 0
         if chunks_tag is not None:
             # Chunks
             chunk_dim_text = chunks_tag.findtext(
@@ -385,6 +386,9 @@ class DMRParser:
                 chunks_shape = tuple(map(int, chunk_dim_text.split()))
             else:
                 chunks_shape = shape
+            if "fillValue" in chunks_tag.attrib:
+                fillValue_attrib = chunks_tag.attrib["fillValue"]
+                array_fill_value = np.array(fillValue_attrib).astype(dtype)[()]
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
             codecs = self._parse_filters(chunks_tag, dtype)
@@ -405,6 +409,7 @@ class DMRParser:
             codecs=codecs,
             dimension_names=dims,
             attributes=attrs,
+            fill_value=array_fill_value,
         )
         return ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
 

@@ -5,19 +5,20 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 import pytest
+import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.parsers import DMRPPParser
+from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
 from virtualizarr.tests import requires_network
-from virtualizarr.tests.utils import obstore_http, obstore_local
+from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset
 
 urls = [
     (
-        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc",
-        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc.dmrpp",
+        "s3://its-live-data/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc",
+        "s3://its-live-data/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc.dmrpp",
     )
     # TODO: later add MUR, SWOT, TEMPO and others by using kerchunk JSON to read refs (rather than reading the whole netcdf file)
 ]
@@ -180,19 +181,27 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 
 @requires_network
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
-@pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    store = obstore_http(file_url=dmrpp_url)
-    # parser = DMRPPParser()
-    # result = open_virtual_dataset(
-        # file_url=dmrpp_url,
-        # object_store=store,
-        # parser=parser,
-        # loadable_variables=[]
-    # )
-    # print(result)
-    # expected = open_virtual_dataset(data_url, loadable_variables=[])
-    # xr.testing.assert_identical(result, expected)
+    store = obstore_s3(
+        file_url=dmrpp_url, 
+        region="us-west-2",
+    )
+
+    parser = DMRPPParser()
+    result = open_virtual_dataset(
+        file_url=dmrpp_url,
+        object_store=store,
+        parser=parser,
+        loadable_variables=[]
+    )
+    hdf_parser = HDFParser()
+    expected = open_virtual_dataset(
+        file_url=data_url,
+        object_store=store,
+        parser=hdf_parser,
+        loadable_variables=[]
+    )
+    xr.testing.assert_identical(result, expected)
 
 
 @pytest.mark.parametrize(
