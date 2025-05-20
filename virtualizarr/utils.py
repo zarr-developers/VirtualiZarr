@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import io
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 from urllib.parse import urlparse
 
@@ -14,7 +13,6 @@ from virtualizarr.codecs import extract_codecs, get_codec_config
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
-    import upath
     from obstore import ReadableFile
     from obstore.store import ObjectStore
 
@@ -44,61 +42,6 @@ class ObstoreReader:
     def tell(self) -> int:
         return self._reader.tell()
 
-
-
-@dataclass
-class _FsspecFSFromFilepath:
-    """Class to create fsspec Filesystem from input filepath.
-
-    Parameters
-    ----------
-    filepath : str
-        Input filepath
-    reader_options : dict, optional
-        dict containing kwargs to pass to file opener, by default {}
-    fs : Option | None
-        The fsspec filesystem object, created in __post_init__
-
-    """
-
-    filepath: str
-    reader_options: Optional[dict] = field(default_factory=dict)
-    fs: fsspec.AbstractFileSystem = field(init=False)
-    upath: upath.core.UPath = field(init=False)
-
-    def open_file(self) -> OpenFileType:
-        """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
-
-        Returns
-        -------
-        OpenFileType
-            file opened with fsspec
-        """
-        return self.fs.open(self.filepath)
-
-    def read_bytes(self, bytes: int) -> bytes:
-        with self.open_file() as of:
-            return of.read(bytes)
-
-    def get_mapper(self):
-        """Returns a mapper for use with Zarr"""
-        return self.fs.get_mapper(self.filepath)
-
-    def __post_init__(self) -> None:
-        """Initialize the fsspec filesystem object"""
-        import fsspec
-        from upath import UPath
-
-        if not isinstance(self.filepath, UPath):
-            upath = UPath(self.filepath)
-
-        self.upath = upath
-        self.protocol = upath.protocol
-
-        self.reader_options = self.reader_options or {}
-        storage_options = self.reader_options.get("storage_options", {})  # type: ignore
-
-        self.fs = fsspec.filesystem(self.protocol, **storage_options)
 
 
 def check_for_collisions(

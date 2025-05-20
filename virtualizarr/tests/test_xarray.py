@@ -15,7 +15,6 @@ from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
-    has_astropy,
     requires_dask,
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -587,7 +586,7 @@ class TestDetermineCoords:
 
 
 @requires_network
-class TestReadFromS3:
+class TestReadRemote:
     @pytest.mark.parametrize(
         "indexes",
         [
@@ -615,109 +614,30 @@ class TestReadFromS3:
                 assert isinstance(vds[name].data, np.ndarray)
 
 
-# @requires_network
-class TestReadFromURL:
-    @pytest.mark.parametrize(
-        "filetype, url",
-        [
-            (
-                "grib",
-                "https://github.com/pydata/xarray-data/raw/master/era5-2mt-2019-03-uk.grib",
-            ),
-            pytest.param(
-                "netcdf3",
-                "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc",
-                marks=pytest.mark.xfail(
-                    reason="Big endian not yet supported by zarr-python 3.0"
-                ),  # https://github.com/zarr-developers/zarr-python/issues/2324
-            ),
-            (
-                "netcdf4",
-                "https://github.com/pydata/xarray-data/raw/master/ROMS_example.nc",
-            ),
-            pytest.param(
-                "hdf4",
-                "https://github.com/corteva/rioxarray/raw/master/test/test_data/input/MOD09GA.A2008296.h14v17.006.2015181011753.hdf",
-                marks=pytest.mark.skip(reason="often times out"),
-            ),
-            pytest.param(
-                "hdf5",
-                "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5",
-                marks=pytest.mark.skip(reason="often times out"),
-            ),
-            # https://github.com/zarr-developers/VirtualiZarr/issues/159
-            # ("hdf5", "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/NEONDSTowerTemperatureData.hdf5"),
-            pytest.param(
-                "tiff",
-                "https://github.com/fsspec/kerchunk/raw/main/kerchunk/tests/lcmap_tiny_cog_2020.tif",
-                marks=pytest.mark.xfail(reason="not yet implemented"),
-            ),
-            pytest.param(
-                "fits",
-                "https://fits.gsfc.nasa.gov/samples/WFPC2u5780205r_c0fx.fits",
-                marks=[
-                    pytest.mark.skipif(
-                        not has_astropy, reason="package astropy is not available"
-                    ),
-                    pytest.mark.xfail(
-                        reason="Big endian not yet supported by zarr-python 3.0"
-                    ),  # https://github.com/zarr-developers/zarr-python/issues/2324
-                ],
-            ),
-            (
-                "jpg",
-                "https://github.com/rasterio/rasterio/raw/main/tests/data/389225main_sw_1965_1024.jpg",
-            ),
-        ],
-    )
-    def test_read_from_url(self, filetype, url):
-        if filetype == "netcdf3":
-            pytest.importorskip("scipy")
-        # if filetype in ["grib", "jpg", "hdf4"]:
-            # with pytest.raises(NotImplementedError):
-                # open_virtual_dataset(url, reader_options={})
-        elif filetype == "hdf5":
-            object_store = obstore_http(file_url=url)
-            parser = HDFParser(
-                group="science/LSAR/GCOV/grids/frequencyA",
-                drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
-            )
-            with open_virtual_dataset(
-                file_url=url,
-                object_store=object_store,
-                parser=parser,
-            ) as vds:
-                assert isinstance(vds, xr.Dataset)
-        # else:
-            # parser_args = obstore_http(file_url=url)
-            # with open_virtual_dataset(url) as vds:
-                # assert isinstance(vds, xr.Dataset)
-
     @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
-    def test_virtualizarr_vs_local_nisar(self, parser):
-        import fsspec
+    def test_virtualizarr_vs_local_nisar(self):
 
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
-        tmpfile = fsspec.open_local(
-            f"filecache::{url}", filecache=dict(cache_storage="/tmp", same_names=True)
-        )
-        assert isinstance(tmpfile, str)  # make type-checkers happy
         hdf_group = "science/LSAR/GCOV/grids/frequencyA"
-
+        store = obstore_http(file_url=url)
+        drop_variables = ["listOfCovarianceTerms", "listOfPolarizations"]
+        parser = HDFParser(
+            group=hdf_group,
+            drop_variables=drop_variables
+        )
         with (
             xr.open_dataset(
-                tmpfile,
+                url,
                 engine="h5netcdf",
                 group=hdf_group,
-                drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+                drop_variables=drop_variables,
                 phony_dims="access",
             ) as dsXR,
             # save group reference file via virtualizarr, then open with engine="kerchunk"
             open_virtual_dataset(
-                tmpfile,
-                group=hdf_group,
-                drop_variables=["listOfCovarianceTerms", "listOfPolarizations"],
+                file_url=url,
+                object_store=store,
                 parser=parser,
             ) as vds,
         ):
