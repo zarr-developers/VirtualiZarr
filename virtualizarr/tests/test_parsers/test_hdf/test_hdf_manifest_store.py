@@ -25,13 +25,31 @@ def basic_ds():
 
 
 @requires_hdf5plugin
-@requires_obstore
 class TestHDFManifestStore:
     def test_roundtrip_simple_virtualdataset(self, tmpdir, basic_ds):
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
+        store = obstore_local(file_url=filepath)
+        parser = HDFParser()
+        manifest_store = parser(
+            file_url=filepath,
+            object_store=store,
+        )
+        rountripped_ds = xr.open_dataset(
+            manifest_store, engine="zarr", consolidated=False, zarr_format=3
+        )
+        xr.testing.assert_allclose(basic_ds, rountripped_ds)
+
+    def test_rountrip_partial_chunk_virtualdataset(self, tmpdir, basic_ds):
+        "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore with a single partial chunk"
+
+        filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        encoding = {
+            "temperature": {"chunksizes": (90, 90), "original_shape": (100, 100)}
+        }
+        basic_ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
         store = obstore_local(file_url=filepath)
         parser = HDFParser()
         manifest_store = parser(
