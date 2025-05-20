@@ -29,6 +29,7 @@ class ObstoreReader:
     def __init__(self, store: ObjectStore, path: str) -> None:
         import obstore as obs
         from obstore.store import LocalStore
+
         parsed = urlparse(path)
         if isinstance(store, LocalStore):
             filepath = os.path.basename(parsed.path)

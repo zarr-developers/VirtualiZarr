@@ -155,7 +155,7 @@ class Parser:
     ) -> ManifestStore:
         if h5py is None:
             raise ImportError("h5py is required for using the hdf parser")
-        
+
         reader = ObstoreReader(store=object_store, path=file_url)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
