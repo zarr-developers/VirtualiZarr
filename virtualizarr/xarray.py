@@ -289,10 +289,7 @@ def construct_fully_virtual_dataset(
 
 
 def construct_virtual_dataset(
-    manifest_store: ManifestStore | None = None,
-    # TODO remove filepath option once all readers use ManifestStore approach
-    fully_virtual_ds: xr.Dataset | None = None,
-    file_url: str | None = None,
+    manifest_store: ManifestStore,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
@@ -300,10 +297,9 @@ def construct_virtual_dataset(
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
-    Construct a fully or partly virtual dataset from a ManifestStore (or filepath for backwards compatibility),
+    Construct a fully or partly virtual dataset from a ManifestStore
     containing the contents of one group.
 
-    Accepts EITHER manifest_store OR fully_virtual_ds and filepath. The latter option should be removed once all readers use ManifestStore approach.
     """
 
     if indexes is not None:

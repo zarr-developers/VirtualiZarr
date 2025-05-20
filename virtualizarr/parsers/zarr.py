@@ -6,6 +6,7 @@ from typing import (
     Any,
     Hashable,
     Iterable,
+    Union,
 )
 from urllib.parse import urlparse
 
@@ -179,6 +180,7 @@ class Parser:
         )
         # Temporary handling of local paths with Zarr LocalStore 
         # until zarr-python adopts obstore LocalStore
+        store: Union[zarr.storage.LocalStore, zarr.storage.ObjectStore]
         if isinstance(object_store, obstore.store.LocalStore):
             parsed = urlparse(filepath)
             store = zarr.storage.LocalStore(parsed.path)

@@ -33,7 +33,6 @@ h5py = soft_import("h5py", "For reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore import ReadableFile
     from obstore.store import ObjectStore
 
 def _construct_manifest_array(
@@ -96,7 +95,7 @@ def _construct_manifest_array(
 
 def _construct_manifest_group(
     filepath: str,
-    file: ReadableFile,
+    reader: ObstoreReader,
     *,
     group: str | None = None,
     drop_variables: Optional[Iterable[str]] = None,
@@ -108,7 +107,7 @@ def _construct_manifest_group(
     if drop_variables is None:
         drop_variables = []
 
-    f = h5py.File(file, mode="r")
+    f = h5py.File(reader, mode="r")
 
     if group is not None and group != "":
         g = f[group]
@@ -161,10 +160,10 @@ class Parser:
         # Create a group containing dataset level metadata and all the manifest arrays
 
         filename = os.path.basename(file_url) 
-        file = ObstoreReader(store=object_store, path=filename)
+        reader = ObstoreReader(store=object_store, path=filename)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
-            file=file,
+            reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
         )

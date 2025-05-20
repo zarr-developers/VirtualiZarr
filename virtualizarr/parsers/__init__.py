@@ -24,6 +24,7 @@ __all__ = [
 @runtime_checkable
 class Parser(Protocol):
     def __call__(
+        self,
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore: ...
