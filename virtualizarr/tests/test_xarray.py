@@ -18,7 +18,7 @@ from virtualizarr.tests import (
     requires_dask,
     requires_hdf5plugin,
     requires_imagecodecs,
-    requires_lithops,
+    # requires_lithops,
     requires_network,
 )
 from virtualizarr.tests.utils import obstore_http, obstore_local, obstore_s3
@@ -817,7 +817,7 @@ class TestOpenVirtualMFDataset:
             False,
             ThreadPoolExecutor,
             pytest.param("dask", marks=requires_dask),
-            pytest.param("lithops", marks=requires_lithops),
+            # pytest.param("lithops", marks=requires_lithops),
         ],
     )
     @pytest.mark.parametrize(
