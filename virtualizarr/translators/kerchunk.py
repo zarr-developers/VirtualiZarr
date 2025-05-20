@@ -36,9 +36,9 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
             codec.get_config()
             for codec in v2_metadata.filters
             if codec is not None
-        ]  # type: ignore[assignment]
+        ]  # type: ignore
     if v2_metadata.compressor:
-        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore[assignment]
+        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore
 
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
