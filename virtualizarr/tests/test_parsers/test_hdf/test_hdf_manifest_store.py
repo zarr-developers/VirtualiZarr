@@ -95,7 +95,7 @@ class TestHDFManifestStore:
         manifest_store = parser(
             file_url=chunked_roundtrip_hdf5_s3_file, object_store=s3store
         )
-
+        
         vds = manifest_store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)

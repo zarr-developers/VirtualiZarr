@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import os
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -156,10 +155,8 @@ class Parser:
     ) -> ManifestStore:
         if h5py is None:
             raise ImportError("h5py is required for using the hdf parser")
-        # Create a group containing dataset level metadata and all the manifest arrays
-
-        filename = os.path.basename(file_url)
-        reader = ObstoreReader(store=object_store, path=filename)
+        
+        reader = ObstoreReader(store=object_store, path=file_url)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
             reader=reader,

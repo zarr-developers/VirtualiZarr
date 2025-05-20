@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import io
+import os
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 from urllib.parse import urlparse
 
@@ -27,10 +28,14 @@ class ObstoreReader:
 
     def __init__(self, store: ObjectStore, path: str) -> None:
         import obstore as obs
-
+        from obstore.store import LocalStore
         parsed = urlparse(path)
+        if isinstance(store, LocalStore):
+            filepath = os.path.basename(parsed.path)
+        else:
+            filepath = parsed.path
 
-        self._reader = obs.open_reader(store, parsed.path)
+        self._reader = obs.open_reader(store, filepath)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
