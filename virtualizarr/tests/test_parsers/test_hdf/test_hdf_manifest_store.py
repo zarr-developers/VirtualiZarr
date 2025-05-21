@@ -1,3 +1,6 @@
+from pathlib import Path
+from urllib.parse import urlparse
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -81,13 +84,18 @@ class TestHDFManifestStore:
     @requires_obstore
     def test_store(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
         import obstore as obs
+        
+        parsed = urlparse(chunked_roundtrip_hdf5_s3_file)
+        path_without_file = str(Path(parsed.path).parent)
+        parsed_without_file = parsed._replace(path=path_without_file)
+        url_without_file = parsed_without_file.geturl()
 
-        s3store = obs.store.S3Store(
-            bucket=minio_bucket["bucket"],
+        s3store = obs.store.from_url(
+            url_without_file,
             config={
-                "endpoint": minio_bucket["endpoint"],
                 "virtual_hosted_style_request": False,
                 "skip_signature": True,
+                "endpoint_url": "http://localhost:9000",
             },
             client_options={"allow_http": True},
         )
