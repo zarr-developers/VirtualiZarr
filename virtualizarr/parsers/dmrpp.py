@@ -36,23 +36,6 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
-        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
-        # if loadable_variables is None or indexes is None:
-        # warnings.warn(
-        # "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
-        # "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
-        # "To silence this warning pass `loadable_variables` explicitly.",
-        # UserWarning,
-        # )
-        # loadable_variables = []
-        # indexes = {}
-
-        # if loadable_variables != [] or decode_times or indexes is None:
-        # raise NotImplementedError(
-        # "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
-        # )
-
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
         )
