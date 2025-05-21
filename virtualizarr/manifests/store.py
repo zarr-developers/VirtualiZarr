@@ -145,7 +145,8 @@ def default_object_store(filepath: str) -> ObjectStore:
     parsed = urlparse(filepath)
 
     if parsed.scheme in ["", "file"]:
-        return obs.store.LocalStore()
+        return obs.store.LocalStore(parsed.path)
+
     if parsed.scheme == "s3":
         bucket = parsed.netloc
         return obs.store.S3Store(
