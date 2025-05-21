@@ -84,7 +84,7 @@ class TestHDFManifestStore:
     @requires_obstore
     def test_store(self, minio_bucket, chunked_roundtrip_hdf5_s3_file):
         import obstore as obs
-        
+
         parsed = urlparse(chunked_roundtrip_hdf5_s3_file)
         path_without_file = str(Path(parsed.path).parent)
         parsed_without_file = parsed._replace(path=path_without_file)
