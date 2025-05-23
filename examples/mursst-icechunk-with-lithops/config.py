@@ -18,6 +18,7 @@ drop_vars = ["dt_1km_data", "sst_anomaly"]
 # Storage configuration
 bucket = "nasa-eodc-public"
 store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v1"
+store_name = "MUR-JPL-L4-GLOB-v4.1-virtual-v1-p2"
 directory = "icechunk"
 
 # Spatial subset configuration
@@ -40,9 +41,12 @@ date_process_dict = {
     ("2023-03-01", "2023-04-21"): "virtual_dataset",
     ("2023-04-22", "2023-04-22"): "zarr",
     ("2023-04-23", "2023-09-03"): "virtual_dataset",
+    ("2023-09-04", "2024-06-01"): "zarr",
+    # New data store
+    ("2024-06-02", "2025-05-23"): "virtual_dataset",
 }
 
-zarr_concurrency = 4
+zarr_concurrency = 100
 
 mursst_var_chunks = {
     "analysed_sst": {"time": 1, "lat": 1023, "lon": 2047},

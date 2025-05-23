@@ -1,3 +1,4 @@
+earthaccess
 xarray>=2025.1.0
 h5netcdf
 h5py

@@ -23,6 +23,7 @@ from url_utils import list_mur_sst_files
 from virtual_datasets import (
     concat_and_write_virtual_datasets,
     map_open_virtual_dataset,
+    write_virtual_results_to_icechunk,
 )
 from zarr_operations import (
     configure_zarr,
@@ -63,10 +64,71 @@ def lithops_write_virtual_references(
     fexec.map_reduce(
         map_function=map_open_virtual_dataset,
         map_iterdata=uris,
-        extra_args=(dict(filetype="dmrpp"),),
+        extra_args=(
+            dict(
+                filetype="dmrpp",
+            ),
+        ),
         reduce_function=concat_and_write_virtual_datasets,
         extra_args_reduce=(start_date, end_date, append_dim),
         spawn_reducer=100,
+    )
+    return fexec.get_result()
+
+
+def open_virtual_mfdataset(start_date: str, end_date: str, append_dim: str = None):
+    """
+    Open a virtual dataset using Lithops.
+    """
+    import os
+
+    import earthaccess
+
+    earthaccess.login(
+        os.environ["EARTHDATA_USERNAME"], os.environ["EARTHDATA_PASSWORD"]
+    )
+    granule_results = earthaccess.search_data(
+        temporal=(start_date, end_date), short_name="MUR-JPL-L4-GLOB-v4.1"
+    )
+    vds = earthaccess.open_virtual_mfdataset(
+        granule_results,
+        access="direct",
+        load=False,
+        concat_dim="time",
+        coords="minimal",
+        compat="override",
+        combine_attrs="override",
+    )
+    return vds
+
+
+def lithops_write_virtual_references_via_edl(
+    start_date: str, end_date: str, append_dim: str = None
+):
+    """
+    Write virtual references to Icechunk using Lithops.
+
+    Args:
+        start_date: The start date in YYYY-MM-DD format
+        end_date: The end date in YYYY-MM-DD format
+        append_dim: The dimension to append to (optional)
+
+    Returns:
+        The result of the operation
+    """
+    fexec = get_fexec()
+    virtual_ds = fexec.call_async(
+        function=open_virtual_mfdataset,  # C1996881146-POCLOUD
+        extra_args_reduce=(start_date, end_date, append_dim),
+    ).get_result()
+    fexec.call_async(
+        function=write_virtual_results_to_icechunk,
+        data=dict(
+            virtual_ds=virtual_ds,
+            start_date=start_date,
+            end_date=end_date,
+            append_dim=append_dim,
+        ),
     )
     return fexec.get_result()
 
@@ -163,6 +225,11 @@ def write_to_icechunk(start_date: str, end_date: str, append_dim: str = None):
     process = find_label_for_range(start_date, end_date, interval_df)
     if process == "virtual_dataset":
         result = lithops_write_virtual_references(
+            start_date=start_date, end_date=end_date, append_dim=append_dim
+        )
+        print(result)
+    if process == "virtual_dataset_via_edl":
+        result = lithops_write_virtual_references_via_edl(
             start_date=start_date, end_date=end_date, append_dim=append_dim
         )
         print(result)
