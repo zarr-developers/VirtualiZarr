@@ -28,7 +28,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.0.7",
+    "zarr>=3.0.8",
     "obstore>=0.5.1",
 ]
 
@@ -97,7 +97,6 @@ upstream = [
     'zarr @ git+https://github.com/zarr-developers/zarr-python',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
-    'fsspec @ git+https://github.com/fsspec/filesystem_spec',
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
