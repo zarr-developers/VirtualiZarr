@@ -3,9 +3,6 @@ import importlib
 import pytest
 from packaging.version import Version
 
-from virtualizarr.readers import HDF5VirtualBackend
-from virtualizarr.readers.hdf import HDFVirtualBackend
-
 requires_network = pytest.mark.network
 requires_minio = pytest.mark.minio
 
@@ -43,8 +40,3 @@ has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_zarr_python, requires_zarr_python = _importorskip("zarr")
 has_dask, requires_dask = _importorskip("dask")
 has_obstore, requires_obstore = _importorskip("obstore")
-
-parametrize_over_hdf_backends = pytest.mark.parametrize(
-    "hdf_backend",
-    [HDF5VirtualBackend, HDFVirtualBackend] if has_kerchunk else [HDFVirtualBackend],
-)

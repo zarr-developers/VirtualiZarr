@@ -6,12 +6,12 @@ from typing import (
     Any,
     Hashable,
     Iterable,
-    Mapping,
-    Optional,
+    Union,
 )
+from urllib.parse import urlparse
 
 import numpy as np
-from xarray import Dataset, Index
+import obstore
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
 
@@ -22,7 +22,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
-from virtualizarr.readers.api import VirtualBackend
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None
@@ -111,15 +110,13 @@ async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: 
 
 async def _construct_manifest_group(
     filepath: str,
+    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     *,
-    reader_options: Optional[dict] = None,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ):
-    reader_options = reader_options or {}
     zarr_group = await open_group_async(
-        filepath,
-        storage_options=reader_options.get("storage_options"),
+        store=store,
         path=group,
         mode="r",
     )
@@ -147,8 +144,7 @@ async def _construct_manifest_group(
 
 def _construct_manifest_store(
     filepath: str,
-    *,
-    reader_options: Optional[dict] = None,
+    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     drop_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestStore:
@@ -156,41 +152,44 @@ def _construct_manifest_store(
 
     manifest_group = asyncio.run(
         _construct_manifest_group(
+            store=store,
             filepath=filepath,
             group=group,
             drop_variables=drop_variables,
-            reader_options=reader_options,
         )
     )
     return ManifestStore(manifest_group)
 
 
-class ZarrVirtualBackend(VirtualBackend):
-    @staticmethod
-    def open_virtual_dataset(
-        filepath: str,
+class Parser:
+    def __init__(
+        self,
         group: str | None = None,
-        drop_variables: str | Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> Dataset:
+        drop_variables: Iterable[str] | None = None,
+    ):
+        self.group = group
+        self.drop_variables = drop_variables
+
+    def __call__(
+        self,
+        file_url: str,
+        object_store: obstore.store.ObjectStore,
+    ) -> ManifestStore:
         filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
+            file_url, fs_root=Path.cwd().as_uri()
         )
-
+        # Temporary handling of local paths with Zarr LocalStore
+        # until zarr-python adopts obstore LocalStore
+        store: Union[zarr.storage.LocalStore, zarr.storage.ObjectStore]
+        if isinstance(object_store, obstore.store.LocalStore):
+            parsed = urlparse(filepath)
+            store = zarr.storage.LocalStore(parsed.path)
+        else:
+            store = zarr.storage.ObjectStore(store=object_store)
         manifest_store = _construct_manifest_store(
+            store=store,
             filepath=filepath,
-            group=group,
-            drop_variables=drop_variables,
-            reader_options=reader_options,
+            group=self.group,
+            drop_variables=self.drop_variables,
         )
-
-        ds = manifest_store.to_virtual_dataset(
-            loadable_variables=loadable_variables,
-            decode_times=decode_times,
-            indexes=indexes,
-        )
-        return ds
+        return manifest_store
