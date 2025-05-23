@@ -294,8 +294,6 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        import obstore as obs
-
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._group, key)
         var = key.split("/")[0]
@@ -308,8 +306,7 @@ class ManifestStore(Store):
         path = manifest._paths[*chunk_indexes]
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
-        # Get the configured object store instance that matches the path
-        store = self._store_registry.get_store(path)
+
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
         # Transform the input byte range to account for the chunk location in the file
@@ -317,10 +314,11 @@ class ManifestStore(Store):
         byte_range = _transform_byte_range(
             byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
         )
+        # Get the configured object store instance that matches the path
+        store = self._store_registry.get_store(path)
         # Actually get the bytes
         try:
-            bytes = await obs.get_range_async(
-                store,
+            bytes = await store.get_range_async(
                 key,
                 start=byte_range.start,
                 end=byte_range.end,
