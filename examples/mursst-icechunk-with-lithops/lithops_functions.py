@@ -5,8 +5,10 @@ This module contains functions that wrap Lithops execution for various tasks.
 """
 
 import logging
+import os
 import subprocess
 
+import earthaccess
 import lithops
 from config import data_vars, lat_slice, lon_slice
 from helpers import (
@@ -76,19 +78,20 @@ def lithops_write_virtual_references(
     return fexec.get_result()
 
 
-def open_virtual_mfdataset(start_date: str, end_date: str, append_dim: str = None):
+def open_virtual_mfdataset(
+    start_date: str,
+    end_date: str,
+    collection_short_name: str = "MUR-JPL-L4-GLOB-v4.1",
+    append_dim: str = None,
+):
     """
     Open a virtual dataset using Lithops.
     """
-    import os
-
-    import earthaccess
-
     earthaccess.login(
         os.environ["EARTHDATA_USERNAME"], os.environ["EARTHDATA_PASSWORD"]
     )
     granule_results = earthaccess.search_data(
-        temporal=(start_date, end_date), short_name="MUR-JPL-L4-GLOB-v4.1"
+        temporal=(start_date, end_date), short_name=collection_short_name
     )
     vds = earthaccess.open_virtual_mfdataset(
         granule_results,
@@ -117,12 +120,22 @@ def lithops_write_virtual_references_via_edl(
         The result of the operation
     """
     fexec = get_fexec()
-    virtual_ds = fexec.call_async(
-        function=open_virtual_mfdataset,  # C1996881146-POCLOUD
-        extra_args_reduce=(start_date, end_date, append_dim),
-    ).get_result()
     fexec.call_async(
-        function=write_virtual_results_to_icechunk,
+        open_virtual_mfdataset,  # C1996881146-POCLOUD
+        data=dict(
+            start_date=start_date,
+            end_date=end_date,
+            collection_short_name="MUR-JPL-L4-GLOB-v4.1",
+            append_dim=append_dim,
+        ),
+        extra_env=dict(
+            EARTHDATA_USERNAME=os.environ["EARTHDATA_USERNAME"],
+            EARTHDATA_PASSWORD=os.environ["EARTHDATA_PASSWORD"],
+        ),
+    )
+    virtual_ds = fexec.get_result()
+    fexec.call_async(
+        write_virtual_results_to_icechunk,
         data=dict(
             virtual_ds=virtual_ds,
             start_date=start_date,

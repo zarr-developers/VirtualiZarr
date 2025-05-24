@@ -34,8 +34,8 @@ echo "Setup complete! Please log out and log back in to apply Docker group chang
 git clone https://github.com/zarr-developers/Virtualizarr
 cd Virtualizarr/
 cd examples/mursst-icechunk-with-lithops/
-uv venv virtualizarr-lithops
+uv venv virtualizarr-lithops --python 3.11
 source virtualizarr-lithops/bin/activate
 uv pip install -r requirements.txt
 export LITHOPS_CONFIG_FILE=$(pwd)/lithops.yaml
-lithops runtime build -b aws_lambda -f Dockerfile virtualizarr-runtime
+lithops runtime build -b aws_lambda -f Dockerfile vz-runtime

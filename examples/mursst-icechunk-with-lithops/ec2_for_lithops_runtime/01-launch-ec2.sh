@@ -1,7 +1,7 @@
 # look up the group id created
 export SECURITY_GROUP_ID=XXX
 export YOUR_IP=$(curl -s https://checkip.amazonaws.com)
-export AMI_ID=ami-027951e78de46a00e
+export AMI_ID=XXX
 export SSH_KEY_NAME=XXX
 aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --ip-permissions '{"IpProtocol":"tcp","FromPort":22,"ToPort":22,"IpRanges":[{"CidrIp":"'$YOUR_IP'/32"}]}'
 aws ec2 run-instances --image-id $AMI_ID \

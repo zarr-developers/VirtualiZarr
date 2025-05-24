@@ -4,7 +4,7 @@ h5netcdf
 h5py
 pandas
 s3fs
-boto3==1.35.99
+boto3
 dask
 distributed
 lithops

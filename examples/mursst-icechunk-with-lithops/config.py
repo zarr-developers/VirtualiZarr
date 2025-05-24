@@ -43,7 +43,7 @@ date_process_dict = {
     ("2023-04-23", "2023-09-03"): "virtual_dataset",
     ("2023-09-04", "2024-06-01"): "zarr",
     # New data store
-    ("2024-06-02", "2025-05-23"): "virtual_dataset",
+    ("2024-06-02", "2025-05-23"): "virtual_dataset_via_edl",
 }
 
 zarr_concurrency = 100

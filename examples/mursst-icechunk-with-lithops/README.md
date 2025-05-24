@@ -2,6 +2,10 @@
 
 This package provides functionality for processing MUR SST (Multi-scale Ultra-high Resolution Sea Surface Temperature) data using [Lithops](https://lithops-cloud.github.io/), a framework for serverless computing.
 
+⚠️ This package was written mostly depending on role-based access to PO.DAAC's bucket which was recently removed. It may be replaced but most functionality won't work without Earthdata login integration for reading the MUR SST NetCDF data from PO.DAAC's Earthdata S3 bucket or via HTTPS.
+
+A new function exists, `virtual_dataset_via_edl` for reading the PO.DAAC dmrpp files into a virtual dataset using earthaccess. It requires `earthaccess`'s [`open_virtual_mfdataset`](https://earthaccess.readthedocs.io/en/latest/user-reference/api/api/#earthaccess.dmrpp_zarr.open_virtual_mfdataset) and environment variables `EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` to be set.
+
 ## Environment + Lithops Setup
 
 1. Set up a Python environment. The below example uses [`uv`](https://docs.astral.sh/uv/), but other environment mangers should work as well:
@@ -84,7 +88,7 @@ Options:
 #### Writing Data to Icechunk
 
 ```bash
-python main.py write_to_icechunk --start_date 2024-06-02 --end_date 2024-06-30 #--append_dim time
+python main.py write_to_icechunk --start_date 2024-06-02 --end_date 2024-06-30 --append_dim time
 ```
 
 #### Calculating the Mean of the Icechunk Store
