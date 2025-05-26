@@ -304,3 +304,6 @@ markers = [
     "network: marks test requiring internet (select with '--run-network-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
 ]
+filterwarnings = [
+    "ignore:Numcodecs codecs are not in the Zarr version 3 specification*:UserWarning:numcodecs"
+]
