@@ -1,5 +1,3 @@
-(custom-readers)=
-
 # Custom Readers
 
 This page explains how to write a custom reader for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.

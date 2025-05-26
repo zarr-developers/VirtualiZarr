@@ -30,7 +30,10 @@ class ObstoreReader:
         import obstore as obs
 
         parsed = urlparse(path)
-        filepath = os.path.basename(parsed.path)
+        if store.prefix:
+            filepath = os.path.basename(parsed.path)
+        else:
+            filepath = parsed.path
 
         self._reader = obs.open_reader(store, filepath)
 

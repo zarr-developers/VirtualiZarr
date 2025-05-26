@@ -30,28 +30,45 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
-```python
-from virtualizarr import open_virtual_dataset
+```python exec="true" session="intro"
+import xarray as xr
+import warnings
+warnings.filterwarnings("ignore",
+                       message="Numcodecs codecs are not in the Zarr version 3 specification*",
+                       category=UserWarning)
+xr.set_options(display_style="html")
+```
 
-virtual_datasets = [
-    open_virtual_dataset(filepath)
-    for filepath in glob.glob('/my/files*.nc')
+```python exec="true" source="above" session="intro" html="true"
+from urllib.parse import urlparse
+
+import obstore as obs
+import xarray as xr
+
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers.hdf.hdf import Parser as HDFParser
+
+file_urls = [
+    "s3://smn-ar-wrf/DATA/WRF/DET/2022/12/31/12/WRFDETAR_01H_20221231_12_000.nc",
+    "s3://smn-ar-wrf/DATA/WRF/DET/2022/12/31/12/WRFDETAR_01H_20221231_12_001.nc",
 ]
 
-# this Dataset wraps a bunch of virtual ManifestArray objects directly
-virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
+parsed = urlparse(file_urls[0])
+s3store = obs.store.S3Store(
+    bucket=parsed.netloc,
+    client_options={"allow_http": True},
+    skip_signature=True,
+    virtual_hosted_style_request=False,
+    region="us-west-2",
+)
+virtual_datasets = [
+    open_virtual_dataset(file_url=url, parser=HDFParser(), object_store=s3store)
+    for url in file_urls
+]
 
-# cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
-virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
+virtual_ds = xr.concat(virtual_datasets, dim='time', coords='minimal', compat='override')
+print(repr(virtual_ds))
 ```
-
-Now you can open your shiny new Zarr store instantly:
-
-```python
-ds = xr.open_dataset('combined.json', engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
-```
-
-No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
 
 See the [Usage docs page](#usage) for more details.
 
@@ -69,24 +86,6 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 ## Licence
 
 Apache 2.0
-
-## Pages
-
-```{toctree}
-:maxdepth: 2
-
-self
-installation
-usage
-examples
-faq
-api
-data_structures
-custom_readers
-releases
-contributing
-core_team_guide
-```
 
 ## References
 
