@@ -1,5 +1,3 @@
-(data-structures)=
-
 # Data structures
 
 This page explains how VirtualiZarr works, by introducing the core data structures one-by-one.

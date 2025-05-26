@@ -1,5 +1,3 @@
-(usage)=
-
 # Usage
 
 This page explains how to use VirtualiZarr. To understand how the functionality actually works, read the page on [Data Structures](data_structures.md).
@@ -18,7 +16,7 @@ ds = xr.tutorial.open_dataset('air_temperature')
 ds.to_netcdf('air.nc')
 ```
 
-We can open a virtual representation of this file using {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>`.
+We can open a virtual representation of this file using [virtualizarr.open_virtual_dataset][].
 
 ```python
 from virtualizarr import open_virtual_dataset
