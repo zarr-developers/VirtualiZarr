@@ -829,16 +829,14 @@ class TestOpenVirtualMFDataset:
     )
     def test_parallel_open(self, netcdf4_files_factory, parallel, preprocess):
         filepath1, filepath2 = netcdf4_files_factory()
-        store1 = obstore_local(file_url=filepath1)
+        store = obstore_local(file_url=filepath1)
         parser = HDFParser()
         vds1 = open_virtual_dataset(
-            file_url=filepath1, object_store=store1, parser=HDFParser()
+            file_url=filepath1, object_store=store, parser=parser()
         )
-        store2 = obstore_local(file_url=filepath2)
-
         vds2 = open_virtual_dataset(
             file_url=filepath2,
-            object_store=store2,
+            object_store=store,
             parser=HDFParser(),
         )
 
@@ -849,7 +847,7 @@ class TestOpenVirtualMFDataset:
         # test combine nested, which doesn't use in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
-            object_store=store1,
+            object_store=store,
             parser=parser,
             combine="nested",
             concat_dim="time",
@@ -861,7 +859,7 @@ class TestOpenVirtualMFDataset:
         # test combine by coords using in-memory indexes
         combined_vds = open_virtual_mfdataset(
             [filepath1, filepath2],
-            object_store=store1,
+            object_store=store,
             parser=parser,
             combine="by_coords",
             parallel=parallel,
@@ -873,7 +871,7 @@ class TestOpenVirtualMFDataset:
         file_glob = Path(filepath1).parent.glob("air*.nc")
         combined_vds = open_virtual_mfdataset(
             file_glob,
-            object_store=store1,
+            object_store=store,
             parser=parser,
             combine="by_coords",
             parallel=parallel,
