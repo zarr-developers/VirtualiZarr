@@ -832,12 +832,12 @@ class TestOpenVirtualMFDataset:
         store = obstore_local(file_url=filepath1)
         parser = HDFParser()
         vds1 = open_virtual_dataset(
-            file_url=filepath1, object_store=store, parser=parser()
+            file_url=filepath1, object_store=store, parser=parser
         )
         vds2 = open_virtual_dataset(
             file_url=filepath2,
             object_store=store,
-            parser=HDFParser(),
+            parser=parser,
         )
 
         expected_vds = xr.concat([vds1, vds2], dim="time")
