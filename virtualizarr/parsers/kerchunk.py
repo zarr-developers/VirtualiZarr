@@ -27,40 +27,11 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables`` kwarg,
-        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
-        # if loadable_variables is None or indexes is None:
-        # warnings.warn(
-        # "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
-        # "As this is unlikely to be the desired behaviour when opening a Kerchunk file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
-        # "To silence this warning pass `loadable_variables` explicitly.",
-        # UserWarning,
-        # )
-        # loadable_variables = []
-        # indexes = {}
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
         )
         filename = os.path.basename(filepath)
         reader = open_reader(store=object_store, path=filename)
-
-        # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        # if fs.filepath.endswith(".parquet") and fs.fs.isfile(
-        # f"{fs.filepath}/.zmetadata"
-        # ):
-        # from fsspec.implementations.reference import LazyReferenceMapper
-
-        # lrm = LazyReferenceMapper(filepath, fs.fs)
-
-        # # build reference dict from KV pairs in LazyReferenceMapper
-        # # is there a better / more performant way to extract this?
-        # array_refs = {k: lrm[k] for k in lrm.keys()}
-
-        # full_reference = {"refs": array_refs}
-
-        # vds = dataset_from_kerchunk_refs(
-        # KerchunkStoreRefs(full_reference), fs_root=fs_root
-        # )
 
         # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
         # https://fsspec.github.io/kerchunk/spec.html

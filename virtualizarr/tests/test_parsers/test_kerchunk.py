@@ -6,8 +6,8 @@ import pytest
 import ujson
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.parsers import KerchunkParser
-from virtualizarr.tests import requires_kerchunk
+from virtualizarr.parsers import KerchunkParquetParser, KerchunkParser
+from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
 from virtualizarr.xarray import open_virtual_dataset
 
@@ -200,8 +200,7 @@ def test_handle_relative_paths(refs_file_factory):
 @requires_kerchunk
 @pytest.mark.parametrize(
     "reference_format",
-    # ["json", "invali", *(["parquet"] if has_fastparquet else [])],
-    ["json", "invalid"],
+    ["json", "invalid", *(["parquet"] if has_fastparquet else [])],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
@@ -233,14 +232,16 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
             with open(ref_filepath, "w") as json_file:
                 ujson.dump(example_reference_dict, json_file)
-        # if reference_format == "parquet":
-        # from kerchunk.df import refs_to_dataframe
+            parser = KerchunkParser()
+        if reference_format == "parquet":
+            from kerchunk.df import refs_to_dataframe
 
-        # ref_filepath = tmp_path / "ref.parquet"
-        # refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+            ref_filepath = tmp_path / "ref.parquet"
+            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+            parser = KerchunkParquetParser()
 
         store = obstore_local(file_url=ref_filepath.as_posix())
-        parser = KerchunkParser()
+        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
         vds = open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
             object_store=store,
