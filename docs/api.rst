@@ -13,7 +13,7 @@ User API
 Reading
 -------
 
-.. currentmodule:: virtualizarr.backend
+.. currentmodule:: virtualizarr.xarray
 .. autosummary::
     :nosignatures:
     :toctree: generated/
