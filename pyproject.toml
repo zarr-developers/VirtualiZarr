@@ -183,14 +183,14 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
-min-deps = ["dev", "test", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
+min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore"]
-test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
-upstream = ["dev", "test", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk"," kerchunk_parquet", "hdf5-lib", "obstore", "all_readers", "all_writers"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore"]
+test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "obstore", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk"," kerchunk_parquet", "hdf5-lib", "obstore", "all_readers", "all_writers"]
 docs = ["docs"]
 
 # Define commands to run within the docs environment
