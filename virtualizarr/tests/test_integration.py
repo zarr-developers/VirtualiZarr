@@ -291,7 +291,6 @@ class TestRoundtrip:
                         == ds.time.encoding["calendar"]
                     )
 
-    @pytest.mark.xfail(reason="To fix coordinate behavior with HDF reader")
     def test_non_dimension_coordinates(
         self,
         tmp_path: Path,
