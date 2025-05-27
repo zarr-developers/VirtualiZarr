@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         fsspec.core.OpenFile, fsspec.spec.AbstractBufferedFile, io.IOBase
     ]
 
+
 class Parser:
     def __init__(
         self,
@@ -41,7 +42,9 @@ class Parser:
         object_store: ObjectStore,
     ) -> ManifestStore:
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        fs = _FsspecFSFromFilepath(filepath=file_url, reader_options=self.reader_options)
+        fs = _FsspecFSFromFilepath(
+            filepath=file_url, reader_options=self.reader_options
+        )
         if fs.filepath.endswith(".parquet") and fs.fs.isfile(
             f"{fs.filepath}/.zmetadata"
         ):
