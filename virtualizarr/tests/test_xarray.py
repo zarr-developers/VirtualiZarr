@@ -813,7 +813,9 @@ class TestOpenVirtualMFDataset:
     )
     def test_parallel_open(self, netcdf4_files_factory, parallel, preprocess):
         if parallel == "lithops":
-            pytest.xfail("TODO - investigate intermittent test failures with lithops executor")
+            pytest.xfail(
+                "TODO - investigate intermittent test failures with lithops executor"
+            )
         filepath1, filepath2 = netcdf4_files_factory()
         store = obstore_local(file_url=filepath1)
         parser = HDFParser()
