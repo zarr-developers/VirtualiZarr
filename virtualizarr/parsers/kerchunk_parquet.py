@@ -45,25 +45,22 @@ class Parser:
         fs = _FsspecFSFromFilepath(
             filepath=file_url, reader_options=self.reader_options
         )
-        if fs.filepath.endswith(".parquet") and fs.fs.isfile(
-            f"{fs.filepath}/.zmetadata"
-        ):
-            from fsspec.implementations.reference import LazyReferenceMapper
+        from fsspec.implementations.reference import LazyReferenceMapper
 
-            lrm = LazyReferenceMapper(file_url, fs.fs)
+        lrm = LazyReferenceMapper(file_url, fs.fs)
 
-            # build reference dict from KV pairs in LazyReferenceMapper
-            # is there a better / more performant way to extract this?
-            array_refs = {k: lrm[k] for k in lrm.keys()}
-            full_reference = {"refs": array_refs}
-            refs = KerchunkStoreRefs(full_reference)
-            manifeststore = manifeststore_from_kerchunk_refs(
-                refs,
-                group=self.group,
-                fs_root=self.fs_root,
-                drop_variables=self.drop_variables,
-            )
-            return manifeststore
+        # build reference dict from KV pairs in LazyReferenceMapper
+        # is there a better / more performant way to extract this?
+        array_refs = {k: lrm[k] for k in lrm.keys()}
+        full_reference = {"refs": array_refs}
+        refs = KerchunkStoreRefs(full_reference)
+        manifeststore = manifeststore_from_kerchunk_refs(
+            refs,
+            group=self.group,
+            fs_root=self.fs_root,
+            drop_variables=self.drop_variables,
+        )
+        return manifeststore
 
 
 @dataclass
