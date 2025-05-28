@@ -49,6 +49,17 @@ class StoreRequest:
     """The key within the store to request."""
 
 
+def get_store_prefix(url: str) -> str:
+    """
+    Get a logical prefix to use for a url in an ObjectStoreRegistry
+    """
+    parsed = urlparse(url)
+    if parsed.scheme in ["", "file"]:
+        return ""
+    else:
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     """
     Generate the expected Zarr V3 metadata from a virtual dataset.
@@ -106,40 +117,6 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-def _find_bucket_region(bucket_name: str) -> str:
-    import requests
-
-    resp = requests.head(f"https://{bucket_name}.s3.amazonaws.com")
-    region = resp.headers.get("x-amz-bucket-region")
-    if not region:
-        raise ValueError(
-            f"Unable to automatically determine region for bucket {bucket_name}"
-        )
-    return region
-
-
-def default_object_store(filepath: str) -> ObjectStore:
-    import obstore as obs
-
-    parsed = urlparse(filepath)
-
-    if parsed.scheme in ["", "file"]:
-        return obs.store.LocalStore()
-    if parsed.scheme == "s3":
-        bucket = parsed.netloc
-        return obs.store.S3Store(
-            bucket=bucket,
-            client_options={"allow_http": True},
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            region=_find_bucket_region(bucket),
-        )
-    if parsed.scheme in ["http", "https"]:
-        base_url = f"{parsed.scheme}://{parsed.netloc}"
-        return obs.store.HTTPStore.from_url(base_url)
-    raise NotImplementedError(f"{parsed.scheme} is not yet supported")
-
-
 class ObjectStoreRegistry:
     """
     ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances. This register allows
@@ -156,41 +133,40 @@ class ObjectStoreRegistry:
                 raise TypeError(f"expected ObjectStore class, got {store!r}")
         self._stores = stores
 
-    def register_store(self, url: str, store: ObjectStore):
+    def register_store(self, prefix: str, store: ObjectStore):
         """
-        Register a store using the given url
+        Register a store using the given prefix
 
         If a store with the same key existed before, it is replaced
+
+        Parameters:
+        -----------
+        prefix : str
+            A url to identify the appropriate object_store instance. If the url is contained in the
+            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
         """
-        parsed = urlparse(url)
-        scheme = parsed.scheme or "file"
-        self._stores[f"{scheme}://{parsed.netloc}"] = store
+        self._stores[prefix] = store
 
     def get_store(self, url: str) -> ObjectStore:
         """
-        Get a suitable store for the provided URL. For example:
-
-            - URL with scheme file:/// or no scheme will return the default LocalFS store
-            - URL with scheme s3://bucket/ will return the S3 store
-
-        If no `ObjectStore` is found for the `url`, ad-hoc discovery may be executed depending on the
-        `url`. An `ObjectStore` may be lazily created and registered.
+        Get a registered store for the provided URL.
 
         Parameters:
         -----------
         url : str
-            A url to identify the appropriate object_store instance based on the URL scheme and netloc.
+            A url to identify the appropriate object_store instance. If the url is contained in the
+            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
 
         Returns:
         --------
         StoreRequest
         """
-        parsed = urlparse(url)
-        store = self._stores.get(f"{parsed.scheme}://{parsed.netloc}")
-        if not store:
-            store = default_object_store(url)
-            self.register_store(url, store)
-        return store
+        # Sort keys by length in descending order to ensure longer, more specific matches take precedence
+        sorted_keys = sorted(self._stores.keys(), key=len, reverse=True)
+        for key in sorted_keys:
+            if url.startswith(key):
+                return self._stores[key]
+        raise ValueError(f"Could not find a store matching {url}")
 
 
 class ManifestStore(Store):
@@ -290,8 +266,19 @@ class ManifestStore(Store):
         length = manifest._lengths[*chunk_indexes]
         # Get the configured object store instance that matches the path
         store = self._store_registry.get_store(path)
+        if not store:
+            raise ValueError(
+                f"Could not find a store to use for {path} in the store registry"
+            )
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
+        if (
+            not isinstance(store, obs.store.HTTPStore)
+            and not isinstance(store, obs.store.MemoryStore)
+            and store.prefix
+        ):
+            # strip the prefix from key
+            key = key.replace(str(store.prefix), "")
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -398,6 +385,11 @@ class ManifestStore(Store):
         """
 
         from virtualizarr.xarray import construct_virtual_dataset
+
+        if loadable_variables and self._store_registry._stores is None:
+            raise ValueError(
+                f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
+            )
 
         return construct_virtual_dataset(
             manifest_store=self,

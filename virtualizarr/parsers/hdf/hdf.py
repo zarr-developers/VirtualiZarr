@@ -19,7 +19,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.store import ObjectStoreRegistry
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
@@ -163,7 +163,7 @@ class Parser:
             group=self.group,
             drop_variables=self.drop_variables,
         )
-        registry = ObjectStoreRegistry({file_url: object_store})
+        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 
