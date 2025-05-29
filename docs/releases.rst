@@ -52,6 +52,10 @@ Documentation
 
 - Added new docs page on how to write a custom reader for bespoke file formats (:issue:`452`, :pull:`580`)
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Added new docs page on how to scale VirtualiZarr effectively (:pull:`590`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
+- Documented the new :py:func:`open_virtual_mfdataset` function (:pull:`590`)
+  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
 - Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)

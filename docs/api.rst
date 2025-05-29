@@ -19,6 +19,7 @@ Reading
     :toctree: generated/
 
     open_virtual_dataset
+    open_virtual_mfdataset
 
 Serialization
 -------------
