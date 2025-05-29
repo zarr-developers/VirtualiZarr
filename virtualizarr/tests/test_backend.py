@@ -162,7 +162,7 @@ def test_cftime_index(tmp_path: Path, hdf_backend: type[VirtualBackend]):
         # TODO use xr.testing.assert_identical(vds.indexes, ds.indexes) instead once class supported by assertion comparison, see https://github.com/pydata/xarray/issues/5812
         assert index_mappings_equal(vds.xindexes, ds.xindexes)
         assert list(ds.coords) == list(vds.coords)
-        assert vds.dims == ds.dims
+        assert vds.sizes == ds.sizes
         assert vds.attrs == ds.attrs
 
 
@@ -229,7 +229,7 @@ class TestReadFromS3:
             reader_options={"storage_options": {"anon": True}},
             backend=hdf_backend,
         ) as vds:
-            assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+            assert vds.sizes == {"time": 2920, "lat": 25, "lon": 53}
 
             assert isinstance(vds["air"].data, ManifestArray)
             for name in ["time", "lat", "lon"]:
