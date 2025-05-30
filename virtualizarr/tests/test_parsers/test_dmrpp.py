@@ -198,6 +198,20 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
     xr.testing.assert_identical(result, expected)
 
 
+@requires_network
+@pytest.mark.parametrize("data_url, dmrpp_url", urls)
+def test_NASA_dmrpp_load(data_url, dmrpp_url):
+    store = obstore_s3(
+        file_url=dmrpp_url,
+        region="us-west-2",
+    )
+
+    parser = DMRPPParser()
+    manifest_store = parser(file_url=dmrpp_url, object_store=store)
+    assert xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ).load()
+
 @pytest.mark.parametrize(
     "dmrpp_xml_str_key, fqn_path, expected_xpath",
     [

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Optional, Union
 
 from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
@@ -54,11 +55,13 @@ class Parser:
         array_refs = {k: lrm[k] for k in lrm.keys()}
         full_reference = {"refs": array_refs}
         refs = KerchunkStoreRefs(full_reference)
+        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,
             group=self.group,
             fs_root=self.fs_root,
             drop_variables=self.drop_variables,
+            store_registry=registry,
         )
         return manifeststore
 

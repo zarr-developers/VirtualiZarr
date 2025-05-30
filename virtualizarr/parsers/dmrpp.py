@@ -1,12 +1,10 @@
 import io
-import os
 import warnings
 from pathlib import Path
 from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obstore import open_reader
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
@@ -15,11 +13,11 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.store import ObjectStoreRegistry
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
+from virtualizarr.utils import ObstoreReader
 
 
 class Parser:
@@ -36,18 +34,13 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        filepath = validate_and_normalize_path_to_uri(
-            file_url, fs_root=Path.cwd().as_uri()
-        )
-
-        filename = os.path.basename(filepath)
-        reader = open_reader(store=object_store, path=filename)
-        file_bytes = reader.read().to_bytes()
+        reader = ObstoreReader(store=object_store, path=file_url)
+        file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 
         parser = DMRParser(
             root=ET.parse(stream).getroot(),
-            data_filepath=filepath.removesuffix(".dmrpp"),
+            data_filepath=file_url.removesuffix(".dmrpp"),
             drop_variables=self.drop_variables,
         )
         manifest_store = parser.parse_dataset(
@@ -159,7 +152,7 @@ class DMRParser:
             manifest_group = self._parse_dataset(
                 self.root,
             )
-        registry = ObjectStoreRegistry({self.data_filepath: object_store})
+        registry = ObjectStoreRegistry({get_store_prefix(self.data_filepath): object_store})
         return ManifestStore(store_registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:

@@ -1,4 +1,6 @@
-from typing import Iterable, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Iterable, cast
 
 import numpy as np
 from zarr.core.common import JSON
@@ -22,6 +24,8 @@ from virtualizarr.types.kerchunk import (
 )
 from virtualizarr.utils import determine_chunk_grid_shape
 
+if TYPE_CHECKING:
+    from virtualizarr.manifests.store import ObjectStoreRegistry
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     """Convert V2 metadata to kerchunk JSON format."""
@@ -43,7 +47,7 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
 
-def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     """
     Convert a decoded zarr array (.zarray) reference to an ArrayV3Metadata object.
     This function processes the given decoded Zarr array reference dictionary,
@@ -93,6 +97,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
         fill_value=fill_value,
         shape=tuple(decoded_arr_refs_zarray["shape"]),
         dimension_names=dimension_names,
+        attributes=zattrs,
     )
 
 
@@ -101,6 +106,7 @@ def manifeststore_from_kerchunk_refs(
     group: str | None = None,
     fs_root: str | None = None,
     drop_variables: Iterable[str] | None = None,
+    store_registry: ObjectStoreRegistry | None = None,
 ) -> ManifestStore:
     """
     Construct a ManifestStore from a dictionary of kerchunk references.
@@ -137,7 +143,7 @@ def manifeststore_from_kerchunk_refs(
     manifestgroup = ManifestGroup(arrays=marrs, attributes=attributes)
 
     # TODO what should the obstore store be?
-    return ManifestStore(group=manifestgroup)
+    return ManifestStore(group=manifestgroup, store_registry=store_registry)
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
@@ -191,7 +197,6 @@ def manifestarray_from_kerchunk_refs(
     # TODO probably need to update internals of this to use ArrayV3Metadata more neatly
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
-
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -300,7 +305,7 @@ def parse_array_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     zarray = arr_refs.pop(".zarray")
     zarray["dimension_names"] = dims
-    metadata = from_kerchunk_refs(zarray)
+    metadata = from_kerchunk_refs(zarray, zattrs)
     chunk_dict = arr_refs
 
     return chunk_dict, metadata, zattrs

@@ -4,6 +4,7 @@ from typing import Any, Callable, Generator, Optional
 import numpy as np
 import pytest
 import ujson
+import xarray as xr
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import KerchunkParquetParser, KerchunkParser
@@ -299,3 +300,29 @@ def test_drop_variables(refs_file_factory, drop_variables):
         parser=parser,
     )
     assert all(var not in vds for var in drop_variables)
+
+
+@requires_kerchunk
+def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
+    refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+    ref_filepath = tmp_path / "ref.json"
+    with open(ref_filepath.as_posix(), "w") as json_file:
+        ujson.dump(refs, json_file)
+
+    store = obstore_local(file_url=ref_filepath.as_posix())
+    parser = KerchunkParser()
+    manifest_store = parser(file_url=ref_filepath.as_posix(), object_store=store)
+    # with (
+        # xr.open_dataset(
+            # netcdf4_file,
+        # ) as ds,
+        # xr.open_dataset(
+            # manifest_store, engine="zarr", consolidated=False,
+            # zarr_format=3,
+        # ).load() as manifest_ds,
+    # ):
+        # xrt.assert_allclose(ds, manifest_ds)
+    assert xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ).load()
+
