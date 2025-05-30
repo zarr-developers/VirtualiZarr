@@ -40,9 +40,10 @@ class Parser:
             reader.seek(0)
             content = reader.readall().decode()
             refs = ujson.loads(content)
-            if self.store_registry is None: 
+            if self.store_registry is None:
                 unique_paths = {
-                    v[0] for v in refs['refs'].values()
+                    v[0]
+                    for v in refs["refs"].values()
                     if isinstance(v, list) and isinstance(v[0], str)
                 }
                 stores = {}

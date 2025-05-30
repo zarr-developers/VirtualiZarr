@@ -152,7 +152,9 @@ class DMRParser:
             manifest_group = self._parse_dataset(
                 self.root,
             )
-        registry = ObjectStoreRegistry({get_store_prefix(self.data_filepath): object_store})
+        registry = ObjectStoreRegistry(
+            {get_store_prefix(self.data_filepath): object_store}
+        )
         return ManifestStore(store_registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:

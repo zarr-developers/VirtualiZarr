@@ -27,6 +27,7 @@ from virtualizarr.utils import determine_chunk_grid_shape
 if TYPE_CHECKING:
     from virtualizarr.manifests.store import ObjectStoreRegistry
 
+
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     """Convert V2 metadata to kerchunk JSON format."""
     import json

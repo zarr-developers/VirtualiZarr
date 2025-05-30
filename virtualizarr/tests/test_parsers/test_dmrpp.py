@@ -212,6 +212,7 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         manifest_store, engine="zarr", consolidated=False, zarr_format=3
     ).load()
 
+
 @pytest.mark.parametrize(
     "dmrpp_xml_str_key, fqn_path, expected_xpath",
     [

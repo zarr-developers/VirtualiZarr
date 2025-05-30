@@ -239,22 +239,25 @@ class TestToVirtualXarray:
         ],
     )
     def test_single_group_to_dataset(
-        self, manifest_array, loadable_variables, expected_loadable_variables,
+        self,
+        manifest_array,
+        loadable_variables,
+        expected_loadable_variables,
     ):
         marr1 = manifest_array(
             shape=(3, 2, 5), chunks=(1, 2, 1), dimension_names=["x", "y", "t"]
         )
         marr2 = manifest_array(shape=(3, 2), chunks=(1, 2), dimension_names=["x", "y"])
         marr3 = manifest_array(shape=(5,), chunks=(5,), dimension_names=["t"])
-         
-        paths1 = list({v['path'] for v in marr1.manifest.values()})
-        paths2 = list({v['path'] for v in marr2.manifest.values()})
-        paths3 = list({v['path'] for v in marr2.manifest.values()})
+
+        paths1 = list({v["path"] for v in marr1.manifest.values()})
+        paths2 = list({v["path"] for v in marr2.manifest.values()})
+        paths3 = list({v["path"] for v in marr2.manifest.values()})
         unique_paths = list(set(paths1 + paths2 + paths3))
         stores = {}
         for path in unique_paths:
             store = obstore_local(path)
-            stores[get_store_prefix(path)] = store 
+            stores[get_store_prefix(path)] = store
         store_registry = ObjectStoreRegistry(stores=stores)
 
         manifest_group = ManifestGroup(

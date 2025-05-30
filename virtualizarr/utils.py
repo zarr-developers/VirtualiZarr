@@ -44,7 +44,7 @@ class ObstoreReader:
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
 
-    def readall(self) ->bytes:
+    def readall(self) -> bytes:
         return self._reader.read().to_bytes()
 
     def seek(self, offset: int, whence: int = 0, /):
