@@ -872,9 +872,6 @@ def test_drop_variables(netcdf4_file):
     store = obstore_local(netcdf4_file)
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=netcdf4_file,
-        object_store=store,
-        parser=parser,
-        drop_variables=["air"]
+        file_url=netcdf4_file, object_store=store, parser=parser, drop_variables=["air"]
     ) as vds:
         assert "air" not in vds.variables
