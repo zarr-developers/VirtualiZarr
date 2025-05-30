@@ -319,7 +319,10 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
             netcdf4_file,
         ) as ds,
         xr.open_dataset(
-            manifest_store, engine="zarr", consolidated=False, zarr_format=3,
+            manifest_store,
+            engine="zarr",
+            consolidated=False,
+            zarr_format=3,
         ).load() as manifest_ds,
     ):
         xrt.assert_identical(ds, manifest_ds)
