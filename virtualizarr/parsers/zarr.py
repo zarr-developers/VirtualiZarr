@@ -150,6 +150,13 @@ class Parser:
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
     ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Parameters:
+            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
+            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
+        """
+
         self.group = group
         self.skip_variables = skip_variables
 
@@ -158,6 +165,17 @@ class Parser:
         file_url: str,
         object_store: obstore.store.ObjectStore,
     ) -> ManifestStore:
+        """
+        Parse the metadata and byte offsets from a given Zarr store to product a VirtualiZarr ManifestStore.
+
+        Parameters:
+            file_url (str): The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
+            object_store (ObjectStore): An obstore ObjectStore instance for accessing the directory specified in the file_url parameter.
+
+        Returns:
+            ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        """
+
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
         )

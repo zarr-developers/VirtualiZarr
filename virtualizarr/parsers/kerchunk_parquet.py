@@ -32,6 +32,15 @@ class Parser:
         skip_variables: Iterable[str] | None = None,
         reader_options: Optional[dict] = None,
     ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Parameters:
+            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
+            fs_root (str): The qualifier to be used for kerchunk references containing relative paths.
+            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
+            reader_options: (dict): Configuration options used internally for the fsspec backend.
+        """
+
         self.group = group
         self.fs_root = fs_root
         self.skip_variables = skip_variables
@@ -42,6 +51,18 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
+        """
+        Parse the metadata and byte offsets from a given file to product a
+        VirtualiZarr ManifestStore.
+
+        Parameters:
+            file_url (str): The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
+            object_store (ObjectStore): An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+
+        Returns:
+            ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        """
+
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
         fs = _FsspecFSFromFilepath(
             filepath=file_url, reader_options=self.reader_options

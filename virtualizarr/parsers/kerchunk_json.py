@@ -17,6 +17,15 @@ class Parser:
         skip_variables: Iterable[str] | None = None,
         store_registry: ObjectStoreRegistry | None = None,
     ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Parameters:
+            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
+            fs_root (str): The qualifier to be used for kerchunk references containing relative paths.
+            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
+            store_registry (ObjectStoreRegistry): A user defined ObjectStoreRegistry to be used for reading data for kerchunk references contain paths to multiple locations.
+        """
+
         self.group = group
         self.fs_root = fs_root
         self.skip_variables = skip_variables
@@ -27,6 +36,18 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
+        """
+        Parse the metadata and byte offsets from a given file to product a
+        VirtualiZarr ManifestStore.
+
+        Parameters:
+            file_url (str): The URI or path to the input file (e.g., "s3://bucket/kerchunk.json").
+            object_store (ObjectStore): An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+
+        Returns:
+            ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        """
+
         reader = ObstoreReader(store=object_store, path=file_url)
 
         # JSON has no magic bytes, but the Kerchunk version 1 spec starts with 'version':
