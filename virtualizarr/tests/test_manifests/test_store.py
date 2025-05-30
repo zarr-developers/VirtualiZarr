@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+from obstore.store import MemoryStore
 from zarr.abc.store import (
     OffsetByteRequest,
     RangeByteRequest,
@@ -29,7 +30,6 @@ from virtualizarr.tests import (
     requires_minio,
     requires_obstore,
 )
-from virtualizarr.tests.utils import obstore_local
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore
@@ -256,7 +256,7 @@ class TestToVirtualXarray:
         unique_paths = list(set(paths1 + paths2 + paths3))
         stores = {}
         for path in unique_paths:
-            store = obstore_local(path)
+            store = MemoryStore()
             stores[get_store_prefix(path)] = store
         store_registry = ObjectStoreRegistry(stores=stores)
 
