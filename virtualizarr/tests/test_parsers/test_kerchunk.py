@@ -8,7 +8,7 @@ import xarray as xr
 import xarray.testing as xrt
 
 from virtualizarr.manifests import ManifestArray
-from virtualizarr.parsers import KerchunkParquetParser, KerchunkParser
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
 from virtualizarr.xarray import open_virtual_dataset
@@ -67,7 +67,7 @@ def refs_file_factory(
 def test_dataset_from_df_refs(refs_file_factory):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     assert "a" in vds
@@ -104,7 +104,7 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     vda = vds["a"]
@@ -127,7 +127,7 @@ def test_empty_chunk_manifest(refs_file_factory):
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray), chunks={})
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
 
     assert "a" in vds.variables
@@ -140,7 +140,7 @@ def test_handle_relative_paths(refs_file_factory):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
         open_virtual_dataset(
             file_url=refs_file,
@@ -150,7 +150,7 @@ def test_handle_relative_paths(refs_file_factory):
 
     refs_file = refs_file_factory(chunks={"a/0.0": ["./test1.nc", 6144, 48]})
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
         open_virtual_dataset(
             file_url=refs_file,
@@ -158,7 +158,7 @@ def test_handle_relative_paths(refs_file_factory):
             parser=parser,
         )
 
-    parser = KerchunkParser(fs_root="some_directory/")
+    parser = KerchunkJSONParser(fs_root="some_directory/")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
@@ -168,7 +168,7 @@ def test_handle_relative_paths(refs_file_factory):
             parser=parser,
         )
 
-    parser = KerchunkParser(fs_root="/some_directory/file.nc")
+    parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
@@ -177,7 +177,7 @@ def test_handle_relative_paths(refs_file_factory):
             object_store=store,
             parser=parser,
         )
-    parser = KerchunkParser(fs_root="/some_directory/")
+    parser = KerchunkJSONParser(fs_root="/some_directory/")
     vds = open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
@@ -188,7 +188,7 @@ def test_handle_relative_paths(refs_file_factory):
         "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
     }
 
-    parser = KerchunkParser(fs_root="file:///some_directory/")
+    parser = KerchunkJSONParser(fs_root="file:///some_directory/")
     vds = open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
@@ -218,7 +218,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         with open(ref_filepath.as_posix(), mode="w") as of:
             of.write("tmp")
         store = obstore_local(file_url=ref_filepath)
-        parser = KerchunkParser()
+        parser = KerchunkJSONParser()
         with pytest.raises(ValueError):
             open_virtual_dataset(
                 file_url=ref_filepath.as_posix(),
@@ -235,7 +235,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
             with open(ref_filepath, "w") as json_file:
                 ujson.dump(example_reference_dict, json_file)
-            parser = KerchunkParser()
+            parser = KerchunkJSONParser()
         if reference_format == "parquet":
             from kerchunk.df import refs_to_dataframe
 
@@ -279,7 +279,7 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
         ujson.dump(netcdf4_inlined_ref, json_file)
 
     store = obstore_local(file_url=ref_filepath.as_posix())
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     with pytest.raises(
         NotImplementedError,
         match="Reading inlined reference data is currently not supported",
@@ -295,7 +295,7 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
 def test_drop_variables(refs_file_factory, drop_variables):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkParser(drop_variables=drop_variables)
+    parser = KerchunkJSONParser(drop_variables=drop_variables)
     vds = open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
@@ -312,7 +312,7 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
         ujson.dump(refs, json_file)
 
     store = obstore_local(file_url=ref_filepath.as_posix())
-    parser = KerchunkParser()
+    parser = KerchunkJSONParser()
     manifest_store = parser(file_url=ref_filepath.as_posix(), object_store=store)
     with (
         xr.open_dataset(
