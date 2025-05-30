@@ -291,17 +291,17 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
         )
 
 
-@pytest.mark.parametrize("drop_variables", ["a", ["a"]])
-def test_drop_variables(refs_file_factory, drop_variables):
+@pytest.mark.parametrize("skip_variables", ["a", ["a"]])
+def test_skip_variables(refs_file_factory, skip_variables):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
-    parser = KerchunkJSONParser(drop_variables=drop_variables)
+    parser = KerchunkJSONParser(skip_variables=skip_variables)
     vds = open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
         parser=parser,
     )
-    assert all(var not in vds for var in drop_variables)
+    assert all(var not in vds for var in skip_variables)
 
 
 @requires_kerchunk

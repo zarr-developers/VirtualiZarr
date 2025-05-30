@@ -106,7 +106,7 @@ def manifeststore_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     group: str | None = None,
     fs_root: str | None = None,
-    drop_variables: Iterable[str] | None = None,
+    skip_variables: Iterable[str] | None = None,
     store_registry: ObjectStoreRegistry | None = None,
 ) -> ManifestStore:
     """
@@ -129,8 +129,8 @@ def manifeststore_from_kerchunk_refs(
         refs = extract_group(refs, group)
 
     arr_names = find_var_names(refs)
-    if drop_variables:
-        arr_names = [var for var in arr_names if var not in drop_variables]
+    if skip_variables:
+        arr_names = [var for var in arr_names if var not in skip_variables]
 
     # TODO support iterating over multiple nested groups
     marrs = {

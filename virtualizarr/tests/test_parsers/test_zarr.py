@@ -34,10 +34,10 @@ class TestOpenVirtualDatasetZarr:
         assert isinstance(vds["time"].data, np.ndarray)
         assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
 
-    def test_drop_variables(self, zarr_store, drop_variables=["air"]):
+    def test_skip_variables(self, zarr_store, skip_variables=["air"]):
         store = obstore_local(zarr_store)
-        parser = ZarrParser(drop_variables=drop_variables)
-        # check variable is dropped
+        parser = ZarrParser(skip_variables=skip_variables)
+        # check variable is skipped
         vds = open_virtual_dataset(
             file_url=zarr_store,
             object_store=store,

@@ -12,11 +12,11 @@ class Parser:
     def __init__(
         self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
         reader_options: Optional[dict] = None,
     ):
         self.group = group
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
         self.reader_options = reader_options
 
     def __call__(
@@ -34,7 +34,7 @@ class Parser:
         manifeststore = manifeststore_from_kerchunk_refs(
             refs,
             group=self.group,
-            drop_variables=self.drop_variables,
+            skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
 

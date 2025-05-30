@@ -114,7 +114,7 @@ async def _construct_manifest_group(
     filepath: str,
     store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     *,
-    drop_variables: str | Iterable[str] | None = None,
+    skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ):
     zarr_group = await open_group_async(
@@ -125,7 +125,7 @@ async def _construct_manifest_group(
 
     zarr_array_keys = [key async for key in zarr_group.array_keys()]
 
-    _drop_vars: list[Hashable] = [] if drop_variables is None else list(drop_variables)
+    _drop_vars: list[Hashable] = [] if skip_variables is None else list(skip_variables)
 
     zarr_arrays = await asyncio.gather(
         *[zarr_group.getitem(var) for var in zarr_array_keys if var not in _drop_vars]
@@ -148,10 +148,10 @@ class Parser:
     def __init__(
         self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
         self.group = group
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
 
     def __call__(
         self,
@@ -176,7 +176,7 @@ class Parser:
                 store=zarr_store,
                 filepath=file_url,
                 group=self.group,
-                drop_variables=self.drop_variables,
+                skip_variables=self.skip_variables,
             )
         )
         registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})

@@ -497,14 +497,14 @@ class TestRelativePaths:
         assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
-def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
+@pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
+def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
     store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-    parser = DMRPPParser(drop_variables=drop_variables)
+    parser = DMRPPParser(skip_variables=skip_variables)
     vds = open_virtual_dataset(
         file_url=basic_dmrpp_temp_filepath.as_posix(),
         object_store=store,
         parser=parser,
         loadable_variables=[],
     )
-    assert all(var not in vds for var in drop_variables)
+    assert all(var not in vds for var in skip_variables)

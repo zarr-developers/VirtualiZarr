@@ -14,12 +14,12 @@ class Parser:
         self,
         group: str | None = None,
         fs_root: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
         store_registry: ObjectStoreRegistry | None = None,
     ):
         self.group = group
         self.fs_root = fs_root
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
         self.store_registry = store_registry
 
     def __call__(
@@ -56,7 +56,7 @@ class Parser:
                 refs,
                 group=self.group,
                 fs_root=self.fs_root,
-                drop_variables=self.drop_variables,
+                skip_variables=self.skip_variables,
                 store_registry=registry,
             )
             return manifeststore

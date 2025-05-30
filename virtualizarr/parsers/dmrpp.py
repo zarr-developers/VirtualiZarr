@@ -24,10 +24,10 @@ class Parser:
     def __init__(
         self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
         self.group = group
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
 
     def __call__(
         self,
@@ -41,7 +41,7 @@ class Parser:
         parser = DMRParser(
             root=ET.parse(stream).getroot(),
             data_filepath=file_url.removesuffix(".dmrpp"),
-            drop_variables=self.drop_variables,
+            skip_variables=self.skip_variables,
         )
         manifest_store = parser.parse_dataset(
             object_store=object_store, group=self.group
@@ -92,7 +92,7 @@ class DMRParser:
         self,
         root: ET.Element,
         data_filepath: Optional[str] = None,
-        drop_variables: Optional[Iterable[str]] = None,
+        skip_variables: Optional[Iterable[str]] = None,
     ):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
@@ -109,7 +109,7 @@ class DMRParser:
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
-        self.drop_variables = drop_variables if drop_variables is not None else []
+        self.skip_variables = skip_variables if skip_variables is not None else []
 
     def parse_dataset(
         self,
@@ -246,7 +246,7 @@ class DMRParser:
 
         manifest_dict: dict[str, ManifestArray] = {}
         for var_tag in self._find_var_tags(root):
-            if var_tag.attrib["name"] not in self.drop_variables:
+            if var_tag.attrib["name"] not in self.skip_variables:
                 variable = self._parse_variable(var_tag)
                 manifest_dict[var_tag.attrib["name"]] = variable
 
