@@ -61,7 +61,7 @@ def open_virtual_dataset(
         decode_times=decode_times,
         indexes=indexes,
     )
-    return ds
+    return ds.drop_vars(_drop_vars)
 
 
 def open_virtual_mfdataset(
