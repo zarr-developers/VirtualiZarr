@@ -72,7 +72,7 @@ class TestOpenVirtualDatasetZarr:
 
         # check dims and coords are present
         assert set(vds.coords) == set(non_var_arrays)
-        assert set(vds.dims) == set(non_var_arrays)
+        assert set(vds.sizes) == set(non_var_arrays)
         # check vars match
         assert set(vds.keys()) == set(["air"])
 
