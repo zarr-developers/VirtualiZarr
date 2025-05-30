@@ -5,7 +5,7 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
-from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 from virtualizarr.utils import ObstoreReader
 
 
@@ -73,13 +73,12 @@ class Parser:
                 registry = ObjectStoreRegistry(stores=stores)
             else:
                 registry = self.store_registry
-            manifeststore = manifeststore_from_kerchunk_refs(
+            manifestgroup = manifestgroup_from_kerchunk_refs(
                 refs,
                 group=self.group,
                 fs_root=self.fs_root,
                 skip_variables=self.skip_variables,
-                store_registry=registry,
             )
-            return manifeststore
+            return ManifestStore(group=manifestgroup, store_registry=registry)
         else:
             raise ValueError(error_message)

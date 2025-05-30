@@ -10,7 +10,7 @@ import xarray.testing as xrt
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.tests import (
@@ -21,7 +21,7 @@ from virtualizarr.tests import (
     requires_zarr_python,
 )
 from virtualizarr.tests.utils import obstore_local
-from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
@@ -50,8 +50,9 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     ds_refs = vds.virtualize.to_kerchunk(format="dict")
 
     # reconstruct the dataset
-    manifest_store = manifeststore_from_kerchunk_refs(ds_refs)
-    roundtrip = manifest_store.to_virtual_dataset(loadable_variables=[])
+    manifestgroup = manifestgroup_from_kerchunk_refs(ds_refs)
+    manifeststore = ManifestStore(group=manifestgroup)
+    roundtrip = manifeststore.to_virtual_dataset(loadable_variables=[])
 
     # # Assert equal to original dataset
     xrt.assert_equal(roundtrip, vds)

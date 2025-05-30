@@ -14,7 +14,6 @@ from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestGroup,
-    ManifestStore,
 )
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.manifests.utils import create_v3_array_metadata
@@ -25,7 +24,7 @@ from virtualizarr.types.kerchunk import (
 from virtualizarr.utils import determine_chunk_grid_shape
 
 if TYPE_CHECKING:
-    from virtualizarr.manifests.store import ObjectStoreRegistry
+    pass
 
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
@@ -102,15 +101,14 @@ def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     )
 
 
-def manifeststore_from_kerchunk_refs(
+def manifestgroup_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     group: str | None = None,
     fs_root: str | None = None,
     skip_variables: Iterable[str] | None = None,
-    store_registry: ObjectStoreRegistry | None = None,
-) -> ManifestStore:
+) -> ManifestGroup:
     """
-    Construct a ManifestStore from a dictionary of kerchunk references.
+    Construct a ManifestGroup from a dictionary of kerchunk references.
 
     Parameters
     ----------
@@ -122,8 +120,6 @@ def manifeststore_from_kerchunk_refs(
         The root of the fsspec filesystem on which these references were generated.
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     """
-    # TODO teach this method to understand kerchunk json/parquet filepaths too? Then it would be a full "reader"
-
     # both group=None and group='' mean to read root group
     if group:
         refs = extract_group(refs, group)
@@ -142,9 +138,7 @@ def manifeststore_from_kerchunk_refs(
     attributes = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
 
     manifestgroup = ManifestGroup(arrays=marrs, attributes=attributes)
-
-    # TODO what should the obstore store be?
-    return ManifestStore(group=manifestgroup, store_registry=store_registry)
+    return manifestgroup
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:

@@ -4,7 +4,8 @@ from typing import Iterable, Optional
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
+from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
@@ -51,11 +52,13 @@ class Parser:
             {"refs": process_file(file_url, **self.reader_options)}
         )
 
-        manifeststore = manifeststore_from_kerchunk_refs(
+        manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,
             skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
 
-        return manifeststore
+        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
+
+        return ManifestStore(group=manifestgroup, store_registry=registry)
