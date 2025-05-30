@@ -8,15 +8,17 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.readers.dmrpp import DMRParser
+from virtualizarr.parsers import DMRPPParser, HDFParser
+from virtualizarr.parsers.dmrpp import DMRParser
 from virtualizarr.tests import requires_network
+from virtualizarr.tests.utils import obstore_local, obstore_s3
+from virtualizarr.xarray import open_virtual_dataset
 
 urls = [
     (
-        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc",
-        "https://its-live-data.s3-us-west-2.amazonaws.com/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc.dmrpp",
+        "s3://its-live-data/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc",
+        "s3://its-live-data/test-space/cloud-experiments/dmrpp/20240826090000-JPL-L4_GHRSST-SSTfnd-MUR25-GLOB-v02.0-fv04.2.nc.dmrpp",
     )
     # TODO: later add MUR, SWOT, TEMPO and others by using kerchunk JSON to read refs (rather than reading the whole netcdf file)
 ]
@@ -179,11 +181,36 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 
 @requires_network
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
-@pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, filetype="dmrpp", loadable_variables=[])
-    expected = open_virtual_dataset(data_url, loadable_variables=[])
+    store = obstore_s3(
+        file_url=dmrpp_url,
+        region="us-west-2",
+    )
+
+    parser = DMRPPParser()
+    result = open_virtual_dataset(
+        file_url=dmrpp_url, object_store=store, parser=parser, loadable_variables=[]
+    )
+    hdf_parser = HDFParser()
+    expected = open_virtual_dataset(
+        file_url=data_url, object_store=store, parser=hdf_parser, loadable_variables=[]
+    )
     xr.testing.assert_identical(result, expected)
+
+
+@requires_network
+@pytest.mark.parametrize("data_url, dmrpp_url", urls)
+def test_NASA_dmrpp_load(data_url, dmrpp_url):
+    store = obstore_s3(
+        file_url=dmrpp_url,
+        region="us-west-2",
+    )
+
+    parser = DMRPPParser()
+    manifest_store = parser(file_url=dmrpp_url, object_store=store)
+    assert xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ).load()
 
 
 @pytest.mark.parametrize(
@@ -232,8 +259,9 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
 
 def test_parse_dataset(tmp_path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
-
-    vds = basic_dmrpp.parse_dataset()
+    store = obstore_local(file_url=basic_dmrpp.data_filepath)
+    ms = basic_dmrpp.parse_dataset(object_store=store)
+    vds = ms.to_virtual_dataset()
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
     assert vds.data_vars.keys() == {"data", "mask"}
     assert vds.data_vars["data"].dims == ("x", "y")
@@ -244,17 +272,27 @@ def test_parse_dataset(tmp_path):
         DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
     )
 
-    vds_root_implicit = nested_groups_dmrpp.parse_dataset()
-    vds_root = nested_groups_dmrpp.parse_dataset(group="/")
+    vds_root_implicit = nested_groups_dmrpp.parse_dataset(
+        object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
+    vds_root = nested_groups_dmrpp.parse_dataset(
+        group="/", object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
+
     xrt.assert_identical(vds_root_implicit, vds_root)
     assert vds_root.sizes == {"a": 10, "b": 10}
     assert vds_root.coords.keys() == {"a", "b"}
 
-    vds_g1 = nested_groups_dmrpp.parse_dataset(group="/group1")
+    vds_g1 = nested_groups_dmrpp.parse_dataset(
+        group="/group1", object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
     assert vds_g1.sizes == {"x": 720, "y": 1440}
     assert vds_g1.coords.keys() == {"x", "y"}
 
-    vds_g2 = nested_groups_dmrpp.parse_dataset(group="/group1/group2")
+    vds_g2 = nested_groups_dmrpp.parse_dataset(
+        group="/group1/group2", object_store=store
+    ).to_virtual_dataset(loadable_variables=[])
+
     assert vds_g2.sizes == {"x": 720, "y": 1440}
     assert vds_g2.data_vars.keys() == {"area"}
     assert vds_g2.data_vars["area"].dims == ("x", "y")
@@ -291,25 +329,17 @@ def test_parse_variable(tmp_path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     var = basic_dmrpp._parse_variable(basic_dmrpp.find_node_fqn("/data"))
-    assert var.dtype == "float32"
-    assert var.dims == ("x", "y")
+    assert var.metadata.dtype == "float32"
+    assert var.metadata.dimension_names == ("x", "y")
     assert var.shape == (720, 1440)
-    assert var.data.metadata.to_dict()["chunk_grid"]["configuration"][
-        "chunk_shape"
-    ] == (360, 720)
-    assert var.data.metadata.fill_value == -32768
-    assert var.encoding == {
-        "add_offset": 298.15,
-        "scale_factor": 0.001,
-        "_FillValue": -32768,
-    }
-    assert var.attrs == {
-        "long_name": "analysed sea surface temperature",
-        "items": [1, 2, 3],
-        "coordinates": "x y z",
-        "add_offset": 298.15,
-        "scale_factor": 0.001,
-    }
+    assert var.chunks == (360, 720)
+    # _FillValue is encoded for array dtype
+    assert var.metadata.attributes["_FillValue"] == "AAAAAAAA4MA="
+    assert var.metadata.attributes["add_offset"] == 298.15
+    assert var.metadata.attributes["scale_factor"] == 0.001
+    assert var.metadata.attributes["long_name"] == "analysed sea surface temperature"
+    assert var.metadata.attributes["items"] == [1, 2, 3]
+    assert var.metadata.attributes["coordinates"] == "x y z"
 
 
 @pytest.mark.parametrize(
@@ -428,8 +458,13 @@ class TestRelativePaths:
         self,
         basic_dmrpp_temp_filepath: Path,
     ):
+        store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+        parser = DMRPPParser()
         vds = open_virtual_dataset(
-            str(basic_dmrpp_temp_filepath), loadable_variables=[], filetype="dmrpp"
+            file_url=basic_dmrpp_temp_filepath.as_posix(),
+            object_store=store,
+            parser=parser,
+            loadable_variables=[],
         )
         path = vds["x"].data.manifest["0"]["path"]
 
@@ -445,26 +480,31 @@ class TestRelativePaths:
         relative_dmrpp_filepath = os.path.relpath(
             str(basic_dmrpp_temp_filepath), start=os.getcwd()
         )
-
+        store = obstore_local(file_url=relative_dmrpp_filepath)
+        parser = DMRPPParser()
         vds = open_virtual_dataset(
-            relative_dmrpp_filepath, loadable_variables=[], filetype="dmrpp"
+            file_url=relative_dmrpp_filepath,
+            object_store=store,
+            parser=parser,
+            loadable_variables=[],
         )
         path = vds["x"].data.manifest["0"]["path"]
 
-        # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+        # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
         expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
             ".dmrpp"
         )
         assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
-def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
+@pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
+def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
+    store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+    parser = DMRPPParser(skip_variables=skip_variables)
     vds = open_virtual_dataset(
-        str(basic_dmrpp_temp_filepath),
+        file_url=basic_dmrpp_temp_filepath.as_posix(),
+        object_store=store,
+        parser=parser,
         loadable_variables=[],
-        filetype="dmrpp",
-        drop_variables=drop_variables,
     )
-
-    assert all(var not in vds for var in drop_variables)
+    assert all(var not in vds for var in skip_variables)
