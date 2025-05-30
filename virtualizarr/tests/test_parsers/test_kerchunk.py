@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import ujson
 import xarray as xr
+import xarray.testing as xrt
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import KerchunkParquetParser, KerchunkParser
@@ -24,7 +25,7 @@ def gen_ds_refs(
     if zarray is None:
         zarray = '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}'
     if zattrs is None:
-        zattrs = '{"_ARRAY_DIMENSIONS":["x","y"]}'
+        zattrs = '{"_ARRAY_DIMENSIONS":["x","y"],"value": "1"}'
     if chunks is None:
         chunks = {"a/0.0": ["/test1.nc", 6144, 48]}
 
@@ -76,6 +77,7 @@ def test_dataset_from_df_refs(refs_file_factory):
     assert vda.shape == (2, 3)
     assert vda.chunks == (2, 3)
     assert vda.dtype == np.dtype("<i8")
+    assert vda.attrs == {"value": "1"}
 
     assert vda.data.metadata.codecs[0].to_dict() == {
         "configuration": {"endian": "little"},
@@ -312,16 +314,12 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
     store = obstore_local(file_url=ref_filepath.as_posix())
     parser = KerchunkParser()
     manifest_store = parser(file_url=ref_filepath.as_posix(), object_store=store)
-    # with (
-    # xr.open_dataset(
-    # netcdf4_file,
-    # ) as ds,
-    # xr.open_dataset(
-    # manifest_store, engine="zarr", consolidated=False,
-    # zarr_format=3,
-    # ).load() as manifest_ds,
-    # ):
-    # xrt.assert_allclose(ds, manifest_ds)
-    assert xr.open_dataset(
-        manifest_store, engine="zarr", consolidated=False, zarr_format=3
-    ).load()
+    with (
+        xr.open_dataset(
+            netcdf4_file,
+        ) as ds,
+        xr.open_dataset(
+            manifest_store, engine="zarr", consolidated=False, zarr_format=3,
+        ).load() as manifest_ds,
+    ):
+        xrt.assert_identical(ds, manifest_ds)
