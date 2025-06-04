@@ -158,12 +158,12 @@ class ObjectStoreRegistry:
         --------
         StoreRequest
         """
-        # Sort keys by length in descending order to ensure longer, more specific matches take precedence
-        sorted_keys = sorted(self._stores.keys(), key=len, reverse=True)
-        for key in sorted_keys:
-            if url.startswith(key):
-                return self._stores[key]
-        raise ValueError(f"Could not find a store matching {url}")
+        prefixes = filter(url.startswith, self._stores)
+
+        if not (longest_prefix := max(prefixes, default=None, key=len)):
+            raise ValueError(f"No store registered for any prefix of {url!r}")
+
+        return self._stores[longest_prefix]
 
 
 class ManifestStore(Store):
