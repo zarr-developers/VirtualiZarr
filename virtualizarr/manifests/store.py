@@ -53,11 +53,8 @@ def get_store_prefix(url: str) -> str:
     """
     Get a logical prefix to use for a url in an ObjectStoreRegistry
     """
-    parsed = urlparse(url)
-    if parsed.scheme in ["", "file"]:
-        return ""
-    else:
-        return f"{parsed.scheme}://{parsed.netloc}"
+    scheme, netloc, *_ = urlparse(url)
+    return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
 def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
