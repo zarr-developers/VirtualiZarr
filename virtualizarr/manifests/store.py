@@ -152,7 +152,7 @@ class ObjectStoreRegistry:
         -----------
         url : str
             A url to identify the appropriate object_store instance. If the url is contained in the
-            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
+            prefix of multiple stores in the registry, the store with the longest prefix is chosen.
 
         Returns:
         --------
