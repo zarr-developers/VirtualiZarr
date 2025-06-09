@@ -144,28 +144,28 @@ def open_virtual_dataset(
 
     Parameters
     ----------
-    filepath : str, default None
+    filepath
         File path to open as a set of virtualized zarr arrays.
-    filetype : FileType or str, default None
+    filetype
         Type of file to be opened. Used to determine which kerchunk file format backend to use.
         Can be one of {'netCDF3', 'netCDF4', 'HDF', 'TIFF', 'GRIB', 'FITS', 'dmrpp', 'kerchunk'}.
         If not provided will attempt to automatically infer the correct filetype from header bytes.
-    group : str, default is None
+    group
         Path to the HDF5/netCDF4 group in the given file to open. Given as a str, supported by filetypes “netcdf4”, “hdf5”, and "dmrpp".
-    drop_variables: list[str], default is None
+    drop_variables
         Variables in the file to drop before returning.
-    loadable_variables: list[str], default is None
+    loadable_variables
         Variables in the file to open as lazy numpy/dask arrays instead of instances of `ManifestArray`.
         Default is to open all variables as virtual variables (i.e. as ManifestArrays).
-    decode_times: bool | None, default is None
+    decode_times
         Bool that is passed into Xarray's open_dataset. Allows time to be decoded into a datetime object.
-    indexes : Mapping[str, Index], default is None
+    indexes
         Indexes to use on the returned xarray Dataset.
         Default is None, which will read any 1D coordinate data to create in-memory Pandas indexes.
         To avoid creating any indexes, pass indexes={}.
-    virtual_backend_kwargs: dict, default is None
+    virtual_backend_kwargs
         Dictionary of keyword arguments passed down to this reader. Allows passing arguments specific to certain readers.
-    reader_options: dict, default {}
+    reader_options
         Dict passed into Kerchunk file readers, to allow reading from remote filesystems.
         Note: Each Kerchunk file reader has distinct arguments, so ensure reader_options match selected Kerchunk reader arguments.
 

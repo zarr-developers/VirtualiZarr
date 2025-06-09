@@ -49,15 +49,18 @@ class ObstoreReader:
 class _FsspecFSFromFilepath:
     """Class to create fsspec Filesystem from input filepath.
 
-    Parameters
+
+
+    Attributes
     ----------
     filepath : str
         Input filepath
     reader_options : dict, optional
         dict containing kwargs to pass to file opener, by default {}
-    fs : Option | None
+    fs : fsspec.AbstractFileSystem
         The fsspec filesystem object, created in __post_init__
-
+    upath : upath.core.UPath
+        The upath object, created in __post_init__
     """
 
     filepath: str
@@ -162,9 +165,9 @@ def convert_v3_to_v2_metadata(
 
     Parameters
     ----------
-    v3_metadata : ArrayV3Metadata
+    v3_metadata
         The metadata object in v3 format.
-    fill_value : Any, optional
+    fill_value
         Override the fill value from v3 metadata.
 
     Returns
