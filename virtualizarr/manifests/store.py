@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pickle
-from collections.abc import AsyncGenerator, Iterable
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -13,23 +13,21 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer, default_buffer_prototype
-from zarr.core.buffer.core import BufferPrototype
+from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
+from zarr.core.common import BytesLike
 
-from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable, Mapping
-    from typing import Any
-
-    import xarray as xr
     from obstore.store import (
         ObjectStore,  # type: ignore[import-not-found]
     )
-    from zarr.core.buffer import BufferPrototype
-    from zarr.core.common import BytesLike
+
+    StoreDict: TypeAlias = dict[str, ObjectStore]
+
+    import xarray as xr
+
 
 __all__ = ["ManifestStore"]
 
@@ -49,25 +47,6 @@ class StoreRequest:
     """The ObjectStore instance to use for making the request."""
     key: str
     """The key within the store to request."""
-
-
-async def list_dir_from_manifest_arrays(
-    arrays: Mapping[str, ManifestArray], prefix: str
-) -> AsyncGenerator[str]:
-    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
-
-    Parameters
-    ----------
-    arrays : Mapping[str, ManifestArrays]
-    prefix : str
-
-    Returns
-    -------
-    AsyncIterator[str]
-    """
-    # TODO shouldn't this just accept a ManifestGroup instead?
-    # Start with expected group level metadata
-    raise NotImplementedError
 
 
 def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
@@ -201,6 +180,7 @@ class ObjectStoreRegistry:
         -----------
         url : str
             A url to identify the appropriate object_store instance based on the URL scheme and netloc.
+
         Returns:
         --------
         StoreRequest
@@ -215,10 +195,10 @@ class ObjectStoreRegistry:
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
-    from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`,
-    allowing for virtually interfacing with underlying data in other file format.
+    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure.
+
+    The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
+    multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------

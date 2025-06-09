@@ -4,16 +4,9 @@ from typing import Hashable, Iterable, Mapping, Optional
 
 from xarray import Dataset, Index
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.readers.api import VirtualBackend
-from virtualizarr.translators.kerchunk import (
-    extract_group,
-    virtual_vars_and_metadata_from_kerchunk_refs,
-)
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
-from virtualizarr.xarray import (
-    construct_fully_virtual_dataset,
-    construct_virtual_dataset,
-)
 
 
 class TIFFVirtualBackend(VirtualBackend):
@@ -51,29 +44,16 @@ class TIFFVirtualBackend(VirtualBackend):
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
         refs = KerchunkStoreRefs({"refs": tiff_to_zarr(filepath, **reader_options)})
 
-        # both group=None and group='' mean to read root group
-        if group:
-            refs = extract_group(refs, group)
-
-        virtual_vars, attrs, coord_names = virtual_vars_and_metadata_from_kerchunk_refs(
+        manifeststore = ManifestStore.from_kerchunk_refs(
             refs,
+            group=group,
             fs_root=Path.cwd().as_uri(),
         )
 
-        fully_virtual_dataset = construct_fully_virtual_dataset(
-            virtual_vars=virtual_vars,
-            coord_names=coord_names,
-            attrs=attrs,
-        )
-
-        vds = construct_virtual_dataset(
-            fully_virtual_ds=fully_virtual_dataset,
-            filepath=filepath,
+        vds = manifeststore.to_virtual_dataset(
             group=group,
             loadable_variables=loadable_variables,
-            reader_options=reader_options,
             indexes=indexes,
-            decode_times=decode_times,
         )
 
         return vds.drop_vars(_drop_vars)
