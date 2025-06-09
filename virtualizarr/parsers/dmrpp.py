@@ -1,7 +1,7 @@
 import io
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np

@@ -4,9 +4,6 @@ import math
 from typing import (
     TYPE_CHECKING,
     Iterable,
-    List,
-    Optional,
-    Union,
 )
 
 import numpy as np

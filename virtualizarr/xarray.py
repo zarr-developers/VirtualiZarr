@@ -49,7 +49,6 @@ def open_virtual_dataset(
 ) -> xr.Dataset:
     filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
-
     manifest_store = parser(
         file_url=filepath,
         object_store=object_store,

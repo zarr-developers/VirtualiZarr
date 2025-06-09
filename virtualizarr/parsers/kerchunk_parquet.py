@@ -20,9 +20,7 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
-    OpenFileType = (
-        fsspec.core.OpenFile | fsspec.spec.AbstractBufferedFile | io.IOBase
-    )
+    OpenFileType = fsspec.core.OpenFile | fsspec.spec.AbstractBufferedFile | io.IOBase
 
 
 class Parser:
