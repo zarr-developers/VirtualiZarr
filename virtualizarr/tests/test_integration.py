@@ -54,7 +54,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     manifeststore = ManifestStore(group=manifestgroup)
     roundtrip = manifeststore.to_virtual_dataset(loadable_variables=[])
 
-    # # Assert equal to original dataset
+    # Assert equal to original dataset
     xrt.assert_equal(roundtrip, vds)
 
 
@@ -316,10 +316,10 @@ class TestRoundtrip:
 
             roundtrip = roundtrip_func(vds, tmp_path)
 
-            # # assert equal to original dataset
+            # assert equal to original dataset
             xrt.assert_allclose(roundtrip, ds)
 
-            # # assert coordinate attributes are maintained
+            # assert coordinate attributes are maintained
             for coord in ds.coords:
                 assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 

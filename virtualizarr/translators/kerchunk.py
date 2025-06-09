@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, cast
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from zarr.core.common import JSON
@@ -22,9 +23,6 @@ from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
 from virtualizarr.utils import determine_chunk_grid_shape
-
-if TYPE_CHECKING:
-    pass
 
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:

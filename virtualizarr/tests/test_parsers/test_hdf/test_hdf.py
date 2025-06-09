@@ -214,12 +214,12 @@ class TestOpenVirtualDataset:
     ):
         store = obstore_local(file_url=root_coordinates_hdf5_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=root_coordinates_hdf5_file,
             object_store=store,
             parser=parser,
-        )
-        assert set(vds.coords) == {"lat", "lon"}
+        ) as vds:
+            assert set(vds.coords) == {"lat", "lon"}
 
     @pytest.mark.xfail(reason="Requires Zarr v3 big endian dtype support")
     def test_big_endian(
@@ -228,12 +228,12 @@ class TestOpenVirtualDataset:
     ):
         store = obstore_local(file_url=big_endian_dtype_hdf5_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=big_endian_dtype_hdf5_file,
             object_store=store,
             parser=parser,
-        )
-        print(vds)
+        ) as vds:
+            print(vds)
 
 
 @requires_hdf5plugin
@@ -243,9 +243,9 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
     # regression test for GH issue #364
     store = obstore_local(file_url=netcdf4_file_with_data_in_multiple_groups)
     parser = HDFParser(group=group)
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         file_url=netcdf4_file_with_data_in_multiple_groups,
         object_store=store,
         parser=parser,
-    )
-    assert list(vds.dims) == ["dim_0"]
+    ) as vds:
+        assert list(vds.dims) == ["dim_0"]

@@ -1,28 +1,23 @@
-from typing import (
-    Tuple,
-    Union,
-)
-
 import numpy as np
 from xarray.backends.zarr import FillValueCoder
 
-FillValueType = Union[
-    int,
-    float,
-    bool,
-    complex,
-    str,
-    np.integer,
-    np.floating,
-    np.bool_,
-    np.complexfloating,
-    bytes,  # For fixed-length string storage
-    Tuple[bytes, int],  # Structured type
-]
+FillValueType = (
+    int
+    | float
+    | bool
+    | complex
+    | str
+    | np.integer
+    | np.floating
+    | np.bool_
+    | np.complexfloating
+    | bytes  # For fixed-length string storage
+    | tuple[bytes, int]  # Structured type
+)
 
 
 def encode_cf_fill_value(
-    fill_value: Union[np.ndarray, np.generic],
+    fill_value: np.ndarray | np.generic,
     target_dtype: np.dtype,
 ) -> FillValueType:
     """

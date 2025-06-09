@@ -109,8 +109,8 @@ class DMRParser:
     def __init__(
         self,
         root: ET.Element,
-        data_filepath: Optional[str] = None,
-        skip_variables: Optional[Iterable[str]] = None,
+        data_filepath: str | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
@@ -127,7 +127,7 @@ class DMRParser:
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
-        self.skip_variables = skip_variables if skip_variables is not None else []
+        self.skip_variables = skip_variables or ()
 
     def parse_dataset(
         self,

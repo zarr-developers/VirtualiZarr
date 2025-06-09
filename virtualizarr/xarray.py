@@ -49,7 +49,6 @@ def open_virtual_dataset(
 ) -> xr.Dataset:
     filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
-    _drop_vars: Iterable[str] = [] if drop_variables is None else list(drop_variables)
 
     manifest_store = parser(
         file_url=filepath,
@@ -61,7 +60,7 @@ def open_virtual_dataset(
         decode_times=decode_times,
         indexes=indexes,
     )
-    return ds.drop_vars(_drop_vars)
+    return ds.drop_vars(list(drop_variables or ()))
 
 
 def open_virtual_mfdataset(
@@ -82,7 +81,7 @@ def open_virtual_mfdataset(
     ) = None,
     compat: "CompatOptions" = "no_conflicts",
     preprocess: Callable[[Dataset], Dataset] | None = None,
-    data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
+    data_vars: Literal["all", "minimal", "different"] | Iterable[Hashable] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
     parallel: Literal["dask", "lithops", False] | Executor = False,

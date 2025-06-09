@@ -270,8 +270,7 @@ class ManifestStore(Store):
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
         if (
-            not isinstance(store, obs.store.HTTPStore)
-            and not isinstance(store, obs.store.MemoryStore)
+            not isinstance(store, (obs.store.HTTPStore, obs.store.MemoryStore))
             and store.prefix
         ):
             # strip the prefix from key

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from obstore.store import ObjectStore
 
@@ -13,19 +13,24 @@ class Parser:
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        reader_options: Optional[dict] = {},
+        reader_options: dict | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
-        Parameters:
-            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
-            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
-            reader_options: (dict): Configuration options used internally for the kerchunk's fsspec backend
+
+        Parameters
+        ----------
+        group (str):
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        skip_variables (Iterable[str]):
+            Variables in the file that will be ignored when creating the ManifestStore.
+        reader_options (dict):
+            Configuration options used internally for the kerchunk's fsspec backend
         """
 
         self.group = group
         self.skip_variables = skip_variables
-        self.reader_options = reader_options
+        self.reader_options = reader_options or {}
 
     def __call__(
         self,
@@ -35,12 +40,16 @@ class Parser:
         """
         Parse the metadata and byte offsets from a given file to product a VirtualiZarr ManifestStore.
 
-        Parameters:
-            file_url (str): The URI or path to the input file (e.g., "s3://bucket/file.nc").
-            object_store (ObjectStore): An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+        Parameters
+        ----------
+        file_url (str):
+            The URI or path to the input file (e.g., "s3://bucket/file.nc").
+        object_store (ObjectStore):
+            An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
 
-        Returns:
-            ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        Returns
+        -------
+        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
         """
 
         from kerchunk.netCDF3 import NetCDF3ToZarr

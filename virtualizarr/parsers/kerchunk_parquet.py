@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable, Optional, Union
+from typing import TYPE_CHECKING
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
@@ -19,9 +20,9 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
-    OpenFileType = Union[
-        fsspec.core.OpenFile, fsspec.spec.AbstractBufferedFile, io.IOBase
-    ]
+    OpenFileType = (
+        fsspec.core.OpenFile | fsspec.spec.AbstractBufferedFile | io.IOBase
+    )
 
 
 class Parser:
@@ -30,15 +31,20 @@ class Parser:
         group: str | None = None,
         fs_root: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        reader_options: Optional[dict] = None,
+        reader_options: dict | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
-        Parameters:
-            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
-            fs_root (str): The qualifier to be used for kerchunk references containing relative paths.
-            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
-            reader_options: (dict): Configuration options used internally for the fsspec backend.
+        Parameters
+        ----------
+        group (str):
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        fs_root (str):
+            The qualifier to be used for kerchunk references containing relative paths.
+        skip_variables (Iterable[str]):
+            Variables in the file that will be ignored when creating the ManifestStore.
+        reader_options (dict):
+            Configuration options used internally for the fsspec backend.
         """
 
         self.group = group
@@ -55,12 +61,16 @@ class Parser:
         Parse the metadata and byte offsets from a given file to product a
         VirtualiZarr ManifestStore.
 
-        Parameters:
-            file_url (str): The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
-            object_store (ObjectStore): An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+        Parameters
+        ----------
+        file_url (str):
+            The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
+        object_store (ObjectStore):
+            An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
 
-        Returns:
-            ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        Returns
+        -------
+        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
         """
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
@@ -104,7 +114,7 @@ class _FsspecFSFromFilepath:
     """
 
     filepath: str
-    reader_options: Optional[dict] = field(default_factory=dict)
+    reader_options: dict | None = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
     upath: upath.core.UPath = field(init=False)
 

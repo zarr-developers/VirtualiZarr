@@ -1,5 +1,5 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
 
 from obstore.store import ObjectStore
 
@@ -14,19 +14,24 @@ class Parser:
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        remote_options: Optional[dict] = None,
+        remote_options: dict | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
-        Parameters:
-            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
-            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
-            remote_options: (dict): Configuration options used internally for the kerchunk's fsspec backend
+
+        Parameters
+        ----------
+        group (str):
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        skip_variables (Iterable[str]):
+            Variables in the file that will be ignored when creating the ManifestStore.
+        remote_options (dict):
+            Configuration options used internally for the kerchunk's fsspec backend
         """
 
         self.group = group
         self.skip_variables = skip_variables
-        self.remote_options = remote_options
+        self.remote_options = remote_options or {}
 
     def __call__(
         self,

@@ -187,15 +187,21 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         region="us-west-2",
     )
 
-    parser = DMRPPParser()
-    result = open_virtual_dataset(
-        file_url=dmrpp_url, object_store=store, parser=parser, loadable_variables=[]
-    )
-    hdf_parser = HDFParser()
-    expected = open_virtual_dataset(
-        file_url=data_url, object_store=store, parser=hdf_parser, loadable_variables=[]
-    )
-    xr.testing.assert_identical(result, expected)
+    with (
+        open_virtual_dataset(
+            file_url=dmrpp_url,
+            object_store=store,
+            parser=DMRPPParser(),
+            loadable_variables=[],
+        ) as actual,
+        open_virtual_dataset(
+            file_url=data_url,
+            object_store=store,
+            parser=HDFParser(),
+            loadable_variables=[],
+        ) as expected,
+    ):
+        xr.testing.assert_identical(actual, expected)
 
 
 @requires_network
@@ -208,9 +214,11 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
 
     parser = DMRPPParser()
     manifest_store = parser(file_url=dmrpp_url, object_store=store)
-    assert xr.open_dataset(
+
+    with xr.open_dataset(
         manifest_store, engine="zarr", consolidated=False, zarr_format=3
-    ).load()
+    ) as ds:
+        assert ds.load()
 
 
 @pytest.mark.parametrize(

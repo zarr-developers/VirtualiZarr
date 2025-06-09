@@ -42,6 +42,7 @@ def _construct_manifest_array(
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
+
     Parameters
     ----------
     filepath: str
@@ -50,11 +51,12 @@ def _construct_manifest_array(
         An h5py dataset.
     group : str
         Name of the group containing this h5py.Dataset.
+
     Returns
     -------
     ManifestArray
     """
-    chunks = dataset.chunks if dataset.chunks else dataset.shape
+    chunks = dataset.chunks or dataset.shape
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
@@ -97,7 +99,7 @@ def _construct_manifest_group(
     reader: ObstoreReader,
     *,
     group: str | None = None,
-    drop_variables: Optional[Iterable[str]] = None,
+    drop_variables: Iterable[str] | None = None,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
@@ -239,7 +241,7 @@ def _dataset_chunk_manifest(
     return chunk_manifest
 
 
-def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
+def _dataset_dims(dataset: H5Dataset, group: str = "") -> list[str]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -260,7 +262,7 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
         List with HDF5 path names of dimension scales attached to input
         dataset.
     """
-    dims = list()
+    dims = []
     rank = len(dataset.shape)
     if rank:
         for n in range(rank):
@@ -287,7 +289,7 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
     return [dim.removeprefix(group) for dim in dims]
 
 
-def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
+def _extract_attrs(h5obj: H5Dataset | H5Group):
     """
     Extract attributes from an HDF5 group or dataset.
 
@@ -332,7 +334,7 @@ def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
     return attrs
 
 
-def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
+def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
     dimension_names = []
     non_coordinate_dimension_variables = []
     for name, obj in group.items():
