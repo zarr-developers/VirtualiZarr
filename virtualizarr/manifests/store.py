@@ -274,7 +274,7 @@ class ManifestStore(Store):
             and store.prefix
         ):
             # strip the prefix from key
-            key = key.replace(str(store.prefix), "")
+            key = key.removeprefix(str(store.prefix))
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
