@@ -102,40 +102,27 @@ def _construct_manifest_group(
     Construct a virtual Group from a HDF dataset.
     """
 
-    if drop_variables is None:
-        drop_variables = []
+    import h5py
 
-    f = h5py.File(reader, mode="r")
+    with h5py.File(reader, mode="r") as f:
+        if not isinstance(g := f.get(group or "/"), h5py.Group):
+            raise ValueError(f"Group {group!r} is not an HDF Group")
 
-    if group is not None and group != "":
-        g = f[group]
-        group_name = group
-        if not isinstance(g, h5py.Group):
-            raise ValueError("The provided group is not an HDF group")
-    else:
-        g = f["/"]
-        group_name = "/"
+        # Several of our test fixtures which use xr.tutorial data have
+        # non coord dimensions serialized using big endian dtypes which are not
+        # yet supported in zarr-python v3.  We'll drop these variables for the
+        # moment until big endian support is included upstream.
 
-    manifest_dict = {}
-    # Several of our test fixtures which use xr.tutorial data have
-    # non coord dimensions serialized using big endian dtypes which are not
-    # yet supported in zarr-python v3.  We'll drop these variables for the
-    # moment until big endian support is included upstream.)
+        non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
+        drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
+        group_name = str(g.name)
+        arrays = {
+            key: _construct_manifest_array(filepath, dataset, group_name)
+            for key in g.keys()
+            if key not in drop_variables and isinstance(dataset := g[key], h5py.Dataset)
+        }
 
-    non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
-    drop_variables = list(set(list(drop_variables) + non_coordinate_dimension_vars))
-    attrs = _extract_attrs(g)
-    for key in g.keys():
-        if key not in drop_variables:
-            if isinstance(g[key], h5py.Dataset):
-                variable = _construct_manifest_array(
-                    filepath=filepath,
-                    dataset=g[key],
-                    group=group_name,
-                )
-                if variable is not None:
-                    manifest_dict[key] = variable
-    return ManifestGroup(arrays=manifest_dict, attributes=attrs)
+    return ManifestGroup(arrays=arrays, attributes=_extract_attrs(g))
 
 
 class Parser:
