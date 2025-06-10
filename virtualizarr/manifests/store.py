@@ -96,12 +96,19 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     Parameters
     ----------
-    key : str
-    chunk_key_encoding : str
-
+    key
+        The key in the Zarr store to parse.
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
     Returns
     -------
-    tuple containing chunk indexes
+    tuple containing chunk indexes.
+
+    Raises
+
+    NotImplementedError
+        Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
+
     """
     if key.endswith("c"):
         # Scalar arrays hold the data in the "c" key
@@ -156,7 +163,12 @@ class ObjectStoreRegistry:
 
         Returns
         -------
-        StoreRequest
+        ObjectStore
+
+        Raises
+        ------
+        ValueError
+            If no store is registered for the provided URL or its prefixes.
         """
         prefixes = filter(url.startswith, self._stores)
 
