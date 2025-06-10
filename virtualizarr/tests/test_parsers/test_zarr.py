@@ -25,35 +25,35 @@ class TestOpenVirtualDatasetZarr:
         # check loadable variables
         store = obstore_local(zarr_store)
         parser = ZarrParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=zarr_store,
             object_store=store,
             parser=parser,
             loadable_variables=loadable_variables,
-        )
-        assert isinstance(vds["time"].data, np.ndarray)
-        assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
+        ) as vds:
+            assert isinstance(vds["time"].data, np.ndarray)
+            assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
 
     def test_skip_variables(self, zarr_store, skip_variables=["air"]):
         store = obstore_local(zarr_store)
         parser = ZarrParser(skip_variables=skip_variables)
         # check variable is skipped
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=zarr_store,
             object_store=store,
             parser=parser,
-        )
-        assert len(vds.data_vars) == 0
+        ) as vds:
+            assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
         store = obstore_local(zarr_store)
         parser = ZarrParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=zarr_store,
             object_store=store,
             parser=parser,
-        )
-        assert "0.0.0" in vds["air"].data.manifest.dict().keys()
+        ) as vds:
+            assert "0.0.0" in vds["air"].data.manifest.dict().keys()
 
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
         import zarr
@@ -61,43 +61,42 @@ class TestOpenVirtualDatasetZarr:
         zg = zarr.open_group(zarr_store)
         store = obstore_local(zarr_store)
         parser = ZarrParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=zarr_store,
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
+        ) as vds:
+            non_var_arrays = ["time", "lat", "lon"]
 
-        non_var_arrays = ["time", "lat", "lon"]
+            # check dims and coords are present
+            assert set(vds.coords) == set(non_var_arrays)
+            assert set(vds.sizes) == set(non_var_arrays)
+            # check vars match
+            assert set(vds.keys()) == set(["air"])
 
-        # check dims and coords are present
-        assert set(vds.coords) == set(non_var_arrays)
-        assert set(vds.sizes) == set(non_var_arrays)
-        # check vars match
-        assert set(vds.keys()) == set(["air"])
+            # check top level attrs
+            assert zg.attrs.asdict() == vds.attrs
 
-        # check top level attrs
-        assert zg.attrs.asdict() == vds.attrs
+            arrays = [val for val in zg.keys()]
 
-        arrays = [val for val in zg.keys()]
-
-        # arrays are ManifestArrays
-        for array in arrays:
-            # check manifest array ArrayV3Metadata dtype
-            assert isinstance(vds[array].data, ManifestArray)
-            # compare manifest array ArrayV3Metadata
-            expected = zg[array].metadata.to_dict()
-            # Check attributes
-            assert expected["attributes"] == vds[array].attrs
-            assert expected["dimension_names"] == vds[array].dims
-            expected.pop(
-                "dimension_names"
-            )  # dimension_names are removed in conversion to virtual variable
-            expected[
-                "attributes"
-            ] = {}  # attributes are removed in conversion to virtual variable
-            actual = vds[array].data.metadata.to_dict()
-            assert expected == actual
+            # arrays are ManifestArrays
+            for array in arrays:
+                # check manifest array ArrayV3Metadata dtype
+                assert isinstance(vds[array].data, ManifestArray)
+                # compare manifest array ArrayV3Metadata
+                expected = zg[array].metadata.to_dict()
+                # Check attributes
+                assert expected["attributes"] == vds[array].attrs
+                assert expected["dimension_names"] == vds[array].dims
+                expected.pop(
+                    "dimension_names"
+                )  # dimension_names are removed in conversion to virtual variable
+                expected[
+                    "attributes"
+                ] = {}  # attributes are removed in conversion to virtual variable
+                actual = vds[array].data.metadata.to_dict()
+                assert expected == actual
 
 
 def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar):

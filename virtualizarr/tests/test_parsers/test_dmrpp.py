@@ -468,20 +468,20 @@ class TestRelativePaths:
     ):
         store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
         parser = DMRPPParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=basic_dmrpp_temp_filepath.as_posix(),
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
-        path = vds["x"].data.manifest["0"]["path"]
+        ) as vds:
+            path = vds["x"].data.manifest["0"]["path"]
 
-        # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-        # and the manifest should only contain absolute file URIs
-        expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
-            ".dmrpp"
-        )
-        assert path == expected_datafile_path_uri
+            # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+            # and the manifest should only contain absolute file URIs
+            expected_datafile_path_uri = (
+                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
+            )
+            assert path == expected_datafile_path_uri
 
     def test_relative_path_to_dmrpp_file(self, basic_dmrpp_temp_filepath: Path):
         # test that if a user supplies a relative path to a DMR++ file we still get an absolute path in the manifest
@@ -490,29 +490,29 @@ class TestRelativePaths:
         )
         store = obstore_local(file_url=relative_dmrpp_filepath)
         parser = DMRPPParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=relative_dmrpp_filepath,
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
-        path = vds["x"].data.manifest["0"]["path"]
+        ) as vds:
+            path = vds["x"].data.manifest["0"]["path"]
 
-        # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-        expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
-            ".dmrpp"
-        )
-        assert path == expected_datafile_path_uri
+            # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+            expected_datafile_path_uri = (
+                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
+            )
+            assert path == expected_datafile_path_uri
 
 
 @pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
 def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
     store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
     parser = DMRPPParser(skip_variables=skip_variables)
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         file_url=basic_dmrpp_temp_filepath.as_posix(),
         object_store=store,
         parser=parser,
         loadable_variables=[],
-    )
-    assert all(var not in vds for var in skip_variables)
+    ) as vds:
+        assert all(var not in vds for var in skip_variables)

@@ -68,26 +68,27 @@ def test_dataset_from_df_refs(refs_file_factory):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
-    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
+    with open_virtual_dataset(
+        file_url=refs_file, object_store=store, parser=parser
+    ) as vds:
+        assert "a" in vds
+        vda = vds["a"]
+        assert isinstance(vda.data, ManifestArray)
+        assert vda.dims == ("x", "y")
+        assert vda.shape == (2, 3)
+        assert vda.chunks == (2, 3)
+        assert vda.dtype == np.dtype("<i8")
+        assert vda.attrs == {"value": "1"}
 
-    assert "a" in vds
-    vda = vds["a"]
-    assert isinstance(vda.data, ManifestArray)
-    assert vda.dims == ("x", "y")
-    assert vda.shape == (2, 3)
-    assert vda.chunks == (2, 3)
-    assert vda.dtype == np.dtype("<i8")
-    assert vda.attrs == {"value": "1"}
+        assert vda.data.metadata.codecs[0].to_dict() == {
+            "configuration": {"endian": "little"},
+            "name": "bytes",
+        }
+        assert vda.data.metadata.fill_value == 0
 
-    assert vda.data.metadata.codecs[0].to_dict() == {
-        "configuration": {"endian": "little"},
-        "name": "bytes",
-    }
-    assert vda.data.metadata.fill_value == 0
-
-    assert vda.data.manifest.dict() == {
-        "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
-    }
+        assert vda.data.manifest.dict() == {
+            "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
+        }
 
 
 def test_dataset_from_df_refs_with_filters(refs_file_factory):
@@ -105,13 +106,14 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
-    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
-
-    vda = vds["a"]
-    assert vda.data.metadata.codecs[1].to_dict() == {
-        "name": "numcodecs.shuffle",
-        "configuration": {"elementsize": 4},
-    }
+    with open_virtual_dataset(
+        file_url=refs_file, object_store=store, parser=parser
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.metadata.codecs[1].to_dict() == {
+            "name": "numcodecs.shuffle",
+            "configuration": {"elementsize": 4},
+        }
 
 
 def test_empty_chunk_manifest(refs_file_factory):
@@ -128,12 +130,13 @@ def test_empty_chunk_manifest(refs_file_factory):
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray), chunks={})
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
-    vds = open_virtual_dataset(file_url=refs_file, object_store=store, parser=parser)
-
-    assert "a" in vds.variables
-    assert isinstance(vds["a"].data, ManifestArray)
-    assert vds["a"].sizes == {"x": 100, "y": 200}
-    assert vds["a"].chunksizes == {"x": 50, "y": 100}
+    with open_virtual_dataset(
+        file_url=refs_file, object_store=store, parser=parser
+    ) as vds:
+        assert "a" in vds.variables
+        assert isinstance(vds["a"].data, ManifestArray)
+        assert vds["a"].sizes == {"x": 100, "y": 200}
+        assert vds["a"].chunksizes == {"x": 50, "y": 100}
 
 
 def test_handle_relative_paths(refs_file_factory):
@@ -142,62 +145,74 @@ def test_handle_relative_paths(refs_file_factory):
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
-        open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=refs_file,
             object_store=store,
             parser=parser,
-        )
+        ) as _:
+            pass
 
     refs_file = refs_file_factory(chunks={"a/0.0": ["./test1.nc", 6144, 48]})
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
     with pytest.raises(ValueError, match="must be absolute posix paths"):
-        open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=refs_file,
             object_store=store,
             parser=parser,
-        )
+        ) as _:
+            pass
 
     parser = KerchunkJSONParser(fs_root="some_directory/")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
-        open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=refs_file,
             object_store=store,
             parser=parser,
-        )
+        ) as _:
+            pass
 
     parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
         ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
-        open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=refs_file,
             object_store=store,
             parser=parser,
-        )
+        ) as _:
+            pass
     parser = KerchunkJSONParser(fs_root="/some_directory/")
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
         parser=parser,
-    )
-    vda = vds["a"]
-    assert vda.data.manifest.dict() == {
-        "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
-    }
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.manifest.dict() == {
+            "0.0": {
+                "path": "file:///some_directory/test1.nc",
+                "offset": 6144,
+                "length": 48,
+            }
+        }
 
     parser = KerchunkJSONParser(fs_root="file:///some_directory/")
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
         parser=parser,
-    )
-    vda = vds["a"]
-    assert vda.data.manifest.dict() == {
-        "0.0": {"path": "file:///some_directory/test1.nc", "offset": 6144, "length": 48}
-    }
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.manifest.dict() == {
+            "0.0": {
+                "path": "file:///some_directory/test1.nc",
+                "offset": 6144,
+                "length": 48,
+            }
+        }
 
 
 @requires_kerchunk
@@ -220,12 +235,12 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
         store = obstore_local(file_url=ref_filepath)
         parser = KerchunkJSONParser()
         with pytest.raises(ValueError):
-            open_virtual_dataset(
+            with open_virtual_dataset(
                 file_url=ref_filepath.as_posix(),
                 object_store=store,
                 parser=parser,
-            )
-
+            ) as _:
+                pass
     else:
         # Test valid json and parquet reference formats
         if reference_format == "json":
@@ -245,25 +260,26 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
         store = obstore_local(file_url=ref_filepath.as_posix())
         expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
+        ) as vds:
+            # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
+            # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
+            refs = vds.virtualize.to_kerchunk(format="dict")
+            expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(
+                format="dict"
+            )
+            assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
+            assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
+            assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
+            assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
 
-        # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
-        # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
-        refs = vds.virtualize.to_kerchunk(format="dict")
-        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
-        assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
-        assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
-        assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
-        assert refs["refs"]["time/0"] == expected_refs["refs"]["time/0"]
-
-        assert list(vds) == list(netcdf4_virtual_dataset)
-        assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
-        assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
+            assert list(vds) == list(netcdf4_virtual_dataset)
+            assert set(vds.coords) == set(netcdf4_virtual_dataset.coords)
+            assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
 
 
 @requires_kerchunk
@@ -284,11 +300,12 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
         NotImplementedError,
         match="Reading inlined reference data is currently not supported",
     ):
-        open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
             object_store=store,
             parser=parser,
-        )
+        ) as _:
+            pass
 
 
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
@@ -296,12 +313,12 @@ def test_skip_variables(refs_file_factory, skip_variables):
     refs_file = refs_file_factory()
     store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser(skip_variables=skip_variables)
-    vds = open_virtual_dataset(
+    with open_virtual_dataset(
         file_url=refs_file,
         object_store=store,
         parser=parser,
-    )
-    assert all(var not in vds for var in skip_variables)
+    ) as vds:
+        assert all(var not in vds for var in skip_variables)
 
 
 @requires_kerchunk

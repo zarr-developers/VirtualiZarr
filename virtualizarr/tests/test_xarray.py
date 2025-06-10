@@ -434,10 +434,10 @@ class TestOpenVirtualDatasetIndexes:
     def test_specify_no_indexes(self, netcdf4_file):
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=netcdf4_file, object_store=object_store, parser=parser, indexes={}
-        )
-        assert vds.indexes == {}
+        ) as vds:
+            assert vds.indexes == {}
 
     @requires_hdf5plugin
     @requires_imagecodecs
@@ -526,17 +526,17 @@ class TestOpenVirtualDatasetAttrs:
         # regression test for GH issue #155
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=netcdf4_file,
             object_store=object_store,
             parser=parser,
-        )
-        assert vds["lat"].attrs == {
-            "standard_name": "latitude",
-            "long_name": "Latitude",
-            "units": "degrees_north",
-            "axis": "Y",
-        }
+        ) as vds:
+            assert vds["lat"].attrs == {
+                "standard_name": "latitude",
+                "long_name": "Latitude",
+                "units": "degrees_north",
+                "axis": "Y",
+            }
 
 
 class TestDetermineCoords:
@@ -819,53 +819,54 @@ class TestOpenVirtualMFDataset:
         filepath1, filepath2 = netcdf4_files_factory()
         store = obstore_local(file_url=filepath1)
         parser = HDFParser()
-        vds1 = open_virtual_dataset(
-            file_url=filepath1, object_store=store, parser=parser
-        )
-        vds2 = open_virtual_dataset(
-            file_url=filepath2,
-            object_store=store,
-            parser=parser,
-        )
+        with (
+            open_virtual_dataset(
+                file_url=filepath1, object_store=store, parser=parser
+            ) as vds1,
+            open_virtual_dataset(
+                file_url=filepath2,
+                object_store=store,
+                parser=parser,
+            ) as vds2,
+        ):
+            expected_vds = xr.concat([vds1, vds2], dim="time")
+            if preprocess:
+                expected_vds = preprocess_func(expected_vds)
 
-        expected_vds = xr.concat([vds1, vds2], dim="time")
-        if preprocess:
-            expected_vds = preprocess_func(expected_vds)
+            # test combine nested, which doesn't use in-memory indexes
+            combined_vds = open_virtual_mfdataset(
+                [filepath1, filepath2],
+                object_store=store,
+                parser=parser,
+                combine="nested",
+                concat_dim="time",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
-        # test combine nested, which doesn't use in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            object_store=store,
-            parser=parser,
-            combine="nested",
-            concat_dim="time",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
+            # test combine by coords using in-memory indexes
+            combined_vds = open_virtual_mfdataset(
+                [filepath1, filepath2],
+                object_store=store,
+                parser=parser,
+                combine="by_coords",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
-        # test combine by coords using in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            object_store=store,
-            parser=parser,
-            combine="by_coords",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
-
-        # test combine by coords again using in-memory indexes but for a glob
-        file_glob = Path(filepath1).parent.glob("air*.nc")
-        combined_vds = open_virtual_mfdataset(
-            file_glob,
-            object_store=store,
-            parser=parser,
-            combine="by_coords",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
+            # test combine by coords again using in-memory indexes but for a glob
+            file_glob = Path(filepath1).parent.glob("air*.nc")
+            combined_vds = open_virtual_mfdataset(
+                file_glob,
+                object_store=store,
+                parser=parser,
+                combine="by_coords",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
 
 def test_drop_variables(netcdf4_file):
