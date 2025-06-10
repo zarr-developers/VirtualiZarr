@@ -42,11 +42,11 @@ def _construct_manifest_array(
 
     Parameters
     ----------
-    filepath: str
+    filepath
         The path of the hdf5 file.
-    dataset : h5py.Dataset
+    dataset
         An h5py dataset.
-    group : str
+    group
         Name of the group containing this h5py.Dataset.
 
     Returns
@@ -163,9 +163,9 @@ def _dataset_chunk_manifest(
 
     Parameters
     ----------
-    filepath: str
+    filepath
         The path of the HDF5 file
-    dataset : h5py.Dataset
+    dataset
         h5py dataset for which to create a ChunkManifest
 
     Returns
@@ -235,9 +235,9 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> list[str]:
 
     Parameters
     ----------
-    dataset : h5py.Dataset
+    dataset
         An h5py dataset.
-    group : str
+    group
         Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
     Returns
@@ -279,7 +279,7 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
 
     Parameters
     ----------
-    h5obj : h5py.Group or h5py.Dataset
+    h5obj
         An h5py group or dataset.
     """
     _HIDDEN_ATTRS = {

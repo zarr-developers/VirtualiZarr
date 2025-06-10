@@ -33,15 +33,16 @@ class Parser:
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+
         Parameters
         ----------
-        group (str):
+        group
             The group within the file to be used as the Zarr root group for the ManifestStore.
-        fs_root (str):
+        fs_root
             The qualifier to be used for kerchunk references containing relative paths.
-        skip_variables (Iterable[str]):
+        skip_variables
             Variables in the file that will be ignored when creating the ManifestStore.
-        reader_options (dict):
+        reader_options
             Configuration options used internally for the fsspec backend.
         """
 
@@ -61,14 +62,15 @@ class Parser:
 
         Parameters
         ----------
-        file_url (str):
+        file_url
             The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
-        object_store (ObjectStore):
-            An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+        object_store
+            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
 
         Returns
         -------
-        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        ManifestStore
+            A ManifestStore which provides a Zarr representation of the parsed file.
         """
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
@@ -117,7 +119,7 @@ class _FsspecFSFromFilepath:
     upath: upath.core.UPath = field(init=False)
 
     def open_file(self) -> OpenFileType:
-        """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
+        """Calls `open` on `fsspec.Filesystem` instantiation using `self.filepath` as an input.
 
         Returns
         -------

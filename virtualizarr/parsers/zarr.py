@@ -150,14 +150,17 @@ class Parser:
         skip_variables: Iterable[str] | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Instantiate a parser with parser-specific parameters that can be used in the
+        `__call__` method.
 
         Parameters
         ----------
-        group (str):
-            The group within the file to be used as the Zarr root group for the ManifestStore.
-        skip_variables (Iterable[str]):
-            Variables in the file that will be ignored when creating the ManifestStore.
+        group
+            The group within the file to be used as the Zarr root group for the
+            ManifestStore (default: the file's root group).
+        skip_variables
+            Variables in the file that will be ignored when creating the ManifestStore
+            (default: `None`, do not ignore any variables).
         """
 
         self.group = group
@@ -173,10 +176,10 @@ class Parser:
 
         Parameters
         ----------
-        file_url (str):
+        file_url
             The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
-        object_store (ObjectStore):
-            An obstore ObjectStore instance for accessing the directory specified in the file_url parameter.
+        object_store
+            An obstore ObjectStore instance for accessing the directory specified in the `file_url` parameter.
 
         Returns
         -------

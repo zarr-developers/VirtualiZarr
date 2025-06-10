@@ -107,6 +107,7 @@ class TestHDFManifestStore:
         vds = manifest_store.to_virtual_dataset()
         assert vds.dims == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)
-        assert xr.open_dataset(
+        with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
-        ).load()
+        ) as ds:
+            assert ds.load()

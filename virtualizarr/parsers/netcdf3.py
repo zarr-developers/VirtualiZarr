@@ -16,16 +16,16 @@ class Parser:
         reader_options: dict | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Instantiate a parser with parser-specific parameters that can be used in the `__call__` method.
 
         Parameters
         ----------
-        group (str):
+        group
             The group within the file to be used as the Zarr root group for the ManifestStore.
-        skip_variables (Iterable[str]):
+        skip_variables
             Variables in the file that will be ignored when creating the ManifestStore.
-        reader_options (dict):
-            Configuration options used internally for the kerchunk's fsspec backend
+        reader_options
+            Configuration options used internally for the kerchunk's fsspec backend.
         """
 
         self.group = group
@@ -42,14 +42,15 @@ class Parser:
 
         Parameters
         ----------
-        file_url (str):
+        file_url
             The URI or path to the input file (e.g., "s3://bucket/file.nc").
-        object_store (ObjectStore):
-            An obstore ObjectStore instance for accessing the file specified in the file_url parameter.
+        object_store
+            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
 
         Returns
         -------
-        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        ManifestStore
+            A ManifestStore that provides a Zarr representation of the parsed file.
         """
 
         from kerchunk.netCDF3 import NetCDF3ToZarr

@@ -498,7 +498,7 @@ class TestRelativePaths:
         )
         path = vds["x"].data.manifest["0"]["path"]
 
-        # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+        # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
         expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
             ".dmrpp"
         )

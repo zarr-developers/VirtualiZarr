@@ -136,9 +136,9 @@ class ObjectStoreRegistry:
 
         If a store with the same key existed before, it is replaced
 
-        Parameters:
-        -----------
-        prefix : str
+        Parameters
+        ----------
+        prefix
             A url to identify the appropriate object_store instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longer prefix is chosen.
         """
@@ -148,19 +148,19 @@ class ObjectStoreRegistry:
         """
         Get a registered store for the provided URL.
 
-        Parameters:
-        -----------
-        url : str
+        Parameters
+        ----------
+        url
             A url to identify the appropriate object_store instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longest prefix is chosen.
 
-        Returns:
-        --------
+        Returns
+        -------
         StoreRequest
         """
         prefixes = filter(url.startswith, self._stores)
 
-        if not (longest_prefix := max(prefixes, default=None, key=len)):
+        if (longest_prefix := max(prefixes, default=None, key=len)) is None:
             raise ValueError(f"No store registered for any prefix of {url!r}")
 
         return self._stores[longest_prefix]
