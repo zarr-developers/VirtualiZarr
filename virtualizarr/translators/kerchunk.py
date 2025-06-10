@@ -1,6 +1,7 @@
 from typing import Any, Mapping, MutableMapping, cast
 
 import numpy as np
+from numcodecs.abc import Codec
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
@@ -36,8 +37,8 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
             for codec in v2_metadata.filters
             if codec is not None
         ]  # type: ignore[assignment]
-    if v2_metadata.compressor:
-        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore[assignment]
+    if isinstance(compressor := v2_metadata.compressor, Codec):
+        zarray_dict["compressor"] = compressor.get_config()
 
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
