@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Executor
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Hashable,
     Literal,
-    MutableMapping,
     Optional,
-    Sequence,
     cast,
 )
 
