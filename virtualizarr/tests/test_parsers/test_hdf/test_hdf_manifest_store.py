@@ -40,10 +40,10 @@ class TestHDFManifestStore:
             file_url=filepath,
             object_store=store,
         )
-        rountripped_ds = xr.open_dataset(
+        with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
-        )
-        xr.testing.assert_allclose(basic_ds, rountripped_ds)
+        ) as rountripped_ds:
+            xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
     def test_rountrip_partial_chunk_virtualdataset(self, tmpdir, basic_ds):
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore with a single partial chunk"
@@ -59,10 +59,10 @@ class TestHDFManifestStore:
             file_url=filepath,
             object_store=store,
         )
-        rountripped_ds = xr.open_dataset(
+        with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
-        )
-        xr.testing.assert_allclose(basic_ds, rountripped_ds)
+        ) as rountripped_ds:
+            xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
     def test_rountrip_simple_virtualdataset_default_store(self, tmpdir, basic_ds):
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
@@ -75,10 +75,10 @@ class TestHDFManifestStore:
             file_url=filepath,
             object_store=store,
         )
-        rountripped_ds = xr.open_dataset(
+        with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
-        )
-        xr.testing.assert_allclose(basic_ds, rountripped_ds)
+        ) as rountripped_ds:
+            xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
     @requires_minio
     @requires_obstore
@@ -104,10 +104,10 @@ class TestHDFManifestStore:
             file_url=chunked_roundtrip_hdf5_s3_file, object_store=s3store
         )
 
-        vds = manifest_store.to_virtual_dataset()
-        assert vds.dims == {"phony_dim_0": 5}
-        assert isinstance(vds["data"].data, ManifestArray)
-        with xr.open_dataset(
-            manifest_store, engine="zarr", consolidated=False, zarr_format=3
-        ) as ds:
-            assert ds.load()
+        with manifest_store.to_virtual_dataset() as vds:
+            assert vds.dims == {"phony_dim_0": 5}
+            assert isinstance(vds["data"].data, ManifestArray)
+            with xr.open_dataset(
+                manifest_store, engine="zarr", consolidated=False, zarr_format=3
+            ) as ds:
+                assert ds.load()
