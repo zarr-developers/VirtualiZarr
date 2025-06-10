@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from pathlib import Path  # noqa
 from typing import (
     Any,
     Hashable,
-    Iterable,
 )
 from urllib.parse import urlparse
 
