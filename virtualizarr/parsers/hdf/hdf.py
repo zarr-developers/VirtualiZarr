@@ -23,7 +23,7 @@ from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
-h5py = soft_import("h5py", "For reading hdf files", strict=False)
+h5py = soft_import("h5py", "reading hdf files", strict=False)
 
 
 if TYPE_CHECKING:
@@ -115,14 +115,15 @@ def _construct_manifest_group(
 
         non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
-        group_name = str(g.name)
+        group_name = str(g.name)  # NOTE: this will always include leading "/"
         arrays = {
             key: _construct_manifest_array(filepath, dataset, group_name)
             for key in g.keys()
             if key not in drop_variables and isinstance(dataset := g[key], h5py.Dataset)
         }
+        attributes = _extract_attrs(g)
 
-    return ManifestGroup(arrays=arrays, attributes=_extract_attrs(g))
+    return ManifestGroup(arrays=arrays, attributes=attributes)
 
 
 class Parser:
@@ -139,9 +140,6 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        if h5py is None:
-            raise ImportError("h5py is required for using the hdf parser")
-
         reader = ObstoreReader(store=object_store, path=file_url)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
@@ -195,14 +193,12 @@ def _dataset_chunk_manifest(
             shape = tuple(
                 math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
             )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
+            paths = np.empty(shape, dtype=np.dtypes.StringDType)
             offsets = np.empty(shape, dtype=np.uint64)
             lengths = np.empty(shape, dtype=np.uint64)
 
             def get_key(blob):
-                return tuple(
-                    [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
-                )
+                return tuple(a // b for a, b in zip(blob.chunk_offset, dataset.chunks))
 
             def add_chunk_info(blob):
                 key = get_key(blob)
@@ -225,7 +221,7 @@ def _dataset_chunk_manifest(
     return chunk_manifest
 
 
-def _dataset_dims(dataset: H5Dataset, group: str = "") -> list[str]:
+def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -238,7 +234,8 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> list[str]:
     dataset
         An h5py dataset.
     group
-        Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
+        Name of the group we are pulling these dimensions from (default: the root
+        group "/"). Required for removing subgroup prefixes.
 
     Returns
     -------
@@ -246,31 +243,28 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> list[str]:
         List with HDF5 path names of dimension scales attached to input
         dataset.
     """
-    dims = []
-    rank = len(dataset.shape)
-    if rank:
-        for n in range(rank):
-            num_scales = len(dataset.dims[n])  # type: ignore
-            if num_scales == 1:
-                dims.append(dataset.dims[n][0].name[1:])  # type: ignore
-            elif h5py.h5ds.is_scale(dataset.id):
-                dims.append(dataset.name[1:])
-            elif num_scales > 1:
-                raise ValueError(
-                    f"{dataset.name}: {len(dataset.dims[n])} "  # type: ignore
-                    f"dimension scales attached to dimension #{n}"
-                )
-            elif num_scales == 0:
-                # Some HDF5 files do not have dimension scales.
-                # If this is the case, `num_scales` will be 0.
-                # In this case, we mimic netCDF4 and assign phony dimension names.
-                # See https://github.com/fsspec/kerchunk/issues/41
-                dims.append(f"phony_dim_{n}")
+    import h5py
 
-    if not group.endswith("/"):
-        group += "/"
+    dims: list[str] = []
 
-    return [dim.removeprefix(group) for dim in dims]
+    for n in range(len(dataset.shape)):
+        if (num_scales := len(dataset.dims[n])) == 1:
+            dims.append(str(dataset.dims[n][0].name))
+        elif h5py.h5ds.is_scale(dataset.id):
+            dims.append(str(dataset.name))
+        elif num_scales > 1:
+            raise ValueError(
+                f"{dataset.name} has {num_scales} dimension scales attached to "
+                f"dimension #{n}; require exactly 1"
+            )
+        elif num_scales == 0:
+            # Some HDF5 files do not have dimension scales.
+            # If this is the case, `num_scales` will be 0.
+            # In this case, we mimic netCDF4 and assign phony dimension names.
+            # See https://github.com/fsspec/kerchunk/issues/41
+            dims.append(f"phony_dim_{n}")
+
+    return [dim.removeprefix(group).removeprefix("/") for dim in dims]
 
 
 def _extract_attrs(h5obj: H5Dataset | H5Group):

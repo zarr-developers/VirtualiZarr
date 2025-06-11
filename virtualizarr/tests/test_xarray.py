@@ -722,10 +722,10 @@ class TestLoadVirtualDataset:
                 if name in actual_loadable_variables:
                     xrt.assert_identical(vds.variables[name], ds.variables[name])
 
-    def test_group_kwarg(self, hdf5_groups_file):
+    def test_group_kwarg_not_a_group(self, hdf5_groups_file):
         object_store = obstore_local(file_url=hdf5_groups_file)
         parser = HDFParser(group="doesnt_exist")
-        with pytest.raises(KeyError, match="doesn't exist"):
+        with pytest.raises(ValueError, match="not an HDF Group"):
             with open_virtual_dataset(
                 file_url=hdf5_groups_file,
                 object_store=object_store,
@@ -733,6 +733,8 @@ class TestLoadVirtualDataset:
             ):
                 pass
 
+    def test_group_kwarg(self, hdf5_groups_file):
+        object_store = obstore_local(file_url=hdf5_groups_file)
         parser = HDFParser(group="test/group")
         vars_to_load = ["air", "time"]
         with (

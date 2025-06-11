@@ -60,10 +60,12 @@ def open_virtual_dataset(
 
 
 def open_virtual_mfdataset(
-    paths: str
-    | os.PathLike
-    | Sequence[str | os.PathLike]
-    | "NestedSequence[str | os.PathLike]",
+    paths: (
+        str
+        | os.PathLike
+        | Sequence[str | os.PathLike]
+        | NestedSequence[str | os.PathLike]
+    ),
     object_store: ObjectStore,
     parser: Parser,
     concat_dim: (
@@ -77,7 +79,7 @@ def open_virtual_mfdataset(
     ) = None,
     compat: "CompatOptions" = "no_conflicts",
     preprocess: Callable[[Dataset], Dataset] | None = None,
-    data_vars: Literal["all", "minimal", "different"] | Iterable[Hashable] = "all",
+    data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
     parallel: Literal["dask", "lithops", False] | Executor = False,

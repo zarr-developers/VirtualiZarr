@@ -238,7 +238,7 @@ class TestOpenVirtualDataset:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-@pytest.mark.parametrize("group", [None, "subgroup", "subgroup/"])
+@pytest.mark.parametrize("group", [None, "/", "subgroup", "subgroup/", "/subgroup/"])
 def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
     # regression test for GH issue #364
     store = obstore_local(file_url=netcdf4_file_with_data_in_multiple_groups)
