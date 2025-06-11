@@ -46,20 +46,17 @@ def _generate_manifest_store(
     provides an easily understandable structure for testing ManifestStore's
     ability to redirect Zarr chunk key requests and extract subsets of the file.
 
-    Parameters:
-    -----------
-    store : ObjectStore
+    Parameters
+    ----------
+    store
         ObjectStore instance for holding the file
-    prefix : str
+    prefix
         Prefix to use to identify the ObjectStore in the ManifestStore
-    filepath : str
+    filepath
         Filepath for storing temporary testing file
-    array_v3_metadata : callable
-        Function for generating V3 array metadata with sensible defaults.
-        This is passed in as a argument because pytest fixtures aren't meant to
-        be imported directly.
-    Returns:
-    --------
+
+    Returns
+    -------
     ManifestStore
     """
     import obstore as obs

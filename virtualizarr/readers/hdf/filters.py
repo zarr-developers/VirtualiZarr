@@ -76,9 +76,9 @@ def _filter_to_codec(
 
     Parameters
     ----------
-    filter_id: str
+    filter_id
         An h5py filter id code.
-    filter_properties : int or None or Tuple
+    filter_properties
         A single or Tuple of h5py filter configuration codes.
 
     Returns
@@ -129,7 +129,7 @@ def cfcodec_from_dataset(dataset: Dataset) -> Codec | None:
 
     Parameters
     ----------
-    dataset: h5py.Dataset
+    dataset
        An h5py dataset.
 
     Returns
@@ -176,7 +176,7 @@ def codecs_from_dataset(dataset: Dataset) -> List[Codec]:
 
     Parameters
     ----------
-    dataset: h5py.Dataset
+    dataset
        An h5py dataset.
 
     Returns

@@ -51,15 +51,15 @@ class VirtualiZarrDatasetAccessor:
 
         Parameters
         ----------
-        store: IcechunkStore
+        store
             Store to write dataset into.
-        group: str, optional
+        group
             Path of the group to write the dataset into (default: the root group).
-        append_dim: str, optional
+        append_dim
             Dimension along which to append the virtual dataset.
-        last_updated_at: datetime, optional
+        last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
-            with this operation.  When not provided, no check is performed.
+            with this operation. When not provided, no check is performed.
 
         Raises
         ------
@@ -117,18 +117,18 @@ class VirtualiZarrDatasetAccessor:
 
         Parameters
         ----------
-        filepath : str, default: None
+        filepath
             File path to write kerchunk references into. Not required if format is 'dict'.
-        format : 'dict', 'json', or 'parquet'
+        format
             Format to serialize the kerchunk references as.
             If 'json' or 'parquet' then the 'filepath' argument is required.
-        record_size (parquet only): int
+        record_size
             Number of references to store in each reference file (default 100,000). Bigger values
-            mean fewer read requests but larger memory footprint.
-        categorical_threshold (parquet only) : int
+            mean fewer read requests but larger memory footprint. Only available when `format` is 'parquet'.
+        categorical_threshold
             Encode urls as pandas.Categorical to reduce memory footprint if the ratio
             of the number of unique urls to total number of refs for each variable
-            is greater than or equal to this number. (default 10)
+            is greater than or equal to this number (default 10). Only available when `format` is 'parquet'.
 
         References
         ----------
@@ -187,6 +187,11 @@ class VirtualiZarrDatasetAccessor:
         -------
         Dataset
 
+        See Also
+        --------
+        ManifestArray.rename_paths
+        ChunkManifest.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -200,11 +205,6 @@ class VirtualiZarrDatasetAccessor:
         ...     return str(new_s3_bucket_url / filename)
 
         >>> ds.virtualize.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ManifestArray.rename_paths
-        ChunkManifest.rename_paths
         """
 
         new_ds = self.ds.copy()
@@ -269,14 +269,14 @@ class VirtualiZarrDataTreeAccessor:
 
         Parameters
         ----------
-        store: IcechunkStore
+        store
             Store to write dataset into.
-        write_inherited_coords : bool, default: False
+        write_inherited_coords
             If ``True``, replicate inherited coordinates on all descendant nodes.
             Otherwise, only write coordinates at the level at which they are
             originally defined. This saves disk space, but requires opening the
             full tree to load inherited coordinates.
-        last_updated_at: datetime, optional
+        last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.
 
