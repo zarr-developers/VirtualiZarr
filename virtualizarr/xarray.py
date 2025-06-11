@@ -82,7 +82,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["dask", "lithops", False] | Executor = False,
+    parallel: Literal["dask", "lithops", False] | type[Executor] = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -115,7 +115,7 @@ def open_virtual_mfdataset(
         Same as in xarray.open_mfdataset
     combine
         Same as in xarray.open_mfdataset
-    parallel : "dask", "lithops", False, or instance of a subclass of ``concurrent.futures.Executor``
+    parallel : "dask", "lithops", False, or type of subclass of ``concurrent.futures.Executor``
         Specify whether the open and preprocess steps of this function will be
         performed in parallel using lithops, dask.delayed, or any executor compatible
         with the ``concurrent.futures`` interface, or in serial.

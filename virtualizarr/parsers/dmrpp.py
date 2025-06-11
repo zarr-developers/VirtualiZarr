@@ -148,40 +148,42 @@ class DMRParser:
 
         Parameters
         ----------
-        group : str
-            The group to parse. If None, and no groups are present, the dataset is parsed.
-            If None and groups are present, the first group is parsed.
+        group
+            The group to parse. Ignored if no groups are present, and the entire
+            dataset is parsed. If `None` or "/", and groups are present, the first group
+            is parsed.  If not `None` or "/", and no groups are present, a UserWarning
+            is issued indicating that the group will be ignored.
 
         Returns
         -------
-        A ManifestStore
+        ManifestStore
 
         Examples
         --------
         Open a sample DMR++ file and parse the dataset
         """
-        group_tags = self.root.findall("dap:Group", self._NS)
-        if group is not None:
-            group = Path(group)
-            if not group.is_absolute():
-                group = Path("/") / group
-            if len(group_tags) == 0:
-                warnings.warn("No groups found in DMR++ file; ignoring group parameter")
-            else:
-                all_groups = self._split_groups(self.root)
-                if group in all_groups:
-                    manifest_group = self._parse_dataset(
-                        all_groups[group],
-                    )
-                else:
-                    raise ValueError(f"Group {group} not found in DMR++ file")
-        else:
-            manifest_group = self._parse_dataset(
-                self.root,
+        group = group or "/"
+        ngroups = len(self.root.findall("dap:Group", self._NS))
+
+        if ngroups == 0 and group != "/":
+            warnings.warn(
+                f"No groups in DMR++ file {self.data_filepath!r}; "
+                f"ignoring group parameter {group!r}"
             )
+
+        group_path = Path("/") if ngroups == 0 else Path("/") / group.removeprefix("/")
+        dataset_element = self._split_groups(self.root).get(group_path)
+
+        if dataset_element is None:
+            raise ValueError(
+                f"Group {group_path} not found in DMR++ file {self.data_filepath!r}"
+            )
+
+        manifest_group = self._parse_dataset(dataset_element)
         registry = ObjectStoreRegistry(
             {get_store_prefix(self.data_filepath): object_store}
         )
+
         return ManifestStore(store_registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
@@ -189,12 +191,13 @@ class DMRParser:
         Find the element in the root element by converting the fully qualified name to an xpath query.
 
         E.g. fqn = "/a/b" --> root.find("./*[@name='a']/*[@name='b']")
+
         See more about OPeNDAP fully qualified names (FQN) here: https://docs.opendap.org/index.php/DAP4:_Specification_Volume_1#Fully_Qualified_Names
 
         Parameters
         ----------
-        fqn : str
-            The fully qualified name of an element. E.g. "/a/b"
+        fqn
+            The fully qualified name of an element. For example, "/a/b".
 
         Returns
         -------
@@ -208,12 +211,14 @@ class DMRParser:
         """
         if fqn == "/":
             return self.root
+
         elements = fqn.strip("/").split("/")  # /a/b/ --> ['a', 'b']
         xpath_segments = [f"*[@name='{element}']" for element in elements]
-        xpath_query = "./" + "/".join(xpath_segments)  # "./[*[@name='a']/*[@name='b']"
-        element = self.root.find(xpath_query, self._NS)
-        if element is None:
+        xpath_query = "/".join([".", *xpath_segments])  # "./[*[@name='a']/*[@name='b']"
+
+        if (element := self.root.find(xpath_query, self._NS)) is None:
             raise ValueError(f"Path {fqn} not found in provided root")
+
         return element
 
     def _split_groups(self, root: ET.Element) -> dict[Path, ET.Element]:

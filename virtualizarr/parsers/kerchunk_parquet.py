@@ -13,6 +13,8 @@ from virtualizarr.types.kerchunk import (
 )
 
 if TYPE_CHECKING:
+    from typing import TypeAlias
+
     import fsspec
     import fsspec.core
     import fsspec.spec
@@ -20,7 +22,9 @@ if TYPE_CHECKING:
     from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
-    OpenFileType = fsspec.core.OpenFile | fsspec.spec.AbstractBufferedFile | io.IOBase
+    OpenFileType: TypeAlias = (
+        fsspec.core.OpenFile | fsspec.spec.AbstractBufferedFile | io.IOBase
+    )
 
 
 class Parser:
@@ -116,7 +120,7 @@ class _FsspecFSFromFilepath:
     filepath: str
     reader_options: dict | None = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
-    upath: upath.core.UPath = field(init=False)
+    upath: upath.UPath = field(init=False)
 
     def open_file(self) -> OpenFileType:
         """Calls `open` on `fsspec.Filesystem` instantiation using `self.filepath` as an input.

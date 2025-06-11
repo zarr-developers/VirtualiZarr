@@ -1,5 +1,6 @@
 import os
 import textwrap
+from contextlib import nullcontext
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -265,20 +266,36 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
     assert result_tags == expected_tags
 
 
-def test_parse_dataset(tmp_path):
+@pytest.mark.parametrize(
+    "group,warns",
+    [
+        pytest.param(None, False, id="None"),
+        pytest.param("/", False, id="/"),
+        pytest.param("/no-such-group", True, id="/no-such-group"),
+    ],
+)
+def test_parse_dataset_basic(group: str | None, warns: bool, tmp_path: Path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
     store = obstore_local(file_url=basic_dmrpp.data_filepath)
-    ms = basic_dmrpp.parse_dataset(object_store=store)
+
+    with nullcontext() if warns else pytest.raises(BaseException, match="DID NOT WARN"):
+        with pytest.warns(UserWarning, match=f"ignoring group parameter {group!r}"):
+            ms = basic_dmrpp.parse_dataset(object_store=store, group=group)
+
     vds = ms.to_virtual_dataset()
+
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
     assert vds.data_vars.keys() == {"data", "mask"}
     assert vds.data_vars["data"].dims == ("x", "y")
     assert vds.attrs == {"Conventions": "CF-1.6", "title": "Sample Dataset"}
     assert vds.coords.keys() == {"x", "y", "z"}
 
+
+def test_parse_dataset_nested(tmp_path: Path):
     nested_groups_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
     )
+    store = obstore_local(file_url=nested_groups_dmrpp.data_filepath)
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
         object_store=store

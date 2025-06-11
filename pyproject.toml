@@ -1,4 +1,3 @@
-
 [project]
 name = "virtualizarr"
 description = "Create virtual Zarr stores from archival data using xarray API"
