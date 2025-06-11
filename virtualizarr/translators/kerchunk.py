@@ -5,9 +5,6 @@ from typing import cast
 
 import numpy as np
 from numcodecs.abc import Codec
-from xarray import Dataset
-from xarray.core.indexes import Index
-from xarray.core.variable import Variable
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
