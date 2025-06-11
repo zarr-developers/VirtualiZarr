@@ -292,6 +292,10 @@ class ManifestArray:
         -------
         ManifestArray
 
+        See Also
+        --------
+        ChunkManifest.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -305,10 +309,6 @@ class ManifestArray:
         ...     return str(new_s3_bucket_url / filename)
 
         >>> marr.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)

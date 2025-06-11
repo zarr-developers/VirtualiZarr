@@ -116,9 +116,9 @@ def convert_v3_to_v2_metadata(
 
     Parameters
     ----------
-    v3_metadata : ArrayV3Metadata
+    v3_metadata
         The metadata object in v3 format.
-    fill_value : Any, optional
+    fill_value
         Override the fill value from v3 metadata.
 
     Returns

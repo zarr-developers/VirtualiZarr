@@ -100,12 +100,13 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
         The key in the Zarr store to parse.
     chunk_key_encoding
         The chunk key separator used in the Zarr store.
+
     Returns
     -------
     tuple containing chunk indexes.
 
     Raises
-
+    ------
     NotImplementedError
         Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
 
@@ -217,9 +218,9 @@ class ManifestStore(Store):
 
         Parameters
         ----------
-        manifest_group : ManifestGroup
+        group
             Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        store_registry : ObjectStoreRegistry
+        store_registry
             A registry mapping the URL scheme and netloc to ObjectStore instances,
             allowing ManifestStores to read from different ObjectStore instances.
         """

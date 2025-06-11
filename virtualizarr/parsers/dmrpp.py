@@ -126,9 +126,9 @@ class DMRParser:
 
         Parameters
         ----------
-        root: xml.ElementTree.Element
+        root
             Root of the xml tree structure of a DMR++ file.
-        data_filepath : str, optional
+        data_filepath
             The path to the actual data file that will be set in the chunk manifests.
             If None, the data file path is taken from the DMR++ file.
         """

@@ -52,17 +52,18 @@ def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     This function processes the given decoded Zarr array reference dictionary,
     to construct and return an ArrayV3Metadata object based on the provided information.
 
-    Parameters:
+    Parameters
     ----------
-    decoded_arr_refs_zarray : dict
+    decoded_arr_refs_zarray
         A dictionary containing the decoded Zarr array reference information.
         Expected keys include "dtype", "fill_value", "zarr_format", "filters",
         "compressor", "chunks", and "shape".
-    Returns:
+
+    Returns
     -------
     ArrayV3Metadata
 
-    Raises:
+    Raises
     ------
     ValueError
         If the Zarr format specified in the input dictionary is not 2 or 3.
@@ -111,13 +112,20 @@ def manifestgroup_from_kerchunk_refs(
 
     Parameters
     ----------
-    refs: dict
+    refs
         The Kerchunk references, as a dictionary.
-    group: string, optional
+    group
         Default is to build a store from the root group.
-    fs_root: string, optional
+    fs_root
         The root of the fsspec filesystem on which these references were generated.
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
+    skip_variables
+        Variables to ignore when creating the ManifestGroup.
+
+    Returns
+    -------
+    ManifestGroup
+        ManifestGroup representation of the virtual chunk references.
     """
     # both group=None and group='' mean to read root group
     if group:
@@ -146,8 +154,8 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
 
     Parameters
     ----------
-    vds_refs : KerchunkStoreRefs
-    group : str
+    vds_refs
+    group
         Should be a non-empty string
     """
     hdf_groups = [
