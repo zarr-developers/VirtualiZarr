@@ -4,6 +4,10 @@ from collections.abc import Iterable
 from typing import cast
 
 import numpy as np
+from numcodecs.abc import Codec
+from xarray import Dataset
+from xarray.core.indexes import Index
+from xarray.core.variable import Variable
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
@@ -38,9 +42,9 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
             codec.get_config()
             for codec in v2_metadata.filters
             if codec is not None
-        ]  # type: ignore
-    if v2_metadata.compressor:
-        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore
+        ]  # type: ignore[assignment]
+    if isinstance(compressor := v2_metadata.compressor, Codec):
+        zarray_dict["compressor"] = compressor.get_config()
 
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
