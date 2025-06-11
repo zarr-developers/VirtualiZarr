@@ -277,7 +277,7 @@ class ManifestArray:
                     output_arr = expand_dims(output_arr, axis=ind)
                 elif axis_indexer != slice(None):
                     raise NotImplementedError(f"Doesn't support slicing with {indexer}")
-                return output_arr
+            return output_arr
 
     def rename_paths(
         self,
