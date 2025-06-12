@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     import fsspec
     import fsspec.core
     import fsspec.spec
-    import upath
     from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
@@ -77,10 +76,9 @@ class Parser:
             A ManifestStore which provides a Zarr representation of the parsed file.
         """
 
-        # The kerchunk .parquet storage format isn't actually a parquet, but a directory that contains named parquets for each group/variable.
-        fs = _FsspecFSFromFilepath(
-            filepath=file_url, reader_options=self.reader_options
-        )
+        # The kerchunk .parquet storage format isn't actually a parquet, but a
+        # directory that contains named parquets for each group/variable.
+        fs = _FsspecFSFromFilepath(file_url, self.reader_options)
         from fsspec.implementations.reference import LazyReferenceMapper
 
         lrm = LazyReferenceMapper(file_url, fs.fs)
@@ -106,13 +104,13 @@ class Parser:
 class _FsspecFSFromFilepath:
     """Class to create fsspec Filesystem from input filepath.
 
-    Parameters
+    Attributes
     ----------
-    filepath : str
+    filepath
         Input filepath
-    reader_options : dict, optional
+    reader_options
         dict containing kwargs to pass to file opener, by default {}
-    fs : Option | None
+    fs
         The fsspec filesystem object, created in __post_init__
 
     """
@@ -120,7 +118,6 @@ class _FsspecFSFromFilepath:
     filepath: str
     reader_options: dict | None = field(default_factory=dict)
     fs: fsspec.AbstractFileSystem = field(init=False)
-    upath: upath.UPath = field(init=False)
 
     def open_file(self) -> OpenFileType:
         """Calls `open` on `fsspec.Filesystem` instantiation using `self.filepath` as an input.
@@ -145,13 +142,8 @@ class _FsspecFSFromFilepath:
         import fsspec
         from upath import UPath
 
-        if not isinstance(self.filepath, UPath):
-            upath = UPath(self.filepath)
-
-        self.upath = upath
-        self.protocol = upath.protocol
-
+        upath = UPath(self.filepath)
         self.reader_options = self.reader_options or {}
-        storage_options = self.reader_options.get("storage_options", {})  # type: ignore
+        storage_options = self.reader_options.get("storage_options", {})
 
-        self.fs = fsspec.filesystem(self.protocol, **storage_options)
+        self.fs = fsspec.filesystem(upath.protocol, **storage_options)
