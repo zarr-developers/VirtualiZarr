@@ -17,7 +17,9 @@ class Parser:
         reader_options: Optional[dict] = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+        Instantiate a parser with parser-specific parameters that can be used in the
+        `__call__` method.
+
         Parameters
         ----------
         group

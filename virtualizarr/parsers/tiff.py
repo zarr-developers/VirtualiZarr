@@ -17,7 +17,8 @@ class Parser:
         remote_options: dict | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the `__call__` method.
+        Instantiate a parser with parser-specific parameters that can be used in the
+        `__call__` method.
 
         Parameters
         ----------
@@ -46,7 +47,8 @@ class Parser:
         file_url
             The URI or path to the input file (e.g., "s3://bucket/file.tiff").
         object_store
-            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
+            An obstore ObjectStore instance for accessing the file specified in the
+            `file_url` parameter.
 
         Returns
         -------

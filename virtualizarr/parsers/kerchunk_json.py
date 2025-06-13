@@ -18,12 +18,20 @@ class Parser:
         store_registry: ObjectStoreRegistry | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
-        Parameters:
-            group (str): The group within the file to be used as the Zarr root group for the ManifestStore.
-            fs_root (str): The qualifier to be used for kerchunk references containing relative paths.
-            skip_variables (Iterable[str]): Variables in the file that will be ignored when creating the ManifestStore.
-            store_registry (ObjectStoreRegistry): A user defined ObjectStoreRegistry to be used for reading data for kerchunk references contain paths to multiple locations.
+        Instantiate a parser with parser-specific parameters that can be used in the
+        `__call__` method.
+
+        Parameters
+        ----------
+        group
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        fs_root
+            The qualifier to be used for kerchunk references containing relative paths.
+        skip_variables
+            Variables in the file that will be ignored when creating the ManifestStore.
+        store_registry
+            A user defined ObjectStoreRegistry to be used for reading data for kerchunk 
+            references contain paths to multiple locations.
         """
 
         self.group = group
@@ -45,7 +53,8 @@ class Parser:
         file_url
             The URI or path to the input file (e.g., "s3://bucket/kerchunk.json").
         object_store
-            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
+            An obstore ObjectStore instance for accessing the file specified in the
+            `file_url` parameter.
 
         Returns
         -------

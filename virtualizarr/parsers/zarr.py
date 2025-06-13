@@ -179,7 +179,8 @@ class Parser:
         file_url
             The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
         object_store
-            An obstore ObjectStore instance for accessing the directory specified in the `file_url` parameter.
+            An obstore ObjectStore instance for accessing the directory specified in the
+            `file_url` parameter.
 
         Returns
         -------
