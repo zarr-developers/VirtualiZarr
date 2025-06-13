@@ -30,7 +30,7 @@ class Parser:
         skip_variables
             Variables in the file that will be ignored when creating the ManifestStore.
         store_registry
-            A user defined ObjectStoreRegistry to be used for reading data for kerchunk 
+            A user defined ObjectStoreRegistry to be used for reading data for kerchunk
             references contain paths to multiple locations.
         """
 
