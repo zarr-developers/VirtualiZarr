@@ -52,9 +52,9 @@ class SerialExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -93,7 +93,7 @@ class SerialExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
@@ -138,9 +138,9 @@ class DaskDelayedExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -184,7 +184,7 @@ class DaskDelayedExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
@@ -241,9 +241,9 @@ class LithopsEagerFunctionExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -293,7 +293,7 @@ class LithopsEagerFunctionExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
