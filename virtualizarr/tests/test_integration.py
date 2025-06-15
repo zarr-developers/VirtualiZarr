@@ -247,18 +247,17 @@ class TestRoundtrip:
 
             # use open_dataset_via_kerchunk to read it as references
             parser = HDFParser()
-            store1 = obstore_local(air1_nc_path)
-            store2 = obstore_local(air2_nc_path)
+            store = obstore_local(str(air1_nc_path))
             with (
                 open_virtual_dataset(
                     file_url=air1_nc_path,
-                    object_store=store1,
+                    object_store=store,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds1,
                 open_virtual_dataset(
                     file_url=air2_nc_path,
-                    object_store=store2,
+                    object_store=store,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds2,
@@ -383,21 +382,20 @@ def test_datatree_roundtrip(
         ds1.to_netcdf(air1_nc_path)
         ds2.to_netcdf(air2_nc_path)
 
-        store1 = obstore_local(file_url=air1_nc_path)
-        store2 = obstore_local(file_url=air2_nc_path)
+        store = obstore_local(file_url=air1_nc_path)
         parser = HDFParser()
         # use open_dataset_via_kerchunk to read it as references
         with (
             open_virtual_dataset(
                 file_url=air1_nc_path,
-                object_store=store1,
+                object_store=store,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds1,
             open_virtual_dataset(
                 file_url=air2_nc_path,
-                object_store=store2,
+                object_store=store,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
