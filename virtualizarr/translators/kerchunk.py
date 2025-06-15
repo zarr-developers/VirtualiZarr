@@ -1,6 +1,7 @@
 from typing import Any, Mapping, MutableMapping, cast
 
 import numpy as np
+from numcodecs.abc import Codec
 from xarray import Dataset
 from xarray.core.indexes import Index
 from xarray.core.variable import Variable
@@ -36,8 +37,8 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
             for codec in v2_metadata.filters
             if codec is not None
         ]  # type: ignore[assignment]
-    if v2_metadata.compressor:
-        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore[assignment]
+    if isinstance(compressor := v2_metadata.compressor, Codec):
+        zarray_dict["compressor"] = compressor.get_config()
 
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
@@ -48,17 +49,18 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
     This function processes the given decoded Zarr array reference dictionary,
     to construct and return an ArrayV3Metadata object based on the provided information.
 
-    Parameters:
+    Parameters
     ----------
-    decoded_arr_refs_zarray : dict
+    decoded_arr_refs_zarray
         A dictionary containing the decoded Zarr array reference information.
         Expected keys include "dtype", "fill_value", "zarr_format", "filters",
         "compressor", "chunks", and "shape".
-    Returns:
+
+    Returns
     -------
     ArrayV3Metadata
 
-    Raises:
+    Raises
     ------
     ValueError
         If the Zarr format specified in the input dictionary is not 2 or 3.
@@ -127,8 +129,8 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
 
     Parameters
     ----------
-    vds_refs : KerchunkStoreRefs
-    group : str
+    vds_refs
+    group
         Should be a non-empty string
     """
     hdf_groups = [
@@ -170,7 +172,7 @@ def virtual_vars_from_kerchunk_refs(
 
     Parameters
     ----------
-    drop_variables: list[str], default is None
+    drop_variables
         Variables in the file to drop before returning.
     """
 
@@ -197,7 +199,7 @@ def dataset_from_kerchunk_refs(
     """
     Translate a store-level kerchunk reference dict into an xarray Dataset containing virtualized arrays.
 
-    drop_variables: list[str], default is None
+    drop_variables
         Variables in the file to drop before returning.
     """
 

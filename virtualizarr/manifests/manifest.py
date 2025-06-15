@@ -213,7 +213,7 @@ class ChunkManifest:
 
         Parameters
         ----------
-        entries: dict
+        entries
             Chunk keys and byte range information, as a dictionary of the form
 
             |    {
@@ -278,10 +278,13 @@ class ChunkManifest:
 
         Parameters
         ----------
-        paths: np.ndarray
-        offsets: np.ndarray
-        lengths: np.ndarray
-        validate_paths: bool
+        paths
+            Array containing the paths to the chunks
+        offsets
+            Array containing the byte offsets of the chunks
+        lengths
+            Array containing the byte lengths of the chunks
+        validate_paths
             Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
             Set to False to skip validation for performance reasons.
         """
@@ -455,6 +458,10 @@ class ChunkManifest:
         -------
         manifest
 
+        See Also
+        --------
+        ManifestArray.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -468,10 +475,6 @@ class ChunkManifest:
         ...     return str(new_s3_bucket_url / filename)
 
         >>> manifest.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ManifestArray.rename_paths
         """
         if isinstance(new, str):
             renamed_paths = np.full_like(self._paths, fill_value=new)

@@ -57,8 +57,8 @@ def convert_to_codec_pipeline(
 
     Parameters
     ----------
-    dtype : np.dtype
-    codecs: list[dict] | None
+    dtype
+    codecs
 
     Returns
     -------

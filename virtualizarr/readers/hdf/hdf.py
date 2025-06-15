@@ -66,11 +66,11 @@ class HDFVirtualBackend(VirtualBackend):
         Construct a ManifestArray from an h5py dataset
         Parameters
         ----------
-        path: str
+        path
             The path of the hdf5 file.
-        dataset : h5py.Dataset
+        dataset
             An h5py dataset.
-        group : str
+        group
             Name of the group containing this h5py.Dataset.
         Returns
         -------
@@ -236,9 +236,9 @@ class HDFVirtualBackend(VirtualBackend):
 
         Parameters
         ----------
-        path: str
+        path
             The path of the HDF5 file
-        dataset : h5py.Dataset
+        dataset
             h5py dataset for which to create a ChunkManifest
 
         Returns
@@ -308,9 +308,9 @@ class HDFVirtualBackend(VirtualBackend):
 
         Parameters
         ----------
-        dataset : h5py.Dataset
+        dataset
             An h5py dataset.
-        group : str
+        group
             Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
 
         Returns
@@ -352,7 +352,7 @@ class HDFVirtualBackend(VirtualBackend):
 
         Parameters
         ----------
-        h5obj : h5py.Group or h5py.Dataset
+        h5obj
             An h5py group or dataset.
         """
         _HIDDEN_ATTRS = {

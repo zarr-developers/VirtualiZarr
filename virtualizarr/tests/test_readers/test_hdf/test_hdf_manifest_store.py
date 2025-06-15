@@ -86,7 +86,7 @@ class TestHDFManifestStore:
             store=s3store,
         )
         vds = store.to_virtual_dataset()
-        assert vds.dims == {"phony_dim_0": 5}
+        assert vds.sizes == {"phony_dim_0": 5}
         assert isinstance(vds["data"].data, ManifestArray)
 
     @requires_network
@@ -96,7 +96,7 @@ class TestHDFManifestStore:
             filepath="s3://carbonplan-share/virtualizarr/local.nc",
         )
         vds = store.to_virtual_dataset()
-        assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+        assert vds.sizes == {"time": 2920, "lat": 25, "lon": 53}
         assert isinstance(vds["air"].data, ManifestArray)
         for name in ["time", "lat", "lon"]:
             assert isinstance(vds[name].data, np.ndarray)

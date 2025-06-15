@@ -197,13 +197,14 @@ class ObjectStoreRegistry:
         If no `ObjectStore` is found for the `url`, ad-hoc discovery may be executed depending on the
         `url`. An `ObjectStore` may be lazily created and registered.
 
-        Parameters:
-        -----------
-        url : str
+        Parameters
+        ----------
+        url
             A url to identify the appropriate object_store instance based on the URL scheme and netloc.
-        Returns:
-        --------
-        StoreRequest
+
+        Returns
+        -------
+        ObjectStore
         """
         parsed = urlparse(url)
         store = self._stores.get(f"{parsed.scheme}://{parsed.netloc}")
@@ -252,9 +253,9 @@ class ManifestStore(Store):
 
         Parameters
         ----------
-        manifest_group : ManifestGroup
+        group
             Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        store_registry : ObjectStoreRegistry
+        store_registry
             A registry mapping the URL scheme and netloc to ObjectStore instances,
             allowing ManifestStores to read from different ObjectStore instances.
         """

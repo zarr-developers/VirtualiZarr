@@ -304,3 +304,22 @@ markers = [
     "network: marks test requiring internet (select with '--run-network-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
 ]
+filterwarnings = [
+    "ignore:Numcodecs codecs are not in the Zarr version 3 specification*:UserWarning:numcodecs"
+]
+
+[tool.numpydoc_validation]
+# See https://numpydoc.readthedocs.io/en/latest/validation.html#built-in-validation-checks for list of checks
+checks = [
+    "GL06",
+    "GL07",
+    # Currently broken; see https://github.com/numpy/numpydoc/issues/573
+    # "GL09",
+    "GL10",
+    "SS02",
+    "SS04",
+    "PR02",
+    "PR03",
+    "PR05",
+    "PR06",
+]
