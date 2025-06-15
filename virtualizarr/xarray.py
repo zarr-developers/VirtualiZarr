@@ -1,16 +1,256 @@
-from collections.abc import Iterable, Mapping
+from __future__ import annotations
+
+import os
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
+from concurrent.futures import Executor
+from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Hashable,
-    MutableMapping,
+    Literal,
     Optional,
+    cast,
 )
 
 import xarray as xr
 import xarray.indexes
+from obstore.store import ObjectStore
+from xarray import DataArray, Dataset, Index, combine_by_coords
+from xarray.backends.common import _find_absolute_paths
+from xarray.core.types import NestedSequence
+from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.parallel import get_executor
+from virtualizarr.parsers import Parser
+
+if TYPE_CHECKING:
+    from xarray.core.types import (
+        CombineAttrsOptions,
+        CompatOptions,
+        JoinOptions,
+    )
+
+
+def open_virtual_dataset(
+    file_url: str,
+    object_store: ObjectStore,
+    parser: Parser,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+    cftime_variables: Iterable[str] | None = None,
+    indexes: Mapping[str, xr.Index] | None = None,
+) -> xr.Dataset:
+    filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
+
+    manifest_store = parser(
+        file_url=filepath,
+        object_store=object_store,
+    )
+
+    ds = manifest_store.to_virtual_dataset(
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        indexes=indexes,
+    )
+    return ds.drop_vars(list(drop_variables or ()))
+
+
+def open_virtual_mfdataset(
+    paths: (
+        str
+        | os.PathLike
+        | Sequence[str | os.PathLike]
+        | NestedSequence[str | os.PathLike]
+    ),
+    object_store: ObjectStore,
+    parser: Parser,
+    concat_dim: (
+        str
+        | DataArray
+        | Index
+        | Sequence[str]
+        | Sequence[DataArray]
+        | Sequence[Index]
+        | None
+    ) = None,
+    compat: "CompatOptions" = "no_conflicts",
+    preprocess: Callable[[Dataset], Dataset] | None = None,
+    data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
+    coords="different",
+    combine: Literal["by_coords", "nested"] = "by_coords",
+    parallel: Literal["dask", "lithops", False] | type[Executor] = False,
+    join: "JoinOptions" = "outer",
+    attrs_file: str | os.PathLike | None = None,
+    combine_attrs: "CombineAttrsOptions" = "override",
+    **kwargs,
+) -> Dataset:
+    """
+    Open multiple files as a single virtual dataset.
+
+    If combine='by_coords' then the function ``combine_by_coords`` is used to combine
+    the datasets into one before returning the result, and if combine='nested' then
+    ``combine_nested`` is used. The filepaths must be structured according to which
+    combining function is used, the details of which are given in the documentation for
+    ``combine_by_coords`` and ``combine_nested``. By default ``combine='by_coords'``
+    will be used. Global attributes from the ``attrs_file`` are used
+    for the combined dataset.
+
+    Parameters
+    ----------
+    paths
+        Same as in xarray.open_mfdataset
+    concat_dim
+        Same as in xarray.open_mfdataset
+    compat
+        Same as in xarray.open_mfdataset
+    preprocess
+        Same as in xarray.open_mfdataset
+    data_vars
+        Same as in xarray.open_mfdataset
+    coords
+        Same as in xarray.open_mfdataset
+    combine
+        Same as in xarray.open_mfdataset
+    parallel : "dask", "lithops", False, or type of subclass of ``concurrent.futures.Executor``
+        Specify whether the open and preprocess steps of this function will be
+        performed in parallel using lithops, dask.delayed, or any executor compatible
+        with the ``concurrent.futures`` interface, or in serial.
+        Default is False, which will execute these steps in serial.
+    join
+        Same as in xarray.open_mfdataset
+    attrs_file
+        Same as in xarray.open_mfdataset
+    combine_attrs
+        Same as in xarray.open_mfdataset
+    **kwargs : optional
+        Additional arguments passed on to :py:func:`virtualizarr.open_virtual_dataset`. For an
+        overview of some of the possible options, see the documentation of
+        :py:func:`virtualizarr.open_virtual_dataset`.
+
+    Returns
+    -------
+    xarray.Dataset
+
+    Notes
+    -----
+    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large.
+    """
+
+    # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?
+
+    # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
+
+    paths = cast(NestedSequence[str], _find_absolute_paths(paths))
+
+    if not paths:
+        raise OSError("no files to open")
+
+    paths1d: list[str]
+    if combine == "nested":
+        if isinstance(concat_dim, str | DataArray) or concat_dim is None:
+            concat_dim = [concat_dim]  # type: ignore[assignment]
+
+        # This creates a flat list which is easier to iterate over, whilst
+        # encoding the originally-supplied structure as "ids".
+        # The "ids" are not used at all if combine='by_coords`.
+        combined_ids_paths = _infer_concat_order_from_positions(paths)
+        ids, paths1d = (
+            list(combined_ids_paths.keys()),
+            list(combined_ids_paths.values()),
+        )
+    elif concat_dim is not None:
+        raise ValueError(
+            "When combine='by_coords', passing a value for `concat_dim` has no "
+            "effect. To manually combine along a specific dimension you should "
+            "instead specify combine='nested' along with a value for `concat_dim`.",
+        )
+    else:
+        paths1d = paths  # type: ignore[assignment]
+
+    # TODO this refactored preprocess and executor logic should be upstreamed into xarray - see https://github.com/pydata/xarray/pull/9932
+
+    if preprocess:
+        # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
+
+        def _open_and_preprocess(path: str) -> xr.Dataset:
+            ds = open_virtual_dataset(
+                file_url=path, object_store=object_store, parser=parser, **kwargs
+            )
+            return preprocess(ds)
+
+        open_func = _open_and_preprocess
+    else:
+
+        def _open(path: str) -> xr.Dataset:
+            return open_virtual_dataset(
+                file_url=path, object_store=object_store, parser=parser, **kwargs
+            )
+
+        open_func = _open
+
+    executor = get_executor(parallel=parallel)
+    with executor() as exec:
+        # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
+        virtual_datasets = list(
+            exec.map(
+                open_func,
+                paths1d,
+            )
+        )
+
+    # TODO add file closers
+
+    # Combine all datasets, closing them in case of a ValueError
+    try:
+        if combine == "nested":
+            # Combined nested list by successive concat and merge operations
+            # along each dimension, using structure given by "ids"
+            combined_vds = _nested_combine(
+                virtual_datasets,
+                concat_dims=concat_dim,
+                compat=compat,
+                data_vars=data_vars,
+                coords=coords,
+                ids=ids,
+                join=join,
+                combine_attrs=combine_attrs,
+            )
+        elif combine == "by_coords":
+            # Redo ordering from coordinates, ignoring how they were ordered
+            # previously
+            combined_vds = combine_by_coords(
+                virtual_datasets,
+                compat=compat,
+                data_vars=data_vars,
+                coords=coords,
+                join=join,
+                combine_attrs=combine_attrs,
+            )
+        else:
+            raise ValueError(
+                f"{combine} is an invalid option for the keyword argument ``combine``"
+            )
+    except ValueError:
+        for vds in virtual_datasets:
+            vds.close()
+        raise
+
+    # combined_vds.set_close(partial(_multi_file_closer, closers))
+
+    # read global attributes from the attrs_file or from the first dataset
+    if attrs_file is not None:
+        if isinstance(attrs_file, os.PathLike):
+            attrs_file = cast(str, os.fspath(attrs_file))
+        combined_vds.attrs = virtual_datasets[paths1d.index(attrs_file)].attrs
+
+    # TODO should we just immediately close everything?
+    # TODO If loadable_variables is eager then we should have already read everything we're ever going to read into memory at this point
+
+    return combined_vds
 
 
 def construct_fully_virtual_dataset(
@@ -36,10 +276,7 @@ def construct_fully_virtual_dataset(
 
 
 def construct_virtual_dataset(
-    manifest_store: ManifestStore | None = None,
-    # TODO remove filepath option once all readers use ManifestStore approach
-    fully_virtual_ds: xr.Dataset | None = None,
-    filepath: str | None = None,
+    manifest_store: ManifestStore,
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
@@ -47,54 +284,32 @@ def construct_virtual_dataset(
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
-    Construct a fully or partly virtual dataset from a ManifestStore (or filepath for backwards compatibility),
+    Construct a fully or partly virtual dataset from a ManifestStore
     containing the contents of one group.
 
-    Accepts EITHER manifest_store OR fully_virtual_ds and filepath. The latter option should be removed once all readers use ManifestStore approach.
     """
 
     if indexes is not None:
         raise NotImplementedError()
 
-    if manifest_store:
-        if group:
-            raise NotImplementedError(
-                "ManifestStore does not yet support nested groups"
-            )
-        else:
-            manifestgroup = manifest_store._group
-
-        fully_virtual_ds = manifestgroup.to_virtual_dataset()
-
-        with xr.open_zarr(
-            manifest_store,
-            group=group,
-            consolidated=False,
-            zarr_format=3,
-            chunks=None,
-            decode_times=decode_times,
-        ) as loadable_ds:
-            return replace_virtual_with_loadable_vars(
-                fully_virtual_ds, loadable_ds, loadable_variables
-            )
+    if group:
+        raise NotImplementedError("ManifestStore does not yet support nested groups")
     else:
-        # TODO pre-ManifestStore codepath, remove once all readers use ManifestStore approach
+        manifestgroup = manifest_store._group
 
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath,  # type: ignore[arg-type]
-            reader_options=reader_options,
-        ).open_file()
+    fully_virtual_ds = manifestgroup.to_virtual_dataset()
 
-        with xr.open_dataset(
-            fpath,  # type: ignore[arg-type]
-            group=group,
-            decode_times=decode_times,
-        ) as loadable_ds:
-            return replace_virtual_with_loadable_vars(
-                fully_virtual_ds,  # type: ignore[arg-type]
-                loadable_ds,
-                loadable_variables,
-            )
+    with xr.open_zarr(
+        manifest_store,
+        group=group,
+        consolidated=False,
+        zarr_format=3,
+        chunks=None,
+        decode_times=decode_times,
+    ) as loadable_ds:
+        return replace_virtual_with_loadable_vars(
+            fully_virtual_ds, loadable_ds, loadable_variables
+        )
 
 
 def replace_virtual_with_loadable_vars(
