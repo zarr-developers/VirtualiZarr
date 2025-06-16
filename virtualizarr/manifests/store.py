@@ -181,7 +181,7 @@ class ObjectStoreRegistry:
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure.
+    A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
 
     The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
     multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
