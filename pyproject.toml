@@ -1,4 +1,3 @@
-
 [project]
 name = "virtualizarr"
 description = "Create virtual Zarr stores from archival data using xarray API"
@@ -28,7 +27,8 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.0.2",
+    "zarr>=3.0.8",
+    "obstore>=0.5.1",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -40,25 +40,16 @@ remote = [
     "aiohttp",
     "s3fs",
 ]
-obstore = [
-    "obstore>=0.5.1",
-]
-# non-kerchunk-based readers
+
+# non-kerchunk-based parsers
 hdf = [
-    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
-    "obstore>=0.5.1",
 ]
 
-# kerchunk-based readers
-hdf5 = [
-    "virtualizarr[remote]",
-    "kerchunk>=0.2.8",
-    "h5py",
-]
+# kerchunk-based parsers
 netcdf3 = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
@@ -69,11 +60,17 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
-all_readers = [
+kerchunk_parquet = [
+   "virtualizarr[remote]",
+   "fastparquet",
+]
+
+# kerchunk
+all_parsers = [
     "virtualizarr[hdf]",
-    "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
+    "virtualizarr[kerchunk_parquet]",
 ]
 
 # writers
@@ -183,14 +180,14 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
-min-deps = ["dev", "test", "hdf", "hdf5", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
+min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore"]
-test-py311 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "py312", "minio"]
-upstream = ["dev", "test", "hdf", "hdf5", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "test", "remote", "hdf", "hdf5", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "obstore", "all_readers", "all_writers"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib"]
+test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312", "minio"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk","kerchunk_parquet", "hdf5-lib", "all_parsers", "all_writers"]
 docs = ["docs"]
 
 # Define commands to run within the docs environment
@@ -201,8 +198,8 @@ readthedocs = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r docs/_build/html $READTH
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.minio.tasks]
-run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_readers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose" }
-run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_readers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose --cov-report=xml" }
+run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose" }
+run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"

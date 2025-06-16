@@ -1,73 +1,79 @@
+import io
 import warnings
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Hashable, Iterable, Optional
+from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from xarray import Coordinates, Dataset, Index, Variable
+from obstore.store import ObjectStore
 
-from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestGroup,
+    ManifestStore,
+)
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.utils import ObstoreReader
 
 
-class DMRPPVirtualBackend(VirtualBackend):
-    @staticmethod
-    def open_virtual_dataset(
-        filepath: str,
+class DMRPPParser:
+    def __init__(
+        self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
-        loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
-        indexes: Mapping[str, Index] | None = None,
-        virtual_backend_kwargs: Optional[dict] = None,
-        reader_options: Optional[dict] = None,
-    ) -> Dataset:
-        if virtual_backend_kwargs:
-            raise NotImplementedError(
-                "DMR++ reader does not understand any virtual_backend_kwargs"
-            )
+        skip_variables: Iterable[str] | None = None,
+    ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
 
-        _drop_vars: list[Hashable] = (
-            [] if drop_variables is None else list(drop_variables)
-        )
+        Parameters
+        ----------
+        group
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        skip_variables
+            Variables in the file that will be ignored when creating the ManifestStore.
+        """
 
-        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
-        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
-        if loadable_variables is None or indexes is None:
-            warnings.warn(
-                "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
-                "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
-                "To silence this warning pass `loadable_variables` explicitly.",
-                UserWarning,
-            )
-            loadable_variables = []
-            indexes = {}
+        self.group = group
+        self.skip_variables = skip_variables
 
-        if loadable_variables != [] or decode_times or indexes is None:
-            raise NotImplementedError(
-                "Specifying `loadable_variables` or auto-creating indexes with `indexes=None` is not supported for dmrpp files."
-            )
+    def __call__(
+        self,
+        file_url: str,
+        object_store: ObjectStore,
+    ) -> ManifestStore:
+        """
+        Parse the metadata and byte offsets from a given file to product a
+        VirtualiZarr ManifestStore.
 
-        filepath = validate_and_normalize_path_to_uri(
-            filepath, fs_root=Path.cwd().as_uri()
-        )
+        Parameters
+        ----------
+        file_url
+            The URI or path to the input file (e.g., "s3://bucket/file.dmrpp").
+        object_store
+            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
 
-        fpath = _FsspecFSFromFilepath(
-            filepath=filepath, reader_options=reader_options
-        ).open_file()
+        Returns
+        -------
+        ManifestStore
+            A ManifestStore that provides a Zarr representation of the parsed file.
+        """
+        reader = ObstoreReader(store=object_store, path=file_url)
+        file_bytes = reader.readall()
+        stream = io.BytesIO(file_bytes)
 
         parser = DMRParser(
-            root=ET.parse(fpath).getroot(),
-            data_filepath=filepath.removesuffix(".dmrpp"),
+            root=ET.parse(stream).getroot(),
+            data_filepath=file_url.removesuffix(".dmrpp"),
+            skip_variables=self.skip_variables,
         )
-        vds = parser.parse_dataset(group=group, indexes=indexes)
-
-        return vds.drop_vars(_drop_vars)
+        manifest_store = parser.parse_dataset(
+            object_store=object_store, group=self.group
+        )
+        return manifest_store
 
 
 class DMRParser:
@@ -105,11 +111,16 @@ class DMRParser:
     # Default zlib compression value
     _DEFAULT_ZLIB_VALUE = 6
     # Encoding keys that should be removed from attributes and placed in xarray encoding dict
-    _ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+    # _ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
     root: ET.Element
     data_filepath: str
 
-    def __init__(self, root: ET.Element, data_filepath: Optional[str] = None):
+    def __init__(
+        self,
+        root: ET.Element,
+        data_filepath: str | None = None,
+        skip_variables: Iterable[str] | None = None,
+    ):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
 
@@ -125,74 +136,68 @@ class DMRParser:
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
+        self.skip_variables = skip_variables or ()
 
-    def parse_dataset(self, group=None, indexes: Mapping[str, Index] = {}) -> Dataset:
+    def parse_dataset(
+        self,
+        object_store: ObjectStore,
+        group: str | None = None,
+    ) -> ManifestStore:
         """
-        Parses the given file and creates a virtual xr.Dataset with ManifestArrays.
+        Parses the given file and creates a ManifestStore.
 
         Parameters
         ----------
-        group : str
-            The group to parse. If None, and no groups are present, the dataset is parsed.
-            If None and groups are present, the first group is parsed.
-
-        indexes : Mapping[str, Index], default is {}
-            Indexes to use on the returned xarray Dataset.
-            Default is {} which will avoid creating any indexes
+        group
+            The group to parse. Ignored if no groups are present, and the entire
+            dataset is parsed. If `None` or "/", and groups are present, the first group
+            is parsed.  If not `None` or "/", and no groups are present, a UserWarning
+            is issued indicating that the group will be ignored.
 
         Returns
         -------
-        An xr.Dataset wrapping virtualized zarr arrays.
+        ManifestStore
 
         Examples
         --------
         Open a sample DMR++ file and parse the dataset
-
-        >>> import requests
-        >>> r = requests.get("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp")
-        >>> parser = DMRParser(r.text)
-        >>> vds = parser.parse_dataset()
-        >>> vds
-        <xarray.Dataset> Size: 4MB
-            Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
-            Dimensions without coordinates: phony_dim_0, phony_dim_1, phony_dim_2
-            Data variables:
-                d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
-
-        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp")
-        >>> vds2
-        <xarray.Dataset> Size: 4MB
-            Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
-            Dimensions without coordinates: phony_dim_0, phony_dim_1, phony_dim_2
-            Data variables:
-                d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
         """
-        group_tags = self.root.findall("dap:Group", self._NS)
-        if group is not None:
-            group = Path(group)
-            if not group.is_absolute():
-                group = Path("/") / group
-            if len(group_tags) == 0:
-                warnings.warn("No groups found in DMR++ file; ignoring group parameter")
-            else:
-                all_groups = self._split_groups(self.root)
-                if group in all_groups:
-                    return self._parse_dataset(all_groups[group], indexes)
-                else:
-                    raise ValueError(f"Group {group} not found in DMR++ file")
-        return self._parse_dataset(self.root, indexes)
+        group = group or "/"
+        ngroups = len(self.root.findall("dap:Group", self._NS))
+
+        if ngroups == 0 and group != "/":
+            warnings.warn(
+                f"No groups in DMR++ file {self.data_filepath!r}; "
+                f"ignoring group parameter {group!r}"
+            )
+
+        group_path = Path("/") if ngroups == 0 else Path("/") / group.removeprefix("/")
+        dataset_element = self._split_groups(self.root).get(group_path)
+
+        if dataset_element is None:
+            raise ValueError(
+                f"Group {group_path} not found in DMR++ file {self.data_filepath!r}"
+            )
+
+        manifest_group = self._parse_dataset(dataset_element)
+        registry = ObjectStoreRegistry(
+            {get_store_prefix(self.data_filepath): object_store}
+        )
+
+        return ManifestStore(store_registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
         """
         Find the element in the root element by converting the fully qualified name to an xpath query.
 
         E.g. fqn = "/a/b" --> root.find("./*[@name='a']/*[@name='b']")
+
         See more about OPeNDAP fully qualified names (FQN) here: https://docs.opendap.org/index.php/DAP4:_Specification_Volume_1#Fully_Qualified_Names
 
         Parameters
         ----------
-        fqn : str
-            The fully qualified name of an element. E.g. "/a/b"
+        fqn
+            The fully qualified name of an element. For example, "/a/b".
 
         Returns
         -------
@@ -206,12 +211,14 @@ class DMRParser:
         """
         if fqn == "/":
             return self.root
+
         elements = fqn.strip("/").split("/")  # /a/b/ --> ['a', 'b']
         xpath_segments = [f"*[@name='{element}']" for element in elements]
-        xpath_query = "./" + "/".join(xpath_segments)  # "./[*[@name='a']/*[@name='b']"
-        element = self.root.find(xpath_query, self._NS)
-        if element is None:
+        xpath_query = "/".join([".", *xpath_segments])  # "./[*[@name='a']/*[@name='b']"
+
+        if (element := self.root.find(xpath_query, self._NS)) is None:
             raise ValueError(f"Path {fqn} not found in provided root")
+
         return element
 
     def _split_groups(self, root: ET.Element) -> dict[Path, ET.Element]:
@@ -253,8 +260,9 @@ class DMRParser:
         return group_dict
 
     def _parse_dataset(
-        self, root: ET.Element, indexes: Mapping[str, Index] = {}
-    ) -> Dataset:
+        self,
+        root: ET.Element,
+    ) -> ManifestGroup:
         """
         Parse the dataset using the root element of the DMR++ file.
 
@@ -265,33 +273,15 @@ class DMRParser:
 
         Returns
         -------
-        xr.Dataset
+        ManifestGroup
         """
-        # Dimension names and sizes
-        dims: dict[str, int] = {}
-        dimension_tags = self._find_dimension_tags(root)
-        for dim in dimension_tags:
-            dims.update(self._parse_dim(dim))
-        # Data variables and coordinates
-        coord_names: set[str] = set()
-        coord_tags = root.findall(
-            ".//dap:Attribute[@name='coordinates']/dap:Value", self._NS
-        )
-        for c in coord_tags:
-            if c.text is not None:
-                coord_names.update(c.text.split(" "))
-        # Separate and parse coords + data variables
-        coord_vars: dict[str, Variable] = {}
-        data_vars: dict[str, Variable] = {}
+
+        manifest_dict: dict[str, ManifestArray] = {}
         for var_tag in self._find_var_tags(root):
-            variable = self._parse_variable(var_tag)
-            # Either coordinates are explicitly defined or 1d variable with same name as dimension is a coordinate
-            if var_tag.attrib["name"] in coord_names or (
-                len(variable.dims) == 1 and variable.dims[0] == var_tag.attrib["name"]
-            ):
-                coord_vars[var_tag.attrib["name"]] = variable
-            else:
-                data_vars[var_tag.attrib["name"]] = variable
+            if var_tag.attrib["name"] not in self.skip_variables:
+                variable = self._parse_variable(var_tag)
+                manifest_dict[var_tag.attrib["name"]] = variable
+
         # Attributes
         attrs: dict[str, str] = {}
         # Look for an attribute tag called "HDF5_GLOBAL" and unpack it
@@ -302,10 +292,10 @@ class DMRParser:
             root.extend(hdf5_global_attrs)
         for attr_tag in root.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
-        return Dataset(
-            data_vars=data_vars,
-            coords=Coordinates(coords=coord_vars, indexes=indexes),
-            attrs=attrs,
+
+        return ManifestGroup(
+            arrays=manifest_dict,
+            attributes=attrs,
         )
 
     def _find_var_tags(self, root: ET.Element) -> list[ET.Element]:
@@ -376,7 +366,7 @@ class DMRParser:
                     dimension_tags.append(dimension_tag)
         return dimension_tags
 
-    def _parse_variable(self, var_tag: ET.Element) -> Variable:
+    def _parse_variable(self, var_tag: ET.Element) -> ManifestArray:
         """
         Parse a variable from a DMR++ tag.
 
@@ -387,7 +377,7 @@ class DMRParser:
 
         Returns
         -------
-        xr.Variable
+        ManifestArray
         """
 
         # Dimension info
@@ -405,6 +395,7 @@ class DMRParser:
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
+        array_fill_value = np.array(0).astype(dtype)[()]
         if chunks_tag is not None:
             # Chunks
             chunk_dim_text = chunks_tag.findtext(
@@ -415,6 +406,9 @@ class DMRParser:
                 chunks_shape = tuple(map(int, chunk_dim_text.split()))
             else:
                 chunks_shape = shape
+            if "fillValue" in chunks_tag.attrib:
+                fillValue_attrib = chunks_tag.attrib["fillValue"]
+                array_fill_value = np.array(fillValue_attrib).astype(dtype)[()]
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
             codecs = self._parse_filters(chunks_tag, dtype)
@@ -422,19 +416,20 @@ class DMRParser:
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
             attrs.update(self._parse_attribute(attr_tag))
-        # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
-        encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
-        fill_value = attrs.pop("_FillValue", None)
-        # create ManifestArray
+        if "_FillValue" in attrs:
+            encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
+            attrs["_FillValue"] = encoded_cf_fill_value
+
         metadata = create_v3_array_metadata(
             shape=shape,
             data_type=dtype,
             chunk_shape=chunks_shape,
-            fill_value=fill_value,
             codecs=codecs,
+            dimension_names=dims,
+            attributes=attrs,
+            fill_value=array_fill_value,
         )
-        marr = ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
-        return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
+        return ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
         """
