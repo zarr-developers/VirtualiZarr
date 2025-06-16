@@ -34,7 +34,7 @@ class Parser(Protocol):
 
     """
     Parse the contents of a given file to produce a ManifestStore.
-    
+
     Effectively maps the contents of the file (e.g. metadata, compression codecs, chunk byte offsets) to the Zarr data model.
 
     Parameters
