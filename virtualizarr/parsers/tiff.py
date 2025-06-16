@@ -27,7 +27,7 @@ class Parser:
         skip_variables
             Variables in the file that will be ignored when creating the ManifestStore.
         remote_options
-            Configuration options used internally for the kerchunk's fsspec backend
+            Configuration options used internally for kerchunk's fsspec backend
         """
 
         self.group = group
