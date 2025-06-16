@@ -33,8 +33,9 @@ class Parser(Protocol):
     ) -> ManifestStore: ...
 
     """
-    Parse the metadata and byte offsets from a given file to produce a
-    VirtualiZarr ManifestStore.
+    Parse the contents of a given file to produce a ManifestStore.
+    
+    Effectively maps the contents of the file (e.g. metadata, compression codecs, chunk byte offsets) to the Zarr data model.
 
     Parameters
     ----------
