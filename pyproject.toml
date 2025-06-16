@@ -41,7 +41,7 @@ remote = [
     "s3fs",
 ]
 
-# non-kerchunk-based readers
+# non-kerchunk-based parsers
 hdf = [
     "h5py",
     "hdf5plugin",
