@@ -30,7 +30,7 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
-```python exec="true" session="intro"
+```python exec="false" session="intro"
 import xarray as xr
 import warnings
 warnings.filterwarnings("ignore",
@@ -39,7 +39,7 @@ warnings.filterwarnings("ignore",
 xr.set_options(display_style="html")
 ```
 
-```python exec="true" source="above" session="intro" html="true"
+```python exec="false" source="above" session="intro" html="true"
 from urllib.parse import urlparse
 
 import obstore as obs
