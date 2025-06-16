@@ -49,7 +49,7 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 
-# kerchunk-based readers
+# kerchunk-based parsers
 netcdf3 = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
