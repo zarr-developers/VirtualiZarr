@@ -45,7 +45,7 @@ class Parser:
         object_store: ObjectStore,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a
+        Parse the metadata and byte offsets from a given file to produce a
         VirtualiZarr ManifestStore.
 
         Parameters
