@@ -126,7 +126,7 @@ def _construct_manifest_group(
     return ManifestGroup(arrays=arrays, attributes=attributes)
 
 
-class Parser:
+class HDFParser:
     def __init__(
         self,
         group: str | None = None,

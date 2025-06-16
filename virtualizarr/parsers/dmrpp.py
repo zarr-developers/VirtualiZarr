@@ -20,7 +20,7 @@ from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader
 
 
-class Parser:
+class DMRPPParser:
     def __init__(
         self,
         group: str | None = None,

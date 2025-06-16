@@ -9,7 +9,7 @@ from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 from virtualizarr.utils import ObstoreReader
 
 
-class Parser:
+class KerchunkJSONParser:
     def __init__(
         self,
         group: str | None = None,

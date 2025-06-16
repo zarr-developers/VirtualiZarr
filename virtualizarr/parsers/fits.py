@@ -9,7 +9,7 @@ from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
-class Parser:
+class FITSParser:
     def __init__(
         self,
         group: str | None = None,

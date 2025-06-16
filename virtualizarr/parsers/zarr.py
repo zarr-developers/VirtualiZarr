@@ -143,7 +143,7 @@ async def _construct_manifest_group(
     return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
-class Parser:
+class ZarrParser:
     def __init__(
         self,
         group: str | None = None,

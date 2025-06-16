@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-class Parser:
+class KerchunkParquetParser:
     def __init__(
         self,
         group: str | None = None,
