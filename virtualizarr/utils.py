@@ -30,10 +30,7 @@ class ObstoreReader:
         import obstore as obs
 
         parsed = urlparse(path)
-        if (
-            isinstance(store, (obs.store.HTTPStore, obs.store.MemoryStore))
-            or store.prefix
-        ):
+        if hasattr(store, "prefix") and store.prefix:
             filepath = os.path.basename(parsed.path)
         else:
             filepath = parsed.path
