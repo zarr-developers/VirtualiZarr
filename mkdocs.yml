@@ -22,6 +22,7 @@ nav:
   - Explanation:
     - "data_structures.md"
     - "custom_readers.md"
+    - "migration_guide.md"
     - "faq.md"
   - Reference:
     - "api.md"
@@ -130,6 +131,8 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tilde
   - toc:
       permalink: true
