@@ -172,7 +172,7 @@ class Parser:
         object_store: obstore.store.ObjectStore,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given Zarr store to product a VirtualiZarr ManifestStore.
+        Parse the metadata and byte offsets from a given Zarr store to produce a VirtualiZarr ManifestStore.
 
         Parameters
         ----------
