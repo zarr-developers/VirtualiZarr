@@ -1,39 +1,34 @@
-from typing import (
-    Tuple,
-    Union,
-)
-
 import numpy as np
 from xarray.backends.zarr import FillValueCoder
 
-FillValueType = Union[
-    int,
-    float,
-    bool,
-    complex,
-    str,
-    np.integer,
-    np.floating,
-    np.bool_,
-    np.complexfloating,
-    bytes,  # For fixed-length string storage
-    Tuple[bytes, int],  # Structured type
-]
+FillValueType = (
+    int
+    | float
+    | bool
+    | complex
+    | str
+    | np.integer
+    | np.floating
+    | np.bool_
+    | np.complexfloating
+    | bytes  # For fixed-length string storage
+    | tuple[bytes, int]  # Structured type
+)
 
 
 def encode_cf_fill_value(
-    fill_value: Union[np.ndarray, np.generic],
+    fill_value: np.ndarray | np.generic,
     target_dtype: np.dtype,
 ) -> FillValueType:
     """
-    Convert the _FillValue attribute into one properly encoded for the target dtype.
+    Convert a fill value into one properly encoded for a target dtype.
 
     Parameters
     ----------
     fill_value
         An ndarray or value.
     target_dtype
-        The target dtype of the ManifestArray that will use the _FillValue
+        The target dtype of the ManifestArray that will use `fill_value` as its fill value.
     """
     if isinstance(fill_value, (np.ndarray, np.generic)):
         if isinstance(fill_value, np.ndarray) and fill_value.size > 1:

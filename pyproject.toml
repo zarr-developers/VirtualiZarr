@@ -1,4 +1,3 @@
-
 [project]
 name = "virtualizarr"
 description = "Create virtual Zarr stores from archival data using xarray API"
@@ -45,12 +44,8 @@ parallel = [
     "lithops",
     "dask",
 ]
-obstore = [
-    "obstore>=0.5.1",
-]
 # non-kerchunk-based readers
 hdf = [
-    "virtualizarr[remote]",
     "h5py",
     "hdf5plugin",
     "imagecodecs",
@@ -58,11 +53,6 @@ hdf = [
 ]
 
 # kerchunk-based readers
-hdf5 = [
-    "virtualizarr[remote]",
-    "kerchunk>=0.2.8",
-    "h5py",
-]
 netcdf3 = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
@@ -73,11 +63,17 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
+kerchunk_parquet = [
+   "virtualizarr[remote]",
+   "fastparquet",
+]
+
+# kerchunk
 all_readers = [
     "virtualizarr[hdf]",
-    "virtualizarr[hdf5]",
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
+    "virtualizarr[kerchunk_parquet]",
 ]
 
 # writers
@@ -311,4 +307,23 @@ markers = [
     "flaky: flaky tests",
     "network: marks test requiring internet (select with '--run-network-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
+]
+filterwarnings = [
+    "ignore:Numcodecs codecs are not in the Zarr version 3 specification*:UserWarning:numcodecs"
+]
+
+[tool.numpydoc_validation]
+# See https://numpydoc.readthedocs.io/en/latest/validation.html#built-in-validation-checks for list of checks
+checks = [
+    "GL06",
+    "GL07",
+    # Currently broken; see https://github.com/numpy/numpydoc/issues/573
+    # "GL09",
+    "GL10",
+    "SS02",
+    "SS04",
+    "PR02",
+    "PR03",
+    "PR05",
+    "PR06",
 ]

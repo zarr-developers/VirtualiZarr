@@ -4,9 +4,6 @@ import math
 from typing import (
     TYPE_CHECKING,
     Iterable,
-    List,
-    Optional,
-    Union,
 )
 
 import numpy as np
@@ -19,14 +16,14 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.store import ObjectStoreRegistry
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
-h5py = soft_import("h5py", "For reading hdf files", strict=False)
+h5py = soft_import("h5py", "reading hdf files", strict=False)
 
 
 if TYPE_CHECKING:
@@ -42,19 +39,21 @@ def _construct_manifest_array(
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
+
     Parameters
     ----------
-    filepath: str
+    filepath
         The path of the hdf5 file.
-    dataset : h5py.Dataset
+    dataset
         An h5py dataset.
-    group : str
+    group
         Name of the group containing this h5py.Dataset.
+
     Returns
     -------
     ManifestArray
     """
-    chunks = dataset.chunks if dataset.chunks else dataset.shape
+    chunks = dataset.chunks or dataset.shape
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
@@ -97,46 +96,34 @@ def _construct_manifest_group(
     reader: ObstoreReader,
     *,
     group: str | None = None,
-    drop_variables: Optional[Iterable[str]] = None,
+    drop_variables: Iterable[str] | None = None,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
     """
 
-    if drop_variables is None:
-        drop_variables = []
+    import h5py
 
-    f = h5py.File(reader, mode="r")
+    with h5py.File(reader, mode="r") as f:
+        if not isinstance(g := f.get(group or "/"), h5py.Group):
+            raise ValueError(f"Group {group!r} is not an HDF Group")
 
-    if group is not None and group != "":
-        g = f[group]
-        group_name = group
-        if not isinstance(g, h5py.Group):
-            raise ValueError("The provided group is not an HDF group")
-    else:
-        g = f["/"]
-        group_name = "/"
+        # Several of our test fixtures which use xr.tutorial data have
+        # non coord dimensions serialized using big endian dtypes which are not
+        # yet supported in zarr-python v3.  We'll drop these variables for the
+        # moment until big endian support is included upstream.
 
-    manifest_dict = {}
-    # Several of our test fixtures which use xr.tutorial data have
-    # non coord dimensions serialized using big endian dtypes which are not
-    # yet supported in zarr-python v3.  We'll drop these variables for the
-    # moment until big endian support is included upstream.)
+        non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
+        drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
+        group_name = str(g.name)  # NOTE: this will always include leading "/"
+        arrays = {
+            key: _construct_manifest_array(filepath, dataset, group_name)
+            for key in g.keys()
+            if key not in drop_variables and isinstance(dataset := g[key], h5py.Dataset)
+        }
+        attributes = _extract_attrs(g)
 
-    non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
-    drop_variables = list(set(list(drop_variables) + non_coordinate_dimension_vars))
-    attrs = _extract_attrs(g)
-    for key in g.keys():
-        if key not in drop_variables:
-            if isinstance(g[key], h5py.Dataset):
-                variable = _construct_manifest_array(
-                    filepath=filepath,
-                    dataset=g[key],
-                    group=group_name,
-                )
-                if variable is not None:
-                    manifest_dict[key] = variable
-    return ManifestGroup(arrays=manifest_dict, attributes=attrs)
+    return ManifestGroup(arrays=arrays, attributes=attributes)
 
 
 class Parser:
@@ -153,9 +140,6 @@ class Parser:
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        if h5py is None:
-            raise ImportError("h5py is required for using the hdf parser")
-
         reader = ObstoreReader(store=object_store, path=file_url)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
@@ -163,7 +147,7 @@ class Parser:
             group=self.group,
             drop_variables=self.drop_variables,
         )
-        registry = ObjectStoreRegistry({file_url: object_store})
+        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 
@@ -177,9 +161,9 @@ def _dataset_chunk_manifest(
 
     Parameters
     ----------
-    filepath: str
+    filepath
         The path of the HDF5 file
-    dataset : h5py.Dataset
+    dataset
         h5py dataset for which to create a ChunkManifest
 
     Returns
@@ -209,14 +193,12 @@ def _dataset_chunk_manifest(
             shape = tuple(
                 math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
             )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)  # type: ignore
+            paths = np.empty(shape, dtype=np.dtypes.StringDType)
             offsets = np.empty(shape, dtype=np.uint64)
             lengths = np.empty(shape, dtype=np.uint64)
 
             def get_key(blob):
-                return tuple(
-                    [a // b for a, b in zip(blob.chunk_offset, dataset.chunks)]
-                )
+                return tuple(a // b for a, b in zip(blob.chunk_offset, dataset.chunks))
 
             def add_chunk_info(blob):
                 key = get_key(blob)
@@ -239,7 +221,7 @@ def _dataset_chunk_manifest(
     return chunk_manifest
 
 
-def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
+def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
 
@@ -249,10 +231,11 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
 
     Parameters
     ----------
-    dataset : h5py.Dataset
+    dataset
         An h5py dataset.
-    group : str
-        Name of the group we are pulling these dimensions from. Required for potentially removing subgroup prefixes.
+    group
+        Name of the group we are pulling these dimensions from (default: the root
+        group "/"). Required for removing subgroup prefixes.
 
     Returns
     -------
@@ -260,40 +243,37 @@ def _dataset_dims(dataset: H5Dataset, group: str = "") -> List[str]:
         List with HDF5 path names of dimension scales attached to input
         dataset.
     """
-    dims = list()
-    rank = len(dataset.shape)
-    if rank:
-        for n in range(rank):
-            num_scales = len(dataset.dims[n])  # type: ignore
-            if num_scales == 1:
-                dims.append(dataset.dims[n][0].name[1:])  # type: ignore
-            elif h5py.h5ds.is_scale(dataset.id):
-                dims.append(dataset.name[1:])
-            elif num_scales > 1:
-                raise ValueError(
-                    f"{dataset.name}: {len(dataset.dims[n])} "  # type: ignore
-                    f"dimension scales attached to dimension #{n}"
-                )
-            elif num_scales == 0:
-                # Some HDF5 files do not have dimension scales.
-                # If this is the case, `num_scales` will be 0.
-                # In this case, we mimic netCDF4 and assign phony dimension names.
-                # See https://github.com/fsspec/kerchunk/issues/41
-                dims.append(f"phony_dim_{n}")
+    import h5py
 
-    if not group.endswith("/"):
-        group += "/"
+    dims: list[str] = []
 
-    return [dim.removeprefix(group) for dim in dims]
+    for n in range(len(dataset.shape)):
+        if (num_scales := len(dataset.dims[n])) == 1:
+            dims.append(str(dataset.dims[n][0].name))
+        elif h5py.h5ds.is_scale(dataset.id):
+            dims.append(str(dataset.name))
+        elif num_scales > 1:
+            raise ValueError(
+                f"{dataset.name} has {num_scales} dimension scales attached to "
+                f"dimension #{n}; require exactly 1"
+            )
+        elif num_scales == 0:
+            # Some HDF5 files do not have dimension scales.
+            # If this is the case, `num_scales` will be 0.
+            # In this case, we mimic netCDF4 and assign phony dimension names.
+            # See https://github.com/fsspec/kerchunk/issues/41
+            dims.append(f"phony_dim_{n}")
+
+    return [dim.removeprefix(group).removeprefix("/") for dim in dims]
 
 
-def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
+def _extract_attrs(h5obj: H5Dataset | H5Group):
     """
     Extract attributes from an HDF5 group or dataset.
 
     Parameters
     ----------
-    h5obj : h5py.Group or h5py.Dataset
+    h5obj
         An h5py group or dataset.
     """
     _HIDDEN_ATTRS = {
@@ -332,7 +312,7 @@ def _extract_attrs(h5obj: Union[H5Dataset, H5Group]):
     return attrs
 
 
-def _find_non_coord_dimension_vars(group: H5Group) -> List[str]:
+def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
     dimension_names = []
     non_coordinate_dimension_variables = []
     for name, obj in group.items():

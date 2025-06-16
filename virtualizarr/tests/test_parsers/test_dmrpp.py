@@ -1,5 +1,6 @@
 import os
 import textwrap
+from contextlib import nullcontext
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -187,15 +188,38 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         region="us-west-2",
     )
 
+    with (
+        open_virtual_dataset(
+            file_url=dmrpp_url,
+            object_store=store,
+            parser=DMRPPParser(),
+            loadable_variables=[],
+        ) as actual,
+        open_virtual_dataset(
+            file_url=data_url,
+            object_store=store,
+            parser=HDFParser(),
+            loadable_variables=[],
+        ) as expected,
+    ):
+        xr.testing.assert_identical(actual, expected)
+
+
+@requires_network
+@pytest.mark.parametrize("data_url, dmrpp_url", urls)
+def test_NASA_dmrpp_load(data_url, dmrpp_url):
+    store = obstore_s3(
+        file_url=dmrpp_url,
+        region="us-west-2",
+    )
+
     parser = DMRPPParser()
-    result = open_virtual_dataset(
-        file_url=dmrpp_url, object_store=store, parser=parser, loadable_variables=[]
-    )
-    hdf_parser = HDFParser()
-    expected = open_virtual_dataset(
-        file_url=data_url, object_store=store, parser=hdf_parser, loadable_variables=[]
-    )
-    xr.testing.assert_identical(result, expected)
+    manifest_store = parser(file_url=dmrpp_url, object_store=store)
+
+    with xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ) as ds:
+        assert ds.load()
 
 
 @pytest.mark.parametrize(
@@ -242,20 +266,36 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
     assert result_tags == expected_tags
 
 
-def test_parse_dataset(tmp_path):
+@pytest.mark.parametrize(
+    "group,warns",
+    [
+        pytest.param(None, False, id="None"),
+        pytest.param("/", False, id="/"),
+        pytest.param("/no-such-group", True, id="/no-such-group"),
+    ],
+)
+def test_parse_dataset_basic(group: str | None, warns: bool, tmp_path: Path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
     store = obstore_local(file_url=basic_dmrpp.data_filepath)
-    ms = basic_dmrpp.parse_dataset(object_store=store)
+
+    with nullcontext() if warns else pytest.raises(BaseException, match="DID NOT WARN"):
+        with pytest.warns(UserWarning, match=f"ignoring group parameter {group!r}"):
+            ms = basic_dmrpp.parse_dataset(object_store=store, group=group)
+
     vds = ms.to_virtual_dataset()
+
     assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
     assert vds.data_vars.keys() == {"data", "mask"}
     assert vds.data_vars["data"].dims == ("x", "y")
     assert vds.attrs == {"Conventions": "CF-1.6", "title": "Sample Dataset"}
     assert vds.coords.keys() == {"x", "y", "z"}
 
+
+def test_parse_dataset_nested(tmp_path: Path):
     nested_groups_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
     )
+    store = obstore_local(file_url=nested_groups_dmrpp.data_filepath)
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
         object_store=store
@@ -445,20 +485,20 @@ class TestRelativePaths:
     ):
         store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
         parser = DMRPPParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=basic_dmrpp_temp_filepath.as_posix(),
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
-        path = vds["x"].data.manifest["0"]["path"]
+        ) as vds:
+            path = vds["x"].data.manifest["0"]["path"]
 
-        # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-        # and the manifest should only contain absolute file URIs
-        expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
-            ".dmrpp"
-        )
-        assert path == expected_datafile_path_uri
+            # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+            # and the manifest should only contain absolute file URIs
+            expected_datafile_path_uri = (
+                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
+            )
+            assert path == expected_datafile_path_uri
 
     def test_relative_path_to_dmrpp_file(self, basic_dmrpp_temp_filepath: Path):
         # test that if a user supplies a relative path to a DMR++ file we still get an absolute path in the manifest
@@ -467,29 +507,29 @@ class TestRelativePaths:
         )
         store = obstore_local(file_url=relative_dmrpp_filepath)
         parser = DMRPPParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=relative_dmrpp_filepath,
             object_store=store,
             parser=parser,
             loadable_variables=[],
-        )
-        path = vds["x"].data.manifest["0"]["path"]
+        ) as vds:
+            path = vds["x"].data.manifest["0"]["path"]
 
-        # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-        expected_datafile_path_uri = basic_dmrpp_temp_filepath.as_uri().removesuffix(
-            ".dmrpp"
-        )
-        assert path == expected_datafile_path_uri
+            # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
+            expected_datafile_path_uri = (
+                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
+            )
+            assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
-def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
+@pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
+def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
     store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-    parser = DMRPPParser(drop_variables=drop_variables)
-    vds = open_virtual_dataset(
+    parser = DMRPPParser(skip_variables=skip_variables)
+    with open_virtual_dataset(
         file_url=basic_dmrpp_temp_filepath.as_posix(),
         object_store=store,
         parser=parser,
         loadable_variables=[],
-    )
-    assert all(var not in vds for var in drop_variables)
+    ) as vds:
+        assert all(var not in vds for var in skip_variables)

@@ -1,6 +1,10 @@
-from typing import Iterable, cast
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import cast
 
 import numpy as np
+from numcodecs.abc import Codec
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.metadata.v2 import ArrayV2Metadata
@@ -12,7 +16,6 @@ from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestGroup,
-    ManifestStore,
 )
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
 from virtualizarr.manifests.utils import create_v3_array_metadata
@@ -36,30 +39,31 @@ def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
             codec.get_config()
             for codec in v2_metadata.filters
             if codec is not None
-        ]  # type: ignore
-    if v2_metadata.compressor:
-        zarray_dict["compressor"] = v2_metadata.compressor.get_config()  # type: ignore
+        ]  # type: ignore[assignment]
+    if isinstance(compressor := v2_metadata.compressor, Codec):
+        zarray_dict["compressor"] = compressor.get_config()
 
     return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
 
 
-def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
+def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     """
     Convert a decoded zarr array (.zarray) reference to an ArrayV3Metadata object.
     This function processes the given decoded Zarr array reference dictionary,
     to construct and return an ArrayV3Metadata object based on the provided information.
 
-    Parameters:
+    Parameters
     ----------
-    decoded_arr_refs_zarray : dict
+    decoded_arr_refs_zarray
         A dictionary containing the decoded Zarr array reference information.
         Expected keys include "dtype", "fill_value", "zarr_format", "filters",
         "compressor", "chunks", and "shape".
-    Returns:
+
+    Returns
     -------
     ArrayV3Metadata
 
-    Raises:
+    Raises
     ------
     ValueError
         If the Zarr format specified in the input dictionary is not 2 or 3.
@@ -93,37 +97,43 @@ def from_kerchunk_refs(decoded_arr_refs_zarray) -> "ArrayV3Metadata":
         fill_value=fill_value,
         shape=tuple(decoded_arr_refs_zarray["shape"]),
         dimension_names=dimension_names,
+        attributes=zattrs,
     )
 
 
-def manifeststore_from_kerchunk_refs(
+def manifestgroup_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     group: str | None = None,
     fs_root: str | None = None,
-    drop_variables: Iterable[str] | None = None,
-) -> ManifestStore:
+    skip_variables: Iterable[str] | None = None,
+) -> ManifestGroup:
     """
-    Construct a ManifestStore from a dictionary of kerchunk references.
+    Construct a ManifestGroup from a dictionary of kerchunk references.
 
     Parameters
     ----------
-    refs: dict
+    refs
         The Kerchunk references, as a dictionary.
-    group: string, optional
+    group
         Default is to build a store from the root group.
-    fs_root: string, optional
+    fs_root
         The root of the fsspec filesystem on which these references were generated.
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
-    """
-    # TODO teach this method to understand kerchunk json/parquet filepaths too? Then it would be a full "reader"
+    skip_variables
+        Variables to ignore when creating the ManifestGroup.
 
+    Returns
+    -------
+    ManifestGroup
+        ManifestGroup representation of the virtual chunk references.
+    """
     # both group=None and group='' mean to read root group
     if group:
         refs = extract_group(refs, group)
 
     arr_names = find_var_names(refs)
-    if drop_variables:
-        arr_names = [var for var in arr_names if var not in drop_variables]
+    if skip_variables:
+        arr_names = [var for var in arr_names if var not in skip_variables]
 
     # TODO support iterating over multiple nested groups
     marrs = {
@@ -135,9 +145,7 @@ def manifeststore_from_kerchunk_refs(
     attributes = fully_decode_arr_refs(refs["refs"]).get(".zattrs", {})
 
     manifestgroup = ManifestGroup(arrays=marrs, attributes=attributes)
-
-    # TODO what should the obstore store be?
-    return ManifestStore(group=manifestgroup)
+    return manifestgroup
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
@@ -146,8 +154,8 @@ def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
 
     Parameters
     ----------
-    vds_refs : KerchunkStoreRefs
-    group : str
+    vds_refs
+    group
         Should be a non-empty string
     """
     hdf_groups = [
@@ -191,7 +199,6 @@ def manifestarray_from_kerchunk_refs(
     # TODO probably need to update internals of this to use ArrayV3Metadata more neatly
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
-
     if chunk_dict:
         manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -300,7 +307,7 @@ def parse_array_refs(
     dims = zattrs.pop("_ARRAY_DIMENSIONS")
     zarray = arr_refs.pop(".zarray")
     zarray["dimension_names"] = dims
-    metadata = from_kerchunk_refs(zarray)
+    metadata = from_kerchunk_refs(zarray, zattrs)
     chunk_dict = arr_refs
 
     return chunk_dict, metadata, zattrs

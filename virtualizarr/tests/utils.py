@@ -18,7 +18,6 @@ def obstore_s3(file_url: str, region: str) -> ObjectStore:
     bucket = parsed.netloc
     key_prefix = os.path.dirname(parsed.path.lstrip("/"))
     base_path = f"s3://{bucket}/{key_prefix}"
-    print(base_path)
     store = from_url(url=base_path, region=region, skip_signature=True)
     return store
 
@@ -27,6 +26,5 @@ def obstore_http(file_url: str) -> ObjectStore:
     parsed = urlparse(file_url)
     key_prefix = os.path.dirname(parsed.path.lstrip("/"))
     base_path = f"{parsed.scheme}://{parsed.netloc}/{key_prefix}"
-    print("wat", base_path)
     store = from_url(url=base_path)
     return store

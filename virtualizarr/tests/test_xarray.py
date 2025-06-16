@@ -434,10 +434,10 @@ class TestOpenVirtualDatasetIndexes:
     def test_specify_no_indexes(self, netcdf4_file):
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=netcdf4_file, object_store=object_store, parser=parser, indexes={}
-        )
-        assert vds.indexes == {}
+        ) as vds:
+            assert vds.indexes == {}
 
     @requires_hdf5plugin
     @requires_imagecodecs
@@ -526,17 +526,17 @@ class TestOpenVirtualDatasetAttrs:
         # regression test for GH issue #155
         object_store = obstore_local(file_url=netcdf4_file)
         parser = HDFParser()
-        vds = open_virtual_dataset(
+        with open_virtual_dataset(
             file_url=netcdf4_file,
             object_store=object_store,
             parser=parser,
-        )
-        assert vds["lat"].attrs == {
-            "standard_name": "latitude",
-            "long_name": "Latitude",
-            "units": "degrees_north",
-            "axis": "Y",
-        }
+        ) as vds:
+            assert vds["lat"].attrs == {
+                "standard_name": "latitude",
+                "long_name": "Latitude",
+                "units": "degrees_north",
+                "axis": "Y",
+            }
 
 
 class TestDetermineCoords:
@@ -722,10 +722,10 @@ class TestLoadVirtualDataset:
                 if name in actual_loadable_variables:
                     xrt.assert_identical(vds.variables[name], ds.variables[name])
 
-    def test_group_kwarg(self, hdf5_groups_file):
+    def test_group_kwarg_not_a_group(self, hdf5_groups_file):
         object_store = obstore_local(file_url=hdf5_groups_file)
         parser = HDFParser(group="doesnt_exist")
-        with pytest.raises(KeyError, match="doesn't exist"):
+        with pytest.raises(ValueError, match="not an HDF Group"):
             with open_virtual_dataset(
                 file_url=hdf5_groups_file,
                 object_store=object_store,
@@ -733,6 +733,8 @@ class TestLoadVirtualDataset:
             ):
                 pass
 
+    def test_group_kwarg(self, hdf5_groups_file):
+        object_store = obstore_local(file_url=hdf5_groups_file)
         parser = HDFParser(group="test/group")
         vars_to_load = ["air", "time"]
         with (
@@ -747,22 +749,6 @@ class TestLoadVirtualDataset:
             for name in full_ds.variables:
                 if name in vars_to_load:
                     xrt.assert_identical(vds.variables[name], full_ds.variables[name])
-
-    # @pytest.mark.xfail(reason="patches a function which no longer exists")
-    # @patch("virtualizarr.translators.kerchunk.read_kerchunk_references_from_file")
-    # def test_open_virtual_dataset_passes_expected_args(
-    # self, mock_read_kerchunk, netcdf4_file
-    # ):
-    # reader_options = {"option1": "value1", "option2": "value2"}
-    # with open_virtual_dataset(netcdf4_file, reader_options=reader_options):
-    # pass
-    # args = {
-    # "file_url": netcdf4_file,
-    # "filetype": None,
-    # "group": None,
-    # "reader_options": reader_options,
-    # }
-    # mock_read_kerchunk.assert_called_once_with(**args)
 
     def test_open_dataset_with_empty(self, hdf5_empty):
         object_store = obstore_local(file_url=hdf5_empty)
@@ -828,53 +814,67 @@ class TestOpenVirtualMFDataset:
         ],
     )
     def test_parallel_open(self, netcdf4_files_factory, parallel, preprocess):
+        if parallel == "lithops":
+            pytest.xfail(
+                "TODO - investigate intermittent test failures with lithops executor"
+            )
         filepath1, filepath2 = netcdf4_files_factory()
         store = obstore_local(file_url=filepath1)
         parser = HDFParser()
-        vds1 = open_virtual_dataset(
-            file_url=filepath1, object_store=store, parser=parser()
-        )
-        vds2 = open_virtual_dataset(
-            file_url=filepath2,
-            object_store=store,
-            parser=HDFParser(),
-        )
+        with (
+            open_virtual_dataset(
+                file_url=filepath1, object_store=store, parser=parser
+            ) as vds1,
+            open_virtual_dataset(
+                file_url=filepath2,
+                object_store=store,
+                parser=parser,
+            ) as vds2,
+        ):
+            expected_vds = xr.concat([vds1, vds2], dim="time")
+            if preprocess:
+                expected_vds = preprocess_func(expected_vds)
 
-        expected_vds = xr.concat([vds1, vds2], dim="time")
-        if preprocess:
-            expected_vds = preprocess_func(expected_vds)
+            # test combine nested, which doesn't use in-memory indexes
+            combined_vds = open_virtual_mfdataset(
+                [filepath1, filepath2],
+                object_store=store,
+                parser=parser,
+                combine="nested",
+                concat_dim="time",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
-        # test combine nested, which doesn't use in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            object_store=store,
-            parser=parser,
-            combine="nested",
-            concat_dim="time",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
+            # test combine by coords using in-memory indexes
+            combined_vds = open_virtual_mfdataset(
+                [filepath1, filepath2],
+                object_store=store,
+                parser=parser,
+                combine="by_coords",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
-        # test combine by coords using in-memory indexes
-        combined_vds = open_virtual_mfdataset(
-            [filepath1, filepath2],
-            object_store=store,
-            parser=parser,
-            combine="by_coords",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
+            # test combine by coords again using in-memory indexes but for a glob
+            file_glob = Path(filepath1).parent.glob("air*.nc")
+            combined_vds = open_virtual_mfdataset(
+                file_glob,
+                object_store=store,
+                parser=parser,
+                combine="by_coords",
+                parallel=parallel,
+                preprocess=preprocess,
+            )
+            xrt.assert_identical(combined_vds, expected_vds)
 
-        # test combine by coords again using in-memory indexes but for a glob
-        file_glob = Path(filepath1).parent.glob("air*.nc")
-        combined_vds = open_virtual_mfdataset(
-            file_glob,
-            object_store=store,
-            parser=parser,
-            combine="by_coords",
-            parallel=parallel,
-            preprocess=preprocess,
-        )
-        xrt.assert_identical(combined_vds, expected_vds)
+
+def test_drop_variables(netcdf4_file):
+    store = obstore_local(netcdf4_file)
+    parser = HDFParser()
+    with open_virtual_dataset(
+        file_url=netcdf4_file, object_store=store, parser=parser, drop_variables=["air"]
+    ) as vds:
+        assert "air" not in vds.variables

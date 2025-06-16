@@ -8,7 +8,8 @@ from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.dmrpp import Parser as DMRPPParser
 from virtualizarr.parsers.fits import Parser as FITSParser
 from virtualizarr.parsers.hdf.hdf import Parser as HDFParser
-from virtualizarr.parsers.kerchunk import Parser as KerchunkParser
+from virtualizarr.parsers.kerchunk_json import Parser as KerchunkJSONParser
+from virtualizarr.parsers.kerchunk_parquet import Parser as KerchunkParquetParser
 from virtualizarr.parsers.netcdf3 import Parser as NetCDF3Parser
 from virtualizarr.parsers.zarr import Parser as ZarrParser
 
@@ -17,7 +18,8 @@ __all__ = [
     "FITSParser",
     "HDFParser",
     "NetCDF3Parser",
-    "KerchunkParser",
+    "KerchunkJSONParser",
+    "KerchunkParquetParser",
     "ZarrParser",
 ]
 
@@ -29,3 +31,21 @@ class Parser(Protocol):
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore: ...
+
+    """
+    Parse the contents of a given file to produce a ManifestStore.
+
+    Effectively maps the contents of the file (e.g. metadata, compression codecs, chunk byte offsets) to the Zarr data model.
+
+    Parameters
+    ----------
+    file_url
+        The URI or path to the input file (e.g., "s3://bucket/file.nc").
+    object_store
+        An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
+
+    Returns
+    -------
+    ManifestStore
+        A ManifestStore which provides a Zarr representation of the parsed file.
+    """

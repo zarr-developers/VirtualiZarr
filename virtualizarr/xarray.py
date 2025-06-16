@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Executor
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Hashable,
     Literal,
-    MutableMapping,
     Optional,
-    Sequence,
     cast,
 )
 
@@ -49,8 +46,6 @@ def open_virtual_dataset(
 ) -> xr.Dataset:
     filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
-    _drop_vars: Iterable[str] = [] if drop_variables is None else list(drop_variables)
-
     manifest_store = parser(
         file_url=filepath,
         object_store=object_store,
@@ -61,14 +56,16 @@ def open_virtual_dataset(
         decode_times=decode_times,
         indexes=indexes,
     )
-    return ds
+    return ds.drop_vars(list(drop_variables or ()))
 
 
 def open_virtual_mfdataset(
-    paths: str
-    | os.PathLike
-    | Sequence[str | os.PathLike]
-    | "NestedSequence[str | os.PathLike]",
+    paths: (
+        str
+        | os.PathLike
+        | Sequence[str | os.PathLike]
+        | NestedSequence[str | os.PathLike]
+    ),
     object_store: ObjectStore,
     parser: Parser,
     concat_dim: (
@@ -85,7 +82,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["dask", "lithops", False] | Executor = False,
+    parallel: Literal["dask", "lithops", False] | type[Executor] = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -118,7 +115,7 @@ def open_virtual_mfdataset(
         Same as in xarray.open_mfdataset
     combine
         Same as in xarray.open_mfdataset
-    parallel : "dask", "lithops", False, or instance of a subclass of ``concurrent.futures.Executor``
+    parallel : "dask", "lithops", False, or type of subclass of ``concurrent.futures.Executor``
         Specify whether the open and preprocess steps of this function will be
         performed in parallel using lithops, dask.delayed, or any executor compatible
         with the ``concurrent.futures`` interface, or in serial.

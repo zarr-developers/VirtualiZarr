@@ -10,7 +10,7 @@ import xarray.testing as xrt
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.tests import (
@@ -21,7 +21,7 @@ from virtualizarr.tests import (
     requires_zarr_python,
 )
 from virtualizarr.tests.utils import obstore_local
-from virtualizarr.translators.kerchunk import manifeststore_from_kerchunk_refs
+from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
@@ -50,10 +50,11 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     ds_refs = vds.virtualize.to_kerchunk(format="dict")
 
     # reconstruct the dataset
-    manifest_store = manifeststore_from_kerchunk_refs(ds_refs)
-    roundtrip = manifest_store.to_virtual_dataset(loadable_variables=[])
+    manifestgroup = manifestgroup_from_kerchunk_refs(ds_refs)
+    manifeststore = ManifestStore(group=manifestgroup)
+    roundtrip = manifeststore.to_virtual_dataset(loadable_variables=[])
 
-    # # Assert equal to original dataset
+    # Assert equal to original dataset
     xrt.assert_equal(roundtrip, vds)
 
 
@@ -246,18 +247,17 @@ class TestRoundtrip:
 
             # use open_dataset_via_kerchunk to read it as references
             parser = HDFParser()
-            store1 = obstore_local(air1_nc_path)
-            store2 = obstore_local(air2_nc_path)
+            store = obstore_local(str(air1_nc_path))
             with (
                 open_virtual_dataset(
                     file_url=air1_nc_path,
-                    object_store=store1,
+                    object_store=store,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds1,
                 open_virtual_dataset(
                     file_url=air2_nc_path,
-                    object_store=store2,
+                    object_store=store,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds2,
@@ -291,7 +291,6 @@ class TestRoundtrip:
                         == ds.time.encoding["calendar"]
                     )
 
-    @pytest.mark.xfail(reason="To fix coordinate behavior with HDF reader")
     def test_non_dimension_coordinates(
         self,
         tmp_path: Path,
@@ -316,10 +315,10 @@ class TestRoundtrip:
 
             roundtrip = roundtrip_func(vds, tmp_path)
 
-            # # assert equal to original dataset
+            # assert equal to original dataset
             xrt.assert_allclose(roundtrip, ds)
 
-            # # assert coordinate attributes are maintained
+            # assert coordinate attributes are maintained
             for coord in ds.coords:
                 assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
@@ -383,21 +382,20 @@ def test_datatree_roundtrip(
         ds1.to_netcdf(air1_nc_path)
         ds2.to_netcdf(air2_nc_path)
 
-        store1 = obstore_local(file_url=air1_nc_path)
-        store2 = obstore_local(file_url=air2_nc_path)
+        store = obstore_local(file_url=air1_nc_path)
         parser = HDFParser()
         # use open_dataset_via_kerchunk to read it as references
         with (
             open_virtual_dataset(
                 file_url=air1_nc_path,
-                object_store=store1,
+                object_store=store,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds1,
             open_virtual_dataset(
                 file_url=air2_nc_path,
-                object_store=store2,
+                object_store=store,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,

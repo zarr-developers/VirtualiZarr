@@ -1,12 +1,10 @@
 import io
-import os
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obstore import open_reader
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
@@ -15,40 +13,62 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.store import ObjectStoreRegistry
+from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
+from virtualizarr.utils import ObstoreReader
 
 
 class Parser:
     def __init__(
         self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
+
+        Parameters
+        ----------
+        group
+            The group within the file to be used as the Zarr root group for the ManifestStore.
+        skip_variables
+            Variables in the file that will be ignored when creating the ManifestStore.
+        """
+
         self.group = group
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
 
     def __call__(
         self,
         file_url: str,
         object_store: ObjectStore,
     ) -> ManifestStore:
-        filepath = validate_and_normalize_path_to_uri(
-            file_url, fs_root=Path.cwd().as_uri()
-        )
+        """
+        Parse the metadata and byte offsets from a given file to product a
+        VirtualiZarr ManifestStore.
 
-        filename = os.path.basename(filepath)
-        reader = open_reader(store=object_store, path=filename)
-        file_bytes = reader.read().to_bytes()
+        Parameters
+        ----------
+        file_url
+            The URI or path to the input file (e.g., "s3://bucket/file.dmrpp").
+        object_store
+            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
+
+        Returns
+        -------
+        ManifestStore
+            A ManifestStore that provides a Zarr representation of the parsed file.
+        """
+        reader = ObstoreReader(store=object_store, path=file_url)
+        file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 
         parser = DMRParser(
             root=ET.parse(stream).getroot(),
-            data_filepath=filepath.removesuffix(".dmrpp"),
-            drop_variables=self.drop_variables,
+            data_filepath=file_url.removesuffix(".dmrpp"),
+            skip_variables=self.skip_variables,
         )
         manifest_store = parser.parse_dataset(
             object_store=object_store, group=self.group
@@ -98,17 +118,17 @@ class DMRParser:
     def __init__(
         self,
         root: ET.Element,
-        data_filepath: Optional[str] = None,
-        drop_variables: Optional[Iterable[str]] = None,
+        data_filepath: str | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
         """
         Initialize the DMRParser with the given DMR++ file contents and source data file path.
 
         Parameters
         ----------
-        root: xml.ElementTree.Element
+        root
             Root of the xml tree structure of a DMR++ file.
-        data_filepath : str, optional
+        data_filepath
             The path to the actual data file that will be set in the chunk manifests.
             If None, the data file path is taken from the DMR++ file.
         """
@@ -116,50 +136,54 @@ class DMRParser:
         self.data_filepath = (
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
-        self.drop_variables = drop_variables if drop_variables is not None else []
+        self.skip_variables = skip_variables or ()
 
     def parse_dataset(
         self,
         object_store: ObjectStore,
-        group=None,
+        group: str | None = None,
     ) -> ManifestStore:
         """
         Parses the given file and creates a ManifestStore.
 
         Parameters
         ----------
-        group : str
-            The group to parse. If None, and no groups are present, the dataset is parsed.
-            If None and groups are present, the first group is parsed.
+        group
+            The group to parse. Ignored if no groups are present, and the entire
+            dataset is parsed. If `None` or "/", and groups are present, the first group
+            is parsed.  If not `None` or "/", and no groups are present, a UserWarning
+            is issued indicating that the group will be ignored.
 
         Returns
         -------
-        A ManifestStore
+        ManifestStore
 
         Examples
         --------
         Open a sample DMR++ file and parse the dataset
         """
-        group_tags = self.root.findall("dap:Group", self._NS)
-        if group is not None:
-            group = Path(group)
-            if not group.is_absolute():
-                group = Path("/") / group
-            if len(group_tags) == 0:
-                warnings.warn("No groups found in DMR++ file; ignoring group parameter")
-            else:
-                all_groups = self._split_groups(self.root)
-                if group in all_groups:
-                    manifest_group = self._parse_dataset(
-                        all_groups[group],
-                    )
-                else:
-                    raise ValueError(f"Group {group} not found in DMR++ file")
-        else:
-            manifest_group = self._parse_dataset(
-                self.root,
+        group = group or "/"
+        ngroups = len(self.root.findall("dap:Group", self._NS))
+
+        if ngroups == 0 and group != "/":
+            warnings.warn(
+                f"No groups in DMR++ file {self.data_filepath!r}; "
+                f"ignoring group parameter {group!r}"
             )
-        registry = ObjectStoreRegistry({self.data_filepath: object_store})
+
+        group_path = Path("/") if ngroups == 0 else Path("/") / group.removeprefix("/")
+        dataset_element = self._split_groups(self.root).get(group_path)
+
+        if dataset_element is None:
+            raise ValueError(
+                f"Group {group_path} not found in DMR++ file {self.data_filepath!r}"
+            )
+
+        manifest_group = self._parse_dataset(dataset_element)
+        registry = ObjectStoreRegistry(
+            {get_store_prefix(self.data_filepath): object_store}
+        )
+
         return ManifestStore(store_registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
@@ -167,12 +191,13 @@ class DMRParser:
         Find the element in the root element by converting the fully qualified name to an xpath query.
 
         E.g. fqn = "/a/b" --> root.find("./*[@name='a']/*[@name='b']")
+
         See more about OPeNDAP fully qualified names (FQN) here: https://docs.opendap.org/index.php/DAP4:_Specification_Volume_1#Fully_Qualified_Names
 
         Parameters
         ----------
-        fqn : str
-            The fully qualified name of an element. E.g. "/a/b"
+        fqn
+            The fully qualified name of an element. For example, "/a/b".
 
         Returns
         -------
@@ -186,12 +211,14 @@ class DMRParser:
         """
         if fqn == "/":
             return self.root
+
         elements = fqn.strip("/").split("/")  # /a/b/ --> ['a', 'b']
         xpath_segments = [f"*[@name='{element}']" for element in elements]
-        xpath_query = "./" + "/".join(xpath_segments)  # "./[*[@name='a']/*[@name='b']"
-        element = self.root.find(xpath_query, self._NS)
-        if element is None:
+        xpath_query = "/".join([".", *xpath_segments])  # "./[*[@name='a']/*[@name='b']"
+
+        if (element := self.root.find(xpath_query, self._NS)) is None:
             raise ValueError(f"Path {fqn} not found in provided root")
+
         return element
 
     def _split_groups(self, root: ET.Element) -> dict[Path, ET.Element]:
@@ -251,7 +278,7 @@ class DMRParser:
 
         manifest_dict: dict[str, ManifestArray] = {}
         for var_tag in self._find_var_tags(root):
-            if var_tag.attrib["name"] not in self.drop_variables:
+            if var_tag.attrib["name"] not in self.skip_variables:
                 variable = self._parse_variable(var_tag)
                 manifest_dict[var_tag.attrib["name"]] = variable
 

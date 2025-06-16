@@ -30,7 +30,7 @@ class ObstoreReader:
         import obstore as obs
 
         parsed = urlparse(path)
-        if store.prefix:
+        if hasattr(store, "prefix") and store.prefix:
             filepath = os.path.basename(parsed.path)
         else:
             filepath = parsed.path
@@ -39,6 +39,9 @@ class ObstoreReader:
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
+
+    def readall(self) -> bytes:
+        return self._reader.read().to_bytes()
 
     def seek(self, offset: int, whence: int = 0, /):
         # TODO: Check on default for whence
@@ -110,9 +113,9 @@ def convert_v3_to_v2_metadata(
 
     Parameters
     ----------
-    v3_metadata : ArrayV3Metadata
+    v3_metadata
         The metadata object in v3 format.
-    fill_value : Any, optional
+    fill_value
         Override the fill value from v3 metadata.
 
     Returns

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from pathlib import Path  # noqa
 from typing import (
     Any,
     Hashable,
-    Iterable,
-    Union,
 )
 from urllib.parse import urlparse
 
@@ -20,8 +19,10 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
+    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
+from virtualizarr.manifests.store import get_store_prefix
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None
@@ -112,7 +113,7 @@ async def _construct_manifest_group(
     filepath: str,
     store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
     *,
-    drop_variables: str | Iterable[str] | None = None,
+    skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ):
     zarr_group = await open_group_async(
@@ -123,7 +124,7 @@ async def _construct_manifest_group(
 
     zarr_array_keys = [key async for key in zarr_group.array_keys()]
 
-    _drop_vars: list[Hashable] = [] if drop_variables is None else list(drop_variables)
+    _drop_vars: list[Hashable] = [] if skip_variables is None else list(skip_variables)
 
     zarr_arrays = await asyncio.gather(
         *[zarr_group.getitem(var) for var in zarr_array_keys if var not in _drop_vars]
@@ -142,54 +143,71 @@ async def _construct_manifest_group(
     return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
-def _construct_manifest_store(
-    filepath: str,
-    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
-    drop_variables: str | Iterable[str] | None = None,
-    group: str | None = None,
-) -> ManifestStore:
-    import asyncio
-
-    manifest_group = asyncio.run(
-        _construct_manifest_group(
-            store=store,
-            filepath=filepath,
-            group=group,
-            drop_variables=drop_variables,
-        )
-    )
-    return ManifestStore(manifest_group)
-
-
 class Parser:
     def __init__(
         self,
         group: str | None = None,
-        drop_variables: Iterable[str] | None = None,
+        skip_variables: Iterable[str] | None = None,
     ):
+        """
+        Instantiate a parser with parser-specific parameters that can be used in the
+        `__call__` method.
+
+        Parameters
+        ----------
+        group
+            The group within the file to be used as the Zarr root group for the
+            ManifestStore (default: the file's root group).
+        skip_variables
+            Variables in the file that will be ignored when creating the ManifestStore
+            (default: `None`, do not ignore any variables).
+        """
+
         self.group = group
-        self.drop_variables = drop_variables
+        self.skip_variables = skip_variables
 
     def __call__(
         self,
         file_url: str,
         object_store: obstore.store.ObjectStore,
     ) -> ManifestStore:
+        """
+        Parse the metadata and byte offsets from a given Zarr store to product a VirtualiZarr ManifestStore.
+
+        Parameters
+        ----------
+        file_url
+            The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
+        object_store
+            An obstore ObjectStore instance for accessing the directory specified in the
+            `file_url` parameter.
+
+        Returns
+        -------
+        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        """
+
         filepath = validate_and_normalize_path_to_uri(
             file_url, fs_root=Path.cwd().as_uri()
         )
+        import asyncio
+
         # Temporary handling of local paths with Zarr LocalStore
         # until zarr-python adopts obstore LocalStore
-        store: Union[zarr.storage.LocalStore, zarr.storage.ObjectStore]
+        zarr_store: zarr.storage.LocalStore | zarr.storage.ObjectStore
         if isinstance(object_store, obstore.store.LocalStore):
             parsed = urlparse(filepath)
-            store = zarr.storage.LocalStore(parsed.path)
+            zarr_store = zarr.storage.LocalStore(parsed.path)
         else:
-            store = zarr.storage.ObjectStore(store=object_store)
-        manifest_store = _construct_manifest_store(
-            store=store,
-            filepath=filepath,
-            group=self.group,
-            drop_variables=self.drop_variables,
+            zarr_store = zarr.storage.ObjectStore(store=object_store)
+        manifest_group = asyncio.run(
+            _construct_manifest_group(
+                store=zarr_store,
+                filepath=file_url,
+                group=self.group,
+                skip_variables=self.skip_variables,
+            )
         )
-        return manifest_store
+        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
+
+        return ManifestStore(store_registry=registry, group=manifest_group)

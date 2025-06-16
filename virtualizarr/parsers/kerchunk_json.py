@@ -1,20 +1,21 @@
 from collections.abc import Iterable
-from pathlib import Path
 
+import ujson
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
-from virtualizarr.types.kerchunk import KerchunkStoreRefs
+from virtualizarr.utils import ObstoreReader
 
 
 class Parser:
     def __init__(
         self,
         group: str | None = None,
+        fs_root: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        remote_options: dict | None = None,
+        store_registry: ObjectStoreRegistry | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the
@@ -24,15 +25,19 @@ class Parser:
         ----------
         group
             The group within the file to be used as the Zarr root group for the ManifestStore.
+        fs_root
+            The qualifier to be used for kerchunk references containing relative paths.
         skip_variables
             Variables in the file that will be ignored when creating the ManifestStore.
-        remote_options
-            Configuration options used internally for the kerchunk's fsspec backend
+        store_registry
+            A user defined ObjectStoreRegistry to be used for reading data for kerchunk
+            references contain paths to multiple locations.
         """
 
         self.group = group
+        self.fs_root = fs_root
         self.skip_variables = skip_variables
-        self.remote_options = remote_options or {}
+        self.store_registry = store_registry
 
     def __call__(
         self,
@@ -40,12 +45,13 @@ class Parser:
         object_store: ObjectStore,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a VirtualiZarr ManifestStore.
+        Parse the metadata and byte offsets from a given file to product a
+        VirtualiZarr ManifestStore.
 
         Parameters
         ----------
         file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.tiff").
+            The URI or path to the input file (e.g., "s3://bucket/kerchunk.json").
         object_store
             An obstore ObjectStore instance for accessing the file specified in the
             `file_url` parameter.
@@ -53,23 +59,30 @@ class Parser:
         Returns
         -------
         ManifestStore
-            A ManifestStore which provides a Zarr representation of the parsed file.
+            A ManifestStore that provides a Zarr representation of the parsed file.
         """
 
-        from kerchunk.tiff import tiff_to_zarr
+        reader = ObstoreReader(store=object_store, path=file_url)
 
-        # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs(
-            {"refs": tiff_to_zarr(file_url, **self.remote_options)}
-        )
-
+        reader.seek(0)
+        content = reader.readall().decode()
+        refs = ujson.loads(content)
+        if self.store_registry is None:
+            unique_paths = {
+                v[0]
+                for v in refs["refs"].values()
+                if isinstance(v, list) and isinstance(v[0], str)
+            }
+            stores = {}
+            for path in unique_paths:
+                stores[get_store_prefix(path)] = object_store
+            registry = ObjectStoreRegistry(stores=stores)
+        else:
+            registry = self.store_registry
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,
+            fs_root=self.fs_root,
             skip_variables=self.skip_variables,
-            fs_root=Path.cwd().as_uri(),
         )
-
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
-
         return ManifestStore(group=manifestgroup, store_registry=registry)
