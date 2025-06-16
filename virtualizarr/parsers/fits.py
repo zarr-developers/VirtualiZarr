@@ -40,8 +40,7 @@ class FITSParser:
         object_store: ObjectStore,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a
-        VirtualiZarr ManifestStore.
+        Parse the contents of a FITS file to produce a ManifestStore.
 
         Parameters
         ----------
