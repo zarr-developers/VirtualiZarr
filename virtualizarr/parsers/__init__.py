@@ -38,10 +38,10 @@ class Parser(Protocol):
 
     Parameters
     ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.nc").
-        object_store
-            An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
+    file_url
+        The URI or path to the input file (e.g., "s3://bucket/file.nc").
+    object_store
+        An obstore ObjectStore instance for accessing the file specified in the `file_url` parameter.
 
     Returns
     -------
