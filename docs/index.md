@@ -30,48 +30,30 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
-```python exec="on" session="intro"
-import xarray as xr
-import warnings
-warnings.filterwarnings("ignore",
-                       message="Numcodecs codecs are not in the Zarr version 3 specification*",
-                       category=UserWarning)
-xr.set_options(display_style="html")
-```
-
-```python exec="on" source="above" session="intro" html="true"
-from urllib.parse import urlparse
-
-import obstore as obs
-import xarray as xr
-
+```python
 from virtualizarr import open_virtual_dataset
-from virtualizarr.parsers import HDFParser
 
-file_urls = [
-    "s3://smn-ar-wrf/DATA/WRF/DET/2022/12/31/12/WRFDETAR_01H_20221231_12_000.nc",
-    "s3://smn-ar-wrf/DATA/WRF/DET/2022/12/31/12/WRFDETAR_01H_20221231_12_001.nc",
-]
-
-parsed = urlparse(file_urls[0])
-s3store = obs.store.S3Store(
-    bucket=parsed.netloc,
-    client_options={"allow_http": True},
-    skip_signature=True,
-    virtual_hosted_style_request=False,
-    region="us-west-2",
-)
 virtual_datasets = [
-    open_virtual_dataset(file_url=url, parser=HDFParser(), object_store=s3store)
-    for url in file_urls
+    open_virtual_dataset(filepath)
+    for filepath in glob.glob('/my/files*.nc')
 ]
 
-# TODO: Requires fix to https://github.com/zarr-developers/VirtualiZarr/issues/596
-# virtual_ds = xr.concat(virtual_datasets, dim='time', coords='minimal', compat='override')
-# print(repr(virtual_ds))
+# this Dataset wraps a bunch of virtual ManifestArray objects directly
+virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
+
+# cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
+virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
 ```
 
-See the [Usage docs page](#usage) for more details.
+Now you can open your shiny new Zarr store instantly:
+
+```python
+ds = xr.open_dataset('combined.json', engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
+```
+
+No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
+
+See the [Usage docs page](usage.md) for more details.
 
 ## Talks and Presentations
 
