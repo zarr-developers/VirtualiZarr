@@ -205,7 +205,7 @@ class VirtualiZarrDatasetAccessor:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> ds.virtualize.rename_paths(local_to_s3_url)
         """
 
