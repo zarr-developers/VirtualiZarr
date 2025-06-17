@@ -99,11 +99,12 @@ upstream = [
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
 ]
 docs = [
-  "mkdocs-material[imaging]>=9.6.14",
-  "mkdocs>=1.6.1",
-  "mkdocstrings>=0.29.1",
-  "mkdocstrings-python>=1.16.10",
-  "markdown-exec[ansi]",
+    "mkdocs-material[imaging]>=9.6.14",
+    "mkdocs>=1.6.1",
+    "mkdocstrings>=0.29.1",
+    "mkdocstrings-python>=1.16.10",
+    "markdown-exec[ansi]",
+    "ruff",
 ]
 dev = [
     "codecov",
