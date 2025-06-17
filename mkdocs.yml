@@ -22,7 +22,6 @@ nav:
   - Explanation:
     - "data_structures.md"
     - "custom_readers.md"
-    - "migration_guide.md"
     - "faq.md"
   - Reference:
     - "api.md"
