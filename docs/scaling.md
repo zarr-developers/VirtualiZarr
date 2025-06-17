@@ -197,7 +197,11 @@ The Kerchunk Parquet format is more scalable, but you may want to experiment wit
 
 ### Icechunk
 
-TODO
+[Icechunk](https://icechunk.io/) uses it's own [open format](https://icechunk.io/en/latest/spec/) for persisting virtual references.
+
+Icechunk's format stores the virtual references in dedicated binary files, and can use "manifest splitting", together meaning that it should be a scalable way to store large numbers of references.
+
+TODO: Put numbers on this by testing at large scale once manifest splitting is actually released in Icechunk.
 
 ## Tips for success
 
