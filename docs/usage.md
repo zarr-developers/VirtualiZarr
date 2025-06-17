@@ -95,7 +95,7 @@ vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_
 
 Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory.
 Instead, you could load specific variables during virtual dataset creation using the regular syntax of `xr.open_dataset`.
-Loading the variables during virtual dataset creation has several benefits detailed in the [FAQ](faq.md#why-would-i-want-to-load-variables-using-loadable-variables).
+Loading the variables during virtual dataset creation has several benefits detailed in the [FAQ](faq.md#why-would-i-want-to-load-variables-using-loadable_variables).
 
 You can use the `loadable_variables` argument to specify variables to load as regular variables rather than virtual variables:
 
