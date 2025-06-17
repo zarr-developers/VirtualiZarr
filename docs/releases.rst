@@ -9,9 +9,12 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
+- Added a pluggable system of "parsers" for generating virtual references from different filetypes.
+  These follow the :py:class:`virtualizarr.parsers.typing.Parser` typing protocol, and return :py:class:`ManifestStore` objects wrapping obstore stores.
+  (:issue:`498`, :pull:`601`)
 - Adds a Zarr parser to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
-  (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
-- Added experimental ManifestStore (:pull:`490`).
+  (:pull:`271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
+- Added ManifestStore (:pull:`490`).
 - Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
@@ -26,6 +29,7 @@ New Features
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
+- As :py:func:`open_virtual_dataset` now uses parsers, it's API has changed. (:pull:`601`)
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
   name matches the name of their only dimension (also known as "dimension coordinates").
