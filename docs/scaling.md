@@ -157,6 +157,7 @@ class CustomExecutor(Executor):
         fn: Callable,
         *iterables: Iterable,
     ) -> Iterator:
+        ...
 
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=CustomExecutor)
 ```
