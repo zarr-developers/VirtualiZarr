@@ -189,8 +189,10 @@ class VirtualiZarrDatasetAccessor:
 
         See Also
         --------
-        ManifestArray.rename_paths
-        ChunkManifest.rename_paths
+
+        virtualizarr.ManifestArray.rename_paths
+
+        virtualizarr.ChunkManifest.rename_paths
 
         Examples
         --------

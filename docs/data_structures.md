@@ -38,12 +38,12 @@ manifest.dict()
 
 In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
 
-The [virtualizarr.manifests.ChunkManifest][] class is virtualizarr's internal in-memory representation of this manifest.
+The [virtualizarr.ChunkManifest][] class is virtualizarr's internal in-memory representation of this manifest.
 
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.
-The [virtualizarr.manifests.ManifestArray][] class stores both the array-level attributes and the corresponding chunk manifest.
+The [virtualizarr.ManifestArray][] class stores both the array-level attributes and the corresponding chunk manifest.
 
 ```python
 marr
