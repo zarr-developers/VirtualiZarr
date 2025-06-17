@@ -221,7 +221,6 @@ class TestOpenVirtualDataset:
         ) as vds:
             assert set(vds.coords) == {"lat", "lon"}
 
-    @pytest.mark.xfail(reason="Requires Zarr v3 big endian dtype support")
     def test_big_endian(
         self,
         big_endian_dtype_hdf5_file,
