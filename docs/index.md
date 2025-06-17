@@ -30,7 +30,7 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 Creating the virtual store looks very similar to how we normally open data with xarray:
 
-```python exec="false" session="intro"
+```python exec="on" session="intro"
 import xarray as xr
 import warnings
 warnings.filterwarnings("ignore",
@@ -39,14 +39,14 @@ warnings.filterwarnings("ignore",
 xr.set_options(display_style="html")
 ```
 
-```python exec="false" source="above" session="intro" html="true"
+```python exec="on" source="above" session="intro" html="true"
 from urllib.parse import urlparse
 
 import obstore as obs
 import xarray as xr
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.parsers.hdf.hdf import Parser as HDFParser
+from virtualizarr.parsers import HDFParser
 
 file_urls = [
     "s3://smn-ar-wrf/DATA/WRF/DET/2022/12/31/12/WRFDETAR_01H_20221231_12_000.nc",
@@ -66,8 +66,9 @@ virtual_datasets = [
     for url in file_urls
 ]
 
-virtual_ds = xr.concat(virtual_datasets, dim='time', coords='minimal', compat='override')
-print(repr(virtual_ds))
+# TODO: Requires fix to https://github.com/zarr-developers/VirtualiZarr/issues/596
+# virtual_ds = xr.concat(virtual_datasets, dim='time', coords='minimal', compat='override')
+# print(repr(virtual_ds))
 ```
 
 See the [Usage docs page](#usage) for more details.
