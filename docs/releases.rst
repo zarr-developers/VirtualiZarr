@@ -9,7 +9,7 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-- Adds a Zarr reader to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
+- Adds a Zarr parser to ``open_virtual_dataset``, which allows opening Zarr V3 stores as virtual datasets.
   (:pull:`#271`) By `Raphael Hagen <https://github.com/norlandrhagen>`_.
 - Added experimental ManifestStore (:pull:`490`).
 - Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
@@ -50,7 +50,7 @@ Bug fixes
 Documentation
 ~~~~~~~~~~~~~
 
-- Added new docs page on how to write a custom reader for bespoke file formats (:issue:`452`, :pull:`580`)
+- Added new docs page on how to write a custom parser for bespoke file formats (:issue:`452`, :pull:`580`)
   By `Tom Nicholas <https://github.com/TomNicholas>`_.
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
@@ -66,7 +66,7 @@ Internal Changes
     - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
     - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
       - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see `parse_named_configuration <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130>`_) to valid Zarr V3 codec classes.
-    - Reader changes are minimal.
+    - parser changes are minimal.
     - Writer changes:
       - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
     - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).

@@ -86,7 +86,7 @@ _The only use case for a virtual dataset is [combining references](#combining-vi
 
 ### Opening remote files
 
-To open remote files as virtual datasets pass the `reader_options` options, e.g.
+To open remote files as virtual datasets pass the `parser_options` options, e.g.
 
 ```python
 aws_credentials = {"key": ..., "secret": ...}

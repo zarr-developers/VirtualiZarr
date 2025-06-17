@@ -29,10 +29,10 @@ The full list of optional dependencies can be seen in the `pyproject.toml` file:
 :end-before: "# Dependency sets under dependencies-groups are NOT available via PyPI"
 ```
 
-The compound groups allow you to install multiple sets of dependencies at once, e.g. install every file reader via
+The compound groups allow you to install multiple sets of dependencies at once, e.g. install every file parser via
 
 ```shell
-pip install "virtualizarr[all_readers]"
+pip install "virtualizarr[all_parsers]"
 ```
 
 The basic `pip install virtualizarr` will only install the minimal required dependencies, and so may not be particularly useful on its own.

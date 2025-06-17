@@ -73,7 +73,7 @@ Rewriting
 Developer API
 =============
 
-If you want to write a new reader to create virtual references pointing to a custom file format, you will need to use VirtualiZarr's internal classes.
+If you want to write a new parser to create virtual references pointing to a custom file format, you will need to use VirtualiZarr's internal classes.
 See the page on custom parsers for more information.
 
 Manifests
