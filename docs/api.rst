@@ -20,6 +20,24 @@ Reading
 
     open_virtual_dataset
 
+Parsers
+-------
+
+Each parser understands how to read a specific file format, and one parser must be passed to :py:func:`~virtualizarr.open_virtual_dataset`
+
+.. currentmodule:: virtualizarr.parsers
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    DMRPPParser
+    FITSParser
+    HDFParser
+    NetCDF3Parser
+    KerchunkJSONParser
+    KerchunkParquetParser
+    ZarrParser
+
 Serialization
 -------------
 
@@ -56,11 +74,13 @@ Developer API
 =============
 
 If you want to write a new reader to create virtual references pointing to a custom file format, you will need to use VirtualiZarr's internal classes.
+See the page on custom parsers for more information.
 
 Manifests
 ---------
 
 VirtualiZarr uses these classes to store virtual references internally.
+See the page on data structures for more information.
 
 .. currentmodule:: virtualizarr.manifests
 .. autosummary::
@@ -69,7 +89,8 @@ VirtualiZarr uses these classes to store virtual references internally.
 
     ChunkManifest
     ManifestArray
-
+    ManifestGroup
+    ManifestStore
 
 Array API
 ---------
@@ -85,3 +106,15 @@ VirtualiZarr's :py:class:`~virtualizarr.ManifestArray` objects support a limited
     stack
     expand_dims
     broadcast_to
+
+Parser typing protocol
+----------------------
+
+All custom parsers must follow the :py:class:`~virtualizarr.parsers.typing.Parser` typing protocol.
+
+.. currentmodule:: virtualizarr.parsers.typing
+.. autosummary::
+    :nosignatures:
+    :toctree: generated/
+
+    Parser
