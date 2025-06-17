@@ -23,6 +23,26 @@ If you attempt to use virtualizarr to create virtual references for data which v
 
 Sometimes you can get around some of these restrictions for specific variables by loading them into memory instead of virtualizing them - see the section in the usage docs about loadable variables.
 
+### Which files formats are supported?
+
+Currently only a small number of filetypes are supported. They are:
+
+- netCDF4/HDF5
+- netCDF3
+- "Native" Zarr v3
+- FITS
+- DMR++
+- Kerchunk JSON / Parquet
+
+Planned but not yet supported are:
+- "Native" Zarr v2
+- TIFF (including COGeoTIFF)
+- GRIB
+- JPEG
+- SafeTensors
+
+You can also write your own custom reader for another file format.
+
 ### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
 Potentially yes.
