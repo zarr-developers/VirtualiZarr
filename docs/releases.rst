@@ -9,30 +9,8 @@ v1.3.3 (unreleased)
 New Features
 ~~~~~~~~~~~~
 
-- Added experimental ManifestStore (:pull:`490`).
-- Added :py:meth:`ManifestStore.to_virtual_dataset()` method (:pull:`522`).
-  By `Tom Nicholas <https://github.com/TomNicholas>`_.
-- Added experimental :py:func:`open_virtual_mfdataset` function (:issue:`345`, :pull:`349`).
-  By `Tom Nicholas <https://github.com/TomNicholas>`_.
-- Added :py:func:`datatree_to_icechunk` function for writing an ``xarray.DataTree`` to
-  an Icechunk store (:issue:`244`).  By `Chuck Daniels <https://github.com/chuckwondo>`_.
-- Added a ``.virtualize`` custom accessor to ``xarray.DataTree``, exposing the method
-  :py:meth:`xarray.DataTree.virtualize.to_icechunk()` for writing an ``xarray.DataTree``
-  to an Icechunk store (:issue:`244`).  By
-  `Chuck Daniels <https://github.com/chuckwondo>`_.
-
 Breaking changes
 ~~~~~~~~~~~~~~~~
-
-- Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
-  same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
-  name matches the name of their only dimension (also known as "dimension coordinates").
-  Pandas indexes will also now be created by default for these loadable variables.
-  This is intended to provide a more friendly default, as often you will want these small variables to be loaded
-  (or "inlined", for efficiency of storage in icechunk/kerchunk), and you will also want to have in-memory indexes for these variables
-  (to allow `xarray.combine_by_coords` to sort using them).
-  The old behaviour is equivalent to passing ``loadable_variables=[]`` and ``indexes={}``.
-  (:issue:`335`, :pull:`477`) by `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Deprecations
 ~~~~~~~~~~~~
@@ -40,34 +18,14 @@ Deprecations
 Bug fixes
 ~~~~~~~~~
 
-- Fixed bug causing ManifestArrays to compare as not equal when they were actually identical (:issue:`501`, :pull:`502`)
-  By `Tom Nicholas <https://github.com/TomNicholas>`_.
-
 Documentation
 ~~~~~~~~~~~~~
 
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   (:pull:`475`) by `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_.
-- Added FAQ answer about what data can be virtualized (:issue:`430`, :pull:`532`)
-  By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
-
-- `ManifestArrays` now internally use `zarr.core.metadata.v3.ArrayV3Metadata <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/metadata/v3.py>`_. This replaces the `ZArray` class that was previously used to store metadata about manifest arrays. (:pull:`429`) By `Aimee Barciauskas <https://github.com/abarciauskas-bgse>`_. Notable internal changes:
-    - Make zarr-python a required dependency with a minimum version `>=3.0.2`.
-    - Specify a minimum numcodecs version of `>=0.15.1`.
-    - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
-    - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
-      - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see `parse_named_configuration <https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130>`_) to valid Zarr V3 codec classes.
-    - Reader changes are minimal.
-    - Writer changes:
-      - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
-    - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported (`zarr-python issue #2324 <https://github.com/zarr-developers/zarr-python/issues/2324>`_).
-    - zarr-python 3.0 does not yet support datetime and timedelta data types (`zarr-python issue #2616 <https://github.com/zarr-developers/zarr-python/issues/2616>`_).
-- The continuous integration workflows and developer environment now use `pixi <https://pixi.sh/latest/>`_ (:pull:`407`).
-- Added `loadable_variables` kwarg to :py:meth:`ManifestStore.to_virtual_dataset`.
-  (:pull:`543`) By `Tom Nicholas <https://github.com/TomNicholas>`_.
 
 .. _v1.3.2:
 

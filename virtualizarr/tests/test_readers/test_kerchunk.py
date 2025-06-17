@@ -73,11 +73,10 @@ def test_dataset_from_df_refs(refs_file_factory):
     assert vda.chunks == (2, 3)
     assert vda.dtype == np.dtype("<i8")
 
-    assert vda.data.metadata.codecs[0].to_dict() == {
-        "configuration": {"endian": "little"},
-        "name": "bytes",
-    }
-    assert vda.data.metadata.fill_value == 0
+    assert vda.data.zarray.compressor is None
+    assert vda.data.zarray.filters is None
+    assert vda.data.zarray.fill_value == 0
+    assert vda.data.zarray.order == "C"
 
     assert vda.data.manifest.dict() == {
         "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
@@ -85,13 +84,13 @@ def test_dataset_from_df_refs(refs_file_factory):
 
 
 def test_dataset_from_df_refs_with_filters(refs_file_factory):
-    compressor = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
+    filters = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
-        "compressor": compressor,
+        "compressor": None,
         "dtype": "<i8",
         "fill_value": None,
-        "filters": None,
+        "filters": filters,
         "order": "C",
         "shape": [2, 3],
         "zarr_format": 2,
@@ -101,10 +100,7 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
     vds = open_virtual_dataset(refs_file, filetype="kerchunk")
 
     vda = vds["a"]
-    assert vda.data.metadata.codecs[1].to_dict() == {
-        "name": "numcodecs.shuffle",
-        "configuration": {"elementsize": 4},
-    }
+    assert vda.data.zarray.filters == filters
 
 
 def test_empty_chunk_manifest(refs_file_factory):
@@ -198,8 +194,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
         with pytest.raises(ValueError):
             open_virtual_dataset(
-                filepath=ref_filepath.as_posix(),
-                filetype="kerchunk",
+                filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
             )
 
     else:
@@ -220,11 +215,10 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
 
         vds = open_virtual_dataset(
-            filepath=ref_filepath.as_posix(),
-            filetype="kerchunk",
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
 
-        # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
+        # Inconsistent results! https://github.com/TomNicholas/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
         refs = vds.virtualize.to_kerchunk(format="dict")
         expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
@@ -250,13 +244,9 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     with open(ref_filepath, "w") as json_file:
         ujson.dump(netcdf4_inlined_ref, json_file)
 
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
+    with pytest.raises(NotImplementedError):
         open_virtual_dataset(
-            filepath=ref_filepath.as_posix(),
-            filetype="kerchunk",
+            filepath=ref_filepath.as_posix(), filetype="kerchunk", indexes={}
         )
 
 

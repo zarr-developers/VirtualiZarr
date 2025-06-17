@@ -34,9 +34,6 @@ class TestFilterToCodec:
         assert isinstance(codec, imagecodecs.numcodecs.Lzf)
 
     def test_blosc(self):
-        import numcodecs
-        from packaging import version
-
         codec = _filter_to_codec("32001", (2, 2, 8, 800, 9, 2, 1))
         assert isinstance(codec, numcodecs.blosc.Blosc)
         expected_config = {
@@ -46,8 +43,6 @@ class TestFilterToCodec:
             "shuffle": 2,
             "cname": "lz4",
         }
-        if version.parse(numcodecs.__version__) > version.parse("0.15.1"):
-            expected_config["typesize"] = None
         assert codec.get_config() == expected_config
 
     def test_zstd(self):

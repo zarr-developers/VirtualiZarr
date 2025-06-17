@@ -2,8 +2,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
-import xarray as xr
+from xarray import Dataset
 from xarray.backends.zarr import encode_zarr_attr_value
+from xarray.core.variable import Variable
 
 from virtualizarr.codecs import get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -15,6 +16,7 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
+from virtualizarr.zarr import encode_dtype
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
 
 
 def dataset_to_icechunk(
-    ds: xr.Dataset,
+    ds: Dataset,
     store: "IcechunkStore",
     *,
     group: Optional[str] = None,
@@ -117,81 +119,6 @@ def dataset_to_icechunk(
     )
 
 
-def datatree_to_icechunk(
-    dt: xr.DataTree,
-    store: "IcechunkStore",
-    *,
-    write_inherited_coords: bool = False,
-    last_updated_at: datetime | None = None,
-) -> None:
-    """
-    Write an xarray dataset to an Icechunk store.
-
-    Both `icechunk` and `zarr` (v3) must be installed.
-
-    Parameters
-    ----------
-    dt: xr.DataTree
-        DataTree to write to an Icechunk store. All variables must be backed by
-        ManifestArray objects.
-    store: IcechunkStore
-        Store to write the dataset to, which must not be read-only.
-    write_inherited_coords : bool, default: False
-        If ``True``, replicate inherited coordinates on all descendant nodes of the
-        tree. Otherwise, only write coordinates at the level at which they are
-        originally defined. This saves disk space, but requires opening the
-        full tree to load inherited coordinates.
-    last_updated_at: datetime, optional
-        The time at which the virtual dataset was last updated. When specified, if any
-        of the virtual chunks written in this session are modified in storage after this
-        time, icechunk will raise an error at runtime when trying to read the virtual
-        chunk. When not specified, icechunk will not check for modifications to the
-        virtual chunks at runtime.
-
-    Raises
-    ------
-    ValueError
-        If the store is read-only.
-    """
-    try:
-        from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr import Group  # type: ignore[import-untyped]
-        from zarr.storage import StorePath  # type: ignore[import-untyped]
-    except ImportError:
-        raise ImportError(
-            "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
-        ) from None
-
-    if not isinstance(store, IcechunkStore):
-        raise TypeError(
-            f"store: expected type IcechunkStore, but got type {type(store)}"
-        )
-
-    if not isinstance(last_updated_at, (type(None), datetime)):
-        raise TypeError(
-            "last_updated_at: expected type datetime,"
-            f" but got type {type(last_updated_at)}"
-        )
-
-    if store.read_only:
-        raise ValueError("supplied store is read-only")
-
-    for path, subtree in dt.subtree_with_keys:
-        tree = cast(xr.DataTree, subtree)  # subtree is typed as Unknown
-        at_root = tree is dt
-        ds = tree.to_dataset(write_inherited_coords or at_root)
-        store_path = StorePath(store, path="" if at_root else tree.relative_to(dt))
-        group = Group.from_store(store=store_path, zarr_format=3)
-
-        write_variables_to_icechunk_group(
-            ds.variables,
-            ds.attrs,
-            store=store,
-            group=group,
-            last_updated_at=last_updated_at,
-        )
-
-
 def write_variables_to_icechunk_group(
     variables,
     attrs,
@@ -214,7 +141,7 @@ def write_variables_to_icechunk_group(
     # NOTE: We set the attributes of the group before writing the dataset because the dataset
     # will overwrite the root group's attributes with the dataset's attributes. We take advantage
     # of xarrays zarr integration to ignore having to format the attributes ourselves.
-    ds = xr.Dataset(loadable_variables, attrs=attrs)
+    ds = Dataset(loadable_variables, attrs=attrs)
     ds.to_zarr(
         store,
         group=group.name,
@@ -267,7 +194,7 @@ def check_compatible_arrays(
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
-    check_same_codecs([get_codecs(arr) for arr in arrays])
+    check_same_codecs([get_codecs(arr, normalize_to_zarr_v3=True) for arr in arrays])
     check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
@@ -278,17 +205,15 @@ def write_virtual_variable_to_icechunk(
     store: "IcechunkStore",
     group: "Group",
     name: str,
-    var: xr.Variable,
+    var: Variable,
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
     from zarr import Array
 
-    from virtualizarr.codecs import extract_codecs
-
     ma = cast(ManifestArray, var.data)
-    metadata = ma.metadata
+    zarray = ma.zarray
 
     dims: list[str] = cast(list[str], list(var.dims))
     existing_num_chunks = 0
@@ -317,17 +242,21 @@ def write_virtual_variable_to_icechunk(
         )
     else:
         append_axis = None
-        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
-        filters, _, compressors = extract_codecs(metadata.codecs)
+
+        # Get the codecs and convert them to zarr v3 format
+        codecs = zarray._v3_codecs()
+
+        # create array if it doesn't already exist
         arr = group.require_array(
             name=name,
-            shape=metadata.shape,
-            chunks=metadata.chunks,
-            dtype=metadata.data_type.to_numpy(),
-            filters=filters,
-            compressors=compressors,
+            shape=zarray.shape,
+            chunks=zarray.chunks,
+            dtype=encode_dtype(zarray.dtype),
+            compressors=codecs.compressors,
+            serializer=codecs.serializer,
+            filters=codecs.filters,
             dimension_names=var.dims,
-            fill_value=metadata.fill_value,
+            fill_value=zarray.fill_value,
         )
 
         arr.update_attributes(

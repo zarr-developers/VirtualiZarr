@@ -1,75 +1,13 @@
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, Union
 
 import numpy as np
-from zarr import Array
-from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
-from zarr.core.metadata.v3 import (
-    ArrayV3Metadata,
-    parse_dimension_names,
-    parse_shapelike,
-)
 
-from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
+from virtualizarr.codecs import get_codecs
 
 if TYPE_CHECKING:
+    from zarr import Array  # type: ignore
+
     from .array import ManifestArray
-
-
-def create_v3_array_metadata(
-    shape: tuple[int, ...],
-    data_type: np.dtype,
-    chunk_shape: tuple[int, ...],
-    chunk_key_encoding: ChunkKeyEncodingLike = {"name": "default"},
-    fill_value: Any = None,
-    codecs: Optional[list[Dict[str, Any]]] = None,
-    attributes: Optional[Dict[str, Any]] = None,
-    dimension_names: Iterable[str] | None = None,
-) -> ArrayV3Metadata:
-    """
-    Create an ArrayV3Metadata instance with standard configuration.
-    This function encapsulates common patterns used across different readers.
-
-    Parameters
-    ----------
-    shape : tuple[int, ...]
-        The shape of the array
-    data_type : np.dtype
-        The numpy dtype of the array
-    chunk_shape : tuple[int, ...]
-        The shape of each chunk
-    chunk_key_encoding : ChunkKeyEncodingLike
-        The mapping from chunk grid cell coordinates to keys.
-    fill_value : Any, optional
-        The fill value for the array
-    codecs : list[Dict[str, Any]], optional
-        List of codec configurations
-    attributes : Dict[str, Any], optional
-        Additional attributes for the array
-    dimension_names : tuple[str], optional
-        Names of the dimensions
-
-    Returns
-    -------
-    ArrayV3Metadata
-        A configured ArrayV3Metadata instance with standard defaults
-    """
-    return ArrayV3Metadata(
-        shape=shape,
-        data_type=data_type,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": chunk_shape},
-        },
-        chunk_key_encoding=chunk_key_encoding,
-        fill_value=fill_value,
-        codecs=convert_to_codec_pipeline(
-            codecs=codecs or [],
-            dtype=data_type,
-        ),
-        attributes=attributes or {},
-        dimension_names=dimension_names,
-        storage_transformers=None,
-    )
 
 
 def check_same_dtypes(dtypes: list[np.dtype]) -> None:
@@ -133,24 +71,6 @@ def check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
             )
 
 
-# TODO remove this once https://github.com/zarr-developers/zarr-python/issues/2929 is solved upstream
-def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -> bool:
-    """Checks the metadata of two zarr arrays are identical, including special treatment for NaN fill_values."""
-    metadata_dict1 = metadata1.to_dict()
-    metadata_dict2 = metadata2.to_dict()
-
-    # fill_value is a special case because numpy NaNs cannot be compared using __eq__, see https://stackoverflow.com/a/10059796
-    fill_value1 = metadata_dict1.pop("fill_value")
-    fill_value2 = metadata_dict2.pop("fill_value")
-    if np.isnan(fill_value1) and np.isnan(fill_value2):  # type: ignore[arg-type]
-        fill_values_equal = fill_value1.dtype == fill_value2.dtype  # type: ignore[union-attr]
-    else:
-        fill_values_equal = fill_value1 == fill_value2
-
-    # everything else in ArrayV3Metadata is a string, Enum, or Dataclass
-    return fill_values_equal and metadata_dict1 == metadata_dict2
-
-
 def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
     new_l = list(t)
     new_l.pop(pos)
@@ -196,35 +116,3 @@ def check_compatible_arrays(
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
-
-
-def copy_and_replace_metadata(
-    old_metadata: ArrayV3Metadata,
-    new_shape: list[int] | None = None,
-    new_chunks: list[int] | None = None,
-    new_dimension_names: Iterable[str] | None | Literal["default"] = "default",
-    new_attributes: dict | None = None,
-) -> ArrayV3Metadata:
-    """
-    Update metadata to reflect a new shape and/or chunk shape.
-    """
-    # TODO this should really be upstreamed into zarr-python
-
-    metadata_copy = old_metadata.to_dict().copy()
-
-    if new_shape is not None:
-        metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
-    if new_chunks is not None:
-        metadata_copy["chunk_grid"] = {
-            "name": "regular",
-            "configuration": {"chunk_shape": tuple(new_chunks)},
-        }
-    if new_dimension_names != "default":
-        # need the option to use the literal string "default" as a sentinel value because None is a valid choice for zarr dimension_names
-        metadata_copy["dimension_names"] = parse_dimension_names(new_dimension_names)
-    if new_attributes is not None:
-        metadata_copy["attributes"] = new_attributes
-
-    # ArrayV3Metadata.from_dict removes extra keys zarr_format and node_type
-    new_metadata = ArrayV3Metadata.from_dict(metadata_copy)
-    return new_metadata

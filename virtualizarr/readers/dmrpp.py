@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Hashable, Iterable, Optional
+from typing import Any, Iterable, Optional
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -9,10 +9,10 @@ from xarray import Coordinates, Dataset, Index, Variable
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.readers.api import VirtualBackend
+from virtualizarr.readers.common import VirtualBackend
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import _FsspecFSFromFilepath
+from virtualizarr.utils import _FsspecFSFromFilepath, check_for_collisions
+from virtualizarr.zarr import ZArray
 
 
 class DMRPPVirtualBackend(VirtualBackend):
@@ -27,26 +27,15 @@ class DMRPPVirtualBackend(VirtualBackend):
         virtual_backend_kwargs: Optional[dict] = None,
         reader_options: Optional[dict] = None,
     ) -> Dataset:
+        drop_variables, loadable_variables = check_for_collisions(
+            drop_variables=drop_variables,
+            loadable_variables=loadable_variables,
+        )
+
         if virtual_backend_kwargs:
             raise NotImplementedError(
                 "DMR++ reader does not understand any virtual_backend_kwargs"
             )
-
-        _drop_vars: list[Hashable] = (
-            [] if drop_variables is None else list(drop_variables)
-        )
-
-        # TODO: whilst this keeps backwards-compatible behaviour for the `loadable_variables` kwarg,
-        # it probably has to change, see https://github.com/zarr-developers/VirtualiZarr/pull/477/#issuecomment-2744448626
-        if loadable_variables is None or indexes is None:
-            warnings.warn(
-                "The default value of the `loadable_variables` kwarg may attempt to load data from the referenced virtual chunks."
-                "As this is unlikely to be the desired behaviour when opening a DMR++ file, `loadable_variables` has been overridden, and set to `loadable_variables=[]`."
-                "To silence this warning pass `loadable_variables` explicitly.",
-                UserWarning,
-            )
-            loadable_variables = []
-            indexes = {}
 
         if loadable_variables != [] or decode_times or indexes is None:
             raise NotImplementedError(
@@ -67,7 +56,7 @@ class DMRPPVirtualBackend(VirtualBackend):
         )
         vds = parser.parse_dataset(group=group, indexes=indexes)
 
-        return vds.drop_vars(_drop_vars)
+        return vds.drop_vars(drop_variables)
 
 
 class DMRParser:
@@ -159,7 +148,7 @@ class DMRParser:
             Data variables:
                 d_8_chunks  (phony_dim_0, phony_dim_1, phony_dim_2) float32 4MB ManifestA...
 
-        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp")
+        >>> vds2 = open_virtual_dataset("https://github.com/OPENDAP/bes/raw/3e518f6dc2f625b0b83cfb6e6fd5275e4d6dcef1/modules/dmrpp_module/data/dmrpp/chunked_threeD.h5.dmrpp", filetype="dmrpp", indexes={})
         >>> vds2
         <xarray.Dataset> Size: 4MB
             Dimensions:     (phony_dim_0: 100, phony_dim_1: 100, phony_dim_2: 100)
@@ -389,7 +378,6 @@ class DMRParser:
         -------
         xr.Variable
         """
-
         # Dimension info
         dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
@@ -402,6 +390,7 @@ class DMRParser:
             self._DAP_NP_DTYPE[var_tag.tag.removeprefix("{" + self._NS["dap"] + "}")]
         )
         # Chunks and Filters
+        filters = None
         shape: tuple[int, ...] = tuple(dims.values())
         chunks_shape = shape
         chunks_tag = var_tag.find("dmrpp:chunks", self._NS)
@@ -417,7 +406,7 @@ class DMRParser:
                 chunks_shape = shape
             chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
             # Filters
-            codecs = self._parse_filters(chunks_tag, dtype)
+            filters = self._parse_filters(chunks_tag, dtype)
         # Attributes
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
@@ -425,15 +414,16 @@ class DMRParser:
         # Fill value is placed in zarr array's fill_value and variable encoding and removed from attributes
         encoding = {k: attrs.get(k) for k in self._ENCODING_KEYS if k in attrs}
         fill_value = attrs.pop("_FillValue", None)
-        # create ManifestArray
-        metadata = create_v3_array_metadata(
-            shape=shape,
-            data_type=dtype,
-            chunk_shape=chunks_shape,
+        # create ManifestArray and ZArray
+        zarray = ZArray(
+            chunks=chunks_shape,
+            dtype=dtype,
             fill_value=fill_value,
-            codecs=codecs,
+            filters=filters,
+            order="C",
+            shape=shape,
         )
-        marr = ManifestArray(metadata=metadata, chunkmanifest=chunkmanifest)
+        marr = ManifestArray(zarray=zarray, chunkmanifest=chunkmanifest)
         return Variable(dims=dims.keys(), data=marr, attrs=attrs, encoding=encoding)
 
     def _parse_attribute(self, attr_tag: ET.Element) -> dict[str, Any]:
@@ -500,23 +490,16 @@ class DMRParser:
             compression_types = chunks_tag.attrib["compressionType"].split(" ")
             for c in compression_types:
                 if c == "shuffle":
-                    filters.append(
-                        {
-                            "name": "numcodecs.shuffle",
-                            "configuration": {"elementsize": dtype.itemsize},
-                        }
-                    )
+                    filters.append({"id": "shuffle", "elementsize": dtype.itemsize})
                 elif c == "deflate":
                     filters.append(
                         {
-                            "name": "numcodecs.zlib",
-                            "configuration": {
-                                "level": int(
-                                    chunks_tag.attrib.get(
-                                        "deflateLevel", self._DEFAULT_ZLIB_VALUE
-                                    )
-                                ),
-                            },
+                            "id": "zlib",
+                            "level": int(
+                                chunks_tag.attrib.get(
+                                    "deflateLevel", self._DEFAULT_ZLIB_VALUE
+                                )
+                            ),
                         }
                     )
             return filters

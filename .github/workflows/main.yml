@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -16,31 +16,42 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PIP_ROOT_USER_ACTION: ignore
+
 jobs:
   test:
-    name: ${{ matrix.environment }}-build
+    name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
-        environment: [test-py311, test-py312, min-deps, minio]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.8.3
-        with:
-          pixi-version: v0.41.4
-          environments: ${{ matrix.environment }}
 
-      - name: List installed libraries
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: ci/environment.yml
+          cache-environment: true
+          create-args: >-
+            python=${{matrix.python-version}}
+
+      - name: Install virtualizarr
         run: |
-          pixi install --environment ${{ matrix.environment }}
-          pixi list --environment ${{ matrix.environment }}
+           python -m pip install -e . --no-deps
+
+      - name: Conda list information
+        run: |
+          micromamba env list
+          micromamba list
 
       - name: Running Tests
         run: |
-          pixi run -e ${{ matrix.environment }} run-tests-xml-cov
+          python -m pytest --run-network-tests --verbose --cov=virtualizarr --cov-report=xml
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4

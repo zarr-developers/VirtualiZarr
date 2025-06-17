@@ -1,4 +1,4 @@
-name: upstream
+name: min-deps
 
 on:
   push:
@@ -20,7 +20,7 @@ env:
   PIP_ROOT_USER_ACTION: ignore
 
 jobs:
-  test-upstream:
+  test-min-deps:
     name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
     defaults:
@@ -35,7 +35,7 @@ jobs:
       - name: Setup micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: ci/upstream.yml
+          environment-file: ci/min-deps.yml
           cache-environment: true
           create-args: >-
             python=${{matrix.python-version}}

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import h5py  # type: ignore
 import numpy as np
 import pytest
@@ -16,18 +18,19 @@ class TestDatasetChunkManifest:
     def test_empty_chunks(self, empty_chunks_hdf5_file):
         f = h5py.File(empty_chunks_hdf5_file)
         ds = f["data"]
-        manifest = HDFVirtualBackend._dataset_chunk_manifest(
-            path=empty_chunks_hdf5_file, dataset=ds
-        )
-        assert manifest.shape_chunk_grid == (0,)
+        with pytest.raises(ValueError, match="chunked but contains no chunks"):
+            HDFVirtualBackend._dataset_chunk_manifest(
+                path=empty_chunks_hdf5_file, dataset=ds
+            )
 
+    @pytest.mark.skip("Need to differentiate non coordinate dimensions from empty")
     def test_empty_dataset(self, empty_dataset_hdf5_file):
         f = h5py.File(empty_dataset_hdf5_file)
         ds = f["data"]
-        manifest = HDFVirtualBackend._dataset_chunk_manifest(
-            path=empty_dataset_hdf5_file, dataset=ds
-        )
-        assert manifest.shape_chunk_grid == (0,)
+        with pytest.raises(ValueError, match="no space allocated in the file"):
+            HDFVirtualBackend._dataset_chunk_manifest(
+                path=empty_dataset_hdf5_file, dataset=ds
+            )
 
     def test_no_chunking(self, no_chunks_hdf5_file):
         f = h5py.File(no_chunks_hdf5_file)
@@ -115,7 +118,7 @@ class TestDatasetToVariable:
         var = HDFVirtualBackend._dataset_to_variable(
             scalar_fill_value_hdf5_file, ds, group=""
         )
-        assert var.data.metadata.fill_value == 42
+        assert var.data.zarray.fill_value == 42
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         f = h5py.File(cf_fill_value_hdf5_file)
@@ -195,16 +198,20 @@ class TestVirtualVarsFromHDF:
             )
 
 
-@pytest.mark.xfail(reason="no idea")
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestOpenVirtualDataset:
+    @patch("virtualizarr.readers.hdf.hdf.construct_virtual_dataset")
+    @patch("virtualizarr.readers.hdf.hdf.maybe_open_loadable_vars_and_indexes")
     def test_coord_names(
         self,
+        maybe_open_loadable_vars_and_indexes,
+        construct_virtual_dataset,
         root_coordinates_hdf5_file,
     ):
-        vds = HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
-        assert set(vds.coords) == {"lat", "lon"}
+        maybe_open_loadable_vars_and_indexes.return_value = (0, 0)
+        HDFVirtualBackend.open_virtual_dataset(root_coordinates_hdf5_file)
+        assert construct_virtual_dataset.call_args[1]["coord_names"] == ["lat", "lon"]
 
 
 @requires_hdf5plugin

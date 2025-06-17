@@ -6,28 +6,21 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
-```{important}
-:name: dependencies
-We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
+```bash
+mamba env create -f ci/environment.yml
+mamba activate virtualizarr-tests
+pre-commit install
+# git checkout -b new-feature
+python -m pip install -e . --no-deps
+python -m pytest
 ```
 
-Run tests with the `pixi run --environment test run-tests` command. Some tests require downloading files over the network.
-Use the `run-tests-no-network` task if you want to run tests faster or have no internet access:
+You may also add the `--run-network-tests` option, which will run additional tests
+that require downloading files over the network.  Skip this if you want the tests to run
+faster or you have no internet access:
 
 ```bash
-# Run all tests
-pixi run --environment test run-tests
-# Skip tests that require a network connection
-pixi run --environment test run-tests-no-network
-```
-
-You can also run tests in other environments:
-
-```bash
-pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
-pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
-# List which versions are installed in the `min-deps` environment
-pixi list --environment min-deps
+python -m pytest --run-network-tests
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test
@@ -35,29 +28,14 @@ coverage report locally, if you wish (CI will automatically do so).  Here are so
 examples:
 
 ```bash
-pixi run --environment test run-tests-cov              # Terminal report showing missing coverage
-pixi run --environment test run-tests-html-cov         # HTML report written to htmlcov/index.html
+python -m pytest --cov=.                     # Terminal (text) report (--cov=term)
+python -m pytest --cov=. --cov=term-missing  # Terminal report showing missing coverage
+python -m pytest --cov=. --cov=html          # HTML report written to htmlcov/index.html
 ```
 
-Rather than using pixi tasks (essentially aliases for running commands in a given shell), you can explicitly start
-a shell within a given environment and execute `pytest` (or other commands) directly:
-
-```bash
-# Start a shell within the environment
-pixi shell --environment test
-# Run the tests
-pytest virtualizarr
-# Exit the shell
-exit
-```
-
-If you run into issues with the development environment, here are some recommending steps:
-- Update pixi using `pixi self-update` and then retry the development workflow.
-- Clean up environments using `pixi clean` and then retry the development workflow.
-- Manually find and clean the cache dir listed in `pixi info` and then retry the development workflow.
-- Ask for help in the [VirtualiZarr channel of the Earthmover community slack](https://earthmover-community.slack.com/archives/C08EXCE8ZQX).
-
-
+To see all available `pytest` options added by the `pytest-cov` plugin, run
+`python -m pytest -h`, or see the
+[pytest-cov documentation](https://pytest-cov.readthedocs.io/en/latest/readme.html).
 
 ## Contributing documentation
 
@@ -66,14 +44,13 @@ Whilst the CI will build the updated documentation for each PR, it can also be u
 ### Build the documentation locally
 
 ```bash
-pixi install --environment docs
-pixi run build-docs
-```
-Pixi can also be used to serve continuously updating version of the documentation during development at [http://0.0.0.0:8000/](http://0.0.0.0:8000/).
-This can be done by navigating to [http://0.0.0.0:8000/](http://0.0.0.0:8000/) in your browser after running:
-
-```bash
-pixi run serve-docs
+mamba env create -f ci/doc.yml
+mamba activate virtualizarr-docs
+python -m pip install -e .  # From project's root - needed to generate API docs
+cd docs # From project's root
+rm -rf generated
+make clean
+make html
 ```
 
 ### Access the documentation locally

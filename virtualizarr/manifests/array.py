@@ -2,15 +2,13 @@ import warnings
 from typing import Any, Callable, Union
 
 import numpy as np
-import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
-import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.zarr import ZArray
 
 
 class ManifestArray:
@@ -26,32 +24,27 @@ class ManifestArray:
     """
 
     _manifest: ChunkManifest
-    _metadata: ArrayV3Metadata
+    _zarray: ZArray
 
     def __init__(
         self,
-        metadata: ArrayV3Metadata | dict,
+        zarray: ZArray | dict,
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the metadata of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
 
         Parameters
         ----------
-        metadata : dict or ArrayV3Metadata
+        zarray : dict or ZArray
         chunkmanifest : dict or ChunkManifest
         """
 
-        if isinstance(metadata, ArrayV3Metadata):
-            _metadata = metadata
+        if isinstance(zarray, ZArray):
+            _zarray = zarray
         else:
             # try unpacking the dict
-            _metadata = ArrayV3Metadata(**metadata)
-
-        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
-            raise NotImplementedError(
-                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
-            )
+            _zarray = ZArray(**zarray)
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
@@ -62,10 +55,10 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
-        # TODO check that the metadata shape and chunkmanifest shape are consistent with one another
+        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
         # TODO also cover the special case of scalar arrays
 
-        self._metadata = _metadata
+        self._zarray = _zarray
         self._manifest = _chunkmanifest
 
     @property
@@ -73,27 +66,21 @@ class ManifestArray:
         return self._manifest
 
     @property
-    def metadata(self) -> ArrayV3Metadata:
-        return self._metadata
+    def zarray(self) -> ZArray:
+        return self._zarray
 
     @property
     def chunks(self) -> tuple[int, ...]:
-        """
-        Individual chunk size by number of elements.
-        """
-        return self._metadata.chunks
+        return tuple(self.zarray.chunks)
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self.metadata.data_type
-        return dtype_str.to_numpy()
+        dtype_str = self.zarray.dtype
+        return np.dtype(dtype_str)
 
     @property
     def shape(self) -> tuple[int, ...]:
-        """
-        Array shape by number of elements along each dimension.
-        """
-        return self.metadata.shape
+        return tuple(int(length) for length in list(self.zarray.shape))
 
     @property
     def ndim(self) -> int:
@@ -168,7 +155,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if not utils.metadata_identical(self.metadata, other.metadata):
+        if self.zarray != other.zarray:
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:
@@ -276,31 +263,7 @@ class ManifestArray:
         ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
-        return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
-
-    def to_virtual_variable(self) -> xr.Variable:
-        """
-        Create a "virtual" xarray.Variable containing the contents of one zarr array.
-
-        The returned variable will be "virtual", i.e. it will wrap a single ManifestArray object.
-        """
-
-        # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
-        # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
-        dims = self.metadata.dimension_names
-        attrs = self.metadata.attributes
-        stripped_metadata = utils.copy_and_replace_metadata(
-            self.metadata, new_dimension_names=None, new_attributes={}
-        )
-        stripped_marr = ManifestArray(
-            chunkmanifest=self.manifest, metadata=stripped_metadata
-        )
-
-        return xr.Variable(
-            data=stripped_marr,
-            dims=dims,
-            attrs=attrs,
-        )
+        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
 
 
 def _possibly_expand_trailing_ellipsis(key, ndim: int):

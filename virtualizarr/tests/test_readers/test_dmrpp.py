@@ -181,8 +181,8 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 @pytest.mark.skip(reason="Fill_val mismatch")
 def test_NASA_dmrpp(data_url, dmrpp_url):
-    result = open_virtual_dataset(dmrpp_url, filetype="dmrpp", loadable_variables=[])
-    expected = open_virtual_dataset(data_url, loadable_variables=[])
+    result = open_virtual_dataset(dmrpp_url, indexes={}, filetype="dmrpp")
+    expected = open_virtual_dataset(data_url, indexes={})
     xr.testing.assert_identical(result, expected)
 
 
@@ -294,10 +294,8 @@ def test_parse_variable(tmp_path):
     assert var.dtype == "float32"
     assert var.dims == ("x", "y")
     assert var.shape == (720, 1440)
-    assert var.data.metadata.to_dict()["chunk_grid"]["configuration"][
-        "chunk_shape"
-    ] == (360, 720)
-    assert var.data.metadata.fill_value == -32768
+    assert var.data.zarray.chunks == (360, 720)
+    assert var.data.zarray.fill_value == -32768
     assert var.encoding == {
         "add_offset": 298.15,
         "scale_factor": 0.001,
@@ -334,22 +332,14 @@ def test_parse_attribute(tmp_path, attr_path, expected):
             "/data",
             np.dtype("float32"),
             [
-                {
-                    "configuration": {"elementsize": np.dtype("float32").itemsize},
-                    "name": "numcodecs.shuffle",
-                },
-                {"name": "numcodecs.zlib", "configuration": {"level": 5}},
+                {"elementsize": np.dtype("float32").itemsize, "id": "shuffle"},
+                {"id": "zlib", "level": 5},
             ],
         ),
         (
             "/mask",
             np.dtype("float32"),
-            [
-                {
-                    "configuration": {"elementsize": np.dtype("float32").itemsize},
-                    "name": "numcodecs.shuffle",
-                }
-            ],
+            [{"elementsize": np.dtype("float32").itemsize, "id": "shuffle"}],
         ),
     ],
 )
@@ -429,7 +419,7 @@ class TestRelativePaths:
         basic_dmrpp_temp_filepath: Path,
     ):
         vds = open_virtual_dataset(
-            str(basic_dmrpp_temp_filepath), loadable_variables=[], filetype="dmrpp"
+            str(basic_dmrpp_temp_filepath), indexes={}, filetype="dmrpp"
         )
         path = vds["x"].data.manifest["0"]["path"]
 
@@ -447,7 +437,7 @@ class TestRelativePaths:
         )
 
         vds = open_virtual_dataset(
-            relative_dmrpp_filepath, loadable_variables=[], filetype="dmrpp"
+            relative_dmrpp_filepath, indexes={}, filetype="dmrpp"
         )
         path = vds["x"].data.manifest["0"]["path"]
 
@@ -458,11 +448,11 @@ class TestRelativePaths:
         assert path == expected_datafile_path_uri
 
 
-@pytest.mark.parametrize("drop_variables", [["mask"], ["data", "mask"]])
+@pytest.mark.parametrize("drop_variables", ["mask", ["data", "mask"]])
 def test_drop_variables(basic_dmrpp_temp_filepath: Path, drop_variables):
     vds = open_virtual_dataset(
         str(basic_dmrpp_temp_filepath),
-        loadable_variables=[],
+        indexes={},
         filetype="dmrpp",
         drop_variables=drop_variables,
     )

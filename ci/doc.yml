@@ -1,0 +1,15 @@
+name: virtualizarr-docs
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.10
+  - "sphinx"
+  - pip
+  - pip:
+      - "myst_nb"
+      - "pydata_sphinx_theme"
+      - "sphinx_copybutton"
+      - "sphinx_design"
+      - "sphinx_togglebutton"
+      - "sphinx-autodoc-typehints"
