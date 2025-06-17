@@ -1,4 +1,5 @@
-> **_Note:_**  This Core Team Member Guide was adapted from [Xarray's code team guide](https://github.com/pydata/xarray/blob/main/CORE_TEAM_GUIDE.md), [napari project's Core Developer Guide](https://napari.org/stable/developers/core_dev_guide.html), and the [Pandas maintainers guide](https://pandas.pydata.org/docs/development/maintaining.html).
+!!! note
+   This Core Team Member Guide was adapted from [Xarray's code team guide](https://github.com/pydata/xarray/blob/main/CORE_TEAM_GUIDE.md), [napari project's Core Developer Guide](https://napari.org/stable/developers/core_dev_guide.html), and the [Pandas maintainers guide](https://pandas.pydata.org/docs/development/maintaining.html).
 
 # Core Team Member Guide
 
