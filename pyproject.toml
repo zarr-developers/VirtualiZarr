@@ -40,10 +40,7 @@ remote = [
     "aiohttp",
     "s3fs",
 ]
-parallel = [
-    "lithops",
-    "dask",
-]
+
 # non-kerchunk-based parsers
 hdf = [
     "h5py",
@@ -86,17 +83,6 @@ all_writers = [
     "virtualizarr[icechunk]",
     "virtualizarr[kerchunk]",
 ]
-all = [
-    "virtualizarr[obstore]",
-    "virtualizarr[remote]",
-    "virtualizarr[parallel]",
-    "virtualizarr[hdf]",
-    "virtualizarr[hdf5]",
-    "virtualizarr[netcdf3]",
-    "virtualizarr[fits]",
-    "virtualizarr[icechunk]",
-    "virtualizarr[kerchunk]",
-]
 
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
@@ -131,6 +117,9 @@ dev = [
     "pytest-mypy",
     "pytest-xdist",
     "ruff",
+    "s3fs",
+    "lithops",
+    "dask",
 ]
 
 [project.urls]
@@ -188,14 +177,14 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
-min-deps = ["dev", "parallel", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
+min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "parallel", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib"]
-test-py311 = ["dev", "parallel", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py311"] # test against python 3.11
-test-py312 = ["dev", "parallel", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312"] # test against python 3.12
-minio = ["dev", "parallel", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312", "minio"]
-upstream = ["dev", "parallel", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-docs = ["remote", "parallel", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "docs"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib"]
+test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312", "minio"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
+docs = ["remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "docs"]
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
