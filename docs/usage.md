@@ -22,12 +22,14 @@ We can open a virtual representation of this file using {py:func}`open_virtual_d
 
 ```python
 from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import HDFParser
+from obstore.store import LocalStore
 
-vds = open_virtual_dataset('air.nc')
+vds = open_virtual_dataset('air.nc', object_store=LocalStore, parser=HDFParser())
 ```
 
 ```{note}
-We did not have to explicitly indicate the file format because {py:func}`open_virtual_dataset <virtualizarr.open_virtual_dataset>` will attempt to automatically infer it.
+VirtualiZarr has various "parsers" which understand different file formats. NetCDF4 files are all really HDF5 files, so we used the `HDFParser`.
 ```
 
 Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` objects. You can learn more about the `ManifestArray` class in the [Data Structures documentation](data_structures.md).
@@ -86,11 +88,14 @@ _The only use case for a virtual dataset is [combining references](#combining-vi
 
 ### Opening remote files
 
-To open remote files as virtual datasets pass the `parser_options` options, e.g.
+To open remote files as virtual datasets use the necessary obstore store and [obstore credentials](https://developmentseed.org/obstore/latest/authentication/), for example:
 
 ```python
-aws_credentials = {"key": ..., "secret": ...}
-vds = open_virtual_dataset("s3://some-bucket/file.nc", reader_options={'storage_options': aws_credentials})
+from obstore.store import S3Store
+
+# set S3 credentials as environment variables
+
+vds = open_virtual_dataset("s3://some-bucket/file.nc", object_store=S3Store, parser=HDFParser())
 ```
 
 ## Loading variables
@@ -102,7 +107,12 @@ Loading the variables during virtual dataset creation has several benefits detai
 You can use the `loadable_variables` argument to specify variables to load as regular variables rather than virtual variables:
 
 ```python
-vds = open_virtual_dataset('air.nc', loadable_variables=['air', 'time'])
+vds = open_virtual_dataset(
+    'air.nc', 
+    object_store=LocalStore,
+    parser=HDFParser(),
+    loadable_variables=['air', 'time'],
+)
 ```
 
 ```python
@@ -143,6 +153,8 @@ To decode time variables according to the CF conventions upon loading, you must 
 ```python
 vds = open_virtual_dataset(
     'air.nc',
+    object_store=LocalStore,
+    parser=HDFParser(),
     loadable_variables=['air', 'time'],
     decode_times=True,
 )
@@ -193,8 +205,8 @@ The simplest case of concatenation is when you have a set of files and you know 
 In this case it is sufficient to open the files one-by-one, then pass the virtual datasets as a list to the concatenation function.
 
 ```python
-vds1 = open_virtual_dataset('air1.nc')
-vds2 = open_virtual_dataset('air2.nc')
+vds1 = open_virtual_dataset('air1.nc', object_store=LocalStore, parser=HDFParser())
+vds2 = open_virtual_dataset('air2.nc', object_store=LocalStore, parser=HDFParser())
 ```
 
 As we know the correct order a priori, we can just combine along one dimension using `xarray.concat`.
@@ -257,8 +269,8 @@ However, you should first be confident that the archival files actually do have 
 If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
 
 ```python
-vds1 = open_virtual_dataset('air1.nc')
-vds2 = open_virtual_dataset('air2.nc')
+vds1 = open_virtual_dataset('air1.nc', object_store=LocalStore, parser=HDFParser())
+vds2 = open_virtual_dataset('air2.nc', object_store=LocalStore, parser=HDFParser())
 
 combined_vds = xr.combine_by_coords([vds2, vds1])
 ```
@@ -367,9 +379,11 @@ You can open existing Kerchunk `json` or `parquet` references as Virtualizarr vi
 This may be useful for manipulating them or converting existing kerchunk-formatted references to other reference storage formats such as [Icechunk](https://icechunk.io/).
 
 ```python
-vds = open_virtual_dataset('combined.json', filetype='kerchunk')
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser 
+
+vds = open_virtual_dataset('combined.json', , object_store=LocalStore, parser=KerchunkJSONParser())
 # or
-vds = open_virtual_dataset('combined.parquet', filetype='kerchunk')
+vds = open_virtual_dataset('combined.parquet', object_store=LocalStore, parser=KerchunkParquetParser())
 ```
 
 One difference between the kerchunk references format and virtualizarr's internal manifest representation (as well as Icechunk's format) is that paths in kerchunk references can be relative paths.
@@ -382,11 +396,13 @@ You can dis-ambuiguate kerchunk references containing relative paths by passing 
 
 vds = open_virtual_dataset(
     'relative_refs.json',
-    filetype='kerchunk',
-    virtual_backend_kwargs={'fs_root': 'file:///some_directory/'}
+    object_store=LocalStore,
+    parser=KerchunkJSONParser(
+        fs_root='file:///data_directory/',
+    )
 )
 
-# the path in the virtual dataset will now be 'file:///some_directory/file.nc'
+# the path in the virtual dataset will now be 'file:///data_directory/file.nc'
 ```
 
 Note that as the virtualizarr {py:meth}`vds.virtualize.to_kerchunk <virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk>` method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.

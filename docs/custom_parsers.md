@@ -107,14 +107,14 @@ The `Parser` callable does not accept arbitrary optional keyword arguments.
 
 However, extra information is often needed to fully map the archival format to the Zarr data model, for example if the format does not include array names or dimension names.
 
-Instead, to pass arbitrary extra information to your parser callable, it is recommended that you bind that information to a class attribute or use `functools.partial`, e.g.
+Instead, to pass arbitrary extra information to your parser callable, it is recommended that you bind that information to class attributes (or use `functools.partial`), e.g.
 
 ```python
 class CustomParser:
     def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
 
-    def parse(self, file_url: str, object_store: ObjectStore) -> ManifestStore:
+    def __call__(self, file_url: str, object_store: ObjectStore) -> ManifestStore:
         # access the file's contents, e.g. using the ObjectStore instance
         readable_file = obstore.open_reader(object_store, file_url)
 
@@ -126,18 +126,18 @@ class CustomParser:
         return ManifestStore(...)
 
 
-parser_with_kwargs = CustomParser(**kwargs)
-
 vds = vz.open_virtual_dataset(
     file_url,
     object_store=object_store,
-    parser=parser_with_kwargs,
+    parser=CustomParser(**kwargs),
 )
 ```
 
+This helps to keep format-specific parser configuration separate from kwargs to `open_virtual_dataset`.
+
 ## How to write your own custom parser
 
-As long as your custom parser function follows the interface above, you can implement it in any way you like.
+As long as your custom parser callable follows the interface above, you can implement it in any way you like.
 However there are few common approaches.
 
 ### Typical VirtualiZarr parsers
