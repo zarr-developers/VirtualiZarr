@@ -108,7 +108,7 @@ You can use the `loadable_variables` argument to specify variables to load as re
 
 ```python
 vds = open_virtual_dataset(
-    'air.nc', 
+    'air.nc',
     object_store=LocalStore,
     parser=HDFParser(),
     loadable_variables=['air', 'time'],
@@ -379,7 +379,7 @@ You can open existing Kerchunk `json` or `parquet` references as Virtualizarr vi
 This may be useful for manipulating them or converting existing kerchunk-formatted references to other reference storage formats such as [Icechunk](https://icechunk.io/).
 
 ```python
-from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser 
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 
 vds = open_virtual_dataset('combined.json', , object_store=LocalStore, parser=KerchunkJSONParser())
 # or
