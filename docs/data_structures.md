@@ -157,7 +157,7 @@ A `ManifestGroup` is a dedicated class that contains multiple `ManifestArray`, p
 It is designed to act similar to a Zarr group, such that a named collection of one or more `ManifestGroup` objects can be combined together to form a `ManifestStore`.
 
 The `ManifestStore` (and `ManifestGroup`) classes are only used during `open_virtual_dataset`, to simplify the creation of virtual references and loading of variables from archival file formats.
-You should therefore only use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom parser](custom_parsers.md) for an unsupported archival file format.
+You should therefore probably only use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom parser](custom_parsers.md) for an unsupported archival file format.
 
 ## "Virtual" Xarray Datasets
 
