@@ -12,15 +12,17 @@ and on conda-forge:
 conda install -c conda-forge virtualizarr
 ```
 
+## Optional dependencies
+
+VirtualiZarr has many optional dependencies, split into those for reading various file formats, and those for writing virtual references out to different formats.
+
 Optional dependencies can be installed in groups via pip. For example to read HDF files and write virtual references to icechunk you could install all necessary dependencies via:
 
 ```shell
 pip install "virtualizarr[hdf, icechunk]"
 ```
 
-## Available optional dependency groups
-
-VirtualiZarr has many optional dependencies, split into those for reading various file formats, and those for writing virtual references out to different formats. The available optional dependency groups are as follows:
+The full list of optional dependencies from the `pyproject.toml` is shown below:
 
 ```python exec="true"
 import tomllib
