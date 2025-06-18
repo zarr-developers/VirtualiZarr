@@ -24,7 +24,7 @@ from xarray.structure.combine import _infer_concat_order_from_positions, _nested
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
-from virtualizarr.parsers import Parser
+from virtualizarr.parsers.typing import Parser
 
 if TYPE_CHECKING:
     from xarray.core.types import (
