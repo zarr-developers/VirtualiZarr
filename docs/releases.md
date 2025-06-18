@@ -47,6 +47,8 @@
   ([#475](https://github.com/zarr-developers/VirtualiZarr/pull/475)) by [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
 - Added FAQ answer about what data can be virtualized ([#430](https://github.com/zarr-developers/VirtualiZarr/issues/430), [#532](https://github.com/zarr-developers/VirtualiZarr/pull/532))
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Switched docs build to use mkdocs-material instead of sphinx ([#615](https://github.com/zarr-developers/VirtualiZarr/pull/615))
+  By [Max Jones](https://github.com/maxrjones)).
 
 ### Internal Changes
 
