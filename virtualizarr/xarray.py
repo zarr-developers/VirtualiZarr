@@ -127,9 +127,9 @@ def open_virtual_mfdataset(
     combine_attrs
         Same as in xarray.open_mfdataset
     **kwargs : optional
-        Additional arguments passed on to :py:func:`virtualizarr.open_virtual_dataset`. For an
+        Additional arguments passed on to [virtualizarr.open_virtual_dataset][]. For an
         overview of some of the possible options, see the documentation of
-        :py:func:`virtualizarr.open_virtual_dataset`.
+        [virtualizarr.open_virtual_dataset][].
 
     Returns
     -------

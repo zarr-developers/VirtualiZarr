@@ -1,5 +1,3 @@
-(data-structures)=
-
 # Data structures
 
 This page explains how VirtualiZarr works, by introducing the core data structures one-by-one.
@@ -40,12 +38,12 @@ manifest.dict()
 
 In this case we can see that the `"air"` variable contains only one chunk, the bytes for which live in the `file:///work/data/air.nc` file, at the location given by the `'offset'` and `'length'` attributes.
 
-The {py:class}`ChunkManifest <virtualizarr.manifests.ChunkManifest>` class is virtualizarr's internal in-memory representation of this manifest.
+The [virtualizarr.ChunkManifest][] class is virtualizarr's internal in-memory representation of this manifest.
 
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.
-The {py:class}`ManifestArray <virtualizarr.manifests.ManifestArray>` class stores both the array-level attributes and the corresponding chunk manifest.
+The [virtualizarr.ManifestArray][] class stores both the array-level attributes and the corresponding chunk manifest.
 
 ```python
 marr
@@ -122,11 +120,10 @@ concatenated.manifest.dict()
 
 This concatenation property is what allows us to combine the data from multiple files on disk into a single Zarr store containing arrays of many chunks.
 
-```{note}
-As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects.
+!!! note
+    As a single Zarr array has only one array-level set of compression codecs by definition, concatenation of arrays from files saved to disk with differing codecs cannot be achieved through concatenation of `ManifestArray` objects.
 
-Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5). See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for other restrictions on what data can be virtualized.
-```
+    Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5). See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for other restrictions on what data can be virtualized.
 
 Remember that you cannot load values from a `ManifestArray` directly.
 
@@ -140,10 +137,9 @@ NotImplementedError: ManifestArrays can't be converted into numpy arrays or pand
 
 The whole point is to manipulate references to the data without actually loading any data.
 
-```{note}
-You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array.
-We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
-```
+!!! note
+    You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array.
+    We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
 
 ## Zarr Groups
 
@@ -169,6 +165,5 @@ Any `ManifestGroup` (or single-group `ManifestStore`) can be converted to a virt
 The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 See the [usage guide on combining virtual datasets](usage.md#combining-virtual-datasets) for more information.
 
-```{note}
-In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.
-```
+!!! note
+    In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.

@@ -6,10 +6,8 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
-```{important}
-:name: dependencies
-We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
-```
+!!! important
+    We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
 
 Run tests with the `pixi run --environment test run-tests` command. Some tests require downloading files over the network.
 Use the `run-tests-no-network` task if you want to run tests faster or have no internet access:

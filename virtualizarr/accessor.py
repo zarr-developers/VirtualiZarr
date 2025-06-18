@@ -189,8 +189,10 @@ class VirtualiZarrDatasetAccessor:
 
         See Also
         --------
-        ManifestArray.rename_paths
-        ChunkManifest.rename_paths
+
+        virtualizarr.ManifestArray.rename_paths
+
+        virtualizarr.ChunkManifest.rename_paths
 
         Examples
         --------
@@ -203,7 +205,7 @@ class VirtualiZarrDatasetAccessor:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> ds.virtualize.rename_paths(local_to_s3_url)
         """
 

@@ -1,5 +1,3 @@
-(custom-readers)=
-
 # Custom Readers
 
 This page explains how to write a custom reader for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
@@ -90,33 +88,30 @@ Generally you want to follow steps like this:
 7. Group `ManifestArrays` up into one or more `ManifestGroup` objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the `ManifestGroup` object as a `zarr.metadata.GroupMetadata` object. Remember that `ManifestGroups` can contain other groups as well as arrays.
 8. Instantiate the final `ManifestStore` using the top-most `ManifestGroup` and return it.
 
-```{note}
-The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it. For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
-```
+!!! note
+    The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it. For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
 
 ### Parsing a pre-existing index file
 
 A custom reader can parse multiple files, perhaps by passing a glob string and looking for expected file naming conventions, or by passing additional reader-specific keyword arguments.
 This can be useful for reading file formats which include some kind of additional "index" sidecar file, but don't have all the information necessary to construct the entire `ManifestStore` object from the sidecar file alone.
 
-```{note}
-If you do have some type of custom sidecar metadata file which contains all the information necessary to create the `ManifestStore`, then you should just create a custom reader for that metadata file format instead!
-Examples of this approach which come packaged with VirtualiZarr are the `DMRPPReader` and the `KerchunkReader`
-```
+!!! note
+    If you do have some type of custom sidecar metadata file which contains all the information necessary to create the `ManifestStore`, then you should just create a custom reader for that metadata file format instead!
+    Examples of this approach which come packaged with VirtualiZarr are the `DMRPPReader` and the `KerchunkReader`
 
 ### Kerchunk-based readers
 
 The Kerchunk package includes code for parsing various array file formats, returning the result as an in-memory nested dictionary objects, following the [Kerchunk references specification](https://fsspec.github.io/kerchunk/spec).
 These references can be directly read and converted into a `ManifestStore` by VirtualiZarr's `KerchunkReader`.
 
-```{note}
-Whilst this might be the quickest way to get a custom reader working, we do not really recommend this approach, as:
-1. The Kerchunk in-memory nested dictionary format is very memory-inefficient compared to the numpy array representation used internally by VirtualiZarr's `ChunkManifest` class,
-2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
-3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk readers sometimes follow inconsistent schemas ([an example]()).
+!!! note
+    Whilst this might be the quickest way to get a custom reader working, we do not really recommend this approach, as:
+    1. The Kerchunk in-memory nested dictionary format is very memory-inefficient compared to the numpy array representation used internally by VirtualiZarr's `ChunkManifest` class,
+    2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
+    3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk readers sometimes follow inconsistent schemas ([an example]()).
 
-Nevertheless this approach is currently used by VirtualiZarr internally, at least for the FITS, netCDF3, and (now-deprecated original implementation of the) HDF5 file format readers.
-```
+    Nevertheless this approach is currently used by VirtualiZarr internally, at least for the FITS, netCDF3, and (now-deprecated original implementation of the) HDF5 file format readers.
 
 ## Data model differences between Zarr and Xarray
 
