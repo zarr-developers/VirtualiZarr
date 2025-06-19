@@ -32,8 +32,8 @@ If you want to write a new reader to create virtual references pointing to a cus
 
 VirtualiZarr uses these classes to store virtual references internally.
 
-::: virtualizarr.ChunkManifest
-::: virtualizarr.ManifestArray
+::: virtualizarr.manifests.ChunkManifest
+::: virtualizarr.manifests.ManifestArray
 
 #### Array API
 
