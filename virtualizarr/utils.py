@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import io
-from dataclasses import dataclass, field
+import os
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 from urllib.parse import urlparse
 
@@ -14,7 +14,6 @@ from virtualizarr.codecs import extract_codecs, get_codec_config
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
-    import upath
     from obstore import ReadableFile
     from obstore.store import ObjectStore
 
@@ -31,11 +30,18 @@ class ObstoreReader:
         import obstore as obs
 
         parsed = urlparse(path)
+        if hasattr(store, "prefix") and store.prefix:
+            filepath = os.path.basename(parsed.path)
+        else:
+            filepath = parsed.path
 
-        self._reader = obs.open_reader(store, parsed.path)
+        self._reader = obs.open_reader(store, filepath)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
+
+    def readall(self) -> bytes:
+        return self._reader.read().to_bytes()
 
     def seek(self, offset: int, whence: int = 0, /):
         # TODO: Check on default for whence
@@ -43,61 +49,6 @@ class ObstoreReader:
 
     def tell(self) -> int:
         return self._reader.tell()
-
-
-@dataclass
-class _FsspecFSFromFilepath:
-    """Class to create fsspec Filesystem from input filepath.
-
-    Parameters
-    ----------
-    filepath : str
-        Input filepath
-    reader_options : dict, optional
-        dict containing kwargs to pass to file opener, by default {}
-    fs : Option | None
-        The fsspec filesystem object, created in __post_init__
-
-    """
-
-    filepath: str
-    reader_options: Optional[dict] = field(default_factory=dict)
-    fs: fsspec.AbstractFileSystem = field(init=False)
-    upath: upath.core.UPath = field(init=False)
-
-    def open_file(self) -> OpenFileType:
-        """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
-
-        Returns
-        -------
-        OpenFileType
-            file opened with fsspec
-        """
-        return self.fs.open(self.filepath)
-
-    def read_bytes(self, bytes: int) -> bytes:
-        with self.open_file() as of:
-            return of.read(bytes)
-
-    def get_mapper(self):
-        """Returns a mapper for use with Zarr"""
-        return self.fs.get_mapper(self.filepath)
-
-    def __post_init__(self) -> None:
-        """Initialize the fsspec filesystem object"""
-        import fsspec
-        from upath import UPath
-
-        if not isinstance(self.filepath, UPath):
-            upath = UPath(self.filepath)
-
-        self.upath = upath
-        self.protocol = upath.protocol
-
-        self.reader_options = self.reader_options or {}
-        storage_options = self.reader_options.get("storage_options", {})  # type: ignore
-
-        self.fs = fsspec.filesystem(self.protocol, **storage_options)
 
 
 def check_for_collisions(
@@ -162,9 +113,9 @@ def convert_v3_to_v2_metadata(
 
     Parameters
     ----------
-    v3_metadata : ArrayV3Metadata
+    v3_metadata
         The metadata object in v3 format.
-    fill_value : Any, optional
+    fill_value
         Override the fill value from v3 metadata.
 
     Returns

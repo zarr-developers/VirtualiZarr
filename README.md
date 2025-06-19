@@ -8,11 +8,12 @@
 [![pre-commit Enabled](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![Apache 2.0 License](https://img.shields.io/badge/license-Apache%202-cb2533.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python Versions](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/zarr-developers/VirtualiZarr/main/pyproject.toml&logo=Python&logoColor=gold&label=Python)](https://docs.python.org)
-[![slack](https://img.shields.io/badge/slack-virtualizarr-purple.svg?logo=slack)](https://earthmover-community.slack.com/archives/C08EXCE8ZQX)
+[![slack](https://img.shields.io/badge/slack-virtualizarr-purple.svg?logo=slack)](https://join.slack.com/t/earthmover-community/shared_invite/zt-32to7398i-HorUXmzPzyy9U87yLxweIA)
 [![Latest Release](https://img.shields.io/github/v/release/zarr-developers/VirtualiZarr)](https://github.com/zarr-developers/VirtualiZarr/releases)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/virtualizarr?label=pypi%7Cdownloads)](https://pypistats.org/packages/virtualizarr)
 [![Conda - Downloads](https://img.shields.io/conda/d/conda-forge/virtualizarr
 )](https://anaconda.org/conda-forge/virtualizarr)
+
 
 
 ## Cloud-Optimize your Scientific Data as a Virtual Zarr Datacube, using Xarray syntax.

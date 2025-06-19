@@ -1,4 +1,5 @@
-> **_Note:_**  This Core Team Member Guide was adapted from [Xarray's code team guide](https://github.com/pydata/xarray/blob/main/CORE_TEAM_GUIDE.md), [napari project's Core Developer Guide](https://napari.org/stable/developers/core_dev_guide.html), and the [Pandas maintainers guide](https://pandas.pydata.org/docs/development/maintaining.html).
+!!! note
+    This Core Team Member Guide was adapted from [Xarray's code team guide](https://github.com/pydata/xarray/blob/main/CORE_TEAM_GUIDE.md), [napari project's Core Developer Guide](https://napari.org/stable/developers/core_dev_guide.html), and the [Pandas maintainers guide](https://pandas.pydata.org/docs/development/maintaining.html).
 
 # Core Team Member Guide
 
@@ -60,58 +61,37 @@ One of the main ways you might spend your contribution time is by responding to 
 Here’s a typical workflow for triaging a newly opened issue or discussion:
 
 1. **Thank the reporter for opening an issue.**
-
-   The issue tracker is many people’s first interaction with the VirtualiZarr project itself, beyond just using the library.
-   It may also be their first open-source contribution of any kind. As such, we want it to be a welcoming, pleasant experience.
-
+    The issue tracker is many people’s first interaction with the VirtualiZarr project itself, beyond just using the library.
+    It may also be their first open-source contribution of any kind. As such, we want it to be a welcoming, pleasant experience.
 2. **Is the necessary information provided?**
-
-   Ideally reporters would fill out the issue template, but many don’t. If crucial information (like the version of VirtualiZarr they used),
-   is missing feel free to ask for that and label the issue with “needs info”.
-
-   Make sure that the title accurately reflects the issue. Edit it yourself if it’s not clear.
-   Remember also that issues can be converted to discussions and vice versa if appropriate.
-
+    Ideally reporters would fill out the issue template, but many don’t. If crucial information (like the version of VirtualiZarr they used),
+    is missing feel free to ask for that and label the issue with “needs info”.
+    Make sure that the title accurately reflects the issue. Edit it yourself if it’s not clear.
+    Remember also that issues can be converted to discussions and vice versa if appropriate.
 3. **Is this a duplicate issue?**
-
-   If a new issue is clearly a duplicate, label the new issue as “duplicate”, and close the issue with a link to the original issue.
-   Make sure to still thank the reporter, and encourage them to chime in on the original issue, and perhaps try to fix it.
-
-   If the new issue provides relevant information, such as a better or slightly different example, add it to the original issue as a comment or an edit to the original post.
-
+    If a new issue is clearly a duplicate, label the new issue as “duplicate”, and close the issue with a link to the original issue.
+    Make sure to still thank the reporter, and encourage them to chime in on the original issue, and perhaps try to fix it.
+    If the new issue provides relevant information, such as a better or slightly different example, add it to the original issue as a comment or an edit to the original post.
 4. **Is the issue minimal and reproducible?**
-
-   For bug reports, we ask that the reporter provide a minimal reproducible example.
-   See [minimal-bug-reports](https://matthewrocklin.com/blog/work/2018/02/28/minimal-bug-reports) for a good explanation.
-   If the example is not reproducible, or if it’s clearly not minimal, feel free to ask the reporter if they can provide and example or simplify the provided one.
-   Do acknowledge that writing minimal reproducible examples is hard work. If the reporter is struggling, you can try to write one yourself and we’ll edit the original post to include it.
-
-   If a nice reproducible example has been provided, thank the reporter for that.
-   If a reproducible example can’t be provided, add the “needs mcve” label.
-
-   If a reproducible example is provided, but you see a simplification, edit the original post with your simpler reproducible example.
-
+    For bug reports, we ask that the reporter provide a minimal reproducible example.
+    See [minimal-bug-reports](https://matthewrocklin.com/blog/work/2018/02/28/minimal-bug-reports) for a good explanation.
+    If the example is not reproducible, or if it’s clearly not minimal, feel free to ask the reporter if they can provide and example or simplify the provided one.
+    Do acknowledge that writing minimal reproducible examples is hard work. If the reporter is struggling, you can try to write one yourself and we’ll edit the original post to include it.
+    If a nice reproducible example has been provided, thank the reporter for that.
+    If a reproducible example can’t be provided, add the “needs mcve” label.
+    If a reproducible example is provided, but you see a simplification, edit the original post with your simpler reproducible example.
 5. **Is this a clearly defined feature request?**
-
-   Generally, VirtualiZarr prefers to discuss and design new features in issues, before a pull request is made.
-   Encourage the submitter to include a proposed API for the new feature. Having them write a full docstring is a good way to pin down specifics.
-
+    Generally, VirtualiZarr prefers to discuss and design new features in issues, before a pull request is made.
+    Encourage the submitter to include a proposed API for the new feature. Having them write a full docstring is a good way to pin down specifics.
 6. **Is this a usage question?**
-
-   We prefer that usage questions are asked as a [GitHub discussion topic](https://github.com/zarr-developers/VirtualiZarr/discussions).
-
-   If it’s easy to answer, feel free to link to the relevant documentation section, let them know that in the future this kind of question should be on the discussions section, and close the issue.
-
+    We prefer that usage questions are asked as a [GitHub discussion topic](https://github.com/zarr-developers/VirtualiZarr/discussions).
+    If it’s easy to answer, feel free to link to the relevant documentation section, let them know that in the future this kind of question should be on the discussions section, and close the issue.
 7. **What labels and milestones should I add?**
-
-   Apply the relevant labels. This is a bit of an art, and comes with experience. Look at similar issues to get a feel for how things are labeled.
-
-   If the issue is clearly defined and the fix seems relatively straightforward, label the issue as `good-first-issue`.
-
+    Apply the relevant labels. This is a bit of an art, and comes with experience. Look at similar issues to get a feel for how things are labeled.
+    If the issue is clearly defined and the fix seems relatively straightforward, label the issue as `good-first-issue`.
 8. **Where should the poster look to fix the issue?**
-
-   If you can, it is very helpful to point to the approximate location in the codebase where a contributor might begin to fix the issue.
-   This helps ease the way in for new contributors to the repository.
+    If you can, it is very helpful to point to the approximate location in the codebase where a contributor might begin to fix the issue.
+    This helps ease the way in for new contributors to the repository.
 
 ## Code review and contributions
 
