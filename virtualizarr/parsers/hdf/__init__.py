@@ -1,1 +1,3 @@
-from virtualizarr.parsers.hdf.hdf import HDFParser  # noqa: F401
+from virtualizarr.parsers.hdf.hdf import HDFParser
+
+__all__ = ["HDFParser"]
