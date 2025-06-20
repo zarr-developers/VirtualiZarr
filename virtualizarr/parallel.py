@@ -3,6 +3,14 @@ import warnings
 from concurrent.futures import Executor, Future
 from typing import Any, Callable, Iterable, Iterator, Literal, TypeVar
 
+
+__all__ = [
+    "SerialExecutor",
+    "DaskDelayedExecutor",
+    "LithopsExecutor",
+]
+
+
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 # TODO the DaskDelayedExecutor class could ideally be upstreamed into dask
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427

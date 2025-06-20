@@ -20,7 +20,6 @@ Users can use xarray for every step apart from reading and serializing virtual r
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes
 
 ### Rewriting
----------
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths
 
@@ -43,3 +42,13 @@ VirtualiZarr's [virtualizarr.ManifestArray][] objects support a limited subset o
 ::: virtualizarr.manifests.array_api.stack
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
+
+#### Parallelization
+
+Parallelizing virtual reference generation can be done using a number of parallel execution frameworks.
+Advanced users may want to call one of these exectutors directly.
+See the docs page on Scaling.
+
+::: virtualizarr.parallel.SerialExecutor
+::: virtualizarr.parallel.DaskDelayedExecutor
+::: virtualizarr.parallel.LithopsExecutor

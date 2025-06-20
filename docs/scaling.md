@@ -90,11 +90,9 @@ VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's
 
 VirtualiZarr comes with a small selection of executors you can choose from when using `open_virtual_mfdataset`.
 
-```{note}
+!!!note
 If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
 ```
-
-TODO: auto-generate API docs for all the executors here
 
 ### Serial
 
