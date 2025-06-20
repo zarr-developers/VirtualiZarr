@@ -22,11 +22,22 @@ Optional dependencies can be installed in groups via pip. For example to read HD
 pip install "virtualizarr[hdf, icechunk]"
 ```
 
-The full list of optional dependencies can be seen in the `pyproject.toml` file:
+The full list of optional dependencies from the `pyproject.toml` is shown below:
 
-```{literalinclude} ../pyproject.toml
-:start-at: "[project.optional-dependencies]"
-:end-before: "# Dependency sets under dependencies-groups are NOT available via PyPI"
+```python exec="true"
+import tomllib
+
+with open("pyproject.toml", "rb") as f:
+    data = tomllib.load(f)
+
+# For PEP 621 optional dependencies
+print("```")
+if "project" in data and "optional-dependencies" in data["project"]:
+    for group, deps in data["project"]["optional-dependencies"].items():
+        print(f"{group}:\n")
+        for dep in deps:
+            print(f"\t{dep}\n")
+print("```")
 ```
 
 The compound groups allow you to install multiple sets of dependencies at once, e.g. install every file parser via

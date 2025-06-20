@@ -49,9 +49,8 @@ Instead you would prefer to just be able to open a single pre-saved virtual stor
 You can think of this as effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together.
 Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
-```{note}
-This means you should not change or add to any of the files comprising the store once created. If you want to make changes or add new data, you should look into using [Icechunk](https://icechunk.io/) instead.
-```
+!!! note
+    This means you should not change or add to any of the files comprising the store once created. If you want to make changes or add new data, you should look into using [Icechunk](https://icechunk.io/) instead.
 
 As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud.
 You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
