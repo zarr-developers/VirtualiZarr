@@ -188,12 +188,14 @@ class ChunkManifest:
 
     The manifest can be converted to or from a dictionary which looks like this
 
-    |    {
-    |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-    |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-    |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-    |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-    |    }
+    ```
+    {
+        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+    }
+    ```
 
     using the .__init__() and .dict() methods, so users of this class can think of the manifest as if it were a dict mapping zarr chunk keys to byte ranges.
 
@@ -213,15 +215,17 @@ class ChunkManifest:
 
         Parameters
         ----------
-        entries: dict
+        entries
             Chunk keys and byte range information, as a dictionary of the form
 
-            |    {
-            |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-            |    }
+            ```
+            {
+                "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+                "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+                "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+            }
+            ```
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
@@ -278,10 +282,13 @@ class ChunkManifest:
 
         Parameters
         ----------
-        paths: np.ndarray
-        offsets: np.ndarray
-        lengths: np.ndarray
-        validate_paths: bool
+        paths
+            Array containing the paths to the chunks
+        offsets
+            Array containing the byte offsets of the chunks
+        lengths
+            Array containing the byte lengths of the chunks
+        validate_paths
             Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
             Set to False to skip validation for performance reasons.
         """
@@ -399,12 +406,14 @@ class ChunkManifest:
 
         The returned dict will be of the form
 
-        |    {
-        |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-        |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-        |    }
+        ```
+        {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+        ```
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
@@ -455,6 +464,10 @@ class ChunkManifest:
         -------
         manifest
 
+        See Also
+        --------
+        ManifestArray.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -466,12 +479,8 @@ class ChunkManifest:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> manifest.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ManifestArray.rename_paths
         """
         if isinstance(new, str):
             renamed_paths = np.full_like(self._paths, fill_value=new)

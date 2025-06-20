@@ -53,7 +53,7 @@ ds = xr.open_dataset('combined.json', engine='kerchunk', chunks={})  # normal xa
 
 No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
 
-See the [Usage docs page](#usage) for more details.
+See the [Usage docs page](usage.md) for more details.
 
 ## Talks and Presentations
 
@@ -69,25 +69,6 @@ This package was originally developed by [Tom Nicholas](https://github.com/TomNi
 ## Licence
 
 Apache 2.0
-
-## Pages
-
-```{toctree}
-:maxdepth: 2
-
-self
-installation
-usage
-examples
-faq
-api
-data_structures
-scaling
-custom_readers
-releases
-contributing
-core_team_guide
-```
 
 ## References
 

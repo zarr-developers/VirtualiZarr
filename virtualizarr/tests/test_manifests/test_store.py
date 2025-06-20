@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+from obstore.store import MemoryStore
 from zarr.abc.store import (
     OffsetByteRequest,
     RangeByteRequest,
@@ -21,13 +22,12 @@ from virtualizarr.manifests import (
     ManifestStore,
     ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import default_object_store
+from virtualizarr.manifests.store import get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_minio,
-    requires_network,
     requires_obstore,
 )
 
@@ -46,20 +46,17 @@ def _generate_manifest_store(
     provides an easily understandable structure for testing ManifestStore's
     ability to redirect Zarr chunk key requests and extract subsets of the file.
 
-    Parameters:
-    -----------
-    store : ObjectStore
+    Parameters
+    ----------
+    store
         ObjectStore instance for holding the file
-    prefix : str
+    prefix
         Prefix to use to identify the ObjectStore in the ManifestStore
-    filepath : str
+    filepath
         Filepath for storing temporary testing file
-    array_v3_metadata : callable
-        Function for generating V3 array metadata with sensible defaults.
-        This is passed in as a argument because pytest fixtures aren't meant to
-        be imported directly.
-    Returns:
-    --------
+
+    Returns
+    -------
     ManifestStore
     """
     import obstore as obs
@@ -127,49 +124,6 @@ def s3_store(minio_bucket):
         prefix=prefix,
         filepath=filepath,
     )
-
-
-@requires_obstore
-@requires_minio
-def test_default_object_store_s3(minio_bucket):
-    from obstore.store import S3Store
-
-    filepath = f"s3://{minio_bucket['bucket']}/data/data.tmp"
-    store = default_object_store(
-        filepath,
-    )
-    assert isinstance(store, S3Store)
-
-
-@requires_obstore
-@requires_minio
-def test_default_object_store_http(minio_bucket):
-    from obstore.store import HTTPStore
-
-    filepath = minio_bucket["endpoint"]
-    store = default_object_store(
-        filepath,
-    )
-    assert isinstance(store, HTTPStore)
-
-
-@requires_obstore
-def test_default_object_store_local(tmpdir):
-    from obstore.store import LocalStore
-
-    filepath = f"{tmpdir}/data.tmp"
-    store = default_object_store(filepath)
-    assert isinstance(store, LocalStore)
-
-
-@requires_network
-@requires_obstore
-def test_default_region_raises():
-    file = "s3://cworthy/oae-efficiency-atlas/data/experiments/000/01/alk-forcing.000-1999-01.pop.h.0347-01.nc"
-    with pytest.raises(
-        ValueError, match="Unable to automatically determine region for bucket*"
-    ):
-        default_object_store(file)
 
 
 @requires_obstore
@@ -282,13 +236,26 @@ class TestToVirtualXarray:
         ],
     )
     def test_single_group_to_dataset(
-        self, manifest_array, loadable_variables, expected_loadable_variables
+        self,
+        manifest_array,
+        loadable_variables,
+        expected_loadable_variables,
     ):
         marr1 = manifest_array(
             shape=(3, 2, 5), chunks=(1, 2, 1), dimension_names=["x", "y", "t"]
         )
         marr2 = manifest_array(shape=(3, 2), chunks=(1, 2), dimension_names=["x", "y"])
         marr3 = manifest_array(shape=(5,), chunks=(5,), dimension_names=["t"])
+
+        paths1 = list({v["path"] for v in marr1.manifest.values()})
+        paths2 = list({v["path"] for v in marr2.manifest.values()})
+        paths3 = list({v["path"] for v in marr2.manifest.values()})
+        unique_paths = list(set(paths1 + paths2 + paths3))
+        stores = {}
+        for path in unique_paths:
+            store = MemoryStore()
+            stores[get_store_prefix(path)] = store
+        store_registry = ObjectStoreRegistry(stores=stores)
 
         manifest_group = ManifestGroup(
             arrays={
@@ -299,7 +266,7 @@ class TestToVirtualXarray:
             attributes={"coordinates": "elevation t", "ham": "eggs"},
         )
 
-        manifest_store = ManifestStore(manifest_group)
+        manifest_store = ManifestStore(manifest_group, store_registry=store_registry)
 
         vds = manifest_store.to_virtual_dataset(loadable_variables=loadable_variables)
         assert set(vds.variables) == set(["T", "elevation", "t"])

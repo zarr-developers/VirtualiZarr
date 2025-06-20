@@ -39,16 +39,16 @@ def virtual_dataset_to_icechunk(
 
     Parameters
     ----------
-    vds: xr.Dataset
+    vds
         Dataset to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
-    store: IcechunkStore
+    store
         Store to write the dataset to, which must not be read-only.
-    group: Optional[str]
+    group
         Path to the group in which to store the dataset, defaulting to the root group.
-    append_dim: Optional[str]
+    append_dim
         Name of the dimension along which to append data. If provided, the dataset must
         have a dimension with this name.
-    last_updated_at: Optional[datetime]
+    last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
         time, icechunk will raise an error at runtime when trying to read the virtual
@@ -128,16 +128,16 @@ def virtual_datatree_to_icechunk(
 
     Parameters
     ----------
-    vdt: xr.DataTree
+    vdt
         DataTree to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
-    store: IcechunkStore
+    store
         Store to write the dataset to, which must not be read-only.
-    write_inherited_coords : bool, default: False
+    write_inherited_coords
         If ``True``, replicate inherited coordinates on all descendant nodes of the
         tree. Otherwise, only write coordinates at the level at which they are
         originally defined. This saves disk space, but requires opening the
         full tree to load inherited coordinates.
-    last_updated_at: datetime, optional
+    last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
         time, icechunk will raise an error at runtime when trying to read the virtual

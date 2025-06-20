@@ -13,7 +13,7 @@ T = TypeVar("T")
 
 
 def get_executor(
-    parallel: Literal["dask", "lithops"] | Executor | Literal[False],
+    parallel: Literal["dask", "lithops"] | type[Executor] | Literal[False],
 ) -> type[Executor]:
     """Get an executor that follows the concurrent.futures.Executor ABC API."""
 
@@ -38,7 +38,7 @@ class SerialExecutor(Executor):
     concurrent.futures.Executor interface. Useful as a default and for debugging.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Track submitted futures to maintain interface compatibility
         self._futures: list[Future] = []
 
@@ -52,9 +52,9 @@ class SerialExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -93,7 +93,7 @@ class SerialExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
@@ -124,7 +124,7 @@ class DaskDelayedExecutor(Executor):
     This executor mimics the concurrent.futures.Executor interface but uses Dask's delayed computation model.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Dask Delayed Executor."""
 
         # Track submitted futures
@@ -138,9 +138,9 @@ class DaskDelayedExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -184,7 +184,7 @@ class DaskDelayedExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
@@ -224,7 +224,7 @@ class LithopsEagerFunctionExecutor(Executor):
     Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         import lithops  # type: ignore[import-untyped]
 
         # Create Lithops client with optional configuration
@@ -241,9 +241,9 @@ class LithopsEagerFunctionExecutor(Executor):
         ----------
         fn
             The callable to execute
-        args
+        *args
             Positional arguments for the callable
-        kwargs
+        **kwargs
             Keyword arguments for the callable
 
         Returns
@@ -293,7 +293,7 @@ class LithopsEagerFunctionExecutor(Executor):
         ----------
         fn
             Function to apply to each item
-        iterables
+        *iterables
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)

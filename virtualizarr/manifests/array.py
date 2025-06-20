@@ -10,6 +10,7 @@ import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
+    expand_dims,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
 
@@ -234,13 +235,12 @@ class ManifestArray:
                 raise NotImplementedError(
                     f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
                 )
-
             indexer = (key,)
         elif isinstance(key, tuple):
             for dim_indexer in key:
                 if (
                     not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
-                    or dim_indexer is None
+                    and dim_indexer is not None
                 ):
                     raise TypeError(
                         f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
@@ -271,7 +271,13 @@ class ManifestArray:
             # indexer is all slice(None)'s, so this is a no-op
             return self
         else:
-            raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            output_arr = self
+            for ind, axis_indexer in enumerate(indexer):
+                if axis_indexer is None:
+                    output_arr = expand_dims(output_arr, axis=ind)
+                elif axis_indexer != slice(None):
+                    raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            return output_arr
 
     def rename_paths(
         self,
@@ -292,6 +298,10 @@ class ManifestArray:
         -------
         ManifestArray
 
+        See Also
+        --------
+        ChunkManifest.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -303,12 +313,8 @@ class ManifestArray:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> marr.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
