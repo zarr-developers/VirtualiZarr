@@ -3,7 +3,6 @@ import warnings
 from concurrent.futures import Executor, Future
 from typing import Any, Callable, Iterable, Iterator, Literal, TypeVar
 
-
 __all__ = [
     "SerialExecutor",
     "DaskDelayedExecutor",
