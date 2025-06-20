@@ -51,4 +51,4 @@ See the docs page on Scaling.
 
 ::: virtualizarr.parallel.SerialExecutor
 ::: virtualizarr.parallel.DaskDelayedExecutor
-::: virtualizarr.parallel.LithopsExecutor
+::: virtualizarr.parallel.LithopsEagerFunctionExecutor
