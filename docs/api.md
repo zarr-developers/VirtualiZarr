@@ -46,7 +46,7 @@ VirtualiZarr's [virtualizarr.ManifestArray][] objects support a limited subset o
 #### Parallelization
 
 Parallelizing virtual reference generation can be done using a number of parallel execution frameworks.
-Advanced users may want to call one of these exectutors directly.
+Advanced users may want to call one of these executors directly.
 See the docs page on Scaling.
 
 ::: virtualizarr.parallel.SerialExecutor
