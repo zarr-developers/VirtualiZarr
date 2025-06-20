@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable, Iterator, Literal, TypeVar
 __all__ = [
     "SerialExecutor",
     "DaskDelayedExecutor",
-    "LithopsExecutor",
+    "LithopsEagerFunctionExecutor",
 ]
 
 
