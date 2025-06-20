@@ -43,7 +43,7 @@ The [virtualizarr.ChunkManifest][] class is virtualizarr's internal in-memory re
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.
-The [virtualizarr.ManifestArray][] class stores both the array-level attributes and the corresponding chunk manifest.
+The [virtualizarr.manifests.ManifestArray][] class stores both the array-level attributes and the corresponding chunk manifest.
 
 ```python
 marr
