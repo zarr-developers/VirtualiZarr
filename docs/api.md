@@ -8,11 +8,11 @@ Users can use xarray for every step apart from reading and serializing virtual r
 ### Reading
 
 ::: virtualizarr.open_virtual_dataset
+::: virtualizarr.open_virtual_mfdataset
 
 ### Serialization
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor
-
 ::: virtualizarr.accessor.VirtualiZarrDataTreeAccessor
 
 ### Information
@@ -20,7 +20,6 @@ Users can use xarray for every step apart from reading and serializing virtual r
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes
 
 ### Rewriting
----------
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths
 
@@ -43,3 +42,13 @@ VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limite
 ::: virtualizarr.manifests.array_api.stack
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
+
+#### Parallelization
+
+Parallelizing virtual reference generation can be done using a number of parallel execution frameworks.
+Advanced users may want to call one of these executors directly.
+See the docs page on Scaling.
+
+::: virtualizarr.parallel.SerialExecutor
+::: virtualizarr.parallel.DaskDelayedExecutor
+::: virtualizarr.parallel.LithopsEagerFunctionExecutor
