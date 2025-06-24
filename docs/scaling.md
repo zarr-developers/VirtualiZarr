@@ -8,7 +8,7 @@ Before you attempt to use VirtualiZarr on a large number of files at once, you s
 
 In particular, you should check that:
 
-- You can call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on one of your files, which requires there to be a reader which can interpret that file format.
+- You can call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on one of your files, which requires there to be a parser which can interpret that file format.
 - After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
 - You can serialize those virtual references to some format (e.g. Kerchunk/Icechunk) and read the data back.
 - The data you read back is exactly what you would have expected to get if you read the data from the original files.
