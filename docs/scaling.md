@@ -169,7 +169,7 @@ There are 3 points at which this might happen:
 3. While writing references
 
 While generating references each worker calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] needs to avoid running out of memory.
-This primarily depends on how the file is read - see the section on [Caching](scaling.md#Caching) below.
+This primarily depends on how the file is read - see the section on [Caching](#caching-remote-files) below.
 
 The combine step happens back on the machine on which [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] was called, so while combining references that machine must have enough memory to hold all the virtual references at once.
 You can find the in-memory size of the references for a single virtual dataset by calling the [`.nbytes`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes] accessor method on it (not to be confused with the `.nbytes` xarray method, which returns the total size if all that data were actually loaded into memory).
