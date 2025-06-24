@@ -21,7 +21,7 @@ If you don't do these checks now, you might find that you deploy a large amount 
 
 VirtualiZarr is a tool designed for taking a large number of slow-to-access files (i.e. non-cloud-optimized data) and creating a way to make all subsequent accesses much faster (i.e. a cloud-optimized datacube).
 
-Running `open_virtual_dataset` on just one file can take a while (seconds to minutes), because for data sat in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data.
+Running [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on just one file can take a while (seconds to minutes), because for data in object storage, fetching just the metadata can be almost as time-consuming as fetching the actual data.
 (For a full explanation as to why [see this article](https://earthmover.io/blog/fundamentals-what-is-cloud-optimized-scientific-data)).
 In some cases we may find it's easiest to load basically the entire contents of the file in order to virtualize it.
 
