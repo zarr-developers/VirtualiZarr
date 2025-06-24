@@ -198,7 +198,8 @@ The Kerchunk Parquet format is more scalable, but you may want to experiment wit
 
 Icechunk's format stores the virtual references in dedicated binary files, and can use "manifest splitting", together meaning that it should be a scalable way to store large numbers of references.
 
-TODO: Put numbers on this by testing at large scale once manifest splitting is actually released in Icechunk.
+!!! TODO
+    Put numbers on this by testing at large scale once manifest splitting is actually released in Icechunk.
 
 ## Tips for success
 
@@ -212,13 +213,15 @@ One way to do this is to issue HTTP range requests only for each piece of metada
 This will download the absolute minimum amount of data in total, but issue a lot of HTTP requests, each of which can take a long time to be returned from high-latency object storage.
 This approach therefore uses the minimum amount of memory on the worker but takes more time.
 
-TODO: Describe how this is the default with obstore
+!!! TODO
+    Describe how this is the default with obstore
 
 The other extreme is to download the entire file up front.
 This downloads all the metadata by definition, but also all the actual data, which is likely millions of times more than you need for virtualization.
 This approach usually takes a lot less time on the worker but requires the maximum amount of memory - using this approach on every file in the dataset entails downloading the entire dataset across all workers!
 
-TODO: How to enable this by passing `cache=True` to obstore
+!!! TODO
+    How to enable this by passing `cache=True` to obstore
 
 There are various tricks one can use when fetching metadata, such as pre-fetching, minimum fetch sizes, or read-ahead caching strategies.
 All of these approaches will put your memory requirements somewhere in between the two extremes described above, and are not necessary for successful execution.
@@ -261,4 +264,5 @@ If you are batching your computation then you could retry each loop iteration if
 
 Instead what is more efficient is to use per-task retries at te executor level.
 
-TODO: We plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
+!!! TODO
+    We plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
