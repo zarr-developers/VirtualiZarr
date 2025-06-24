@@ -259,6 +259,14 @@ In N-dimensions the datasets would need to be passed as an N-deep nested list-of
     Without indexes we can avoid loading any data whatsoever from the files.
     However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 
+You can achieve both the opening and combining steps for multiple files in one go by using [open_virtual_mfdataset][virtualizarr.open_virtual_mfdataset].
+
+```python
+combined_vds = xr.open_virtual_mfdataset(['air1.nc', 'air2.nc'], concat_dim='time', combine='nested')
+```
+
+We passed `combine='nested'` to specify that we want the datasets to be combined in the order they appear, using `xr.combine_nested` under the hood.
+
 ### Ordering by coordinate values
 
 If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
@@ -271,7 +279,8 @@ combined_vds = xr.combine_by_coords([vds2, vds1])
 ```
 
 Notice we don't have to specify the concatenation dimension explicitly - xarray works out the correct ordering for us.
-Even though we actually passed in the virtual datasets in the wrong order just now, the manifest still has the chunks listed in the correct order such that the 1-dimensional `time` coordinate has ascending values:
+Even though we actually passed in the virtual datasets in the wrong order just now, they have been combined in the correct order such that the 1-dimensional `time` coordinate has ascending values.
+As a result our chunk manifest still has the chunks listed in the expected order:
 
 ```python
 combined_vds['air'].data.manifest.dict()
@@ -282,9 +291,29 @@ combined_vds['air'].data.manifest.dict()
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
+Again, we can achieve both the opening and combining steps for multiple files in one go by using [open_virtual_mfdataset][virtualizarr.open_virtual_mfdataset], but this passing `combine='by_coords'`.
+
+```python
+combined_vds = xr.open_virtual_mfdataset(['air2.nc', 'air1.nc'], combine='by_coords')
+```
+
+We can even pass in a glob to find all the files we want to automatically combine:
+
+```python
+combined_vds = xr.open_virtual_mfdataset('air*.nc', combine='by_coords')
+```
+
 ### Ordering using metadata
 
 TODO: Use preprocess to create a new index from the metadata. Requires `open_virtual_mfdataset` to be implemented in [PR #349](https://github.com/zarr-developers/VirtualiZarr/pull/349).
+
+### Combining many virtual datasets at once
+
+Combining a large number (e.g., 1000s) of virtual datasets at once should be very quick (a few seconds), as we are manipulating only a few KBs of metadata in memory.
+
+However creating 1000s of virtual datasets at once can take a very long time.
+(If it were quick to do so, there would be little need for this library!)
+See the page on [Scaling](scaling.md) for tips on how to create large numbers of virtual datasets at once.
 
 ## Writing virtual stores to disk
 

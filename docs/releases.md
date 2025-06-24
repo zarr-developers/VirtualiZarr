@@ -48,6 +48,10 @@
 
 - Added new docs page on how to write a custom parser for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Documented the new [`virtualizarr.open_virtual_mfdataset`] function [#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   ([#475](https://github.com/zarr-developers/VirtualiZarr/pull/475)) by [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
 - Added FAQ answer about what data can be virtualized ([#430](https://github.com/zarr-developers/VirtualiZarr/issues/430), [#532](https://github.com/zarr-developers/VirtualiZarr/pull/532))

@@ -91,6 +91,8 @@ def open_virtual_mfdataset(
     """
     Open multiple files as a single virtual dataset.
 
+    This function is explicitly modelled after `xarray.open_mfdataset`, and works in the same way.
+
     If combine='by_coords' then the function ``combine_by_coords`` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
     ``combine_nested`` is used. The filepaths must be structured according to which
@@ -137,7 +139,7 @@ def open_virtual_mfdataset(
 
     Notes
     -----
-    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large.
+    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large. See the docs page on Scaling.
     """
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?

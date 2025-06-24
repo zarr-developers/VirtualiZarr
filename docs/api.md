@@ -8,6 +8,7 @@ Users can use xarray for every step apart from reading and serializing virtual r
 ### Reading
 
 ::: virtualizarr.open_virtual_dataset
+::: virtualizarr.open_virtual_mfdataset
 
 ### Parsers
 
@@ -24,7 +25,6 @@ Each parser understands how to read a specific file format, and a parser must be
 ### Serialization
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor
-
 ::: virtualizarr.accessor.VirtualiZarrDataTreeAccessor
 
 ### Information
@@ -32,7 +32,6 @@ Each parser understands how to read a specific file format, and a parser must be
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes
 
 ### Rewriting
----------
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths
 
@@ -53,7 +52,7 @@ See the page on data structures for more information.
 
 #### Array API
 
-VirtualiZarr's [virtualizarr.ManifestArray][] objects support a limited subset of the Python Array API standard in `virtualizarr.manifests.array_api`.
+VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limited subset of the Python Array API standard in `virtualizarr.manifests.array_api`.
 
 ::: virtualizarr.manifests.array_api.concatenate
 ::: virtualizarr.manifests.array_api.stack
@@ -65,3 +64,13 @@ VirtualiZarr's [virtualizarr.ManifestArray][] objects support a limited subset o
 All custom parsers must follow the `virtualizarr.parsers.typing.Parser` typing protocol.
 
 ::: virtualizarr.parsers.typing.Parser
+
+#### Parallelization
+
+Parallelizing virtual reference generation can be done using a number of parallel execution frameworks.
+Advanced users may want to call one of these executors directly.
+See the docs page on Scaling.
+
+::: virtualizarr.parallel.SerialExecutor
+::: virtualizarr.parallel.DaskDelayedExecutor
+::: virtualizarr.parallel.LithopsEagerFunctionExecutor
