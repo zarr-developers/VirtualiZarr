@@ -33,6 +33,9 @@ VirtualiZarr uses these classes to store virtual references internally.
 
 ::: virtualizarr.manifests.ChunkManifest
 ::: virtualizarr.manifests.ManifestArray
+::: virtualizarr.manifests.ManifestGroup
+::: virtualizarr.manifests.ManifestStore
+::: virtualizarr.manifests.ObjectStoreRegistry
 
 #### Array API
 

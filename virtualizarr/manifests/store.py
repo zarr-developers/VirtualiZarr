@@ -21,7 +21,7 @@ from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from obstore.store import (
-        ObjectStore,  # type: ignore[import-not-found]
+        ObjectStore,
     )
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
@@ -124,8 +124,8 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances. This register allows
-    Zarr Store implementations (e.g., ManifestStore) to read from different ObjectStore instances.
+    ObjectStoreRegistry maps the URL scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. This register allows
+    Zarr Store implementations (e.g., [ManifestStore][virtualizarr.manifests.ManifestStore]) to read from different ObjectStore instances.
     """
 
     _stores: dict[str, ObjectStore]
@@ -147,7 +147,7 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         prefix
-            A url to identify the appropriate object_store instance. If the url is contained in the
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longer prefix is chosen.
         """
         self._stores[prefix] = store
@@ -159,7 +159,7 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         url
-            A url to identify the appropriate object_store instance. If the url is contained in the
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longest prefix is chosen.
 
         Returns
@@ -183,16 +183,16 @@ class ManifestStore(Store):
     """
     A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
 
-    The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
+    The requests from the Zarr API are redirected using the [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing
+    multiple [ManifestArray][virtualizarr.manifests.ManifestArray], allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------
-    group : ManifestGroup
+    group
         Root group of the store.
-        Contains group metadata, ManifestArrays, and any subgroups.
+        Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     store_registry : ObjectStoreRegistry
-        ObjectStoreRegistry that maps the URL scheme and netloc to ObjectStore instances,
+        [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore]instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
@@ -217,10 +217,10 @@ class ManifestStore(Store):
         Parameters
         ----------
         group
-            Manifest Group containing Group metadata and mapping variable names to ManifestArrays
+            [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing Group metadata and mapping variable names to ManifestArrays
         store_registry
-            A registry mapping the URL scheme and netloc to ObjectStore instances,
-            allowing ManifestStores to read from different ObjectStore instances.
+            A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+            allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
 
         # TODO: Don't allow stores with prefix
@@ -369,7 +369,7 @@ class ManifestStore(Store):
         indexes: Mapping[str, xr.Index] | None = None,
     ) -> "xr.Dataset":
         """
-        Create a "virtual" xarray dataset containing the contents of one zarr group.
+        Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
 
         Will ignore the contents of any other groups in the store.
 
