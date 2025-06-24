@@ -1,5 +1,3 @@
-(scaling)=
-
 # Scaling
 
 This page explains how to scale up your usage of VirtualiZarr to cloud-optimize large numbers of files.
@@ -9,8 +7,9 @@ This page explains how to scale up your usage of VirtualiZarr to cloud-optimize 
 Before you attempt to use VirtualiZarr on a large number of files at once, you should check that you can successfully use the library on a small subset of your data.
 
 In particular, you should check that:
-- You can call `open_virtual_dataset` on one of your files, which requires there to be a reader which can interpret that file format.
-- After calling `open_virtual_dataset` on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
+
+- You can call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on one of your files, which requires there to be a reader which can interpret that file format.
+- After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
 - You can serialize those virtual references to some format (e.g. Kerchunk/Icechunk) and read the data back.
 - The data you read back is exactly what you would have expected to get if you read the data from the original files.
 
@@ -28,13 +27,13 @@ In some cases we may find it's easiest to load basically the entire contents of 
 
 Therefore we should expect that running VirtualiZarr on all our data files will take a long time - we are paying this cost once up front so that our users do not have to pay it again on subsequent data accesses.
 
-However, the `open_virtual_dataset` calls for each file are completely independent, meaning that part of the computation is "embarrassingly parallelizable".
+However, the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls for each file are completely independent, meaning that part of the computation is "embarrassingly parallelizable".
 
 ### Map-reduce
 
 The problem of scaling VirtualiZarr is an example of a classic map-reduce problem, with two parts:
 
-1. We first must apply the `open_virtual_dataset` function over every file we want to virtualize. This is the map step, and can be parallelized.
+1. We first must apply the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] function over every file we want to virtualize. This is the map step, and can be parallelized.
 2. Then we must take all the resultant virtual datasets (one per file), and combine them together into one final virtual dataset. This is the reduce step.
 
 Finally we write this single virtual dataset to some persistent format.
@@ -48,11 +47,11 @@ This avoids the need for more complicated parallelization strategies such as a t
 ## Parallelization Approaches
 
 There are two ways you can implement a map-reduce approach to virtualization in your code.
-The first is to write it yourself, and the second is to use `open_virtual_mfdataset`.
+The first is to write it yourself, and the second is to use [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
 ### Manual parallelism
 
-You are free to call `open_virtual_dataset` on your various files however you like, using any method to apply them, including applying them in parallel.
+You are free to call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on your various files however you like, using any method to apply them, including applying them in parallel.
 
 For example you may want to parallelize using the [dask library](https://www.dask.org/), which you can do by wrapping each call using `dask.delayed` like this:
 
@@ -74,7 +73,7 @@ combined_vds = xr.combine_by_coords(virtual_datasets)
 
 ### The `parallel` kwarg to `open_virtual_mfdataset`
 
-Alternatively, you can use `virtualizarr.open_virtual_mfdataset`'s `parallel` keyword argument.
+Alternatively, you can use [virtualizarr.open_virtual_mfdataset][]'s `parallel` keyword argument.
 
 This argument allows you to conveniently choose from a range of pre-defined parallel execution frameworks, or even pass your own executor.
 
@@ -84,11 +83,11 @@ The resulting code only takes one function call to generate virtual references i
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=<choice_of_executor>)
 ```
 
-VirtualiZarr's `open_virtual_mfdataset` is designed to mimic the API of Xarray's `open_mfdataset`, and so accepts all the same keyword argument options for combining.
+VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] is designed to mimic the API of Xarray's `open_mfdataset`, and so accepts all the same keyword argument options for combining.
 
 ## Executors
 
-VirtualiZarr comes with a small selection of executors you can choose from when using `open_virtual_mfdataset`.
+VirtualiZarr comes with a small selection of executors you can choose from when using [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
 !!!note
 If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
@@ -96,7 +95,7 @@ If you prefer to do manual parallelism but would like to use one of these execut
 
 ### Serial
 
-The simplest executor is the `SerialExecutor`, which executes all the `open_virtual_dataset` calls in serial, not in parallel.
+The simplest executor is the `SerialExecutor`, which executes all the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls in serial, not in parallel.
 It is the default executor.
 
 ### Threads or Processes
@@ -116,7 +115,7 @@ This can work well when virtualizing files in remote object storage because it p
 ### Dask Delayed
 
 You can parallelize using `dask.delayed` automatically by passing `parallel='dask'`.
-This will select the `virtualizarr.parallel.DaskDelayedExecutor`.
+This will select the [virtualizarr.parallel.DaskDelayedExecutor][].
 
 ```python
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='dask')
@@ -134,7 +133,7 @@ You can parallelize VirtualiZarr serverlessly by using the [lithops](http://lith
 Lithops can run on all the main cloud provider's serverless FaaS platforms.
 
 To run on lithops you need to configure lithops for the relevant compute backend (e.g. AWS Lambda), build a runtime using Docker ([example Dockerfile]() with the required dependencies), and ensure the necessary cloud permissions to run are available.
-Then you can use the `virtualizarr.parallel.LithopsEagerFunctionExecutor` simply via
+Then you can use the [virtualizarr.parallel.LithopsEagerFunctionExecutor][] simply via:
 
 ```python
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
@@ -169,11 +168,11 @@ There are 3 points at which this might happen:
 2. While combining references
 3. While writing references
 
-While generating references each worker calling `open_virtual_dataset` needs to avoid running out of memory.
+While generating references each worker calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] needs to avoid running out of memory.
 This primarily depends on how the file is read - see the section on [Caching](scaling.md#Caching) below.
 
-The combine step happens back on the machine on which `vz.open_virtual_mfdataset` was called, so while combining references that machine must have enough memory to hold all the virtual references at once.
-You can find the in-memory size of the references for a single virtual dataset by calling the `.nbytes` accessor method on it (not to be confused with the `.nbytes` xarray method, which returns the total size if all that data were actually loaded into memory).
+The combine step happens back on the machine on which [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] was called, so while combining references that machine must have enough memory to hold all the virtual references at once.
+You can find the in-memory size of the references for a single virtual dataset by calling the [`.nbytes`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes] accessor method on it (not to be confused with the `.nbytes` xarray method, which returns the total size if all that data were actually loaded into memory).
 Do this for one file, and multiply by the number of files you have to estimate the total memory required for this step.
 
 Writing the combined virtual references out requires converting them to a different references format, which may have different memory requirements.
@@ -191,7 +190,7 @@ Both the in-memory Kerchunk `dict` and Kerchunk JSON formats are extremely ineff
 You may well find that a virtual dataset object that easily fits in memory suddenly uses up many times more memory or space on disk when converted to one of these formats.
 Persisting large numbers of references in these formats is therefore not recommended.
 
-The Kerchunk Parquet format is more scalable, but you may want to experiment with the  `record_size` and `categorical_threshold` arguments to the virtualizarr `.to_kerchunk` accessor method.
+The Kerchunk Parquet format is more scalable, but you may want to experiment with the  `record_size` and `categorical_threshold` arguments to the virtualizarr [`.to_kerchunk`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk] accessor method.
 
 ### Icechunk
 
@@ -207,7 +206,7 @@ Here are some assorted tips for successfully scaling VirtualiZarr.
 
 ### Caching remote files
 
-When you call `open_virtual_dataset` on a remote file, it  needs to extract the metadata and store it in memory (the returned virtual dataset).
+When you call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a remote file, it  needs to extract the metadata and store it in memory (the returned virtual dataset).
 
 One way to do this is to issue HTTP range requests only for each piece of metadata.
 This will download the absolute minimum amount of data in total, but issue a lot of HTTP requests, each of which can take a long time to be returned from high-latency object storage.
@@ -255,10 +254,10 @@ Notice this workflow could also be used for appending data only as it becomes av
 
 ### Retries
 
-Sometimes an `open_virtual_dataset` call might fail for a transient reason, such as a failed HTTP response from a server.
+Sometimes an [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] call might fail for a transient reason, such as a failed HTTP response from a server.
 In such a scenario automatically retrying the failed call might be enough to obtain success and keep the computation proceeding.
 
-If you are batching your computation then you could retry each loop iteration if any `open_virtual_dataset` calls fail, but that's potentially very inefficient, because that would also retry the successful calls.
+If you are batching your computation then you could retry each loop iteration if any [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls fail, but that's potentially very inefficient, because that would also retry the successful calls.
 
 Instead what is more efficient is to use per-task retries at te executor level.
 

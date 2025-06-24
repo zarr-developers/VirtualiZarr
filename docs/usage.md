@@ -246,7 +246,7 @@ In N-dimensions the datasets would need to be passed as an N-deep nested list-of
     Without indexes we can avoid loading any data whatsoever from the files.
     However, you should first be confident that the archival files actually do have compatible data, as the coordinate values then cannot be efficiently compared for consistency (i.e. aligned).
 
-You can achieve both the opening and combining steps for multiple files in one go by using `open_virtual_mfdataset <virtualizarr.open_virtual_mfdataset>`.
+You can achieve both the opening and combining steps for multiple files in one go by using [open_virtual_mfdataset][virtualizarr.open_virtual_mfdataset].
 
 ```python
 combined_vds = xr.open_virtual_mfdataset(['air1.nc', 'air2.nc'], concat_dim='time', combine='nested')
@@ -278,7 +278,7 @@ combined_vds['air'].data.manifest.dict()
  '1.0.0': {'path': 'file:///work/data/air2.nc', 'offset': 15419, 'length': 3869000}}
 ```
 
-Again, we can achieve both the opening and combining steps for multiple files in one go by using `open_virtual_mfdataset <virtualizarr.open_virtual_mfdataset>`, but this passing `combine='by_coords'`.
+Again, we can achieve both the opening and combining steps for multiple files in one go by using [open_virtual_mfdataset][virtualizarr.open_virtual_mfdataset], but this passing `combine='by_coords'`.
 
 ```python
 combined_vds = xr.open_virtual_mfdataset(['air2.nc', 'air1.nc'], combine='by_coords')
