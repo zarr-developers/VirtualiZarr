@@ -30,6 +30,20 @@ vds = open_virtual_dataset('air.nc', object_store=LocalStore, parser=HDFParser()
 
     VirtualiZarr has various "parsers" which understand different file formats. You must supply a parser, and as all netCDF4 files are really HDF5 files, here we used the `HDFParser`.
 
+!!! important
+
+    It is good practice to use `open_virtual_dataset` as a context manager to automatically close file handles.
+    For example the above code would become:
+
+    ```python
+    with vz.open_virtual_dataset('air.nc', object_store=LocalStore, parser=HDFParser()) as vds:
+	    # do things with vds
+        ...
+    ```
+
+    This is important to avoid accumulating open file handles and for avoiding leaks, so is recommended for production code.
+    However we omit the context managers from the examples in the documentation for brevity.
+
 Printing this "virtual dataset" shows that although it is an instance of `xarray.Dataset`, unlike a typical xarray dataset, in addition to a few in-memory numpy arrays, it also wraps [virtualizarr.manifests.ManifestArray][] objects. You can learn more about the `ManifestArray` class in the [Data Structures documentation](data_structures.md).
 
 ```python
