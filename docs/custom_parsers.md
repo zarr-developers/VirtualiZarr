@@ -212,10 +212,12 @@ import xarray.testing as xrt
 from virtualizarr.parsers import HDFParser
 
 manifest_store = HDFParser("file.nc", object_store=obstore.LocalStore)
-actual = xr.open_dataset(manifest_store, engine="zarr")
 
-expected = xr.open_dataset(manifest_store, backend="h5netcdf")
-xrt.assert_identical(actual, expected)
+with (
+    xr.open_dataset(manifest_store, engine="zarr") as actual,
+    xr.open_dataset(manifest_store, backend="h5netcdf") as expected,
+):
+    xrt.assert_identical(actual, expected)
 ```
 
 These two approaches do not share any IO code, other than potentially the CF-metadata decoding that `xarray.open_dataset` optionally applies when opening any file.
