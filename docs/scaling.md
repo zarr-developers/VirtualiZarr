@@ -87,21 +87,21 @@ VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] i
 
 ## Executors
 
-VirtualiZarr comes with a small selection of executors you can choose from when using [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
+VirtualiZarr comes with a small selection of executors you can choose from when using [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset], provided under the [`virtualizarr.parallel`][] namespace.
 
 !!!note
-    If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
+    If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the [`virtualizarr.parallel`][] namespace and use its `.map` method.
 
 ### Serial
 
-The simplest executor is the `SerialExecutor`, which executes all the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls in serial, not in parallel.
+The simplest executor is the [`SerialExecutor`][virtualizarr.parallel.SerialExecutor], which executes all the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls in serial, not in parallel.
 It is the default executor.
 
 ### Threads or Processes
 
 One way to parallelize creating virtual references from a single machine is to across multiple threads or processes.
-For this you can use the `ThreadPoolExecutor` or `ProcessPoolExecutor` class from the `concurrent.futures` module in the python standard library.
-You simply pass the executor class directly via the `parallel` kwarg.
+For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] or [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
+You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -114,13 +114,13 @@ This can work well when virtualizing files in remote object storage because it p
 ### Dask Delayed
 
 You can parallelize using `dask.delayed` automatically by passing `parallel='dask'`.
-This will select the [virtualizarr.parallel.DaskDelayedExecutor][].
+This will select the [`DaskDelayedExecutor`][virtualizarr.parallel.DaskDelayedExecutor].
 
 ```python
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='dask')
 ```
 
-This uses the same approach that `xarray.open_mfdataset` does when `parallel=True` is passed to it.
+This uses the same approach that [`open_mfdataset`][xarray.open_mfdataset] does when `parallel=True` is passed to it.
 Using `dask.delayed` allows for parallelizing with any type of dask cluster, included a managed [Coiled](http://www.coiled.io) cluster.
 
 ### Lithops
@@ -132,7 +132,7 @@ You can parallelize VirtualiZarr serverlessly by using the [lithops](http://lith
 Lithops can run on all the main cloud provider's serverless FaaS platforms.
 
 To run on lithops you need to configure lithops for the relevant compute backend (e.g. AWS Lambda), build a runtime using Docker ([example Dockerfile]() with the required dependencies), and ensure the necessary cloud permissions to run are available.
-Then you can use the [virtualizarr.parallel.LithopsEagerFunctionExecutor][] simply via:
+Then you can use the [`LithopsEagerFunctionExecutor`][virtualizarr.parallel.LithopsEagerFunctionExecutor] simply via:
 
 ```python
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
@@ -142,7 +142,7 @@ combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
 
 You can also define your own executor to run in some other way, for example on a different serverless platform such as [Modal](https://modal.com).
 
-Your custom executor must inherit from the `concurrent.futures.Executor` ABC, and must implement the `.map` method.
+Your custom executor must inherit from the [`concurrent.futures.Executor`][] ABC, and must implement the `.map` method.
 
 ```python
 from concurrent.futures import Executor
@@ -168,10 +168,10 @@ There are 3 points at which this might happen:
 3. While writing references
 
 While generating references each worker calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] needs to avoid running out of memory.
-This primarily depends on how the file is read - see the section on [Caching](#caching-remote-files) below.
+This primarily depends on how the file is read - see the section on [caching](#caching-remote-files) below.
 
 The combine step happens back on the machine on which [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] was called, so while combining references that machine must have enough memory to hold all the virtual references at once.
-You can find the in-memory size of the references for a single virtual dataset by calling the [`.nbytes`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes] accessor method on it (not to be confused with the `.nbytes` xarray method, which returns the total size if all that data were actually loaded into memory).
+You can find the in-memory size of the references for a single virtual dataset by calling the [`.nbytes`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes] accessor method on it (not to be confused with the [`.nbytes`][xarray.Dataset.nbytes] xarray method, which returns the total size if all that data were actually loaded into memory).
 Do this for one file, and multiply by the number of files you have to estimate the total memory required for this step.
 
 Writing the combined virtual references out requires converting them to a different references format, which may have different memory requirements.
