@@ -131,7 +131,7 @@ This approach allows for virtualizing N files in the same time it takes to virtu
 You can parallelize VirtualiZarr serverlessly by using the [lithops](http://lithops-cloud.github.io) library.
 Lithops can run on all the main cloud provider's serverless FaaS platforms.
 
-To run on lithops you need to configure lithops for the relevant compute backend (e.g. AWS Lambda), build a runtime using Docker ([example Dockerfile]() with the required dependencies), and ensure the necessary cloud permissions to run are available.
+To run on lithops you need to configure lithops for the relevant compute backend (e.g. AWS Lambda), build a runtime using Docker ([example Dockerfile](https://github.com/zarr-developers/VirtualiZarr/tree/develop/examples/oae/Dockerfile) with the required dependencies), and ensure the necessary cloud permissions to run are available.
 Then you can use the [`LithopsEagerFunctionExecutor`][virtualizarr.parallel.LithopsEagerFunctionExecutor] simply via:
 
 ```python
