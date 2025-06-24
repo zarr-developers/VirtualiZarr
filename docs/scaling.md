@@ -83,7 +83,7 @@ The resulting code only takes one function call to generate virtual references i
 combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=<choice_of_executor>)
 ```
 
-VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] is designed to mimic the API of Xarray's `open_mfdataset`, and so accepts all the same keyword argument options for combining.
+VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] is designed to mimic the API of xarray's [`open_mfdataset`][xarray.open_mfdataset], and so accepts all the same keyword argument options for combining.
 
 ## Executors
 
