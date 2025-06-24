@@ -90,7 +90,7 @@ VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] i
 VirtualiZarr comes with a small selection of executors you can choose from when using [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset], provided under the `virtualizarr.parallel` namespace.
 
 !!!note
-    If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the [virtualizarr.parallel][] namespace and use its `.map` method.
+    If you prefer to do manual parallelism but would like to use one of these executors you can - just import the executor directly from the `virtualizarr.parallel` namespace and use its `.map` method.
 
 ### Serial
 
