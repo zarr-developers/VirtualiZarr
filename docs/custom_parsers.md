@@ -39,18 +39,17 @@ vds = vz.open_virtual_dataset(
 )
 ```
 
-All parsers _must_ follow this exact call signature, enforced at runtime by checking against the the :py:class:`virtualizarr.parsers.typing.Parser` typing protocol.
+All parsers _must_ follow this exact call signature, enforced at runtime by checking against the :py:class:`virtualizarr.parsers.typing.Parser` typing protocol.
 
 ```{note}
-The object store registry can technically be empty, but to be able to read actual chunks of data back from the `ManifestStore` later the registry needs to contain at least one `ObjectStore` instance.
+The object store registry can technically be empty, but to be able to read actual chunks of data back from the `ManifestStore` later, the registry needs to contain at least one `ObjectStore` instance.
 
-The only time you might want to use an empty object store registry is if you are attempting to parse a custom metadata-only references format without touching the original files they refer to - i.e. a format like Kerchunk or DMR++, that doesn't contain actual binary data values.
+The only time you might want to use an empty object store registry is if you are attempting to parse a custom metadata-only references format without touching the original files they refer to -- i.e., a format like Kerchunk or DMR++, that doesn't contain actual binary data values.
 ```
 
 ## What is the responsibility of a parser?
 
-The VirtualiZarr package really does four separate things.
-In order, it:
+The VirtualiZarr package really does four separate things, in order:
 
 1. Maps the contents of common archival file formats to the Zarr data model, including references to the locations of the chunks.
 2. Allows reading chosen variables into memory (e.g. via the `loadable_variables` kwarg, or reading from the `ManifestStore` using zarr-python directly).
@@ -63,6 +62,7 @@ In other words, all of the assumptions required to map the data model of an arch
 **The ObjectStore instances are responsible for fetching the bytes in step (2).**
 
 This design provides a neat separation of concerns, which is helpful in two ways:
+
 1. The Xarray data model is subtly different from the Zarr data model (see below), so as the final objective is to create a virtual store which programmatically maps Zarr API calls to the archival file format at read-time, it is useful to separate that logic up front, before we convert to use the xarray virtual dataset representation and potentially subtly confuse matters.
 2. It also allows us to support reading data from the file via the `ManifestStore` interface, using zarr-python and obstore, but without using Xarray.
 
@@ -72,7 +72,8 @@ As well as being a well-defined representation of the archival data in the Zarr 
 
 This works because the `ManifestStore` class is an implementation of the Zarr-Python `zarr.abc.Store` interface, and uses the [obstore](https://developmentseed.org/obstore/latest/) package internally to actually fetch chunk data when requested.
 
-Reading data from the `ManifestStore` can therefore be done using the zarr-python API directly
+Reading data from the `ManifestStore` can therefore be done using the zarr-python API directly:
+
 ```python
 manifest_store = parser(url, object_store)
 
@@ -111,7 +112,7 @@ The `Parser` callable does not accept arbitrary optional keyword arguments.
 
 However, extra information is often needed to fully map the archival format to the Zarr data model, for example if the format does not include array names or dimension names.
 
-Instead, to pass arbitrary extra information to your parser callable, it is recommended that you bind that information to class attributes (or use `functools.partial`), e.g.
+Instead, to pass arbitrary extra information to your parser callable, it is recommended that you bind that information to class attributes (or use `functools.partial`). For example:
 
 ```python
 class CustomParser:
@@ -146,21 +147,22 @@ However there are few common approaches.
 
 ### Typical VirtualiZarr parsers
 
-The recommended way to implement a custom parser is simply to parse the given file yourself, and construct the `ManifestStore` object explicitly component by component, extracting the metadata that you need.
+The recommended way to implement a custom parser is simply to parse the given file yourself, and construct the `ManifestStore` object explicitly, component by component, extracting the metadata that you need.
 
 Generally you want to follow steps like this:
+
 1. Extract file header or magic bytes to confirm the file passed is the format your parser expects.
-2. Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
-3. For each array in the file:
-  4. Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
-  5. Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a `ChunkManifest` object.
-  6. Create one `ManifestArray` object, using the corresponding `ArrayV3Metadata` and `ChunkManifest` objects.
-7. Group `ManifestArrays` into one or more `ManifestGroup` objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the `ManifestGroup` object as a `zarr.metadata.GroupMetadata` object. Remember that `ManifestGroups` can contain other groups as well as arrays.
-8. Instantiate the final `ManifestStore` using the top-most `ManifestGroup` and return it.
+1. Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
+1. For each array in the file:
+   1. Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
+   1. Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a `ChunkManifest` object.
+   1. Create one `ManifestArray` object, using the corresponding `ArrayV3Metadata` and `ChunkManifest` objects.
+1. Group `ManifestArrays` into one or more `ManifestGroup` objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the `ManifestGroup` object as a `zarr.metadata.GroupMetadata` object. Remember that `ManifestGroups` can contain other groups as well as arrays.
+1. Instantiate the final `ManifestStore` using the top-most `ManifestGroup` and return it.
 
 !!! note
-    The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it. 
-    
+    The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it.
+
     For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
 
 ### Parsing a pre-existing index file
@@ -200,7 +202,7 @@ You also may want to set the `coordinates` field of the group metadata to tell x
 
 The fact we can read data from the `ManifestStore` is useful for testing that our parser implementation behaves as expected.
 
-If we already have some other way to read data directly into memory from that archival file format - for example a conventional xarray IO backend - we can compare the results of opening and loading data via the two approaches.
+If we already have some other way to read data directly into memory from that archival file format -- for example, a conventional xarray IO backend -- we can compare the results of opening and loading data via the two approaches.
 
 For example we could test the ability of VirtualiZarr's in-built `HDFParser` to read netCDF files by comparing the output to xarray's `h5netcdf` backend.
 

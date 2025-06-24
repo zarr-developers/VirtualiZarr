@@ -403,7 +403,7 @@ This may be useful for manipulating them or converting existing kerchunk-formatt
 ```python
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 
-vds = open_virtual_dataset('combined.json', , object_store=LocalStore, parser=KerchunkJSONParser())
+vds = open_virtual_dataset('combined.json', object_store=LocalStore, parser=KerchunkJSONParser())
 # or
 vds = open_virtual_dataset('combined.parquet', object_store=LocalStore, parser=KerchunkParquetParser())
 ```

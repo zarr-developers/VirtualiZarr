@@ -44,6 +44,7 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 VirtualiZarr version 1 (mostly) achieves [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
 VirtualiZarr version 2 (unreleased) will bring:
+
 - Zarr v3 support,
 - A pluggable system of "parsers" for virtualizing custom file formats,
 - The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first,
