@@ -184,7 +184,7 @@ Depending on the format, this step may also have scalability concerns.
 
 ### Kerchunk
 
-The Kerchunk references specification supports 3 formats - an in-memory (nested) `dict`, JSON, and Parquet.
+The Kerchunk references specification supports 3 formats: an in-memory (nested) `dict`, JSON, and Parquet.
 
 Both the in-memory Kerchunk `dict` and Kerchunk JSON formats are extremely inefficient ways to represent virtual references.
 You may well find that a virtual dataset object that easily fits in memory suddenly uses up many times more memory or space on disk when converted to one of these formats.
