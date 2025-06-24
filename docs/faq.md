@@ -11,12 +11,12 @@ This means that if your data contains anything that cannot be represented within
 
 When virtualizing multi-file datasets, it is sometimes the case that it is possible to virtualize one file, but not possible to virtualize all the files together as part of one datacube, because of inconsistencies _between_ the files. The following restrictions apply across every file in the datacube you wish to create!
 
-The main restrictions of the zarr data model are:
 - **Recognized format** - Firstly, there must be a virtualizarr reader that understands how to parse the file format that your data is in. The VirtualiZarr package ships with readers for a number of common formats, if your data is not supported you may first have to write your own dedicated virtualizarr reader which understands your format.
-- **Rectilinear arrays** - The zarr data model is one of a set of rectilinear arrays, so your data must be decodable as a set of rectilinear arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to a rectilinear array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
-- **Homogeneous chunking** - The zarr data model assumes that every chunk of data in a single array has the same chunk shape. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent chunking your data cannot be virtualized. This is a big restriction, and there are plans to relax it in future, by adding support for variable-length chunks to the zarr data model.
-- **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. or multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
+- **Arrays** - The zarr data model is one of a set of arrays, so your data must be decodable as a set of arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to an array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
+- **Homogeneous chunk shapes** - The zarr data model assumes that every chunk of data in a single array has the same chunk shape. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent chunking your data cannot be virtualized. This is a big restriction, and there are plans to relax it in future, by adding support for variable-length chunks to the zarr data model.
+- **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
 - **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
+- **Homogeneous data types** - The zarr data model assumes that every chunk of data in a single array decodes to the same data type (i.e. dtype). For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent data types your data cannot be virtualized. This is arguably inherent to the concept of what an array is.
 - **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
 
 If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
@@ -49,9 +49,8 @@ Instead you would prefer to just be able to open a single pre-saved virtual stor
 You can think of this as effectively caching the result of performing all the various consistency checks that xarray performs when it combines newly-encountered datasets together.
 Once you have the new virtual Zarr store xarray is able to assume that this checking has already been done, and trusts your Zarr store enough to just open it instantly.
 
-```{note}
-This means you should not change or add to any of the files comprising the store once created. If you want to make changes or add new data, you should look into using [Icechunk](https://icechunk.io/) instead.
-```
+!!! note
+    This means you should not change or add to any of the files comprising the store once created. If you want to make changes or add new data, you should look into using [Icechunk](https://icechunk.io/) instead.
 
 As Zarr can read data that lives on filesystems too, this can be useful even if you don't plan to put your data in the cloud.
 You can create the virtual store once (e.g. as soon as your HPC simulation finishes) and then opening that dataset will be much faster than using `open_mfdataset` each time.
@@ -77,7 +76,7 @@ vds.virtualize.to_icechunk(icechunkstore)
 
 ### I already have some data in Zarr, do I have to resave it?
 
-No! VirtualiZarr can (well, [soon will be able to](https://github.com/zarr-developers/VirtualiZarr/issues/262)) create virtual references pointing to existing Zarr stores in the same way as for other file formats.
+No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats. Note: Currently only reading Zarr V3 is supported.
 
 ### Can I add a new reader for my custom file format?
 
@@ -101,7 +100,6 @@ Loading variables can be useful in a few scenarios:
 3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
-
 
 ## How does this actually work?
 
@@ -130,7 +128,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a netCDF3 file                                                      | `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                                    | `open_virtual_dataset(..., filetype='netcdf3')`, via `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                     |
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., filetype='tiff')`, via `kerchunk.tiff.tiff_to_zarr` or potentially `tifffile` (❌ Not yet implemented - see [issue #291](https://github.com/zarr-developers/VirtualiZarr/issues/291))                                                               |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., filetype='zarr')` (❌ Not yet implemented - see [issue #262](https://github.com/zarr-developers/VirtualiZarr/issues/262))                                                                                       |
-| From a Zarr v3 store                                                     | ❌                                                                                                          | `open_virtual_dataset(..., filetype='zarr')` (❌ Not yet implemented - see [issue #262](https://github.com/zarr-developers/VirtualiZarr/issues/262))                                                                                       |
+| From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., filetype='zarr')`                                                                                        |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., filetype='grib')` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., filetype='fits')`, via `kerchunk.fits.process_file`                                                                                      |
 | From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., filetype='hdf4')`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |

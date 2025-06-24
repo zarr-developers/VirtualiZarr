@@ -1,4 +1,5 @@
 import warnings
+from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -9,6 +10,7 @@ import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
+    expand_dims,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
 
@@ -207,7 +209,14 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key,
+        key: Union[
+            int,
+            slice,
+            EllipsisType,
+            None,
+            tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+            np.ndarray,
+        ],
         /,
     ) -> "ManifestArray":
         """
@@ -217,13 +226,39 @@ class ManifestArray:
         """
         from xarray.core.indexing import BasicIndexer
 
+        indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]
+        # check type is valid
         if isinstance(key, BasicIndexer):
             indexer = key.tuple
-        else:
+        elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
+            if isinstance(key, np.ndarray):
+                raise NotImplementedError(
+                    f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                )
+            indexer = (key,)
+        elif isinstance(key, tuple):
+            for dim_indexer in key:
+                if (
+                    not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
+                    and dim_indexer is not None
+                ):
+                    raise TypeError(
+                        f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+                    )
+
+                if isinstance(key, np.ndarray):
+                    raise NotImplementedError(
+                        f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                    )
+
             indexer = key
+        else:
+            raise TypeError(
+                f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+            )
 
-        indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
-
+        # check value is valid
+        indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
         if len(indexer) != self.ndim:
             raise ValueError(
                 f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
@@ -236,7 +271,13 @@ class ManifestArray:
             # indexer is all slice(None)'s, so this is a no-op
             return self
         else:
-            raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            output_arr = self
+            for ind, axis_indexer in enumerate(indexer):
+                if axis_indexer is None:
+                    output_arr = expand_dims(output_arr, axis=ind)
+                elif axis_indexer != slice(None):
+                    raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            return output_arr
 
     def rename_paths(
         self,
@@ -257,6 +298,10 @@ class ManifestArray:
         -------
         ManifestArray
 
+        See Also
+        --------
+        ChunkManifest.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -268,12 +313,8 @@ class ManifestArray:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> marr.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
@@ -303,10 +344,26 @@ class ManifestArray:
         )
 
 
-def _possibly_expand_trailing_ellipsis(key, ndim: int):
-    if key[-1] == ...:
-        extra_slices_needed = ndim - (len(key) - 1)
-        *indexer, ellipsis = key
-        return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
+def _possibly_expand_trailing_ellipsis(
+    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+    ndim: int,
+):
+    """
+    Allows for passing indexers <= the shape of the array, so long as they end with an ellipsis.
+
+    For example:
+
+    marr[3, slice(2), ...]
+
+    where marr.ndim => 3.
+    """
+    final_dim_indexer = indexer[-1]
+    if final_dim_indexer == ...:
+        if len(indexer) > ndim:
+            raise ValueError(f"Invalid indexer for array with ndim={ndim}: {indexer}")
+
+        extra_slices_needed = ndim - (len(indexer) - 1)
+        *indexer_as_list, ellipsis = indexer
+        return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
     else:
-        return key
+        return indexer

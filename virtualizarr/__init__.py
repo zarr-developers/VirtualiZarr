@@ -4,14 +4,7 @@ from virtualizarr.accessor import (
     VirtualiZarrDatasetAccessor,
     VirtualiZarrDataTreeAccessor,
 )
-from virtualizarr.backend import open_virtual_dataset, open_virtual_mfdataset
-from virtualizarr.manifests import (
-    ChunkManifest,
-    ManifestArray,
-    ManifestGroup,
-    ManifestStore,
-    ObjectStoreRegistry,
-)
+from virtualizarr.xarray import open_virtual_dataset, open_virtual_mfdataset
 
 try:
     __version__ = _version("virtualizarr")
@@ -21,11 +14,6 @@ except Exception:
     __version__ = "9999"
 
 __all__ = [
-    "ChunkManifest",
-    "ManifestArray",
-    "ManifestGroup",
-    "ManifestStore",
-    "ObjectStoreRegistry",
     "VirtualiZarrDatasetAccessor",
     "VirtualiZarrDataTreeAccessor",
     "open_virtual_dataset",

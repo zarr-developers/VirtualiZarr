@@ -44,6 +44,30 @@ def pytest_runtest_setup(item):
         pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
 
 
+def _xarray_subset():
+    ds = xr.tutorial.open_dataset("air_temperature")
+    return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
+
+
+@pytest.fixture(params=[2, 3])
+def zarr_store(tmpdir, request):
+    ds = _xarray_subset()
+    filepath = f"{tmpdir}/air.zarr"
+    ds.to_zarr(filepath, zarr_format=request.param)
+    ds.close()
+    return filepath
+
+
+@pytest.fixture()
+def zarr_store_scalar(tmpdir):
+    import zarr
+
+    store = zarr.storage.MemoryStore()
+    zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype="int8")
+    zarr_store_scalar[()] = 42
+    return zarr_store_scalar
+
+
 # Common codec configurations
 DELTA_CODEC = {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}}
 ARRAYBYTES_CODEC = {"name": "bytes", "configuration": {"endian": "little"}}
@@ -178,12 +202,43 @@ def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
     ) -> tuple[str, str]:
         filepath1 = tmp_path / "air1.nc"
         filepath2 = tmp_path / "air2.nc"
+
         with xr.tutorial.open_dataset("air_temperature") as ds:
             ds1 = ds.isel(time=slice(None, 1460))
             ds2 = ds.isel(time=slice(1460, None))
+
             ds1.to_netcdf(filepath1, encoding=encoding)
             ds2.to_netcdf(filepath2, encoding=encoding)
+
         return str(filepath1), str(filepath2)
+
+    return create_netcdf4_files
+
+
+@pytest.fixture
+def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str, str, str]]:
+    """Factory fixture to create multiple NetCDF4 files."""
+
+    def create_netcdf4_files(
+        encoding: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    ) -> tuple[str, str, str, str]:
+        filepath1 = tmp_path / "air1.nc"
+        filepath2 = tmp_path / "air2.nc"
+        filepath3 = tmp_path / "air3.nc"
+        filepath4 = tmp_path / "air4.nc"
+
+        with xr.tutorial.open_dataset("air_temperature") as ds:
+            ds1 = ds.isel(time=slice(None, 1460), lat=slice(None, 10))
+            ds2 = ds.isel(time=slice(1460, None), lat=slice(None, 10))
+            ds3 = ds.isel(time=slice(None, 1460), lat=slice(10, 20))
+            ds4 = ds.isel(time=slice(1460, None), lat=slice(10, 20))
+
+            ds1.to_netcdf(filepath1, encoding=encoding)
+            ds2.to_netcdf(filepath2, encoding=encoding)
+            ds3.to_netcdf(filepath3, encoding=encoding)
+            ds4.to_netcdf(filepath4, encoding=encoding)
+
+        return str(filepath1), str(filepath2), str(filepath3), str(filepath4)
 
     return create_netcdf4_files
 
@@ -201,8 +256,17 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 def netcdf4_virtual_dataset(netcdf4_file):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.tests.utils import obstore_local
 
-    with open_virtual_dataset(netcdf4_file, loadable_variables=[]) as ds:
+    store = obstore_local(file_url=netcdf4_file)
+    parser = HDFParser()
+    with open_virtual_dataset(
+        file_url=netcdf4_file,
+        object_store=store,
+        parser=parser,
+        loadable_variables=[],
+    ) as ds:
         yield ds
 
 
