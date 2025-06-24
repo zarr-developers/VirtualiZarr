@@ -36,7 +36,7 @@ VirtualiZarr uses these classes to store virtual references internally.
 
 #### Array API
 
-VirtualiZarr's [virtualizarr.ManifestArray][] objects support a limited subset of the Python Array API standard in `virtualizarr.manifests.array_api`.
+VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limited subset of the Python Array API standard in `virtualizarr.manifests.array_api`.
 
 ::: virtualizarr.manifests.array_api.concatenate
 ::: virtualizarr.manifests.array_api.stack
