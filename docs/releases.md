@@ -47,7 +47,7 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Documented the new :py:func:`open_virtual_mfdataset` function [#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
+- Documented the new [`virtualizarr.open_virtual_mfdataset`] function [#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added MUR SST virtual and zarr icechunk store generation using lithops example.
   ([#475](https://github.com/zarr-developers/VirtualiZarr/pull/475)) by [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
