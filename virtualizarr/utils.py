@@ -30,7 +30,7 @@ def remove_prefix(store: ObjectStore, path: str) -> str:
         filepath = os.path.basename(parsed.path)
     else:
         filepath = parsed.path
-    
+
     return filepath
 
 

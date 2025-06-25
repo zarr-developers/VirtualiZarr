@@ -6,9 +6,8 @@ import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
-from zarr.core.metadata import ArrayV3Metadata
 
-from virtualizarr.manifests import ManifestArray, ManifestStore, ChunkManifest
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
@@ -347,11 +346,13 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
 
 
 def test_parse_dict_via_memorystore(array_v3_metadata):
-    import obstore
     import json
+
+    import obstore
+
     from virtualizarr.parsers import KerchunkJSONParser
 
-    # generate some example kerchunk references 
+    # generate some example kerchunk references
     refs: dict = gen_ds_refs()
 
     memory_store = obstore.store.MemoryStore()
@@ -361,18 +362,18 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     manifeststore = parser("refs.json", memory_store)
 
     assert isinstance(manifeststore, ManifestStore)
-    
+
     assert manifeststore._store_registry._stores == {"": memory_store}
     # TODO should it be this instead?
-    #assert manifeststore._store_registry._stores == {"memory://": memory_store}
-    
+    # assert manifeststore._store_registry._stores == {"memory://": memory_store}
+
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(
         shape=(2, 3),
         chunks=(2, 3),
         data_type=np.dtype("int64"),
-        dimension_names=['x', 'y'],
-        attributes={'value': '1'}
+        dimension_names=["x", "y"],
+        attributes={"value": "1"},
     )
     manifest = ChunkManifest(
         {

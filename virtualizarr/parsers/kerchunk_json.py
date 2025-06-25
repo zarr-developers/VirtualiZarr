@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
-import ujson
 import obstore
+import ujson
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
@@ -69,7 +69,7 @@ class KerchunkJSONParser:
         resp = obstore.get(object_store, path)
         content = resp.bytes().to_bytes()
         refs = ujson.loads(content)
-        
+
         if self.store_registry is None:
             unique_paths = {
                 v[0]
