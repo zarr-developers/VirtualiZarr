@@ -77,6 +77,8 @@
   ([#543](https://github.com/zarr-developers/VirtualiZarr/pull/543)) By [Tom Nicholas](https://github.com/TomNicholas).
 - Ensure that the `KerchunkJSONParser` can be used to parse in-memory kerchunk dictionaries using `obstore.store.MemoryStore`.
   ([#631](https://github.com/zarr-developers/VirtualiZarr/pull/631)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Move the `virtualizarr.translators.kerchunk` module to `virtualizarr.parsers.kerchunk.translator`, to better indicate that it is private.
+  ([#633](https://github.com/zarr-developers/VirtualiZarr/pull/633)) By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v1.3.2 (3rd Mar 2025)
 
