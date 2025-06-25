@@ -13,6 +13,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
+from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
@@ -21,7 +22,6 @@ from virtualizarr.tests import (
     requires_zarr_python,
 )
 from virtualizarr.tests.utils import obstore_local
-from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree

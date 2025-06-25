@@ -4,10 +4,9 @@ from collections.abc import Iterable
 from typing import cast
 
 import numpy as np
+import ujson
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
-import ujson
-
 
 from virtualizarr.codecs import (
     numcodec_config_to_configurable,

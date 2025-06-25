@@ -3,17 +3,17 @@ import json
 from typing import cast
 
 import numpy as np
+import ujson
+from numcodecs.abc import Codec
 from xarray import Dataset, Variable
+from xarray.backends.zarr import encode_zarr_variable
 from xarray.coding.times import CFDatetimeCoder
 from xarray.conventions import encode_dataset_coordinates
-from xarray.backends.zarr import encode_zarr_variable
-from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.common import JSON
-from numcodecs.abc import Codec
-import ujson
+from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.utils import convert_v3_to_v2_metadata
 
