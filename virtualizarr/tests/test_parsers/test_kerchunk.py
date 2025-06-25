@@ -343,3 +343,23 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
         ).load() as manifest_ds,
     ):
         xrt.assert_identical(ds, manifest_ds)
+
+
+def test_parse_dict_via_memorystore():
+    import obstore
+    import json
+    from virtualizarr.parsers import KerchunkJSONParser
+
+    # generate some example kerchunk references 
+    refs: dict = gen_ds_refs()
+
+    memory_store = obstore.store.MemoryStore()
+    memory_store.put("refs.json", json.dumps(refs).encode())
+
+    parser = KerchunkJSONParser()
+
+    manifeststore = parser("refs.json", memory_store)
+
+    print(manifeststore)
+
+    # TODO assert metadata loaded correctly
