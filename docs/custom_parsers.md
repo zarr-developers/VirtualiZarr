@@ -1,5 +1,3 @@
-(custom-parsers)=
-
 # Custom parsers
 
 This page explains how to write a custom parser for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
