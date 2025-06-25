@@ -4,7 +4,7 @@ This page explains how to write a custom parser for VirtualiZarr, to extract chu
 This is advanced material intended for 3rd-party developers, and assumes you have read the page on [Data Structures](data_structures.md).
 
 !!! note
-    "Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr. 
+    "Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr.
     We renamed them to avoid confusion with obstore readers and xarray backends.
 
 ## What is a VirtualiZarr parser?
@@ -180,7 +180,7 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
 
 !!! note
     Whilst this might be the quickest way to get a custom parser working, we do not really recommend this approach, as:
-    
+
     1. The Kerchunk in-memory nested dictionary format is very memory-inefficient compared to the numpy array representation used internally by VirtualiZarr's [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] class,
     2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
     3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
