@@ -21,7 +21,7 @@ from virtualizarr.tests import (
     requires_zarr_python,
 )
 from virtualizarr.tests.utils import obstore_local
-from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
+from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree

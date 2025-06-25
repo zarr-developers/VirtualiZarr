@@ -91,7 +91,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
     from virtualizarr.manifests import ManifestArray
-    from virtualizarr.translators.kerchunk import to_kerchunk_json
+    from virtualizarr.parsers.kerchunk.translator import to_kerchunk_json
 
     if isinstance(var.data, ManifestArray):
         marr = var.data
