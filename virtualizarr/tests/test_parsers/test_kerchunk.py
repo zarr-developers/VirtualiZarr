@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import Any, Callable, Generator, Optional
 
 import numpy as np
+import obstore
 import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
-import obstore
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
@@ -347,7 +347,6 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
 
 
 def test_parse_dict_via_memorystore(array_v3_metadata):
-
     # generate some example kerchunk references
     refs: dict = gen_ds_refs()
 
