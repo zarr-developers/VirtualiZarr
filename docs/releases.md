@@ -75,6 +75,8 @@
 - The continuous integration workflows and developer environment now use [pixi](https://pixi.sh/latest/) ([#407](https://github.com/zarr-developers/VirtualiZarr/pull/407)).
 - Added `loadable_variables` kwarg to `ManifestStore.to_virtual_dataset`.
   ([#543](https://github.com/zarr-developers/VirtualiZarr/pull/543)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Ensure that the `KerchunkJSONParser` can be used to parse in-memory kerchunk dictionaries using `obstore.store.MemoryStore`.
+  ([#631](https://github.com/zarr-developers/VirtualiZarr/pull/631)) By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v1.3.2 (3rd Mar 2025)
 
