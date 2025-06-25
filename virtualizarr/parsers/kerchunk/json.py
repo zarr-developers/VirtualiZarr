@@ -6,7 +6,7 @@ from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
-from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
+from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.utils import remove_prefix
 
 
