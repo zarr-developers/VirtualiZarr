@@ -352,6 +352,7 @@ def test_parse_dict_via_memorystore():
 
     # generate some example kerchunk references 
     refs: dict = gen_ds_refs()
+    print(refs)
 
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", json.dumps(refs).encode())
@@ -363,3 +364,6 @@ def test_parse_dict_via_memorystore():
     print(manifeststore)
 
     # TODO assert metadata loaded correctly
+    assert isinstance(manifeststore, manifeststore)
+
+    # TODO assert that manifeststore.to_kerchunk_refs() roundtrips, once we have that method

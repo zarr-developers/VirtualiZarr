@@ -1,7 +1,8 @@
 from collections.abc import Iterable
 
 import ujson
-from obstore.store import ObjectStore
+import obstore
+from obstore.store import ObjectStore, MemoryStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
@@ -62,11 +63,21 @@ class KerchunkJSONParser:
             A ManifestStore that provides a Zarr representation of the parsed file.
         """
 
-        reader = ObstoreReader(store=object_store, path=file_url)
+        if isinstance(object_store, MemoryStore):
+            # TODO can this be consolidated with the other codepath?
+            print(file_url)
+            resp = obstore.get(object_store, file_url)
+            content = resp.bytes().to_bytes()
+            refs = ujson.loads(content)
+        else:
+            reader = ObstoreReader(store=object_store, path=file_url)
 
-        reader.seek(0)
-        content = reader.readall().decode()
-        refs = ujson.loads(content)
+            # TODO why do we need the ReadableFile object if we're only going to get all the bytes with `.readall()` - couldn't we just have used get on the store?
+            reader.seek(0)
+            content = reader.readall().decode()
+            refs = ujson.loads(content)
+        
+        # TODO does get_store_prefix need to learn about MemoryStores?
         if self.store_registry is None:
             unique_paths = {
                 v[0]
@@ -79,6 +90,7 @@ class KerchunkJSONParser:
             registry = ObjectStoreRegistry(stores=stores)
         else:
             registry = self.store_registry
+
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,
