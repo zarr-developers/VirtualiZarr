@@ -6,8 +6,9 @@ import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
+from zarr.core.metadata import ArrayV3Metadata
 
-from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests import ManifestArray, ManifestStore, ChunkManifest
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
@@ -345,7 +346,7 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
         xrt.assert_identical(ds, manifest_ds)
 
 
-def test_parse_dict_via_memorystore():
+def test_parse_dict_via_memorystore(array_v3_metadata):
     import obstore
     import json
     from virtualizarr.parsers import KerchunkJSONParser
@@ -363,7 +364,31 @@ def test_parse_dict_via_memorystore():
 
     print(manifeststore)
 
-    # TODO assert metadata loaded correctly
-    assert isinstance(manifeststore, manifeststore)
+    assert isinstance(manifeststore, ManifestStore)
+    
+    assert manifeststore._store_registry._stores == {"": memory_store}
+    # TODO should it be this instead?
+    #assert manifeststore._store_registry._stores == {"memory://": memory_store}
+    
+    # assert metadata parsed correctly
+    expected_metadata = array_v3_metadata(
+        shape=(2, 3),
+        chunks=(2, 3),
+        data_type=np.dtype("int64"),
+        dimension_names=['x', 'y'],
+        attributes={'value': '1'}
+    )
+    manifest = ChunkManifest(
+        {
+            "0": {"path": "/test1.nc", "offset": 6144, "length": 48},
+        }
+    )
+    expected_marr = ManifestArray(
+        metadata=expected_metadata,
+        chunkmanifest=manifest,
+    )
+    # TODO this might be easier if `ManifestStore/Group` had __eq__ methods?
+    actual_marr = manifeststore._group._members["a"]
+    assert (actual_marr == expected_marr).all()
 
     # TODO assert that manifeststore.to_kerchunk_refs() roundtrips, once we have that method
