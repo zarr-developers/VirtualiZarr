@@ -151,9 +151,9 @@ Generally you want to follow steps like this:
 1. Extract file header or magic bytes to confirm the file passed is the format your parser expects.
 1. Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
 1. For each array in the file:
-   1. Create a [`zarr.core.metadata.ArrayV3Metadata`][] object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
+   1. Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
    1. Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] object.
-   1. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding [`ArrayV3Metadata`][zarr.core.metadata.ArrayV3Metadata] and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
+   1. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding `zarr.core.metadata.ArrayV3Metadata` and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
 1. Group [`ManifestArray`][virtualizarr.manifests.ManifestArray]s into one or more [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] object as a [`zarr.metadata.GroupMetadata`][] object. Remember that [`ManifestGroup`][virtualizarr.manifests.ManifestGroup]s can contain other groups as well as arrays.
 1. Instantiate the final [`ManifestStore`][virtualizarr.manifests.ManifestStore] using the top-most [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] and return it.
 
@@ -191,7 +191,7 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
 
 Whilst the [`ManifestStore`][virtualizarr.manifests.ManifestStore] class enforces nothing other than the minimum required to conform to the Zarr model, if you want to convert your [`ManifestStore`][virtualizarr.manifests.ManifestStore] to a virtual xarray dataset using [`ManifestStore.to_virtual_dataset`][virtualizarr.manifests.ManifestStore.to_virtual_dataset], there are a couple of additional requirements, set by Xarray's data model.
 
-1. All arrays must have dimension names, specified in the [`ArrayV3Metadata`][zarr.core.metadata.ArrayV3Metadata] objects.
+1. All arrays must have dimension names, specified in the `zarr.core.metadata.ArrayV3Metadata` objects.
 2. All arrays in the same group with a common dimension name must have the same length along that common dimension.
 
 You also may want to set the `coordinates` field of the group metadata to tell xarray to set those variables as coordinates upon conversion.
