@@ -3,9 +3,9 @@
 This page explains how to write a custom parser for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
 This is advanced material intended for 3rd-party developers, and assumes you have read the page on [Data Structures](data_structures.md).
 
-```{note}
-"Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr. We renamed them to avoid confusion with obstore readers and xarray backends.
-```
+!!! note
+    "Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr. 
+    We renamed them to avoid confusion with obstore readers and xarray backends.
 
 ## What is a VirtualiZarr parser?
 
