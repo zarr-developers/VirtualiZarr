@@ -148,16 +148,24 @@ The recommended way to implement a custom parser is simply to parse the given fi
 
 Generally you want to follow steps like this:
 
-1. Extract file header or magic bytes to confirm the file passed is the format your parser expects.
-1. Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
-1. For each array in the file:
-   1. Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
-   1. Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] object.
-   1. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding `zarr.core.metadata.ArrayV3Metadata` and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
-1. Group [`ManifestArray`][virtualizarr.manifests.ManifestArray]s into one or more [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] object as a `zarr.metadata.GroupMetadata` object. Remember that [`ManifestGroup`][virtualizarr.manifests.ManifestGroup]s can contain other groups as well as arrays.
-1. Instantiate the final [`ManifestStore`][virtualizarr.manifests.ManifestStore] using the top-most [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] and return it.
+1.  Extract file header or magic bytes to confirm the file passed is the format your parser expects.
+
+2.  Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
+
+3.  For each array in the file:
+
+    1.  Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
+
+    2.  Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] object.
+
+    3. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding `zarr.core.metadata.ArrayV3Metadata` and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
+
+4.  Group [`ManifestArray`][virtualizarr.manifests.ManifestArray]s into one or more [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] object as a `zarr.metadata.GroupMetadata` object. Remember that [`ManifestGroup`][virtualizarr.manifests.ManifestGroup]s can contain other groups as well as arrays.
+
+5.  Instantiate the final [`ManifestStore`][virtualizarr.manifests.ManifestStore] using the top-most [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] and return it.
 
 !!! note
+
     The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it.
 
     For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
