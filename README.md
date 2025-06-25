@@ -28,6 +28,7 @@ Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/ind
 
 * Create virtual references pointing to bytes inside an archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets).
 * Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5, and has a pluggable system for supporting new formats.
+* Access data via the zarr-python API by reading from the zarr-compatible [`ManifestStore`](https://virtualizarr.readthedocs.io/en/latest/generated/virtualizarr.manifests.ManifestStore.html).
 * [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger datacube using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html).
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual datacube simply as a single zarr-compatible store using [`xarray.open_zarr`](https://docs.xarray.dev/en/stable/generated/xarray.open_zarr.html).
@@ -42,15 +43,21 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 VirtualiZarr version 1 (mostly) achieves [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
+VirtualiZarr version 2 (unreleased) will bring:
+
+- Zarr v3 support,
+- A pluggable system of "parsers" for virtualizing custom file formats,
+- The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first,
+- Integration with [`obstore`](https://developmentseed.org/obstore/latest/),
+- Reference parsing that doesn't rely on kerchunk under the hood.
+
 Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
 We have a lot of ideas, including:
-- [Zarr v3 support](https://github.com/zarr-developers/VirtualiZarr/issues/17)
 - [Zarr-native on-disk chunk manifest format](https://github.com/zarr-developers/zarr-specs/issues/287)
 - ["Virtual concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) of separate Zarr arrays
 - ManifestArrays as an [intermediate layer in-memory](https://github.com/zarr-developers/VirtualiZarr/issues/71) in Zarr-Python
 - [Separating CF-related Codecs from xarray](https://github.com/zarr-developers/VirtualiZarr/issues/68#issuecomment-2197682388)
-- [Generating references without kerchunk](https://github.com/zarr-developers/VirtualiZarr/issues/78)
 
 If you see other opportunities then we would love to hear your ideas!
 
