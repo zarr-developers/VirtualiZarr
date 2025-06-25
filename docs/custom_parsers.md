@@ -177,11 +177,11 @@ A `Parser` can be used to parse existing references that are in-memory, as well 
 ```python
 # some example kerchunk-formatted JSON references, as an in-memory python dict
 refs = {
-    'version': 1, 
+    'version': 1,
     'refs': {
-        '.zgroup': '{"zarr_format":2}', 
-        'a/.zarray': '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}', 
-        'a/.zattrs': '{"_ARRAY_DIMENSIONS":["x","y"],"value": "1"}', 
+        '.zgroup': '{"zarr_format":2}',
+        'a/.zarray': '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+        'a/.zattrs': '{"_ARRAY_DIMENSIONS":["x","y"],"value": "1"}',
         'a/0.0': ['/test1.nc', 6144, 48],
     }
 }
