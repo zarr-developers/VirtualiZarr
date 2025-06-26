@@ -1,0 +1,10 @@
+xarray>=2025.1.0
+h5netcdf
+h5py
+pandas
+s3fs
+boto3==1.35.99
+dask
+distributed
+lithops
+git+https://github.com/zarr-developers/virtualizarr.git@main[icechunk]

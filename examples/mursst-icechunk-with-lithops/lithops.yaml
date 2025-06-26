@@ -1,0 +1,16 @@
+lithops:
+  backend: aws_lambda
+  storage: aws_s3
+  data_limit: False # Max (iter)data size (in MB). Set to False for unlimited size.
+
+aws:
+  region: us-west-2
+
+aws_lambda:
+  execution_role: arn:aws:iam::CHANGE_ME:role/veda-data-reader-dev
+  runtime: vz-runtime:latest
+  runtime_memory: 10240
+  # user_id: kuf3 # if the runtime was created with a different IAM identity, this user id will need to be included
+
+aws_s3:
+  bucket: arn:aws:s3:::nasa-eodc-lithops

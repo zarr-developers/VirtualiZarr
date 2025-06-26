@@ -2,6 +2,26 @@
 
 ## Usage questions
 
+### Which files formats are supported?
+
+Currently only a small number of filetypes are supported. They are:
+
+- netCDF4/HDF5
+- netCDF3
+- "Native" Zarr v3
+- FITS
+- DMR++
+- Kerchunk JSON / Parquet
+
+Planned but not yet supported are:
+- "Native" Zarr v2
+- TIFF (including COGeoTIFF)
+- GRIB
+- JPEG
+- SafeTensors
+
+You can also write your own custom reader for another file format.
+
 ### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
 Potentially yes.
