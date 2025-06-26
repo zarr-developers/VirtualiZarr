@@ -189,9 +189,12 @@ refs = {
 memory_store = obstore.store.MemoryStore()
 memory_store.put("refs.json", ujson.dumps(refs).encode())
 
-parser = KerchunkJSONParser()
+registry = ObjectStoreRegistry({"memory://": memory_store})
+parser = KerchunkJSONParser(store_registry=registry)
 manifeststore = parser("refs.json", memory_store)
 ```
+
+Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
 
 ### Parsing a sidecar file
 
