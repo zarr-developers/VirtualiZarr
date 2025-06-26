@@ -361,7 +361,7 @@ def _possibly_expand_trailing_ellipsis(
     if final_dim_indexer == ...:
         if len(indexer) > ndim:
             raise ValueError(
-                f"Indexer `{indexer}` length exceeds number of dimensions `{ndim}`."
+                f"Indexer length exceeds number of array dimensions. Invalid Indexer: {indexer}, Number of dimensions: {ndim}."
                 f"For ManifestArrays, ensure all non-coordinate data variables have the concatenation dimension, "
                 f"or consider `data_vars='minimal'`."
             )

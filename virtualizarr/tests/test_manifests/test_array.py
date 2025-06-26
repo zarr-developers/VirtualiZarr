@@ -409,7 +409,7 @@ class TestIndexing:
     def test_invalid_indexer_shape(self, manifest_array, dodgy_indexer):
         marr = manifest_array(shape=(4,), chunks=(2,))
 
-        with pytest.raises(ValueError, match="Invalid indexer for array with ndim"):
+        with pytest.raises(ValueError, match="Indexer length exceeds number of array dimensions"):
             marr[dodgy_indexer]
 
     @pytest.mark.parametrize("dodgy_indexer", [np.ndarray(5)])
