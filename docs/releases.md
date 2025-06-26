@@ -46,6 +46,7 @@
 
 ### Documentation
 
+- Added more detail to error messages when an indexer of ManifestArray is invalid ([#630](https://github.com/zarr-developers/VirtualiZarr/issues/630), [#635](https://github.com/zarr-developers/VirtualiZarr/pull/635)). By [Danny Kaufman](https://github.com/danielfromearth/).
 - Added new docs page on how to write a custom parser for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
