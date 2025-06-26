@@ -17,7 +17,7 @@ class VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
 
-    Methods on this object are called via `vds.virtualize.{method}`.
+    Methods on this object are called via `ds.virtualize.{method}`.
     """
 
     def __init__(self, ds: xr.Dataset):
@@ -122,7 +122,7 @@ class VirtualiZarrDatasetAccessor:
         ----------
         https://fsspec.github.io/kerchunk/spec.html
         """
-        refs = dataset_to_kerchunk_refs(self.vds)
+        refs = dataset_to_kerchunk_refs(self.ds)
 
         if format == "dict":
             return refs
@@ -197,7 +197,7 @@ class VirtualiZarrDatasetAccessor:
         >>> ds.virtualize.rename_paths(local_to_s3_url)
         """
 
-        new_ds = self.vds.copy()
+        new_ds = self.ds.copy()
         for var_name in new_ds.variables:
             data = new_ds[var_name].data
             if isinstance(data, ManifestArray):
@@ -220,7 +220,7 @@ class VirtualiZarrDatasetAccessor:
             var.data.nbytes_virtual
             if isinstance(var.data, ManifestArray)
             else var.nbytes
-            for var in self.vds.variables.values()
+            for var in self.ds.variables.values()
         )
 
 
