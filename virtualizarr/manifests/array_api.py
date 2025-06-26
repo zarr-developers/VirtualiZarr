@@ -2,14 +2,16 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 import numpy as np
 
-from virtualizarr.zarr import determine_chunk_grid_shape
+from virtualizarr.utils import determine_chunk_grid_shape
 
 from .manifest import ChunkManifest
 from .utils import (
     check_combinable_zarr_arrays,
+    check_no_partial_chunks_on_concat_axis,
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
+    copy_and_replace_metadata,
 )
 
 if TYPE_CHECKING:
@@ -53,6 +55,7 @@ def concatenate(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.concat`.
     """
+
     from .array import ManifestArray
 
     if axis is None:
@@ -73,7 +76,9 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
+    arr_chunks = [arr.chunks for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+    check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
     # find what new array shape must be
     new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])
@@ -100,12 +105,11 @@ def concatenate(
         lengths=concatenated_lengths,
     )
 
-    # chunk shape has not changed, there are just now more chunks along the concatenation axis
-    new_zarray = first_arr.zarray.replace(
-        shape=tuple(new_shape),
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=first_arr.metadata, new_shape=new_shape
     )
 
-    return ManifestArray(chunkmanifest=concatenated_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
 
 
 @implements(np.stack)
@@ -120,6 +124,7 @@ def stack(
 
     The signature of this function is array API compliant, so that it can be called by `xarray.stack`.
     """
+
     from .array import ManifestArray
 
     if not isinstance(axis, int):
@@ -170,12 +175,11 @@ def stack(
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
-    new_zarray = first_arr.zarray.replace(
-        chunks=tuple(new_chunks),
-        shape=tuple(new_shape),
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
     )
 
-    return ManifestArray(chunkmanifest=stacked_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=stacked_manifest, metadata=new_metadata)
 
 
 @implements(np.expand_dims)
@@ -203,7 +207,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
             f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
         )
 
-    # new chunk_shape is old chunk_shape with singleton dimensions pre-pended
+    # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
     old_chunk_shape = x.chunks
     new_chunk_shape = _prepend_singleton_dimensions(
@@ -236,12 +240,13 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         lengths=broadcasted_lengths,
     )
 
-    new_zarray = x.zarray.replace(
-        chunks=new_chunk_shape,
-        shape=new_shape,
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=x.metadata,
+        new_shape=list(new_shape),
+        new_chunks=list(new_chunk_shape),
     )
 
-    return ManifestArray(chunkmanifest=broadcasted_manifest, zarray=new_zarray)
+    return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:
@@ -262,7 +267,7 @@ def full_like(
 
     Returns a numpy array instead of a ManifestArray.
 
-    Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
+    Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
     """
     return np.full(
         shape=x.shape,
@@ -276,7 +281,7 @@ def isnan(x: "ManifestArray", /) -> np.ndarray:
     """
     Returns a numpy array of all False.
 
-    Only implemented to get past some checks deep inside xarray, see https://github.com/TomNicholas/VirtualiZarr/issues/29.
+    Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
     """
     return _isnan(x.shape)
 

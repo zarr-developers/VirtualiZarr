@@ -1,4 +1,4 @@
-# Examples
+# End-to-end examples
 
 The following examples demonstrate the use of VirtualiZarr to create virtual datasets of various kinds:
 

@@ -1,12 +1,13 @@
-name: upstream
+name: Upstream
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" , "develop"]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main" , "develop"]
+    types: [ labeled ]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -16,42 +17,35 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PIP_ROOT_USER_ACTION: ignore
-
 jobs:
   test-upstream:
-    name: ${{ matrix.python-version }}-build
+    name: ${{ matrix.environment }}-build
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'test-upstream')
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       matrix:
-        python-version: ["3.12"]
+        environment: [upstream]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup micromamba
-        uses: mamba-org/setup-micromamba@v1
+      - uses: prefix-dev/setup-pixi@v0.8.3
         with:
-          environment-file: ci/upstream.yml
-          cache-environment: true
-          create-args: >-
-            python=${{matrix.python-version}}
+          pixi-version: v0.41.4
+          environments: ${{ matrix.environment }}
 
-      - name: Install virtualizarr
+      - name: List installed libraries
         run: |
-           python -m pip install -e . --no-deps
-
-      - name: Conda list information
-        run: |
-          micromamba env list
-          micromamba list
+          pixi install --environment ${{ matrix.environment }}
+          pixi list --environment ${{ matrix.environment }}
 
       - name: Running Tests
         run: |
-          python -m pytest --verbose --cov=virtualizarr --cov-report=xml
+          pixi run -e ${{ matrix.environment }} run-tests-xml-cov
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4
@@ -61,3 +55,4 @@ jobs:
           env_vars: OS,PYTHON
           name: codecov-umbrella
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

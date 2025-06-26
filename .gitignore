@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 virtualizarr/_version.py
 docs/generated/
+docs/jupyter_execute/
 examples/
 
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
@@ -180,3 +181,14 @@ examples/
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
+
+# Pixi folder
+.pixi/
+
+# python virtual environment
+.venv
+venv
+
+# Pixi lock file (because it changes with every upstream commit)
+pixi.lock
+output

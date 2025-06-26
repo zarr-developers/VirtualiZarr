@@ -1,6 +1,6 @@
 # Launch and use an EC2 for building the Lithops lambda runtime
 
-The scripts in this directy will help to launch and set up an ec2 so that you can build and push a lithops lambda runtime.
+The scripts in this directly will help to launch and set up an ec2 so that you can build and push a lithops lambda runtime.
 
 You will need AWS console and CLI access.
 

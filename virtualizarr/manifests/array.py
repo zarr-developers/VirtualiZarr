@@ -1,14 +1,18 @@
 import warnings
+from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
+import xarray as xr
+from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
+import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
+    expand_dims,
 )
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.zarr import ZArray
 
 
 class ManifestArray:
@@ -24,27 +28,32 @@ class ManifestArray:
     """
 
     _manifest: ChunkManifest
-    _zarray: ZArray
+    _metadata: ArrayV3Metadata
 
     def __init__(
         self,
-        zarray: ZArray | dict,
+        metadata: ArrayV3Metadata | dict,
         chunkmanifest: dict | ChunkManifest,
     ) -> None:
         """
-        Create a ManifestArray directly from the .zarray information of a zarr array and the manifest of chunks.
+        Create a ManifestArray directly from the metadata of a zarr array and the manifest of chunks.
 
         Parameters
         ----------
-        zarray : dict or ZArray
+        metadata : dict or ArrayV3Metadata
         chunkmanifest : dict or ChunkManifest
         """
 
-        if isinstance(zarray, ZArray):
-            _zarray = zarray
+        if isinstance(metadata, ArrayV3Metadata):
+            _metadata = metadata
         else:
             # try unpacking the dict
-            _zarray = ZArray(**zarray)
+            _metadata = ArrayV3Metadata(**metadata)
+
+        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
+            raise NotImplementedError(
+                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
+            )
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
@@ -55,10 +64,10 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
-        # TODO check that the zarray shape and chunkmanifest shape are consistent with one another
+        # TODO check that the metadata shape and chunkmanifest shape are consistent with one another
         # TODO also cover the special case of scalar arrays
 
-        self._zarray = _zarray
+        self._metadata = _metadata
         self._manifest = _chunkmanifest
 
     @property
@@ -66,21 +75,27 @@ class ManifestArray:
         return self._manifest
 
     @property
-    def zarray(self) -> ZArray:
-        return self._zarray
+    def metadata(self) -> ArrayV3Metadata:
+        return self._metadata
 
     @property
     def chunks(self) -> tuple[int, ...]:
-        return tuple(self.zarray.chunks)
+        """
+        Individual chunk size by number of elements.
+        """
+        return self._metadata.chunks
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self.zarray.dtype
-        return np.dtype(dtype_str)
+        dtype_str = self.metadata.data_type
+        return dtype_str.to_numpy()
 
     @property
     def shape(self) -> tuple[int, ...]:
-        return tuple(int(length) for length in list(self.zarray.shape))
+        """
+        Array shape by number of elements along each dimension.
+        """
+        return self.metadata.shape
 
     @property
     def ndim(self) -> int:
@@ -155,7 +170,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if self.zarray != other.zarray:
+        if not utils.metadata_identical(self.metadata, other.metadata):
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:
@@ -194,7 +209,14 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key,
+        key: Union[
+            int,
+            slice,
+            EllipsisType,
+            None,
+            tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+            np.ndarray,
+        ],
         /,
     ) -> "ManifestArray":
         """
@@ -204,13 +226,39 @@ class ManifestArray:
         """
         from xarray.core.indexing import BasicIndexer
 
+        indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]
+        # check type is valid
         if isinstance(key, BasicIndexer):
             indexer = key.tuple
-        else:
+        elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
+            if isinstance(key, np.ndarray):
+                raise NotImplementedError(
+                    f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                )
+            indexer = (key,)
+        elif isinstance(key, tuple):
+            for dim_indexer in key:
+                if (
+                    not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
+                    and dim_indexer is not None
+                ):
+                    raise TypeError(
+                        f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+                    )
+
+                if isinstance(key, np.ndarray):
+                    raise NotImplementedError(
+                        f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
+                    )
+
             indexer = key
+        else:
+            raise TypeError(
+                f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
+            )
 
-        indexer = _possibly_expand_trailing_ellipsis(key, self.ndim)
-
+        # check value is valid
+        indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
         if len(indexer) != self.ndim:
             raise ValueError(
                 f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
@@ -223,7 +271,13 @@ class ManifestArray:
             # indexer is all slice(None)'s, so this is a no-op
             return self
         else:
-            raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            output_arr = self
+            for ind, axis_indexer in enumerate(indexer):
+                if axis_indexer is None:
+                    output_arr = expand_dims(output_arr, axis=ind)
+                elif axis_indexer != slice(None):
+                    raise NotImplementedError(f"Doesn't support slicing with {indexer}")
+            return output_arr
 
     def rename_paths(
         self,
@@ -244,6 +298,10 @@ class ManifestArray:
         -------
         ManifestArray
 
+        See Also
+        --------
+        ChunkManifest.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -255,21 +313,57 @@ class ManifestArray:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> marr.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ChunkManifest.rename_paths
         """
         renamed_manifest = self.manifest.rename_paths(new)
-        return ManifestArray(zarray=self.zarray, chunkmanifest=renamed_manifest)
+        return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
+
+    def to_virtual_variable(self) -> xr.Variable:
+        """
+        Create a "virtual" xarray.Variable containing the contents of one zarr array.
+
+        The returned variable will be "virtual", i.e. it will wrap a single ManifestArray object.
+        """
+
+        # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
+        # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
+        dims = self.metadata.dimension_names
+        attrs = self.metadata.attributes
+        stripped_metadata = utils.copy_and_replace_metadata(
+            self.metadata, new_dimension_names=None, new_attributes={}
+        )
+        stripped_marr = ManifestArray(
+            chunkmanifest=self.manifest, metadata=stripped_metadata
+        )
+
+        return xr.Variable(
+            data=stripped_marr,
+            dims=dims,
+            attrs=attrs,
+        )
 
 
-def _possibly_expand_trailing_ellipsis(key, ndim: int):
-    if key[-1] == ...:
-        extra_slices_needed = ndim - (len(key) - 1)
-        *indexer, ellipsis = key
-        return tuple(tuple(indexer) + (slice(None),) * extra_slices_needed)
+def _possibly_expand_trailing_ellipsis(
+    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+    ndim: int,
+):
+    """
+    Allows for passing indexers <= the shape of the array, so long as they end with an ellipsis.
+
+    For example:
+
+    marr[3, slice(2), ...]
+
+    where marr.ndim => 3.
+    """
+    final_dim_indexer = indexer[-1]
+    if final_dim_indexer == ...:
+        if len(indexer) > ndim:
+            raise ValueError(f"Invalid indexer for array with ndim={ndim}: {indexer}")
+
+        extra_slices_needed = ndim - (len(indexer) - 1)
+        *indexer_as_list, ellipsis = indexer
+        return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
     else:
-        return key
+        return indexer

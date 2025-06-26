@@ -2,11 +2,11 @@ name: Typing
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" , "develop"]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main" , "develop"]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -25,17 +25,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: prefix-dev/setup-pixi@v0.8.3
         with:
-          python-version: '3.12'
-
-      - name: Install deps
+          pixi-version: v0.41.4
+      - name: List installed libraries
         run: |
-          # We need to test optional dep to add all the library stubs
-          pip install -e '.[test]'
-
+          pixi install --environment test
+          pixi list --environment test
       - name: Type check
         run: |
-          mypy virtualizarr
+          pixi run -e test run-mypy
