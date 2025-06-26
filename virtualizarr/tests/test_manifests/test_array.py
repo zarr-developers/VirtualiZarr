@@ -410,7 +410,8 @@ class TestIndexing:
         marr = manifest_array(shape=(4,), chunks=(2,))
 
         with pytest.raises(
-            ValueError, match="Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array"
+            ValueError,
+            match="Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array",
         ):
             marr[dodgy_indexer]
 
