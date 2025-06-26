@@ -2,26 +2,6 @@
 
 ## Usage questions
 
-### Which files formats are supported?
-
-Currently only a small number of filetypes are supported. They are:
-
-- netCDF4/HDF5
-- netCDF3
-- "Native" Zarr v3
-- FITS
-- DMR++
-- Kerchunk JSON / Parquet
-
-Planned but not yet supported are:
-- "Native" Zarr v2
-- TIFF (including COGeoTIFF)
-- GRIB
-- JPEG
-- SafeTensors
-
-You can also write your own custom reader for another file format.
-
 ### Can my specific data be virtualized?
 
 Depends on some details of your data.
@@ -41,7 +21,6 @@ When virtualizing multi-file datasets, it is sometimes the case that it is possi
 If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
 
 Sometimes you can get around some of these restrictions for specific variables by loading them into memory instead of virtualizing them - see the section in the usage docs about loadable variables.
->>>>>>> develop
 
 ### I'm an Xarray user but unfamiliar with Zarr/Cloud - might I still want this?
 
