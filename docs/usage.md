@@ -256,7 +256,7 @@ combined_vds['air'].data.manifest.dict()
 ```
 
 !!! note
-    If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another.
+    If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another.  Similarly, if there are data variables that do not include the concatenation dimension, you will likely need to specify `data_vars='minimal'`.
 
     In future this [default will be changed](https://github.com/pydata/xarray/issues/8778), such that passing these two arguments explicitly will become unnecessary.
 
