@@ -4,7 +4,6 @@
 
 ### New Features
 
-- Added more detail to error message for invalid indexer of ManifestArray ([#630](https://github.com/zarr-developers/VirtualiZarr/issues/630), [#635](https://github.com/zarr-developers/VirtualiZarr/pull/635)). By [Danny Kaufman](https://github.com/danielfromearth/).
 - Added a pluggable system of "parsers" for generating virtual references from different filetypes. These follow the `virtualizarr.parsers.typing.Parser` typing protocol, and return `ManifestStore` objects wrapping obstore stores.
   ([#498](https://github.com/zarr-developers/VirtualiZarr/issues/498), [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
 - Adds a Zarr parser to `open_virtual_dataset`, which allows opening Zarr V3 stores as virtual datasets.
@@ -47,6 +46,7 @@
 
 ### Documentation
 
+- Added more detail to error messages when an indexer of ManifestArray is invalid ([#630](https://github.com/zarr-developers/VirtualiZarr/issues/630), [#635](https://github.com/zarr-developers/VirtualiZarr/pull/635)). By [Danny Kaufman](https://github.com/danielfromearth/).
 - Added new docs page on how to write a custom parser for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
