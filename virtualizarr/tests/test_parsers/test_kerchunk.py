@@ -8,16 +8,12 @@ import ujson
 import xarray as xr
 import xarray.testing as xrt
 
-<<<<<<< HEAD
-from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
-=======
 from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestStore,
     ObjectStoreRegistry,
 )
->>>>>>> develop
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
