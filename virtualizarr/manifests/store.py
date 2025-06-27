@@ -125,7 +125,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 class ObjectStoreRegistry:
     """
     Registry of [ObjectStore][obstore.store.ObjectStore] instances and their associated URI prefixes.
-    
+
     ObjectStoreRegistry maps the URI scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. Used by [ManifestStore][virtualizarr.manifests.ManifestStore] to read both metadata and data referenced by virtual chunk references, via the associated [ObjectStore][obstore.store.ObjectStore].
     """
 
