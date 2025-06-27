@@ -23,18 +23,24 @@ if TYPE_CHECKING:
     ]
 
 
+def remove_prefix(store: ObjectStore, path: str) -> str:
+    """Remove a store prefix like file:/// or memory:// if it exists in the path"""
+    parsed = urlparse(path)
+    if hasattr(store, "prefix") and store.prefix:
+        filepath = os.path.basename(parsed.path)
+    else:
+        filepath = parsed.path
+
+    return filepath
+
+
 class ObstoreReader:
     _reader: ReadableFile
 
     def __init__(self, store: ObjectStore, path: str) -> None:
         import obstore as obs
 
-        parsed = urlparse(path)
-        if hasattr(store, "prefix") and store.prefix:
-            filepath = os.path.basename(parsed.path)
-        else:
-            filepath = parsed.path
-
+        filepath = remove_prefix(store, path)
         self._reader = obs.open_reader(store, filepath)
 
     def read(self, size: int, /) -> bytes:

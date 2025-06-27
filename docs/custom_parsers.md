@@ -170,7 +170,33 @@ Generally you want to follow steps like this:
 
     For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
 
-### Parsing a pre-existing index file
+### Parsing existing in-memory references
+
+A `Parser` can be used to parse existing references that are in-memory, as well as those on-disk. This can be done by using the [`obstore.store.MemoryStore`][], and highlights the power of delegating all IO to a general store-like interface.
+
+```python
+# some example kerchunk-formatted JSON references, as an in-memory python dict
+refs = {
+    'version': 1,
+    'refs': {
+        '.zgroup': '{"zarr_format":2}',
+        'a/.zarray': '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+        'a/.zattrs': '{"_ARRAY_DIMENSIONS":["x","y"],"value": "1"}',
+        'a/0.0': ['/test1.nc', 6144, 48],
+    }
+}
+
+memory_store = obstore.store.MemoryStore()
+memory_store.put("refs.json", ujson.dumps(refs).encode())
+
+registry = ObjectStoreRegistry({"memory://": memory_store})
+parser = KerchunkJSONParser(store_registry=registry)
+manifeststore = parser("refs.json", memory_store)
+```
+
+Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
+
+### Parsing a sidecar file
 
 A custom parser can parse multiple files, perhaps by passing a glob string and looking for expected file naming conventions, or by passing additional parser-specific keyword arguments.
 This can be useful for reading file formats which include some kind of additional "index" sidecar file, but don't have all the information necessary to construct the entire [`ManifestStore`][virtualizarr.manifests.ManifestStore] object from the sidecar file alone.

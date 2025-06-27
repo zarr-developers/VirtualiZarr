@@ -1,12 +1,13 @@
 from collections.abc import Iterable
 
+import obstore
 import ujson
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
-from virtualizarr.utils import ObstoreReader
+from virtualizarr.utils import remove_prefix
 
 
 class KerchunkJSONParser:
@@ -62,11 +63,13 @@ class KerchunkJSONParser:
             A ManifestStore that provides a Zarr representation of the parsed file.
         """
 
-        reader = ObstoreReader(store=object_store, path=file_url)
+        path = remove_prefix(object_store, file_url)
 
-        reader.seek(0)
-        content = reader.readall().decode()
+        # we need the whole thing so just get the entire contents in one request
+        resp = obstore.get(object_store, path)
+        content = resp.bytes().to_bytes()
         refs = ujson.loads(content)
+
         if self.store_registry is None:
             unique_paths = {
                 v[0]
@@ -79,6 +82,7 @@ class KerchunkJSONParser:
             registry = ObjectStoreRegistry(stores=stores)
         else:
             registry = self.store_registry
+
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,
