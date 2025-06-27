@@ -1,11 +1,11 @@
 # V2 Migration Guide
 
 
-With the release of VirtualiZarr 2.0, there are some core changes to how VirtualiZarr works. The goal of this guide is to provide some context around the core changes and demonstrate the updated usage. 
+With the release of VirtualiZarr 2.0, there are some core changes to how VirtualiZarr works. The goal of this guide is to provide some context around the core changes and demonstrate the updated usage.
 
 ## `open_virtual_dataset` in V1
 
-In V1 there was a lot of auto-magic guesswork of filetypes and urls that was happening under the hood. 
+In V1 there was a lot of auto-magic guesswork of filetypes and urls that was happening under the hood.
 While this made it easy to get started, it could lead to a lot of footguns and unexpected behavior.
 
 ```python
@@ -15,8 +15,8 @@ vds = open_virtual_dataset(filepath)
 
 ## V2
 In V2, virtualizing a dataset requires a bit more input, but is much more explicit.
-You now must pass in a `Parser` (formally called a reader) and an [Obstore Store](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store) into `open_virtual_dataset`. 
-This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust. 
+You now must pass in a `Parser` (formally called a reader) and an [Obstore Store](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store) into `open_virtual_dataset`.
+This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust.
 
 === "S3 Store"
 
