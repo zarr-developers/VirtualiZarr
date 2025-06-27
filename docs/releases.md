@@ -34,6 +34,8 @@
   ([#335](https://github.com/zarr-developers/VirtualiZarr/issues/335), [#477](https://github.com/zarr-developers/VirtualiZarr/pull/477)) by [Tom Nicholas](https://github.com/TomNicholas).
 - Moved `ChunkManifest`, `ManifestArray` etc. to be behind a dedicated `.manifests` namespace. ([#620](https://github.com/zarr-developers/VirtualiZarr/issues/620), [#624](https://github.com/zarr-developers/VirtualiZarr/pull/624))
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Now by default when writing virtual chunks to Icechunk, the `last_updated_time` for the chunk will be set to the current time. This helps protect users against reading from stale or overwritten chunks stored in Icechunk, by default.
+  ([#436](https://github.com/zarr-developers/VirtualiZarr/issues/436), [#480](https://github.com/zarr-developers/VirtualiZarr/pull/480)) by [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Deprecations
 
@@ -46,6 +48,7 @@
 
 ### Documentation
 
+- Added more detail to error messages when an indexer of ManifestArray is invalid ([#630](https://github.com/zarr-developers/VirtualiZarr/issues/630), [#635](https://github.com/zarr-developers/VirtualiZarr/pull/635)). By [Danny Kaufman](https://github.com/danielfromearth/).
 - Added new docs page on how to write a custom parser for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).

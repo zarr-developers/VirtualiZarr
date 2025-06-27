@@ -261,7 +261,10 @@ class ManifestArray:
         indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
         if len(indexer) != self.ndim:
             raise ValueError(
-                f"Invalid indexer for array with ndim={self.ndim}: {indexer}"
+                f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
+                f"but indexer={indexer} has length {len(indexer)} and array has {self.ndim} dimensions."
+                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
+                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
             )
 
         if all(
@@ -360,7 +363,12 @@ def _possibly_expand_trailing_ellipsis(
     final_dim_indexer = indexer[-1]
     if final_dim_indexer == ...:
         if len(indexer) > ndim:
-            raise ValueError(f"Invalid indexer for array with ndim={ndim}: {indexer}")
+            raise ValueError(
+                f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
+                f"but indexer={indexer} has length {len(indexer)} and array has {ndim} dimensions."
+                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
+                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
+            )
 
         extra_slices_needed = ndim - (len(indexer) - 1)
         *indexer_as_list, ellipsis = indexer

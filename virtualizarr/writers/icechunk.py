@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import numpy as np
@@ -413,6 +413,14 @@ def write_manifest_virtual_refs(
         ],
         op_flags=[["readonly"]] * 3,  # type: ignore
     )
+
+    if last_updated_at is None:
+        # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
+        # so we need to add a buffer, so that if you immediately read data back from this icechunk store,
+        # and the referenced data was literally just created (<1s ago),
+        # you don't get an IcechunkError warning you that your referenced chunk has changed.
+        # In practice this should only really come up in synthetic examples, e.g. tests and docs.
+        last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(

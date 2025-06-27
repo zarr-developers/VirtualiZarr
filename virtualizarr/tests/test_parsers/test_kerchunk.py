@@ -8,7 +8,16 @@ import ujson
 import xarray as xr
 import xarray.testing as xrt
 
+<<<<<<< HEAD
 from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
+=======
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestStore,
+    ObjectStoreRegistry,
+)
+>>>>>>> develop
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
@@ -353,14 +362,12 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", ujson.dumps(refs).encode())
 
-    parser = KerchunkJSONParser()
+    registry = ObjectStoreRegistry({"memory://": memory_store})
+    parser = KerchunkJSONParser(store_registry=registry)
     manifeststore = parser("refs.json", memory_store)
 
     assert isinstance(manifeststore, ManifestStore)
-
-    assert manifeststore._store_registry._stores == {"": memory_store}
-    # TODO should it be this instead?
-    # assert manifeststore._store_registry._stores == {"memory://": memory_store}
+    assert manifeststore._store_registry._stores == {"memory://": memory_store}
 
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(
