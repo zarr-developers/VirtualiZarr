@@ -4,7 +4,9 @@
 
 ### New Features
 
-- Adds a Zarr reader to `open_virtual_dataset`, which allows opening Zarr V3 stores as virtual datasets.
+- Added a pluggable system of "parsers" for generating virtual references from different filetypes. These follow the `virtualizarr.parsers.typing.Parser` typing protocol, and return `ManifestStore` objects wrapping obstore stores.
+  ([#498](https://github.com/zarr-developers/VirtualiZarr/issues/498), [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
+- Adds a Zarr parser to `open_virtual_dataset`, which allows opening Zarr V3 stores as virtual datasets.
   ([#271](https://github.com/zarr-developers/VirtualiZarr/pull/271)) By [Raphael Hagen](https://github.com/norlandrhagen).
 - Added experimental ManifestStore ([#490](https://github.com/zarr-developers/VirtualiZarr/pull/490)).
 - Added `ManifestStore.to_virtual_dataset()` method ([#522](https://github.com/zarr-developers/VirtualiZarr/pull/522)).
@@ -20,6 +22,7 @@
 
 ### Breaking changes
 
+- As `virtualizarr.open_virtual_dataset` now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
   name matches the name of their only dimension (also known as "dimension coordinates").
@@ -31,6 +34,8 @@
   ([#335](https://github.com/zarr-developers/VirtualiZarr/issues/335), [#477](https://github.com/zarr-developers/VirtualiZarr/pull/477)) by [Tom Nicholas](https://github.com/TomNicholas).
 - Moved `ChunkManifest`, `ManifestArray` etc. to be behind a dedicated `.manifests` namespace. ([#620](https://github.com/zarr-developers/VirtualiZarr/issues/620), [#624](https://github.com/zarr-developers/VirtualiZarr/pull/624))
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Now by default when writing virtual chunks to Icechunk, the `last_updated_time` for the chunk will be set to the current time. This helps protect users against reading from stale or overwritten chunks stored in Icechunk, by default.
+  ([#436](https://github.com/zarr-developers/VirtualiZarr/issues/436), [#480](https://github.com/zarr-developers/VirtualiZarr/pull/480)) by [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Deprecations
 
@@ -43,7 +48,8 @@
 
 ### Documentation
 
-- Added new docs page on how to write a custom reader for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
+- Added more detail to error messages when an indexer of ManifestArray is invalid ([#630](https://github.com/zarr-developers/VirtualiZarr/issues/630), [#635](https://github.com/zarr-developers/VirtualiZarr/pull/635)). By [Danny Kaufman](https://github.com/danielfromearth/).
+- Added new docs page on how to write a custom parser for bespoke file formats ([#452](https://github.com/zarr-developers/VirtualiZarr/issues/452), [#580](https://github.com/zarr-developers/VirtualiZarr/pull/580))
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added new docs page on how to scale VirtualiZarr effectively[#590](https://github.com/zarr-developers/VirtualiZarr/issues/590).
   By [Tom Nicholas](https://github.com/TomNicholas).
@@ -54,7 +60,7 @@
 - Added FAQ answer about what data can be virtualized ([#430](https://github.com/zarr-developers/VirtualiZarr/issues/430), [#532](https://github.com/zarr-developers/VirtualiZarr/pull/532))
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Switched docs build to use mkdocs-material instead of sphinx ([#615](https://github.com/zarr-developers/VirtualiZarr/pull/615))
-  By [Max Jones](https://github.com/maxrjones)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ### Internal Changes
 
@@ -64,7 +70,7 @@
     - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
     - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
       - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see [parse_named_configuration](https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130)) to valid Zarr V3 codec classes.
-    - Reader changes are minimal.
+    - Parser changes are minimal.
     - Writer changes:
       - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
     - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported ([zarr-python issue #2324](https://github.com/zarr-developers/zarr-python/issues/2324)).
@@ -72,6 +78,8 @@
 - The continuous integration workflows and developer environment now use [pixi](https://pixi.sh/latest/) ([#407](https://github.com/zarr-developers/VirtualiZarr/pull/407)).
 - Added `loadable_variables` kwarg to `ManifestStore.to_virtual_dataset`.
   ([#543](https://github.com/zarr-developers/VirtualiZarr/pull/543)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Ensure that the `KerchunkJSONParser` can be used to parse in-memory kerchunk dictionaries using `obstore.store.MemoryStore`.
+  ([#631](https://github.com/zarr-developers/VirtualiZarr/pull/631)) By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v1.3.2 (3rd Mar 2025)
 

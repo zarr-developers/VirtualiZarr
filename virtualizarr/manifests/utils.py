@@ -27,7 +27,7 @@ def create_v3_array_metadata(
 ) -> ArrayV3Metadata:
     """
     Create an ArrayV3Metadata instance with standard configuration.
-    This function encapsulates common patterns used across different readers.
+    This function encapsulates common patterns used across different parsers.
 
     Parameters
     ----------

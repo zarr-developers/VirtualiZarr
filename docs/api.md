@@ -10,6 +10,18 @@ Users can use xarray for every step apart from reading and serializing virtual r
 ::: virtualizarr.open_virtual_dataset
 ::: virtualizarr.open_virtual_mfdataset
 
+### Parsers
+
+Each parser understands how to read a specific file format, and a parser must be passed to `virtualizarr.open_virtual_dataset`.
+
+::: virtualizarr.parsers.DMRPPParser
+::: virtualizarr.parsers.FITSParser
+::: virtualizarr.parsers.HDFParser
+::: virtualizarr.parsers.NetCDF3Parser
+::: virtualizarr.parsers.KerchunkJSONParser
+::: virtualizarr.parsers.KerchunkParquetParser
+::: virtualizarr.parsers.ZarrParser
+
 ### Serialization
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor
@@ -25,11 +37,13 @@ Users can use xarray for every step apart from reading and serializing virtual r
 
 ### Developer API
 
-If you want to write a new reader to create virtual references pointing to a custom file format, you will need to use VirtualiZarr's internal classes.
+If you want to write a new parser to create virtual references pointing to a custom file format, you will need to use VirtualiZarr's internal classes.
+See the page on custom parsers for more information.
 
 #### Manifests
 
 VirtualiZarr uses these classes to store virtual references internally.
+See the page on data structures for more information.
 
 ::: virtualizarr.manifests.ChunkManifest
 ::: virtualizarr.manifests.ManifestArray
@@ -45,6 +59,12 @@ VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limite
 ::: virtualizarr.manifests.array_api.stack
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
+
+#### Parser typing protocol
+
+All custom parsers must follow the `virtualizarr.parsers.typing.Parser` typing protocol.
+
+::: virtualizarr.parsers.typing.Parser
 
 #### Parallelization
 

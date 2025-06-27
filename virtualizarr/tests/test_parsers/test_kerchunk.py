@@ -2,12 +2,18 @@ from pathlib import Path
 from typing import Any, Callable, Generator, Optional
 
 import numpy as np
+import obstore
 import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestStore,
+    ObjectStoreRegistry,
+)
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
@@ -343,3 +349,41 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
         ).load() as manifest_ds,
     ):
         xrt.assert_identical(ds, manifest_ds)
+
+
+def test_parse_dict_via_memorystore(array_v3_metadata):
+    # generate some example kerchunk references
+    refs: dict = gen_ds_refs()
+
+    memory_store = obstore.store.MemoryStore()
+    memory_store.put("refs.json", ujson.dumps(refs).encode())
+
+    registry = ObjectStoreRegistry({"memory://": memory_store})
+    parser = KerchunkJSONParser(store_registry=registry)
+    manifeststore = parser("refs.json", memory_store)
+
+    assert isinstance(manifeststore, ManifestStore)
+    assert manifeststore._store_registry._stores == {"memory://": memory_store}
+
+    # assert metadata parsed correctly
+    expected_metadata = array_v3_metadata(
+        shape=(2, 3),
+        chunks=(2, 3),
+        data_type=np.dtype("int64"),
+        dimension_names=["x", "y"],
+        attributes={"value": "1"},
+    )
+    manifest = ChunkManifest(
+        {
+            "0": {"path": "/test1.nc", "offset": 6144, "length": 48},
+        }
+    )
+    expected_marr = ManifestArray(
+        metadata=expected_metadata,
+        chunkmanifest=manifest,
+    )
+    # TODO this might be easier if `ManifestStore/Group` had __eq__ methods?
+    actual_marr = manifeststore._group._members["a"]
+    assert (actual_marr == expected_marr).all()
+
+    # TODO assert that manifeststore.to_kerchunk_refs() roundtrips, once we have that method
