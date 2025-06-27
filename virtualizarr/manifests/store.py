@@ -124,7 +124,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps the URL scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. This register allows
+    ObjectStoreRegistry maps the URL scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. This registry allows
     Zarr Store implementations (e.g., [ManifestStore][virtualizarr.manifests.ManifestStore]) to read from different ObjectStore instances.
     """
 
