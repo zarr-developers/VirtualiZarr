@@ -3,7 +3,7 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import NetCDF3Parser
-from virtualizarr.tests import requires_network, requires_scipy
+from virtualizarr.tests import requires_kerchunk, requires_network, requires_scipy
 from virtualizarr.tests.utils import obstore_http, obstore_local
 
 
@@ -24,6 +24,7 @@ def test_read_netcdf3(netcdf3_file, array_v3_metadata):
         xrt.assert_identical(observed.load(), expected.load())
 
 
+@requires_kerchunk
 @requires_network
 def test_read_http_netcdf3(array_v3_metadata):
     file_url = "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc"
