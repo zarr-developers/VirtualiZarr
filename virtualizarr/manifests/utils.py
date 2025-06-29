@@ -55,7 +55,7 @@ def create_v3_array_metadata(
     """
     return ArrayV3Metadata(
         shape=shape,
-        data_type=data_type,
+        data_type=data_type.name if hasattr(data_type, "name") else data_type,
         chunk_grid={
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},

@@ -4,6 +4,7 @@ import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
+from zarr.codecs import BytesCodec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
@@ -64,7 +65,6 @@ def convert_to_codec_pipeline(
     -------
     BatchedCodecPipeline
     """
-    from zarr.core.array import _get_default_chunk_encoding_v3
     from zarr.registry import get_codec_class
 
     zarr_codecs: tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...] = ()
@@ -78,7 +78,10 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        arraybytes_codec = _get_default_chunk_encoding_v3(dtype)[1]
+        if dtype.byteorder == ">":
+            arraybytes_codec = BytesCodec(endian="big")
+        else:
+            arraybytes_codec = BytesCodec()
 
     codec_pipeline = BatchedCodecPipeline(
         array_array_codecs=arrayarray_codecs,
