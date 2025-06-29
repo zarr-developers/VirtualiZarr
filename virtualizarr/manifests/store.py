@@ -74,7 +74,7 @@ def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
     else:
         var, _ = key.split("/")
         metadata = manifest_group.arrays[var].metadata.to_dict()
-    
+
     return metadata.to_buffer_dict(prototype=default_buffer_prototype())
 
 
@@ -254,7 +254,7 @@ class ManifestStore(Store):
 
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._group, key)
-        
+
         var = key.split("/")[0]
         marr = self._group.arrays[var]
         manifest = marr.manifest
@@ -272,7 +272,7 @@ class ManifestStore(Store):
             raise ValueError(
                 f"Could not find a store to use for {path} in the store registry"
             )
-        
+
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
         if hasattr(store, "prefix") and store.prefix:
