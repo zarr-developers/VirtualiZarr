@@ -1,4 +1,5 @@
 # Launch and use an EC2 for building the Lithops lambda runtime
+## Note: This example uses a pre-2.0 release of VirtualiZarr
 
 The scripts in this directly will help to launch and set up an ec2 so that you can build and push a lithops lambda runtime.
 

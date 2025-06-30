@@ -1,5 +1,4 @@
 ## Docker
-
 Build the runtime with
 
 ```bash

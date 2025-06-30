@@ -1,5 +1,6 @@
 # Use lithops to create a virtual dataset from a collection of necdf files on s3.
-#
+# Note: This example uses a pre-2.0 release of VirtualiZarr
+
 # Inspired by Pythia's cookbook: https://projectpythia.org/kerchunk-cookbook
 # by norlandrhagen.
 #

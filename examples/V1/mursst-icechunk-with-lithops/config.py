@@ -1,5 +1,6 @@
 """
 Configuration settings for MUR SST data processing.
+Note: This example uses a pre-2.0 release of VirtualiZarr
 
 This module contains all the configuration settings and constants used
 throughout the package.
