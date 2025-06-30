@@ -1,4 +1,5 @@
 # Lithops Package for MUR SST Data Processing
+## Note: This example uses a pre-2.0 release of VirtualiZarr
 
 This package provides functionality for processing MUR SST (Multi-scale Ultra-high Resolution Sea Surface Temperature) data using [Lithops](https://lithops-cloud.github.io/), a framework for serverless computing.
 
