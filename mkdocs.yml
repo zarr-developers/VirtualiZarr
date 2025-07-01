@@ -4,7 +4,7 @@ repo_name: zarr-developers/VirtualiZarr
 repo_url: https://github.com/zarr-developers/VirtualiZarr
 site_description: Cloud-Optimize your Scientific Data as Virtual Zarr stores, using Xarray syntax.
 site_author: VirtualiZarr developers
-site_url: https://virtualizarr.readthedocs.io/
+site_url: https://virtualizarr.readthedocs.io/en/latest/
 docs_dir: docs
 use_directory_urls: false
 
