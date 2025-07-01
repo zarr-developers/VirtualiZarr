@@ -20,6 +20,7 @@ nav:
   - How-to guides:
     - "usage.md"
     - "examples.md"
+    - "migration_guide.md"
   - Explanation:
     - "data_structures.md"
     - "custom_parsers.md"
@@ -134,6 +135,8 @@ markdown_extensions:
   - pymdownx.smartsymbols
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tabbed:
