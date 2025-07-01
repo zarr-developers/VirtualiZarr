@@ -27,7 +27,8 @@ from virtualizarr.manifests.store import get_store_prefix
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 if TYPE_CHECKING:
-    pass
+    import zarr
+
 
 FillValueT = bool | str | float | int | list | None
 
@@ -40,9 +41,6 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     np.dtype("complex").kind: [0.0, 0.0],
     np.dtype("datetime64").kind: 0,
 }
-
-
-import zarr
 
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
