@@ -15,7 +15,7 @@ vds = open_virtual_dataset(filepath)
 
 ## V2
 In V2, virtualizing a dataset requires a bit more input, but is much more explicit.
-You now must pass in a `Parser` (formally called a reader) and an [Obstore Store](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store) into `open_virtual_dataset`.
+You now must pass in a `Parser` (formerly called a reader) and an [Obstore Store](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store) into `open_virtual_dataset`.
 This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust.
 
 === "S3 Store"
