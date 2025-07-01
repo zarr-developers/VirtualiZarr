@@ -103,7 +103,10 @@ def test_write_new_virtual_variable(
 
 
 def test_set_single_virtual_ref_without_encoding(
-    icechunk_filestore: "IcechunkStore", simple_netcdf4: Path, array_v3_metadata
+    icechunk_filestore: "IcechunkStore",
+    icechunk_repo: "Repository",
+    simple_netcdf4: Path,
+    array_v3_metadata,
 ):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
@@ -128,7 +131,10 @@ def test_set_single_virtual_ref_without_encoding(
 
     vds.virtualize.to_icechunk(icechunk_filestore)
 
-    root_group = zarr.group(store=icechunk_filestore)
+    icechunk_filestore.session.commit("test")
+
+    icechunk_readonly_session = icechunk_repo.readonly_session("main")
+    root_group = zarr.open_group(store=icechunk_readonly_session.store, mode="r")
     array = root_group["foo"]
 
     # check chunk references
@@ -136,7 +142,9 @@ def test_set_single_virtual_ref_without_encoding(
     # icechunk doesn't yet expose any get_virtual_refs method
 
     with (
-        xr.open_zarr(store=icechunk_filestore, zarr_format=3, consolidated=False) as ds,
+        xr.open_zarr(
+            store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
+        ) as ds,
         xr.open_dataset(simple_netcdf4) as expected_ds,
     ):
         expected_array = expected_ds["foo"].to_numpy()
@@ -149,7 +157,10 @@ def test_set_single_virtual_ref_without_encoding(
 
 
 def test_set_single_virtual_ref_with_encoding(
-    icechunk_filestore: "IcechunkStore", netcdf4_file: Path, array_v3_metadata
+    icechunk_filestore: "IcechunkStore",
+    icechunk_repo: "Repository",
+    netcdf4_file: Path,
+    array_v3_metadata,
 ):
     with xr.open_dataset(netcdf4_file) as ds:
         # We drop the coordinates because we don't have them in the zarr test case
@@ -179,7 +190,10 @@ def test_set_single_virtual_ref_with_encoding(
 
         vds.virtualize.to_icechunk(icechunk_filestore)
 
-        root_group = zarr.group(store=icechunk_filestore)
+        icechunk_filestore.session.commit("test")
+
+        icechunk_readonly_session = icechunk_repo.readonly_session("main")
+        root_group = zarr.open_group(store=icechunk_readonly_session.store, mode="r")
         air_array = root_group["air"]
         assert isinstance(air_array, zarr.Array)
 
@@ -195,7 +209,7 @@ def test_set_single_virtual_ref_with_encoding(
 
         # check the data
         with xr.open_zarr(
-            store=icechunk_filestore, zarr_format=3, consolidated=False
+            store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as actual_ds:
             # Because we encode attributes, attributes may differ, for example
             # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
@@ -429,7 +443,9 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
         generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
 
 
-def test_roundtrip_coords(manifest_array, icechunk_filestore: "IcechunkStore"):
+def test_roundtrip_coords(
+    manifest_array, icechunk_filestore: "IcechunkStore", icechunk_repo: "Repository"
+):
     # regression test for GH issue #574
 
     vds = xr.Dataset(
@@ -450,8 +466,10 @@ def test_roundtrip_coords(manifest_array, icechunk_filestore: "IcechunkStore"):
         },
     )
     vds.virtualize.to_icechunk(icechunk_filestore)
+    icechunk_filestore.session.commit("test")
 
-    roundtrip = xr.open_zarr(icechunk_filestore, consolidated=False)
+    icechunk_readonly_session = icechunk_repo.readonly_session("main")
+    roundtrip = xr.open_zarr(icechunk_readonly_session.store, consolidated=False)
     assert set(roundtrip.coords) == set(vds.coords)
 
 
