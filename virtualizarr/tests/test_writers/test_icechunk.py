@@ -10,7 +10,9 @@ pytest.importorskip("icechunk")
 import numpy as np
 import numpy.testing as npt
 import xarray as xr
+import xarray.testing as xrt
 import zarr
+from zarr.core.buffer import default_buffer_prototype
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -103,7 +105,6 @@ def test_write_new_virtual_variable(
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore", simple_netcdf4: Path, array_v3_metadata
 ):
-    import xarray.testing as xrt
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
@@ -139,6 +140,7 @@ def test_set_single_virtual_ref_without_encoding(
         xr.open_dataset(simple_netcdf4) as expected_ds,
     ):
         expected_array = expected_ds["foo"].to_numpy()
+
         npt.assert_equal(array, expected_array)
         xrt.assert_identical(ds.foo, expected_ds.foo)
 
@@ -149,8 +151,6 @@ def test_set_single_virtual_ref_without_encoding(
 def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore", netcdf4_file: Path, array_v3_metadata
 ):
-    import xarray.testing as xrt
-
     with xr.open_dataset(netcdf4_file) as ds:
         # We drop the coordinates because we don't have them in the zarr test case
         expected_ds = ds.drop_vars(["lon", "lat", "time"])
@@ -348,10 +348,12 @@ def test_checksum(
 
     vds = xr.Dataset({"pressure": ma_v})
 
-    # Icechunk checksums currently store with second precision, so we need to make sure
-    # the checksum_date is at least one second in the future
-    checksum_date = datetime.now(timezone.utc) + timedelta(seconds=1)
-    vds.virtualize.to_icechunk(icechunk_filestore, last_updated_at=checksum_date)
+    # default behaviour is to create a checksum based on the current time
+    vds.virtualize.to_icechunk(icechunk_filestore)
+
+    # Make sure the checksum_date is at least one second in the past before trying to overwrite referenced file with new data
+    # This represents someone coming back much later and overwriting archival data
+    time.sleep(1)
 
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
@@ -372,8 +374,11 @@ def test_checksum(
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
     var = xr.Variable(data=arr, dims=["x", "y"])
     ds = xr.Dataset({"foo": var})
-    time.sleep(1)  # Make sure the checksum_date is at least one second in the future
     ds.to_netcdf(netcdf_path)
+
+    # TODO assert that icechunk knows the correct last_updated_at for this chunk
+    # TODO ideally use icechunk's get_chunk_ref to directly interrogate the last_updated_time
+    # however this is currently only available in rust
 
     # Now if we try to read the data back in, it should fail because the checksum_date
     # is newer than the last_updated_at
@@ -424,6 +429,32 @@ def test_generate_chunk_key_append_axis_out_of_bounds():
         generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
 
 
+def test_roundtrip_coords(manifest_array, icechunk_filestore: "IcechunkStore"):
+    # regression test for GH issue #574
+
+    vds = xr.Dataset(
+        data_vars={
+            "data": (
+                ["x", "y", "t"],
+                manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1)),
+            ),
+        },
+        coords={
+            "coord_3d": (
+                ["x", "y", "t"],
+                manifest_array(shape=(4, 2, 3), chunks=(2, 1, 1)),
+            ),
+            "coord_2d": (["x", "y"], manifest_array(shape=(4, 2), chunks=(2, 1))),
+            "coord_1d": (["t"], manifest_array(shape=(3,), chunks=(1,))),
+            "coord_0d": ([], manifest_array(shape=(), chunks=())),
+        },
+    )
+    vds.virtualize.to_icechunk(icechunk_filestore)
+
+    roundtrip = xr.open_zarr(icechunk_filestore, consolidated=False)
+    assert set(roundtrip.coords) == set(vds.coords)
+
+
 class TestAppend:
     """
     Tests for appending to existing icechunk store.
@@ -437,8 +468,6 @@ class TestAppend:
         simple_netcdf4: str,
         virtual_dataset: Callable,
     ):
-        import xarray.testing as xrt
-
         # generate virtual dataset
         vds = virtual_dataset(file_uri=simple_netcdf4)
         # Commit the first virtual dataset
@@ -473,8 +502,6 @@ class TestAppend:
         netcdf4_files_factory: Callable,
         virtual_dataset: Callable,
     ):
-        import xarray.testing as xrt
-
         scale_factor = 0.01
         encoding = {"air": {"scale_factor": scale_factor}}
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
@@ -536,9 +563,6 @@ class TestAppend:
         virtual_variable: Callable,
         virtual_dataset: Callable,
     ):
-        import xarray.testing as xrt
-        from zarr.core.buffer import default_buffer_prototype
-
         filepath1, filepath2 = netcdf4_files_factory(
             encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
         )
@@ -649,8 +673,6 @@ class TestAppend:
         netcdf4_files_factory: Callable,
         virtual_dataset: Callable,
     ):
-        import xarray.testing as xrt
-
         encoding = {
             "air": {
                 "zlib": True,
