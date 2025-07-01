@@ -54,7 +54,7 @@ This change adds a bit more verbosity, but is intended to make virtualizing data
 In Virtualizarr V1 if you wanted to access the underlying chunks of a dataset, you first had to write the reference to disk. From there you could read those references back into Xarray and access the chunks like you would with a normal Xarray dataset.
 
 In V2 you can now **directly read the chunks from a Parser into Xarray without writing them to disk first**. 🤯
-Since each `Parser` is now responsible for creating a `ManifestStore` and the `ManifestStore` chunks are backed by `Obstore`, you should be able to pass a `ManifestStore` directly into Xarray.
+Since each `Parser` is now responsible for creating a `ManifestStore` and the `ManifestStore` chunks are backed by `Obstore`, you can pass a `ManifestStore` directly into Zarr or Xarray. This is because each `ManifestStore` is a valid Zarr store.
 
 `Parser -> ManifestStore -> Xarray`
 
