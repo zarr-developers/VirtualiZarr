@@ -201,7 +201,7 @@ docs = ["docs"]
 serve-docs = { cmd = "mkdocs serve" }
 build-docs = { cmd = "mkdocs build" }
 check-docs = { cmd = "mkdocs build --strict" }
-prep-site-url = { cmd = 'sed -i "" "s|^site_url: https://virtualizarr.readthedocs.io/en/latest/|site_url: ${READTHEDOCS_CANONICAL_URL}|" mkdocs.yml'}
+prep-site-url = { cmd = "sed -i '' \"s|^site_url: https://virtualizarr.readthedocs.io/en/latest/|site_url: $READTHEDOCS_CANONICAL_URL|\" mkdocs.yml" }
 readthedocs = { cmd = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r site $READTHEDOCS_OUTPUT/html" }
 # Define commands to run within the docs environment
 [tool.pixi.feature.minio.tasks]
