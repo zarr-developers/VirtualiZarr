@@ -10,6 +10,5 @@ build:
   commands:
     - mamba install -c conda-forge -c nodefaults pixi
     - pixi install --environment docs
-    - pixi run prep-site-url
     - pixi run build-docs
     - pixi run readthedocs
