@@ -11,6 +11,7 @@ import xarray.testing as xrt
 from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
+from virtualizarr import open_dataset as vz_open_dataset
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
@@ -22,6 +23,18 @@ from virtualizarr.tests import (
     requires_network,
 )
 from virtualizarr.tests.utils import obstore_http, obstore_local, obstore_s3
+
+
+def test_open_dataset(netcdf4_file: str):
+    store = obstore_local(file_url=netcdf4_file)
+    parser = HDFParser()
+
+    observed = vz_open_dataset(netcdf4_file, object_store=store, parser=parser)
+    observed_value = observed.air.isel(lat=10, lon=10, time=10).data
+    expected = xr.open_dataset(netcdf4_file, decode_timedelta=True, engine="netcdf4")
+    expected_value = expected.air.isel(lat=10, lon=10, time=10).data
+    xr.testing.assert_allclose(observed, expected)
+    np.testing.assert_allclose(observed_value, expected_value)
 
 
 def test_wrapping(array_v3_metadata):

@@ -34,6 +34,31 @@ if TYPE_CHECKING:
     )
 
 
+def open_dataset(
+    file_url: str,
+    object_store: ObjectStore,
+    parser: Parser,
+    drop_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+    cftime_variables: Iterable[str] | None = None,
+) -> xr.Dataset:
+    filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
+
+    manifest_store = parser(
+        file_url=filepath,
+        object_store=object_store,
+    )
+
+    ds = xr.open_dataset(
+        manifest_store,
+        decode_times=decode_times,
+        engine="zarr",
+        consolidated=False,
+        zarr_format=3,
+    )
+    return ds.drop_vars(list(drop_variables or ()))
+
+
 def open_virtual_dataset(
     file_url: str,
     object_store: ObjectStore,
