@@ -473,6 +473,12 @@ def test_roundtrip_coords(
     assert set(roundtrip.coords) == set(vds.coords)
 
 
+def test_warn_if_no_virtual_vars(icechunk_filestore: "IcechunkStore"):
+    non_virtual_ds = xr.Dataset({"foo": ("x", [10, 20, 30]), "x": ("x", [1, 2, 3])})
+    with pytest.warns(UserWarning, match="non-virtual"):
+        non_virtual_ds.virtualize.to_icechunk(icechunk_filestore)
+
+
 class TestAppend:
     """
     Tests for appending to existing icechunk store.
