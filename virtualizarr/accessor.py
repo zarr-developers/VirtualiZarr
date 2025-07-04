@@ -9,8 +9,6 @@ from typing import (
     Generator,
     Iterable,
     Literal,
-    ParamSpec,
-    TypeVar,
     overload,
 )
 
@@ -24,16 +22,12 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
-P = ParamSpec("P")
-T = TypeVar("T")
-
-
 def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
     """Decorator for methods which only make sense for fully virtual xarray objects."""
 
-    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+    def decorator(func):
         @wraps(func)
-        def wrapper(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        def wrapper(self, *args, **kwargs):
             all_vars: Iterable[xr.Variable]
             match cls_name:
                 case "Dataset":
