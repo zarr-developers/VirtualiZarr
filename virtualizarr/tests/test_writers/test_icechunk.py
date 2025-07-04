@@ -478,6 +478,12 @@ def test_warn_if_no_virtual_vars(icechunk_filestore: "IcechunkStore"):
     with pytest.warns(UserWarning, match="non-virtual"):
         non_virtual_ds.virtualize.to_icechunk(icechunk_filestore)
 
+    non_virtual_dt = xr.DataTree.from_dict(
+        {"/": non_virtual_ds, "/group": non_virtual_ds}
+    )
+    with pytest.warns(UserWarning, match="non-virtual"):
+        non_virtual_dt.virtualize.to_icechunk(icechunk_filestore)
+
 
 class TestAppend:
     """
