@@ -1,8 +1,9 @@
 import warnings
+from collections import deque
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, Callable, Literal, ParamSpec, TypeVar, overload, Iterable, Generator
 
 import xarray as xr
 
@@ -18,25 +19,43 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def warn_if_ds_not_virtual(func: Callable[P, T]) -> Callable[P, T]:
-    """Decorator for methods which write to virtual references formats."""
-    
-    @wraps(func)
-    def wrapper(self, *args: P.args, **kwargs: P.kwargs) -> T:
-        if not any(
-            isinstance(var.data, ManifestArray) for var in self.ds.variables.values()
-        ):
-            warnings.warn(
-                "Attempting to write an entirely non-virtual dataset to a virtual references format - i.e. your `xarray.Dataset` contains zero `ManifestArray` objects. "
-                "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
-                "This may have happened because you used `xarray.open_dataset` instead of `virtualizarr.open_virtual_dataset`, or you set all variables to be `loadable_variables`."
-                "Please read the usage docs.",
-                UserWarning,
-            )
+def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
+    """Decorator for methods which only make sense for fully virtual xarray objects."""
 
-        return func(self, *args, **kwargs)
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        @wraps(func)
+        def wrapper(self, *args: P.args, **kwargs: P.kwargs) -> T:
 
-    return wrapper
+            all_vars: Iterable[xr.Variable]
+            match cls_name:
+                case "Dataset":
+                    all_vars = self.ds.variables.values()
+                case "DataTree":
+                    all_vars = all_datatree_variables(self.dt)
+
+            if not any(
+                isinstance(var.data, ManifestArray) for var in all_vars
+            ):
+                warnings.warn(
+                    f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
+                    "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
+                    f"This may have happened because you used `xarray.open_{cls_name}` instead of `virtualizarr.open_virtual_{cls_name}`, or you set all variables to be `loadable_variables`."
+                    "Please read the usage docs.",
+                    UserWarning,
+                )
+
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, None]:
+    """Flat iterable over all variables in a DataTree"""
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        yield from node.variables.values()
+        queue.extend(node.children.values())
 
 
 @xr.register_dataset_accessor("virtualize")
@@ -50,7 +69,7 @@ class VirtualiZarrDatasetAccessor:
     def __init__(self, ds: xr.Dataset):
         self.ds: xr.Dataset = ds
 
-    @warn_if_ds_not_virtual
+    @warn_if_not_virtual("Dataset")
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -121,7 +140,7 @@ class VirtualiZarrDatasetAccessor:
         categorical_threshold: int = 10,
     ) -> None: ...
 
-    @warn_if_ds_not_virtual
+    @warn_if_not_virtual("Dataset")
     def to_kerchunk(
         self,
         filepath: str | Path | None = None,
@@ -264,6 +283,7 @@ class VirtualiZarrDataTreeAccessor:
     def __init__(self, dt: xr.DataTree):
         self.dt = dt
 
+    @warn_if_not_virtual("DataTree")
     def to_icechunk(
         self,
         store: "IcechunkStore",
