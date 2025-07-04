@@ -1,4 +1,3 @@
-import datetime
 import functools
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +8,6 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from obstore.store import LocalStore
 from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 

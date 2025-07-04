@@ -427,6 +427,7 @@ class TestIndexing:
         marr = manifest_array(shape=(), chunks=())
         assert marr[...] == marr
 
+
 def test_to_xarray(array_v3_metadata):
     chunks = (5, 10)
     shape = (5, 20)
