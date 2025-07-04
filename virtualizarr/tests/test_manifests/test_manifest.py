@@ -46,6 +46,14 @@ class TestPathValidation:
         with pytest.raises(ValueError):
             ChunkEntry.with_validation(path=path, offset=100, length=100)
 
+    def test_allow_path_containing_colon(self):
+        # regression test for issue #593
+        ChunkEntry.with_validation(
+            path="file:///folder/wrfout_d01_2024-01-02_01:00:00.nc",
+            offset=100,
+            length=100,
+        )
+
 
 class TestConvertingRelativePathsUsingFSRoot:
     def test_fs_root_must_be_absolute(self):
