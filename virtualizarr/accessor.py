@@ -1,6 +1,8 @@
+import warnings
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, overload
+from typing import TYPE_CHECKING, Callable, Literal, ParamSpec, TypeVar, overload
 
 import xarray as xr
 
@@ -10,6 +12,31 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def warn_if_ds_not_virtual(func: Callable[P, T]) -> Callable[P, T]:
+    """Decorator for methods which write to virtual references formats."""
+    
+    @wraps(func)
+    def wrapper(self, *args: P.args, **kwargs: P.kwargs) -> T:
+        if not any(
+            isinstance(var.data, ManifestArray) for var in self.ds.variables.values()
+        ):
+            warnings.warn(
+                "Attempting to write an entirely non-virtual dataset to a virtual references format - i.e. your `xarray.Dataset` contains zero `ManifestArray` objects. "
+                "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
+                "This may have happened because you used `xarray.open_dataset` instead of `virtualizarr.open_virtual_dataset`, or you set all variables to be `loadable_variables`."
+                "Please read the usage docs.",
+                UserWarning,
+            )
+
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 @xr.register_dataset_accessor("virtualize")
@@ -23,6 +50,7 @@ class VirtualiZarrDatasetAccessor:
     def __init__(self, ds: xr.Dataset):
         self.ds: xr.Dataset = ds
 
+    @warn_if_ds_not_virtual
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -93,6 +121,7 @@ class VirtualiZarrDatasetAccessor:
         categorical_threshold: int = 10,
     ) -> None: ...
 
+    @warn_if_ds_not_virtual
     def to_kerchunk(
         self,
         filepath: str | Path | None = None,
