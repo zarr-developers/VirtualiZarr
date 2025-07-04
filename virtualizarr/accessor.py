@@ -3,7 +3,16 @@ from collections import deque
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, ParamSpec, TypeVar, overload, Iterable, Generator
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generator,
+    Iterable,
+    Literal,
+    ParamSpec,
+    TypeVar,
+    overload,
+)
 
 import xarray as xr
 
@@ -25,7 +34,6 @@ def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
         @wraps(func)
         def wrapper(self, *args: P.args, **kwargs: P.kwargs) -> T:
-
             all_vars: Iterable[xr.Variable]
             match cls_name:
                 case "Dataset":
@@ -33,9 +41,7 @@ def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
                 case "DataTree":
                     all_vars = all_datatree_variables(self.dt)
 
-            if not any(
-                isinstance(var.data, ManifestArray) for var in all_vars
-            ):
+            if not any(isinstance(var.data, ManifestArray) for var in all_vars):
                 warnings.warn(
                     f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
                     "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
@@ -45,7 +51,9 @@ def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
                 )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
