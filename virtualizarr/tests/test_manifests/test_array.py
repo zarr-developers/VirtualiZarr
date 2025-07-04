@@ -422,6 +422,10 @@ class TestIndexing:
         with pytest.raises(NotImplementedError):
             marr[dodgy_indexer]
 
+    def test_indexing_scalar_with_ellipsis(self, manifest_array):
+        # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
+        marr = manifest_array(shape=(), chunks=())
+        assert marr[...] == marr
 
 def test_to_xarray(array_v3_metadata):
     chunks = (5, 10)
