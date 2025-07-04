@@ -1,5 +1,10 @@
 # End-to-end examples
 
+!!! note
+    The examples listed here use a pre-2.0 release of VirtualiZarr.
+
+
+
 The following examples demonstrate the use of VirtualiZarr to create virtual datasets of various kinds:
 
 1. [Appending new daily NOAA SST data to Icechunk](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/append/noaa-cdr-sst.ipynb)

@@ -4,6 +4,8 @@
 
 ### New Features
 
+- Adds a V1 -> V2 usage migration guide [#637](https://github.com/zarr-developers/VirtualiZarr/issues/637). By [Raphael Hagen](https://github.com/norlandrhagen).
+- Moves examples into a `V1/` directory and adds notes that examples use the VirtualiZarr V1 syntax [#644](https://github.com/zarr-developers/VirtualiZarr/issues/644). By [Raphael Hagen](https://github.com/norlandrhagen).
 - Added a pluggable system of "parsers" for generating virtual references from different filetypes. These follow the `virtualizarr.parsers.typing.Parser` typing protocol, and return `ManifestStore` objects wrapping obstore stores.
   ([#498](https://github.com/zarr-developers/VirtualiZarr/issues/498), [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
 - Adds a Zarr parser to `open_virtual_dataset`, which allows opening Zarr V3 stores as virtual datasets.
