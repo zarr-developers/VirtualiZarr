@@ -878,3 +878,12 @@ def test_drop_variables(netcdf4_file):
         file_url=netcdf4_file, object_store=store, parser=parser, drop_variables=["air"]
     ) as vds:
         assert "air" not in vds.variables
+
+
+def test_concat_zero_dimensional_var(manifest_array):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
+    marr = manifest_array(shape=(), chunks=())
+    vds1 = xr.Dataset({"a": marr})
+    vds2 = xr.Dataset({"a": marr})
+    result = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
+    assert result["a"].sizes == {"time": 2}
