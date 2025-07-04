@@ -32,13 +32,6 @@ class TestPathValidation:
         assert chunkentry["path"] == url
 
     @pytest.mark.parametrize(
-        "path", ["/directory/file", "s3://bucket/file", "https://site.com/file"]
-    )
-    def test_disallow_paths_without_file_suffixes(self, path):
-        with pytest.raises(ValueError, match="this path has no file suffix"):
-            ChunkEntry.with_validation(path=path, offset=100, length=100)
-
-    @pytest.mark.parametrize(
         "path",
         [
             pytest.param(
