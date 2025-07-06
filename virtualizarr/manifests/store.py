@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import pickle
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -17,6 +16,7 @@ from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -122,64 +122,6 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-class ObjectStoreRegistry:
-    """
-    Registry of [ObjectStore][obstore.store.ObjectStore] instances and their associated URI prefixes.
-
-    ObjectStoreRegistry maps the URI scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. Used by [ManifestStore][virtualizarr.manifests.ManifestStore] to read both metadata and data referenced by virtual chunk references, via the associated [ObjectStore][obstore.store.ObjectStore].
-    """
-
-    _stores: dict[str, ObjectStore]
-
-    @classmethod
-    def __init__(self, stores: dict[str, ObjectStore] | None = None):
-        stores = stores or {}
-        for store in stores.values():
-            if not store.__class__.__module__.startswith("obstore"):
-                raise TypeError(f"expected ObjectStore class, got {store!r}")
-        self._stores = stores
-
-    def register_store(self, prefix: str, store: ObjectStore):
-        """
-        Register a store using the given prefix
-
-        If a store with the same key existed before, it is replaced
-
-        Parameters
-        ----------
-        prefix
-            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
-            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
-        """
-        self._stores[prefix] = store
-
-    def get_store(self, url: str) -> ObjectStore:
-        """
-        Get a registered store for the provided URL.
-
-        Parameters
-        ----------
-        url
-            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
-            prefix of multiple stores in the registry, the store with the longest prefix is chosen.
-
-        Returns
-        -------
-        ObjectStore
-
-        Raises
-        ------
-        ValueError
-            If no store is registered for the provided URL or its prefixes.
-        """
-        prefixes = filter(url.startswith, self._stores)
-
-        if (longest_prefix := max(prefixes, default=None, key=len)) is None:
-            raise ValueError(f"No store registered for any prefix of {url!r}")
-
-        return self._stores[longest_prefix]
-
-
 class ManifestStore(Store):
     """
     A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
@@ -224,7 +166,6 @@ class ManifestStore(Store):
             allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
 
-        # TODO: Don't allow stores with prefix
         if not isinstance(group, ManifestGroup):
             raise TypeError
 
@@ -236,21 +177,6 @@ class ManifestStore(Store):
 
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, stores={self._store_registry})"
-
-    def __getstate__(self) -> dict[Any, Any]:
-        state = self.__dict__.copy()
-        stores = state["_store_registry"]._stores.copy()
-        for k, v in stores.items():
-            stores[k] = pickle.dumps(v)
-        state["_store_registry"] = stores
-        return state
-
-    def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_store_registry"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.loads(v)
-        state["_store_registry"] = ObjectStoreRegistry(stores)
-        self.__dict__.update(state)
 
     async def get(
         self,
@@ -272,11 +198,7 @@ class ManifestStore(Store):
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
         # Get the configured object store instance that matches the path
-        store = self._store_registry.get_store(path)
-        if not store:
-            raise ValueError(
-                f"Could not find a store to use for {path} in the store registry"
-            )
+        store, _ = self._store_registry.resolve(path)
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
         if hasattr(store, "prefix") and store.prefix:
@@ -388,7 +310,7 @@ class ManifestStore(Store):
 
         from virtualizarr.xarray import construct_virtual_dataset
 
-        if loadable_variables and self._store_registry._stores is None:
+        if loadable_variables and self._store_registry.map is None:
             raise ValueError(
                 f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
             )

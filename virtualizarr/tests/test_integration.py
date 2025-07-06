@@ -181,13 +181,14 @@ class TestRoundtrip:
         roundtrip_func: RoundtripFunction,
     ):
         air_zarr_path = str(tmp_path / "air_temperature.zarr")
-        store = obstore_local(file_url=air_zarr_path)
+        air_zarr_url = f"file://{air_zarr_path}"
+        store = obstore_local(file_url=air_zarr_url)
         parser = ZarrParser()
         with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
             # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
             ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
             with open_virtual_dataset(
-                file_url=air_zarr_path,
+                file_url=air_zarr_url,
                 object_store=store,
                 parser=parser,
             ) as vds:

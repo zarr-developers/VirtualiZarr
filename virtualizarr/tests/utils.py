@@ -8,7 +8,8 @@ from obstore.store import LocalStore, ObjectStore, from_url
 
 
 def obstore_local(file_url: str) -> ObjectStore:
-    path = Path(file_url)
+    parsed = urlparse(file_url)
+    path = Path(parsed.path)
     store = LocalStore(prefix=path.parent)
     return store
 

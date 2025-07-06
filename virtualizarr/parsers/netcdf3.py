@@ -4,7 +4,7 @@ from pathlib import Path
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
+from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 
 
@@ -68,7 +68,7 @@ class NetCDF3Parser:
             skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
-
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
+        registry = ObjectStoreRegistry()
+        registry.register(file_url, object_store)
 
         return ManifestStore(group=manifestgroup, store_registry=registry)

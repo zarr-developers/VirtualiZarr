@@ -176,7 +176,8 @@ def dmrparser(dmrpp_xml_str: str, tmp_path: Path, filename="test.nc") -> DMRPars
     # this would avoid the need to pass tmp_path separately
 
     return DMRParser(
-        root=ET.fromstring(dmrpp_xml_str), data_filepath=str(tmp_path / filename)
+        root=ET.fromstring(dmrpp_xml_str),
+        data_filepath=f"file://{str(tmp_path / filename)}",
     )
 
 
@@ -276,7 +277,7 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
 )
 def test_parse_dataset_basic(group: str | None, warns: bool, tmp_path: Path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
-    store = obstore_local(file_url=basic_dmrpp.data_filepath)
+    store = obstore_local(file_url=f"file://{basic_dmrpp.data_filepath}")
 
     with nullcontext() if warns else pytest.raises(BaseException, match="DID NOT WARN"):
         with pytest.warns(UserWarning, match=f"ignoring group parameter {group!r}"):
@@ -295,7 +296,7 @@ def test_parse_dataset_nested(tmp_path: Path):
     nested_groups_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
     )
-    store = obstore_local(file_url=nested_groups_dmrpp.data_filepath)
+    store = obstore_local(file_url=f"file://{nested_groups_dmrpp.data_filepath}")
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
         object_store=store

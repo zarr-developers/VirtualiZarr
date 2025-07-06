@@ -22,7 +22,6 @@ from virtualizarr.manifests import (
     ManifestStore,
     ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -87,7 +86,8 @@ def _generate_manifest_store(
         arrays={"foo": manifest_array, "bar": manifest_array},
         attributes={"Zarr": "Hooray!"},
     )
-    registry = ObjectStoreRegistry({prefix: store})
+    registry = ObjectStoreRegistry()
+    registry.register(prefix, store)
     return ManifestStore(store_registry=registry, group=manifest_group)
 
 
@@ -249,13 +249,12 @@ class TestToVirtualXarray:
 
         paths1 = list({v["path"] for v in marr1.manifest.values()})
         paths2 = list({v["path"] for v in marr2.manifest.values()})
-        paths3 = list({v["path"] for v in marr2.manifest.values()})
+        paths3 = list({v["path"] for v in marr3.manifest.values()})
         unique_paths = list(set(paths1 + paths2 + paths3))
-        stores = {}
+        store_registry = ObjectStoreRegistry()
         for path in unique_paths:
             store = MemoryStore()
-            stores[get_store_prefix(path)] = store
-        store_registry = ObjectStoreRegistry(stores=stores)
+            store_registry.register(path, store)
 
         manifest_group = ManifestGroup(
             arrays={

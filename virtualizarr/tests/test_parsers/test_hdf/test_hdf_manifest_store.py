@@ -33,11 +33,12 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        file_url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = obstore_local(file_url=filepath)
+        store = obstore_local(file_url=file_url)
         parser = HDFParser()
         manifest_store = parser(
-            file_url=filepath,
+            file_url=file_url,
             object_store=store,
         )
         with xr.open_dataset(
@@ -49,14 +50,15 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore with a single partial chunk"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        file_url = f"file://{filepath}"
         encoding = {
             "temperature": {"chunksizes": (90, 90), "original_shape": (100, 100)}
         }
         basic_ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
-        store = obstore_local(file_url=filepath)
+        store = obstore_local(file_url=file_url)
         parser = HDFParser()
         manifest_store = parser(
-            file_url=filepath,
+            file_url=file_url,
             object_store=store,
         )
         with xr.open_dataset(
@@ -68,11 +70,12 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        file_url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
         store = obstore_local(file_url=filepath)
         parser = HDFParser()
         manifest_store = parser(
-            file_url=filepath,
+            file_url=file_url,
             object_store=store,
         )
         with xr.open_dataset(

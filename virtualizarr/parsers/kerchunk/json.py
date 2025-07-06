@@ -1,11 +1,12 @@
 from collections.abc import Iterable
+from urllib.parse import urlparse
 
 import obstore
 import ujson
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
+from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.utils import remove_prefix
 
@@ -36,6 +37,11 @@ class KerchunkJSONParser:
         """
 
         self.group = group
+        if fs_root:
+            if not urlparse(fs_root).scheme:
+                raise ValueError(
+                    f"fs_root should include a valid scheme (e.g., `file://`), received `fs_root = '{fs_root}'`."
+                )
         self.fs_root = fs_root
         self.skip_variables = skip_variables
         self.store_registry = store_registry
@@ -70,16 +76,25 @@ class KerchunkJSONParser:
         content = resp.bytes().to_bytes()
         refs = ujson.loads(content)
 
+        # TODO: Deduplicate with KerchunkParquetParser
         if self.store_registry is None:
             unique_paths = {
                 v[0]
                 for v in refs["refs"].values()
                 if isinstance(v, list) and isinstance(v[0], str)
             }
-            stores = {}
+            registry = ObjectStoreRegistry()
             for path in unique_paths:
-                stores[get_store_prefix(path)] = object_store
-            registry = ObjectStoreRegistry(stores=stores)
+                parsed = urlparse(path)
+                if self.fs_root and not parsed.scheme:
+                    registry.register(f"{self.fs_root}{path}", object_store)
+                elif not parsed.scheme:
+                    raise ValueError(
+                        f"Detected relative path `{path}`. Parser must have `fs_root` set for "
+                        f"handling relative path. Parser has `fs_root = {self.fs_root}`."
+                    )
+                else:
+                    registry.register(path, object_store)
         else:
             registry = self.store_registry
 

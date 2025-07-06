@@ -13,7 +13,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
+from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
@@ -180,9 +180,8 @@ class DMRParser:
             )
 
         manifest_group = self._parse_dataset(dataset_element)
-        registry = ObjectStoreRegistry(
-            {get_store_prefix(self.data_filepath): object_store}
-        )
+        registry = ObjectStoreRegistry()
+        registry.register(self.data_filepath, object_store)
 
         return ManifestStore(store_registry=registry, group=manifest_group)
 

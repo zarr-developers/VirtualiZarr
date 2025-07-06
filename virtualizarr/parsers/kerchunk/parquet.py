@@ -4,9 +4,10 @@ import io
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
+from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
@@ -90,8 +91,25 @@ class KerchunkParquetParser:
         array_refs = {k: lrm[k] for k in lrm.keys()}
         full_reference = {"refs": array_refs}
         refs = KerchunkStoreRefs(full_reference)
+        # TODO: Deduplicate with KerchunkJsonParser
+        unique_paths = {
+            v[0]
+            for v in refs["refs"].values()
+            if isinstance(v, list) and isinstance(v[0], str)
+        }
+        registry = ObjectStoreRegistry()
+        for path in unique_paths:
+            parsed = urlparse(path)
+            if self.fs_root and not parsed.scheme:
+                registry.register(f"{self.fs_root}{path}", object_store)
+            elif not parsed.scheme:
+                raise ValueError(
+                    f"Detected relative path `{path}`. Parser must have `fs_root` set for "
+                    f"handling relative path. Parser has `fs_root = {self.fs_root}`."
+                )
+            else:
+                registry.register(path, object_store)
 
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,

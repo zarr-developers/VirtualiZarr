@@ -10,10 +10,11 @@ from virtualizarr.tests.utils import obstore_http, obstore_local
 @requires_scipy
 def test_read_netcdf3(netcdf3_file, array_v3_metadata):
     filepath = str(netcdf3_file)
-    store = obstore_local(file_url=filepath)
+    file_url = f"file://{filepath}"
+    store = obstore_local(file_url=file_url)
     parser = NetCDF3Parser()
     with (
-        parser(file_url=filepath, object_store=store) as manifest_store,
+        parser(file_url=file_url, object_store=store) as manifest_store,
         xr.open_dataset(filepath) as expected,
     ):
         observed = xr.open_dataset(

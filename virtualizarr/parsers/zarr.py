@@ -19,10 +19,9 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
-from virtualizarr.manifests.store import get_store_prefix
+from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None
@@ -208,6 +207,7 @@ class ZarrParser:
                 skip_variables=self.skip_variables,
             )
         )
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
+        registry = ObjectStoreRegistry()
+        registry.register(file_url, object_store)
 
         return ManifestStore(store_registry=registry, group=manifest_group)
