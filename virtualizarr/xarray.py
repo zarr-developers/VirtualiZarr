@@ -21,7 +21,7 @@ from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests import ManifestStore, ObjectStoreRegistry
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 def open_virtual_dataset(
     file_url: str,
-    object_store: ObjectStore,
+    registry: ObjectStoreRegistry,
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
@@ -48,7 +48,7 @@ def open_virtual_dataset(
 
     manifest_store = parser(
         file_url=filepath,
-        object_store=object_store,
+        registry=registry,
     )
 
     ds = manifest_store.to_virtual_dataset(
