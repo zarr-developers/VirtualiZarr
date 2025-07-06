@@ -15,7 +15,6 @@ from typing import (
 
 import xarray as xr
 import xarray.indexes
-from obstore.store import ObjectStore
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
@@ -66,7 +65,7 @@ def open_virtual_mfdataset(
         | Sequence[str | os.PathLike]
         | NestedSequence[str | os.PathLike]
     ),
-    object_store: ObjectStore,
+    registry: ObjectStoreRegistry,
     parser: Parser,
     concat_dim: (
         str
@@ -105,6 +104,8 @@ def open_virtual_mfdataset(
     ----------
     paths
         Same as in xarray.open_mfdataset
+    registry
+        An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
         Same as in xarray.open_mfdataset
     compat
@@ -180,7 +181,7 @@ def open_virtual_mfdataset(
 
         def _open_and_preprocess(path: str) -> xr.Dataset:
             ds = open_virtual_dataset(
-                file_url=path, object_store=object_store, parser=parser, **kwargs
+                file_url=path, registry=registry, parser=parser, **kwargs
             )
             return preprocess(ds)
 
@@ -189,7 +190,7 @@ def open_virtual_mfdataset(
 
         def _open(path: str) -> xr.Dataset:
             return open_virtual_dataset(
-                file_url=path, object_store=object_store, parser=parser, **kwargs
+                file_url=path, registry=registry, parser=parser, **kwargs
             )
 
         open_func = _open

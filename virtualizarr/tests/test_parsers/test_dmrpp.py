@@ -190,7 +190,7 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         region="us-west-2",
     )
     registry = ObjectStoreRegistry()
-    registry.register(dmrpp_url, store)
+    registry.register("s3://its-live-data/test-space", store)
     with (
         open_virtual_dataset(
             file_url=dmrpp_url,
