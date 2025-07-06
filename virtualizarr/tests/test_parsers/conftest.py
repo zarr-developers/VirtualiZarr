@@ -242,7 +242,11 @@ def filter_encoded_roundtrip_netcdf4_file(
     ds["var2"].encoding.update(encoding_config)
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
     ds.to_netcdf(filepath, engine="netcdf4")
-    return {"filepath": filepath, "compressor": request.param}
+    return {
+        "filepath": filepath,
+        "url": f"file://{filepath}",
+        "compressor": request.param,
+    }
 
 
 @pytest.fixture
@@ -288,14 +292,14 @@ def scale_add_offset_hdf5_file(
 
 
 @pytest.fixture()
-def chunked_roundtrip_hdf5_file(tmpdir):
+def chunked_roundtrip_hdf5_url(tmpdir):
     ds = create_test_data(dim_sizes=(20, 80, 10))
     ds = ds.drop_dims("dim3")
     filepath = f"{tmpdir}/chunked_xarray.nc"
     ds.to_netcdf(
         filepath, engine="netcdf4", encoding={"var2": {"chunksizes": (10, 10)}}
     )
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture(params=["gzip", "zlib"])
@@ -369,7 +373,7 @@ def non_coord_dim(tmpdir):
 
 
 @pytest.fixture
-def scalar_fill_value_hdf5_file(tmp_path: Path) -> str:
+def scalar_fill_value_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "scalar_fill_value.nc")
 
     with h5py.File(filepath, "w") as f:
@@ -377,7 +381,7 @@ def scalar_fill_value_hdf5_file(tmp_path: Path) -> str:
         fill_value = 42
         f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
 
-    return filepath
+    return f"file://{filepath}"
 
 
 compound_dtype = np.dtype(

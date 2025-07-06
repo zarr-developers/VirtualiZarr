@@ -4,12 +4,13 @@ import pytest
 import xarray as xr
 
 from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests import ObjectStoreRegistry
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
 )
-from virtualizarr.tests.utils import obstore_local
+from virtualizarr.tests.utils import manifest_store_from_hdf_url, obstore_local
 
 
 @requires_hdf5plugin
@@ -19,34 +20,23 @@ class TestDatasetChunkManifest:
         reason="Tutorial data non coord dimensions are serialized with big endidan types and internally dropped"
     )
     def test_empty_chunks(self, empty_chunks_hdf5_url):
-        store = obstore_local(file_url=empty_chunks_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=empty_chunks_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(empty_chunks_hdf5_url)
         assert manifest_store._group.arrays["data"].shape == (0,)
 
     def test_empty_dataset(self, empty_dataset_hdf5_url):
-        store = obstore_local(file_url=empty_dataset_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=empty_dataset_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(empty_dataset_hdf5_url)
         assert manifest_store._group.arrays["data"].shape == (0,)
 
     def test_no_chunking(self, no_chunks_hdf5_url):
-        store = obstore_local(no_chunks_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=no_chunks_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(no_chunks_hdf5_url)
         assert manifest_store._group.arrays["data"].manifest.shape_chunk_grid == (1, 1)
 
     def test_chunked(self, chunked_hdf5_url):
-        store = obstore_local(file_url=chunked_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=chunked_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(chunked_hdf5_url)
         assert manifest_store._group.arrays["data"].manifest.shape_chunk_grid == (2, 2)
 
-    def test_chunked_roundtrip(self, chunked_roundtrip_hdf5_file):
-        chunked_roundtrip_hdf5_url = f"file://{chunked_roundtrip_hdf5_file}"
-        store = obstore_local(file_url=chunked_roundtrip_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=chunked_roundtrip_hdf5_url, object_store=store)
+    def test_chunked_roundtrip(self, chunked_roundtrip_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(chunked_roundtrip_hdf5_url)
         assert manifest_store._group.arrays["var2"].manifest.shape_chunk_grid == (2, 8)
 
 
@@ -54,31 +44,21 @@ class TestDatasetChunkManifest:
 @requires_imagecodecs
 class TestDatasetDims:
     def test_single_dimension_scale(self, single_dimension_scale_hdf5_url):
-        store = obstore_local(file_url=single_dimension_scale_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=single_dimension_scale_hdf5_url, object_store=store
-        )
+        manifest_store = manifest_store_from_hdf_url(single_dimension_scale_hdf5_url)
         assert manifest_store._group.arrays["data"].metadata.dimension_names == ("x",)
 
     def test_is_dimension_scale(self, is_scale_hdf5_url):
-        store = obstore_local(file_url=is_scale_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=is_scale_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(is_scale_hdf5_url)
         assert manifest_store._group.arrays["data"].metadata.dimension_names == (
             "data",
         )
 
     def test_multiple_dimension_scales(self, multiple_dimension_scales_hdf5_url):
-        store = obstore_local(file_url=multiple_dimension_scales_hdf5_url)
-        parser = HDFParser()
         with pytest.raises(ValueError, match="dimension scales attached"):
-            parser(file_url=multiple_dimension_scales_hdf5_url, object_store=store)
+            manifest_store_from_hdf_url(multiple_dimension_scales_hdf5_url)
 
     def test_no_dimension_scales(self, no_chunks_hdf5_url):
-        store = obstore_local(file_url=no_chunks_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=no_chunks_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(no_chunks_hdf5_url)
         assert manifest_store._group.arrays["data"].metadata.dimension_names == (
             "phony_dim_0",
             "phony_dim_1",
@@ -89,57 +69,38 @@ class TestDatasetDims:
 @requires_imagecodecs
 class TestDatasetToManifestArray:
     def test_chunked_dataset(self, chunked_dimensions_netcdf4_url):
-        store = obstore_local(file_url=chunked_dimensions_netcdf4_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=chunked_dimensions_netcdf4_url, object_store=store
-        )
+        manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
         assert manifest_store._group.arrays["data"].chunks == (50, 50)
 
     def test_not_chunked_dataset(self, single_dimension_scale_hdf5_url):
-        store = obstore_local(file_url=single_dimension_scale_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=single_dimension_scale_hdf5_url, object_store=store
-        )
+        manifest_store = manifest_store_from_hdf_url(single_dimension_scale_hdf5_url)
         assert manifest_store._group.arrays["data"].chunks == (2,)
 
     def test_dataset_attributes(self, string_attributes_hdf5_url):
-        store = obstore_local(file_url=string_attributes_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=string_attributes_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert metadata.attributes["attribute_name"] == "attribute_name"
 
-    def test_scalar_fill_value(self, scalar_fill_value_hdf5_file):
-        scalar_fill_value_hdf5_url = f"file://{scalar_fill_value_hdf5_file}"
-        store = obstore_local(file_url=scalar_fill_value_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=scalar_fill_value_hdf5_url, object_store=store)
+    def test_scalar_fill_value(self, scalar_fill_value_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(scalar_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert metadata.fill_value == 42
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         cf_fill_value_hdf5_url = f"file://{cf_fill_value_hdf5_file}"
-        store = obstore_local(file_url=cf_fill_value_hdf5_url)
         f = h5py.File(cf_fill_value_hdf5_file)
         ds = f["data"]
         if ds.dtype.kind in "S":
             pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
         if ds.dtype.names:
             pytest.xfail("To fix, structured dtype fill value encoding for Zarr parser")
-        parser = HDFParser()
-        manifest_store = parser(file_url=cf_fill_value_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(cf_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert "_FillValue" in metadata.attributes
 
     def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
         cf_array_fill_value_hdf5_url = f"file://{cf_array_fill_value_hdf5_file}"
-        store = obstore_local(file_url=cf_array_fill_value_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=cf_array_fill_value_hdf5_url, object_store=store
-        )
+        manifest_store = manifest_store_from_hdf_url(cf_array_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert not isinstance(metadata.attributes["_FillValue"], np.ndarray)
 
@@ -148,18 +109,14 @@ class TestDatasetToManifestArray:
 @requires_imagecodecs
 class TestExtractAttributes:
     def test_root_attribute(self, root_attributes_hdf5_url):
-        store = obstore_local(file_url=root_attributes_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=root_attributes_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(root_attributes_hdf5_url)
         assert (
             manifest_store._group.metadata.attributes["attribute_name"]
             == "attribute_name"
         )
 
     def test_multiple_attributes(self, string_attributes_hdf5_url):
-        store = obstore_local(file_url=string_attributes_hdf5_url)
-        parser = HDFParser()
-        manifest_store = parser(file_url=string_attributes_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert len(metadata.attributes.keys()) == 2
 
@@ -168,36 +125,32 @@ class TestExtractAttributes:
 @requires_imagecodecs
 class TestManifestGroupFromHDF:
     def test_variable_with_dimensions(self, chunked_dimensions_netcdf4_url):
-        store = obstore_local(file_url=chunked_dimensions_netcdf4_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=chunked_dimensions_netcdf4_url, object_store=store
-        )
+        manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
         assert len(manifest_store._group.arrays) == 3
 
     def test_nested_groups_are_ignored(self, nested_group_hdf5_url):
-        store = obstore_local(file_url=nested_group_hdf5_url)
-        parser = HDFParser(group="group")
-        manifest_store = parser(file_url=nested_group_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(
+            nested_group_hdf5_url, group="group"
+        )
         assert len(manifest_store._group.arrays) == 1
 
     def test_drop_variables(self, multiple_datasets_hdf5_url):
-        store = obstore_local(file_url=multiple_datasets_hdf5_url)
+        registry = ObjectStoreRegistry()
+        registry.register(
+            multiple_datasets_hdf5_url,
+            obstore_local(file_url=multiple_datasets_hdf5_url),
+        )
         parser = HDFParser(drop_variables=["data2"])
-        manifest_store = parser(file_url=multiple_datasets_hdf5_url, object_store=store)
+        manifest_store = parser(file_url=multiple_datasets_hdf5_url, registry=registry)
         assert "data2" not in manifest_store._group.arrays.keys()
 
     def test_dataset_in_group(self, group_hdf5_url):
-        store = obstore_local(file_url=group_hdf5_url)
-        parser = HDFParser(group="group")
-        manifest_store = parser(file_url=group_hdf5_url, object_store=store)
+        manifest_store = manifest_store_from_hdf_url(group_hdf5_url, group="group")
         assert len(manifest_store._group.arrays) == 1
 
     def test_non_group_error(self, group_hdf5_url):
-        store = obstore_local(file_url=group_hdf5_url)
-        parser = HDFParser(group="group/data")
         with pytest.raises(ValueError):
-            parser(file_url=group_hdf5_url, object_store=store)
+            manifest_store_from_hdf_url(group_hdf5_url, group="group/data")
 
 
 @requires_hdf5plugin
@@ -208,11 +161,14 @@ class TestOpenVirtualDataset:
         root_coordinates_hdf5_file,
     ):
         root_coordinates_hdf5_url = f"file://{root_coordinates_hdf5_file}"
-        store = obstore_local(file_url=root_coordinates_hdf5_url)
+        registry = ObjectStoreRegistry()
+        registry.register(
+            root_coordinates_hdf5_url, obstore_local(file_url=root_coordinates_hdf5_url)
+        )
         parser = HDFParser()
         with open_virtual_dataset(
             file_url=root_coordinates_hdf5_url,
-            object_store=store,
+            registry=registry,
             parser=parser,
         ) as vds:
             assert set(vds.coords) == {"lat", "lon"}
@@ -222,11 +178,14 @@ class TestOpenVirtualDataset:
         big_endian_dtype_hdf5_file,
     ):
         big_endian_dtype_hdf5_url = f"file://{big_endian_dtype_hdf5_file}"
-        store = obstore_local(file_url=big_endian_dtype_hdf5_url)
+        registry = ObjectStoreRegistry()
+        registry.register(
+            big_endian_dtype_hdf5_url, obstore_local(file_url=big_endian_dtype_hdf5_url)
+        )
         parser = HDFParser()
         with (
             parser(
-                file_url=big_endian_dtype_hdf5_url, object_store=store
+                file_url=big_endian_dtype_hdf5_url, registry=registry
             ) as manifest_store,
             xr.open_dataset(big_endian_dtype_hdf5_file) as expected,
         ):
@@ -245,11 +204,15 @@ def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, grou
     netcdf4_url_with_data_in_multiple_groups = (
         f"file://{netcdf4_file_with_data_in_multiple_groups}"
     )
-    store = obstore_local(file_url=netcdf4_url_with_data_in_multiple_groups)
+    registry = ObjectStoreRegistry()
+    registry.register(
+        netcdf4_url_with_data_in_multiple_groups,
+        obstore_local(file_url=netcdf4_url_with_data_in_multiple_groups),
+    )
     parser = HDFParser(group=group)
     with open_virtual_dataset(
         file_url=netcdf4_url_with_data_in_multiple_groups,
-        object_store=store,
+        registry=registry,
         parser=parser,
     ) as vds:
         assert list(vds.dims) == ["dim_0"]
