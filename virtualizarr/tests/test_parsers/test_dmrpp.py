@@ -9,6 +9,7 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
+from virtualizarr.manifests import ObjectStoreRegistry
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
@@ -188,17 +189,18 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         file_url=dmrpp_url,
         region="us-west-2",
     )
-
+    registry = ObjectStoreRegistry()
+    registry.register(dmrpp_url, store)
     with (
         open_virtual_dataset(
             file_url=dmrpp_url,
-            object_store=store,
+            registry=registry,
             parser=DMRPPParser(),
             loadable_variables=[],
         ) as actual,
         open_virtual_dataset(
             file_url=data_url,
-            object_store=store,
+            registry=registry,
             parser=HDFParser(),
             loadable_variables=[],
         ) as expected,
@@ -213,9 +215,10 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         file_url=dmrpp_url,
         region="us-west-2",
     )
-
+    registry = ObjectStoreRegistry()
+    registry.register(dmrpp_url, store)
     parser = DMRPPParser()
-    manifest_store = parser(file_url=dmrpp_url, object_store=store)
+    manifest_store = parser(file_url=dmrpp_url, registry=registry)
 
     with xr.open_dataset(
         manifest_store, engine="zarr", consolidated=False, zarr_format=3
@@ -485,10 +488,12 @@ class TestRelativePaths:
         basic_dmrpp_temp_filepath: Path,
     ):
         store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+        registry = ObjectStoreRegistry()
+        registry.register("file://", store)
         parser = DMRPPParser()
         with open_virtual_dataset(
             file_url=basic_dmrpp_temp_filepath.as_posix(),
-            object_store=store,
+            registry=registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:
@@ -507,10 +512,12 @@ class TestRelativePaths:
             str(basic_dmrpp_temp_filepath), start=os.getcwd()
         )
         store = obstore_local(file_url=relative_dmrpp_filepath)
+        registry = ObjectStoreRegistry()
+        registry.register("file://", store)
         parser = DMRPPParser()
         with open_virtual_dataset(
             file_url=relative_dmrpp_filepath,
-            object_store=store,
+            registry=registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:
@@ -526,10 +533,12 @@ class TestRelativePaths:
 @pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
 def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
     store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
+    registry = ObjectStoreRegistry()
+    registry.register("file://", store)
     parser = DMRPPParser(skip_variables=skip_variables)
     with open_virtual_dataset(
         file_url=basic_dmrpp_temp_filepath.as_posix(),
-        object_store=store,
+        registry=registry,
         parser=parser,
         loadable_variables=[],
     ) as vds:
