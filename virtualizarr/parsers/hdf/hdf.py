@@ -30,7 +30,6 @@ h5py = soft_import("h5py", "reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore.store import ObjectStore
 
 
 def _construct_manifest_array(
@@ -139,17 +138,16 @@ class HDFParser:
     def __call__(
         self,
         file_url: str,
-        object_store: ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
-        reader = ObstoreReader(store=object_store, path=urlparse(file_url).path)
+        store, _ = registry.resolve(file_url)
+        reader = ObstoreReader(store=store, path=urlparse(file_url).path)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
         )
-        registry = ObjectStoreRegistry()
-        registry.register(file_url, object_store)
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 
