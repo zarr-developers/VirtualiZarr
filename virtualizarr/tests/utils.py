@@ -34,7 +34,7 @@ def obstore_http(file_url: str) -> ObjectStore:
     return store
 
 
-def manifest_store_from_hdf_url(url, group: str = None):
+def manifest_store_from_hdf_url(url, group: str | None = None):
     registry = ObjectStoreRegistry()
     registry.register(url, obstore_local(file_url=url))
     parser = HDFParser(group=group)
