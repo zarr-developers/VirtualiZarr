@@ -13,7 +13,7 @@ import xarray as xr
 from xarray.core.variable import Variable
 
 # Local imports
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ObjectStoreRegistry
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.utils import ceildiv
@@ -260,10 +260,12 @@ def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr.tests.utils import obstore_local
 
     store = obstore_local(file_url=netcdf4_file)
+    registry = ObjectStoreRegistry()
+    registry.register("file://", store)
     parser = HDFParser()
     with open_virtual_dataset(
         file_url=netcdf4_file,
-        object_store=store,
+        registry=registry,
         parser=parser,
         loadable_variables=[],
     ) as ds:
