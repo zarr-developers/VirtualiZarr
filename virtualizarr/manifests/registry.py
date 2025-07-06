@@ -22,6 +22,24 @@ UrlKey = namedtuple("UrlKey", ["scheme", "netloc"])
 
 
 def get_url_key(url: Url) -> UrlKey:
+    """
+    Generate the UrlKey containing a url's scheme and authority/netloc that is used a the
+    primary key's in a [ObjectStoreRegsitry.map][virtualizarr.manifests.ObjectStoreRegistry.map]
+
+    Parameters
+    ----------
+    url
+        Url to generate a UrlKey from
+
+    Returns
+    -------
+        NamedTuple containing the Url's scheme and authority/netloc
+
+    Raises
+    ------
+    ValueError
+        If provided Url does not contain a scheme based on [urllib.parse.urlparse][]
+    """
     parsed = urlparse(url)
     if not parsed.scheme:
         raise ValueError(
@@ -98,7 +116,41 @@ class ObjectStoreRegistry:
         self.map: Dict[UrlKey, PathEntry] = {}
 
     def register(self, url: Url, store: ObjectStore) -> Optional[ObjectStore]:
-        """Register a store for the given URL"""
+        """
+        Register a new store for the provided store URL
+
+        If a store with the same URL existed before, it is replaced and returned
+
+        Parameters
+        ----------
+        url
+            Url to registry the [ObjectStore][obstore.store.ObjectStore] under
+        store
+            [ObjectStore][obstore.store.ObjectStore] instance to register using the
+            provided url.
+
+        Returns
+        -------
+        Optional[ObjectStore]
+            The [ObjectStore][obstore.store.ObjectStore] that has been replaced, if applicable.
+
+        Examples
+        --------
+
+        ```python exec="on" source="above" session="registry-examples"
+        from obstore.store import S3Store
+        from virtualizarr.manifests import ObjectStoreRegistry
+
+        reg = ObjectStoreRegistry()
+        orig_store = S3Store(bucket="my-bucket-1", prefix="orig-path")
+        reg.register("s3://my-bucket-1", orig_store)
+
+        new_store = S3Store(bucket="my-bucket-1", prefix="updated-path")
+        store = reg.register("s3://my-bucket-1", new_store)
+        assert orig_store == store
+        print(store)
+        ```
+        """
         parsed = urlparse(url)
 
         key = get_url_key(url)
@@ -120,7 +172,64 @@ class ObjectStoreRegistry:
         return old_store
 
     def resolve(self, url: Url) -> Tuple[ObjectStore, Path]:
-        """Resolve a URL to an ObjectStore and path"""
+        """
+        Resolve an URL within the [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry].
+
+        If [ObjectStoreRegistry.register][virtualizarr.manifests.ObjectStoreRegistry.register] has been called
+        with a URL with the same scheme and authority/netloc as the object URL, and a path that is a prefix
+        of the provided url's, it is returned along with the trailing path. Paths are matched on a
+        path segment basis, and in the event of multiple possibilities the longest path match is used.
+
+        Parameters
+        ----------
+        url
+            Url to resolve in the [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry]
+
+        Returns
+        -------
+        ObjectStore
+            The [ObjectStore][obstore.store.ObjectStore] stored at the resolved url.
+        Path
+            The trailing portion of the url. I.e., the portion that it not part of the matching prefix in the
+            [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry].
+
+        Raises
+        ------
+        ValueError
+            If the URL cannot be resolved, meaning that [ObjectStoreRegistry.register][virtualizarr.manifests.ObjectStoreRegistry.register]
+            has not been called with a URL with the same scheme and authority/netloc as the object URL, and a path that is a prefix
+            of the provided url's.
+
+        Examples
+        --------
+
+        ```python exec="on" source="above" session="registry-resolve-examples"
+        from obstore.store import MemoryStore
+        from virtualizarr.manifests import ObjectStoreRegistry
+
+        registry = ObjectStoreRegistry()
+        memstore1 = MemoryStore()
+        registry.register("s3://bucket1", memstore1)
+        url = "s3://bucket1/path/to/object"
+        ret, path = registry.resolve(url)
+        assert path == "path/to/object"
+        assert ret is memstore1
+        print(f"Resolved url: `{url}` to store: `{ret}` and path: `{path}`")
+        ```
+
+        ```python exec="on" source="above" session="registry-resolve-examples"
+        memstore2 = MemoryStore()
+        base = "https://s3.region.amazonaws.com/bucket"
+        registry.register(base, memstore2)
+
+        url = "https://s3.region.amazonaws.com/bucket/path/to/object"
+        ret, path = registry.resolve(url)
+        assert path == "path/to/object"
+        assert ret is memstore2
+        print(f"Resolved url: `{url}` to store: `{ret}` and path: `{path}`")
+        ```
+
+        """
         parsed = urlparse(url)
 
         key = UrlKey(parsed.scheme, parsed.netloc)

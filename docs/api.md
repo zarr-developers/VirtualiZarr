@@ -49,6 +49,11 @@ See the page on data structures for more information.
 ::: virtualizarr.manifests.ManifestArray
 ::: virtualizarr.manifests.ManifestGroup
 ::: virtualizarr.manifests.ManifestStore
+
+#### Registry
+
+::: virtualizarr.manifests.registry.Url
+::: virtualizarr.manifests.registry.UrlKey
 ::: virtualizarr.manifests.ObjectStoreRegistry
 
 #### Array API
