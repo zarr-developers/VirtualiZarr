@@ -48,23 +48,6 @@ def get_url_key(url: Url) -> UrlKey:
     return UrlKey(parsed.scheme, parsed.netloc)
 
 
-class PathPart:
-    """Represents a single path segment"""
-
-    @staticmethod
-    def parse(segment: str) -> "PathPart":
-        """Parse a path segment, validating it's acceptable"""
-        if not segment or "/" in segment:
-            raise ValueError(f"Invalid path segment: {segment}")
-        return PathPart(segment)
-
-    def __init__(self, segment: str):
-        self.segment = segment
-
-    def __str__(self) -> str:
-        return self.segment
-
-
 class PathEntry:
     """
     Construct a tree of path segments starting from the root
@@ -241,7 +224,7 @@ class ObjectStoreRegistry:
                 path = "/".join(list(path_segments(parsed.path))[depth:])
                 return store, path
 
-        raise ValueError(f"Could not find an ObjectStore matching the url {url}")
+        raise ValueError(f"Could not find an ObjectStore matching the url `{url}`")
 
 
 def path_segments(path: str) -> Iterator[str]:
