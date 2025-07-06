@@ -21,6 +21,8 @@
   `xarray.DataTree.virtualize.to_icechunk()` for writing an `xarray.DataTree`
   to an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By
   [Chuck Daniels](https://github.com/chuckwondo).
+- Now throws a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
