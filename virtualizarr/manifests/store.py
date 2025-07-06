@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import pickle
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -236,21 +235,6 @@ class ManifestStore(Store):
 
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, stores={self._store_registry})"
-
-    def __getstate__(self) -> dict[Any, Any]:
-        state = self.__dict__.copy()
-        stores = state["_store_registry"]._stores.copy()
-        for k, v in stores.items():
-            stores[k] = pickle.dumps(v)
-        state["_store_registry"] = stores
-        return state
-
-    def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_store_registry"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.loads(v)
-        state["_store_registry"] = ObjectStoreRegistry(stores)
-        self.__dict__.update(state)
 
     async def get(
         self,
