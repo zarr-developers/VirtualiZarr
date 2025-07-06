@@ -10,6 +10,7 @@ import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
+from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
 # Local imports
@@ -56,6 +57,13 @@ def zarr_store(tmpdir, request):
     ds.to_zarr(filepath, zarr_format=request.param)
     ds.close()
     return filepath
+
+
+@pytest.fixture()
+def local_registry():
+    registry = ObjectStoreRegistry()
+    registry.register("file://", LocalStore())
+    return registry
 
 
 @pytest.fixture()
