@@ -4,13 +4,12 @@ import pytest
 import xarray as xr
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ObjectStoreRegistry
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
 )
-from virtualizarr.tests.utils import manifest_store_from_hdf_url, obstore_local
+from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
 
 @requires_hdf5plugin
@@ -134,14 +133,11 @@ class TestManifestGroupFromHDF:
         )
         assert len(manifest_store._group.arrays) == 1
 
-    def test_drop_variables(self, multiple_datasets_hdf5_url):
-        registry = ObjectStoreRegistry()
-        registry.register(
-            multiple_datasets_hdf5_url,
-            obstore_local(file_url=multiple_datasets_hdf5_url),
-        )
+    def test_drop_variables(self, multiple_datasets_hdf5_url, local_registry):
         parser = HDFParser(drop_variables=["data2"])
-        manifest_store = parser(file_url=multiple_datasets_hdf5_url, registry=registry)
+        manifest_store = parser(
+            file_url=multiple_datasets_hdf5_url, registry=local_registry
+        )
         assert "data2" not in manifest_store._group.arrays.keys()
 
     def test_dataset_in_group(self, group_hdf5_url):
@@ -156,36 +152,22 @@ class TestManifestGroupFromHDF:
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestOpenVirtualDataset:
-    def test_coord_names(
-        self,
-        root_coordinates_hdf5_file,
-    ):
+    def test_coord_names(self, root_coordinates_hdf5_file, local_registry):
         root_coordinates_hdf5_url = f"file://{root_coordinates_hdf5_file}"
-        registry = ObjectStoreRegistry()
-        registry.register(
-            root_coordinates_hdf5_url, obstore_local(file_url=root_coordinates_hdf5_url)
-        )
         parser = HDFParser()
         with open_virtual_dataset(
             file_url=root_coordinates_hdf5_url,
-            registry=registry,
+            registry=local_registry,
             parser=parser,
         ) as vds:
             assert set(vds.coords) == {"lat", "lon"}
 
-    def test_big_endian(
-        self,
-        big_endian_dtype_hdf5_file,
-    ):
+    def test_big_endian(self, big_endian_dtype_hdf5_file, local_registry):
         big_endian_dtype_hdf5_url = f"file://{big_endian_dtype_hdf5_file}"
-        registry = ObjectStoreRegistry()
-        registry.register(
-            big_endian_dtype_hdf5_url, obstore_local(file_url=big_endian_dtype_hdf5_url)
-        )
         parser = HDFParser()
         with (
             parser(
-                file_url=big_endian_dtype_hdf5_url, registry=registry
+                file_url=big_endian_dtype_hdf5_url, registry=local_registry
             ) as manifest_store,
             xr.open_dataset(big_endian_dtype_hdf5_file) as expected,
         ):
@@ -199,20 +181,17 @@ class TestOpenVirtualDataset:
 @requires_hdf5plugin
 @requires_imagecodecs
 @pytest.mark.parametrize("group", [None, "/", "subgroup", "subgroup/", "/subgroup/"])
-def test_subgroup_variable_names(netcdf4_file_with_data_in_multiple_groups, group):
+def test_subgroup_variable_names(
+    netcdf4_file_with_data_in_multiple_groups, group, local_registry
+):
     # regression test for GH issue #364
     netcdf4_url_with_data_in_multiple_groups = (
         f"file://{netcdf4_file_with_data_in_multiple_groups}"
     )
-    registry = ObjectStoreRegistry()
-    registry.register(
-        netcdf4_url_with_data_in_multiple_groups,
-        obstore_local(file_url=netcdf4_url_with_data_in_multiple_groups),
-    )
     parser = HDFParser(group=group)
     with open_virtual_dataset(
         file_url=netcdf4_url_with_data_in_multiple_groups,
-        registry=registry,
+        registry=local_registry,
         parser=parser,
     ) as vds:
         assert list(vds.dims) == ["dim_0"]

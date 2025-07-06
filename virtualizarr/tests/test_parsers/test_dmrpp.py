@@ -484,16 +484,12 @@ def basic_dmrpp_temp_filepath(tmp_path: Path) -> Path:
 
 class TestRelativePaths:
     def test_absolute_path_to_dmrpp_file_containing_relative_path(
-        self,
-        basic_dmrpp_temp_filepath: Path,
+        self, basic_dmrpp_temp_filepath: Path, local_registry
     ):
-        store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-        registry = ObjectStoreRegistry()
-        registry.register("file://", store)
         parser = DMRPPParser()
         with open_virtual_dataset(
             file_url=basic_dmrpp_temp_filepath.as_posix(),
-            registry=registry,
+            registry=local_registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:
@@ -506,18 +502,17 @@ class TestRelativePaths:
             )
             assert path == expected_datafile_path_uri
 
-    def test_relative_path_to_dmrpp_file(self, basic_dmrpp_temp_filepath: Path):
+    def test_relative_path_to_dmrpp_file(
+        self, basic_dmrpp_temp_filepath: Path, local_registry
+    ):
         # test that if a user supplies a relative path to a DMR++ file we still get an absolute path in the manifest
         relative_dmrpp_filepath = os.path.relpath(
             str(basic_dmrpp_temp_filepath), start=os.getcwd()
         )
-        store = obstore_local(file_url=relative_dmrpp_filepath)
-        registry = ObjectStoreRegistry()
-        registry.register("file://", store)
         parser = DMRPPParser()
         with open_virtual_dataset(
             file_url=relative_dmrpp_filepath,
-            registry=registry,
+            registry=local_registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:
@@ -531,14 +526,13 @@ class TestRelativePaths:
 
 
 @pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
-def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
-    store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-    registry = ObjectStoreRegistry()
-    registry.register("file://", store)
+def test_skip_variables(
+    basic_dmrpp_temp_filepath: Path, skip_variables, local_registry
+):
     parser = DMRPPParser(skip_variables=skip_variables)
     with open_virtual_dataset(
         file_url=basic_dmrpp_temp_filepath.as_posix(),
-        registry=registry,
+        registry=local_registry,
         parser=parser,
         loadable_variables=[],
     ) as vds:
