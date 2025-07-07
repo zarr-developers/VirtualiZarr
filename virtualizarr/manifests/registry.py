@@ -43,7 +43,7 @@ def get_url_key(url: Url) -> UrlKey:
     parsed = urlparse(url)
     if not parsed.scheme:
         raise ValueError(
-            f"Urls are expected to contain a scheme, received {url} which parsed to {parsed}"
+            f"Urls are expected to contain a scheme (e.g., `file://` or `s://`), received {url} which parsed to {parsed}"
         )
     return UrlKey(parsed.scheme, parsed.netloc)
 
