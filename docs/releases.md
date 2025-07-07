@@ -21,6 +21,8 @@
   `xarray.DataTree.virtualize.to_icechunk()` for writing an `xarray.DataTree`
   to an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By
   [Chuck Daniels](https://github.com/chuckwondo).
+- Now throws a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
@@ -47,6 +49,10 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fixed bug causing coordinates to be demoted to data variables when writing to Icechunk ([#574](https://github.com/zarr-developers/VirtualiZarr/issues/574), [#588](https://github.com/zarr-developers/VirtualiZarr/pull/588))
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Removed checks forbidding paths in virtual references without file suffixes ([#659](https://github.com/zarr-developers/VirtualiZarr/pull/659))
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fixed bug when indexing a scalar ManifestArray with an ellipsis([#596](https://github.com/zarr-developers/VirtualiZarr/issues/596), [#641](https://github.com/zarr-developers/VirtualiZarr/pull/641))
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
