@@ -13,10 +13,9 @@ from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestStore,
-    ObjectStoreRegistry,
 )
-from virtualizarr.manifests.registry import UrlKey
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
+from virtualizarr.registry import ObjectStoreRegistry, UrlKey
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.tests.utils import obstore_local
 from virtualizarr.xarray import open_virtual_dataset

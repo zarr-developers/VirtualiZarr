@@ -24,7 +24,7 @@ UrlKey = namedtuple("UrlKey", ["scheme", "netloc"])
 def get_url_key(url: Url) -> UrlKey:
     """
     Generate the UrlKey containing a url's scheme and authority/netloc that is used a the
-    primary key's in a [ObjectStoreRegistry.map][virtualizarr.manifests.ObjectStoreRegistry.map]
+    primary key's in a [ObjectStoreRegistry.map][virtualizarr.registry.ObjectStoreRegistry.map]
 
     Parameters
     ----------
@@ -122,7 +122,7 @@ class ObjectStoreRegistry:
 
         ```python exec="on" source="above" session="registry-examples"
         from obstore.store import S3Store
-        from virtualizarr.manifests import ObjectStoreRegistry
+        from virtualizarr.registry import ObjectStoreRegistry
 
         reg = ObjectStoreRegistry()
         orig_store = S3Store(bucket="my-bucket-1", prefix="orig-path")
@@ -156,9 +156,9 @@ class ObjectStoreRegistry:
 
     def resolve(self, url: Url) -> Tuple[ObjectStore, Path]:
         """
-        Resolve an URL within the [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry].
+        Resolve an URL within the [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].
 
-        If [ObjectStoreRegistry.register][virtualizarr.manifests.ObjectStoreRegistry.register] has been called
+        If [ObjectStoreRegistry.register][virtualizarr.registry.ObjectStoreRegistry.register] has been called
         with a URL with the same scheme and authority/netloc as the object URL, and a path that is a prefix
         of the provided url's, it is returned along with the trailing path. Paths are matched on a
         path segment basis, and in the event of multiple possibilities the longest path match is used.
@@ -166,7 +166,7 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         url
-            Url to resolve in the [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry]
+            Url to resolve in the [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry]
 
         Returns
         -------
@@ -174,12 +174,12 @@ class ObjectStoreRegistry:
             The [ObjectStore][obstore.store.ObjectStore] stored at the resolved url.
         Path
             The trailing portion of the url. I.e., the portion that it not part of the matching prefix in the
-            [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry].
+            [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].
 
         Raises
         ------
         ValueError
-            If the URL cannot be resolved, meaning that [ObjectStoreRegistry.register][virtualizarr.manifests.ObjectStoreRegistry.register]
+            If the URL cannot be resolved, meaning that [ObjectStoreRegistry.register][virtualizarr.registry.ObjectStoreRegistry.register]
             has not been called with a URL with the same scheme and authority/netloc as the object URL, and a path that is a prefix
             of the provided url's.
 
@@ -188,7 +188,7 @@ class ObjectStoreRegistry:
 
         ```python exec="on" source="above" session="registry-resolve-examples"
         from obstore.store import MemoryStore
-        from virtualizarr.manifests import ObjectStoreRegistry
+        from virtualizarr.registry import ObjectStoreRegistry
 
         registry = ObjectStoreRegistry()
         memstore1 = MemoryStore()
@@ -234,3 +234,6 @@ def path_segments(path: str) -> Iterator[str]:
     Note: We filter out empty segments unlike urllib.parse
     """
     return filter(lambda x: x, path.split("/"))
+
+
+__all__ = ["ObjectStoreRegistry"]

@@ -4,8 +4,8 @@ from pathlib import Path
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 class NetCDF3Parser:

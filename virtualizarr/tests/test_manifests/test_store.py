@@ -20,9 +20,9 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,

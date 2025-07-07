@@ -52,9 +52,9 @@ See the page on data structures for more information.
 
 #### Registry
 
-::: virtualizarr.manifests.registry.Url
-::: virtualizarr.manifests.registry.UrlKey
-::: virtualizarr.manifests.ObjectStoreRegistry
+::: virtualizarr.registry.Url
+::: virtualizarr.registry.UrlKey
+::: virtualizarr.registry.ObjectStoreRegistry
 
 #### Array API
 

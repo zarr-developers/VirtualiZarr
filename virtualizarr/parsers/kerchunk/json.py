@@ -6,8 +6,8 @@ import ujson
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import remove_prefix
 
 

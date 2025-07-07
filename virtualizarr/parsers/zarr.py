@@ -21,7 +21,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
-from virtualizarr.manifests.registry import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None

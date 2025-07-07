@@ -4,8 +4,8 @@ from typing import Iterable, Optional
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 

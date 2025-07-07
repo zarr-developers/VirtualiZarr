@@ -5,12 +5,10 @@ from virtualizarr.manifests.array import ManifestArray  # type: ignore # noqa
 from virtualizarr.manifests.group import ManifestGroup  # type: ignore # noqa
 from virtualizarr.manifests.manifest import ChunkEntry, ChunkManifest  # type: ignore # noqa
 from virtualizarr.manifests.store import ManifestStore  # type: ignore # noqa
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 
 __all__ = [
     "ChunkManifest",
     "ManifestArray",
     "ManifestGroup",
     "ManifestStore",
-    "ObjectStoreRegistry",
 ]

@@ -16,7 +16,7 @@ from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.manifests.registry import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -135,7 +135,7 @@ class ManifestStore(Store):
         Root group of the store.
         Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     store_registry : ObjectStoreRegistry
-        [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore]instances,
+        [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore]instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings

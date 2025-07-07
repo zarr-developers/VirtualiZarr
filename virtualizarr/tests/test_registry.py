@@ -1,7 +1,7 @@
 import pytest
 from obstore.store import MemoryStore
 
-from virtualizarr.manifests import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 def test_registry():

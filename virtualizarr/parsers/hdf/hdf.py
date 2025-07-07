@@ -17,10 +17,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
