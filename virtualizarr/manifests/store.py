@@ -253,6 +253,8 @@ class ManifestStore(Store):
             key, marr.metadata.chunk_key_encoding.separator
         )
         path = manifest._paths[*chunk_indexes]
+        if path == "":
+            return None
         offset = manifest._offsets[*chunk_indexes]
         length = manifest._lengths[*chunk_indexes]
         # Get the configured object store instance that matches the path
