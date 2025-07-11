@@ -25,4 +25,4 @@ def test_open_hubble_data():
         assert list(vds.variables) == ["PRIMARY"]
         var = vds["PRIMARY"].variable
         assert var.sizes == {"y": 17, "x": 589}
-        assert var.dtype == ">i4"
+        assert var.dtype == "int32"
