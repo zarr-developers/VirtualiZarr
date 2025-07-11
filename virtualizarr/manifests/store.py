@@ -56,28 +56,6 @@ def get_store_prefix(url: str) -> str:
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
-def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
-    """
-    Extract the expected Zarr V3 metadata from a ManifestGroup and convert to spec-compliant format.
-
-    Parameters
-    ----------
-    manifest_group : ManifestGroup
-    key : str
-
-    Returns
-    -------
-    Buffer
-    """
-    if key == "zarr.json":
-        metadata = manifest_group.metadata.to_dict()
-    else:
-        var, _ = key.split("/")
-        metadata = manifest_group.arrays[var].metadata.to_dict()
-
-    return metadata.to_buffer_dict(prototype=default_buffer_prototype())
-
-
 def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
     """
     Splits `key` provided to a zarr store into the variable indicated
@@ -252,9 +230,18 @@ class ManifestStore(Store):
     ) -> Buffer | None:
         # docstring inherited
 
-        if key.endswith("zarr.json"):
-            return get_zarr_metadata(self._group, key)
-
+        if key == "zarr.json":
+            # Return group metadata
+            return self._group.metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
+        elif key.endswith("zarr.json"):
+            # Return array metadata
+            # TODO: Handle nested groups
+            var, _ = key.split("/")
+            return self._group.arrays[var].metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
         var = key.split("/")[0]
         marr = self._group.arrays[var]
         manifest = marr.manifest
