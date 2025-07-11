@@ -409,7 +409,10 @@ class TestIndexing:
     def test_invalid_indexer_shape(self, manifest_array, dodgy_indexer):
         marr = manifest_array(shape=(4,), chunks=(2,))
 
-        with pytest.raises(ValueError, match="Invalid indexer for array with ndim"):
+        with pytest.raises(
+            ValueError,
+            match="Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array",
+        ):
             marr[dodgy_indexer]
 
     @pytest.mark.parametrize("dodgy_indexer", [np.ndarray(5)])
@@ -418,6 +421,11 @@ class TestIndexing:
 
         with pytest.raises(NotImplementedError):
             marr[dodgy_indexer]
+
+    def test_indexing_scalar_with_ellipsis(self, manifest_array):
+        # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
+        marr = manifest_array(shape=(), chunks=())
+        assert marr[...] == marr
 
 
 def test_to_xarray(array_v3_metadata):

@@ -24,7 +24,7 @@ from xarray.structure.combine import _infer_concat_order_from_positions, _nested
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
-from virtualizarr.parsers import Parser
+from virtualizarr.parsers.typing import Parser
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -91,6 +91,8 @@ def open_virtual_mfdataset(
     """
     Open multiple files as a single virtual dataset.
 
+    This function is explicitly modelled after `xarray.open_mfdataset`, and works in the same way.
+
     If combine='by_coords' then the function ``combine_by_coords`` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
     ``combine_nested`` is used. The filepaths must be structured according to which
@@ -127,9 +129,9 @@ def open_virtual_mfdataset(
     combine_attrs
         Same as in xarray.open_mfdataset
     **kwargs : optional
-        Additional arguments passed on to :py:func:`virtualizarr.open_virtual_dataset`. For an
+        Additional arguments passed on to [virtualizarr.open_virtual_dataset][]. For an
         overview of some of the possible options, see the documentation of
-        :py:func:`virtualizarr.open_virtual_dataset`.
+        [virtualizarr.open_virtual_dataset][].
 
     Returns
     -------
@@ -137,7 +139,7 @@ def open_virtual_mfdataset(
 
     Notes
     -----
-    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large.
+    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large. See the docs page on Scaling.
     """
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?

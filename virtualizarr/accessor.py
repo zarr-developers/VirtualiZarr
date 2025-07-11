@@ -1,6 +1,16 @@
+import warnings
+from collections import deque
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, overload
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generator,
+    Iterable,
+    Literal,
+    overload,
+)
 
 import xarray as xr
 
@@ -10,6 +20,44 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+
+
+def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
+    """Decorator for methods which only make sense for fully virtual xarray objects."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            all_vars: Iterable[xr.Variable]
+            match cls_name:
+                case "Dataset":
+                    all_vars = self.ds.variables.values()
+                case "DataTree":
+                    all_vars = all_datatree_variables(self.dt)
+
+            if not any(isinstance(var.data, ManifestArray) for var in all_vars):
+                warnings.warn(
+                    f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
+                    "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
+                    f"This may have happened because you used `xarray.open_{cls_name}` instead of `virtualizarr.open_virtual_{cls_name}`, or you set all variables to be `loadable_variables`."
+                    "Please read the usage docs.",
+                    UserWarning,
+                )
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, None]:
+    """Flat iterable over all variables in a DataTree"""
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        yield from node.variables.values()
+        queue.extend(node.children.values())
 
 
 @xr.register_dataset_accessor("virtualize")
@@ -23,6 +71,7 @@ class VirtualiZarrDatasetAccessor:
     def __init__(self, ds: xr.Dataset):
         self.ds: xr.Dataset = ds
 
+    @warn_if_not_virtual("Dataset")
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -45,7 +94,7 @@ class VirtualiZarrDatasetAccessor:
         chunks written to the store with this operation.  At read time, if any of the
         virtual chunks have been updated since this provided datetime, an error will be
         raised.  This protects against reading outdated virtual chunks that have been
-        updated since the last read.  When not provided, no check is performed.  This
+        updated since the last read.  When not provided, the current time is used.  This
         value is stored in Icechunk with seconds precision, so be sure to take that into
         account when providing this value.
 
@@ -59,24 +108,12 @@ class VirtualiZarrDatasetAccessor:
             Dimension along which to append the virtual dataset.
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
-            with this operation. When not provided, no check is performed.
+            with this operation. When not provided, the current time is used.
 
         Raises
         ------
         ValueError
             If the store is read-only.
-
-        Examples
-        --------
-        To ensure an error is raised if the files containing referenced virtual chunks
-        are modified at any time from now on, pass the current time to
-        ``last_updated_at``.
-
-        >>> from datetime import datetime
-        >>> vds.virtualize.to_icechunk(  # doctest: +SKIP
-        ...     icechunkstore,
-        ...     last_updated_at=datetime.now(),
-        ... )
         """
         from virtualizarr.writers.icechunk import virtual_dataset_to_icechunk
 
@@ -105,6 +142,7 @@ class VirtualiZarrDatasetAccessor:
         categorical_threshold: int = 10,
     ) -> None: ...
 
+    @warn_if_not_virtual("Dataset")
     def to_kerchunk(
         self,
         filepath: str | Path | None = None,
@@ -189,8 +227,10 @@ class VirtualiZarrDatasetAccessor:
 
         See Also
         --------
-        ManifestArray.rename_paths
-        ChunkManifest.rename_paths
+
+        virtualizarr.ManifestArray.rename_paths
+
+        virtualizarr.ChunkManifest.rename_paths
 
         Examples
         --------
@@ -203,7 +243,7 @@ class VirtualiZarrDatasetAccessor:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> ds.virtualize.rename_paths(local_to_s3_url)
         """
 
@@ -245,6 +285,7 @@ class VirtualiZarrDataTreeAccessor:
     def __init__(self, dt: xr.DataTree):
         self.dt = dt
 
+    @warn_if_not_virtual("DataTree")
     def to_icechunk(
         self,
         store: "IcechunkStore",

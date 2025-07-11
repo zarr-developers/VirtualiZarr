@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import pickle
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -20,7 +19,7 @@ from virtualizarr.manifests.group import ManifestGroup
 
 if TYPE_CHECKING:
     from obstore.store import (
-        ObjectStore,  # type: ignore[import-not-found]
+        ObjectStore,
     )
 
     StoreDict: TypeAlias = dict[str, ObjectStore]
@@ -93,8 +92,9 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
 class ObjectStoreRegistry:
     """
-    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances. This register allows
-    Zarr Store implementations (e.g., ManifestStore) to read from different ObjectStore instances.
+    Registry of [ObjectStore][obstore.store.ObjectStore] instances and their associated URI prefixes.
+
+    ObjectStoreRegistry maps the URI scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. Used by [ManifestStore][virtualizarr.manifests.ManifestStore] to read both metadata and data referenced by virtual chunk references, via the associated [ObjectStore][obstore.store.ObjectStore].
     """
 
     _stores: dict[str, ObjectStore]
@@ -116,7 +116,7 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         prefix
-            A url to identify the appropriate object_store instance. If the url is contained in the
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longer prefix is chosen.
         """
         self._stores[prefix] = store
@@ -128,7 +128,7 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         url
-            A url to identify the appropriate object_store instance. If the url is contained in the
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
             prefix of multiple stores in the registry, the store with the longest prefix is chosen.
 
         Returns
@@ -152,27 +152,25 @@ class ManifestStore(Store):
     """
     A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
 
-    The requests from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`, allowing for virtually interfacing with underlying data in other file formats.
+    The requests from the Zarr API are redirected using the [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing
+    multiple [ManifestArray][virtualizarr.manifests.ManifestArray], allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------
-    group : ManifestGroup
+    group
         Root group of the store.
-        Contains group metadata, ManifestArrays, and any subgroups.
+        Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     store_registry : ObjectStoreRegistry
-        ObjectStoreRegistry that maps the URL scheme and netloc to ObjectStore instances,
+        [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore]instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
     --------
     ManifestStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
-
-    Notes
-    -----
-    Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
+
+    #  Modified from https://github.com/zarr-developers/zarr-python/pull/1661
 
     _group: ManifestGroup
     _store_registry: ObjectStoreRegistry
@@ -188,10 +186,10 @@ class ManifestStore(Store):
         Parameters
         ----------
         group
-            Manifest Group containing Group metadata and mapping variable names to ManifestArrays
+            [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing Group metadata and mapping variable names to ManifestArrays
         store_registry
-            A registry mapping the URL scheme and netloc to ObjectStore instances,
-            allowing ManifestStores to read from different ObjectStore instances.
+            A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+            allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
 
         # TODO: Don't allow stores with prefix
@@ -206,21 +204,6 @@ class ManifestStore(Store):
 
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, stores={self._store_registry})"
-
-    def __getstate__(self) -> dict[Any, Any]:
-        state = self.__dict__.copy()
-        stores = state["_store_registry"]._stores.copy()
-        for k, v in stores.items():
-            stores[k] = pickle.dumps(v)
-        state["_store_registry"] = stores
-        return state
-
-    def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_store_registry"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.loads(v)
-        state["_store_registry"] = ObjectStoreRegistry(stores)
-        self.__dict__.update(state)
 
     async def get(
         self,
@@ -355,7 +338,7 @@ class ManifestStore(Store):
         indexes: Mapping[str, xr.Index] | None = None,
     ) -> "xr.Dataset":
         """
-        Create a "virtual" xarray dataset containing the contents of one zarr group.
+        Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
 
         Will ignore the contents of any other groups in the store.
 

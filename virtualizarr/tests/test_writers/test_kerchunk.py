@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pytest
+import xarray as xr
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
@@ -179,3 +181,9 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
     assert filters_config["dtype"] == "<i8"
     assert filters_config["astype"] == "<i8"
     assert v2_metadata.attributes == {}
+
+
+def test_warn_if_no_virtual_vars():
+    non_virtual_ds = xr.Dataset({"foo": ("x", [10, 20, 30]), "x": ("x", [1, 2, 3])})
+    with pytest.warns(UserWarning, match="non-virtual"):
+        non_virtual_ds.virtualize.to_kerchunk()

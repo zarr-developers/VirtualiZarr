@@ -1,4 +1,9 @@
-# Examples
+# End-to-end examples
+
+!!! note
+    The examples listed here use a pre-2.0 release of VirtualiZarr.
+
+
 
 The following examples demonstrate the use of VirtualiZarr to create virtual datasets of various kinds:
 

@@ -4,7 +4,6 @@ from virtualizarr.accessor import (
     VirtualiZarrDatasetAccessor,
     VirtualiZarrDataTreeAccessor,
 )
-from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.xarray import open_virtual_dataset, open_virtual_mfdataset
 
 try:
@@ -15,8 +14,6 @@ except Exception:
     __version__ = "9999"
 
 __all__ = [
-    "ChunkManifest",
-    "ManifestArray",
     "VirtualiZarrDatasetAccessor",
     "VirtualiZarrDataTreeAccessor",
     "open_virtual_dataset",

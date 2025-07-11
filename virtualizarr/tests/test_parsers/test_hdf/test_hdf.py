@@ -1,6 +1,7 @@
 import h5py  # type: ignore
 import numpy as np
 import pytest
+import xarray as xr
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
@@ -227,12 +228,17 @@ class TestOpenVirtualDataset:
     ):
         store = obstore_local(file_url=big_endian_dtype_hdf5_file)
         parser = HDFParser()
-        with open_virtual_dataset(
-            file_url=big_endian_dtype_hdf5_file,
-            object_store=store,
-            parser=parser,
-        ) as vds:
-            print(vds)
+        with (
+            parser(
+                file_url=big_endian_dtype_hdf5_file, object_store=store
+            ) as manifest_store,
+            xr.open_dataset(big_endian_dtype_hdf5_file) as expected,
+        ):
+            observed = xr.open_dataset(
+                manifest_store, engine="zarr", consolidated=False, zarr_format=3
+            )
+            assert isinstance(observed, xr.Dataset)
+            xr.testing.assert_identical(observed.load(), expected.load())
 
 
 @requires_hdf5plugin

@@ -457,4 +457,6 @@ def big_endian_dtype_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/big_endian.nc"
     f = h5py.File(filepath, "w")
     f.create_dataset("data", shape=(10,), dtype=">f4")
+    dset = f["data"]
+    dset[...] = 10
     return filepath

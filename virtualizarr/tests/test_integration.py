@@ -13,6 +13,7 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
+from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
@@ -21,7 +22,6 @@ from virtualizarr.tests import (
     requires_zarr_python,
 )
 from virtualizarr.tests.utils import obstore_local
-from virtualizarr.translators.kerchunk import manifestgroup_from_kerchunk_refs
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
@@ -141,11 +141,14 @@ def roundtrip_as_in_memory_icechunk(
 
     # write those references to an icechunk store
     vdata.virtualize.to_icechunk(session.store, **(virtualize_kwargs or {}))
+    session.commit("Test")
+
+    read_only_session = repo.readonly_session("main")
 
     if isinstance(vdata, xr.DataTree):
         # read the dataset from icechunk
         return xr.open_datatree(
-            session.store,  # type: ignore
+            read_only_session.store,  # type: ignore
             engine="zarr",
             zarr_format=3,
             consolidated=False,
@@ -153,7 +156,9 @@ def roundtrip_as_in_memory_icechunk(
         )
 
     # read the dataset from icechunk
-    return xr.open_zarr(session.store, zarr_format=3, consolidated=False, **kwargs)
+    return xr.open_zarr(
+        read_only_session.store, zarr_format=3, consolidated=False, **kwargs
+    )
 
 
 @requires_zarr_python
