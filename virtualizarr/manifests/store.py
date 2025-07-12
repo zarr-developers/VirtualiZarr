@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeAlias
@@ -110,15 +111,24 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
         Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
 
     """
-    if key.endswith("c"):
-        # Scalar arrays hold the data in the "c" key
-        raise NotImplementedError(
-            "Scalar arrays are not yet supported by ManifestStore"
-        )
-    parts = key.split(
-        "c/"
-    )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
-    return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
+    # Handle empty or root path
+    if not key or key == "/" or key.endswith("zarr.json"):
+        return ()
+
+    # Remove leading slash if present
+    if key.startswith("/"):
+        key = key[1:]
+
+    # Handle scalar value
+    if key.endswith("/c"):
+        return (0,)
+
+    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
+    match = re.search(
+        f"(?:^|/)c{chunk_key_encoding}(\d+(?:{chunk_key_encoding}\d+)*)", key
+    ).group()
+    match = match.removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    return tuple(int(ind) for ind in match.split(chunk_key_encoding))
 
 
 class ObjectStoreRegistry:

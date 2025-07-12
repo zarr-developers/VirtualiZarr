@@ -22,7 +22,7 @@ from virtualizarr.manifests import (
     ManifestStore,
     ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import get_store_prefix
+from virtualizarr.manifests.store import get_store_prefix, parse_manifest_index
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
@@ -33,6 +33,31 @@ from virtualizarr.tests import (
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore
+
+
+@pytest.mark.parametrize(
+    "val,expected",
+    [
+        (("zarr.json", "."), ()),
+        (("foo/bar/zarr.json", "."), ()),
+        (("c/1/23/45", "/"), (1, 23, 45)),
+        (("foo/bar/c/1/23/45", "/"), (1, 23, 45)),
+        (("c/bar/c/1/23/45", "/"), (1, 23, 45)),
+        (("c/c/c/1/23/45", "/"), (1, 23, 45)),
+        (("foo/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c/c/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/abc/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/abc/c", "."), (0,)),
+        (("c1.2/abc/c.0", "."), (0,)),
+        (("c1.2/abc/c/0", "/"), (0,)),
+    ],
+)
+def test_parse_manifest_index(val, expected):
+    key = val[0]
+    chunk_key_encoding = val[1]
+    assert parse_manifest_index(key, chunk_key_encoding) == expected
 
 
 def _generate_manifest_store(
@@ -142,24 +167,24 @@ class TestManifestStore:
     )
     async def test_get_data(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
-        observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
+        observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
-        observed = await store.get("foo/c/1.0", prototype=default_buffer_prototype())
+        observed = await store.get("foo/c.1.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x09\x10\x11\x12"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=RangeByteRequest(start=1, end=2),
         )
         assert observed.to_bytes() == b"\x02"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=OffsetByteRequest(offset=1),
         )
         assert observed.to_bytes() == b"\x02\x03\x04"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=SuffixByteRequest(suffix=2),
         )
@@ -192,12 +217,12 @@ class TestManifestStore:
         assert isinstance(new_store, ManifestStore)
         # Check new store works
         observed = await local_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
+            "foo/c.0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
         # Check old store works
         observed = await new_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
+            "foo/c.0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
 
