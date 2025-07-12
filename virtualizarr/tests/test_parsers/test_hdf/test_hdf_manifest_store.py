@@ -27,6 +27,19 @@ def basic_ds():
     return ds
 
 
+def test_variable_with_c_ending(tmpdir, variable_with_c_ending):
+    store = obstore_local(file_url=variable_with_c_ending)
+    parser = HDFParser()
+    manifest_store = parser(
+        file_url=variable_with_c_ending,
+        object_store=store,
+    )
+    with xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ) as rountripped_ds:
+        rountripped_ds.load()
+
+
 @requires_hdf5plugin
 class TestHDFManifestStore:
     def test_roundtrip_simple_virtualdataset(self, tmpdir, basic_ds):

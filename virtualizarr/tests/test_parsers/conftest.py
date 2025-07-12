@@ -460,3 +460,14 @@ def big_endian_dtype_hdf5_file(tmpdir):
     dset = f["data"]
     dset[...] = 10
     return filepath
+
+
+@pytest.fixture()
+def variable_with_c_ending(tmpdir):
+    filepath = f"{tmpdir}/variable_with_c_ending.nc"
+    f = h5py.File(filepath, "w")
+    f.create_dataset("c", shape=(1,), dtype=">f4")
+    dset = f["c"]
+    dset[...] = 10
+    f.attrs.create(name="coordinates", data="c")
+    return filepath
