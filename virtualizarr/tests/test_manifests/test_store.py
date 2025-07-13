@@ -55,8 +55,7 @@ if TYPE_CHECKING:
     ],
 )
 def test_parse_manifest_index(val, expected):
-    key = val[0]
-    chunk_key_encoding = val[1]
+    key, chunk_key_encoding = val
     assert parse_manifest_index(key, chunk_key_encoding) == expected
 
 
