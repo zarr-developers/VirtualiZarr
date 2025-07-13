@@ -125,10 +125,16 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
     match = re.search(
-        f"(?:^|/)c{chunk_key_encoding}(\d+(?:{chunk_key_encoding}\d+)*)", key
-    ).group()
-    match = match.removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
-    return tuple(int(ind) for ind in match.split(chunk_key_encoding))
+        rf"(?:^|/)c{chunk_key_encoding}(\d+(?:{chunk_key_encoding}\d+)*)", key
+    )
+    if not match:
+        raise ValueError(
+            "Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+        )
+    chunk_component = (
+        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    )
+    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 class ObjectStoreRegistry:
