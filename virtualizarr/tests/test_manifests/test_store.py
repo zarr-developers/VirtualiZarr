@@ -150,6 +150,31 @@ def s3_store(minio_bucket):
     )
 
 
+@pytest.fixture()
+def empty_memory_store():
+    import obstore as obs
+
+    store = obs.store.MemoryStore()
+    prefix = get_store_prefix("")
+    chunk_dict = {
+        "0.0": {"path": "", "offset": 0, "length": 4},
+    }
+    manifest = ChunkManifest(entries=chunk_dict)
+    codecs = [{"configuration": {"endian": "little"}, "name": "bytes"}]
+    array_metadata = create_v3_array_metadata(
+        shape=(1, 1),
+        chunk_shape=(1, 1),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
+    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    manifest_group = ManifestGroup(arrays={"foo": manifest_array})
+    registry = ObjectStoreRegistry({prefix: store})
+    return ManifestStore(store_registry=registry, group=manifest_group)
+
+
 @requires_obstore
 class TestManifestStore:
     def test_manifest_store_properties(self, local_store):
@@ -158,6 +183,16 @@ class TestManifestStore:
         assert not local_store.supports_deletes
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["empty_memory_store"],
+    )
+    async def test_get_empty_chunk(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
+        assert observed is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
