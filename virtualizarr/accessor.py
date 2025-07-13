@@ -1,6 +1,16 @@
+import warnings
+from collections import deque
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, overload
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generator,
+    Iterable,
+    Literal,
+    overload,
+)
 
 import xarray as xr
 
@@ -10,6 +20,44 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+
+
+def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
+    """Decorator for methods which only make sense for fully virtual xarray objects."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            all_vars: Iterable[xr.Variable]
+            match cls_name:
+                case "Dataset":
+                    all_vars = self.ds.variables.values()
+                case "DataTree":
+                    all_vars = all_datatree_variables(self.dt)
+
+            if not any(isinstance(var.data, ManifestArray) for var in all_vars):
+                warnings.warn(
+                    f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
+                    "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
+                    f"This may have happened because you used `xarray.open_{cls_name}` instead of `virtualizarr.open_virtual_{cls_name}`, or you set all variables to be `loadable_variables`."
+                    "Please read the usage docs.",
+                    UserWarning,
+                )
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, None]:
+    """Flat iterable over all variables in a DataTree"""
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        yield from node.variables.values()
+        queue.extend(node.children.values())
 
 
 @xr.register_dataset_accessor("virtualize")
@@ -23,6 +71,7 @@ class VirtualiZarrDatasetAccessor:
     def __init__(self, ds: xr.Dataset):
         self.ds: xr.Dataset = ds
 
+    @warn_if_not_virtual("Dataset")
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -93,6 +142,7 @@ class VirtualiZarrDatasetAccessor:
         categorical_threshold: int = 10,
     ) -> None: ...
 
+    @warn_if_not_virtual("Dataset")
     def to_kerchunk(
         self,
         filepath: str | Path | None = None,
@@ -235,6 +285,7 @@ class VirtualiZarrDataTreeAccessor:
     def __init__(self, dt: xr.DataTree):
         self.dt = dt
 
+    @warn_if_not_virtual("DataTree")
     def to_icechunk(
         self,
         store: "IcechunkStore",
