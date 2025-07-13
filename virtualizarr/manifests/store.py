@@ -111,17 +111,13 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
         Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
 
     """
-    # Handle empty or root path
-    if not key or key == "/" or key.endswith("zarr.json"):
+    # Handle empty, root path, or scalar array
+    if not key or key == "/" or key.endswith("zarr.json") or key.endswith("/c"):
         return ()
 
     # Remove leading slash if present
     if key.startswith("/"):
         key = key[1:]
-
-    # Handle scalar value
-    if key.endswith("/c"):
-        return (0,)
 
     # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
     match = re.search(
