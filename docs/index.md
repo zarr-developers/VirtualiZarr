@@ -42,7 +42,7 @@ virtual_datasets = [
 virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
 
 # cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
-virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
+virtual_ds.vz.to_kerchunk('combined.json', format='json')
 ```
 
 Now you can open your shiny new Zarr store instantly:

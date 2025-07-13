@@ -60,6 +60,7 @@ def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, No
         queue.extend(node.children.values())
 
 
+@xr.register_dataset_accessor("vz")
 @xr.register_dataset_accessor("virtualize")
 class VirtualiZarrDatasetAccessor:
     """
@@ -275,6 +276,7 @@ class VirtualiZarrDatasetAccessor:
 
 
 @xr.register_datatree_accessor("virtualize")
+@xr.register_datatree_accessor("vz")
 class VirtualiZarrDataTreeAccessor:
     """
     Xarray accessor for writing out virtual datatrees to disk.

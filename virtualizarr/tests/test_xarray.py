@@ -341,7 +341,7 @@ class TestCombine:
 
 
 class TestRenamePaths:
-    def test_rename_to_str(self, netcdf4_file):
+    def test_old_accessor(self, netcdf4_file):
         store = obstore_local(netcdf4_file)
         parser = HDFParser()
         with open_virtual_dataset(
@@ -350,6 +350,20 @@ class TestRenamePaths:
             parser=parser,
         ) as vds:
             renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            assert (
+                renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                == "s3://bucket/air.nc"
+            )
+
+    def test_rename_to_str(self, netcdf4_file):
+        store = obstore_local(netcdf4_file)
+        parser = HDFParser()
+        with open_virtual_dataset(
+            file_url=netcdf4_file,
+            object_store=store,
+            parser=parser,
+        ) as vds:
+            renamed_vds = vds.vz.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -370,7 +384,7 @@ class TestRenamePaths:
             object_store=store,
             parser=parser,
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+            renamed_vds = vds.vz.rename_paths(local_to_s3_url)
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -383,7 +397,7 @@ class TestRenamePaths:
             file_url=netcdf4_file, object_store=store, parser=parser
         ) as vds:
             with pytest.raises(TypeError):
-                vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+                vds.vz.rename_paths(["file1.nc", "file2.nc"])
 
     @requires_hdf5plugin
     @requires_imagecodecs
@@ -396,7 +410,7 @@ class TestRenamePaths:
             parser=parser,
             loadable_variables=["lat", "lon"],
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            renamed_vds = vds.vz.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -414,7 +428,7 @@ def test_nbytes(simple_netcdf4):
         object_store=store,
         parser=parser,
     ) as vds:
-        assert vds.virtualize.nbytes == 32
+        assert vds.vz.nbytes == 32
         assert vds.nbytes == 48
 
     with open_virtual_dataset(
@@ -423,10 +437,10 @@ def test_nbytes(simple_netcdf4):
         parser=parser,
         loadable_variables=["foo"],
     ) as vds:
-        assert vds.virtualize.nbytes == 48
+        assert vds.vz.nbytes == 48
 
     with open_dataset(simple_netcdf4) as ds:
-        assert ds.virtualize.nbytes == ds.nbytes
+        assert ds.vz.nbytes == ds.nbytes
 
 
 class TestOpenVirtualDatasetIndexes:
@@ -623,7 +637,7 @@ class TestReadRemote:
             ) as vds,
         ):
             tmpref = "/tmp/cmip6.json"
-            vds.virtualize.to_kerchunk(tmpref, format="json")
+            vds.vz.to_kerchunk(tmpref, format="json")
 
             with xr.open_dataset(tmpref, engine="kerchunk") as dsV:
                 # xrt.assert_identical(dsXR, dsV) #Attribute order changes
