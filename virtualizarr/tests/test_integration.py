@@ -138,15 +138,20 @@ def roundtrip_as_in_memory_icechunk(
     storage = icechunk.Storage.new_in_memory()
 
     config = icechunk.RepositoryConfig.default()
-    container = icechunk.VirtualChunkContainer(
-        url_prefix="file:///private/var/folders/70",
-        store=icechunk.local_filesystem_store("file:///private/var/folders/70"),
-    )
-    config.set_virtual_chunk_container(container)
+
+    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
+
+    for url_prefix in url_prefixes:
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(url_prefix),
+        )
+        config.set_virtual_chunk_container(container)
+
     repo = icechunk.Repository.create(
         storage=storage,
         config=config,
-        authorize_virtual_chunk_access={"file:///private/var/folders/70": None},
+        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
     )
     session = repo.writable_session("main")
 

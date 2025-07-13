@@ -35,21 +35,22 @@ def icechunk_storage(tmp_path: Path) -> "Storage":
 
 @pytest.fixture(scope="function")
 def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
-    from icechunk import Repository
-
     config = icechunk.RepositoryConfig.default()
-    container = icechunk.VirtualChunkContainer(
-        url_prefix="file:///private/var/folders/70",
-        store=icechunk.local_filesystem_store("file:///private/var/folders/70"),
-    )
-    config.set_virtual_chunk_container(container)
-    repo = Repository.create(
+
+    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
+
+    for url_prefix in url_prefixes:
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(url_prefix),
+        )
+        config.set_virtual_chunk_container(container)
+
+    return icechunk.Repository.create(
         storage=icechunk_storage,
         config=config,
-        authorize_virtual_chunk_access={"file:///private/var/folders/70": None},
+        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
     )
-
-    return repo
 
 
 @pytest.fixture(scope="function")
