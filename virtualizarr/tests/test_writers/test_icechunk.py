@@ -3,12 +3,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-import pytest
-
-pytest.importorskip("icechunk")
-
 import numpy as np
 import numpy.testing as npt
+import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
@@ -18,6 +15,8 @@ from zarr.core.metadata import ArrayV3Metadata
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.writers.icechunk import generate_chunk_key
 from virtualizarr.xarray import separate_coords
+
+icechunk = pytest.importorskip("icechunk")
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
@@ -35,10 +34,21 @@ def icechunk_storage(tmp_path: Path) -> "Storage":
 
 
 @pytest.fixture(scope="function")
-def icechunk_repo(icechunk_storage: "Storage") -> "Repository":
+def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
     from icechunk import Repository
 
-    repo = Repository.create(storage=icechunk_storage)
+    config = icechunk.RepositoryConfig.default()
+    container = icechunk.VirtualChunkContainer(
+        url_prefix="file:///private/var/folders/70",
+        store=icechunk.local_filesystem_store("file:///private/var/folders/70"),
+    )
+    config.set_virtual_chunk_container(container)
+    repo = Repository.create(
+        storage=icechunk_storage,
+        config=config,
+        authorize_virtual_chunk_access={"file:///private/var/folders/70": None},
+    )
+
     return repo
 
 
