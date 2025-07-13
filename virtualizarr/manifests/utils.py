@@ -27,7 +27,7 @@ def create_v3_array_metadata(
 ) -> ArrayV3Metadata:
     """
     Create an ArrayV3Metadata instance with standard configuration.
-    This function encapsulates common patterns used across different readers.
+    This function encapsulates common patterns used across different parsers.
 
     Parameters
     ----------
@@ -55,7 +55,7 @@ def create_v3_array_metadata(
     """
     return ArrayV3Metadata(
         shape=shape,
-        data_type=data_type,
+        data_type=data_type.name if hasattr(data_type, "name") else data_type,
         chunk_grid={
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
@@ -155,6 +155,20 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
     new_l = list(t)
     new_l.pop(pos)
     return tuple(new_l)
+
+
+def check_no_partial_chunks_on_concat_axis(
+    shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
+):
+    """Check that there are no partial chunks along the concatenation axis"""
+    # loop over the arrays to be concatenated
+    for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        if shape[axis] % chunk_shape[axis] > 0:
+            raise ValueError(
+                "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
+                f"Concat input {i} has array length {shape[axis]} along the concatenation axis which is not "
+                f"evenly divisible by chunk length {chunk_shape[axis]}."
+            )
 
 
 def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):

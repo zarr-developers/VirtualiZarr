@@ -3,10 +3,16 @@ import json
 from typing import cast
 
 import numpy as np
+import ujson
+from numcodecs.abc import Codec
 from xarray import Dataset, Variable
+from xarray.backends.zarr import encode_zarr_variable
 from xarray.coding.times import CFDatetimeCoder
 from xarray.conventions import encode_dataset_coordinates
+from zarr.core.common import JSON
+from zarr.core.metadata.v2 import ArrayV2Metadata
 
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.utils import convert_v3_to_v2_metadata
@@ -46,12 +52,27 @@ class NumpyEncoder(json.JSONEncoder):
             raise
 
 
+def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
+    """Convert V2 metadata to kerchunk JSON format."""
+
+    zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
+    if v2_metadata.filters:
+        zarray_dict["filters"] = [
+            # we could also cast to json, but get_config is intended for serialization
+            codec.get_config()
+            for codec in v2_metadata.filters
+            if codec is not None
+        ]  # type: ignore[assignment]
+    if isinstance(compressor := v2_metadata.compressor, Codec):
+        zarray_dict["compressor"] = compressor.get_config()
+
+    return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
+
+
 def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
     """
     Create a dictionary containing kerchunk-style store references from a single xarray.Dataset (which wraps ManifestArray objects).
     """
-
-    import ujson
 
     # xarray's .to_zarr() does this, so we need to do it for kerchunk too
     variables, attrs = encode_dataset_coordinates(ds)
@@ -90,8 +111,6 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
 
     Partially encodes the inner dicts to json to match kerchunk behaviour (see https://github.com/fsspec/kerchunk/issues/415).
     """
-    from virtualizarr.manifests import ManifestArray
-    from virtualizarr.translators.kerchunk import to_kerchunk_json
 
     if isinstance(var.data, ManifestArray):
         marr = var.data
@@ -107,9 +126,6 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
         zattrs = {**var.attrs, **var.encoding}
     else:
-        from xarray.backends.zarr import encode_zarr_variable
-        from zarr.core.metadata.v2 import ArrayV2Metadata
-
         var = encode_zarr_variable(var)
         try:
             np_arr = var.to_numpy()

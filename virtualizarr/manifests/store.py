@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import pickle
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeAlias
 from urllib.parse import urlparse
 
-import xarray as xr
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -13,18 +12,20 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer
-from zarr.core.buffer.core import BufferPrototype
+from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
+from zarr.core.common import BytesLike
 
-from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable
-    from typing import Any
+    from obstore.store import (
+        ObjectStore,
+    )
 
-    from zarr.core.buffer import BufferPrototype
-    from zarr.core.common import BytesLike
+    StoreDict: TypeAlias = dict[str, ObjectStore]
+
+    import xarray as xr
 
 
 __all__ = ["ManifestStore"]
@@ -35,19 +36,6 @@ _ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
     IsADirectoryError,
     NotADirectoryError,
 )
-
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
-
-from zarr.core.buffer import default_buffer_prototype
-
-from virtualizarr.vendor.zarr.metadata import dict_to_buffer
-
-if TYPE_CHECKING:
-    from obstore.store import ObjectStore  # type: ignore[import-not-found]
-
-    StoreDict: TypeAlias = dict[str, ObjectStore]
 
 
 @dataclass
@@ -60,23 +48,12 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-async def list_dir_from_manifest_arrays(
-    arrays: Mapping[str, ManifestArray], prefix: str
-) -> AsyncGenerator[str]:
-    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
-
-    Parameters
-    ----------
-    arrays : Mapping[str, ManifestArrays]
-    prefix : str
-
-    Returns
-    -------
-    AsyncIterator[str]
+def get_store_prefix(url: str) -> str:
     """
-    # TODO shouldn't this just accept a ManifestGroup instead?
-    # Start with expected group level metadata
-    raise NotImplementedError
+    Get a logical prefix to use for a url in an ObjectStoreRegistry
+    """
+    scheme, netloc, *_ = urlparse(url)
+    return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
 def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
@@ -118,12 +95,20 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     Parameters
     ----------
-    key : str
-    chunk_key_encoding : str
+    key
+        The key in the Zarr store to parse.
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
 
     Returns
     -------
-    tuple containing chunk indexes
+    tuple containing chunk indexes.
+
+    Raises
+    ------
+    NotImplementedError
+        Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
+
     """
     if key.endswith("c"):
         # Scalar arrays hold the data in the "c" key
@@ -136,117 +121,120 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
 
 
-def find_matching_store(stores: StoreDict, request_key: str) -> StoreRequest:
+class ObjectStoreRegistry:
     """
-    Find the matching store based on the store keys and the beginning of the URI strings,
-    to fetch data from the appropriately configured ObjectStore.
+    Registry of [ObjectStore][obstore.store.ObjectStore] instances and their associated URI prefixes.
 
-    Parameters:
-    -----------
-    stores : StoreDict
-        A dictionary with URI prefixes for different stores as keys
-    request_key : str
-        A string to match against the dictionary keys
-
-    Returns:
-    --------
-    StoreRequest
+    ObjectStoreRegistry maps the URI scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. Used by [ManifestStore][virtualizarr.manifests.ManifestStore] to read both metadata and data referenced by virtual chunk references, via the associated [ObjectStore][obstore.store.ObjectStore].
     """
-    # Sort keys by length in descending order to ensure longer, more specific matches take precedence
-    sorted_keys = sorted(stores.keys(), key=len, reverse=True)
 
-    # Check each key to see if it's a prefix of the uri_string
-    for key in sorted_keys:
-        if request_key.startswith(key):
-            parsed_key = urlparse(request_key)
-            return StoreRequest(store=stores[key], key=parsed_key.path)
-    # if no match is found, raise an error
-    raise ValueError(
-        f"Expected the one of stores.keys() to match the data prefix, got {stores.keys()} and {request_key}"
-    )
+    _stores: dict[str, ObjectStore]
+
+    @classmethod
+    def __init__(self, stores: dict[str, ObjectStore] | None = None):
+        stores = stores or {}
+        for store in stores.values():
+            if not store.__class__.__module__.startswith("obstore"):
+                raise TypeError(f"expected ObjectStore class, got {store!r}")
+        self._stores = stores
+
+    def register_store(self, prefix: str, store: ObjectStore):
+        """
+        Register a store using the given prefix
+
+        If a store with the same key existed before, it is replaced
+
+        Parameters
+        ----------
+        prefix
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
+            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
+        """
+        self._stores[prefix] = store
+
+    def get_store(self, url: str) -> ObjectStore:
+        """
+        Get a registered store for the provided URL.
+
+        Parameters
+        ----------
+        url
+            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
+            prefix of multiple stores in the registry, the store with the longest prefix is chosen.
+
+        Returns
+        -------
+        ObjectStore
+
+        Raises
+        ------
+        ValueError
+            If no store is registered for the provided URL or its prefixes.
+        """
+        prefixes = filter(url.startswith, self._stores)
+
+        if (longest_prefix := max(prefixes, default=None, key=len)) is None:
+            raise ValueError(f"No store registered for any prefix of {url!r}")
+
+        return self._stores[longest_prefix]
 
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
-    from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`,
-    allowing for virtually interfacing with underlying data in other file format.
+    A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
+
+    The requests from the Zarr API are redirected using the [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing
+    multiple [ManifestArray][virtualizarr.manifests.ManifestArray], allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------
-    group : ManifestGroup
+    group
         Root group of the store.
-        Contains group metadata, ManifestArrays, and any subgroups.
-    stores : dict[prefix, :class:`obstore.store.ObjectStore`]
-        A mapping of url prefixes to obstore Store instances set up with the proper credentials.
-
-        The prefixes are matched to the URIs in the ManifestArrays to determine which store to
-        use for making requests.
+        Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
+    store_registry : ObjectStoreRegistry
+        [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore]instances,
+        allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
     --------
     ManifestStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
-
-    Notes
-    -----
-    Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
+    #  Modified from https://github.com/zarr-developers/zarr-python/pull/1661
+
     _group: ManifestGroup
-    _stores: StoreDict
+    _store_registry: ObjectStoreRegistry
 
     def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
-        self,
-        group: ManifestGroup,
-        *,
-        stores: StoreDict,  # TODO: Consider using a sequence of tuples rather than a dict (see https://github.com/zarr-developers/VirtualiZarr/pull/490#discussion_r2010717898).
+        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry | None = None
     ) -> None:
-        """Instantiate a new ManifestStore
+        """Instantiate a new ManifestStore.
 
         Parameters
         ----------
-        manifest_group : ManifestGroup
-            Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        stores : dict[prefix, :class:`obstore.store.ObjectStore`]
-            A mapping of url prefixes to obstore Store instances set up with the proper credentials.
-
-            The prefixes are matched to the URIs in the ManifestArrays to determine which store to
-            use for making requests.
+        group
+            [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing Group metadata and mapping variable names to ManifestArrays
+        store_registry
+            A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+            allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
-        for store in stores.values():
-            if not store.__class__.__module__.startswith("obstore"):
-                raise TypeError(f"expected ObjectStore class, got {store!r}")
 
         # TODO: Don't allow stores with prefix
         if not isinstance(group, ManifestGroup):
             raise TypeError
 
         super().__init__(read_only=True)
-        self._stores = stores
+        if store_registry is None:
+            store_registry = ObjectStoreRegistry()
+        self._store_registry = store_registry
         self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore(group={self._group}, stores={self._stores})"
-
-    def __getstate__(self) -> dict[Any, Any]:
-        state = self.__dict__.copy()
-        stores = state["_stores"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.dumps(v)
-        state["_stores"] = stores
-        return state
-
-    def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_stores"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.loads(v)
-        state["_stores"] = stores
-        self.__dict__.update(state)
+        return f"ManifestStore(group={self._group}, stores={self._store_registry})"
 
     async def get(
         self,
@@ -255,8 +243,6 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        import obstore as obs
-
         if key.endswith("zarr.json"):
             return get_zarr_metadata(self._group, key)
         var = key.split("/")[0]
@@ -266,11 +252,23 @@ class ManifestStore(Store):
         chunk_indexes = parse_manifest_index(
             key, marr.metadata.chunk_key_encoding.separator
         )
-        path = manifest._paths[*chunk_indexes]
-        offset = manifest._offsets[*chunk_indexes]
-        length = manifest._lengths[*chunk_indexes]
-        # Get the  configured object store instance that matches the path
-        store_request = find_matching_store(stores=self._stores, request_key=path)
+
+        path = manifest._paths[chunk_indexes]
+        if path == "":
+            return None
+        offset = manifest._offsets[chunk_indexes]
+        length = manifest._lengths[chunk_indexes]
+        # Get the configured object store instance that matches the path
+        store = self._store_registry.get_store(path)
+        if not store:
+            raise ValueError(
+                f"Could not find a store to use for {path} in the store registry"
+            )
+        # Truncate path to match Obstore expectations
+        key = urlparse(path).path
+        if hasattr(store, "prefix") and store.prefix:
+            # strip the prefix from key
+            key = key.removeprefix(str(store.prefix))
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -278,9 +276,8 @@ class ManifestStore(Store):
         )
         # Actually get the bytes
         try:
-            bytes = await obs.get_range_async(
-                store_request.store,
-                store_request.key,
+            bytes = await store.get_range_async(
+                key,
                 start=byte_range.start,
                 end=byte_range.end,
             )
@@ -352,31 +349,44 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
-    def to_virtual_dataset(self, group="") -> xr.Dataset:
+    def to_virtual_dataset(
+        self,
+        group="",
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+        indexes: Mapping[str, xr.Index] | None = None,
+    ) -> "xr.Dataset":
         """
-        Create a "virtual" xarray dataset containing the contents of one zarr group.
-
-        All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
+        Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
 
         Will ignore the contents of any other groups in the store.
+
+        Requires xarray.
 
         Parameters
         ----------
         group : str
+        loadable_variables : Iterable[str], optional
 
         Returns
         -------
         vds : xarray.Dataset
         """
 
-        if group:
-            raise NotImplementedError(
-                "ManifestStore does not yet support nested groups"
-            )
-        else:
-            manifestgroup = self._group
+        from virtualizarr.xarray import construct_virtual_dataset
 
-        return manifestgroup.to_virtual_dataset()
+        if loadable_variables and self._store_registry._stores is None:
+            raise ValueError(
+                f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
+            )
+
+        return construct_virtual_dataset(
+            manifest_store=self,
+            group=group,
+            loadable_variables=loadable_variables,
+            indexes=indexes,
+            decode_times=decode_times,
+        )
 
 
 def _transform_byte_range(

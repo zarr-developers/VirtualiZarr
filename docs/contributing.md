@@ -6,10 +6,8 @@ Contributions are welcome and encouraged! We ask only that all contributors foll
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
 
-```{important}
-:name: dependencies
-We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
-```
+!!! important
+    We use [pixi](https://pixi.sh/latest/) to manage dependencies, which you'll want to install to get started.
 
 Run tests with the `pixi run --environment test run-tests` command. Some tests require downloading files over the network.
 Use the `run-tests-no-network` task if you want to run tests faster or have no internet access:
@@ -57,7 +55,36 @@ If you run into issues with the development environment, here are some recommend
 - Manually find and clean the cache dir listed in `pixi info` and then retry the development workflow.
 - Ask for help in the [VirtualiZarr channel of the Earthmover community slack](https://earthmover-community.slack.com/archives/C08EXCE8ZQX).
 
+### Code standards
 
+#### Pre-commit
+
+All code must conform to the PEP8 standard. `VirtualiZarr` uses a set of `pre-commit` hooks and the `pre-commit` bot to format, type-check, and prettify the codebase. `pre-commit` can be installed locally by running:
+
+```
+python -m pip install pre-commit
+```
+The hooks can be installed locally by running:
+
+```
+pre-commit install
+```
+
+This would run the checks every time a commit is created locally. These checks will also run on every commit pushed to an open PR, resulting in some automatic styling fixes by the `pre-commit` bot. The checks will by default only run on the files modified by a commit, but the checks can be triggered for all the files by running:
+
+```
+pre-commit run --all-files
+```
+
+If you would like to skip the failing checks and push the code for further discussion, use the `--no-verify` option with `git commit`.
+
+#### Private functions
+
+`VirtualiZarr` uses the following convention for private functions:
+
+- Functions are preceded with an `_` (single underscore) if they should only be used within that module and may change at any time
+- Functions without a preceding `_` (single underscore) are treated as relatively stable by the rest of the codebase, but not for public use (i.e. they are stable developer API).
+- Public functions are documented in the fully public API and should follow the backwards-compatibility expectations of Effective Effort Versioning.
 
 ## Contributing documentation
 

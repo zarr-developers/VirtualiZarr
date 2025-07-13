@@ -7,6 +7,7 @@ from virtualizarr.utils import determine_chunk_grid_shape
 from .manifest import ChunkManifest
 from .utils import (
     check_combinable_zarr_arrays,
+    check_no_partial_chunks_on_concat_axis,
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
@@ -75,7 +76,9 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
+    arr_chunks = [arr.chunks for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+    check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
     # find what new array shape must be
     new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])
@@ -204,7 +207,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
             f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
         )
 
-    # new chunk_shape is old chunk_shape with singleton dimensions pre-pended
+    # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
     old_chunk_shape = x.chunks
     new_chunk_shape = _prepend_singleton_dimensions(

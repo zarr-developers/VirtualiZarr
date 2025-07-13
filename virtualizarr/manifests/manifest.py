@@ -1,9 +1,7 @@
-import json
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
 from pathlib import PosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
-from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 
@@ -25,6 +23,8 @@ VALID_URI_PREFIXES = {
     "cos://",
     "minio://",
     "file:///",
+    "http://",
+    "https://",
 }
 
 
@@ -48,8 +48,8 @@ class ChunkEntry(TypedDict):
         """
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
-
-        path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+        if path != "":
+            path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 
@@ -69,37 +69,12 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     if path == "":
         # (empty paths are allowed through as they represent missing chunks)
         return path
-
-    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra depedencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
-
-    if path.startswith("http://") or path.startswith("https://"):
-        # hopefully would raise if given a malformed URL
-        components = urlparse(path)
-
-        if not PosixPath(components.path).suffix:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
-
-        return urlunparse(components)
-
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        if not PosixPath(path).suffix:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
-
         return path  # path is already in URI form
-
     else:
         # must be a posix filesystem path (absolute or relative)
         # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
         _path = PosixPath(path)
-
-        if not _path.suffix:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
 
         # only posix paths can possibly not be absolute
         if not _path.is_absolute():
@@ -188,12 +163,14 @@ class ChunkManifest:
 
     The manifest can be converted to or from a dictionary which looks like this
 
-    |    {
-    |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-    |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-    |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-    |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-    |    }
+    ```
+    {
+        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+    }
+    ```
 
     using the .__init__() and .dict() methods, so users of this class can think of the manifest as if it were a dict mapping zarr chunk keys to byte ranges.
 
@@ -213,15 +190,17 @@ class ChunkManifest:
 
         Parameters
         ----------
-        entries: dict
+        entries
             Chunk keys and byte range information, as a dictionary of the form
 
-            |    {
-            |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-            |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-            |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-            |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-            |    }
+            ```
+            {
+                "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+                "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+                "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+                "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+            }
+            ```
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
@@ -278,10 +257,13 @@ class ChunkManifest:
 
         Parameters
         ----------
-        paths: np.ndarray
-        offsets: np.ndarray
-        lengths: np.ndarray
-        validate_paths: bool
+        paths
+            Array containing the paths to the chunks
+        offsets
+            Array containing the byte offsets of the chunks
+        lengths
+            Array containing the byte lengths of the chunks
+        validate_paths
             Check that entries in the manifest are valid paths (e.g. that local paths are absolute not relative).
             Set to False to skip validation for performance reasons.
         """
@@ -373,7 +355,7 @@ class ChunkManifest:
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
-        # TODO fix bug here - types of path, offset, length shoudl be coerced
+        # TODO fix bug here - types of path, offset, length should be coerced
         return ChunkEntry(path=path, offset=offset, length=length)
 
     def __iter__(self) -> Iterator[ChunkKey]:
@@ -399,12 +381,14 @@ class ChunkManifest:
 
         The returned dict will be of the form
 
-        |    {
-        |        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
-        |        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
-        |        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
-        |        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
-        |    }
+        ```
+        {
+            "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+            "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+            "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+        }
+        ```
 
         Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary.
         """
@@ -436,21 +420,6 @@ class ChunkManifest:
         lengths_equal = (self._lengths == other._lengths).all()
         return paths_equal and offsets_equal and lengths_equal
 
-    @classmethod
-    def from_zarr_json(cls, filepath: str) -> "ChunkManifest":
-        """Create a ChunkManifest from a Zarr manifest.json file."""
-
-        with open(filepath, "r") as manifest_file:
-            entries = json.load(manifest_file)
-
-        return cls(entries=entries)
-
-    def to_zarr_json(self, filepath: str) -> None:
-        """Write the manifest to a Zarr manifest.json file."""
-        entries = self.dict()
-        with open(filepath, "w") as json_file:
-            json.dump(entries, json_file, indent=4, separators=(", ", ": "))
-
     def rename_paths(
         self,
         new: str | Callable[[str], str],
@@ -470,6 +439,10 @@ class ChunkManifest:
         -------
         manifest
 
+        See Also
+        --------
+        ManifestArray.rename_paths
+
         Examples
         --------
         Rename paths to reflect moving the referenced files from local storage to an S3 bucket.
@@ -481,12 +454,8 @@ class ChunkManifest:
         ...
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
-
+        >>>
         >>> manifest.rename_paths(local_to_s3_url)
-
-        See Also
-        --------
-        ManifestArray.rename_paths
         """
         if isinstance(new, str):
             renamed_paths = np.full_like(self._paths, fill_value=new)

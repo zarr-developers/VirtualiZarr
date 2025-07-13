@@ -4,6 +4,7 @@ import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
+from zarr.codecs import BytesCodec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
@@ -57,14 +58,13 @@ def convert_to_codec_pipeline(
 
     Parameters
     ----------
-    dtype : np.dtype
-    codecs: list[dict] | None
+    dtype
+    codecs
 
     Returns
     -------
     BatchedCodecPipeline
     """
-    from zarr.core.array import _get_default_chunk_encoding_v3
     from zarr.registry import get_codec_class
 
     zarr_codecs: tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...] = ()
@@ -78,7 +78,10 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        arraybytes_codec = _get_default_chunk_encoding_v3(dtype)[1]
+        if dtype.byteorder == ">":
+            arraybytes_codec = BytesCodec(endian="big")
+        else:
+            arraybytes_codec = BytesCodec()
 
     codec_pipeline = BatchedCodecPipeline(
         array_array_codecs=arrayarray_codecs,
@@ -94,10 +97,20 @@ def get_codec_config(codec: ZarrCodec) -> dict[str, Any]:
     """
     Extract configuration from a codec, handling both zarr-python and numcodecs codecs.
     """
+
     if hasattr(codec, "codec_config"):
         return codec.codec_config
     elif hasattr(codec, "get_config"):
         return codec.get_config()
+    elif hasattr(codec, "_zstd_codec"):
+        # related issue: https://github.com/zarr-developers/VirtualiZarr/issues/514
+        # very silly workaround. codec.to_dict for zstd gives:
+        # {'name': 'zstd', 'configuration': {'level': 0, 'checksum': False}}
+        # which when passed through ArrayV2Metadata -> numcodecs.get_codec gives the error:
+        # *** numcodecs.errors.UnknownCodecError: codec not available: 'None'
+        # if codec._zstd_codec.get_config() : {'id': 'zstd', 'level': 0, 'checksum': False}
+        # is passed to numcodecs.get_codec. It works fine.
+        return codec._zstd_codec.get_config()
     elif hasattr(codec, "to_dict"):
         return codec.to_dict()
     else:
