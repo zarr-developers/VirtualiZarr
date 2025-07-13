@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, List, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, TypedDict, Union
 
 import numcodecs.registry as registry
 import numpy as np
@@ -9,12 +9,6 @@ from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
 from xarray.coding.variables import _choose_float_dtype
 
-from virtualizarr.readers.common import (
-    CFCodec,
-    ShuffleProperties,
-    ZlibProperties,
-    ZstdProperties,
-)
 from virtualizarr.utils import soft_import
 
 h5py = soft_import("h5py", "For reading hdf files", strict=False)
@@ -52,6 +46,26 @@ class BloscProperties:
             for key, value in hdf5plugin._filters.Blosc._Blosc__COMPRESSIONS.items()
         }
         self.cname = blosc_compressor_codes[self.cname]
+
+
+@dataclasses.dataclass
+class ZstdProperties:
+    level: int
+
+
+@dataclasses.dataclass
+class ShuffleProperties:
+    elementsize: int
+
+
+@dataclasses.dataclass
+class ZlibProperties:
+    level: int
+
+
+class CFCodec(TypedDict):
+    target_dtype: np.dtype
+    codec: Codec
 
 
 def _filter_to_codec(
