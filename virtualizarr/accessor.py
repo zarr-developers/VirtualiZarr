@@ -64,7 +64,7 @@ class _VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
 
-    Methods on this object are called via `ds.virtualize.{method}`.
+    Methods on this object are called via `ds.vz.{method}`.
     """
 
     def __init__(self, ds: xr.Dataset):
@@ -243,7 +243,7 @@ class _VirtualiZarrDatasetAccessor:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> ds.virtualize.rename_paths(local_to_s3_url)
+        >>> ds.vz.rename_paths(local_to_s3_url)
         """
 
         new_ds = self.ds.copy()
@@ -292,7 +292,7 @@ class _VirtualiZarrDataTreeAccessor:
     """
     Xarray accessor for writing out virtual datatrees to disk.
 
-    Methods on this object are called via `dt.virtualize.{method}`.
+    Methods on this object are called via `dt.vz.{method}`.
     """
 
     def __init__(self, dt: xr.DataTree):
@@ -346,7 +346,7 @@ class _VirtualiZarrDataTreeAccessor:
         ``last_updated_at``.
 
         >>> from datetime import datetime
-        >>> vdt.virtualize.to_icechunk(  # doctest: +SKIP
+        >>> vdt.vz.to_icechunk(  # doctest: +SKIP
         ...     icechunkstore,
         ...     last_updated_at=datetime.now(),
         ... )
