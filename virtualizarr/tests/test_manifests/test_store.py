@@ -123,7 +123,7 @@ def _generate_manifest_store(
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     scalar_chunk_manifest = ChunkManifest.from_arrays(
-        paths=np.array(f"{prefix}/{filepath}", dtype=np.dtypes.StringDType),
+        paths=np.array(f"{prefix}/{filepath}", dtype=np.dtypes.StringDType),  # type: ignore
         offsets=np.array(0, dtype=np.uint64),
         lengths=np.array(1, dtype=np.uint64),
     )

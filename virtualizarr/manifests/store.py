@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -57,7 +57,9 @@ def get_store_prefix(url: str) -> str:
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
-def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
+def parse_manifest_index(
+    key: str, chunk_key_encoding: Literal[".", "/"] = "."
+) -> tuple[int, ...]:
     """
     Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
     data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays

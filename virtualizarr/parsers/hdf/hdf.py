@@ -177,7 +177,7 @@ def _dataset_chunk_manifest(
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         elif dataset.shape == ():
             chunk_manifest = ChunkManifest.from_arrays(
-                paths=np.array(filepath, dtype=np.dtypes.StringDType),
+                paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
                 offsets=np.array(dsid.get_offset(), dtype=np.uint64),
                 lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
             )
