@@ -23,6 +23,8 @@ from virtualizarr.tests import (
 )
 from virtualizarr.tests.utils import obstore_local
 
+icechunk = pytest.importorskip("icechunk")
+
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
 ]
@@ -132,11 +134,25 @@ def roundtrip_as_in_memory_icechunk(
     virtualize_kwargs: Mapping[str, Any] | None = None,
     **kwargs,
 ) -> xr.Dataset | xr.DataTree:
-    from icechunk import Repository, Storage
-
     # create an in-memory icechunk store
-    storage = Storage.new_in_memory()
-    repo = Repository.create(storage=storage)
+    storage = icechunk.Storage.new_in_memory()
+
+    config = icechunk.RepositoryConfig.default()
+
+    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
+
+    for url_prefix in url_prefixes:
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(url_prefix),
+        )
+        config.set_virtual_chunk_container(container)
+
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
+    )
     session = repo.writable_session("main")
 
     # write those references to an icechunk store
