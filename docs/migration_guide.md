@@ -70,3 +70,11 @@ parser = HDFParser()
 manifest_store = parser(file_url = file_url, object_store = store)
 ds = xr.open_zarr(manifest_store)
 ```
+
+### Xarray accessor name
+
+In VirtualiZarr V2 you can use the shorthand `.vz` accessor for Xarray operations. For example:
+
+```python
+vds.vz.to_icechunk(icechunk_store)
+```

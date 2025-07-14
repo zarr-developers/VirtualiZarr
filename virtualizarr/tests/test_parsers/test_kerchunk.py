@@ -229,9 +229,7 @@ def test_handle_relative_paths(refs_file_factory):
 def test_open_virtual_dataset_existing_kerchunk_refs(
     tmp_path, netcdf4_virtual_dataset, reference_format
 ):
-    example_reference_dict = netcdf4_virtual_dataset.virtualize.to_kerchunk(
-        format="dict"
-    )
+    example_reference_dict = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
 
     if reference_format == "invalid":
         # Test invalid file format leads to ValueError
@@ -265,7 +263,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             parser = KerchunkParquetParser()
 
         store = obstore_local(file_url=ref_filepath.as_posix())
-        expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+        expected_refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
         with open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
             object_store=store,
@@ -273,11 +271,9 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             loadable_variables=[],
         ) as vds:
             # Inconsistent results! https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
-            # assert vds.virtualize.to_kerchunk(format='dict') == example_reference_dict
-            refs = vds.virtualize.to_kerchunk(format="dict")
-            expected_refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(
-                format="dict"
-            )
+            # assert vds.vz.to_kerchunk(format='dict') == example_reference_dict
+            refs = vds.vz.to_kerchunk(format="dict")
+            expected_refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
             assert refs["refs"]["air/0.0.0"] == expected_refs["refs"]["air/0.0.0"]
             assert refs["refs"]["lon/0"] == expected_refs["refs"]["lon/0"]
             assert refs["refs"]["lat/0"] == expected_refs["refs"]["lat/0"]
@@ -329,7 +325,7 @@ def test_skip_variables(refs_file_factory, skip_variables):
 
 @requires_kerchunk
 def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
-    refs = netcdf4_virtual_dataset.virtualize.to_kerchunk(format="dict")
+    refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
     ref_filepath = tmp_path / "ref.json"
     with open(ref_filepath.as_posix(), "w") as json_file:
         ujson.dump(refs, json_file)
