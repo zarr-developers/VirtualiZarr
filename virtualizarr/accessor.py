@@ -60,9 +60,7 @@ def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, No
         queue.extend(node.children.values())
 
 
-@xr.register_dataset_accessor("vz")
-@xr.register_dataset_accessor("virtualize")
-class VirtualiZarrDatasetAccessor:
+class _VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
 
@@ -275,9 +273,22 @@ class VirtualiZarrDatasetAccessor:
         )
 
 
-@xr.register_datatree_accessor("virtualize")
-@xr.register_datatree_accessor("vz")
-class VirtualiZarrDataTreeAccessor:
+@xr.register_dataset_accessor("vz")
+class VirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
+    pass
+
+
+@xr.register_dataset_accessor("virtualize")
+class DeprecatedVirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
+    def __init__(self, ds: xr.Dataset):
+        super().__init__(ds)
+        warnings.warn(
+            "VirtualiZarr's accessor has been renamed from `virtualize` to `vz`. Please use `.vz`",
+            DeprecationWarning,
+        )
+
+
+class _VirtualiZarrDataTreeAccessor:
     """
     Xarray accessor for writing out virtual datatrees to disk.
 
@@ -347,4 +358,19 @@ class VirtualiZarrDataTreeAccessor:
             store,
             write_inherited_coords=write_inherited_coords,
             last_updated_at=last_updated_at,
+        )
+
+
+@xr.register_datatree_accessor("vz")
+class VirtualiZarrDataTreeAccessor(_VirtualiZarrDataTreeAccessor):
+    pass
+
+
+@xr.register_datatree_accessor("virtualize")
+class DeprecatedVirtualiZarrDataTreeAccessor(_VirtualiZarrDataTreeAccessor):
+    def __init__(self, dt: xr.DataTree):
+        super().__init__(dt)
+        warnings.warn(
+            "VirtualiZarr's accessor has been renamed from `virtualize` to `vz`. Please use `.vz`",
+            DeprecationWarning,
         )

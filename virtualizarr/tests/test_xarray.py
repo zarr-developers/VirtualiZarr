@@ -349,11 +349,12 @@ class TestRenamePaths:
             object_store=store,
             parser=parser,
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
-            assert (
-                renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
-                == "s3://bucket/air.nc"
-            )
+            with pytest.warns(DeprecationWarning):
+                renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+                assert (
+                    renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                    == "s3://bucket/air.nc"
+                )
 
     def test_rename_to_str(self, netcdf4_file):
         store = obstore_local(netcdf4_file)
