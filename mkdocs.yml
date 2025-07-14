@@ -118,6 +118,7 @@ plugins:
             - https://docs.h5py.org/en/stable/objects.inv
             - https://icechunk.io/en/stable/objects.inv
             - https://lithops-cloud.github.io/docs/objects.inv
+            - https://docs.dask.org/en/stable/objects.inv
 # https://github.com/developmentseed/titiler/blob/50934c929cca2fa8d3c408d239015f8da429c6a8/docs/mkdocs.yml#L115-L140
 markdown_extensions:
   - admonition
