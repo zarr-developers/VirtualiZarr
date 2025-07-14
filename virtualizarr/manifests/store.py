@@ -18,7 +18,6 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import construct_chunk_pattern
-from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -56,36 +55,6 @@ def get_store_prefix(url: str) -> str:
     """
     scheme, netloc, *_ = urlparse(url)
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
-
-
-def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
-    """
-    Generate the expected Zarr V3 metadata from a virtual dataset.
-
-    Group metadata is returned for all Datasets and Array metadata
-    is returned for all DataArrays.
-
-    Combines the ManifestArray metadata with the attrs from the DataArray
-    and adds `dimension_names` for all arrays if not already provided.
-
-    Parameters
-    ----------
-    manifest_group : ManifestGroup
-    key : str
-
-    Returns
-    -------
-    Buffer
-    """
-    # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
-
-    if key == "zarr.json":
-        metadata = manifest_group.metadata.to_dict()
-        return dict_to_buffer(metadata, prototype=default_buffer_prototype())
-    else:
-        var, _ = key.split("/")
-        metadata = manifest_group.arrays[var].metadata.to_dict()
-        return dict_to_buffer(metadata, prototype=default_buffer_prototype())
 
 
 def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
@@ -254,8 +223,19 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        if key.endswith("zarr.json"):
-            return get_zarr_metadata(self._group, key)
+
+        if key == "zarr.json":
+            # Return group metadata
+            return self._group.metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
+        elif key.endswith("zarr.json"):
+            # Return array metadata
+            # TODO: Handle nested groups
+            var, _ = key.split("/")
+            return self._group.arrays[var].metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
         var = key.split("/")[0]
         marr = self._group.arrays[var]
         manifest = marr.manifest
@@ -269,22 +249,26 @@ class ManifestStore(Store):
             return None
         offset = manifest._offsets[chunk_indexes]
         length = manifest._lengths[chunk_indexes]
+
         # Get the configured object store instance that matches the path
         store = self._store_registry.get_store(path)
         if not store:
             raise ValueError(
                 f"Could not find a store to use for {path} in the store registry"
             )
+
         # Truncate path to match Obstore expectations
         key = urlparse(path).path
         if hasattr(store, "prefix") and store.prefix:
             # strip the prefix from key
             key = key.removeprefix(str(store.prefix))
+
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
             byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
         )
+
         # Actually get the bytes
         try:
             bytes = await store.get_range_async(
