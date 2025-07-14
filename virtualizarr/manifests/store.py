@@ -115,9 +115,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     if not key or key == "/" or key.endswith("zarr.json") or key.endswith("/c"):
         return ()
 
-    # Remove leading slash if present
-    if key.startswith("/"):
-        key = key[1:]
+    key = key.removeprefix("/")
 
     # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
     match = re.search(
