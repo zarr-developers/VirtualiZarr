@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.3.0",
+    "xarray>=2025.3.0,!=2025.7.0,!=2025.7.1",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
@@ -75,7 +75,7 @@ all_parsers = [
 
 # writers
 icechunk = [
-    "icechunk>=0.2.4",
+    "icechunk>=1.0.0",
 ]
 kerchunk = ["fastparquet"]
 
