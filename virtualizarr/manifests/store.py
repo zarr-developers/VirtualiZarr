@@ -117,8 +117,6 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     if key.endswith("/c"):
         return ()
 
-    key = key.removeprefix("/")
-
     pattern = construct_chunk_pattern(chunk_key_encoding)
     # Expand pattern to include `/c` to protect against group structures that look like chunk structures
     pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
