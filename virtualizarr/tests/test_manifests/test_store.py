@@ -122,8 +122,28 @@ def _generate_manifest_store(
         fill_value=0,
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    scalar_chunk_manifest = ChunkManifest.from_arrays(
+        paths=np.array(f"{prefix}/{filepath}", dtype=np.dtypes.StringDType),
+        offsets=np.array(0, dtype=np.uint64),
+        lengths=np.array(1, dtype=np.uint64),
+    )
+    scalar_array_metadata = create_v3_array_metadata(
+        shape=(),
+        chunk_shape=(),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
+    scalar_manifest_array = ManifestArray(
+        metadata=scalar_array_metadata, chunkmanifest=scalar_chunk_manifest
+    )
     manifest_group = ManifestGroup(
-        arrays={"foo": manifest_array, "bar": manifest_array},
+        arrays={
+            "foo": manifest_array,
+            "bar": manifest_array,
+            "scalar": scalar_manifest_array,
+        },
         attributes={"Zarr": "Hooray!"},
     )
     registry = ObjectStoreRegistry({prefix: store})
@@ -238,6 +258,11 @@ class TestManifestStore:
             byte_range=SuffixByteRequest(suffix=2),
         )
         assert observed.to_bytes() == b"\x03\x04"
+        observed = await store.get(
+            "scalar/c",
+            prototype=default_buffer_prototype(),
+        )
+        assert observed.to_bytes() == b"\x01"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -283,7 +308,7 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
-        assert observed == ("zarr.json", "foo", "bar")
+        assert observed == ("zarr.json", "foo", "bar", "scalar")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:
