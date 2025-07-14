@@ -111,8 +111,9 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
         Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
 
     """
-    # Handle empty, root path, or scalar array
-    if not key or key == "/" or key.endswith("zarr.json") or key.endswith("/c"):
+    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
+    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
+    if key.endswith("/c"):
         return ()
 
     key = key.removeprefix("/")
@@ -123,7 +124,7 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
     )
     if not match:
         raise ValueError(
-            "Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
         )
     chunk_component = (
         match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")

@@ -38,8 +38,6 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     "val,expected",
     [
-        (("zarr.json", "."), ()),
-        (("foo/bar/zarr.json", "."), ()),
         (("c/1/23/45", "/"), (1, 23, 45)),
         (("foo/bar/c/1/23/45", "/"), (1, 23, 45)),
         (("c/bar/c/1/23/45", "/"), (1, 23, 45)),
@@ -49,7 +47,7 @@ if TYPE_CHECKING:
         (("c/c/c.1.23.45", "."), (1, 23, 45)),
         (("c1.2/bar/c.1.23.45", "."), (1, 23, 45)),
         (("c1.2/abc/c.1.23.45", "."), (1, 23, 45)),
-        (("c1.2/abc/c", "."), (0,)),
+        (("c1.2/abc/c", "."), ()),
         (("c1.2/abc/c.0", "."), (0,)),
         (("c1.2/abc/c/0", "/"), (0,)),
     ],
@@ -57,6 +55,22 @@ if TYPE_CHECKING:
 def test_parse_manifest_index(val, expected):
     key, chunk_key_encoding = val
     assert parse_manifest_index(key, chunk_key_encoding) == expected
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        (("zarr.json", ".")),
+        (("foo/bar/zarr.json", ".")),
+    ],
+)
+def test_parse_manifest_index_raises(val):
+    key, chunk_key_encoding = val
+    with pytest.raises(
+        ValueError,
+        match=rf"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy.",
+    ):
+        parse_manifest_index(key, chunk_key_encoding)
 
 
 def _generate_manifest_store(
