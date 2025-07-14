@@ -5,14 +5,8 @@ from typing import Any, Callable, NewType, Tuple, TypedDict, cast
 
 import numpy as np
 
+from virtualizarr.manifests.utils import construct_chunk_pattern
 from virtualizarr.types import ChunkKey
-
-_INTEGER = (
-    r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
-)
-_SEPARATOR = r"\."
-_CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
-
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -26,6 +20,9 @@ VALID_URI_PREFIXES = {
     "http://",
     "https://",
 }
+
+
+_CHUNK_KEY = rf"^{construct_chunk_pattern('.')}"
 
 
 class ChunkEntry(TypedDict):

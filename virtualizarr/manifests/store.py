@@ -17,6 +17,7 @@ from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.manifests.utils import construct_chunk_pattern
 from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
 
 if TYPE_CHECKING:
@@ -118,10 +119,11 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     key = key.removeprefix("/")
 
+    pattern = construct_chunk_pattern(chunk_key_encoding)
+    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
+    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
     # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
-    match = re.search(
-        rf"(?:^|/)c{chunk_key_encoding}(\d+(?:{chunk_key_encoding}\d+)*)", key
-    )
+    match = re.search(pattern, key)
     if not match:
         raise ValueError(
             f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."

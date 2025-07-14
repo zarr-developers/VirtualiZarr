@@ -205,7 +205,7 @@ class TestManifestStore:
     )
     async def test_get_empty_chunk(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
-        observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
+        observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
         assert observed is None
 
     @pytest.mark.asyncio

@@ -15,6 +15,28 @@ if TYPE_CHECKING:
     from .array import ManifestArray
 
 
+def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]):
+    """
+    Produces a pattern for finding a chunk indices from key within a Zarr store using [re.match][] or [re.search][].
+
+    Parameters
+    ----------
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
+
+    Returns
+    -------
+    Regular expression for a chunk key index
+    """
+
+    integer_pattern = r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
+    separator = (
+        rf"\{chunk_key_encoding}" if chunk_key_encoding == "." else chunk_key_encoding
+    )
+    pattern = rf"{integer_pattern}+({separator}{integer_pattern})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
+    return pattern
+
+
 def create_v3_array_metadata(
     shape: tuple[int, ...],
     data_type: np.dtype,
