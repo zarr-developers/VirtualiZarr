@@ -394,9 +394,7 @@ def test_refuse_combine(array_v3_metadata):
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
-    metadata_copy = metadata_common.to_dict().copy()
-    metadata_copy["data_type"] = np.dtype("int64")
-    metadata_wrong_dtype = ArrayV3Metadata.from_dict(metadata_copy)
+    metadata_wrong_dtype = array_v3_metadata(shape=shape, chunks=chunks, data_type=np.dtype("int64"))
     marr2 = ManifestArray(metadata=metadata_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
