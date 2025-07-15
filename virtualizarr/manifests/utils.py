@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .array import ManifestArray
 
 
-def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]):
+def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]) -> str:
     """
     Produces a pattern for finding a chunk indices from key within a Zarr store using [re.match][] or [re.search][].
 
@@ -26,7 +26,7 @@ def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]):
 
     Returns
     -------
-    Regular expression for a chunk key index
+    String representation of regular expression for a chunk key index
     """
 
     integer_pattern = r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
