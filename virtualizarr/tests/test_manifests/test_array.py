@@ -9,7 +9,7 @@ from conftest import (
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
-class TestManifestArray:
+class TestInit:
     def test_manifest_array(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -48,6 +48,23 @@ class TestManifestArray:
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+
+
+class TestResultType:
+    def test_idempotent(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+
+        assert np.result_type(marr1) == marr1.dtype
+        assert np.result_type(marr1, marr1.dtype) == marr1.dtype
+        assert np.result_type(marr1, marr2) == marr1.dtype
+    
+    def test_raises(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int64"))
+
+        with pytest.raises(ValueError, match="inconsistent"):
+            np.result_type(marr1, marr2)
 
 
 class TestEquals:
