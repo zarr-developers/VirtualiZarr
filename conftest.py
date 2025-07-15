@@ -363,7 +363,11 @@ def manifest_array(array_v3_metadata):
         dimension_names: Iterable[str] | None = None,
     ):
         metadata = array_v3_metadata(
-            shape=shape, chunks=chunks, data_type=data_type, codecs=codecs, dimension_names=dimension_names
+            shape=shape,
+            chunks=chunks,
+            data_type=data_type,
+            codecs=codecs,
+            dimension_names=dimension_names,
         )
         entries = _generate_chunk_entries(shape, chunks, _entry_from_chunk_key)
         chunkmanifest = ChunkManifest(entries=entries)

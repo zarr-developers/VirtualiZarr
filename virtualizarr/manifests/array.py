@@ -84,7 +84,7 @@ class ManifestArray:
         Individual chunk size by number of elements.
         """
         return self._metadata.chunks
-    
+
     @property
     def dtype(self) -> np.dtype:
         """The native dtype of the data (typically a numpy dtype)"""
