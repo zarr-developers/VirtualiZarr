@@ -27,7 +27,7 @@ class TestManifestGroup:
         expected_repr = textwrap.dedent(
             """
             ManifestGroup(
-                arrays={'foo': ManifestArray<shape=(5, 2), dtype=int32, chunks=(5, 2)>},
+                arrays={'foo': ManifestArray<shape=(5, 2), dtype=<i4, chunks=(5, 2)>},
                 groups={},
                 metadata=GroupMetadata(attributes={}, zarr_format=3, consolidated_metadata=None, node_type='group'),
             )
