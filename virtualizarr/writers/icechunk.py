@@ -344,7 +344,7 @@ def write_virtual_variable_to_icechunk(
             name=name,
             shape=metadata.shape,
             chunks=metadata.chunks,
-            dtype=metadata.data_type.to_numpy(),
+            dtype=metadata.data_type,
             filters=filters,
             compressors=compressors,
             dimension_names=var.dims,
