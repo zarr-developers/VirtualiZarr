@@ -58,7 +58,7 @@ class TestResultType:
         assert np.result_type(marr1) == marr1.dtype
         assert np.result_type(marr1, marr1.dtype) == marr1.dtype
         assert np.result_type(marr1, marr2) == marr1.dtype
-    
+
     def test_raises(self, manifest_array):
         marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
         marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int64"))
