@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast, Union
 
 import numpy as np
 
@@ -34,12 +34,17 @@ def implements(numpy_function):
 
 
 @implements(np.result_type)
-def result_type(*arrays_and_dtypes) -> np.dtype:
+def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtype:
     """Called by xarray to ensure all arguments to concat have the same dtype."""
-    first_dtype, *other_dtypes = (np.dtype(obj) for obj in arrays_and_dtypes)
+    from virtualizarr.manifests.array import ManifestArray
+
+    dtypes = (obj.dtype if isinstance(obj, ManifestArray) else np.dtype(obj) for obj in arrays_and_dtypes)
+    first_dtype, *other_dtypes = dtypes
+    unique_dtypes = set(dtypes)
     for other_dtype in other_dtypes:
         if other_dtype != first_dtype:
-            raise ValueError("dtypes not all consistent")
+            raise ValueError(f"Cannot combine arrays with inconsistent dtypes, but got {len(unique_dtypes)} distinct dtypes: {unique_dtypes}")
+
     return first_dtype
 
 
