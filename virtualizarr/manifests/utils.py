@@ -8,6 +8,7 @@ from zarr.core.metadata.v3 import (
     parse_dimension_names,
     parse_shapelike,
 )
+from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
@@ -75,15 +76,16 @@ def create_v3_array_metadata(
     ArrayV3Metadata
         A configured ArrayV3Metadata instance with standard defaults
     """
+    zdtype = parse_data_type(data_type, zarr_format=3)
     return ArrayV3Metadata(
         shape=shape,
-        data_type=data_type.name if hasattr(data_type, "name") else data_type,
+        data_type=zdtype,
         chunk_grid={
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
         },
         chunk_key_encoding=chunk_key_encoding,
-        fill_value=fill_value,
+        fill_value=zdtype.default_scalar() if fill_value is None else fill_value,
         codecs=convert_to_codec_pipeline(
             codecs=codecs or [],
             dtype=data_type,
