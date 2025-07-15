@@ -491,6 +491,9 @@ def test_open_scalar_variable(tmp_path: Path):
         parser=parser,
     ) as vds:
         assert vds["a"].shape == ()
+    ms = parser(file_url=nc_path, object_store=store)
+    roundtripped = xr.open_zarr(ms, consolidated=False, zarr_format=3)
+    xr.testing.assert_allclose(ds, roundtripped.load())
 
 
 class TestPathsToURIs:

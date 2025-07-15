@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncGenerator, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -16,6 +17,7 @@ from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
+from virtualizarr.manifests.utils import construct_chunk_pattern
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -55,12 +57,13 @@ def get_store_prefix(url: str) -> str:
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
-def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
+def parse_manifest_index(
+    key: str, chunk_key_encoding: Literal[".", "/"] = "."
+) -> tuple[int, ...]:
     """
-    Splits `key` provided to a zarr store into the variable indicated
-    by the first part and the chunk index from the 3rd through last parts,
-    which can be used to index into the ndarrays containing paths, offsets,
-    and lengths in ManifestArrays.
+    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
+    data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
+    containing paths, offsets, and lengths in ManifestArrays.
 
     Parameters
     ----------
@@ -75,19 +78,29 @@ def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, 
 
     Raises
     ------
-    NotImplementedError
-        Raised if the key ends with "c", indicating a scalar array, which is not yet supported.
+    ValueError
+        Raised if the key does not match the expected node structure for a chunk according the
+        [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
 
     """
-    if key.endswith("c"):
-        # Scalar arrays hold the data in the "c" key
-        raise NotImplementedError(
-            "Scalar arrays are not yet supported by ManifestStore"
+    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
+    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
+    if key.endswith("/c"):
+        return ()
+
+    pattern = construct_chunk_pattern(chunk_key_encoding)
+    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
+    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
+    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
+    match = re.search(pattern, key)
+    if not match:
+        raise ValueError(
+            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
         )
-    parts = key.split(
-        "c/"
-    )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
-    return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
+    chunk_component = (
+        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    )
+    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 class ObjectStoreRegistry:

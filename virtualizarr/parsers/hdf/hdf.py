@@ -175,6 +175,12 @@ def _dataset_chunk_manifest(
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+        elif dataset.shape == ():
+            chunk_manifest = ChunkManifest.from_arrays(
+                paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
+                offsets=np.array(dsid.get_offset(), dtype=np.uint64),
+                lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
+            )
         else:
             key_list = [0] * (len(dataset.shape) or 1)
             key = ".".join(map(str, key_list))

@@ -782,6 +782,13 @@ class TestLoadVirtualDataset:
         ) as vds:
             assert vds.scalar.dims == ()
             assert vds.scalar.attrs == {"scalar": "true"}
+            assert isinstance(vds.scalar.data, ManifestArray)
+        ms = parser(object_store=object_store, file_url=hdf5_scalar)
+        with (
+            xr.open_dataset(hdf5_scalar, engine="h5netcdf") as expected,
+            xr.open_zarr(ms, consolidated=False, zarr_format=3) as observed,
+        ):
+            xr.testing.assert_allclose(expected, observed)
 
 
 preprocess_func = functools.partial(
