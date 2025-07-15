@@ -150,7 +150,7 @@ def convert_v3_to_v2_metadata(
 
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type.to_numpy(),
+        dtype=v3_metadata.data_type,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
         compressor=compressor_config,
