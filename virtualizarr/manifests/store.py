@@ -32,11 +32,7 @@ if TYPE_CHECKING:
 __all__ = ["ManifestStore"]
 
 
-_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
-    FileNotFoundError,
-    IsADirectoryError,
-    NotADirectoryError,
-)
+_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = ()
 
 
 @dataclass
@@ -259,11 +255,10 @@ class ManifestStore(Store):
                 f"Could not find a store to use for {path} in the store registry"
             )
 
-        # Truncate path to match Obstore expectations
-        key = urlparse(path).path
+        path_in_store = urlparse(path).path
         if hasattr(store, "prefix") and store.prefix:
-            # strip the prefix from key
-            key = key.removeprefix(str(store.prefix))
+            prefix = str(store.prefix).lstrip("/")
+            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
 
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
@@ -274,7 +269,7 @@ class ManifestStore(Store):
         # Actually get the bytes
         try:
             bytes = await store.get_range_async(
-                key,
+                path_in_store,
                 start=byte_range.start,
                 end=byte_range.end,
             )
