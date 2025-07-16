@@ -138,9 +138,9 @@ class TestBroadcast:
         assert expanded.shape == (3, 2)
         assert expanded.chunks == (1, 2)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
+            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
         }
 
     def test_broadcast_new_axis(self, manifest_array):
@@ -149,9 +149,9 @@ class TestBroadcast:
         assert expanded.shape == (1, 3)
         assert expanded.chunks == (1, 1)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
-            "0.1": {"path": "file:///foo.1.nc", "offset": 10, "length": 6},
-            "0.2": {"path": "file:///foo.2.nc", "offset": 20, "length": 7},
+            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
+            "0.1": {"path": "file:///foo.1.nc", "offset": 0, "length": 4},
+            "0.2": {"path": "file:///foo.2.nc", "offset": 0, "length": 4},
         }
 
     def test_broadcast_scalar(self, manifest_array):
@@ -160,14 +160,14 @@ class TestBroadcast:
         assert marr.shape == ()
         assert marr.chunks == ()
         assert marr.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
         assert expanded.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
     @pytest.mark.parametrize(
