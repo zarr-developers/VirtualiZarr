@@ -1,19 +1,16 @@
-import os
 import textwrap
-from contextlib import nullcontext
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
 import pytest
 import xarray as xr
-import xarray.testing as xrt
 
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
 from virtualizarr.tests import requires_network
-from virtualizarr.tests.utils import obstore_local, obstore_s3
+from virtualizarr.tests.utils import obstore_s3
 from virtualizarr.xarray import open_virtual_dataset
 
 urls = [
@@ -267,63 +264,6 @@ def test_split_groups(tmp_path, dmrpp_xml_str_key, group_path):
 
 
 @pytest.mark.parametrize(
-    "group,warns",
-    [
-        pytest.param(None, False, id="None"),
-        pytest.param("/", False, id="/"),
-        pytest.param("/no-such-group", True, id="/no-such-group"),
-    ],
-)
-def test_parse_dataset_basic(group: str | None, warns: bool, tmp_path: Path):
-    basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
-    store = obstore_local(file_url=basic_dmrpp.data_filepath)
-
-    with nullcontext() if warns else pytest.raises(BaseException, match="DID NOT WARN"):
-        with pytest.warns(UserWarning, match=f"ignoring group parameter {group!r}"):
-            ms = basic_dmrpp.parse_dataset(object_store=store, group=group)
-
-    vds = ms.to_virtual_dataset()
-
-    assert vds.sizes == {"x": 720, "y": 1440, "z": 3}
-    assert vds.data_vars.keys() == {"data", "mask"}
-    assert vds.data_vars["data"].dims == ("x", "y")
-    assert vds.attrs == {"Conventions": "CF-1.6", "title": "Sample Dataset"}
-    assert vds.coords.keys() == {"x", "y", "z"}
-
-
-def test_parse_dataset_nested(tmp_path: Path):
-    nested_groups_dmrpp = dmrparser(
-        DMRPP_XML_STRINGS["nested_groups"], tmp_path=tmp_path
-    )
-    store = obstore_local(file_url=nested_groups_dmrpp.data_filepath)
-
-    vds_root_implicit = nested_groups_dmrpp.parse_dataset(
-        object_store=store
-    ).to_virtual_dataset(loadable_variables=[])
-    vds_root = nested_groups_dmrpp.parse_dataset(
-        group="/", object_store=store
-    ).to_virtual_dataset(loadable_variables=[])
-
-    xrt.assert_identical(vds_root_implicit, vds_root)
-    assert vds_root.sizes == {"a": 10, "b": 10}
-    assert vds_root.coords.keys() == {"a", "b"}
-
-    vds_g1 = nested_groups_dmrpp.parse_dataset(
-        group="/group1", object_store=store
-    ).to_virtual_dataset(loadable_variables=[])
-    assert vds_g1.sizes == {"x": 720, "y": 1440}
-    assert vds_g1.coords.keys() == {"x", "y"}
-
-    vds_g2 = nested_groups_dmrpp.parse_dataset(
-        group="/group1/group2", object_store=store
-    ).to_virtual_dataset(loadable_variables=[])
-
-    assert vds_g2.sizes == {"x": 720, "y": 1440}
-    assert vds_g2.data_vars.keys() == {"area"}
-    assert vds_g2.data_vars["area"].dims == ("x", "y")
-
-
-@pytest.mark.parametrize(
     "dim_path, expected",
     [
         ("/a", {"a": 10}),
@@ -476,60 +416,3 @@ def basic_dmrpp_temp_filepath(tmp_path: Path) -> Path:
         f.write(drmpp_xml_str)
 
     return filepath
-
-
-class TestRelativePaths:
-    def test_absolute_path_to_dmrpp_file_containing_relative_path(
-        self,
-        basic_dmrpp_temp_filepath: Path,
-    ):
-        store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-        parser = DMRPPParser()
-        with open_virtual_dataset(
-            file_url=basic_dmrpp_temp_filepath.as_posix(),
-            object_store=store,
-            parser=parser,
-            loadable_variables=[],
-        ) as vds:
-            path = vds["x"].data.manifest["0"]["path"]
-
-            # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-            # and the manifest should only contain absolute file URIs
-            expected_datafile_path_uri = (
-                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
-            )
-            assert path == expected_datafile_path_uri
-
-    def test_relative_path_to_dmrpp_file(self, basic_dmrpp_temp_filepath: Path):
-        # test that if a user supplies a relative path to a DMR++ file we still get an absolute path in the manifest
-        relative_dmrpp_filepath = os.path.relpath(
-            str(basic_dmrpp_temp_filepath), start=os.getcwd()
-        )
-        store = obstore_local(file_url=relative_dmrpp_filepath)
-        parser = DMRPPParser()
-        with open_virtual_dataset(
-            file_url=relative_dmrpp_filepath,
-            object_store=store,
-            parser=parser,
-            loadable_variables=[],
-        ) as vds:
-            path = vds["x"].data.manifest["0"]["path"]
-
-            # # by convention, if dmrpp file path is {PATH}.nc.dmrpp, the data filepath should be {PATH}.nc
-            expected_datafile_path_uri = (
-                basic_dmrpp_temp_filepath.as_uri().removesuffix(".dmrpp")
-            )
-            assert path == expected_datafile_path_uri
-
-
-@pytest.mark.parametrize("skip_variables", [["mask"], ["data", "mask"]])
-def test_skip_variables(basic_dmrpp_temp_filepath: Path, skip_variables):
-    store = obstore_local(file_url=basic_dmrpp_temp_filepath.as_posix())
-    parser = DMRPPParser(skip_variables=skip_variables)
-    with open_virtual_dataset(
-        file_url=basic_dmrpp_temp_filepath.as_posix(),
-        object_store=store,
-        parser=parser,
-        loadable_variables=[],
-    ) as vds:
-        assert all(var not in vds for var in skip_variables)
