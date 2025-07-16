@@ -98,24 +98,19 @@ class ObjectStoreRegistry:
         # Mapping from UrlKey (containing scheme and netlocs) to PathEntry
         self.map: Dict[UrlKey, PathEntry] = {}
 
-    def register(self, url: Url, store: ObjectStore) -> Optional[ObjectStore]:
+    def register(self, url: Url, store: ObjectStore) -> None:
         """
-        Register a new store for the provided store URL
+        Register a new store for the provided store URL.
 
-        If a store with the same URL existed before, it is replaced and returned
+        If a store with the same URL existed before, it is replaced.
 
         Parameters
         ----------
         url
-            Url to registry the [ObjectStore][obstore.store.ObjectStore] under
+            Url to registry the [ObjectStore][obstore.store.ObjectStore] under.
         store
             [ObjectStore][obstore.store.ObjectStore] instance to register using the
             provided url.
-
-        Returns
-        -------
-        Optional[ObjectStore]
-            The [ObjectStore][obstore.store.ObjectStore] that has been replaced, if applicable.
 
         Examples
         --------
@@ -129,9 +124,7 @@ class ObjectStoreRegistry:
         reg.register("s3://my-bucket-1", orig_store)
 
         new_store = S3Store(bucket="my-bucket-1", prefix="updated-path")
-        store = reg.register("s3://my-bucket-1", new_store)
-        assert orig_store == store
-        print(store)
+        reg.register("s3://my-bucket-1", new_store)
         ```
         """
         parsed = urlparse(url)
@@ -148,11 +141,8 @@ class ObjectStoreRegistry:
             if segment not in entry.children:
                 entry.children[segment] = PathEntry()
             entry = entry.children[segment]
-
-        # Replace the store and return the old one
-        old_store = entry.store
+        # Update the store
         entry.store = store
-        return old_store
 
     def resolve(self, url: Url) -> Tuple[ObjectStore, Path]:
         """
