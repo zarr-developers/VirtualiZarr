@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
@@ -45,7 +45,7 @@ class FITSParser:
         file_url
             The URI or path to the input file (e.g., "s3://bucket/file.fits").
         registry
-            An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

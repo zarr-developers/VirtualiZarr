@@ -3,9 +3,10 @@ import pytest
 from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ManifestArray, ObjectStoreRegistry
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import get_chunk_mapping_prefix
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 @pytest.mark.parametrize(

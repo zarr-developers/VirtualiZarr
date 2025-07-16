@@ -42,7 +42,7 @@ virtual_datasets = [
 virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
 
 # cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
-virtual_ds.virtualize.to_kerchunk('combined.json', format='json')
+virtual_ds.vz.to_kerchunk('combined.json', format='json')
 ```
 
 Now you can open your shiny new Zarr store instantly:
@@ -57,6 +57,7 @@ See the [Usage docs page](usage.md) for more details.
 
 ## Talks and Presentations
 
+- 2025/04/30 - Cloud-Native Geospatial Forum - Tom Nicholas - [Slides](https://speakerdeck.com/tomnicholas/virtualizarr-and-icechunk-build-a-cloud-optimized-datacube-in-3-lines) / [Recording](https://youtu.be/QBkZQ53vE6o)
 - 2024/11/21 - MET Office Architecture Guild - Tom Nicholas - [Slides](https://speakerdeck.com/tomnicholas/virtualizarr-talk-at-met-office)
 - 2024/11/13 - Cloud-Native Geospatial conference - Raphael Hagen - [Slides](https://decks.carbonplan.org/cloud-native-geo/11-13-24)
 - 2024/07/24 - ESIP Meeting - Sean Harkins - [Event](https://2024julyesipmeeting.sched.com/event/1eVP6) / [Recording](https://youtu.be/T6QAwJIwI3Q?t=3689)

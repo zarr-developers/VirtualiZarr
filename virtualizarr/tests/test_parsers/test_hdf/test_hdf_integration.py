@@ -35,7 +35,7 @@ class TestIntegration:
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
-            vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+            vds.vz.to_kerchunk(kerchunk_file, format="json")
             with xr.open_dataset(
                 kerchunk_file, engine="kerchunk", decode_times=True
             ) as roundtrip:
@@ -55,7 +55,7 @@ class TestIntegration:
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
-            vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+            vds.vz.to_kerchunk(kerchunk_file, format="json")
             with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
                 xrt.assert_equal(ds, roundtrip)
 
@@ -73,7 +73,7 @@ class TestIntegration:
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "filter_cf_kerchunk.json")
-            vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+            vds.vz.to_kerchunk(kerchunk_file, format="json")
             with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
                 xrt.assert_allclose(ds, roundtrip)
                 assert (
@@ -92,7 +92,7 @@ class TestIntegration:
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
-            vds.virtualize.to_kerchunk(kerchunk_file, format="json")
+            vds.vz.to_kerchunk(kerchunk_file, format="json")
             with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
                 xrt.assert_equal(ds, roundtrip)
 

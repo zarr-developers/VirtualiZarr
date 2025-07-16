@@ -32,13 +32,6 @@ class TestPathValidation:
         assert chunkentry["path"] == url
 
     @pytest.mark.parametrize(
-        "path", ["/directory/file", "s3://bucket/file", "https://site.com/file"]
-    )
-    def test_disallow_paths_without_file_suffixes(self, path):
-        with pytest.raises(ValueError, match="this path has no file suffix"):
-            ChunkEntry.with_validation(path=path, offset=100, length=100)
-
-    @pytest.mark.parametrize(
         "path",
         [
             pytest.param(
@@ -47,12 +40,19 @@ class TestPathValidation:
                     reason="cloudpathlib should ideally do stricter validation - see https://github.com/drivendataorg/cloudpathlib/issues/489"
                 ),
             ),
-            "https://site.com/###/foo.nc",
         ],
     )
     def test_catch_malformed_path(self, path):
         with pytest.raises(ValueError):
             ChunkEntry.with_validation(path=path, offset=100, length=100)
+
+    def test_allow_path_containing_colon(self):
+        # regression test for issue #593
+        ChunkEntry.with_validation(
+            path="file:///folder/wrfout_d01_2024-01-02_01:00:00.nc",
+            offset=100,
+            length=100,
+        )
 
 
 class TestConvertingRelativePathsUsingFSRoot:

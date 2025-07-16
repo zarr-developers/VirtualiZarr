@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.registry import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 @runtime_checkable
@@ -24,7 +24,7 @@ class Parser(Protocol):
     file_url
         The URL of the input file (e.g., "s3://bucket/file.nc").
     registry
-        An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
     Returns
     -------

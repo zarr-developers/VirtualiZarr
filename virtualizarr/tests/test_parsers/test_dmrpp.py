@@ -9,10 +9,10 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 
-from virtualizarr.manifests import ObjectStoreRegistry
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_network
 from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset

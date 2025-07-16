@@ -17,10 +17,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
@@ -175,6 +175,12 @@ def _dataset_chunk_manifest(
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+        elif dataset.shape == ():
+            chunk_manifest = ChunkManifest.from_arrays(
+                paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
+                offsets=np.array(dsid.get_offset(), dtype=np.uint64),
+                lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
+            )
         else:
             key_list = [0] * (len(dataset.shape) or 1)
             key = ".".join(map(str, key_list))

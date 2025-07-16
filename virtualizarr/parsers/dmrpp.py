@@ -13,9 +13,9 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.registry import ObjectStoreRegistry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader
 
@@ -54,7 +54,7 @@ class DMRPPParser:
         file_url
             The URI or path to the input file (e.g., "s3://bucket/file.dmrpp").
         registry
-            An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

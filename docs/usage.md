@@ -82,7 +82,7 @@ ds.nbytes
 ```
 
 ```python
-vds.virtualize.nbytes
+vds.vz.nbytes
 ```
 
 ```
@@ -340,7 +340,7 @@ The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specific
 To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the [virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk][] accessor method.
 
 ```python
-combined_vds.virtualize.to_kerchunk('combined.json', format='json')
+combined_vds.vz.to_kerchunk('combined.json', format='json')
 ```
 
 These zarr-like references can now be interpreted by [fsspec](https://github.com/fsspec/filesystem_spec), using kerchunk's built-in xarray backend (kerchunk must be installed to use `engine='kerchunk'`).
@@ -359,7 +359,7 @@ When you have many chunks, the reference file can get large enough to be unwield
 In that case the references can be instead stored as parquet, which again this uses kerchunk internally.
 
 ```python
-combined_vds.virtualize.to_kerchunk('combined.parquet', format='parquet')
+combined_vds.vz.to_kerchunk('combined.parquet', format='parquet')
 ```
 
 And again we can read these references using the "kerchunk" backend
@@ -387,7 +387,7 @@ repo = icechunk.Repository.create(storage)
 session = repo.writable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
-vds1.virtualize.to_icechunk(session.store)
+vds1.vz.to_icechunk(session.store)
 session.commit("Wrote first dataset")
 ```
 
@@ -403,7 +403,7 @@ This is especially useful for datasets that grow over time.
 session = repo.writeable_session("main")
 
 # write the virtual dataset to the session with the IcechunkStore
-vds2.virtualize.to_icechunk(session.store, append_dim="time")
+vds2.vz.to_icechunk(session.store, append_dim="time")
 session.commit("Appended second dataset")
 ```
 
@@ -462,7 +462,7 @@ def local_to_s3_url(old_local_path: str) -> str:
     filename = Path(old_local_path).name
     return str(new_s3_bucket_url / filename)
 
-renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+renamed_vds = vds.vz.rename_paths(local_to_s3_url)
 renamed_vds['air'].data.manifest.dict()
 ```
 

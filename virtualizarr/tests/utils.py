@@ -6,8 +6,8 @@ from urllib.parse import urlparse
 
 from obstore.store import LocalStore, ObjectStore, from_url
 
-from virtualizarr.manifests import ObjectStoreRegistry
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 def obstore_local(file_url: str) -> ObjectStore:

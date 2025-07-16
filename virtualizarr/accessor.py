@@ -1,6 +1,16 @@
+import warnings
+from collections import deque
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, overload
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generator,
+    Iterable,
+    Literal,
+    overload,
+)
 
 import xarray as xr
 
@@ -12,17 +22,55 @@ if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
-@xr.register_dataset_accessor("virtualize")
-class VirtualiZarrDatasetAccessor:
+def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
+    """Decorator for methods which only make sense for fully virtual xarray objects."""
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            all_vars: Iterable[xr.Variable]
+            match cls_name:
+                case "Dataset":
+                    all_vars = self.ds.variables.values()
+                case "DataTree":
+                    all_vars = all_datatree_variables(self.dt)
+
+            if not any(isinstance(var.data, ManifestArray) for var in all_vars):
+                warnings.warn(
+                    f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
+                    "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
+                    f"This may have happened because you used `xarray.open_{cls_name}` instead of `virtualizarr.open_virtual_{cls_name}`, or you set all variables to be `loadable_variables`."
+                    "Please read the usage docs.",
+                    UserWarning,
+                )
+
+            return func(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def all_datatree_variables(root: xr.DataTree) -> Generator[xr.Variable, None, None]:
+    """Flat iterable over all variables in a DataTree"""
+    queue = deque([root])
+    while queue:
+        node = queue.popleft()
+        yield from node.variables.values()
+        queue.extend(node.children.values())
+
+
+class _VirtualiZarrDatasetAccessor:
     """
     Xarray accessor for writing out virtual datasets to disk.
 
-    Methods on this object are called via `ds.virtualize.{method}`.
+    Methods on this object are called via `ds.vz.{method}`.
     """
 
     def __init__(self, ds: xr.Dataset):
         self.ds: xr.Dataset = ds
 
+    @warn_if_not_virtual("Dataset")
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -93,6 +141,7 @@ class VirtualiZarrDatasetAccessor:
         categorical_threshold: int = 10,
     ) -> None: ...
 
+    @warn_if_not_virtual("Dataset")
     def to_kerchunk(
         self,
         filepath: str | Path | None = None,
@@ -194,7 +243,7 @@ class VirtualiZarrDatasetAccessor:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> ds.virtualize.rename_paths(local_to_s3_url)
+        >>> ds.vz.rename_paths(local_to_s3_url)
         """
 
         new_ds = self.ds.copy()
@@ -224,17 +273,32 @@ class VirtualiZarrDatasetAccessor:
         )
 
 
-@xr.register_datatree_accessor("virtualize")
-class VirtualiZarrDataTreeAccessor:
+@xr.register_dataset_accessor("vz")
+class VirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
+    pass
+
+
+@xr.register_dataset_accessor("virtualize")
+class DeprecatedVirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
+    def __init__(self, ds: xr.Dataset):
+        super().__init__(ds)
+        warnings.warn(
+            "VirtualiZarr's accessor has been renamed from `virtualize` to `vz`. Please use `.vz`",
+            DeprecationWarning,
+        )
+
+
+class _VirtualiZarrDataTreeAccessor:
     """
     Xarray accessor for writing out virtual datatrees to disk.
 
-    Methods on this object are called via `dt.virtualize.{method}`.
+    Methods on this object are called via `dt.vz.{method}`.
     """
 
     def __init__(self, dt: xr.DataTree):
         self.dt = dt
 
+    @warn_if_not_virtual("DataTree")
     def to_icechunk(
         self,
         store: "IcechunkStore",
@@ -282,7 +346,7 @@ class VirtualiZarrDataTreeAccessor:
         ``last_updated_at``.
 
         >>> from datetime import datetime
-        >>> vdt.virtualize.to_icechunk(  # doctest: +SKIP
+        >>> vdt.vz.to_icechunk(  # doctest: +SKIP
         ...     icechunkstore,
         ...     last_updated_at=datetime.now(),
         ... )
@@ -294,4 +358,19 @@ class VirtualiZarrDataTreeAccessor:
             store,
             write_inherited_coords=write_inherited_coords,
             last_updated_at=last_updated_at,
+        )
+
+
+@xr.register_datatree_accessor("vz")
+class VirtualiZarrDataTreeAccessor(_VirtualiZarrDataTreeAccessor):
+    pass
+
+
+@xr.register_datatree_accessor("virtualize")
+class DeprecatedVirtualiZarrDataTreeAccessor(_VirtualiZarrDataTreeAccessor):
+    def __init__(self, dt: xr.DataTree):
+        super().__init__(dt)
+        warnings.warn(
+            "VirtualiZarr's accessor has been renamed from `virtualize` to `vz`. Please use `.vz`",
+            DeprecationWarning,
         )

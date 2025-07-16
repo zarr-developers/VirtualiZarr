@@ -20,10 +20,11 @@ from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.manifests import ManifestStore, ObjectStoreRegistry
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
+from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -105,7 +106,7 @@ def open_virtual_mfdataset(
     paths
         Same as in xarray.open_mfdataset
     registry
-        An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
         Same as in xarray.open_mfdataset
     compat

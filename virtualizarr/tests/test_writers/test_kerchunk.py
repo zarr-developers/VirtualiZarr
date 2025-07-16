@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pytest
+import xarray as xr
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
@@ -38,7 +40,7 @@ class TestAccessor:
             },
         }
 
-        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
+        result_ds_refs = ds.vz.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_dict_empty(self, array_v3_metadata):
@@ -65,7 +67,7 @@ class TestAccessor:
             },
         }
 
-        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
+        result_ds_refs = ds.vz.to_kerchunk(format="dict")
         assert result_ds_refs == expected_ds_refs
 
     def test_accessor_to_kerchunk_json(self, tmp_path, array_v3_metadata):
@@ -88,7 +90,7 @@ class TestAccessor:
 
         filepath = tmp_path / "refs.json"
 
-        ds.virtualize.to_kerchunk(filepath, format="json")
+        ds.vz.to_kerchunk(filepath, format="json")
 
         with open(filepath) as json_file:
             loaded_refs = ujson.load(json_file)
@@ -128,7 +130,7 @@ class TestAccessor:
 
         filepath = tmp_path / "refs"
 
-        ds.virtualize.to_kerchunk(filepath, format="parquet", record_size=2)
+        ds.vz.to_kerchunk(filepath, format="parquet", record_size=2)
 
         with open(tmp_path / "refs" / ".zmetadata") as f:
             meta = ujson.load(f)
@@ -179,3 +181,9 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
     assert filters_config["dtype"] == "<i8"
     assert filters_config["astype"] == "<i8"
     assert v2_metadata.attributes == {}
+
+
+def test_warn_if_no_virtual_vars():
+    non_virtual_ds = xr.Dataset({"foo": ("x", [10, 20, 30]), "x": ("x", [1, 2, 3])})
+    with pytest.warns(UserWarning, match="non-virtual"):
+        non_virtual_ds.vz.to_kerchunk()

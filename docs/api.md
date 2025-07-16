@@ -24,8 +24,10 @@ Each parser understands how to read a specific file format, and a parser must be
 
 ### Serialization
 
-::: virtualizarr.accessor.VirtualiZarrDatasetAccessor
-::: virtualizarr.accessor.VirtualiZarrDataTreeAccessor
+::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_icechunk
+::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk
+
+::: virtualizarr.accessor.VirtualiZarrDataTreeAccessor.to_icechunk
 
 ### Information
 
@@ -34,6 +36,7 @@ Each parser understands how to read a specific file format, and a parser must be
 ### Rewriting
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths
+
 
 ### Developer API
 
@@ -52,9 +55,9 @@ See the page on data structures for more information.
 
 #### Registry
 
-::: virtualizarr.manifests.registry.Url
-::: virtualizarr.manifests.registry.UrlKey
-::: virtualizarr.manifests.ObjectStoreRegistry
+::: virtualizarr.registry.Url
+::: virtualizarr.registry.UrlKey
+::: virtualizarr.registry.ObjectStoreRegistry
 
 #### Array API
 

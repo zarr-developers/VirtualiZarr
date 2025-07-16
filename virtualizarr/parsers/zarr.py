@@ -19,7 +19,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
-from virtualizarr.manifests.registry import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None
@@ -176,7 +176,7 @@ class ZarrParser:
         file_url
             The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
         registry
-            An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

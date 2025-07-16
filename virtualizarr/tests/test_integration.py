@@ -15,11 +15,11 @@ from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
@@ -27,6 +27,8 @@ from virtualizarr.tests import (
     requires_kerchunk,
     requires_zarr_python,
 )
+
+icechunk = pytest.importorskip("icechunk")
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
@@ -52,7 +54,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     vds = xr.Dataset({"a": (["x", "y"], marr)})
 
     # Use accessor to write it out to kerchunk reference dict
-    ds_refs = vds.virtualize.to_kerchunk(format="dict")
+    ds_refs = vds.vz.to_kerchunk(format="dict")
 
     # reconstruct the dataset
     manifestgroup = manifestgroup_from_kerchunk_refs(ds_refs)
@@ -94,7 +96,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
         parser=parser,
         loadable_variables=vars_to_inline,
     ) as vds:
-        refs = vds.virtualize.to_kerchunk(format="dict")
+        refs = vds.vz.to_kerchunk(format="dict")
 
         # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert refs == expected
@@ -106,7 +108,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
 def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to an in-memory kerchunk-formatted references dictionary
-    ds_refs = vds.virtualize.to_kerchunk(format="dict")
+    ds_refs = vds.vz.to_kerchunk(format="dict")
 
     # use fsspec to read the dataset from the kerchunk references dict
     return xr.open_dataset(ds_refs, engine="kerchunk", **kwargs)
@@ -114,7 +116,7 @@ def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
 
 def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to disk as kerchunk references format
-    vds.virtualize.to_kerchunk(f"{tmpdir}/refs.json", format="json")
+    vds.vz.to_kerchunk(f"{tmpdir}/refs.json", format="json")
 
     # use fsspec to read the dataset from disk via the kerchunk references
     return xr.open_dataset(f"{tmpdir}/refs.json", engine="kerchunk", **kwargs)
@@ -122,7 +124,7 @@ def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
 
 def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to disk as kerchunk references format
-    vds.virtualize.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
+    vds.vz.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
 
     # use fsspec to read the dataset from disk via the kerchunk references
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
@@ -134,15 +136,29 @@ def roundtrip_as_in_memory_icechunk(
     virtualize_kwargs: Mapping[str, Any] | None = None,
     **kwargs,
 ) -> xr.Dataset | xr.DataTree:
-    from icechunk import Repository, Storage
-
     # create an in-memory icechunk store
-    storage = Storage.new_in_memory()
-    repo = Repository.create(storage=storage)
+    storage = icechunk.Storage.new_in_memory()
+
+    config = icechunk.RepositoryConfig.default()
+
+    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
+
+    for url_prefix in url_prefixes:
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(url_prefix),
+        )
+        config.set_virtual_chunk_container(container)
+
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
+    )
     session = repo.writable_session("main")
 
     # write those references to an icechunk store
-    vdata.virtualize.to_icechunk(session.store, **(virtualize_kwargs or {}))
+    vdata.vz.to_icechunk(session.store, **(virtualize_kwargs or {}))
     session.commit("Test")
 
     read_only_session = repo.readonly_session("main")
@@ -472,6 +488,9 @@ def test_open_scalar_variable(tmp_path: Path, local_registry):
         parser=parser,
     ) as vds:
         assert vds["a"].shape == ()
+    ms = parser(file_url=f"file://{nc_path}", registry=local_registry)
+    roundtripped = xr.open_zarr(ms, consolidated=False, zarr_format=3)
+    xr.testing.assert_allclose(ds, roundtripped.load())
 
 
 class TestPathsToURIs:

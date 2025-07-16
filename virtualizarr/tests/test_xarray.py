@@ -12,8 +12,9 @@ from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
-from virtualizarr.manifests import ChunkManifest, ManifestArray, ObjectStoreRegistry
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_dask,
     requires_hdf5plugin,
@@ -337,6 +338,20 @@ class TestCombine:
 
 
 class TestRenamePaths:
+    def test_old_accessor(self, netcdf4_file, local_registry):
+        parser = HDFParser()
+        with open_virtual_dataset(
+            file_url=netcdf4_file,
+            registry=local_registry,
+            parser=parser,
+        ) as vds:
+            with pytest.warns(DeprecationWarning):
+                renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+                assert (
+                    renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
+                    == "s3://bucket/air.nc"
+                )
+
     def test_rename_to_str(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -344,7 +359,7 @@ class TestRenamePaths:
             registry=local_registry,
             parser=parser,
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            renamed_vds = vds.vz.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -364,7 +379,7 @@ class TestRenamePaths:
             registry=local_registry,
             parser=parser,
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths(local_to_s3_url)
+            renamed_vds = vds.vz.rename_paths(local_to_s3_url)
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -376,7 +391,7 @@ class TestRenamePaths:
             file_url=netcdf4_file, registry=local_registry, parser=parser
         ) as vds:
             with pytest.raises(TypeError):
-                vds.virtualize.rename_paths(["file1.nc", "file2.nc"])
+                vds.vz.rename_paths(["file1.nc", "file2.nc"])
 
     @requires_hdf5plugin
     @requires_imagecodecs
@@ -390,7 +405,7 @@ class TestRenamePaths:
             parser=parser,
             loadable_variables=["lat", "lon"],
         ) as vds:
-            renamed_vds = vds.virtualize.rename_paths("s3://bucket/air.nc")
+            renamed_vds = vds.vz.rename_paths("s3://bucket/air.nc")
             assert (
                 renamed_vds["air"].data.manifest.dict()["0.0.0"]["path"]
                 == "s3://bucket/air.nc"
@@ -407,7 +422,7 @@ def test_nbytes(simple_netcdf4, local_registry):
         registry=local_registry,
         parser=parser,
     ) as vds:
-        assert vds.virtualize.nbytes == 32
+        assert vds.vz.nbytes == 32
         assert vds.nbytes == 48
 
     with open_virtual_dataset(
@@ -416,10 +431,10 @@ def test_nbytes(simple_netcdf4, local_registry):
         parser=parser,
         loadable_variables=["foo"],
     ) as vds:
-        assert vds.virtualize.nbytes == 48
+        assert vds.vz.nbytes == 48
 
     with open_dataset(simple_netcdf4) as ds:
-        assert ds.virtualize.nbytes == ds.nbytes
+        assert ds.vz.nbytes == ds.nbytes
 
 
 class TestOpenVirtualDatasetIndexes:
@@ -615,7 +630,7 @@ class TestReadRemote:
             ) as vds,
         ):
             tmpref = "/tmp/cmip6.json"
-            vds.virtualize.to_kerchunk(tmpref, format="json")
+            vds.vz.to_kerchunk(tmpref, format="json")
 
             with xr.open_dataset(tmpref, engine="kerchunk") as dsV:
                 # xrt.assert_identical(dsXR, dsV) #Attribute order changes
@@ -751,10 +766,17 @@ class TestLoadVirtualDataset:
     def test_open_dataset_with_scalar(self, hdf5_scalar, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=hdf5_scalar, registry=local_registry, parser=parser
+            file_url=f"file://{hdf5_scalar}", registry=local_registry, parser=parser
         ) as vds:
             assert vds.scalar.dims == ()
             assert vds.scalar.attrs == {"scalar": "true"}
+            assert isinstance(vds.scalar.data, ManifestArray)
+        ms = parser(registry=local_registry, file_url=f"file://{hdf5_scalar}")
+        with (
+            xr.open_dataset(hdf5_scalar, engine="h5netcdf") as expected,
+            xr.open_zarr(ms, consolidated=False, zarr_format=3) as observed,
+        ):
+            xr.testing.assert_allclose(expected, observed)
 
 
 preprocess_func = functools.partial(
@@ -866,3 +888,12 @@ def test_drop_variables(netcdf4_file, local_registry):
         drop_variables=["air"],
     ) as vds:
         assert "air" not in vds.variables
+
+
+def test_concat_zero_dimensional_var(manifest_array):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
+    marr = manifest_array(shape=(), chunks=())
+    vds1 = xr.Dataset({"a": marr})
+    vds2 = xr.Dataset({"a": marr})
+    result = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
+    assert result["a"].sizes == {"time": 2}

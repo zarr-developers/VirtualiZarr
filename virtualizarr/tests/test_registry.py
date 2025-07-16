@@ -1,7 +1,7 @@
 import pytest
 from obstore.store import MemoryStore
 
-from virtualizarr.manifests import ObjectStoreRegistry
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 def test_registry():
@@ -14,7 +14,17 @@ def test_registry():
     assert ret is memstore
 
 
-def test_registry_raises():
+def test_register_raises():
+    registry = ObjectStoreRegistry()
+    with pytest.raises(
+        ValueError,
+        match="Urls are expected to contain a scheme \(e\.g\., `file://` or `s3://`\), received .* which parsed to ParseResult\(scheme='.*', netloc='.*', path='.*', params='.*', query='.*', fragment='.*'\)",
+    ):
+        url = "bucket1/path/to/object"
+        ret, path = registry.register(url, MemoryStore())
+
+
+def test_resolve_raises():
     registry = ObjectStoreRegistry()
     with pytest.raises(
         ValueError,

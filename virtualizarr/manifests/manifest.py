@@ -2,18 +2,11 @@ import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
 from pathlib import PosixPath
 from typing import Any, Callable, NewType, Tuple, TypedDict, cast
-from urllib.parse import urlparse, urlunparse
 
 import numpy as np
 
+from virtualizarr.manifests.utils import construct_chunk_pattern
 from virtualizarr.types import ChunkKey
-
-_INTEGER = (
-    r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
-)
-_SEPARATOR = r"\."
-_CHUNK_KEY = rf"^{_INTEGER}+({_SEPARATOR}{_INTEGER})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
-
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -24,7 +17,12 @@ VALID_URI_PREFIXES = {
     "cos://",
     "minio://",
     "file:///",
+    "http://",
+    "https://",
 }
+
+
+_CHUNK_KEY = rf"^{construct_chunk_pattern('.')}"
 
 
 class ChunkEntry(TypedDict):
@@ -47,8 +45,8 @@ class ChunkEntry(TypedDict):
         """
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
-
-        path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+        if path != "":
+            path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 
@@ -68,38 +66,12 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     if path == "":
         # (empty paths are allowed through as they represent missing chunks)
         return path
-
-    # TODO ideally we would just use cloudpathlib.AnyPath to handle all types of paths but that would require extra dependencies, see https://github.com/drivendataorg/cloudpathlib/issues/489#issuecomment-2504725280
-
-    if path.startswith("http://") or path.startswith("https://"):
-        # hopefully would raise if given a malformed URL
-        components = urlparse(path)
-
-        if not PosixPath(components.path).suffix:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
-
-        return urlunparse(components)
-
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
-        # Question: This feels fragile, is there a better way to ID a Zarr
-        if not PosixPath(path).suffix and "zarr" not in path:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
-
         return path  # path is already in URI form
-
     else:
         # must be a posix filesystem path (absolute or relative)
         # using PosixPath here ensures a clear error would be thrown on windows (whose paths and platform are not officially supported)
         _path = PosixPath(path)
-
-        if not _path.suffix and "zarr" not in path:
-            raise ValueError(
-                f"entries in the manifest must be paths to files, but this path has no file suffix: {path}"
-            )
 
         # only posix paths can possibly not be absolute
         if not _path.is_absolute():

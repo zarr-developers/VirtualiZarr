@@ -3,8 +3,8 @@ from collections.abc import Iterable
 import ujson
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import remove_prefix
 
 
@@ -48,7 +48,7 @@ class KerchunkJSONParser:
         file_url
             The URI or path to the input file (e.g., "s3://bucket/kerchunk.json").
         registry
-            An [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
