@@ -165,7 +165,9 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         array_v2_metadata = ArrayV2Metadata(
             chunks=np_arr.shape,
             shape=np_arr.shape,
-            dtype=parse_data_type(np_arr.dtype, zarr_format=2),  # needed unless zarr-python fixes https://github.com/zarr-developers/zarr-python/issues/3253
+            dtype=parse_data_type(
+                np_arr.dtype, zarr_format=2
+            ),  # needed unless zarr-python fixes https://github.com/zarr-developers/zarr-python/issues/3253
             order="C",
             fill_value=None,
         )
