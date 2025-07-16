@@ -12,8 +12,7 @@ from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
 from virtualizarr.codecs import extract_codecs, get_codec_config
-from virtualizarr.types.general import JSON
-from virtualizarr.types.kerchunk import KerchunkStoreRefs, KerchunkArrRefs
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 # taken from zarr.core.common
 JSON = str | int | float | Mapping[str, "JSON"] | Sequence["JSON"] | None
