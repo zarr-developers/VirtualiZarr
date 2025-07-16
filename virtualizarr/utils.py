@@ -179,12 +179,14 @@ def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
 
     See https://github.com/zarr-developers/VirtualiZarr/issues/679 for context as to why this is needed.
     """
-    normalized_result: JSON = copy.deepcopy(refs)
 
-    for k, v in refs["refs"].items():
+    normalized_result: dict[str, JSON] = copy.deepcopy(refs)
+    v0_refs: dict[str, JSON] = refs["refs"]
+
+    for k, v in v0_refs.items():
         # check for strings because the value could be for a chunk, in which case it is already a list like ["/test.nc", 6144, 48]
         # this is a rather fragile way to discover if we're looking at a chunk key or not, but it should work...
         if isinstance(v, str):
-            normalized_result["refs"][k] = json.loads(v)
+            normalized_result["refs"][k] = json.loads(v)  # type: ignore[index]
 
     return normalized_result
