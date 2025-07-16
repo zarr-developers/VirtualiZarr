@@ -32,9 +32,6 @@ if TYPE_CHECKING:
 __all__ = ["ManifestStore"]
 
 
-_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = ()
-
-
 @dataclass
 class StoreRequest:
     """Dataclass for matching a key to the store instance"""
@@ -267,15 +264,12 @@ class ManifestStore(Store):
         )
 
         # Actually get the bytes
-        try:
-            bytes = await store.get_range_async(
-                path_in_store,
-                start=byte_range.start,
-                end=byte_range.end,
-            )
-            return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
-        except _ALLOWED_EXCEPTIONS:
-            return None
+        bytes = await store.get_range_async(
+            path_in_store,
+            start=byte_range.start,
+            end=byte_range.end,
+        )
+        return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
 
     async def get_partial_values(
         self,
