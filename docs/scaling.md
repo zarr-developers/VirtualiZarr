@@ -247,7 +247,7 @@ for i, batch in enumerate(file_batches):
 
     combined_batch_vds = vz.open_virtual_mfdataset(batch)
 
-    combined_batch_vds.virtualize.to_icechunk(session.store, append_dim=...)
+    combined_batch_vds.vz.to_icechunk(session.store, append_dim=...)
 
     session.commit(f"wrote virtual references for batch {i}")
 ```

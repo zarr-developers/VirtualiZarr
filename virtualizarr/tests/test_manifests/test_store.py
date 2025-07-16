@@ -21,6 +21,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.store import parse_manifest_index
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
@@ -32,6 +33,45 @@ from virtualizarr.tests import (
 
 if TYPE_CHECKING:
     from obstore.store import ObjectStore
+
+
+@pytest.mark.parametrize(
+    "val,expected",
+    [
+        (("c/1/23/45", "/"), (1, 23, 45)),
+        (("foo/bar/c/1/23/45", "/"), (1, 23, 45)),
+        (("c/bar/c/1/23/45", "/"), (1, 23, 45)),
+        (("c/c/c/1/23/45", "/"), (1, 23, 45)),
+        (("foo/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("/foo/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c/c/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/bar/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/abc/c.1.23.45", "."), (1, 23, 45)),
+        (("c1.2/abc/c", "."), ()),
+        (("c1.2/abc/c.0", "."), (0,)),
+        (("c1.2/abc/c/0", "/"), (0,)),
+    ],
+)
+def test_parse_manifest_index(val, expected):
+    key, chunk_key_encoding = val
+    assert parse_manifest_index(key, chunk_key_encoding) == expected
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        (("zarr.json", ".")),
+        (("foo/bar/zarr.json", ".")),
+    ],
+)
+def test_parse_manifest_index_raises(val):
+    key, chunk_key_encoding = val
+    with pytest.raises(
+        ValueError,
+        match=rf"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy.",
+    ):
+        parse_manifest_index(key, chunk_key_encoding)
 
 
 def _generate_manifest_store(
@@ -82,8 +122,28 @@ def _generate_manifest_store(
         fill_value=0,
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    scalar_chunk_manifest = ChunkManifest.from_arrays(
+        paths=np.array(f"{prefix}/{filepath}", dtype=np.dtypes.StringDType),  # type: ignore
+        offsets=np.array(0, dtype=np.uint64),
+        lengths=np.array(1, dtype=np.uint64),
+    )
+    scalar_array_metadata = create_v3_array_metadata(
+        shape=(),
+        chunk_shape=(),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
+    scalar_manifest_array = ManifestArray(
+        metadata=scalar_array_metadata, chunkmanifest=scalar_chunk_manifest
+    )
     manifest_group = ManifestGroup(
-        arrays={"foo": manifest_array, "bar": manifest_array},
+        arrays={
+            "foo": manifest_array,
+            "bar": manifest_array,
+            "scalar": scalar_manifest_array,
+        },
         attributes={"Zarr": "Hooray!"},
     )
     registry = ObjectStoreRegistry()
@@ -126,6 +186,31 @@ def s3_store(minio_bucket):
     )
 
 
+@pytest.fixture()
+def empty_memory_store():
+    import obstore as obs
+
+    store = obs.store.MemoryStore()
+    chunk_dict = {
+        "0.0": {"path": "", "offset": 0, "length": 4},
+    }
+    manifest = ChunkManifest(entries=chunk_dict)
+    codecs = [{"configuration": {"endian": "little"}, "name": "bytes"}]
+    array_metadata = create_v3_array_metadata(
+        shape=(1, 1),
+        chunk_shape=(1, 1),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
+    manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
+    manifest_group = ManifestGroup(arrays={"foo": manifest_array})
+    registry = ObjectStoreRegistry()
+    registry.register("memory://", store)
+    return ManifestStore(store_registry=registry, group=manifest_group)
+
+
 @requires_obstore
 class TestManifestStore:
     def test_manifest_store_properties(self, local_store):
@@ -138,32 +223,47 @@ class TestManifestStore:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",
+        ["empty_memory_store"],
+    )
+    async def test_get_empty_chunk(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
+        assert observed is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "manifest_store",
         ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
     async def test_get_data(self, manifest_store, request):
         store = request.getfixturevalue(manifest_store)
-        observed = await store.get("foo/c/0.0", prototype=default_buffer_prototype())
+        observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
-        observed = await store.get("foo/c/1.0", prototype=default_buffer_prototype())
+        observed = await store.get("foo/c.1.0", prototype=default_buffer_prototype())
         assert observed.to_bytes() == b"\x09\x10\x11\x12"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=RangeByteRequest(start=1, end=2),
         )
         assert observed.to_bytes() == b"\x02"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=OffsetByteRequest(offset=1),
         )
         assert observed.to_bytes() == b"\x02\x03\x04"
         observed = await store.get(
-            "foo/c/0.0",
+            "foo/c.0.0",
             prototype=default_buffer_prototype(),
             byte_range=SuffixByteRequest(suffix=2),
         )
         assert observed.to_bytes() == b"\x03\x04"
+        observed = await store.get(
+            "scalar/c",
+            prototype=default_buffer_prototype(),
+        )
+        assert observed.to_bytes() == b"\x01"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -192,12 +292,12 @@ class TestManifestStore:
         assert isinstance(new_store, ManifestStore)
         # Check new store works
         observed = await local_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
+            "foo/c.0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
         # Check old store works
         observed = await new_store.get(
-            "foo/c/0.0", prototype=default_buffer_prototype()
+            "foo/c.0.0", prototype=default_buffer_prototype()
         )
         assert observed.to_bytes() == b"\x01\x02\x03\x04"
 
@@ -209,7 +309,7 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
-        assert observed == ("zarr.json", "foo", "bar")
+        assert observed == ("zarr.json", "foo", "bar", "scalar")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:
