@@ -8,7 +8,7 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
-from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json, JSON
+from virtualizarr.utils import JSON, convert_v3_to_v2_metadata, kerchunk_refs_as_json
 
 
 def test_deserialize_to_json():
@@ -28,10 +28,10 @@ def test_deserialize_to_json():
             ".zgroup": {"zarr_format": 2},
             ".zattrs": {},
             "a/.zarray": {
-                "shape": [2,3],
-                "chunks": [2,3],
+                "shape": [2, 3],
+                "chunks": [2, 3],
                 "fill_value": 0,
-                "order": "C" ,
+                "order": "C",
                 "filters": None,
                 "dimension_separator": ".",
                 "compressor": None,
@@ -106,7 +106,9 @@ class TestAccessor:
         }
 
         result_ds_refs = ds.vz.to_kerchunk(format="dict")
-        assert kerchunk_refs_as_json(result_ds_refs) == kerchunk_refs_as_json(expected_ds_refs)
+        assert kerchunk_refs_as_json(result_ds_refs) == kerchunk_refs_as_json(
+            expected_ds_refs
+        )
 
     def test_accessor_to_kerchunk_json(self, tmp_path, array_v3_metadata):
         import ujson
@@ -143,7 +145,9 @@ class TestAccessor:
                 "a/0.0": ["/test.nc", 6144, 48],
             },
         }
-        assert kerchunk_refs_as_json(loaded_refs) == kerchunk_refs_as_json(expected_ds_refs)
+        assert kerchunk_refs_as_json(loaded_refs) == kerchunk_refs_as_json(
+            expected_ds_refs
+        )
 
     @requires_fastparquet
     def test_accessor_to_kerchunk_parquet(self, tmp_path, array_v3_metadata):

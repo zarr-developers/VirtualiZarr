@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import copy
 import importlib
 import io
-import os
 import json
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, Mapping, Sequence
+import os
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
 from urllib.parse import urlparse
-import copy
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
@@ -172,7 +172,7 @@ def convert_v3_to_v2_metadata(
 def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
     """
     Normalizes all Kerchunk references into true JSON all the way down.
-    
+
     See https://github.com/zarr-developers/VirtualiZarr/issues/679 for context as to why this is needed.
     """
     normalized_result: JSON = copy.deepcopy(refs)
@@ -182,5 +182,5 @@ def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
         # this is a rather fragile way to discover if we're looking at a chunk key or not, but it should work...
         if isinstance(v, str):
             normalized_result["refs"][k] = json.loads(v)
-    
+
     return normalized_result
