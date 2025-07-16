@@ -27,7 +27,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.0.8",
+    "zarr>=3.1.0",
     "obstore>=0.5.1",
 ]
 
