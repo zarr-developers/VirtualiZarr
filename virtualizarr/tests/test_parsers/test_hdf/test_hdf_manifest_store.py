@@ -7,12 +7,13 @@ import xarray as xr
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
     requires_obstore,
 )
-from virtualizarr.tests.utils import obstore_local
+from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
 
 @pytest.fixture(name="basic_ds")
@@ -35,12 +36,7 @@ class TestHDFManifestStore:
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         file_url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = obstore_local(file_url=file_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=file_url,
-            object_store=store,
-        )
+        manifest_store = manifest_store_from_hdf_url(file_url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -55,12 +51,7 @@ class TestHDFManifestStore:
             "temperature": {"chunksizes": (90, 90), "original_shape": (100, 100)}
         }
         basic_ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
-        store = obstore_local(file_url=file_url)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=file_url,
-            object_store=store,
-        )
+        manifest_store = manifest_store_from_hdf_url(file_url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -72,12 +63,7 @@ class TestHDFManifestStore:
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
         file_url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        store = obstore_local(file_url=filepath)
-        parser = HDFParser()
-        manifest_store = parser(
-            file_url=file_url,
-            object_store=store,
-        )
+        manifest_store = manifest_store_from_hdf_url(file_url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -102,9 +88,11 @@ class TestHDFManifestStore:
             },
             client_options={"allow_http": True},
         )
+        registry = ObjectStoreRegistry()
+        registry.register(url_without_file, s3store)
         parser = HDFParser()
         manifest_store = parser(
-            file_url=chunked_roundtrip_hdf5_s3_file, object_store=s3store
+            file_url=chunked_roundtrip_hdf5_s3_file, registry=registry
         )
 
         with manifest_store.to_virtual_dataset() as vds:

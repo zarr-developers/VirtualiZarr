@@ -15,7 +15,6 @@ from typing import (
 
 import xarray as xr
 import xarray.indexes
-from obstore.store import ObjectStore
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core.types import NestedSequence
@@ -25,6 +24,7 @@ from virtualizarr.manifests import ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
+from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 def open_virtual_dataset(
     file_url: str,
-    object_store: ObjectStore,
+    registry: ObjectStoreRegistry,
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
@@ -48,7 +48,7 @@ def open_virtual_dataset(
 
     manifest_store = parser(
         file_url=filepath,
-        object_store=object_store,
+        registry=registry,
     )
 
     ds = manifest_store.to_virtual_dataset(
@@ -66,7 +66,7 @@ def open_virtual_mfdataset(
         | Sequence[str | os.PathLike]
         | NestedSequence[str | os.PathLike]
     ),
-    object_store: ObjectStore,
+    registry: ObjectStoreRegistry,
     parser: Parser,
     concat_dim: (
         str
@@ -105,6 +105,8 @@ def open_virtual_mfdataset(
     ----------
     paths
         Same as in xarray.open_mfdataset
+    registry
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
         Same as in xarray.open_mfdataset
     compat
@@ -180,7 +182,7 @@ def open_virtual_mfdataset(
 
         def _open_and_preprocess(path: str) -> xr.Dataset:
             ds = open_virtual_dataset(
-                file_url=path, object_store=object_store, parser=parser, **kwargs
+                file_url=path, registry=registry, parser=parser, **kwargs
             )
             return preprocess(ds)
 
@@ -189,7 +191,7 @@ def open_virtual_mfdataset(
 
         def _open(path: str) -> xr.Dataset:
             return open_virtual_dataset(
-                file_url=path, object_store=object_store, parser=parser, **kwargs
+                file_url=path, registry=registry, parser=parser, **kwargs
             )
 
         open_func = _open

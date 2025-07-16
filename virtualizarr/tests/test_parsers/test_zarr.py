@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
+from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import get_chunk_mapping_prefix
-from virtualizarr.tests.utils import obstore_local
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 @pytest.mark.parametrize(
@@ -23,11 +24,13 @@ from virtualizarr.tests.utils import obstore_local
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check loadable variables
-        store = obstore_local(zarr_store)
+        store = LocalStore(prefix=zarr_store)
+        registry = ObjectStoreRegistry()
+        registry.register(f"file://{zarr_store}", store)
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
-            object_store=store,
+            registry=registry,
             parser=parser,
             loadable_variables=loadable_variables,
         ) as vds:
@@ -35,22 +38,26 @@ class TestOpenVirtualDatasetZarr:
             assert isinstance(vds["air"].data, np.ndarray), type(vds["air"].data)
 
     def test_skip_variables(self, zarr_store, skip_variables=["air"]):
-        store = obstore_local(zarr_store)
+        store = LocalStore(prefix=zarr_store)
+        registry = ObjectStoreRegistry()
+        registry.register(f"file://{zarr_store}", store)
         parser = ZarrParser(skip_variables=skip_variables)
         # check variable is skipped
         with open_virtual_dataset(
             file_url=zarr_store,
-            object_store=store,
+            registry=registry,
             parser=parser,
         ) as vds:
             assert len(vds.data_vars) == 0
 
     def test_manifest_indexing(self, zarr_store):
-        store = obstore_local(zarr_store)
+        store = LocalStore(prefix=zarr_store)
+        registry = ObjectStoreRegistry()
+        registry.register(f"file://{zarr_store}", store)
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
-            object_store=store,
+            registry=registry,
             parser=parser,
         ) as vds:
             assert "0.0.0" in vds["air"].data.manifest.dict().keys()
@@ -59,11 +66,13 @@ class TestOpenVirtualDatasetZarr:
         import zarr
 
         zg = zarr.open_group(zarr_store)
-        store = obstore_local(zarr_store)
+        store = LocalStore(prefix=zarr_store)
+        registry = ObjectStoreRegistry()
+        registry.register(f"file://{zarr_store}", store)
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
-            object_store=store,
+            registry=registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:

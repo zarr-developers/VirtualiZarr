@@ -3,18 +3,18 @@ import xarray.testing as xrt
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import NetCDF3Parser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_kerchunk, requires_network, requires_scipy
-from virtualizarr.tests.utils import obstore_http, obstore_local
+from virtualizarr.tests.utils import obstore_http
 
 
 @requires_scipy
-def test_read_netcdf3(netcdf3_file, array_v3_metadata):
+def test_read_netcdf3(netcdf3_file, array_v3_metadata, local_registry):
     filepath = str(netcdf3_file)
     file_url = f"file://{filepath}"
-    store = obstore_local(file_url=file_url)
     parser = NetCDF3Parser()
     with (
-        parser(file_url=file_url, object_store=store) as manifest_store,
+        parser(file_url=file_url, registry=local_registry) as manifest_store,
         xr.open_dataset(filepath) as expected,
     ):
         observed = xr.open_dataset(
@@ -30,11 +30,13 @@ def test_read_netcdf3(netcdf3_file, array_v3_metadata):
 def test_read_http_netcdf3(array_v3_metadata):
     file_url = "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc"
     store = obstore_http(file_url=file_url)
+    registry = ObjectStoreRegistry()
+    registry.register(file_url, store)
     parser = NetCDF3Parser()
     with open_virtual_dataset(
         file_url=file_url,
         parser=parser,
-        object_store=store,
+        registry=registry,
     ) as vds:
         assert isinstance(vds, xr.Dataset)
 

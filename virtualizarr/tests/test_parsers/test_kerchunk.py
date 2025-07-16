@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import Any, Callable, Generator, Optional
 
@@ -17,7 +16,6 @@ from virtualizarr.manifests import (
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.registry import ObjectStoreRegistry, UrlKey
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
-from virtualizarr.tests.utils import obstore_local
 from virtualizarr.xarray import open_virtual_dataset
 
 
@@ -71,13 +69,12 @@ def refs_file_factory(
     yield _refs_file
 
 
-def test_dataset_from_df_refs(refs_file_factory):
+def test_dataset_from_df_refs(refs_file_factory, local_registry):
     refs_file = refs_file_factory()
     refs_url = f"file://{refs_file}"
-    store = obstore_local(file_url=refs_url)
-    parser = KerchunkJSONParser(fs_root="file://")
+    parser = KerchunkJSONParser()
     with open_virtual_dataset(
-        file_url=refs_url, object_store=store, parser=parser
+        file_url=refs_url, registry=local_registry, parser=parser
     ) as vds:
         assert "a" in vds
         vda = vds["a"]
@@ -99,7 +96,7 @@ def test_dataset_from_df_refs(refs_file_factory):
         }
 
 
-def test_dataset_from_df_refs_with_filters(refs_file_factory):
+def test_dataset_from_df_refs_with_filters(refs_file_factory, local_registry):
     compressor = [{"elementsize": 4, "id": "shuffle"}, {"id": "zlib", "level": 4}]
     zarray = {
         "chunks": [2, 3],
@@ -112,10 +109,9 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
         "zarr_format": 2,
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray))
-    store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser(fs_root="file://")
     with open_virtual_dataset(
-        file_url=refs_file, object_store=store, parser=parser
+        file_url=refs_file, registry=local_registry, parser=parser
     ) as vds:
         vda = vds["a"]
         assert vda.data.metadata.codecs[1].to_dict() == {
@@ -124,7 +120,7 @@ def test_dataset_from_df_refs_with_filters(refs_file_factory):
         }
 
 
-def test_empty_chunk_manifest(refs_file_factory):
+def test_empty_chunk_manifest(refs_file_factory, local_registry):
     zarray = {
         "chunks": [50, 100],
         "compressor": None,
@@ -136,10 +132,9 @@ def test_empty_chunk_manifest(refs_file_factory):
         "zarr_format": 2,
     }
     refs_file = refs_file_factory(zarray=ujson.dumps(zarray), chunks={})
-    store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
     with open_virtual_dataset(
-        file_url=refs_file, object_store=store, parser=parser
+        file_url=refs_file, registry=local_registry, parser=parser
     ) as vds:
         assert "a" in vds.variables
         assert isinstance(vds["a"].data, ManifestArray)
@@ -147,53 +142,68 @@ def test_empty_chunk_manifest(refs_file_factory):
         assert vds["a"].chunksizes == {"x": 50, "y": 100}
 
 
-def test_handle_relative_paths(refs_file_factory):
+def test_handle_relative_paths(refs_file_factory, local_registry):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
-    store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser()
-    with pytest.raises(
-        ValueError,
-        match="Detected relative path `test1.nc`. Parser must have `fs_root` set for handling relative path. Parser has `fs_root = None`.",
-    ):
+    with pytest.raises(ValueError, match="must be absolute posix paths"):
         with open_virtual_dataset(
             file_url=refs_file,
-            object_store=store,
+            registry=local_registry,
             parser=parser,
         ) as _:
             pass
 
     refs_file = refs_file_factory(chunks={"a/0.0": ["./test1.nc", 6144, 48]})
-    with pytest.raises(
-        ValueError,
-        match="Detected relative path `./test1.nc`. Parser must have `fs_root` set for handling relative path. Parser has `fs_root = None`.",
-    ):
+    parser = KerchunkJSONParser()
+    with pytest.raises(ValueError, match="must be absolute posix paths"):
         with open_virtual_dataset(
             file_url=refs_file,
-            object_store=store,
+            registry=local_registry,
             parser=parser,
         ) as _:
             pass
 
+    parser = KerchunkJSONParser(fs_root="some_directory/")
     with pytest.raises(
-        ValueError,
-        match=re.escape(
-            "fs_root should include a valid scheme (e.g., `file://`), received `fs_root = 'some_directory/'`."
-        ),
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
-        parser = KerchunkJSONParser(fs_root="some_directory/")
+        with open_virtual_dataset(
+            file_url=refs_file,
+            registry=local_registry,
+            parser=parser,
+        ) as _:
+            pass
 
+    parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
-        ValueError,
-        match=re.escape(
-            "fs_root should include a valid scheme (e.g., `file://`), received `fs_root = '/some_directory/file.nc'`."
-        ),
+        ValueError, match="fs_root must be an absolute path to a filesystem directory"
     ):
-        parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
+        with open_virtual_dataset(
+            file_url=refs_file,
+            registry=local_registry,
+            parser=parser,
+        ) as _:
+            pass
+    parser = KerchunkJSONParser(fs_root="/some_directory/")
+    with open_virtual_dataset(
+        file_url=refs_file,
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.manifest.dict() == {
+            "0.0": {
+                "path": "file:///some_directory/test1.nc",
+                "offset": 6144,
+                "length": 48,
+            }
+        }
+
     parser = KerchunkJSONParser(fs_root="file:///some_directory/")
     with open_virtual_dataset(
         file_url=refs_file,
-        object_store=store,
+        registry=local_registry,
         parser=parser,
     ) as vds:
         vda = vds["a"]
@@ -212,22 +222,20 @@ def test_handle_relative_paths(refs_file_factory):
     ["json", "invalid", *(["parquet"] if has_fastparquet else [])],
 )
 def test_open_virtual_dataset_existing_kerchunk_refs(
-    tmp_path, netcdf4_virtual_dataset, reference_format
+    tmp_path, netcdf4_virtual_dataset, reference_format, local_registry
 ):
     example_reference_dict = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
 
     if reference_format == "invalid":
         # Test invalid file format leads to ValueError
         ref_filepath = tmp_path / "ref.csv"
-        ref_url = f"file://{ref_filepath}"
         with open(ref_filepath.as_posix(), mode="w") as of:
             of.write("tmp")
-        store = obstore_local(file_url=ref_url)
         parser = KerchunkJSONParser(fs_root="file://")
         with pytest.raises(ValueError):
             with open_virtual_dataset(
                 file_url=ref_filepath.as_posix(),
-                object_store=store,
+                registry=local_registry,
                 parser=parser,
             ) as _:
                 pass
@@ -247,12 +255,10 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             ref_filepath = tmp_path / "ref.parquet"
             refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
             parser = KerchunkParquetParser(fs_root="file://")
-
-        store = obstore_local(file_url=ref_filepath.as_posix())
         expected_refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
         with open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
-            object_store=store,
+            registry=local_registry,
             parser=parser,
             loadable_variables=[],
         ) as vds:
@@ -271,7 +277,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
 
 @requires_kerchunk
-def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
+def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_registry):
     # For now, we raise a NotImplementedError if we read existing references that have inlined data
     # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
 
@@ -282,43 +288,42 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref):
     with open(ref_filepath, "w") as json_file:
         ujson.dump(netcdf4_inlined_ref, json_file)
 
-    store = obstore_local(file_url=ref_filepath.as_posix())
-    parser = KerchunkJSONParser(fs_root="file://")
+    parser = KerchunkJSONParser()
     with pytest.raises(
         NotImplementedError,
         match="Reading inlined reference data is currently not supported",
     ):
         with open_virtual_dataset(
             file_url=ref_filepath.as_posix(),
-            object_store=store,
+            registry=local_registry,
             parser=parser,
         ) as _:
             pass
 
 
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
-def test_skip_variables(refs_file_factory, skip_variables):
+def test_skip_variables(refs_file_factory, skip_variables, local_registry):
     refs_file = refs_file_factory()
-    store = obstore_local(file_url=refs_file)
     parser = KerchunkJSONParser(skip_variables=skip_variables, fs_root="file://")
     with open_virtual_dataset(
         file_url=refs_file,
-        object_store=store,
+        registry=local_registry,
         parser=parser,
     ) as vds:
         assert all(var not in vds for var in skip_variables)
 
 
 @requires_kerchunk
-def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset):
+def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_registry):
     refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
     ref_filepath = tmp_path / "ref.json"
     with open(ref_filepath.as_posix(), "w") as json_file:
         ujson.dump(refs, json_file)
 
-    store = obstore_local(file_url=ref_filepath.as_posix())
-    parser = KerchunkJSONParser(fs_root="file://")
-    manifest_store = parser(file_url=ref_filepath.as_posix(), object_store=store)
+    parser = KerchunkJSONParser()
+    manifest_store = parser(
+        file_url=f"file://{ref_filepath.as_posix()}", registry=local_registry
+    )
     with (
         xr.open_dataset(
             netcdf4_file,
@@ -342,8 +347,8 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
 
     registry = ObjectStoreRegistry()
     registry.register("memory://", memory_store)
-    parser = KerchunkJSONParser(store_registry=registry)
-    manifeststore = parser("refs.json", memory_store)
+    parser = KerchunkJSONParser()
+    manifeststore = parser("memory:///refs.json", registry=registry)
 
     assert isinstance(manifeststore, ManifestStore)
     assert manifeststore._store_registry.map[UrlKey("memory", "")].store == memory_store
