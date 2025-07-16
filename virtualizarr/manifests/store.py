@@ -256,7 +256,9 @@ class ManifestStore(Store):
         if hasattr(store, "prefix") and store.prefix:
             prefix = str(store.prefix).lstrip("/")
             path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
-
+        elif hasattr(store, "url"):
+            prefix = urlparse(store.url).path.lstrip("/")
+            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
