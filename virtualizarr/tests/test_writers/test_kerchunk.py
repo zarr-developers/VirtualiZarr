@@ -79,7 +79,7 @@ class TestAccessor:
         }
 
         result_ds_refs = ds.vz.to_kerchunk(format="dict")
-        assert result_ds_refs == kerchunk_refs_as_json(expected_ds_refs)
+        assert kerchunk_refs_as_json(result_ds_refs) == kerchunk_refs_as_json(expected_ds_refs)
 
     def test_accessor_to_kerchunk_dict_empty(self, array_v3_metadata):
         manifest = ChunkManifest(entries={}, shape=(1, 1))
