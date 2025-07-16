@@ -27,7 +27,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.0.8",
+    "zarr<3.1.0",
     "obstore>=0.5.1",
 ]
 
@@ -91,7 +91,7 @@ upstream = [
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
-    'zarr @ git+https://github.com/zarr-developers/zarr-python',
+#    'zarr @ git+https://github.com/zarr-developers/zarr-python',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     's3fs @ git+https://github.com/fsspec/s3fs',
