@@ -167,7 +167,7 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
 
     assert isinstance(v2_metadata, ArrayV2Metadata)
     assert v2_metadata.shape == shape
-    assert v2_metadata.dtype == np.dtype("int32")
+    assert v2_metadata.dtype.to_native_dtype() == np.dtype("int32")
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
     compressor_config = v2_metadata.compressor.get_config()

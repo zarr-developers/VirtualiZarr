@@ -11,6 +11,7 @@ from xarray.coding.times import CFDatetimeCoder
 from xarray.conventions import encode_dataset_coordinates
 from zarr.core.common import JSON
 from zarr.core.metadata.v2 import ArrayV2Metadata
+from zarr.dtype import parse_data_type
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import join
@@ -54,6 +55,9 @@ class NumpyEncoder(json.JSONEncoder):
 
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     """Convert V2 metadata to kerchunk JSON format."""
+
+    print(v2_metadata)
+    print(type(v2_metadata.dtype))
 
     zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
     if v2_metadata.filters:
@@ -161,12 +165,13 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         array_v2_metadata = ArrayV2Metadata(
             chunks=np_arr.shape,
             shape=np_arr.shape,
-            dtype=np_arr.dtype,
+            dtype=parse_data_type(np_arr.dtype, zarr_format=2),  # needed unless zarr-python fixes https://github.com/zarr-developers/zarr-python/issues/3253
             order="C",
             fill_value=None,
         )
         zattrs = {**var.attrs}
 
+    print(array_v2_metadata)
     zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
