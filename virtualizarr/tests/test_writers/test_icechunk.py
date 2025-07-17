@@ -1,9 +1,9 @@
+import os
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
-import tempfile
-import os
 
 import numpy as np
 import numpy.testing as npt
@@ -42,7 +42,6 @@ def icechunk_storage(tmp_path: Path) -> "Storage":
 
 @pytest.fixture(scope="function")
 def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
-
     config = icechunk.RepositoryConfig.default()
 
     container = icechunk.VirtualChunkContainer(
