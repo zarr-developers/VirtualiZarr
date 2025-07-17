@@ -13,11 +13,10 @@ import xarray as xr
 from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
+# Local imports
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
-
-# Local imports
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import ceildiv
 
@@ -63,9 +62,7 @@ def zarr_store(tmpdir, request):
 
 @pytest.fixture()
 def local_registry():
-    registry = ObjectStoreRegistry()
-    registry.register("file://", LocalStore())
-    return registry
+    return ObjectStoreRegistry({"file://": LocalStore()})
 
 
 @pytest.fixture()

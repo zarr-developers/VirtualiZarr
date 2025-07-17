@@ -94,9 +94,38 @@ class PathEntry:
 
 
 class ObjectStoreRegistry:
-    def __init__(self) -> None:
+    def __init__(self, stores: dict[Url, ObjectStore] | None = None) -> None:
+        """
+        Create a new store registry that matches the provided Urls and
+        [ObjectStore][obstore.store.ObjectStore] instances.
+
+
+        Parameters
+        ----------
+        stores
+            Mapping of Urls to the [ObjectStore][obstore.store.ObjectStore] to
+            be registered under the Url.
+
+        Examples
+        --------
+
+        ```python exec="on" source="above" session="registry-examples"
+        from obstore.store import S3Store
+        from virtualizarr.registry import ObjectStoreRegistry
+
+        s3store = S3Store(bucket="my-bucket-1", prefix="orig-path")
+        reg = ObjectStoreRegistry({"s3://my-bucket-1": s3store})
+
+        ret, path = reg.resolve("s3://my-bucket-1/orig-path/group/my-file.nc")
+        assert path == "group/my-file.nc"
+        assert ret is s3store
+        ```
+        """
         # Mapping from UrlKey (containing scheme and netlocs) to PathEntry
         self.map: Dict[UrlKey, PathEntry] = {}
+        stores = stores or {}
+        for url, store in stores.items():
+            self.register(url, store)
 
     def register(self, url: Url, store: ObjectStore) -> None:
         """
@@ -203,10 +232,10 @@ class ObjectStoreRegistry:
         ```
 
         ```python exec="on" source="above" session="registry-resolve-examples"
-        s3store = S3Store(bucket = "mybucket", prefix="mydata/prefix/")
-        registry.register("s3://mybucket", s3store)
-        ret, path = registry.resolve("s3://mybucket/mydata/prefix/myfile.nc")
-        assert path == "myfile.nc"
+        s3store = S3Store(bucket = "my-bucket", prefix="my-data/prefix/")
+        registry.register("s3://my-bucket", s3store)
+        ret, path = registry.resolve("s3://my-bucket/my-data/prefix/my-file.nc")
+        assert path == "my-file.nc"
         assert ret is s3store
         ```
         """
