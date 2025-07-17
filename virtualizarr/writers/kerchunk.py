@@ -56,9 +56,6 @@ class NumpyEncoder(json.JSONEncoder):
 def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
     """Convert V2 metadata to kerchunk JSON format."""
 
-    print(v2_metadata)
-    print(type(v2_metadata.dtype))
-
     zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
     if v2_metadata.filters:
         zarray_dict["filters"] = [
@@ -173,7 +170,6 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         )
         zattrs = {**var.attrs}
 
-    print(array_v2_metadata)
     zarray_dict = to_kerchunk_json(array_v2_metadata)
     arr_refs[".zarray"] = zarray_dict
 
