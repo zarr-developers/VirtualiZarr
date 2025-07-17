@@ -156,12 +156,9 @@ def convert_v3_to_v2_metadata(
     # Handle filter configurations
     filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
 
-    native_dtype = v3_metadata.data_type.to_native_dtype()
-    v2_compatible_data_type = parse_data_type(native_dtype, zarr_format=2)
-
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
-        dtype=v2_compatible_data_type,
+        dtype=v3_metadata.data_type,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
         compressor=compressor_config,
