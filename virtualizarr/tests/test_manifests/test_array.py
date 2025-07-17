@@ -445,6 +445,23 @@ class TestIndexing:
         assert marr[...] == marr
 
 
+def test_nbytes(array_v3_metadata):
+    chunks = (5, 10)
+    shape = (5, 20)
+    metadata = array_v3_metadata(
+        shape=shape,
+        chunks=chunks,
+        dimension_names=["x", "y"],
+    )
+    chunks_dict = {
+        "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
+    }
+    manifest = ChunkManifest(entries=chunks_dict)
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    assert marr.nbytes == 400
+
+
 def test_to_xarray(array_v3_metadata):
     chunks = (5, 10)
     shape = (5, 20)

@@ -90,7 +90,7 @@ class ManifestArray:
         """The native dtype of the data (typically a numpy dtype)"""
         zdtype = self.metadata.data_type
         dtype = zdtype.to_native_dtype()
-        return dtype.str
+        return dtype
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -111,11 +111,28 @@ class ManifestArray:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
 
     @property
+    def nbytes(self) -> int:
+        """
+        The total number of bytes that are stored in the chunks of this array.
+
+        Notes
+        -----
+        This value is calculated by multiplying the number of elements in the array and the size
+        of each element, the latter of which is determined by the dtype of the array.
+        For this reason, ``nbytes`` will likely be inaccurate for arrays with variable-length
+        dtypes. It is not possible to determine the size of an array with variable-length elements
+        from the shape and dtype alone.
+        """
+        return self.size * self.dtype.itemsize
+
+    @property
     def nbytes_virtual(self) -> int:
         """
-        Size required to hold these references in memory in bytes.
+        The total number of bytes required to hold these virtual references in memory in bytes.
 
-        Note this is not the size of the referenced array if it were actually loaded into memory,
+        Notes
+        -----
+        This is not the size of the referenced array if it were actually loaded into memory (use `.nbytes`),
         this is only the size of the pointers to the chunk locations.
         If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
         """
