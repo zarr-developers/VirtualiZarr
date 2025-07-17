@@ -204,8 +204,7 @@ class TestRoundtrip:
             # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
             ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
             store = LocalStore(prefix=air_zarr_path)
-            registry = ObjectStoreRegistry()
-            registry.register(air_zarr_url, store)
+            registry = ObjectStoreRegistry({air_zarr_url: store})
             parser = ZarrParser()
             with open_virtual_dataset(
                 file_url=air_zarr_url,

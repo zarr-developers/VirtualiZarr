@@ -146,8 +146,7 @@ def _generate_manifest_store(
         },
         attributes={"Zarr": "Hooray!"},
     )
-    registry = ObjectStoreRegistry()
-    registry.register(prefix, store)
+    registry = ObjectStoreRegistry({prefix: store})
     return ManifestStore(store_registry=registry, group=manifest_group)
 
 
@@ -206,8 +205,7 @@ def empty_memory_store():
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(arrays={"foo": manifest_array})
-    registry = ObjectStoreRegistry()
-    registry.register("memory://", store)
+    registry = ObjectStoreRegistry({"memory://": store})
     return ManifestStore(store_registry=registry, group=manifest_group)
 
 

@@ -30,8 +30,7 @@ def test_read_netcdf3(netcdf3_file, array_v3_metadata, local_registry):
 def test_read_http_netcdf3(array_v3_metadata):
     file_url = "https://github.com/pydata/xarray-data/raw/master/air_temperature.nc"
     store = obstore_http(file_url=file_url)
-    registry = ObjectStoreRegistry()
-    registry.register(file_url, store)
+    registry = ObjectStoreRegistry({file_url: store})
     parser = NetCDF3Parser()
     with open_virtual_dataset(
         file_url=file_url,

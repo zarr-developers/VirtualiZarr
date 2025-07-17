@@ -345,8 +345,7 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", ujson.dumps(refs).encode())
 
-    registry = ObjectStoreRegistry()
-    registry.register("memory://", memory_store)
+    registry = ObjectStoreRegistry({"memory://": memory_store})
     parser = KerchunkJSONParser()
     manifeststore = parser("memory:///refs.json", registry=registry)
 

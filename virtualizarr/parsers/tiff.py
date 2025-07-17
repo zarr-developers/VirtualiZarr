@@ -1,8 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from obstore.store import ObjectStore
-
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.registry import ObjectStoreRegistry
@@ -37,7 +35,7 @@ class Parser:
     def __call__(
         self,
         file_url: str,
-        object_store: ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given file to product a VirtualiZarr ManifestStore.
@@ -46,9 +44,8 @@ class Parser:
         ----------
         file_url
             The URI or path to the input file (e.g., "s3://bucket/file.tiff").
-        object_store
-            An obstore ObjectStore instance for accessing the file specified in the
-            `file_url` parameter.
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -69,7 +66,5 @@ class Parser:
             skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
-        registry = ObjectStoreRegistry()
-        registry.register(file_url, object_store)
 
         return ManifestStore(group=manifestgroup, store_registry=registry)

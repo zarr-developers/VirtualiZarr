@@ -25,8 +25,7 @@ class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check loadable variables
         store = LocalStore(prefix=zarr_store)
-        registry = ObjectStoreRegistry()
-        registry.register(f"file://{zarr_store}", store)
+        registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
@@ -39,8 +38,8 @@ class TestOpenVirtualDatasetZarr:
 
     def test_skip_variables(self, zarr_store, skip_variables=["air"]):
         store = LocalStore(prefix=zarr_store)
-        registry = ObjectStoreRegistry()
-        registry.register(f"file://{zarr_store}", store)
+        registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
+
         parser = ZarrParser(skip_variables=skip_variables)
         # check variable is skipped
         with open_virtual_dataset(
@@ -52,8 +51,7 @@ class TestOpenVirtualDatasetZarr:
 
     def test_manifest_indexing(self, zarr_store):
         store = LocalStore(prefix=zarr_store)
-        registry = ObjectStoreRegistry()
-        registry.register(f"file://{zarr_store}", store)
+        registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
@@ -67,8 +65,7 @@ class TestOpenVirtualDatasetZarr:
 
         zg = zarr.open_group(zarr_store)
         store = LocalStore(prefix=zarr_store)
-        registry = ObjectStoreRegistry()
-        registry.register(f"file://{zarr_store}", store)
+        registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
             file_url=zarr_store,
