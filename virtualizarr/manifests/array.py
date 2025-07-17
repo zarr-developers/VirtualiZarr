@@ -189,7 +189,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if not utils.metadata_identical(self.metadata, other.metadata):
+        if not self.metadata.to_dict() == other.metadata.to_dict():
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:
