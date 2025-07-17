@@ -23,6 +23,7 @@
   [Chuck Daniels](https://github.com/chuckwondo).
 - Now throws a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Support big-endian data via zarr-python 3.0.9 and zarr v3's new data types system ([#618](https://github.com/zarr-developers/VirtualiZarr/issues/618), [#677](https://github.com/zarr-developers/VirtualiZarr/issues/677)) By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 

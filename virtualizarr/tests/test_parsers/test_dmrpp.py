@@ -504,7 +504,7 @@ def test_parse_variable(netcdf4_file):
     parser = dmrparser(DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file)
 
     var = parser._parse_variable(parser.find_node_fqn("/air"))
-    assert var.metadata.dtype == "int16"
+    assert var.metadata.dtype.to_native_dtype() == "int16"
     assert var.metadata.dimension_names == ("time", "lat", "lon")
     assert var.shape == (2920, 25, 53)
     assert var.chunks == (2920, 25, 53)

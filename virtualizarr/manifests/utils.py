@@ -8,6 +8,7 @@ from zarr.core.metadata.v3 import (
     parse_dimension_names,
     parse_shapelike,
 )
+from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
@@ -75,15 +76,16 @@ def create_v3_array_metadata(
     ArrayV3Metadata
         A configured ArrayV3Metadata instance with standard defaults
     """
+    zdtype = parse_data_type(data_type, zarr_format=3)
     return ArrayV3Metadata(
         shape=shape,
-        data_type=data_type.name if hasattr(data_type, "name") else data_type,
+        data_type=zdtype,
         chunk_grid={
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
         },
         chunk_key_encoding=chunk_key_encoding,
-        fill_value=fill_value,
+        fill_value=zdtype.default_scalar() if fill_value is None else fill_value,
         codecs=convert_to_codec_pipeline(
             codecs=codecs or [],
             dtype=data_type,
@@ -153,24 +155,6 @@ def check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
             raise ValueError(
                 f"Cannot concatenate arrays with differing shapes: {first_shape} vs {other_shape}"
             )
-
-
-# TODO remove this once https://github.com/zarr-developers/zarr-python/issues/2929 is solved upstream
-def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -> bool:
-    """Checks the metadata of two zarr arrays are identical, including special treatment for NaN fill_values."""
-    metadata_dict1 = metadata1.to_dict()
-    metadata_dict2 = metadata2.to_dict()
-
-    # fill_value is a special case because numpy NaNs cannot be compared using __eq__, see https://stackoverflow.com/a/10059796
-    fill_value1 = metadata_dict1.pop("fill_value")
-    fill_value2 = metadata_dict2.pop("fill_value")
-    if np.isnan(fill_value1) and np.isnan(fill_value2):  # type: ignore[arg-type]
-        fill_values_equal = fill_value1.dtype == fill_value2.dtype  # type: ignore[union-attr]
-    else:
-        fill_values_equal = fill_value1 == fill_value2
-
-    # everything else in ArrayV3Metadata is a string, Enum, or Dataclass
-    return fill_values_equal and metadata_dict1 == metadata_dict2
 
 
 def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
