@@ -111,21 +111,6 @@ class ManifestArray:
         return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
 
     @property
-    def nbytes(self) -> int:
-        """
-        The total number of bytes that are stored in the chunks of this array.
-
-        Notes
-        -----
-        This value is calculated by multiplying the number of elements in the array and the size
-        of each element, the latter of which is determined by the dtype of the array.
-        For this reason, ``nbytes`` will likely be inaccurate for arrays with variable-length
-        dtypes. It is not possible to determine the size of an array with variable-length elements
-        from the shape and dtype alone.
-        """
-        return self.size * self.dtype.itemsize
-
-    @property
     def nbytes_virtual(self) -> int:
         """
         The total number of bytes required to hold these virtual references in memory in bytes.
