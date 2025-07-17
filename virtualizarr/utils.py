@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
-from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import extract_codecs, get_codec_config
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
