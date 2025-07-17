@@ -346,6 +346,9 @@ class TestRoundtrip:
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata
     ):
+        if roundtrip_func == roundtrip_as_in_memory_icechunk:
+            pytest.xfail(reason="xarray can't decode the ns datetime fill_value")
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
