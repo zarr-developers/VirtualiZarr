@@ -5,7 +5,6 @@ import ujson
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.registry import ObjectStoreRegistry
-from virtualizarr.utils import remove_prefix
 
 
 class KerchunkJSONParser:
@@ -55,11 +54,10 @@ class KerchunkJSONParser:
         ManifestStore
             A ManifestStore that provides a Zarr representation of the parsed file.
         """
-        store, _ = registry.resolve(file_url)
-        path = remove_prefix(store, file_url)
+        store, path_after_prefix = registry.resolve(file_url)
 
         # we need the whole thing so just get the entire contents in one request
-        resp = store.get(path)
+        resp = store.get(path_after_prefix)
         content = resp.bytes().to_bytes()
         refs = ujson.loads(content)
 
