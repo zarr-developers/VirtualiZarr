@@ -2,6 +2,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
+import tempfile
+import os
 
 import numpy as np
 import numpy.testing as npt
@@ -26,6 +28,11 @@ if TYPE_CHECKING:
     )
 
 
+# Set pytest temporary data into a known location in what should be a cross-platform way. See https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
+# The realpath call is there to resolve with symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk also needs to know the entire URI prefix.
+PYTEST_TMP_DIRECTORY_URI_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"
+
+
 @pytest.fixture(scope="function")
 def icechunk_storage(tmp_path: Path) -> "Storage":
     from icechunk import Storage
@@ -35,21 +42,19 @@ def icechunk_storage(tmp_path: Path) -> "Storage":
 
 @pytest.fixture(scope="function")
 def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
+
     config = icechunk.RepositoryConfig.default()
 
-    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
-
-    for url_prefix in url_prefixes:
-        container = icechunk.VirtualChunkContainer(
-            url_prefix=url_prefix,
-            store=icechunk.local_filesystem_store(url_prefix),
-        )
-        config.set_virtual_chunk_container(container)
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URI_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URI_PREFIX),
+    )
+    config.set_virtual_chunk_container(container)
 
     return icechunk.Repository.create(
         storage=icechunk_storage,
         config=config,
-        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URI_PREFIX: None},
     )
 
 
