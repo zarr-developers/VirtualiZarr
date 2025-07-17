@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     )
 
 
-# Set pytest temporary data into a known location in what should be a cross-platform way. See https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
-# The realpath call is there to resolve with symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk also needs to know the entire URI prefix.
+# Find location of pytest temporary data in what should be a cross-platform way. This should be the same as what pytest actually does - see https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
+# The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URI prefix without symlinks.
 PYTEST_TMP_DIRECTORY_URI_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"
 
 
