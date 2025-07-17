@@ -6,10 +6,9 @@ import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
-from virtualizarr.codecs import get_codecs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.codecs import extract_codecs, get_codecs
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestGroup
 from virtualizarr.manifests.utils import (
-    check_compatible_encodings,
     check_same_chunk_shapes,
     check_same_codecs,
     check_same_dtypes,
@@ -219,20 +218,43 @@ def write_virtual_dataset_to_icechunk_group(
             append_dim=append_dim,
         )
 
+    # TODO make sure coordinates get set
+    fully_virtual_ds = xr.Dataset(loadable_variables, attrs=vds.attrs)
+    manifest_group = ManifestGroup.from_virtual_dataset(fully_virtual_ds)
+
+    # note: this calls write_manifestgroup_to_icechunk
+    manifest_group.to_icechunk(
+        store=store,
+        group=group.name,
+        append_dim=append_dim,
+        last_updated_at=last_updated_at,
+    )
+
+
+def write_manifestgroup_to_icechunk(
+    manifest_group: ManifestGroup,
+    store: "IcechunkStore",
+    *,
+    group: Optional[str] = None,
+    append_dim: Optional[str] = None,
+    last_updated_at: Optional[datetime] = None,
+) -> None:
+    """Write the contents of a single ManifestGroup into an Icechunk Store as virtual chunks."""
+
     # Then write the virtual variables to the same group
-    for name, var in virtual_variables.items():
-        write_virtual_variable_to_icechunk(
+    for name, marr in manifest_group.arrays():
+        write_manifestarray_to_icechunk(
             store=store,
             group=group,
             name=name,  # type: ignore[arg-type]
-            var=var,
+            marr=marr,
             append_dim=append_dim,
             last_updated_at=last_updated_at,
         )
 
     # finish by writing group-level attributes
     # note: group attributes must be set after writing individual variables else it gets overwritten
-    update_attributes(group, vds.attrs, coords=vds.coords)
+    update_attributes(group, group.metadata.attributes)
 
 
 def update_attributes(
@@ -295,23 +317,19 @@ def check_compatible_arrays(
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
-def write_virtual_variable_to_icechunk(
+def write_manifestarray_to_icechunk(
     store: "IcechunkStore",
     group: "Group",
     name: str,
-    var: xr.Variable,
+    ma: ManifestArray,
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from zarr import Array
 
-    from virtualizarr.codecs import extract_codecs
-
-    ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
 
-    dims: list[str] = cast(list[str], list(var.dims))
+    dims: list[str] = cast(list[str], list(ma.metadata.dimension_names))
     existing_num_chunks = 0
     if append_dim and append_dim in dims:
         # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
@@ -322,7 +340,9 @@ def write_virtual_variable_to_icechunk(
 
         # check if arrays can be concatenated
         check_compatible_arrays(ma, group[name], append_axis)  # type: ignore[arg-type]
-        check_compatible_encodings(var.encoding, group[name].attrs)
+
+        # TODO how to check encodings for manifestarrays here?
+        # check_compatible_encodings(var.encoding, group[name].attrs)
 
         # determine number of existing chunks along the append axis
         existing_num_chunks = num_chunks(
@@ -347,10 +367,11 @@ def write_virtual_variable_to_icechunk(
             dtype=metadata.data_type.to_numpy(),
             filters=filters,
             compressors=compressors,
-            dimension_names=var.dims,
+            dimension_names=dims,
             fill_value=metadata.fill_value,
         )
 
+        # TODO
         update_attributes(arr, var.attrs, encoding=var.encoding)
 
     write_manifest_virtual_refs(
