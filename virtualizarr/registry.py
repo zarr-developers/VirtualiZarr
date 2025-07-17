@@ -163,7 +163,7 @@ class ObjectStoreRegistry:
         ObjectStore
             The [ObjectStore][obstore.store.ObjectStore] stored at the resolved url.
         Path
-            The trailing portion of the url. I.e., the portion that it not part of the matching prefix in the
+            The trailing portion of the url after the prefix of the matching store in the
             [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].
 
         Raises
@@ -177,7 +177,7 @@ class ObjectStoreRegistry:
         --------
 
         ```python exec="on" source="above" session="registry-resolve-examples"
-        from obstore.store import MemoryStore
+        from obstore.store import MemoryStore, S3Store
         from virtualizarr.registry import ObjectStoreRegistry
 
         registry = ObjectStoreRegistry()
@@ -197,23 +197,41 @@ class ObjectStoreRegistry:
 
         url = "https://s3.region.amazonaws.com/bucket/path/to/object"
         ret, path = registry.resolve(url)
-        assert path == "path/to/object"
+        assert path == "bucket/path/to/object"
         assert ret is memstore2
         print(f"Resolved url: `{url}` to store: `{ret}` and path: `{path}`")
         ```
 
+        ```python exec="on" source="above" session="registry-resolve-examples"
+        s3store = S3Store(bucket = "mybucket", prefix="mydata/prefix/")
+        registry.register("s3://mybucket", s3store)
+        ret, path = registry.resolve("s3://mybucket/mydata/prefix/myfile.nc")
+        assert path == "myfile.nc"
+        assert ret is s3store
+        ```
         """
         parsed = urlparse(url)
+        path = parsed.path
 
         key = UrlKey(parsed.scheme, parsed.netloc)
 
         if key in self.map:
-            result = self.map[key].lookup(parsed.path)
+            result = self.map[key].lookup(path)
             if result:
-                store, depth = result
-                path = "/".join(list(path_segments(parsed.path))[depth:])
-                return store, path
-
+                store, _ = result
+                if hasattr(store, "prefix") and store.prefix:
+                    prefix = str(store.prefix).lstrip("/")
+                    path_after_prefix = (
+                        path.lstrip("/").removeprefix(prefix).lstrip("/")
+                    )
+                elif hasattr(store, "url"):
+                    prefix = urlparse(store.url).path.lstrip("/")
+                    path_after_prefix = (
+                        path.lstrip("/").removeprefix(prefix).lstrip("/")
+                    )
+                else:
+                    path_after_prefix = path.lstrip("/")
+                return store, path_after_prefix
         raise ValueError(f"Could not find an ObjectStore matching the url `{url}`")
 
 

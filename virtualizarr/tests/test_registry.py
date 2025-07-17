@@ -18,7 +18,7 @@ def test_register_raises():
     registry = ObjectStoreRegistry()
     with pytest.raises(
         ValueError,
-        match="Urls are expected to contain a scheme \(e\.g\., `file://` or `s3://`\), received .* which parsed to ParseResult\(scheme='.*', netloc='.*', path='.*', params='.*', query='.*', fragment='.*'\)",
+        match=r"Urls are expected to contain a scheme \(e\.g\., `file://` or `s3://`\), received .* which parsed to ParseResult\(scheme='.*', netloc='.*', path='.*', params='.*', query='.*', fragment='.*'\)",
     ):
         url = "bucket1/path/to/object"
         ret, path = registry.register(url, MemoryStore())

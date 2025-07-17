@@ -195,16 +195,11 @@ class ManifestStore(Store):
         length = manifest._lengths[chunk_indexes]
 
         # Get the configured object store instance that matches the path
-        store, _ = self._store_registry.resolve(path)
+        store, path_after_prefix = self._store_registry.resolve(path)
         if not store:
             raise ValueError(
                 f"Could not find a store to use for {path} in the store registry"
             )
-        # Truncate path to match Obstore expectations
-        key = urlparse(path).path
-        if hasattr(store, "prefix") and store.prefix:
-            # strip the prefix from key
-            key = key.removeprefix(str(store.prefix))
 
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
@@ -215,7 +210,7 @@ class ManifestStore(Store):
         # Actually get the bytes
         try:
             bytes = await store.get_range_async(
-                key,
+                path_after_prefix,
                 start=byte_range.start,
                 end=byte_range.end,
             )
