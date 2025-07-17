@@ -103,8 +103,8 @@ class ObjectStoreRegistry:
         Parameters
         ----------
         stores
-            Mapping of Urls to the [ObjectStore][obstore.store.ObjectStore] to
-            be registered under the Url.
+            Mapping of [Url][virtualizarr.registry.Url] to the [ObjectStore][obstore.store.ObjectStore]
+            to be registered under the [Url][virtualizarr.registry.Url].
 
         Examples
         --------
@@ -129,17 +129,17 @@ class ObjectStoreRegistry:
 
     def register(self, url: Url, store: ObjectStore) -> None:
         """
-        Register a new store for the provided store URL.
+        Register a new store for the provided store [Url][virtualizarr.registry.Url].
 
-        If a store with the same URL existed before, it is replaced.
+        If a store with the same [Url][virtualizarr.registry.Url]  existed before, it is replaced.
 
         Parameters
         ----------
         url
-            Url to registry the [ObjectStore][obstore.store.ObjectStore] under.
+            [Url][virtualizarr.registry.Url] to registry the [ObjectStore][obstore.store.ObjectStore] under.
         store
             [ObjectStore][obstore.store.ObjectStore] instance to register using the
-            provided url.
+            provided [Url][virtualizarr.registry.Url].
 
         Examples
         --------
