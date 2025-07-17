@@ -341,12 +341,12 @@ class TestRoundtrip:
             for coord in ds.coords:
                 assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    @pytest.mark.xfail(
-        reason="Datetime and timedelta data types not yet supported by zarr-python 3.0"  # https://github.com/zarr-developers/zarr-python/issues/2616
-    )
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata
     ):
+        if roundtrip_func == roundtrip_as_in_memory_icechunk:
+            pytest.xfail(reason="xarray can't decode the ns datetime fill_value")
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }

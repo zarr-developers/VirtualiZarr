@@ -358,7 +358,7 @@ def test_parse_variable(tmp_path):
     basic_dmrpp = dmrparser(DMRPP_XML_STRINGS["basic"], tmp_path=tmp_path)
 
     var = basic_dmrpp._parse_variable(basic_dmrpp.find_node_fqn("/data"))
-    assert var.metadata.dtype == "float32"
+    assert var.metadata.dtype.to_native_dtype() == "float32"
     assert var.metadata.dimension_names == ("x", "y")
     assert var.shape == (720, 1440)
     assert var.chunks == (360, 720)
