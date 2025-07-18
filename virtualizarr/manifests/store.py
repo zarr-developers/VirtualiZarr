@@ -33,13 +33,6 @@ if TYPE_CHECKING:
 __all__ = ["ManifestStore"]
 
 
-_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
-    FileNotFoundError,
-    IsADirectoryError,
-    NotADirectoryError,
-)
-
-
 @dataclass
 class StoreRequest:
     """Dataclass for matching a key to the store instance"""
@@ -201,6 +194,13 @@ class ManifestStore(Store):
                 f"Could not find a store to use for {path} in the store registry"
             )
 
+        path_in_store = urlparse(path).path
+        if hasattr(store, "prefix") and store.prefix:
+            prefix = str(store.prefix).lstrip("/")
+            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
+        elif hasattr(store, "url"):
+            prefix = urlparse(store.url).path.lstrip("/")
+            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
@@ -208,15 +208,12 @@ class ManifestStore(Store):
         )
 
         # Actually get the bytes
-        try:
-            bytes = await store.get_range_async(
-                path_after_prefix,
-                start=byte_range.start,
-                end=byte_range.end,
-            )
-            return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
-        except _ALLOWED_EXCEPTIONS:
-            return None
+        bytes = await store.get_range_async(
+            path_in_store,
+            start=byte_range.start,
+            end=byte_range.end,
+        )
+        return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
 
     async def get_partial_values(
         self,

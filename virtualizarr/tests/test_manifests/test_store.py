@@ -5,6 +5,7 @@ import pickle
 from typing import TYPE_CHECKING
 
 import numpy as np
+import obstore as obs
 import pytest
 from obstore.store import MemoryStore
 from zarr.abc.store import (
@@ -340,19 +341,28 @@ class TestToVirtualXarray:
         expected_loadable_variables,
     ):
         marr1 = manifest_array(
-            shape=(3, 2, 5), chunks=(1, 2, 1), dimension_names=["x", "y", "t"]
+            shape=(3, 2, 5),
+            chunks=(1, 2, 1),
+            dimension_names=["x", "y", "t"],
+            codecs=None,
         )
-        marr2 = manifest_array(shape=(3, 2), chunks=(1, 2), dimension_names=["x", "y"])
-        marr3 = manifest_array(shape=(5,), chunks=(5,), dimension_names=["t"])
+        marr2 = manifest_array(
+            shape=(3, 2), chunks=(1, 2), dimension_names=["x", "y"], codecs=None
+        )
+        marr3 = manifest_array(
+            shape=(5,), chunks=(5,), dimension_names=["t"], codecs=None
+        )
 
-        paths1 = list({v["path"] for v in marr1.manifest.values()})
-        paths2 = list({v["path"] for v in marr2.manifest.values()})
-        paths3 = list({v["path"] for v in marr3.manifest.values()})
-        unique_paths = list(set(paths1 + paths2 + paths3))
-        store_registry = ObjectStoreRegistry()
-        for path in unique_paths:
-            store = MemoryStore()
-            store_registry.register(path, store)
+        store = MemoryStore()
+        for marr in [marr1, marr2, marr3]:
+            unique_paths = list({v["path"] for v in marr.manifest.values()})
+            for path in unique_paths:
+                obs.put(
+                    store,
+                    path.split("/")[-1],
+                    np.ones(marr.chunks, dtype=marr.dtype).tobytes(),
+                )
+        store_registry = ObjectStoreRegistry({"file://": store})
 
         manifest_group = ManifestGroup(
             arrays={
