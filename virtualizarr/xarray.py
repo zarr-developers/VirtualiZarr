@@ -60,7 +60,7 @@ def open_virtual_dataset(
 
 
 def open_virtual_mfdataset(
-    paths: (
+    file_urls: (
         str
         | os.PathLike
         | Sequence[str | os.PathLike]
@@ -91,45 +91,45 @@ def open_virtual_mfdataset(
     """
     Open multiple files as a single virtual dataset.
 
-    This function is explicitly modelled after `xarray.open_mfdataset`, and works in the same way.
+    This function is explicitly modelled after [xarray.open_mfdataset][], and works in the same way.
 
-    If combine='by_coords' then the function ``combine_by_coords`` is used to combine
+    If `combine='by_coords'` then the function `combine_by_coords` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
-    ``combine_nested`` is used. The filepaths must be structured according to which
+    `combine_nested` is used. The filepaths must be structured according to which
     combining function is used, the details of which are given in the documentation for
-    ``combine_by_coords`` and ``combine_nested``. By default ``combine='by_coords'``
-    will be used. Global attributes from the ``attrs_file`` are used
+    `combine_by_coords` and `combine_nested`. By default `combine='by_coords'`
+    will be used. Global attributes from the `attrs_file` are used
     for the combined dataset.
 
     Parameters
     ----------
-    paths
-        Same as in xarray.open_mfdataset
+    file_urls
+        Same as in [virtualizarr.open_virtual_dataset][]
     registry
         An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     compat
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     preprocess
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     data_vars
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     coords
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     combine
-        Same as in xarray.open_mfdataset
-    parallel : "dask", "lithops", False, or type of subclass of ``concurrent.futures.Executor``
+        Same as in [xarray.open_mfdataset][]
+    parallel : "dask", "lithops", False, or type of subclass of [concurrent.futures.Executor][]
         Specify whether the open and preprocess steps of this function will be
-        performed in parallel using lithops, dask.delayed, or any executor compatible
-        with the ``concurrent.futures`` interface, or in serial.
+        performed in parallel using [lithops][], [dask.delayed][], or any executor compatible
+        with the [concurrent.futures][] interface, or in serial.
         Default is False, which will execute these steps in serial.
     join
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     attrs_file
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     combine_attrs
-        Same as in xarray.open_mfdataset
+        Same as in [xarray.open_mfdataset][]
     **kwargs : optional
         Additional arguments passed on to [virtualizarr.open_virtual_dataset][]. For an
         overview of some of the possible options, see the documentation of
@@ -137,18 +137,20 @@ def open_virtual_mfdataset(
 
     Returns
     -------
-    xarray.Dataset
+    vds
+        An [xarray.Dataset][] containing virtual chunk references for all variables not included
+        in `loadable_variables` and normal lazily indexed arrays for each variable in `loadable_variables`.
 
     Notes
     -----
-    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large. See the docs page on Scaling.
+    The results of opening each virtual dataset in parallel are sent back to the client process, so must not be too large. See the docs page on [Scaling][].
     """
 
     # TODO this is practically all just copied from xarray.open_mfdataset - an argument for writing a virtualizarr engine for xarray?
 
     # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
-    paths = cast(NestedSequence[str], _find_absolute_paths(paths))
+    paths = cast(NestedSequence[str], _find_absolute_paths(file_urls))
 
     if not paths:
         raise OSError("no files to open")
@@ -236,7 +238,7 @@ def open_virtual_mfdataset(
             )
         else:
             raise ValueError(
-                f"{combine} is an invalid option for the keyword argument ``combine``"
+                f"{combine} is an invalid option for the keyword argument `combine`"
             )
     except ValueError:
         for vds in virtual_datasets:
