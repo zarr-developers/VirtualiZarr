@@ -121,7 +121,7 @@ def open_virtual_mfdataset(
         Same as in [xarray.open_mfdataset][]
     parallel : "dask", "lithops", False, or type of subclass of [concurrent.futures.Executor][]
         Specify whether the open and preprocess steps of this function will be
-        performed in parallel using [lithops][], [dask.delayed][], or any executor compatible
+        performed in parallel using [lithops][], `dask.delayed`, or any executor compatible
         with the [concurrent.futures][] interface, or in serial.
         Default is False, which will execute these steps in serial.
     join
