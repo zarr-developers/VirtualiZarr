@@ -202,9 +202,6 @@ upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-d
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk","kerchunk_parquet", "hdf5-lib", "all_parsers", "all_writers"]
 docs = ["docs"]
 
-[tool.pixi.dependencies]
-ipython = ">=9.4.0,<10"
-
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
 serve-docs = { cmd = "mkdocs serve" }
