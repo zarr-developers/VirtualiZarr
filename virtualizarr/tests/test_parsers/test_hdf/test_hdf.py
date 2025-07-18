@@ -2,9 +2,11 @@ import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
+from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -195,3 +197,13 @@ def test_subgroup_variable_names(
         parser=parser,
     ) as vds:
         assert list(vds.dims) == ["dim_0"]
+
+
+def test_netcdf_over_https():
+    url = "https://oceania.generic-mapping-tools.org/cache/Iceland.nc"
+    store = from_url(url)
+    registry = ObjectStoreRegistry({url: store})
+    parser = HDFParser()
+    with parser(file_url=url, registry=registry) as ms:
+        ds = xr.open_zarr(ms, zarr_format=3, consolidated=False).load()
+        np.testing.assert_allclose(ds["z"].min().to_numpy(), -1857)

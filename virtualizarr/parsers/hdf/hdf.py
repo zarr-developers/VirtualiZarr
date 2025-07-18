@@ -5,7 +5,6 @@ from typing import (
     TYPE_CHECKING,
     Iterable,
 )
-from urllib.parse import urlparse
 
 import numpy as np
 
@@ -140,8 +139,8 @@ class HDFParser:
         file_url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
-        store, _ = registry.resolve(file_url)
-        reader = ObstoreReader(store=store, path=urlparse(file_url).path)
+        store, path_in_store = registry.resolve(file_url)
+        reader = ObstoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
             reader=reader,

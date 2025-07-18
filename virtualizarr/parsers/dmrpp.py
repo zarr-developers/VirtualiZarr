@@ -61,8 +61,8 @@ class DMRPPParser:
         ManifestStore
             A ManifestStore that provides a Zarr representation of the parsed file.
         """
-        store, _ = registry.resolve(file_url)
-        reader = ObstoreReader(store=store, path=file_url)
+        store, path_in_store = registry.resolve(file_url)
+        reader = ObstoreReader(store=store, path=path_in_store)
         file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 
