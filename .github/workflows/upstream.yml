@@ -7,7 +7,7 @@ on:
     - 'docs/**'
   pull_request:
     branches: [ "main" ]
-    types: [ labeled ]
+    types: [opened, reopened, synchronize, labeled]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -24,7 +24,6 @@ jobs:
       always()
       && (
           (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-          || needs.detect-ci-trigger.outputs.triggered == 'true'
           || contains( github.event.pull_request.labels.*.name, 'test-upstream')
       )
     runs-on: ubuntu-latest
