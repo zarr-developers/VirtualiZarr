@@ -3,27 +3,21 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 from pathlib import Path  # noqa
-from typing import (
-    Any,
-    Hashable,
-)
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Any, Hashable
 
 import numpy as np
-import obstore
-import zarr
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
     ChunkManifest,
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
-from virtualizarr.manifests.store import get_store_prefix
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 FillValueT = bool | str | float | int | list | None
@@ -37,6 +31,9 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     np.dtype("complex").kind: [0.0, 0.0],
     np.dtype("datetime64").kind: 0,
 }
+
+if TYPE_CHECKING:
+    import zarr
 
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
@@ -109,7 +106,7 @@ async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: 
 
 async def _construct_manifest_group(
     filepath: str,
-    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
+    store: zarr.storage.ObjectStore,
     *,
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
@@ -173,7 +170,7 @@ class ZarrParser:
     def __call__(
         self,
         file_url: str,
-        object_store: obstore.store.ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given Zarr store to produce a VirtualiZarr ManifestStore.
@@ -182,9 +179,8 @@ class ZarrParser:
         ----------
         file_url
             The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
-        object_store
-            An obstore ObjectStore instance for accessing the directory specified in the
-            `file_url` parameter.
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -196,14 +192,8 @@ class ZarrParser:
         )
         import asyncio
 
-        # Temporary handling of local paths with Zarr LocalStore
-        # until zarr-python adopts obstore LocalStore
-        zarr_store: zarr.storage.LocalStore | zarr.storage.ObjectStore
-        if isinstance(object_store, obstore.store.LocalStore):
-            parsed = urlparse(filepath)
-            zarr_store = zarr.storage.LocalStore(parsed.path)
-        else:
-            zarr_store = zarr.storage.ObjectStore(store=object_store)
+        object_store, _ = registry.resolve(filepath)
+        zarr_store = ObjectStore(store=object_store)
         manifest_group = asyncio.run(
             _construct_manifest_group(
                 store=zarr_store,
@@ -212,6 +202,4 @@ class ZarrParser:
                 skip_variables=self.skip_variables,
             )
         )
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
-
         return ManifestStore(store_registry=registry, group=manifest_group)

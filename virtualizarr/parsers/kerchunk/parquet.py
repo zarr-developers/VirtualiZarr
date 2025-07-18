@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     import fsspec
     import fsspec.core
     import fsspec.spec
-    from obstore.store import ObjectStore
 
     # See pangeo_forge_recipes.storage
     OpenFileType: TypeAlias = (
@@ -58,7 +57,7 @@ class KerchunkParquetParser:
     def __call__(
         self,
         file_url: str,
-        object_store: ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given file to product a
@@ -68,9 +67,8 @@ class KerchunkParquetParser:
         ----------
         file_url
             The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
-        object_store
-            An obstore ObjectStore instance for accessing the file specified in the
-            `file_url` parameter.
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -91,7 +89,6 @@ class KerchunkParquetParser:
         full_reference = {"refs": array_refs}
         refs = KerchunkStoreRefs(full_reference)
 
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,
             group=self.group,

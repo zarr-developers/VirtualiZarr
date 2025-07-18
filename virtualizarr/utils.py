@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import copy
 import importlib
 import io
+import json
 import os
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
 from urllib.parse import urlparse
 
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
 from virtualizarr.codecs import extract_codecs, get_codec_config
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
+
+# taken from zarr.core.common
+JSON = str | int | float | Mapping[str, "JSON"] | Sequence["JSON"] | None
+
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -150,7 +157,7 @@ def convert_v3_to_v2_metadata(
 
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type.to_numpy(),
+        dtype=v3_metadata.data_type,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
         compressor=compressor_config,
@@ -160,3 +167,22 @@ def convert_v3_to_v2_metadata(
         dimension_separator=".",  # Assuming '.' as default dimension separator
     )
     return v2_metadata
+
+
+def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
+    """
+    Normalizes all Kerchunk references into true JSON all the way down.
+
+    See https://github.com/zarr-developers/VirtualiZarr/issues/679 for context as to why this is needed.
+    """
+
+    normalized_result: dict[str, JSON] = copy.deepcopy(refs)
+    v0_refs: dict[str, JSON] = refs["refs"]
+
+    for k, v in v0_refs.items():
+        # check for strings because the value could be for a chunk, in which case it is already a list like ["/test.nc", 6144, 48]
+        # this is a rather fragile way to discover if we're looking at a chunk key or not, but it should work...
+        if isinstance(v, str):
+            normalized_result["refs"][k] = json.loads(v)  # type: ignore[index]
+
+    return normalized_result

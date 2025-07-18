@@ -1,11 +1,9 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from obstore.store import ObjectStore
-
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 
 
 class NetCDF3Parser:
@@ -36,7 +34,7 @@ class NetCDF3Parser:
     def __call__(
         self,
         file_url: str,
-        object_store: ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given file to product a VirtualiZarr ManifestStore.
@@ -45,9 +43,8 @@ class NetCDF3Parser:
         ----------
         file_url
             The URI or path to the input file (e.g., "s3://bucket/file.nc").
-        object_store
-            An obstore ObjectStore instance for accessing the file specified in the
-            `file_url` parameter.
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -68,7 +65,4 @@ class NetCDF3Parser:
             skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
-
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
-
         return ManifestStore(group=manifestgroup, store_registry=registry)

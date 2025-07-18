@@ -87,8 +87,10 @@ class ManifestArray:
 
     @property
     def dtype(self) -> np.dtype:
-        dtype_str = self.metadata.data_type
-        return dtype_str.to_numpy()
+        """The native dtype of the data (typically a numpy dtype)"""
+        zdtype = self.metadata.data_type
+        dtype = zdtype.to_native_dtype()
+        return dtype
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -111,9 +113,11 @@ class ManifestArray:
     @property
     def nbytes_virtual(self) -> int:
         """
-        Size required to hold these references in memory in bytes.
+        The total number of bytes required to hold these virtual references in memory in bytes.
 
-        Note this is not the size of the referenced array if it were actually loaded into memory,
+        Notes
+        -----
+        This is not the size of the referenced array if it were actually loaded into memory (use `.nbytes`),
         this is only the size of the pointers to the chunk locations.
         If you were to load the data into memory it would be ~1e6x larger for 1MB chunks.
         """
@@ -170,7 +174,7 @@ class ManifestArray:
         if self.shape != other.shape:
             raise NotImplementedError("Unsure how to handle broadcasting like this")
 
-        if not utils.metadata_identical(self.metadata, other.metadata):
+        if not self.metadata.to_dict() == other.metadata.to_dict():
             return np.full(shape=self.shape, fill_value=False, dtype=np.dtype(bool))
         else:
             if self.manifest == other.manifest:

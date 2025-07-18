@@ -9,7 +9,7 @@ from conftest import (
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
-class TestManifestArray:
+class TestInit:
     def test_manifest_array(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -48,6 +48,23 @@ class TestManifestArray:
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+
+
+class TestResultType:
+    def test_idempotent(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+
+        assert np.result_type(marr1) == marr1.dtype
+        assert np.result_type(marr1, marr1.dtype) == marr1.dtype
+        assert np.result_type(marr1, marr2) == marr1.dtype
+
+    def test_raises(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int64"))
+
+        with pytest.raises(ValueError, match="inconsistent"):
+            np.result_type(marr1, marr2)
 
 
 class TestEquals:
@@ -121,9 +138,9 @@ class TestBroadcast:
         assert expanded.shape == (3, 2)
         assert expanded.chunks == (1, 2)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
+            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
         }
 
     def test_broadcast_new_axis(self, manifest_array):
@@ -132,9 +149,9 @@ class TestBroadcast:
         assert expanded.shape == (1, 3)
         assert expanded.chunks == (1, 1)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
-            "0.1": {"path": "file:///foo.1.nc", "offset": 10, "length": 6},
-            "0.2": {"path": "file:///foo.2.nc", "offset": 20, "length": 7},
+            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
+            "0.1": {"path": "file:///foo.1.nc", "offset": 0, "length": 4},
+            "0.2": {"path": "file:///foo.2.nc", "offset": 0, "length": 4},
         }
 
     def test_broadcast_scalar(self, manifest_array):
@@ -143,14 +160,14 @@ class TestBroadcast:
         assert marr.shape == ()
         assert marr.chunks == ()
         assert marr.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
         assert expanded.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
     @pytest.mark.parametrize(
@@ -377,9 +394,9 @@ def test_refuse_combine(array_v3_metadata):
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
-    metadata_copy = metadata_common.to_dict().copy()
-    metadata_copy["data_type"] = np.dtype("int64")
-    metadata_wrong_dtype = ArrayV3Metadata.from_dict(metadata_copy)
+    metadata_wrong_dtype = array_v3_metadata(
+        shape=shape, chunks=chunks, data_type=np.dtype("int64")
+    )
     marr2 = ManifestArray(metadata=metadata_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):

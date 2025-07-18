@@ -5,6 +5,7 @@ from typing import (
     TYPE_CHECKING,
     Iterable,
 )
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -16,10 +17,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.store import ObjectStoreRegistry, get_store_prefix
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import ObstoreReader, soft_import
 
@@ -29,7 +30,6 @@ h5py = soft_import("h5py", "reading hdf files", strict=False)
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
     from h5py import Group as H5Group
-    from obstore.store import ObjectStore
 
 
 def _construct_manifest_array(
@@ -138,16 +138,16 @@ class HDFParser:
     def __call__(
         self,
         file_url: str,
-        object_store: ObjectStore,
+        registry: ObjectStoreRegistry,
     ) -> ManifestStore:
-        reader = ObstoreReader(store=object_store, path=file_url)
+        store, _ = registry.resolve(file_url)
+        reader = ObstoreReader(store=store, path=urlparse(file_url).path)
         manifest_group = _construct_manifest_group(
             filepath=file_url,
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
         )
-        registry = ObjectStoreRegistry({get_store_prefix(file_url): object_store})
         # Convert to a manifest store
         return ManifestStore(store_registry=registry, group=manifest_group)
 
@@ -175,6 +175,12 @@ def _dataset_chunk_manifest(
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+        elif dataset.shape == ():
+            chunk_manifest = ChunkManifest.from_arrays(
+                paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
+                offsets=np.array(dsid.get_offset(), dtype=np.uint64),
+                lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
+            )
         else:
             key_list = [0] * (len(dataset.shape) or 1)
             key = ".".join(map(str, key_list))

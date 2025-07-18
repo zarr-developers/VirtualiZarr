@@ -7,13 +7,19 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from obstore.store import LocalStore
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestStore
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestStore,
+)
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
@@ -21,7 +27,8 @@ from virtualizarr.tests import (
     requires_kerchunk,
     requires_zarr_python,
 )
-from virtualizarr.tests.utils import obstore_local
+
+icechunk = pytest.importorskip("icechunk")
 
 RoundtripFunction: TypeAlias = Callable[
     Concatenate[xr.Dataset | xr.DataTree, Path, ...], xr.Dataset | xr.DataTree
@@ -47,7 +54,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     vds = xr.Dataset({"a": (["x", "y"], marr)})
 
     # Use accessor to write it out to kerchunk reference dict
-    ds_refs = vds.virtualize.to_kerchunk(format="dict")
+    ds_refs = vds.vz.to_kerchunk(format="dict")
 
     # reconstruct the dataset
     manifestgroup = manifestgroup_from_kerchunk_refs(ds_refs)
@@ -72,9 +79,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     ],
 )
 def test_numpy_arrays_to_inlined_kerchunk_refs(
-    netcdf4_file,
-    inline_threshold,
-    vars_to_inline,
+    netcdf4_file, inline_threshold, vars_to_inline, local_registry
 ):
     from kerchunk.hdf import SingleHdf5ToZarr
 
@@ -84,15 +89,14 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     ).translate()
 
     # loading the variables should produce same result as inlining them using kerchunk
-    store = obstore_local(netcdf4_file)
     parser = HDFParser()
     with open_virtual_dataset(
         file_url=netcdf4_file,
-        object_store=store,
+        registry=local_registry,
         parser=parser,
         loadable_variables=vars_to_inline,
     ) as vds:
-        refs = vds.virtualize.to_kerchunk(format="dict")
+        refs = vds.vz.to_kerchunk(format="dict")
 
         # TODO I would just compare the entire dicts but kerchunk returns inconsistent results - see https://github.com/zarr-developers/VirtualiZarr/pull/73#issuecomment-2040931202
         # assert refs == expected
@@ -104,7 +108,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
 
 def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to an in-memory kerchunk-formatted references dictionary
-    ds_refs = vds.virtualize.to_kerchunk(format="dict")
+    ds_refs = vds.vz.to_kerchunk(format="dict")
 
     # use fsspec to read the dataset from the kerchunk references dict
     return xr.open_dataset(ds_refs, engine="kerchunk", **kwargs)
@@ -112,7 +116,7 @@ def roundtrip_as_kerchunk_dict(vds: xr.Dataset, tmpdir, **kwargs):
 
 def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to disk as kerchunk references format
-    vds.virtualize.to_kerchunk(f"{tmpdir}/refs.json", format="json")
+    vds.vz.to_kerchunk(f"{tmpdir}/refs.json", format="json")
 
     # use fsspec to read the dataset from disk via the kerchunk references
     return xr.open_dataset(f"{tmpdir}/refs.json", engine="kerchunk", **kwargs)
@@ -120,7 +124,7 @@ def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
 
 def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to disk as kerchunk references format
-    vds.virtualize.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
+    vds.vz.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
 
     # use fsspec to read the dataset from disk via the kerchunk references
     return xr.open_dataset(f"{tmpdir}/refs.parquet", engine="kerchunk", **kwargs)
@@ -132,15 +136,29 @@ def roundtrip_as_in_memory_icechunk(
     virtualize_kwargs: Mapping[str, Any] | None = None,
     **kwargs,
 ) -> xr.Dataset | xr.DataTree:
-    from icechunk import Repository, Storage
-
     # create an in-memory icechunk store
-    storage = Storage.new_in_memory()
-    repo = Repository.create(storage=storage)
+    storage = icechunk.Storage.new_in_memory()
+
+    config = icechunk.RepositoryConfig.default()
+
+    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
+
+    for url_prefix in url_prefixes:
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.local_filesystem_store(url_prefix),
+        )
+        config.set_virtual_chunk_container(container)
+
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
+    )
     session = repo.writable_session("main")
 
     # write those references to an icechunk store
-    vdata.virtualize.to_icechunk(session.store, **(virtualize_kwargs or {}))
+    vdata.vz.to_icechunk(session.store, **(virtualize_kwargs or {}))
     session.commit("Test")
 
     read_only_session = repo.readonly_session("main")
@@ -181,14 +199,16 @@ class TestRoundtrip:
         roundtrip_func: RoundtripFunction,
     ):
         air_zarr_path = str(tmp_path / "air_temperature.zarr")
-        store = obstore_local(file_url=air_zarr_path)
-        parser = ZarrParser()
+        air_zarr_url = f"file://{air_zarr_path}"
         with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
             # TODO: for now we will save as Zarr V3. Later we can parameterize it for V2.
             ds.to_zarr(air_zarr_path, zarr_format=3, consolidated=False)
+            store = LocalStore(prefix=air_zarr_path)
+            registry = ObjectStoreRegistry({air_zarr_url: store})
+            parser = ZarrParser()
             with open_virtual_dataset(
-                file_url=air_zarr_path,
-                object_store=store,
+                file_url=air_zarr_url,
+                registry=registry,
                 parser=parser,
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
@@ -201,9 +221,7 @@ class TestRoundtrip:
                     assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
     def test_roundtrip_no_concat(
-        self,
-        tmp_path,
-        roundtrip_func: RoundtripFunction,
+        self, tmp_path, roundtrip_func: RoundtripFunction, local_registry
     ):
         air_nc_path = str(tmp_path / "air.nc")
 
@@ -211,11 +229,10 @@ class TestRoundtrip:
         with xr.tutorial.open_dataset("air_temperature", decode_times=False) as ds:
             # save it to disk as netCDF (in temporary directory)
             ds.to_netcdf(air_nc_path)
-            store = obstore_local(air_nc_path)
             parser = HDFParser()
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(
-                file_url=air_nc_path, object_store=store, parser=parser
+                file_url=air_nc_path, registry=local_registry, parser=parser
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
                 # assert all_close to original dataset
@@ -235,6 +252,7 @@ class TestRoundtrip:
         roundtrip_func: RoundtripFunction,
         decode_times: bool,
         time_vars: list[str],
+        local_registry,
     ):
         # set up example xarray dataset
         with xr.tutorial.open_dataset(
@@ -252,17 +270,16 @@ class TestRoundtrip:
 
             # use open_dataset_via_kerchunk to read it as references
             parser = HDFParser()
-            store = obstore_local(str(air1_nc_path))
             with (
                 open_virtual_dataset(
                     file_url=air1_nc_path,
-                    object_store=store,
+                    registry=local_registry,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds1,
                 open_virtual_dataset(
                     file_url=air2_nc_path,
-                    object_store=store,
+                    registry=local_registry,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds2,
@@ -297,9 +314,7 @@ class TestRoundtrip:
                     )
 
     def test_non_dimension_coordinates(
-        self,
-        tmp_path: Path,
-        roundtrip_func: RoundtripFunction,
+        self, tmp_path: Path, roundtrip_func: RoundtripFunction, local_registry
     ):
         # regression test for GH issue #105
 
@@ -310,10 +325,9 @@ class TestRoundtrip:
         nc_path = str(tmp_path / "non_dim_coords.nc")
         ds.to_netcdf(nc_path)
 
-        store = obstore_local(nc_path)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=nc_path, object_store=store, parser=parser
+            file_url=nc_path, registry=local_registry, parser=parser
         ) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs
@@ -327,12 +341,12 @@ class TestRoundtrip:
             for coord in ds.coords:
                 assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
-    @pytest.mark.xfail(
-        reason="Datetime and timedelta data types not yet supported by zarr-python 3.0"  # https://github.com/zarr-developers/zarr-python/issues/2616
-    )
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata
     ):
+        if roundtrip_func == roundtrip_as_in_memory_icechunk:
+            pytest.xfail(reason="xarray can't decode the ns datetime fill_value")
+
         chunks_dict = {
             "0.0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
         }
@@ -374,6 +388,7 @@ def test_datatree_roundtrip(
     decode_times: bool,
     time_vars: list[str],
     inherit: bool,
+    local_registry,
 ):
     # set up example xarray dataset
     with xr.tutorial.open_dataset("air_temperature", decode_times=decode_times) as ds:
@@ -386,21 +401,19 @@ def test_datatree_roundtrip(
         air2_nc_path = str(tmp_path / "air2.nc")
         ds1.to_netcdf(air1_nc_path)
         ds2.to_netcdf(air2_nc_path)
-
-        store = obstore_local(file_url=air1_nc_path)
         parser = HDFParser()
         # use open_dataset_via_kerchunk to read it as references
         with (
             open_virtual_dataset(
                 file_url=air1_nc_path,
-                object_store=store,
+                registry=local_registry,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds1,
             open_virtual_dataset(
                 file_url=air2_nc_path,
-                object_store=store,
+                registry=local_registry,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
@@ -460,30 +473,31 @@ def test_datatree_roundtrip(
                     )
 
 
-def test_open_scalar_variable(tmp_path: Path):
+def test_open_scalar_variable(tmp_path: Path, local_registry):
     # regression test for GH issue #100
 
     nc_path = str(tmp_path / "scalar.nc")
     ds = xr.Dataset(data_vars={"a": 0})
     ds.to_netcdf(nc_path)
 
-    store = obstore_local(nc_path)
     parser = HDFParser()
     with open_virtual_dataset(
         file_url=nc_path,
-        object_store=store,
+        registry=local_registry,
         parser=parser,
     ) as vds:
         assert vds["a"].shape == ()
+    ms = parser(file_url=f"file://{nc_path}", registry=local_registry)
+    roundtripped = xr.open_zarr(ms, consolidated=False, zarr_format=3)
+    xr.testing.assert_allclose(ds, roundtripped.load())
 
 
 class TestPathsToURIs:
-    def test_convert_absolute_paths_to_uris(self, netcdf4_file):
-        store = obstore_local(file_url=netcdf4_file)
+    def test_convert_absolute_paths_to_uris(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
             file_url=netcdf4_file,
-            object_store=store,
+            registry=local_registry,
             parser=parser,
         ) as vds:
             expected_path = Path(netcdf4_file).as_uri()
@@ -492,13 +506,12 @@ class TestPathsToURIs:
 
             assert path == expected_path
 
-    def test_convert_relative_paths_to_uris(self, netcdf4_file):
+    def test_convert_relative_paths_to_uris(self, netcdf4_file, local_registry):
         relative_path = relpath(netcdf4_file)
-        store = obstore_local(relative_path)
         parser = HDFParser()
         with open_virtual_dataset(
             file_url=relative_path,
-            object_store=store,
+            registry=local_registry,
             parser=parser,
         ) as vds:
             expected_path = Path(netcdf4_file).as_uri()

@@ -126,7 +126,7 @@ class SerialExecutor(Executor):
 
 class DaskDelayedExecutor(Executor):
     """
-    An Executor that uses dask.delayed for parallel computation.
+    An Executor that uses [dask.delayed][dask.delayed.delayed] for parallel computation.
 
     This executor mimics the concurrent.futures.Executor interface but uses Dask's delayed computation model.
     """
@@ -139,7 +139,7 @@ class DaskDelayedExecutor(Executor):
 
     def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
         """
-        Submit a task to be computed with dask.delayed.
+        Submit a task to be computed with [dask.delayed][dask.delayed.delayed].
 
         Parameters
         ----------
@@ -185,7 +185,7 @@ class DaskDelayedExecutor(Executor):
         chunksize: int = 1,
     ) -> Iterator[T]:
         """
-        Apply a function to an iterable using dask.delayed.
+        Apply a function to an iterable using [dask.delayed][dask.delayed.delayed].
 
         Parameters
         ----------
@@ -226,9 +226,9 @@ class DaskDelayedExecutor(Executor):
 
 class LithopsEagerFunctionExecutor(Executor):
     """
-    Lithops-based function executor which follows the concurrent.futures.Executor API.
+    Lithops-based function executor which follows the [concurrent.futures.Executor][] API.
 
-    Only required because lithops doesn't follow the concurrent.futures.Executor API, see https://github.com/lithops-cloud/lithops/issues/1427.
+    Only required because lithops doesn't follow the [concurrent.futures.Executor][] API, see https://github.com/lithops-cloud/lithops/issues/1427.
     """
 
     def __init__(self, **kwargs) -> None:
@@ -294,7 +294,7 @@ class LithopsEagerFunctionExecutor(Executor):
         """
         Apply a function to an iterable using lithops.
 
-        Only needed because lithops.FunctionExecutor.map returns futures, unlike ``concurrent.futures.Executor.map``.
+        Only needed because [lithops.executors.FunctionExecutor.map][lithops.executors.FunctionExecutor.map] returns futures, unlike [concurrent.futures.Executor.map][].
 
         Parameters
         ----------

@@ -17,41 +17,41 @@ except ModuleNotFoundError:
 
 
 @pytest.fixture
-def empty_chunks_hdf5_file(tmpdir):
+def empty_chunks_hdf5_url(tmpdir):
     ds = xr.Dataset({"data": []})
     filepath = f"{tmpdir}/empty_chunks.nc"
     ds.to_netcdf(filepath, engine="h5netcdf")
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def empty_dataset_hdf5_file(tmpdir):
+def empty_dataset_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/empty_dataset.nc"
     f = h5py.File(filepath, "w")
     f.create_dataset("data", shape=(0,), dtype="f")
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def no_chunks_hdf5_file(tmpdir):
+def no_chunks_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/no_chunks.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def chunked_hdf5_file(tmpdir):
+def chunked_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/chunks.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((100, 100))
     f.create_dataset(name="data", data=data, chunks=(50, 50))
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def single_dimension_scale_hdf5_file(tmpdir):
+def single_dimension_scale_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/single_dimension_scale.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
@@ -60,21 +60,21 @@ def single_dimension_scale_hdf5_file(tmpdir):
     f.create_dataset(name="x", data=x)
     f["x"].make_scale()
     f["data"].dims[0].attach_scale(f["x"])
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def is_scale_hdf5_file(tmpdir):
+def is_scale_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/is_scale.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
     f.create_dataset(name="data", data=data)
     f["data"].make_scale()
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def multiple_dimension_scales_hdf5_file(tmpdir):
+def multiple_dimension_scales_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/multiple_dimension_scales.nc"
     f = h5py.File(filepath, "w")
     data = [1, 2]
@@ -85,11 +85,11 @@ def multiple_dimension_scales_hdf5_file(tmpdir):
     f["y"].make_scale()
     f["data"].dims[0].attach_scale(f["x"])
     f["data"].dims[0].attach_scale(f["y"])
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def chunked_dimensions_netcdf4_file(tmpdir):
+def chunked_dimensions_netcdf4_url(tmpdir):
     filepath = f"{tmpdir}/chunks_dimension.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((100, 100))
@@ -100,40 +100,40 @@ def chunked_dimensions_netcdf4_file(tmpdir):
     f.create_dataset(name="y", data=y)
     f["data"].dims[0].attach_scale(f["x"])
     f["data"].dims[1].attach_scale(f["y"])
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def string_attributes_hdf5_file(tmpdir):
+def string_attributes_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/attributes.nc"
     f = h5py.File(filepath, "w")
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
     f["data"].attrs["attribute_name"] = "attribute_name"
     f["data"].attrs["attribute_name2"] = "attribute_name2"
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def root_attributes_hdf5_file(tmpdir):
+def root_attributes_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/root_attributes.nc"
     f = h5py.File(filepath, "w")
     f.attrs["attribute_name"] = "attribute_name"
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def group_hdf5_file(tmpdir):
+def group_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/group.nc"
     f = h5py.File(filepath, "w")
     g = f.create_group("group")
     data = np.random.random((10, 10))
     g.create_dataset("data", data=data)
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def nested_group_hdf5_file(tmp_path: Path) -> str:
+def nested_group_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "nested_group.nc")
 
     with h5py.File(filepath, "w") as f:
@@ -142,11 +142,11 @@ def nested_group_hdf5_file(tmp_path: Path) -> str:
         g.create_dataset("data", data=data)
         g.create_group("nested_group")
 
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
-def multiple_datasets_hdf5_file(tmp_path: Path) -> str:
+def multiple_datasets_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "multiple_datasets.nc")
 
     with h5py.File(filepath, "w") as f:
@@ -154,7 +154,7 @@ def multiple_datasets_hdf5_file(tmp_path: Path) -> str:
         f.create_dataset(name="data", data=data, chunks=None)
         f.create_dataset(name="data2", data=data, chunks=None)
 
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture
@@ -242,7 +242,11 @@ def filter_encoded_roundtrip_netcdf4_file(
     ds["var2"].encoding.update(encoding_config)
     filepath = f"{tmpdir}/{request.param}_xarray.nc"
     ds.to_netcdf(filepath, engine="netcdf4")
-    return {"filepath": filepath, "compressor": request.param}
+    return {
+        "filepath": filepath,
+        "url": f"file://{filepath}",
+        "compressor": request.param,
+    }
 
 
 @pytest.fixture
@@ -288,14 +292,14 @@ def scale_add_offset_hdf5_file(
 
 
 @pytest.fixture()
-def chunked_roundtrip_hdf5_file(tmpdir):
+def chunked_roundtrip_hdf5_url(tmpdir):
     ds = create_test_data(dim_sizes=(20, 80, 10))
     ds = ds.drop_dims("dim3")
     filepath = f"{tmpdir}/chunked_xarray.nc"
     ds.to_netcdf(
         filepath, engine="netcdf4", encoding={"var2": {"chunksizes": (10, 10)}}
     )
-    return filepath
+    return f"file://{filepath}"
 
 
 @pytest.fixture(params=["gzip", "zlib"])
@@ -369,7 +373,7 @@ def non_coord_dim(tmpdir):
 
 
 @pytest.fixture
-def scalar_fill_value_hdf5_file(tmp_path: Path) -> str:
+def scalar_fill_value_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "scalar_fill_value.nc")
 
     with h5py.File(filepath, "w") as f:
@@ -377,7 +381,7 @@ def scalar_fill_value_hdf5_file(tmp_path: Path) -> str:
         fill_value = 42
         f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
 
-    return filepath
+    return f"file://{filepath}"
 
 
 compound_dtype = np.dtype(
