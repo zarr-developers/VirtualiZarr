@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -24,6 +24,7 @@ jobs:
       run:
         shell: bash -l {0}
     strategy:
+      fail-fast: false
       matrix:
         environment: [test-py311, test-py312, min-deps, minio]
     steps:
