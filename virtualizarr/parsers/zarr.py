@@ -3,14 +3,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 from pathlib import Path  # noqa
-from typing import (
-    Any,
-    Hashable,
-)
+from typing import TYPE_CHECKING, Any, Hashable
 
 import numpy as np
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -34,8 +32,8 @@ ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
     np.dtype("datetime64").kind: 0,
 }
 
-
-import zarr
+if TYPE_CHECKING:
+    import zarr
 
 
 async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
@@ -108,7 +106,7 @@ async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: 
 
 async def _construct_manifest_group(
     filepath: str,
-    store: zarr.storage.ObjectStore | zarr.storage.LocalStore,
+    store: zarr.storage.ObjectStore,
     *,
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
@@ -121,12 +119,17 @@ async def _construct_manifest_group(
 
     zarr_array_keys = [key async for key in zarr_group.array_keys()]
 
-    _drop_vars: list[Hashable] = [] if skip_variables is None else list(skip_variables)
-
-    zarr_arrays = await asyncio.gather(
-        *[zarr_group.getitem(var) for var in zarr_array_keys if var not in _drop_vars]
+    _skip_variables: list[Hashable] = (
+        [] if skip_variables is None else list(skip_variables)
     )
 
+    zarr_arrays = await asyncio.gather(
+        *[
+            zarr_group.getitem(var)
+            for var in zarr_array_keys
+            if var not in _skip_variables
+        ]
+    )
     manifest_arrays = await asyncio.gather(
         *[
             _construct_manifest_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
@@ -137,6 +140,7 @@ async def _construct_manifest_group(
     manifest_dict = {
         array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
     }
+
     return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
@@ -189,7 +193,7 @@ class ZarrParser:
         import asyncio
 
         object_store, _ = registry.resolve(filepath)
-        zarr_store = zarr.storage.ObjectStore(store=object_store)
+        zarr_store = ObjectStore(store=object_store)
         manifest_group = asyncio.run(
             _construct_manifest_group(
                 store=zarr_store,
