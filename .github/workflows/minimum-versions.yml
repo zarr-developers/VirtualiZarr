@@ -1,4 +1,4 @@
-name: Upstream
+name: Minimum-versions
 
 on:
   push:
