@@ -26,8 +26,11 @@ nav:
     - "custom_parsers.md"
     - "scaling.md"
     - "faq.md"
-  - Reference:
-    - "api.md"
+  - API Reference:
+    - api/virtualizarr.md
+    - api/parsers.md
+    - api/serialization.md
+    - api/developer.md
   - About the project:
     - "releases.md"
     - "contributing.md"
