@@ -10,6 +10,7 @@ from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
+    requires_network,
 )
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
@@ -199,6 +200,7 @@ def test_subgroup_variable_names(
         assert list(vds.dims) == ["dim_0"]
 
 
+@requires_network
 def test_netcdf_over_https():
     url = "https://oceania.generic-mapping-tools.org/cache/Iceland.nc"
     store = from_url(url)
