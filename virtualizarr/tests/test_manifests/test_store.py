@@ -21,10 +21,10 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
     ManifestStore,
-    ObjectStoreRegistry,
 )
-from virtualizarr.manifests.store import get_store_prefix, parse_manifest_index
+from virtualizarr.manifests.store import parse_manifest_index
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -191,7 +191,6 @@ def empty_memory_store():
     import obstore as obs
 
     store = obs.store.MemoryStore()
-    prefix = get_store_prefix("")
     chunk_dict = {
         "0.0": {"path": "", "offset": 0, "length": 4},
     }
@@ -207,7 +206,7 @@ def empty_memory_store():
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(arrays={"foo": manifest_array})
-    registry = ObjectStoreRegistry({prefix: store})
+    registry = ObjectStoreRegistry({"memory://": store})
     return ManifestStore(store_registry=registry, group=manifest_group)
 
 

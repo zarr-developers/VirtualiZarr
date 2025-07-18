@@ -9,6 +9,7 @@ import xarray.testing as xrt
 
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_network
 from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset
@@ -352,17 +353,18 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
         file_url=dmrpp_url,
         region="us-west-2",
     )
-
+    registry = ObjectStoreRegistry()
+    registry.register("s3://its-live-data/test-space", store)
     with (
         open_virtual_dataset(
             file_url=dmrpp_url,
-            object_store=store,
+            registry=registry,
             parser=DMRPPParser(),
             loadable_variables=[],
         ) as actual,
         open_virtual_dataset(
             file_url=data_url,
-            object_store=store,
+            registry=registry,
             parser=HDFParser(),
             loadable_variables=[],
         ) as expected,
@@ -377,9 +379,10 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         file_url=dmrpp_url,
         region="us-west-2",
     )
-
+    registry = ObjectStoreRegistry()
+    registry.register(dmrpp_url, store)
     parser = DMRPPParser()
-    manifest_store = parser(file_url=dmrpp_url, object_store=store)
+    manifest_store = parser(file_url=dmrpp_url, registry=registry)
 
     with xr.open_dataset(
         manifest_store, engine="zarr", consolidated=False, zarr_format=3
@@ -448,7 +451,9 @@ def test_split_groups(hdf5_groups_file, group_path):
     ],
 )
 def test_parse_dataset(group: str | None, warns: bool, netcdf4_file):
-    drmpp = dmrparser(DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file)
+    drmpp = dmrparser(
+        DMRPP_XML_STRINGS["netcdf4_file"], filepath=f"file://{netcdf4_file}"
+    )
     store = obstore_local(file_url=drmpp.data_filepath)
 
     with nullcontext() if warns else pytest.raises(BaseException, match="DID NOT WARN"):
@@ -472,9 +477,9 @@ def test_parse_dataset(group: str | None, warns: bool, netcdf4_file):
 
 def test_parse_dataset_nested(hdf5_groups_file):
     nested_groups_dmrpp = dmrparser(
-        DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=hdf5_groups_file
+        DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=f"file://{hdf5_groups_file}"
     )
-    store = obstore_local(file_url=nested_groups_dmrpp.data_filepath)
+    store = obstore_local(file_url=f"file://{nested_groups_dmrpp.data_filepath}")
 
     vds_root_implicit = nested_groups_dmrpp.parse_dataset(
         object_store=store

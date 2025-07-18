@@ -10,12 +10,14 @@ import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
+from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
 # Local imports
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import ceildiv
 
 
@@ -56,6 +58,11 @@ def zarr_store(tmpdir, request):
     ds.to_zarr(filepath, zarr_format=request.param)
     ds.close()
     return filepath
+
+
+@pytest.fixture()
+def local_registry():
+    return ObjectStoreRegistry({"file://": LocalStore()})
 
 
 @pytest.fixture()
@@ -262,10 +269,12 @@ def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr.tests.utils import obstore_local
 
     store = obstore_local(file_url=netcdf4_file)
+    registry = ObjectStoreRegistry()
+    registry.register("file://", store)
     parser = HDFParser()
     with open_virtual_dataset(
         file_url=netcdf4_file,
-        object_store=store,
+        registry=registry,
         parser=parser,
         loadable_variables=[],
     ) as ds:

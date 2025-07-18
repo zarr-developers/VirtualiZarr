@@ -3,6 +3,7 @@ from xarray import Dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import FITSParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_kerchunk, requires_network
 from virtualizarr.tests.utils import obstore_s3
 
@@ -16,9 +17,11 @@ def test_open_hubble_data():
     file_url = "s3://stpubdata/hst/public/f05i/f05i0201m/f05i0201m_a1f.fits"
     store = obstore_s3(file_url=file_url, region="us-west-2")
     parser = FITSParser(reader_options={"storage_options": {"anon": True}})
+    registry = ObjectStoreRegistry()
+    registry.register(file_url, store)
     with open_virtual_dataset(
         file_url=file_url,
-        object_store=store,
+        registry=registry,
         parser=parser,
     ) as vds:
         assert isinstance(vds, Dataset)

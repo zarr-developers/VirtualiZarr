@@ -18,6 +18,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import construct_chunk_pattern
+from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -96,64 +97,6 @@ def parse_manifest_index(
     return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
-class ObjectStoreRegistry:
-    """
-    Registry of [ObjectStore][obstore.store.ObjectStore] instances and their associated URI prefixes.
-
-    ObjectStoreRegistry maps the URI scheme and netloc to [ObjectStore][obstore.store.ObjectStore] instances. Used by [ManifestStore][virtualizarr.manifests.ManifestStore] to read both metadata and data referenced by virtual chunk references, via the associated [ObjectStore][obstore.store.ObjectStore].
-    """
-
-    _stores: dict[str, ObjectStore]
-
-    @classmethod
-    def __init__(self, stores: dict[str, ObjectStore] | None = None):
-        stores = stores or {}
-        for store in stores.values():
-            if not store.__class__.__module__.startswith("obstore"):
-                raise TypeError(f"expected ObjectStore class, got {store!r}")
-        self._stores = stores
-
-    def register_store(self, prefix: str, store: ObjectStore):
-        """
-        Register a store using the given prefix
-
-        If a store with the same key existed before, it is replaced
-
-        Parameters
-        ----------
-        prefix
-            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
-            prefix of multiple stores in the registry, the store with the longer prefix is chosen.
-        """
-        self._stores[prefix] = store
-
-    def get_store(self, url: str) -> ObjectStore:
-        """
-        Get a registered store for the provided URL.
-
-        Parameters
-        ----------
-        url
-            A url to identify the appropriate  [ObjectStore][obstore.store.ObjectStore] instance. If the url is contained in the
-            prefix of multiple stores in the registry, the store with the longest prefix is chosen.
-
-        Returns
-        -------
-        ObjectStore
-
-        Raises
-        ------
-        ValueError
-            If no store is registered for the provided URL or its prefixes.
-        """
-        prefixes = filter(url.startswith, self._stores)
-
-        if (longest_prefix := max(prefixes, default=None, key=len)) is None:
-            raise ValueError(f"No store registered for any prefix of {url!r}")
-
-        return self._stores[longest_prefix]
-
-
 class ManifestStore(Store):
     """
     A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
@@ -167,7 +110,7 @@ class ManifestStore(Store):
         Root group of the store.
         Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     store_registry : ObjectStoreRegistry
-        [ObjectStoreRegistry][virtualizarr.manifests.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+        [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
@@ -198,7 +141,6 @@ class ManifestStore(Store):
             allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
 
-        # TODO: Don't allow stores with prefix
         if not isinstance(group, ManifestGroup):
             raise TypeError
 
@@ -246,7 +188,7 @@ class ManifestStore(Store):
         length = manifest._lengths[chunk_indexes]
 
         # Get the configured object store instance that matches the path
-        store = self._store_registry.get_store(path)
+        store, path_after_prefix = self._store_registry.resolve(path)
         if not store:
             raise ValueError(
                 f"Could not find a store to use for {path} in the store registry"
@@ -363,7 +305,7 @@ class ManifestStore(Store):
 
         from virtualizarr.xarray import construct_virtual_dataset
 
-        if loadable_variables and self._store_registry._stores is None:
+        if loadable_variables and self._store_registry.map is None:
             raise ValueError(
                 f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
             )
