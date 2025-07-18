@@ -2,11 +2,11 @@ name: Upstream
 
 on:
   push:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     types: [ labeled ]
     paths-ignore:
     - 'docs/**'
@@ -21,9 +21,12 @@ jobs:
   test-upstream:
     name: ${{ matrix.environment }}-build
     if: |
-      github.event_name == 'push' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'pull_request' && github.event.label.name == 'test-upstream')
+      always()
+      && (
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+          || needs.detect-ci-trigger.outputs.triggered == 'true'
+          || contains( github.event.pull_request.labels.*.name, 'test-upstream')
+      )
     runs-on: ubuntu-latest
     defaults:
       run:
