@@ -28,7 +28,13 @@ nav:
     - "faq.md"
   - API Reference:
     - api/virtualizarr.md
-    - api/parsers.md
+    - Parsers:
+      - api/parsers/hdf5.md
+      - api/parsers/fits.md
+      - api/parsers/kerchunk.md
+      - api/parsers/netcdf3.md
+      - api/parsers/zarr.md
+      - api/parsers/dmrpp.md
     - api/serialization.md
     - api/developer.md
   - About the project:
