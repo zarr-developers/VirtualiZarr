@@ -53,7 +53,7 @@ def open_virtual_dataset(
     Parameters
     ----------
     file_url
-        The url of the file to virtualize. The URL should include a scheme and, if remote, a netloc. For example:
+        The url of the file to virtualize. The URL should include a scheme. For example:
 
         - `file_url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local file.
         - `file_url="s3://my-bucket/my-project/my-data.nc"` for a remote file on an S3 compatible cloud.
@@ -63,7 +63,7 @@ def open_virtual_dataset(
     parser
         A parser to use for the given file. For example:
 
-        - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF or HDF5 files.
+        - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
@@ -73,7 +73,7 @@ def open_virtual_dataset(
     drop_variables
         Variables in the file to drop before returning.
     loadable_variables
-        Variables in the file to load as Dask/NumPy arrays instead of instances of virtual arrays.
+        Variables in the file to load as Dask/NumPy arrays instead of as virtual arrays.
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
     indexes
@@ -84,7 +84,8 @@ def open_virtual_dataset(
     Returns
     -------
     vds
-        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
+        An [xarray.Dataset][] containing virtual chunk references for all variables not included
+        in `loadable_variables` and normal lazily indexed arrays for each variable in `loadable_variables`.
     """
     filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
