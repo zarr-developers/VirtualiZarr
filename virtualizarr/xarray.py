@@ -41,9 +41,51 @@ def open_virtual_dataset(
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
-    cftime_variables: Iterable[str] | None = None,
     indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
+    """
+    Open a data file, virtual dataset, Zarr store, etc. as an [xarray.Dataset][] wrapping virtualized zarr arrays.
+
+    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
+
+    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+
+    Parameters
+    ----------
+    file_url
+        The url of the file to virtualize. The URL should include a scheme and, if remote, a netloc. For example:
+
+        - `file_url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local file.
+        - `file_url="s3://my-bucket/my-project/my-data.nc"` for a remote file on an S3 compatible cloud.
+
+    registry
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+    parser
+        A parser to use for the given file. For example:
+
+        - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF or HDF5 files.
+        - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
+        - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
+        - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
+        - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
+        - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+
+    drop_variables
+        Variables in the file to drop before returning.
+    loadable_variables
+        Variables in the file to load as Dask/NumPy arrays instead of instances of virtual arrays.
+    decode_times
+        Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
+    indexes
+        Indexes to use on the returned [xarray.Dataset][].
+        Default will read any 1D coordinate data to create in-memory Pandas indexes.
+        To avoid creating any indexes, pass `indexes={}`.
+
+    Returns
+    -------
+    vds
+        An xarray Dataset containing instances of virtual_array_cls for each variable, or normal lazily indexed arrays for each variable in loadable_variables.
+    """
     filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
 
     manifest_store = parser(
