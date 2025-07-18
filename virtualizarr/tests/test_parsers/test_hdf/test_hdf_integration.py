@@ -31,7 +31,7 @@ class TestIntegration:
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time"],
-                cftime_variables=["time"],
+                decode_times=True,
             ) as vds,
         ):
             kerchunk_file = str(tmp_path / "kerchunk.json")
