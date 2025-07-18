@@ -184,7 +184,8 @@ class ZarrParser:
 
         Returns
         -------
-        ManifestStore: A ManifestStore which provides a Zarr representation of the parsed file.
+        ManifestStore
+            A ManifestStore which provides a Zarr representation of the parsed file.
         """
 
         filepath = validate_and_normalize_path_to_uri(
