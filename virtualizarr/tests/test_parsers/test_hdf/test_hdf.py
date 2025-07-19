@@ -10,7 +10,6 @@ from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
-    requires_network,
 )
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
@@ -200,12 +199,15 @@ def test_subgroup_variable_names(
         assert list(vds.dims) == ["dim_0"]
 
 
-@requires_network
+# @requires_network
 def test_netcdf_over_https():
-    url = "https://oceania.generic-mapping-tools.org/cache/Iceland.nc"
+    url = "https://www.earthbyte.org/webdav/gmt_mirror/gmt/data/cache/topo_32.nc"
     store = from_url(url)
     registry = ObjectStoreRegistry({url: store})
     parser = HDFParser()
-    with parser(file_url=url, registry=registry) as ms:
-        ds = xr.open_zarr(ms, zarr_format=3, consolidated=False).load()
-        np.testing.assert_allclose(ds["z"].min().to_numpy(), -1857)
+    with (
+        parser(file_url=url, registry=registry) as ms,
+        xr.open_zarr(ms, zarr_format=3, consolidated=False).load() as ds,
+    ):
+        np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
+        np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
