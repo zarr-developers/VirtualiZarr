@@ -65,4 +65,4 @@ class Parser:
             fs_root=Path.cwd().as_uri(),
         )
 
-        return ManifestStore(group=manifestgroup, store_registry=registry)
+        return ManifestStore(group=manifestgroup, registry=registry)

@@ -66,4 +66,4 @@ class KerchunkJSONParser:
             fs_root=self.fs_root,
             skip_variables=self.skip_variables,
         )
-        return ManifestStore(group=manifestgroup, store_registry=registry)
+        return ManifestStore(group=manifestgroup, registry=registry)

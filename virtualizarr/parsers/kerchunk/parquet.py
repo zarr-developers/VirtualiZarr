@@ -96,7 +96,7 @@ class KerchunkParquetParser:
             skip_variables=self.skip_variables,
         )
 
-        return ManifestStore(group=manifestgroup, store_registry=registry)
+        return ManifestStore(group=manifestgroup, registry=registry)
 
 
 @dataclass

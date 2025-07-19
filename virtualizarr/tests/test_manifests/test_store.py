@@ -148,7 +148,7 @@ def _generate_manifest_store(
         attributes={"Zarr": "Hooray!"},
     )
     registry = ObjectStoreRegistry({prefix: store})
-    return ManifestStore(store_registry=registry, group=manifest_group)
+    return ManifestStore(registry=registry, group=manifest_group)
 
 
 @pytest.fixture()
@@ -207,7 +207,7 @@ def empty_memory_store():
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
     manifest_group = ManifestGroup(arrays={"foo": manifest_array})
     registry = ObjectStoreRegistry({"memory://": store})
-    return ManifestStore(store_registry=registry, group=manifest_group)
+    return ManifestStore(registry=registry, group=manifest_group)
 
 
 @requires_obstore
@@ -362,7 +362,7 @@ class TestToVirtualXarray:
                     path.split("/")[-1],
                     np.ones(marr.chunks, dtype=marr.dtype).tobytes(),
                 )
-        store_registry = ObjectStoreRegistry({"file://": store})
+        registry = ObjectStoreRegistry({"file://": store})
 
         manifest_group = ManifestGroup(
             arrays={
@@ -373,7 +373,7 @@ class TestToVirtualXarray:
             attributes={"coordinates": "elevation t", "ham": "eggs"},
         )
 
-        manifest_store = ManifestStore(manifest_group, store_registry=store_registry)
+        manifest_store = ManifestStore(manifest_group, registry=registry)
 
         vds = manifest_store.to_virtual_dataset(loadable_variables=loadable_variables)
         assert set(vds.variables) == set(["T", "elevation", "t"])

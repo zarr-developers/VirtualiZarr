@@ -109,7 +109,7 @@ class ManifestStore(Store):
     group
         Root group of the store.
         Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
-    store_registry : ObjectStoreRegistry
+    registry : ObjectStoreRegistry
         [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
@@ -122,13 +122,13 @@ class ManifestStore(Store):
     #  Modified from https://github.com/zarr-developers/zarr-python/pull/1661
 
     _group: ManifestGroup
-    _store_registry: ObjectStoreRegistry
+    _registry: ObjectStoreRegistry
 
     def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
-        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry | None = None
+        self, group: ManifestGroup, *, registry: ObjectStoreRegistry | None = None
     ) -> None:
         """Instantiate a new ManifestStore.
 
@@ -136,7 +136,7 @@ class ManifestStore(Store):
         ----------
         group
             [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing Group metadata and mapping variable names to ManifestArrays
-        store_registry
+        registry
             A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
             allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
@@ -145,13 +145,11 @@ class ManifestStore(Store):
             raise TypeError
 
         super().__init__(read_only=True)
-        if store_registry is None:
-            store_registry = ObjectStoreRegistry()
-        self._store_registry = store_registry
+        self._registry = ObjectStoreRegistry() if registry is None else registry
         self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore(group={self._group}, stores={self._store_registry})"
+        return f"ManifestStore(group={self._group}, registry={self._registry})"
 
     async def get(
         self,
@@ -188,7 +186,7 @@ class ManifestStore(Store):
         length = manifest._lengths[chunk_indexes]
 
         # Get the configured object store instance that matches the path
-        store, path_after_prefix = self._store_registry.resolve(path)
+        store, path_after_prefix = self._registry.resolve(path)
         if not store:
             raise ValueError(
                 f"Could not find a store to use for {path} in the store registry"
@@ -305,7 +303,7 @@ class ManifestStore(Store):
 
         from virtualizarr.xarray import construct_virtual_dataset
 
-        if loadable_variables and self._store_registry.map is None:
+        if loadable_variables and self._registry.map is None:
             raise ValueError(
                 f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
             )
