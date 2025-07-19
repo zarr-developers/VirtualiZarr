@@ -199,4 +199,4 @@ class ZarrParser:
                 skip_variables=self.skip_variables,
             )
         )
-        return ManifestStore(store_registry=registry, group=manifest_group)
+        return ManifestStore(registry=registry, group=manifest_group)
