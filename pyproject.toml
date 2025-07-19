@@ -21,7 +21,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.3.0,!=2025.7.0,!=2025.7.1",
+    "xarray==2025.06.0",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
@@ -87,7 +87,7 @@ all_writers = [
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
 upstream = [
-    'xarray @ git+https://github.com/pydata/xarray',
+    # 'xarray @ git+https://github.com/pydata/xarray',
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
@@ -166,7 +166,7 @@ h5netcdf = ">=1.5.0,<2"
 rust = "*"
 
 [tool.pixi.feature.minimum-versions.dependencies]
-xarray = "==2025.3.0"
+xarray = "==2025.6.0"
 numpy = "==2.0.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
