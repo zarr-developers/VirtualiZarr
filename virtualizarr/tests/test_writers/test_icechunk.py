@@ -29,8 +29,8 @@ if TYPE_CHECKING:
 
 
 # Find location of pytest temporary data in what should be a cross-platform way. This should be the same as what pytest actually does - see https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
-# The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URI prefix without symlinks.
-PYTEST_TMP_DIRECTORY_URI_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"
+# The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URL prefix without symlinks.
+PYTEST_TMP_DIRECTORY_URL_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"
 
 
 @pytest.fixture(scope="function")
@@ -45,15 +45,15 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
     config = icechunk.RepositoryConfig.default()
 
     container = icechunk.VirtualChunkContainer(
-        url_prefix=PYTEST_TMP_DIRECTORY_URI_PREFIX,
-        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URI_PREFIX),
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
     )
     config.set_virtual_chunk_container(container)
 
     return icechunk.Repository.create(
         storage=icechunk_storage,
         config=config,
-        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URI_PREFIX: None},
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
     )
 
 
@@ -517,7 +517,7 @@ class TestAppend:
         virtual_dataset: Callable,
     ):
         # generate virtual dataset
-        vds = virtual_dataset(file_uri=simple_netcdf4)
+        vds = virtual_dataset(url=simple_netcdf4)
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.vz.to_icechunk(writable_session.store)
@@ -555,7 +555,7 @@ class TestAppend:
         filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
         vds1, vds2 = (
             virtual_dataset(
-                file_uri=filepath1,
+                url=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
@@ -566,7 +566,7 @@ class TestAppend:
                 length=15476000,
             ),
             virtual_dataset(
-                file_uri=filepath2,
+                url=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
@@ -662,7 +662,7 @@ class TestAppend:
         ]
         vds1, vds2 = (
             virtual_dataset(
-                file_uri=filepath1,
+                url=filepath1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
@@ -673,7 +673,7 @@ class TestAppend:
                 coords=coords1,
             ),
             virtual_dataset(
-                file_uri=filepath2,
+                url=filepath2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 dims=["time", "lat", "lon"],
@@ -733,7 +733,7 @@ class TestAppend:
         # Generate compressed dataset
         vds1, vds2 = (
             virtual_dataset(
-                file_uri=file1,
+                url=file1,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 codecs=[
@@ -747,7 +747,7 @@ class TestAppend:
                 length=3936114,
             ),
             virtual_dataset(
-                file_uri=file2,
+                url=file2,
                 shape=(1460, 25, 53),
                 chunk_shape=(1460, 25, 53),
                 codecs=[
@@ -790,7 +790,7 @@ class TestAppend:
         virtual_dataset: Callable,
     ):
         # Generate a virtual dataset with specific chunking
-        vds = virtual_dataset(file_uri=simple_netcdf4, chunk_shape=(3, 4))
+        vds = virtual_dataset(url=simple_netcdf4, chunk_shape=(3, 4))
 
         # Commit the dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -798,9 +798,7 @@ class TestAppend:
         icechunk_filestore.commit("test commit")
 
         # Try to append dataset with different chunking, expect failure
-        vds_different_chunking = virtual_dataset(
-            file_uri=simple_netcdf4, chunk_shape=(1, 1)
-        )
+        vds_different_chunking = virtual_dataset(url=simple_netcdf4, chunk_shape=(1, 1))
         icechunk_filestore_append = icechunk_repo.writable_session("main")
         with pytest.raises(
             ValueError, match="Cannot concatenate arrays with inconsistent chunk shapes"
@@ -817,8 +815,8 @@ class TestAppend:
         virtual_dataset: Callable,
     ):
         # Generate datasets with different encoding
-        vds1 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.1})
-        vds2 = virtual_dataset(file_uri=simple_netcdf4, encoding={"scale_factor": 0.01})
+        vds1 = virtual_dataset(url=simple_netcdf4, encoding={"scale_factor": 0.1})
+        vds2 = virtual_dataset(url=simple_netcdf4, encoding={"scale_factor": 0.01})
 
         # Commit the first dataset
         icechunk_filestore = icechunk_repo.writable_session("main")
@@ -842,12 +840,12 @@ class TestAppend:
         # Generate datasets with different lengths on the non-append dimension (x)
         vds1 = virtual_dataset(
             # {'x': 5, 'y': 4}
-            file_uri=simple_netcdf4,
+            url=simple_netcdf4,
             shape=(5, 4),
         )
         vds2 = virtual_dataset(
             # {'x': 6, 'y': 4}
-            file_uri=simple_netcdf4,
+            url=simple_netcdf4,
             shape=(6, 4),
         )
 
@@ -871,7 +869,7 @@ class TestAppend:
         Test that attempting to append with an append_dim not present in dims raises a ValueError.
         """
         vds = virtual_dataset(
-            file_uri=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
+            url=simple_netcdf4, shape=(5, 4), chunk_shape=(5, 4), dims=["x", "y"]
         )
 
         icechunk_filestore = icechunk_repo.writable_session("main")

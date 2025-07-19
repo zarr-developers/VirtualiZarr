@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     import zarr
 
 
-async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -> dict:
+async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, path: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
@@ -48,7 +48,7 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
         prefix_keys = [(prefix,)]
         _lengths = [await zarr_array.store.getsize("c")]
         _dict_keys = ["c"]
-        _paths = [filepath + "/" + _dict_keys[0]]
+        _paths = [path + "/" + _dict_keys[0]]
 
     else:
         prefix = zarr_array.name.lstrip("/") + "/c/"
@@ -56,7 +56,7 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
         _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
         chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
         _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-        _paths = [filepath + "/" + prefix + key for key in chunk_keys]
+        _paths = [path + "/" + prefix + key for key in chunk_keys]
 
     _offsets = [0] * len(_lengths)
     return {
@@ -70,11 +70,9 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, filepath: str) -
     }
 
 
-async def build_chunk_manifest(
-    zarr_array: zarr.AsyncArray, filepath: str
-) -> ChunkManifest:
+async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str) -> ChunkManifest:
     """Build a ChunkManifest from a dictionary"""
-    chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, filepath=filepath)
+    chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
     return ChunkManifest(chunk_map)
 
 
@@ -97,15 +95,15 @@ def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
 
 
-async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], filepath: str):
+async def _construct_manifest_array(zarr_array: zarr.AsyncArray[Any], path: str):
     array_metadata = get_metadata(zarr_array=zarr_array)
 
-    chunk_manifest = await build_chunk_manifest(zarr_array, filepath=filepath)
+    chunk_manifest = await build_chunk_manifest(zarr_array, path=path)
     return ManifestArray(metadata=array_metadata, chunkmanifest=chunk_manifest)
 
 
 async def _construct_manifest_group(
-    filepath: str,
+    path: str,
     store: zarr.storage.ObjectStore,
     *,
     skip_variables: str | Iterable[str] | None = None,
@@ -132,7 +130,7 @@ async def _construct_manifest_group(
     )
     manifest_arrays = await asyncio.gather(
         *[
-            _construct_manifest_array(zarr_array=array, filepath=filepath)  # type: ignore[arg-type]
+            _construct_manifest_array(zarr_array=array, path=path)  # type: ignore[arg-type]
             for array in zarr_arrays
         ]
     )
@@ -157,10 +155,10 @@ class ZarrParser:
         Parameters
         ----------
         group
-            The group within the file to be used as the Zarr root group for the
-            ManifestStore (default: the file's root group).
+            The group within the original Zarr store to be used as the root group for the
+            ManifestStore (default: the Zarr store's root group).
         skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore
+            Variables in the Zarr store that will be ignored when creating the ManifestStore
             (default: `None`, do not ignore any variables).
         """
 
@@ -169,7 +167,7 @@ class ZarrParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
@@ -177,28 +175,26 @@ class ZarrParser:
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input Zarr store (e.g., "s3://bucket/store.zarr").
+        url
+            The URL to the input Zarr store (e.g., "s3://bucket/store.zarr").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore which provides a Zarr representation of the parsed file.
+            A ManifestStore which provides a virtual Zarr representation of the parsed data source.
         """
 
-        filepath = validate_and_normalize_path_to_uri(
-            file_url, fs_root=Path.cwd().as_uri()
-        )
+        path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         import asyncio
 
-        object_store, _ = registry.resolve(filepath)
+        object_store, _ = registry.resolve(path)
         zarr_store = ObjectStore(store=object_store)
         manifest_group = asyncio.run(
             _construct_manifest_group(
                 store=zarr_store,
-                filepath=file_url,
+                path=url,
                 group=self.group,
                 skip_variables=self.skip_variables,
             )

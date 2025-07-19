@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 
 def open_virtual_dataset(
-    file_url: str,
+    url: str,
     registry: ObjectStoreRegistry,
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
@@ -52,16 +52,16 @@ def open_virtual_dataset(
 
     Parameters
     ----------
-    file_url
-        The url of the file to virtualize. The URL should include a scheme. For example:
+    url
+        The url of the data source to virtualize. The URL should include a scheme. For example:
 
-        - `file_url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local file.
-        - `file_url="s3://my-bucket/my-project/my-data.nc"` for a remote file on an S3 compatible cloud.
+        - `url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local data source.
+        - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
         An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
-        A parser to use for the given file. For example:
+        A parser to use for the given data source. For example:
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
@@ -71,9 +71,9 @@ def open_virtual_dataset(
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
 
     drop_variables
-        Variables in the file to drop before returning.
+        Variables in the data source to drop before returning.
     loadable_variables
-        Variables in the file to load as Dask/NumPy arrays instead of as virtual arrays.
+        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
     indexes
@@ -87,10 +87,10 @@ def open_virtual_dataset(
         An [xarray.Dataset][] containing virtual chunk references for all variables not included
         in `loadable_variables` and normal lazily indexed arrays for each variable in `loadable_variables`.
     """
-    filepath = validate_and_normalize_path_to_uri(file_url, fs_root=Path.cwd().as_uri())
+    filepath = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
 
     manifest_store = parser(
-        file_url=filepath,
+        url=filepath,
         registry=registry,
     )
 
@@ -103,7 +103,7 @@ def open_virtual_dataset(
 
 
 def open_virtual_mfdataset(
-    file_urls: (
+    urls: (
         str
         | os.PathLike
         | Sequence[str | os.PathLike]
@@ -132,13 +132,13 @@ def open_virtual_mfdataset(
     **kwargs,
 ) -> Dataset:
     """
-    Open multiple files as a single virtual dataset.
+    Open multiple data sources as a single virtual dataset.
 
     This function is explicitly modelled after [xarray.open_mfdataset][], and works in the same way.
 
     If `combine='by_coords'` then the function `combine_by_coords` is used to combine
     the datasets into one before returning the result, and if combine='nested' then
-    `combine_nested` is used. The filepaths must be structured according to which
+    `combine_nested` is used. The urls must be structured according to which
     combining function is used, the details of which are given in the documentation for
     `combine_by_coords` and `combine_nested`. By default `combine='by_coords'`
     will be used. Global attributes from the `attrs_file` are used
@@ -146,7 +146,7 @@ def open_virtual_mfdataset(
 
     Parameters
     ----------
-    file_urls
+    urls
         Same as in [virtualizarr.open_virtual_dataset][]
     registry
         An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
@@ -193,10 +193,10 @@ def open_virtual_mfdataset(
 
     # TODO list kwargs passed to open_virtual_dataset explicitly in docstring?
 
-    paths = cast(NestedSequence[str], _find_absolute_paths(file_urls))
+    paths = cast(NestedSequence[str], _find_absolute_paths(urls))
 
     if not paths:
-        raise OSError("no files to open")
+        raise OSError("No data sources to open, pass urls to the `urls` parameter.")
 
     paths1d: list[str]
     if combine == "nested":
@@ -227,7 +227,7 @@ def open_virtual_mfdataset(
 
         def _open_and_preprocess(path: str) -> xr.Dataset:
             ds = open_virtual_dataset(
-                file_url=path, registry=registry, parser=parser, **kwargs
+                url=path, registry=registry, parser=parser, **kwargs
             )
             return preprocess(ds)
 
@@ -236,7 +236,7 @@ def open_virtual_mfdataset(
 
         def _open(path: str) -> xr.Dataset:
             return open_virtual_dataset(
-                file_url=path, registry=registry, parser=parser, **kwargs
+                url=path, registry=registry, parser=parser, **kwargs
             )
 
         open_func = _open

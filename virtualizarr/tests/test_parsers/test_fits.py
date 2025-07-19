@@ -14,13 +14,13 @@ pytest.importorskip("astropy")
 @requires_network
 def test_open_hubble_data():
     # data from https://registry.opendata.aws/hst/
-    file_url = "s3://stpubdata/hst/public/f05i/f05i0201m/f05i0201m_a1f.fits"
-    store = obstore_s3(file_url=file_url, region="us-west-2")
+    url = "s3://stpubdata/hst/public/f05i/f05i0201m/f05i0201m_a1f.fits"
+    store = obstore_s3(url=url, region="us-west-2")
     parser = FITSParser(reader_options={"storage_options": {"anon": True}})
     registry = ObjectStoreRegistry()
-    registry.register(file_url, store)
+    registry.register(url, store)
     with open_virtual_dataset(
-        file_url=file_url,
+        url=url,
         registry=registry,
         parser=parser,
     ) as vds:

@@ -27,7 +27,7 @@ class TestIntegration:
                 filter_encoded_roundtrip_hdf5_file, decode_times=True
             ) as ds,
             open_virtual_dataset(
-                file_url=url,
+                url=url,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time"],
@@ -49,7 +49,7 @@ class TestIntegration:
         with (
             xr.open_dataset(filepath) as ds,
             open_virtual_dataset(
-                file_url=filepath,
+                url=filepath,
                 parser=parser,
                 registry=local_registry,
             ) as vds,
@@ -67,7 +67,7 @@ class TestIntegration:
         with (
             xr.open_dataset(filter_and_cf_roundtrip_hdf5_file) as ds,
             open_virtual_dataset(
-                file_url=url,
+                url=url,
                 registry=local_registry,
                 parser=parser,
             ) as vds,
@@ -86,7 +86,7 @@ class TestIntegration:
         with (
             xr.open_dataset(non_coord_dim) as ds,
             open_virtual_dataset(
-                file_url=non_coord_dim,
+                url=non_coord_dim,
                 registry=local_registry,
                 parser=parser,
             ) as vds,
@@ -109,7 +109,7 @@ class TestIntegration:
                     " encoding in xarray zarr parser."
                 )
             with open_virtual_dataset(
-                file_url=cf_fill_value_hdf5_url,
+                url=cf_fill_value_hdf5_url,
                 registry=local_registry,
                 parser=parser,
             ) as vds:

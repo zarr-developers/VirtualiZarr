@@ -137,9 +137,7 @@ class TestManifestGroupFromHDF:
 
     def test_drop_variables(self, multiple_datasets_hdf5_url, local_registry):
         parser = HDFParser(drop_variables=["data2"])
-        manifest_store = parser(
-            file_url=multiple_datasets_hdf5_url, registry=local_registry
-        )
+        manifest_store = parser(url=multiple_datasets_hdf5_url, registry=local_registry)
         assert "data2" not in manifest_store._group.arrays.keys()
 
     def test_dataset_in_group(self, group_hdf5_url):
@@ -158,7 +156,7 @@ class TestOpenVirtualDataset:
         root_coordinates_hdf5_url = f"file://{root_coordinates_hdf5_file}"
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=root_coordinates_hdf5_url,
+            url=root_coordinates_hdf5_url,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -169,7 +167,7 @@ class TestOpenVirtualDataset:
         parser = HDFParser()
         with (
             parser(
-                file_url=big_endian_dtype_hdf5_url, registry=local_registry
+                url=big_endian_dtype_hdf5_url, registry=local_registry
             ) as manifest_store,
             xr.open_dataset(big_endian_dtype_hdf5_file) as expected,
         ):
@@ -192,7 +190,7 @@ def test_subgroup_variable_names(
     )
     parser = HDFParser(group=group)
     with open_virtual_dataset(
-        file_url=netcdf4_url_with_data_in_multiple_groups,
+        url=netcdf4_url_with_data_in_multiple_groups,
         registry=local_registry,
         parser=parser,
     ) as vds:
@@ -206,7 +204,7 @@ def test_netcdf_over_https():
     registry = ObjectStoreRegistry({url: store})
     parser = HDFParser()
     with (
-        parser(file_url=url, registry=registry) as ms,
+        parser(url=url, registry=registry) as ms,
         xr.open_zarr(ms, zarr_format=3, consolidated=False).load() as ds,
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
