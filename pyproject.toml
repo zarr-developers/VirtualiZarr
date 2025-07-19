@@ -105,6 +105,12 @@ docs = [
     "mkdocstrings-python>=1.16.10",
     "markdown-exec[ansi]",
     "ruff",
+    "h5py",
+    "pooch",
+    "netcdf4",
+    "icechunk",
+    "kerchunk",
+    "fastparquet"
 ]
 dev = [
     "codecov",
