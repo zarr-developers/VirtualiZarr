@@ -44,11 +44,11 @@ def open_virtual_dataset(
     indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
     """
-    Open a data file, virtual dataset, Zarr store, etc. as an [xarray.Dataset][] wrapping virtualized zarr arrays.
+    Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will be xarray lazily indexed arrays).
+    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
 
-    Xarray indexes can optionally be created (the default behaviour). To avoid creating any xarray indexes pass ``indexes={}``.
+    Xarray indexes can optionally be created (the default behaviour is to create indexes for any 1D coordinate variables). To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
