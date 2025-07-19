@@ -78,11 +78,16 @@ Now, let's create a parser instance and create a virtual dataset by passing the 
 
 ```python exec="on" source="above" session="homepage" result="ansi"
 parser = HDFParser()
-vds = open_virtual_dataset(url=f"{bucket}/{path}", parser=parser, registry=registry)
+vds = open_virtual_dataset(
+  url=f"{bucket}/{path}",
+  parser=parser,
+  registry=registry,
+  loadable_variables = []
+)
 print(repr(vds))
 ```
 
-No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray to the location of chunks in the original netCDF when data is needed later on. The size represents the size of the original dataset, you can see the size of the virtual dataset using the `vz` accessor:
+Since we specified `loadable_variables=[]`, no data has been loaded or copied in this process. We have merely created an on-disk lookup table that points Xarray to the location of chunks in the original netCDF when data is needed later on. The default behavior (`loadable_variables=None`) will load data associated with coordinates but not data variables. The size represents the size of the original dataset, you can see the size of the virtual dataset using the `vz` accessor:
 
 ```python exec="on" source="above" session="homepage" result="ansi"
 print(f"Original dataset size: {vds.nbytes} bytes")
