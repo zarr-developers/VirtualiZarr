@@ -34,9 +34,9 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
-        file_url = f"file://{filepath}"
+        url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        manifest_store = manifest_store_from_hdf_url(file_url)
+        manifest_store = manifest_store_from_hdf_url(url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -46,12 +46,12 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore with a single partial chunk"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
-        file_url = f"file://{filepath}"
+        url = f"file://{filepath}"
         encoding = {
             "temperature": {"chunksizes": (90, 90), "original_shape": (100, 100)}
         }
         basic_ds.to_netcdf(filepath, engine="h5netcdf", encoding=encoding)
-        manifest_store = manifest_store_from_hdf_url(file_url)
+        manifest_store = manifest_store_from_hdf_url(url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -61,9 +61,9 @@ class TestHDFManifestStore:
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore"
 
         filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
-        file_url = f"file://{filepath}"
+        url = f"file://{filepath}"
         basic_ds.to_netcdf(filepath, engine="h5netcdf")
-        manifest_store = manifest_store_from_hdf_url(file_url)
+        manifest_store = manifest_store_from_hdf_url(url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
         ) as rountripped_ds:
@@ -91,9 +91,7 @@ class TestHDFManifestStore:
         registry = ObjectStoreRegistry()
         registry.register(url_without_file, s3store)
         parser = HDFParser()
-        manifest_store = parser(
-            file_url=chunked_roundtrip_hdf5_s3_file, registry=registry
-        )
+        manifest_store = parser(url=chunked_roundtrip_hdf5_s3_file, registry=registry)
 
         with manifest_store.to_virtual_dataset() as vds:
             assert vds.dims == {"phony_dim_0": 5}

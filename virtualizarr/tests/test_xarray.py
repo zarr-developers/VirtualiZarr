@@ -198,13 +198,13 @@ class TestCombine:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1,
+                url=filepath1,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2,
+                url=filepath2,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
@@ -227,25 +227,25 @@ class TestCombine:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1,
+                url=filepath1,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2,
+                url=filepath2,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds2,
             open_virtual_dataset(
-                file_url=filepath3,
+                url=filepath3,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds3,
             open_virtual_dataset(
-                file_url=filepath4,
+                url=filepath4,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
@@ -274,25 +274,25 @@ class TestCombine:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1,
+                url=filepath1,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2,
+                url=filepath2,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds2,
             open_virtual_dataset(
-                file_url=filepath3,
+                url=filepath3,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
             ) as vds3,
             open_virtual_dataset(
-                file_url=filepath4,
+                url=filepath4,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=["time", "lat", "lon"],
@@ -324,10 +324,10 @@ class TestCombine:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1, registry=local_registry, parser=parser
+                url=filepath1, registry=local_registry, parser=parser
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2, registry=local_registry, parser=parser
+                url=filepath2, registry=local_registry, parser=parser
             ) as vds2,
         ):
             combined_vds = xr.combine_by_coords([vds2, vds1])
@@ -341,7 +341,7 @@ class TestRenamePaths:
     def test_old_accessor(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -355,7 +355,7 @@ class TestRenamePaths:
     def test_rename_to_str(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -375,7 +375,7 @@ class TestRenamePaths:
 
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -388,7 +388,7 @@ class TestRenamePaths:
     def test_invalid_type(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file, registry=local_registry, parser=parser
+            url=netcdf4_file, registry=local_registry, parser=parser
         ) as vds:
             with pytest.raises(TypeError):
                 vds.vz.rename_paths(["file1.nc", "file2.nc"])
@@ -400,7 +400,7 @@ class TestRenamePaths:
     ):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
             loadable_variables=["lat", "lon"],
@@ -418,7 +418,7 @@ class TestRenamePaths:
 def test_nbytes(simple_netcdf4, local_registry):
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=simple_netcdf4,
+        url=simple_netcdf4,
         registry=local_registry,
         parser=parser,
     ) as vds:
@@ -426,7 +426,7 @@ def test_nbytes(simple_netcdf4, local_registry):
         assert vds.nbytes == 48
 
     with open_virtual_dataset(
-        file_url=simple_netcdf4,
+        url=simple_netcdf4,
         registry=local_registry,
         parser=parser,
         loadable_variables=["foo"],
@@ -442,7 +442,7 @@ class TestOpenVirtualDatasetIndexes:
     def test_specify_no_indexes(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file, registry=local_registry, parser=parser, indexes={}
+            url=netcdf4_file, registry=local_registry, parser=parser, indexes={}
         ) as vds:
             assert vds.indexes == {}
 
@@ -456,7 +456,7 @@ class TestOpenVirtualDatasetIndexes:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=netcdf4_file,
+                url=netcdf4_file,
                 registry=local_registry,
                 parser=parser,
                 indexes=None,
@@ -505,7 +505,7 @@ def test_cftime_index(tmp_path: Path, local_registry):
 
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=filepath,
+        url=filepath,
         registry=local_registry,
         parser=parser,
         loadable_variables=["time", "lat", "lon"],
@@ -522,7 +522,7 @@ class TestOpenVirtualDatasetAttrs:
         parser = HDFParser()
         # regression test for GH issue #150
         vds = open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         )
@@ -532,7 +532,7 @@ class TestOpenVirtualDatasetAttrs:
         # regression test for GH issue #155
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -548,7 +548,7 @@ class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -557,7 +557,7 @@ class TestDetermineCoords:
     def test_var_attr_coords(self, netcdf4_file_with_2d_coords, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file_with_2d_coords,
+            url=netcdf4_file_with_2d_coords,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -588,12 +588,12 @@ class TestReadRemote:
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
         filepath = "s3://carbonplan-share/virtualizarr/local.nc"
-        object_store = obstore_s3(file_url=filepath, region="us-west-2")
+        object_store = obstore_s3(url=filepath, region="us-west-2")
         registry = ObjectStoreRegistry()
         registry.register(filepath, object_store)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=filepath,
+            url=filepath,
             registry=registry,
             indexes=indexes,
             parser=parser,
@@ -609,7 +609,7 @@ class TestReadRemote:
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
         hdf_group = "science/LSAR/GCOV/grids/frequencyA"
-        store = obstore_http(file_url=url)
+        store = obstore_http(url=url)
         registry = ObjectStoreRegistry()
         registry.register(url, registry)
         drop_variables = ["listOfCovarianceTerms", "listOfPolarizations"]
@@ -624,7 +624,7 @@ class TestReadRemote:
             ) as dsXR,
             # save group reference file via virtualizarr, then open with engine="kerchunk"
             open_virtual_dataset(
-                file_url=url,
+                url=url,
                 object_store=store,
                 parser=parser,
             ) as vds,
@@ -641,7 +641,7 @@ class TestOpenVirtualDatasetHDFGroup:
     def test_open_empty_group(self, empty_netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=empty_netcdf4_file,
+            url=empty_netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -654,7 +654,7 @@ class TestOpenVirtualDatasetHDFGroup:
     ):
         parser = HDFParser(group="subgroup")
         with open_virtual_dataset(
-            file_url=netcdf4_file_with_data_in_multiple_groups,
+            url=netcdf4_file_with_data_in_multiple_groups,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -668,7 +668,7 @@ class TestOpenVirtualDatasetHDFGroup:
     ):
         parser = HDFParser(group=group)
         with open_virtual_dataset(
-            file_url=netcdf4_file_with_data_in_multiple_groups,
+            url=netcdf4_file_with_data_in_multiple_groups,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -699,7 +699,7 @@ class TestLoadVirtualDataset:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=netcdf4_file,
+                url=netcdf4_file,
                 registry=local_registry,
                 loadable_variables=loadable_variables,
                 parser=parser,
@@ -733,7 +733,7 @@ class TestLoadVirtualDataset:
         parser = HDFParser(group="doesnt_exist")
         with pytest.raises(ValueError, match="not an HDF Group"):
             with open_virtual_dataset(
-                file_url=hdf5_groups_file,
+                url=hdf5_groups_file,
                 registry=local_registry,
                 parser=parser,
             ):
@@ -744,7 +744,7 @@ class TestLoadVirtualDataset:
         vars_to_load = ["air", "time"]
         with (
             open_virtual_dataset(
-                file_url=hdf5_groups_file,
+                url=hdf5_groups_file,
                 registry=local_registry,
                 loadable_variables=vars_to_load,
                 parser=parser,
@@ -758,7 +758,7 @@ class TestLoadVirtualDataset:
     def test_open_dataset_with_empty(self, hdf5_empty, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=hdf5_empty, registry=local_registry, parser=parser
+            url=hdf5_empty, registry=local_registry, parser=parser
         ) as vds:
             assert vds.empty.dims == ()
             assert vds.empty.attrs == {"empty": "true"}
@@ -766,12 +766,12 @@ class TestLoadVirtualDataset:
     def test_open_dataset_with_scalar(self, hdf5_scalar, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=f"file://{hdf5_scalar}", registry=local_registry, parser=parser
+            url=f"file://{hdf5_scalar}", registry=local_registry, parser=parser
         ) as vds:
             assert vds.scalar.dims == ()
             assert vds.scalar.attrs == {"scalar": "true"}
             assert isinstance(vds.scalar.data, ManifestArray)
-        ms = parser(registry=local_registry, file_url=f"file://{hdf5_scalar}")
+        ms = parser(registry=local_registry, url=f"file://{hdf5_scalar}")
         with (
             xr.open_dataset(hdf5_scalar, engine="h5netcdf") as expected,
             xr.open_zarr(ms, consolidated=False, zarr_format=3) as observed,
@@ -831,10 +831,10 @@ class TestOpenVirtualMFDataset:
         parser = HDFParser()
         with (
             open_virtual_dataset(
-                file_url=filepath1, registry=local_registry, parser=parser
+                url=filepath1, registry=local_registry, parser=parser
             ) as vds1,
             open_virtual_dataset(
-                file_url=filepath2,
+                url=filepath2,
                 registry=local_registry,
                 parser=parser,
             ) as vds2,
@@ -882,7 +882,7 @@ class TestOpenVirtualMFDataset:
 def test_drop_variables(netcdf4_file, local_registry):
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=netcdf4_file,
+        url=netcdf4_file,
         registry=local_registry,
         parser=parser,
         drop_variables=["air"],

@@ -34,7 +34,7 @@ class Parser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
@@ -42,23 +42,21 @@ class Parser:
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.tiff").
+        url
+            The URL of the input TIFF file (e.g., "s3://bucket/file.tiff").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore which provides a Zarr representation of the parsed file.
+            A ManifestStore which provides a Zarr representation of the parsed TIFF file.
         """
 
         from kerchunk.tiff import tiff_to_zarr
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs(
-            {"refs": tiff_to_zarr(file_url, **self.remote_options)}
-        )
+        refs = KerchunkStoreRefs({"refs": tiff_to_zarr(url, **self.remote_options)})
 
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,

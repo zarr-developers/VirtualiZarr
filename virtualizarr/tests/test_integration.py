@@ -91,7 +91,7 @@ def test_numpy_arrays_to_inlined_kerchunk_refs(
     # loading the variables should produce same result as inlining them using kerchunk
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=netcdf4_file,
+        url=netcdf4_file,
         registry=local_registry,
         parser=parser,
         loadable_variables=vars_to_inline,
@@ -207,7 +207,7 @@ class TestRoundtrip:
             registry = ObjectStoreRegistry({air_zarr_url: store})
             parser = ZarrParser()
             with open_virtual_dataset(
-                file_url=air_zarr_url,
+                url=air_zarr_url,
                 registry=registry,
                 parser=parser,
             ) as vds:
@@ -232,7 +232,7 @@ class TestRoundtrip:
             parser = HDFParser()
             # use open_dataset_via_kerchunk to read it as references
             with open_virtual_dataset(
-                file_url=air_nc_path, registry=local_registry, parser=parser
+                url=air_nc_path, registry=local_registry, parser=parser
             ) as vds:
                 roundtrip = roundtrip_func(vds, tmp_path, decode_times=False)
                 # assert all_close to original dataset
@@ -272,13 +272,13 @@ class TestRoundtrip:
             parser = HDFParser()
             with (
                 open_virtual_dataset(
-                    file_url=air1_nc_path,
+                    url=air1_nc_path,
                     registry=local_registry,
                     parser=parser,
                     loadable_variables=time_vars,
                 ) as vds1,
                 open_virtual_dataset(
-                    file_url=air2_nc_path,
+                    url=air2_nc_path,
                     registry=local_registry,
                     parser=parser,
                     loadable_variables=time_vars,
@@ -327,7 +327,7 @@ class TestRoundtrip:
 
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=nc_path, registry=local_registry, parser=parser
+            url=nc_path, registry=local_registry, parser=parser
         ) as vds:
             assert "lat" in vds.coords
             assert "coordinates" not in vds.attrs
@@ -405,14 +405,14 @@ def test_datatree_roundtrip(
         # use open_dataset_via_kerchunk to read it as references
         with (
             open_virtual_dataset(
-                file_url=air1_nc_path,
+                url=air1_nc_path,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=time_vars,
                 decode_times=decode_times,
             ) as vds1,
             open_virtual_dataset(
-                file_url=air2_nc_path,
+                url=air2_nc_path,
                 registry=local_registry,
                 parser=parser,
                 loadable_variables=time_vars,
@@ -482,21 +482,21 @@ def test_open_scalar_variable(tmp_path: Path, local_registry):
 
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=nc_path,
+        url=nc_path,
         registry=local_registry,
         parser=parser,
     ) as vds:
         assert vds["a"].shape == ()
-    ms = parser(file_url=f"file://{nc_path}", registry=local_registry)
+    ms = parser(url=f"file://{nc_path}", registry=local_registry)
     roundtripped = xr.open_zarr(ms, consolidated=False, zarr_format=3)
     xr.testing.assert_allclose(ds, roundtripped.load())
 
 
-class TestPathsToURIs:
-    def test_convert_absolute_paths_to_uris(self, netcdf4_file, local_registry):
+class TestPathsToURLs:
+    def test_convert_absolute_paths_to_urls(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=netcdf4_file,
+            url=netcdf4_file,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -506,11 +506,11 @@ class TestPathsToURIs:
 
             assert path == expected_path
 
-    def test_convert_relative_paths_to_uris(self, netcdf4_file, local_registry):
+    def test_convert_relative_paths_to_urls(self, netcdf4_file, local_registry):
         relative_path = relpath(netcdf4_file)
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=relative_path,
+            url=relative_path,
             registry=local_registry,
             parser=parser,
         ) as vds:

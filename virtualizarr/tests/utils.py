@@ -10,15 +10,15 @@ from virtualizarr.parsers import HDFParser
 from virtualizarr.registry import ObjectStoreRegistry
 
 
-def obstore_local(file_url: str) -> ObjectStore:
-    parsed = urlparse(file_url)
+def obstore_local(url: str) -> ObjectStore:
+    parsed = urlparse(url)
     path = Path(parsed.path)
     store = LocalStore(prefix=path.parent)
     return store
 
 
-def obstore_s3(file_url: str, region: str) -> ObjectStore:
-    parsed = urlparse(file_url)
+def obstore_s3(url: str, region: str) -> ObjectStore:
+    parsed = urlparse(url)
     bucket = parsed.netloc
     key_prefix = os.path.dirname(parsed.path.lstrip("/"))
     base_path = f"s3://{bucket}/{key_prefix}"
@@ -26,8 +26,8 @@ def obstore_s3(file_url: str, region: str) -> ObjectStore:
     return store
 
 
-def obstore_http(file_url: str) -> ObjectStore:
-    parsed = urlparse(file_url)
+def obstore_http(url: str) -> ObjectStore:
+    parsed = urlparse(url)
     key_prefix = os.path.dirname(parsed.path.lstrip("/"))
     base_path = f"{parsed.scheme}://{parsed.netloc}/{key_prefix}"
     store = from_url(url=base_path)
@@ -36,6 +36,6 @@ def obstore_http(file_url: str) -> ObjectStore:
 
 def manifest_store_from_hdf_url(url, group: str | None = None):
     registry = ObjectStoreRegistry()
-    registry.register(url, obstore_local(file_url=url))
+    registry.register(url, obstore_local(url=url))
     parser = HDFParser(group=group)
-    return parser(file_url=url, registry=registry)
+    return parser(url=url, registry=registry)

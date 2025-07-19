@@ -34,7 +34,7 @@ class FITSParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
@@ -42,23 +42,21 @@ class FITSParser:
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.fits").
+        url
+            The URL of the input FITS file (e.g., "s3://bucket/file.fits").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore which provides a Zarr representation of the parsed file.
+            A ManifestStore which provides a Zarr representation of the parsed FITS file.
         """
 
         from kerchunk.fits import process_file
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs(
-            {"refs": process_file(file_url, **self.reader_options)}
-        )
+        refs = KerchunkStoreRefs({"refs": process_file(url, **self.reader_options)})
 
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,

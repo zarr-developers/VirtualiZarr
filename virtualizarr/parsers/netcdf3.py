@@ -33,31 +33,29 @@ class NetCDF3Parser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a VirtualiZarr ManifestStore.
+        Parse the metadata and byte offsets from a given NetCDF3 file to product a VirtualiZarr ManifestStore.
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.nc").
+        url
+            The URL of the input NetCDF3 file (e.g., "s3://bucket/file.nc").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore that provides a Zarr representation of the parsed file.
+            A ManifestStore that provides a Zarr representation of the parsed NetCDF3 file.
         """
 
         from kerchunk.netCDF3 import NetCDF3ToZarr
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = NetCDF3ToZarr(
-            file_url, inline_threshold=0, **self.reader_options
-        ).translate()
+        refs = NetCDF3ToZarr(url, inline_threshold=0, **self.reader_options).translate()
 
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,

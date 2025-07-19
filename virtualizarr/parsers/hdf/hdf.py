@@ -132,7 +132,7 @@ class HDFParser:
         drop_variables: Iterable[str] | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the
+        Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
         `__call__` method.
 
         Parameters
@@ -148,7 +148,7 @@ class HDFParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
@@ -157,8 +157,8 @@ class HDFParser:
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
+        url
+            The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
@@ -167,10 +167,10 @@ class HDFParser:
         ManifestStore
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
-        store, path_in_store = registry.resolve(file_url)
+        store, path_in_store = registry.resolve(url)
         reader = ObstoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
-            filepath=file_url,
+            filepath=url,
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,

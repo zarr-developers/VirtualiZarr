@@ -22,11 +22,11 @@ class KerchunkJSONParser:
         Parameters
         ----------
         group
-            The group within the file to be used as the Zarr root group for the ManifestStore.
+            The group within the Kerchunk JSON to be used as the Zarr root group for the ManifestStore.
         fs_root
-            The qualifier to be used for kerchunk references containing relative paths.
+            The qualifier to be used for Kerchunk chunk references containing relative paths.
         skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore.
+            Variables in the Kerchunk JSON that will be ignored when creating the ManifestStore.
         """
 
         self.group = group
@@ -35,26 +35,26 @@ class KerchunkJSONParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to produce a
+        Parse the metadata and byte offsets from a given Kerchunk JSON to produce a
         VirtualiZarr ManifestStore.
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/kerchunk.json").
+        url
+            The URL of the input Kerchunk JSON (e.g., "s3://bucket/kerchunk.json").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore that provides a Zarr representation of the parsed file.
+            A ManifestStore that provides a Zarr representation of the parsed Kerchunk JSON.
         """
-        store, path_after_prefix = registry.resolve(file_url)
+        store, path_after_prefix = registry.resolve(url)
 
         # we need the whole thing so just get the entire contents in one request
         resp = store.get(path_after_prefix)

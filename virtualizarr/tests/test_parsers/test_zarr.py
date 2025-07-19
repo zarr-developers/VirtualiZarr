@@ -28,7 +28,7 @@ class TestOpenVirtualDatasetZarr:
         registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
-            file_url=zarr_store,
+            url=zarr_store,
             registry=registry,
             parser=parser,
             loadable_variables=loadable_variables,
@@ -43,7 +43,7 @@ class TestOpenVirtualDatasetZarr:
         parser = ZarrParser(skip_variables=skip_variables)
         # check variable is skipped
         with open_virtual_dataset(
-            file_url=zarr_store,
+            url=zarr_store,
             registry=registry,
             parser=parser,
         ) as vds:
@@ -54,7 +54,7 @@ class TestOpenVirtualDatasetZarr:
         registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
-            file_url=zarr_store,
+            url=zarr_store,
             registry=registry,
             parser=parser,
         ) as vds:
@@ -68,7 +68,7 @@ class TestOpenVirtualDatasetZarr:
         registry = ObjectStoreRegistry({f"file://{zarr_store}": store})
         parser = ZarrParser()
         with open_virtual_dataset(
-            file_url=zarr_store,
+            url=zarr_store,
             registry=registry,
             parser=parser,
             loadable_variables=[],
@@ -113,7 +113,7 @@ def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar):
 
     chunk_map = asyncio.run(
         get_chunk_mapping_prefix(
-            zarr_array=zarr_store_scalar, filepath=str(zarr_store_scalar.store_path)
+            zarr_array=zarr_store_scalar, path=str(zarr_store_scalar.store_path)
         )
     )
     assert chunk_map["c"]["offset"] == 0
