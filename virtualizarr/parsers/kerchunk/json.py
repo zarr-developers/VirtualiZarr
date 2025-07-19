@@ -13,7 +13,7 @@ class KerchunkJSONParser:
         group: str | None = None,
         fs_root: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        store_registry: ObjectStoreRegistry | None = None,
+        registry: ObjectStoreRegistry | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the
@@ -67,4 +67,4 @@ class KerchunkJSONParser:
             fs_root=self.fs_root,
             skip_variables=self.skip_variables,
         )
-        return ManifestStore(group=manifestgroup, store_registry=registry)
+        return ManifestStore(group=manifestgroup, registry=registry)

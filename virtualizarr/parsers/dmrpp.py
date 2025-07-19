@@ -182,7 +182,7 @@ class DMRParser:
         registry = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
 
-        return ManifestStore(store_registry=registry, group=manifest_group)
+        return ManifestStore(registry=registry, group=manifest_group)
 
     def find_node_fqn(self, fqn: str) -> ET.Element:
         """
