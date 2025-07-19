@@ -145,13 +145,11 @@ class ManifestStore(Store):
             raise TypeError
 
         super().__init__(read_only=True)
-        if registry is None:
-            registry = ObjectStoreRegistry()
-        self._registry = registry
+        self._registry = ObjectStoreRegistry() if registry is None else registry
         self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore(group={self._group}, stores={self._registry})"
+        return f"ManifestStore(group={self._group}, registry={self._registry})"
 
     async def get(
         self,
