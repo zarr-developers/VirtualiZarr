@@ -1,80 +1,138 @@
 # V2 Migration Guide
 
+VirtualiZarr V2 includes breaking changes and other conceptual differences relative to V1. The goal of this guide
+is to provide some context around the core changes and demonstrate the updated usage.
 
-With the release of VirtualiZarr 2.0, there are some core changes to how VirtualiZarr works. The goal of this guide is to provide some context around the core changes and demonstrate the updated usage.
+## Breaking changes
 
-## `open_virtual_dataset` in V1
+### Open_virtual_dataset
 
-In V1 there was a lot of auto-magic guesswork of filetypes and urls that was happening under the hood.
-While this made it easy to get started, it could lead to a lot of footguns and unexpected behavior.
+In V1 there was a lot of auto-magic guesswork of filetypes and urls happening under the hood.
+While this made it easy to get started, it could lead to a lot of foot-guns and unexpected behavior.
+
+For example, the following V1-style usage would guess that your data is in a NetCDF file format and that your data
+is stored in a local file. However, this did not provide a way for people to develop their own utilities
+for data formats or specific datasets. This guess work also made it more challenging for developers to avoid bugs and
+users to understand VirtualiZarr's behavior.
 
 ```python
 from virtualizarr import open_virtual_dataset
-vds = open_virtual_dataset(filepath)
+vds = open_virtual_dataset("data1.nc")
 ```
 
-## V2
-In V2, virtualizing a dataset requires a bit more input, but is much more explicit.
-You now must pass in a `Parser` (formerly called a reader) and an [Obstore Store](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store) into `open_virtual_dataset`.
-This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust.
+To provide a more extensible and reliable API, VirtualiZarr V2 requires more explicit configuration by the user.
+You now must pass in a valid [Parser][virtualizarr.parsers.Parser] and a [virtualizarr.registry.ObjectStoreRegistry][] to [virtualizarr.open_virtual_dataset][].
+This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust. It is most common for the
+[ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] to contain one or more [ObjectStores][obstore.store.ObjectStore]
+for reading the original data, but some parsers may accept an empty [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].
 
 === "S3 Store"
 
-    ```python
-    from virtualizarr import open_virtual_dataset
-    from virtualizarr.parsers import HDFParser
+    ```python exec="on" source="material-block" session="migration" result="code"
     from obstore.store import S3Store
 
-    file_url = "data1.nc"
-    store = S3Store("bucket-name", region="us-east-1", skip_signature=True)
-    parser = HDFParser()
+    from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
 
-    vds = open_virtual_dataset(file_url = file_url, object_store = store, parser=parser)
+    bucket = "nex-gddp-cmip6"
+    store = S3Store(
+        bucket=bucket,
+        region="us-west-2",
+        skip_signature=True
+    )
+    registry = ObjectStoreRegistry({f"s3://{bucket}": store})
+    parser = HDFParser()
+    vds = open_virtual_dataset(
+        url=f"s3://{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc",
+        registry=registry,
+        parser=parser
+    )
+    print(vds)
     ```
 
 === "Local Store"
 
     ```python
-    from virtualizarr import open_virtual_dataset
-    from virtualizarr.parsers import HDFParser
-    from obstore.store import LocalStore
     from pathlib import Path
 
-    file_url = 'path/data1.nc'
-    path = Path(file_url)
+    from obstore.store import LocalStore
+
+    from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    path = Path('/Users/User/Documents/my-project/my-data.nc')
     store = LocalStore(prefix=path.parent)
+    registry = ObjectStoreRegistry({f"file://{str(path.parent)}": store})
     parser = HDFParser()
 
-    vds = open_virtual_dataset(file_url = file_url, object_store = store, parser=parser)
+    vds = open_virtual_dataset(
+        url = f"file://{str(path)}",
+        registry=registry,
+        parser=parser
+    )
     ```
 
+## Missing features
 
-
-### Reading chunks without writing to disk
-In Virtualizarr V1 if you wanted to access the underlying chunks of a dataset, you first had to write the reference to disk. From there you could read those references back into Xarray and access the chunks like you would with a normal Xarray dataset.
-
-In V2 you can now **directly read the chunks from a Parser into Xarray without writing them to disk first**. 🤯
-Since each `Parser` is now responsible for creating a `ManifestStore` and the `ManifestStore` chunks are backed by `Obstore`, you can pass a `ManifestStore` directly into Zarr or Xarray. This is because each `ManifestStore` is a valid Zarr store.
-
-`Parser -> ManifestStore -> Xarray`
-
-```python
-from virtualizarr import open_virtual_dataset
-from virtualizarr.parsers import HDFParser
-from obstore.store import S3Store
-
-file_url = "data1.nc"
-store = S3Store("bucket-name", region="us-east-1", skip_signature=True)
-parser = HDFParser()
-
-manifest_store = parser(file_url = file_url, object_store = store)
-ds = xr.open_zarr(manifest_store)
-```
+We have worked hard to ensure that nearly all features from VirtualiZarr V1 are available in V2. To our knowledge,
+the only functionality regression is the ability to "glob" in [virtualizarr.open_virtual_mfdataset][]. We aim to support
+this in the future. Please see [issue #569](https://github.com/zarr-developers/VirtualiZarr/issues/569) for progress
+towards this feature.
 
 ### Xarray accessor name
 
-In VirtualiZarr V2 you can use the shorthand `.vz` accessor for Xarray operations. For example:
+In VirtualiZarr V2 you should use the shorthand `.vz` accessor for Xarray operations. The previous accessor name
+`virtualize` is available but will yield a `DeprecationWarning`. It may be remove entirely in the future. Here
+is an example of using the new accessor name:
 
 ```python
 vds.vz.to_icechunk(icechunk_store)
 ```
+
+## New functionality
+
+### Reading chunks without writing to disk
+
+In Virtualizarr V1 if you wanted to access the underlying chunks of a dataset, you first had to write the reference to disk. From there you could read those references back into Xarray and access the chunks like you would with a normal Xarray dataset.
+
+In V2 you can now **directly read the chunks from a Parser into Xarray without writing them to disk first**. 🤯
+Since each `Parser` is now responsible for creating a [ManifestStore][virtualizarr.manifests.ManifestStore] and the [ManifestStore][virtualizarr.manifests.ManifestStore] has the ability to fetch data through any [ObjectStore][obstore.store.ObjectStore] in the [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry]. You
+can load data using the [ManifestStore][virtualizarr.manifests.ManifestStore] via either Zarr or Xarray. Here's an example using Xarray:
+
+```python exec="on" source="material-block" session="migration" result="code"
+import xarray as xr
+from obstore.store import S3Store
+
+from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
+
+bucket = "nex-gddp-cmip6"
+store = S3Store(
+    bucket=bucket,
+    region="us-west-2",
+    skip_signature=True
+)
+registry = ObjectStoreRegistry({f"s3://{bucket}": store})
+parser = HDFParser()
+manifest_store = parser(
+    url=f"s3://{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc",
+    registry=registry
+)
+loadable_ds = xr.open_zarr(
+    manifest_store,
+    consolidated=False,
+    zarr_format=3,
+)
+print(loadable_ds)
+```
+
+Note how the Xarray dataset contains loadable Dask arrays rather than manifest arrays.
+
+### Bring your own parser
+
+The V2 API means that you can use VirtualiZarr's data structure and xarray's functionality merging and combining datasets
+completely independently from the VirtualiZarr library! [Virtual-Tiff](https://github.com/virtual-zarr/virtual-tiff) and
+the [hrrr-parser](https://github.com/virtual-zarr/hrrr-parser) are examples of this pattern. Read some instructions
+on how to write a parser in the [Custom Parsers](custom_parsers.md) page.
