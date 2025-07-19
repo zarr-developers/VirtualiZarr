@@ -96,7 +96,6 @@ plugins:
   - search
   - autorefs
   - markdown-exec:
-      execution: false
   - mkdocstrings:
       enable_inventory: true
       handlers:
