@@ -268,12 +268,12 @@ def netcdf4_virtual_dataset(netcdf4_file):
     from virtualizarr.parsers import HDFParser
     from virtualizarr.tests.utils import obstore_local
 
-    store = obstore_local(file_url=netcdf4_file)
+    store = obstore_local(url=netcdf4_file)
     registry = ObjectStoreRegistry()
     registry.register("file://", store)
     parser = HDFParser()
     with open_virtual_dataset(
-        file_url=netcdf4_file,
+        url=netcdf4_file,
         registry=registry,
         parser=parser,
         loadable_variables=[],
@@ -394,7 +394,7 @@ def virtual_variable(array_v3_metadata: Callable) -> Callable:
     """Generate a virtual variable with configurable parameters."""
 
     def _virtual_variable(
-        file_uri: str,
+        url: str,
         shape: tuple[int, ...] = (3, 4),
         chunk_shape: tuple[int, ...] = (3, 4),
         dtype: np.dtype = np.dtype("int32"),
@@ -407,7 +407,7 @@ def virtual_variable(array_v3_metadata: Callable) -> Callable:
         attrs: dict[str, Any] = {},
     ) -> xr.Variable:
         manifest = _generate_chunk_manifest(
-            file_uri,
+            url,
             shape=shape,
             chunks=chunk_shape,
             offset=offset,
@@ -436,7 +436,7 @@ def virtual_dataset(virtual_variable: Callable) -> Callable:
     """Generate a virtual dataset with configurable parameters."""
 
     def _virtual_dataset(
-        file_uri: str,
+        url: str,
         shape: tuple[int, ...] = (3, 4),
         chunk_shape: tuple[int, ...] = (3, 4),
         dtype: np.dtype = np.dtype("int32"),
@@ -449,9 +449,9 @@ def virtual_dataset(virtual_variable: Callable) -> Callable:
         dims: Optional[list[str]] = None,
         coords: Optional[xr.Coordinates] = None,
     ) -> xr.Dataset:
-        with xr.open_dataset(file_uri) as ds:
+        with xr.open_dataset(url) as ds:
             var = virtual_variable(
-                file_uri=file_uri,
+                url=url,
                 shape=shape,
                 chunk_shape=chunk_shape,
                 dtype=dtype,

@@ -2,9 +2,11 @@ import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
+from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -135,9 +137,7 @@ class TestManifestGroupFromHDF:
 
     def test_drop_variables(self, multiple_datasets_hdf5_url, local_registry):
         parser = HDFParser(drop_variables=["data2"])
-        manifest_store = parser(
-            file_url=multiple_datasets_hdf5_url, registry=local_registry
-        )
+        manifest_store = parser(url=multiple_datasets_hdf5_url, registry=local_registry)
         assert "data2" not in manifest_store._group.arrays.keys()
 
     def test_dataset_in_group(self, group_hdf5_url):
@@ -156,7 +156,7 @@ class TestOpenVirtualDataset:
         root_coordinates_hdf5_url = f"file://{root_coordinates_hdf5_file}"
         parser = HDFParser()
         with open_virtual_dataset(
-            file_url=root_coordinates_hdf5_url,
+            url=root_coordinates_hdf5_url,
             registry=local_registry,
             parser=parser,
         ) as vds:
@@ -167,7 +167,7 @@ class TestOpenVirtualDataset:
         parser = HDFParser()
         with (
             parser(
-                file_url=big_endian_dtype_hdf5_url, registry=local_registry
+                url=big_endian_dtype_hdf5_url, registry=local_registry
             ) as manifest_store,
             xr.open_dataset(big_endian_dtype_hdf5_file) as expected,
         ):
@@ -190,8 +190,22 @@ def test_subgroup_variable_names(
     )
     parser = HDFParser(group=group)
     with open_virtual_dataset(
-        file_url=netcdf4_url_with_data_in_multiple_groups,
+        url=netcdf4_url_with_data_in_multiple_groups,
         registry=local_registry,
         parser=parser,
     ) as vds:
         assert list(vds.dims) == ["dim_0"]
+
+
+# @requires_network
+def test_netcdf_over_https():
+    url = "https://www.earthbyte.org/webdav/gmt_mirror/gmt/data/cache/topo_32.nc"
+    store = from_url(url)
+    registry = ObjectStoreRegistry({url: store})
+    parser = HDFParser()
+    with (
+        parser(url=url, registry=registry) as ms,
+        xr.open_zarr(ms, zarr_format=3, consolidated=False).load() as ds,
+    ):
+        np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
+        np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)

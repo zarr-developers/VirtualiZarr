@@ -5,7 +5,6 @@ from typing import (
     TYPE_CHECKING,
     Iterable,
 )
-from urllib.parse import urlparse
 
 import numpy as np
 
@@ -132,18 +131,46 @@ class HDFParser:
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
     ):
+        """
+        Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
+        `__call__` method.
+
+        Parameters
+        ----------
+        group
+            Name of the group within the HDF5 file to virtualize.
+        drop_variables
+            Variables in the file that will be ignored when creating the ManifestStore
+            (default: `None`, do not ignore any variables).
+        """
         self.group = group
         self.drop_variables = drop_variables
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
-        store, _ = registry.resolve(file_url)
-        reader = ObstoreReader(store=store, path=urlparse(file_url).path)
+        """
+        Parse the metadata and byte offsets from a given HDF5/NetCDF4 file to produce a VirtualiZarr
+        [ManifestStore][virtualizarr.manifests.ManifestStore].
+
+        Parameters
+        ----------
+        url
+            The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+
+        Returns
+        -------
+        ManifestStore
+            A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
+        """
+        store, path_in_store = registry.resolve(url)
+        reader = ObstoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
-            filepath=file_url,
+            filepath=url,
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,

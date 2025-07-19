@@ -42,33 +42,33 @@ class DMRPPParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a
+        Parse the metadata and byte offsets from a given DMR++ file to product a
         VirtualiZarr ManifestStore.
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input file (e.g., "s3://bucket/file.dmrpp").
+        url
+            The URL of the input DMR++ file (e.g., "s3://bucket/file.dmrpp").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore that provides a Zarr representation of the parsed file.
+            A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
-        store, _ = registry.resolve(file_url)
-        reader = ObstoreReader(store=store, path=file_url)
+        store, path_in_store = registry.resolve(url)
+        reader = ObstoreReader(store=store, path=path_in_store)
         file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 
         parser = DMRParser(
             root=ET.parse(stream).getroot(),
-            data_filepath=file_url.removesuffix(".dmrpp"),
+            data_filepath=url.removesuffix(".dmrpp"),
             skip_variables=self.skip_variables,
         )
         manifest_store = parser.parse_dataset(object_store=store, group=self.group)

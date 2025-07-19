@@ -1,4 +1,4 @@
-name: Upstream
+name: Minimum-versions
 
 on:
   push:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   test-upstream:
-    name: upstream-build
+    name: minimum-versions-build
     if: |
       always()
       && (
@@ -35,16 +35,15 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.8.3
         with:
           pixi-version: v0.41.4
-          environments: upstream
+          environments: minimum-versions
 
       - name: List installed libraries
         run: |
-          pixi install --environment upstream
-          pixi list --environment upstream
-
+          pixi install --environment minimum-versions
+          pixi list --environment minimum-versions
       - name: Running Tests
         run: |
-          pixi run -e upstream run-tests-xml-cov
+          pixi run -e minimum-versions run-tests-xml-cov
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4

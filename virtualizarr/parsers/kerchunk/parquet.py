@@ -34,17 +34,17 @@ class KerchunkParquetParser:
         reader_options: dict | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the
-        `__call__` method.
+        Instantiate a parser for virtualizing Kerchunk's Parquet references into a Virtual Zarr store
+        using the `__call__` method.
 
         Parameters
         ----------
         group
-            The group within the file to be used as the Zarr root group for the ManifestStore.
+            The group within the input Kerchunk Parquet references to be used as the Zarr root group for the ManifestStore.
         fs_root
-            The qualifier to be used for kerchunk references containing relative paths.
+            The qualifier to be used for chunk references containing relative paths.
         skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore.
+            Variables in the Kerchunk Parquet references that will be ignored when creating the ManifestStore.
         reader_options
             Configuration options used internally for the fsspec backend.
         """
@@ -56,32 +56,32 @@ class KerchunkParquetParser:
 
     def __call__(
         self,
-        file_url: str,
+        url: str,
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given file to product a
+        Parse the metadata and byte offsets from a given Kerchunk Parquet directory to product a
         VirtualiZarr ManifestStore.
 
         Parameters
         ----------
-        file_url
-            The URI or path to the input parquet directory (e.g., "s3://bucket/file.parq").
+        url
+            The URL of the input parquet directory (e.g., "s3://bucket/my-kerchunk-references.parq").
         registry
             An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
         ManifestStore
-            A ManifestStore which provides a Zarr representation of the parsed file.
+            A ManifestStore which provides a Zarr representation based on the parsed Kerchunk Parquet directory.
         """
 
         # The kerchunk .parquet storage format isn't actually a parquet, but a
         # directory that contains named parquets for each group/variable.
-        fs = _FsspecFSFromFilepath(file_url, self.reader_options)
+        fs = _FsspecFSFromFilepath(url, self.reader_options)
         from fsspec.implementations.reference import LazyReferenceMapper
 
-        lrm = LazyReferenceMapper(file_url, fs.fs)
+        lrm = LazyReferenceMapper(url, fs.fs)
 
         # build reference dict from KV pairs in LazyReferenceMapper
         # is there a better / more performant way to extract this?
