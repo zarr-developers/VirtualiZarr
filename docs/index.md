@@ -26,32 +26,90 @@ VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues
 
 You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
 
-## Usage
+## Quick usage example
 
-Creating the virtual store looks very similar to how we normally open data with xarray:
+Creating the virtual dataset looks quite similar to how we normally open data with [xarray][], but there are a few notable differences that are shown through this example.
 
-```python
-from virtualizarr import open_virtual_dataset
+First, import the necessary functions and classes:
+```python exec="on" source="above" session="homepage"
+import icechunk
+from obstore.store import from_url
 
-virtual_datasets = [
-    open_virtual_dataset(filepath)
-    for filepath in glob.glob('/my/files*.nc')
-]
-
-# this Dataset wraps a bunch of virtual ManifestArray objects directly
-virtual_ds = xr.combine_nested(virtual_datasets, concat_dim=['time'])
-
-# cache the combined dataset pattern to disk, in this case using the existing kerchunk specification for reference files
-virtual_ds.vz.to_kerchunk('combined.json', format='json')
+from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 ```
 
-Now you can open your shiny new Zarr store instantly:
+Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
+specification yet - let's suppress those.
 
-```python
-ds = xr.open_dataset('combined.json', engine='kerchunk', chunks={})  # normal xarray.Dataset object, wrapping dask/numpy arrays etc.
+```python exec="on" source="above" session="homepage"
+import warnings
+warnings.filterwarnings(
+  "ignore",
+  message="Numcodecs codecs are not in the Zarr version 3 specification*",
+  category=UserWarning
+)
 ```
 
-No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray into the specific parts of the original netCDF files when it needs to read each chunk.
+```python exec="on" session="homepage"
+# This code isn't shown since we didn't set source="above"
+import xarray as xr
+xr.set_options(display_style="html")
+```
+
+We can use Obstore's [from_url][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data the specified URLs.
+
+```python exec="on" source="above" session="homepage"
+bucket = "s3://nex-gddp-cmip6"
+path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+store = from_url(bucket, region="us-west-2", skip_signature=True)
+```
+
+We also need to create an [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that
+maps the URL structure to the ObjectStore
+
+```python exec="on" source="above" session="homepage"
+registry = ObjectStoreRegistry({bucket: store})
+```
+
+Now, let's create the parser instance and create a virtual dataset by passing the URL, parser, and registry to [virtualizarr.open_virtual_dataset][].
+
+```python exec="on" source="above" session="homepage" result="ansi"
+parser = HDFParser()
+vds = open_virtual_dataset(url=f"{bucket}/{path}", parser=parser, registry=registry)
+print(repr(vds))
+```
+
+No data has been loaded or copied in this process, we have merely created an on-disk lookup table that points xarray to the location of chunks in the original netCDF when data is needed later on. The size represents the size of the original dataset, you can see the size of the virtual dataset using the `vz` accessor:
+
+```python exec="on" source="above" session="homepage" result="ansi"
+print(f"Original dataset size: {vds.nbytes} bytes")
+print(f"Virtual dataset size: {vds.vz.nbytes} bytes")
+```
+
+VirtualiZarr's other top-level function is [virtualizarr.open_virtual_mfdataset][], which can open and virtualize multiple data sources into
+a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset:
+
+```python exec="on" source="above" session="homepage" result="ansi"
+urls = [f"s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc" for year in range(2015, 2017)]
+vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
+print(repr(vds))
+```
+
+The magic of VirtualiZarr is that you can persist the virtual dataset as an Icechunk store,
+meaning that the work of constructing the single coherent dataset only needs to happen once.
+For subsequent analyses, you can use [xarray.open_zarr][] to open that Icechunk store which is
+much faster than using [xarray.open_mfdataset][] on the original files.
+
+Let's see how you persist the Virtual dataset using Icechunk. Here we'll use a Memory cache but in most cases you'll store the virtual dataset in the cloud or on disk.
+
+```python exec="on" source="above" session="homepage"
+icechunk_store = icechunk.in_memory_storage()
+repo = icechunk.Repository.create(icechunk_store)
+session = repo.writable_session("main")
+vds.vz.to_icechunk(session.store)
+```
 
 See the [Usage docs page](usage.md) for more details.
 
