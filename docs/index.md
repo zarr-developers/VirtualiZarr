@@ -76,7 +76,7 @@ registry = ObjectStoreRegistry({bucket: store})
 
 Now, let's create a parser instance and create a virtual dataset by passing the URL, parser, and registry to [virtualizarr.open_virtual_dataset][].
 
-```python exec="on" source="above" session="homepage" result="ansi"
+```python exec="on" source="above" session="homepage" result="code"
 parser = HDFParser()
 vds = open_virtual_dataset(
   url=f"{bucket}/{path}",
@@ -84,12 +84,12 @@ vds = open_virtual_dataset(
   registry=registry,
   loadable_variables = []
 )
-print(repr(vds))
+print(vds)
 ```
 
 Since we specified `loadable_variables=[]`, no data has been loaded or copied in this process. We have merely created an on-disk lookup table that points Xarray to the location of chunks in the original netCDF when data is needed later on. The default behavior (`loadable_variables=None`) will load data associated with coordinates but not data variables. The size represents the size of the original dataset, you can see the size of the virtual dataset using the `vz` accessor:
 
-```python exec="on" source="above" session="homepage" result="ansi"
+```python exec="on" source="above" session="homepage" result="code"
 print(f"Original dataset size: {vds.nbytes} bytes")
 print(f"Virtual dataset size: {vds.vz.nbytes} bytes")
 ```
@@ -97,10 +97,10 @@ print(f"Virtual dataset size: {vds.vz.nbytes} bytes")
 VirtualiZarr's other top-level function is [virtualizarr.open_virtual_mfdataset][], which can open and virtualize multiple data sources into
 a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset.
 
-```python exec="on" source="above" session="homepage" result="ansi"
+```python exec="on" source="above" session="homepage" result="code"
 urls = [f"s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc" for year in range(2015, 2017)]
 vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
-print(repr(vds))
+print(vds)
 ```
 
 The magic of VirtualiZarr is that you can persist the virtual dataset as an Icechunk store,
