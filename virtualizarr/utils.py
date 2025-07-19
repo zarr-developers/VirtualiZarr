@@ -35,7 +35,7 @@ class ObstoreReader:
     def __init__(self, store: ObjectStore, path: str) -> None:
         """
         Create an obstore file reader that implements the read, readall, seek, and tell methods, which
-        can be used in libraries that file-like objects.
+        can be used in libraries that expect file-like objects.
 
         Parameters
         ----------
