@@ -176,7 +176,7 @@ class HDFParser:
             drop_variables=self.drop_variables,
         )
         # Convert to a manifest store
-        return ManifestStore(store_registry=registry, group=manifest_group)
+        return ManifestStore(registry=registry, group=manifest_group)
 
 
 def _dataset_chunk_manifest(

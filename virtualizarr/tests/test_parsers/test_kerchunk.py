@@ -350,7 +350,7 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     manifeststore = parser("memory:///refs.json", registry=registry)
 
     assert isinstance(manifeststore, ManifestStore)
-    assert manifeststore._store_registry.map[UrlKey("memory", "")].store == memory_store
+    assert manifeststore._registry.map[UrlKey("memory", "")].store == memory_store
 
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(

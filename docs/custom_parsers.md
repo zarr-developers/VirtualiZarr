@@ -27,7 +27,7 @@ def custom_parser(file_url: str, object_store: ObjectStore) -> ManifestStore:
     registry = ObjectStoreRegistry({store_prefix: object_store})
 
     # construct the Manifeststore from the parsed metadata and the object store registry
-    return ManifestStore(group=manifestgroup, store_registry=registry)
+    return ManifestStore(group=manifestgroup, registry=registry)
 
 
 vds = vz.open_virtual_dataset(
@@ -190,7 +190,7 @@ memory_store = obstore.store.MemoryStore()
 memory_store.put("refs.json", ujson.dumps(refs).encode())
 
 registry = ObjectStoreRegistry({"memory://": memory_store})
-parser = KerchunkJSONParser(store_registry=registry)
+parser = KerchunkJSONParser(registry=registry)
 manifeststore = parser("refs.json", memory_store)
 ```
 

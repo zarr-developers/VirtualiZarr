@@ -63,4 +63,4 @@ class NetCDF3Parser:
             skip_variables=self.skip_variables,
             fs_root=Path.cwd().as_uri(),
         )
-        return ManifestStore(group=manifestgroup, store_registry=registry)
+        return ManifestStore(group=manifestgroup, registry=registry)
