@@ -13,7 +13,6 @@ class KerchunkJSONParser:
         group: str | None = None,
         fs_root: str | None = None,
         skip_variables: Iterable[str] | None = None,
-        store_registry: ObjectStoreRegistry | None = None,
     ):
         """
         Instantiate a parser with parser-specific parameters that can be used in the
