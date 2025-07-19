@@ -4,10 +4,9 @@ import copy
 import importlib
 import io
 import json
-import os
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
-from urllib.parse import urlparse
 
+import obstore as obs
 from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
@@ -30,25 +29,22 @@ if TYPE_CHECKING:
     ]
 
 
-def remove_prefix(store: ObjectStore, path: str) -> str:
-    """Remove a store prefix like file:/// or memory:// if it exists in the path"""
-    parsed = urlparse(path)
-    if hasattr(store, "prefix") and store.prefix:
-        filepath = os.path.basename(parsed.path)
-    else:
-        filepath = parsed.path
-
-    return filepath
-
-
 class ObstoreReader:
     _reader: ReadableFile
 
     def __init__(self, store: ObjectStore, path: str) -> None:
-        import obstore as obs
+        """
+        Create an obstore file reader that implements the read, readall, seek, and tell methods, which
+        can be used in libraries that expect file-like objects.
 
-        filepath = remove_prefix(store, path)
-        self._reader = obs.open_reader(store, filepath)
+        Parameters
+        ----------
+        store
+            [ObjectStore][obstore.store.ObjectStore] for reading the file.
+        path
+            The path to the file within the store. This should not include the prefix.
+        """
+        self._reader = obs.open_reader(store, path)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
