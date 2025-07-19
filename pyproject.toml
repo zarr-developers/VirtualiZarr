@@ -193,8 +193,8 @@ test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "ke
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "minimum-versions"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk","kerchunk_parquet", "hdf5-lib", "all_parsers", "all_writers"]
-docs = ["docs"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "all_parsers", "all_writers"]
+docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib",]
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
