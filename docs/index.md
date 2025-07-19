@@ -42,7 +42,7 @@ from virtualizarr.registry import ObjectStoreRegistry
 ```
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
-specification yet - let's suppress those.
+specification yet -- let's suppress those.
 
 ```python exec="on" source="above" session="homepage"
 import warnings
@@ -59,7 +59,7 @@ import xarray as xr
 xr.set_options(display_style="html")
 ```
 
-We can use Obstore's [from_url][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data the specified URLs.
+We can use Obstore's [from_url][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data from the specified URLs.
 
 ```python exec="on" source="above" session="homepage"
 bucket = "s3://nex-gddp-cmip6"
@@ -74,7 +74,7 @@ maps the URL structure to the ObjectStore.
 registry = ObjectStoreRegistry({bucket: store})
 ```
 
-Now, let's create the parser instance and create a virtual dataset by passing the URL, parser, and registry to [virtualizarr.open_virtual_dataset][].
+Now, let's create a parser instance and create a virtual dataset by passing the URL, parser, and registry to [virtualizarr.open_virtual_dataset][].
 
 ```python exec="on" source="above" session="homepage" result="ansi"
 parser = HDFParser()
@@ -90,7 +90,7 @@ print(f"Virtual dataset size: {vds.vz.nbytes} bytes")
 ```
 
 VirtualiZarr's other top-level function is [virtualizarr.open_virtual_mfdataset][], which can open and virtualize multiple data sources into
-a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset:
+a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset.
 
 ```python exec="on" source="above" session="homepage" result="ansi"
 urls = [f"s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc" for year in range(2015, 2017)]
