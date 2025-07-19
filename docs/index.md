@@ -31,6 +31,7 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 Creating the virtual dataset looks quite similar to how we normally open data with [xarray][], but there are a few notable differences that are shown through this example.
 
 First, import the necessary functions and classes:
+
 ```python exec="on" source="above" session="homepage"
 import icechunk
 from obstore.store import from_url
@@ -67,7 +68,7 @@ store = from_url(bucket, region="us-west-2", skip_signature=True)
 ```
 
 We also need to create an [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that
-maps the URL structure to the ObjectStore
+maps the URL structure to the ObjectStore.
 
 ```python exec="on" source="above" session="homepage"
 registry = ObjectStoreRegistry({bucket: store})
@@ -102,7 +103,7 @@ meaning that the work of constructing the single coherent dataset only needs to 
 For subsequent analyses, you can use [xarray.open_zarr][] to open that Icechunk store which is
 much faster than using [xarray.open_mfdataset][] on the original files.
 
-Let's see how you persist the Virtual dataset using Icechunk. Here we'll use a Memory cache but in most cases you'll store the virtual dataset in the cloud or on disk.
+Let's persist the Virtual dataset using Icechunk. Here we store the dataset in a memory store but in most cases you'll store the virtual dataset in the cloud.
 
 ```python exec="on" source="above" session="homepage"
 icechunk_store = icechunk.in_memory_storage()
