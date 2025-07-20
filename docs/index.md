@@ -34,7 +34,7 @@ First, import the necessary functions and classes:
 
 ```python exec="on" source="above" session="homepage"
 import icechunk
-from obstore.store import from_url
+import obstore
 
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.parsers import HDFParser
@@ -59,12 +59,12 @@ import xarray as xr
 xr.set_options(display_style="html")
 ```
 
-We can use Obstore's [from_url][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data from the specified URLs.
+We can use Obstore's [`obstore.store.from_url`][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data from the specified URLs.
 
 ```python exec="on" source="above" session="homepage"
 bucket = "s3://nex-gddp-cmip6"
 path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-store = from_url(bucket, region="us-west-2", skip_signature=True)
+store = obstore.store.from_url(bucket, region="us-west-2", skip_signature=True)
 ```
 
 We also need to create an [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that
@@ -82,12 +82,12 @@ vds = open_virtual_dataset(
   url=f"{bucket}/{path}",
   parser=parser,
   registry=registry,
-  loadable_variables = []
+  loadable_variables=[],
 )
 print(vds)
 ```
 
-Since we specified `loadable_variables=[]`, no data has been loaded or copied in this process. We have merely created an on-disk lookup table that points Xarray to the location of chunks in the original netCDF when data is needed later on. The default behavior (`loadable_variables=None`) will load data associated with coordinates but not data variables. The size represents the size of the original dataset, you can see the size of the virtual dataset using the `vz` accessor:
+Since we specified `loadable_variables=[]`, no data has been loaded or copied in this process. We have merely created an in-memory lookup table that points to the location of chunks in the original netCDF when data is needed later on. The default behavior (`loadable_variables=None`) will load data associated with coordinates but not data variables. The size represents the size of the original dataset - you can see the size of the virtual dataset using the `vz` accessor:
 
 ```python exec="on" source="above" session="homepage" result="code"
 print(f"Original dataset size: {vds.nbytes} bytes")
@@ -103,10 +103,10 @@ vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
 print(vds)
 ```
 
-The magic of VirtualiZarr is that you can persist the virtual dataset as an Icechunk store,
+The magic of VirtualiZarr is that you can persist the virtual dataset to disk in a chunk references format such as [Icechunk][https://icechunk.io/],
 meaning that the work of constructing the single coherent dataset only needs to happen once.
-For subsequent analyses, you can use [xarray.open_zarr][] to open that Icechunk store which is
-much faster than using [xarray.open_mfdataset][] on the original files.
+For subsequent data access, you can use [xarray.open_zarr][] to open that Icechunk store, which on object storage is
+far faster than using [xarray.open_mfdataset][] to open the the original non-cloud-optimized files.
 
 Let's persist the Virtual dataset using Icechunk. Here we store the dataset in a memory store but in most cases you'll store the virtual dataset in the cloud.
 
