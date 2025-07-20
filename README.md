@@ -41,15 +41,16 @@ You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr prov
 
 ### Development Status and Roadmap
 
-VirtualiZarr version 1 (mostly) achieves [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
+VirtualiZarr version 1 (mostly) achieved [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
-VirtualiZarr version 2 (unreleased) will bring:
+VirtualiZarr version 2 brings:
 
-- Zarr v3 support,
-- A pluggable system of "parsers" for virtualizing custom file formats,
-- The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first,
-- Integration with [`obstore`](https://developmentseed.org/obstore/latest/),
-- Reference parsing that doesn't rely on kerchunk under the hood.
+- Zarr v3 support
+- A pluggable system of "parsers" for virtualizing custom file formats
+- The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first
+- Integration with [`obstore`](https://developmentseed.org/obstore/latest/)
+- Reference parsing that doesn't rely on kerchunk under the hood
+- The ability to use "parsers" to load data directly from archival file formats
 
 Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
