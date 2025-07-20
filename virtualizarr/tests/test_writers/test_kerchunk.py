@@ -214,7 +214,7 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
     assert v2_metadata.dtype.to_native_dtype() == np.dtype("int32")
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
-    compressor_config = v2_metadata.compressor.get_config()
+    compressor_config = v2_metadata.filters[1].get_config()
     assert compressor_config["id"] == "blosc"
     assert compressor_config["cname"] == "zstd"
     assert compressor_config["clevel"] == 5

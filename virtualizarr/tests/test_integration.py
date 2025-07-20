@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from obstore.store import LocalStore
+from obstore.store import LocalStore, from_url
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
 from virtualizarr import open_virtual_dataset
@@ -25,6 +25,7 @@ from virtualizarr.tests import (
     has_icechunk,
     has_kerchunk,
     requires_kerchunk,
+    requires_network,
     requires_zarr_python,
 )
 
@@ -519,3 +520,34 @@ class TestPathsToURLs:
             path = manifest["0.0.0"]["path"]
 
             assert path == expected_path
+
+
+@requires_kerchunk
+@requires_network
+def test_roundtrip_dataset_with_multiple_compressors():
+    # Regression test to make sure we can load data with a compression and a shuffle codec
+    # TODO: Simplify this test to not require network access
+    import s3fs
+
+    bucket = "s3://nex-gddp-cmip6"
+    path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket, region="us-west-2", skip_signature=True)
+    registry = ObjectStoreRegistry({bucket: store})
+    parser = HDFParser()
+    vds = open_virtual_dataset(
+        url=url, parser=parser, registry=registry, loadable_variables=[]
+    )
+
+    ds_refs = vds.vz.to_kerchunk(format="dict")
+    fs = s3fs.S3FileSystem(anon=True)
+    with (
+        xr.open_dataset(fs.open(url), engine="h5netcdf", decode_times=True) as expected,
+        xr.open_dataset(
+            ds_refs,
+            decode_times=True,
+            engine="kerchunk",
+            storage_options={"remote_options": {"anon": True}},
+        ) as observed,
+    ):
+        xr.testing.assert_allclose(expected, observed)
