@@ -8,7 +8,8 @@
   ([#498](https://github.com/zarr-developers/VirtualiZarr/issues/498), [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
 - Added a [Zarr parser][virtualizarr.parsers.ZarrParser] that allows opening Zarr V3 stores as virtual datasets.
   ([#271](https://github.com/zarr-developers/VirtualiZarr/pull/271)) By [Raphael Hagen](https://github.com/norlandrhagen).
-- Added [`ManifestStore`][virtualizarr.manifests.ManifestStore] for loading data from ManifestArrays by ([#490](https://github.com/zarr-developers/VirtualiZarr/pull/490)).
+- Added [`ManifestStore`][virtualizarr.manifests.ManifestStore] for loading data from ManifestArrays by ([#490](https://github.com/zarr-developers/VirtualiZarr/pull/490))
+  By [Max Jones](https://github.com/maxrjones).
 - Added [`ManifestStore.to_virtual_dataset()`][virtualizarr.manifests.ManifestStore.to_virtual_dataset] method ([#522](https://github.com/zarr-developers/VirtualiZarr/pull/522)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] function ([#345](https://github.com/zarr-developers/VirtualiZarr/issues/345), [#349](https://github.com/zarr-developers/VirtualiZarr/pull/349)).
