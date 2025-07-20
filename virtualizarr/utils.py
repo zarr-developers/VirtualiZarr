@@ -4,13 +4,10 @@ import copy
 import importlib
 import io
 import json
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Union
 
 import obstore as obs
-from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
-from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
-from virtualizarr.codecs import extract_codecs, get_codec_config
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 # taken from zarr.core.common
@@ -112,57 +109,6 @@ def determine_chunk_grid_shape(
 ) -> tuple[int, ...]:
     """Calculate the shape of the chunk grid based on array shape and chunk size."""
     return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
-
-
-def convert_v3_to_v2_metadata(
-    v3_metadata: ArrayV3Metadata, fill_value: Any = None
-) -> ArrayV2Metadata:
-    """
-    Convert ArrayV3Metadata to ArrayV2Metadata.
-
-    Parameters
-    ----------
-    v3_metadata
-        The metadata object in v3 format.
-    fill_value
-        Override the fill value from v3 metadata.
-
-    Returns
-    -------
-    ArrayV2Metadata
-        The metadata object in v2 format.
-    """
-    import warnings
-
-    array_filters: tuple[ArrayArrayCodec, ...]
-    bytes_compressors: tuple[BytesBytesCodec, ...]
-    array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
-    # Handle compressor configuration
-    compressor_config: dict[str, Any] | None = None
-    if bytes_compressors:
-        if len(bytes_compressors) > 1:
-            warnings.warn(
-                "Multiple compressors found in v3 metadata. Using the first compressor, "
-                "others will be ignored. This may affect data compatibility.",
-                UserWarning,
-            )
-        compressor_config = get_codec_config(bytes_compressors[0])
-
-    # Handle filter configurations
-    filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
-
-    v2_metadata = ArrayV2Metadata(
-        shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type,
-        chunks=v3_metadata.chunks,
-        fill_value=fill_value or v3_metadata.fill_value,
-        compressor=compressor_config,
-        filters=filter_configs,
-        order="C",
-        attributes=v3_metadata.attributes,
-        dimension_separator=".",  # Assuming '.' as default dimension separator
-    )
-    return v2_metadata
 
 
 def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:

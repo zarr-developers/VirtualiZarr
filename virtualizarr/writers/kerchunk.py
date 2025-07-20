@@ -3,20 +3,15 @@ import json
 from typing import cast
 
 import numpy as np
-import ujson
-from numcodecs.abc import Codec
 from xarray import Dataset, Variable
 from xarray.backends.zarr import encode_zarr_variable
 from xarray.coding.times import CFDatetimeCoder
 from xarray.conventions import encode_dataset_coordinates
-from zarr.core.common import JSON
-from zarr.core.metadata.v2 import ArrayV2Metadata
-from zarr.dtype import parse_data_type
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import join
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
-from virtualizarr.utils import convert_v3_to_v2_metadata
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -53,23 +48,6 @@ class NumpyEncoder(json.JSONEncoder):
             raise
 
 
-def to_kerchunk_json(v2_metadata: ArrayV2Metadata) -> str:
-    """Convert V2 metadata to kerchunk JSON format."""
-
-    zarray_dict: dict[str, JSON] = v2_metadata.to_dict()
-    if v2_metadata.filters:
-        zarray_dict["filters"] = [
-            # we could also cast to json, but get_config is intended for serialization
-            codec.get_config()
-            for codec in v2_metadata.filters
-            if codec is not None
-        ]  # type: ignore[assignment]
-    if isinstance(compressor := v2_metadata.compressor, Codec):
-        zarray_dict["compressor"] = compressor.get_config()
-
-    return json.dumps(zarray_dict, separators=(",", ":"), cls=NumpyEncoder)
-
-
 def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
     """
     Create a dictionary containing kerchunk-style store references from a single xarray.Dataset (which wraps ManifestArray objects).
@@ -87,11 +65,11 @@ def dataset_to_kerchunk_refs(ds: Dataset) -> KerchunkStoreRefs:
         }
         all_arr_refs.update(prepended_with_var_name)
 
+    group_metadata = {"zarr_format": 3, "node_type": "group", "attributes": attrs}
     ds_refs = {
         "version": 1,
         "refs": {
-            ".zgroup": '{"zarr_format":2}',
-            ".zattrs": ujson.dumps(attrs),
+            "zarr.json": group_metadata,
             **all_arr_refs,
         },
     }
@@ -115,17 +93,23 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
 
     if isinstance(var.data, ManifestArray):
         marr = var.data
-
-        arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): [
+        array_v3_metadata = marr.metadata.to_dict()
+        chunk_key_encoding = array_v3_metadata["chunk_key_encoding"]["configuration"][
+            "separator"
+        ]
+        arr_refs: dict[str, str | list[str | int]] = {}
+        for chunk_key, entry in marr.manifest.dict().items():
+            chunk_key = chunk_key.replace(".", chunk_key_encoding)
+            chunk_key = chunk_key.replace("/", chunk_key_encoding)
+            chunk_key = f"c{chunk_key_encoding}{chunk_key}"
+            arr_refs[chunk_key] = [
                 remove_file_uri_prefix(entry["path"]),
                 entry["offset"],
                 entry["length"],
             ]
-            for chunk_key, entry in marr.manifest.dict().items()
-        }
-        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
-        zattrs = {**var.attrs, **var.encoding}
+
+        if array_v3_metadata.get("dimenion_names", None) is None:
+            array_v3_metadata["dimension_names"] = list(var.dims)
     else:
         var = encode_zarr_variable(var)
         try:
@@ -158,22 +142,15 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
         # TODO can this be generalized to save individual chunks of a dask array?
         # TODO will this fail for a scalar?
         arr_refs = {join(0 for _ in np_arr.shape): inlined_data}
-
-        array_v2_metadata = ArrayV2Metadata(
-            chunks=np_arr.shape,
+        attrs = var.attrs
+        dims = list(var.dims)
+        array_v3_metadata = create_v3_array_metadata(
+            chunk_shape=np_arr.shape,
             shape=np_arr.shape,
-            dtype=parse_data_type(
-                np_arr.dtype, zarr_format=2
-            ),  # needed unless zarr-python fixes https://github.com/zarr-developers/zarr-python/issues/3253
-            order="C",
+            data_type=np_arr.dtype,
             fill_value=None,
-        )
-        zattrs = {**var.attrs}
-
-    zarray_dict = to_kerchunk_json(array_v2_metadata)
-    arr_refs[".zarray"] = zarray_dict
-
-    zattrs["_ARRAY_DIMENSIONS"] = list(var.dims)
-    arr_refs[".zattrs"] = json.dumps(zattrs, separators=(",", ":"), cls=NumpyEncoder)
-
+            attributes=attrs,
+            dimension_names=dims,
+        ).to_dict()
+    arr_refs["zarr.json"] = array_v3_metadata
     return cast(KerchunkArrRefs, arr_refs)
