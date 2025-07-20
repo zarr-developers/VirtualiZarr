@@ -166,6 +166,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 ### Why a new project?
 
 The reasons why VirtualiZarr has been developed as separate project rather than by contributing to the Kerchunk library upstream are:
+
 - Kerchunk aims to support non-Zarr-like formats too [(1)](https://github.com/fsspec/kerchunk/issues/386#issuecomment-1795379571) [(2)](https://github.com/zarr-developers/zarr-specs/issues/287#issuecomment-1944439368), whereas VirtualiZarr is more strictly scoped, and may eventually be very tighted integrated with the Zarr-Python library itself.
 - Whilst some features of VirtualiZarr currently require importing Kerchunk, Kerchunk is an optional dependency, and the VirtualiZarr roadmap aims to at some point not share any code with the Kerchunk library, nor ever require importing it. (You would nevertheless still be able to write out references in the Kerchunk format though!)
 - The API design of VirtualiZarr is deliberately [completely different](https://github.com/fsspec/kerchunk/issues/377#issuecomment-1922688615) to Kerchunk's API, so integration into Kerchunk would have meant duplicated functionality.
@@ -176,6 +177,7 @@ The reasons why VirtualiZarr has been developed as separate project rather than 
 VirtualiZarr version 1 (mostly) achieved [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
 VirtualiZarr version 2 brought:
+
 - Zarr v3 support,
 - A pluggable system of "parsers" for virtualizing custom file formats,
 - The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first,
@@ -186,6 +188,7 @@ VirtualiZarr version 2 brought:
 Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
 We have a lot of ideas, including:
+
 - [Zarr-native on-disk chunk manifest format](https://github.com/zarr-developers/zarr-specs/issues/287)
 - ["Virtual concatenation"](https://github.com/zarr-developers/zarr-specs/issues/288) of separate Zarr arrays
 - ManifestArrays as an [intermediate layer in-memory](https://github.com/zarr-developers/VirtualiZarr/issues/71) in Zarr-Python
