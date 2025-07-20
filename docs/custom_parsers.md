@@ -36,7 +36,7 @@ vds = vz.open_virtual_dataset(
 )
 ```
 
-All parsers _must_ follow this exact call signature, enforced at runtime by checking against the [`virtualizarr.parsers.Parser`][] typing protocol.
+All parsers _must_ follow this exact call signature, enforced at runtime by checking against the [`virtualizarr.parsers.typing.Parser`][] typing protocol.
 
 !!! note
     The object store registry can technically be empty, but to be able to read actual chunks of data back from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] later, the registry needs to contain at least one [`ObjectStore`][obstore.store.ObjectStore] matched to the URL prefix of the data sources.
@@ -104,7 +104,7 @@ This virtual dataset object is then returned to the user, so [`open_virtual_data
 
 ## Parser-specific keyword arguments
 
-The [`Parser`][virtualizarr.parsers.Parser] `__call__` method does not accept arbitrary optional keyword arguments.
+The [`Parser`][virtualizarr.parsers.typing.Parser] `__call__` method does not accept arbitrary optional keyword arguments.
 
 However, extra information is often needed to fully map the archival format to the Zarr data model, for example if the format does not include array names or dimension names.
 
