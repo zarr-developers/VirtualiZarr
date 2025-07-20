@@ -96,7 +96,7 @@ extra_css:
 plugins:
   - search
   - autorefs
-  - markdown-exec:
+  - markdown-exec
   - mkdocstrings:
       enable_inventory: true
       handlers:
