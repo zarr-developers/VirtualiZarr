@@ -50,7 +50,7 @@ VirtualiZarr version 2 brings:
 - The `ManifestStore` abstraction, which allows for loading data without serializing to Kerchunk/Icechunk first
 - Integration with [`obstore`](https://developmentseed.org/obstore/latest/)
 - Reference parsing that doesn't rely on kerchunk under the hood
-- The ability to use "parsers" to load data directly from archival file formats
+- The ability to use "parsers" to load data directly from archival file formats into Zarr and/or Xarray
 
 Future VirtualiZarr development will focus on generalizing and upstreaming useful concepts into the Zarr specification, the Zarr-Python library, Xarray, and possibly some new packages.
 
