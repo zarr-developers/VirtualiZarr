@@ -30,6 +30,11 @@ def pytest_addoption(parser):
         help="runs tests requiring a network connection",
     )
     parser.addoption(
+        "--run-slow-tests",
+        action="store_true",
+        help="runs slow tests",
+    )
+    parser.addoption(
         "--run-minio-tests",
         action="store_true",
         help="runs tests requiring docker and minio",
@@ -44,6 +49,8 @@ def pytest_runtest_setup(item):
         )
     if "minio" in item.keywords and not item.config.getoption("--run-minio-tests"):
         pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
+    if "slow" in item.keywords and not item.config.getoption("--run-slow-tests"):
+        pytest.skip("set --run-slow-tests to run slow tests")
 
 
 def _xarray_subset():

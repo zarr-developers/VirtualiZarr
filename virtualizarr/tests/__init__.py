@@ -5,6 +5,7 @@ from packaging.version import Version
 
 requires_network = pytest.mark.network
 requires_minio = pytest.mark.minio
+slow_test = pytest.mark.slow
 
 
 def _importorskip(

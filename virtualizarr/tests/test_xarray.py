@@ -21,6 +21,7 @@ from virtualizarr.tests import (
     requires_imagecodecs,
     requires_lithops,
     requires_network,
+    slow_test,
 )
 from virtualizarr.tests.utils import obstore_http, obstore_s3
 
@@ -576,6 +577,7 @@ class TestDetermineCoords:
 
 @requires_network
 class TestReadRemote:
+    @slow_test
     @pytest.mark.parametrize(
         "indexes",
         [
@@ -604,14 +606,14 @@ class TestReadRemote:
             for name in ["time", "lat", "lon"]:
                 assert isinstance(vds[name].data, np.ndarray)
 
-    @pytest.mark.skip(reason="often times out, as nisar file is 200MB")
+    @slow_test
     def test_virtualizarr_vs_local_nisar(self):
         # Open group directly from locally cached file with xarray
         url = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR-SAMPLE-DATA/GCOV/ALOS1_Rosamond_20081012/NISAR_L2_PR_GCOV_001_005_A_219_4020_SHNA_A_20081012T060910_20081012T060926_P01101_F_N_J_001.h5"
         hdf_group = "science/LSAR/GCOV/grids/frequencyA"
         store = obstore_http(url=url)
         registry = ObjectStoreRegistry()
-        registry.register(url, registry)
+        registry.register(url, store)
         drop_variables = ["listOfCovarianceTerms", "listOfPolarizations"]
         parser = HDFParser(group=hdf_group, drop_variables=drop_variables)
         with (
@@ -625,7 +627,7 @@ class TestReadRemote:
             # save group reference file via virtualizarr, then open with engine="kerchunk"
             open_virtual_dataset(
                 url=url,
-                object_store=store,
+                registry=registry,
                 parser=parser,
             ) as vds,
         ):

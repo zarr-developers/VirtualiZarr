@@ -27,6 +27,7 @@ from virtualizarr.tests import (
     requires_kerchunk,
     requires_network,
     requires_zarr_python,
+    slow_test,
 )
 
 icechunk = pytest.importorskip("icechunk")
@@ -524,6 +525,7 @@ class TestPathsToURLs:
 
 @requires_kerchunk
 @requires_network
+@slow_test
 def test_roundtrip_dataset_with_multiple_compressors():
     # Regression test to make sure we can load data with a compression and a shuffle codec
     # TODO: Simplify this test to not require network access
