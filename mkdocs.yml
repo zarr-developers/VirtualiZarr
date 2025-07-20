@@ -20,7 +20,6 @@ nav:
   - How-to guides:
     - "usage.md"
     - "examples.md"
-    - "migration_guide.md"
   - Explanation:
     - "data_structures.md"
     - "custom_parsers.md"
@@ -37,6 +36,7 @@ nav:
       - api/parsers/dmrpp.md
     - api/serialization.md
     - api/developer.md
+  - "migration_guide.md"
   - About the project:
     - "releases.md"
     - "contributing.md"
@@ -95,7 +95,7 @@ extra_css:
 plugins:
   - search
   - autorefs
-  - markdown-exec
+  - markdown-exec:
   - mkdocstrings:
       enable_inventory: true
       handlers:
