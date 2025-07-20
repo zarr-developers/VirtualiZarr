@@ -1,33 +1,34 @@
 # Release notes
 
-## v1.3.3 (unreleased)
+## v2.0 (20th July 2025)
 
 ### New Features
 
-- Adds a V1 -> V2 usage migration guide [#637](https://github.com/zarr-developers/VirtualiZarr/issues/637). By [Raphael Hagen](https://github.com/norlandrhagen).
-- Moves examples into a `V1/` directory and adds notes that examples use the VirtualiZarr V1 syntax [#644](https://github.com/zarr-developers/VirtualiZarr/issues/644). By [Raphael Hagen](https://github.com/norlandrhagen).
-- Added a pluggable system of "parsers" for generating virtual references from different filetypes. These follow the `virtualizarr.parsers.typing.Parser` typing protocol, and return `ManifestStore` objects wrapping obstore stores.
+- Added a pluggable system of "parsers" for generating virtual references from different filetypes. These follow the [`virtualizarr.parsers.typing.Parser`][] typing protocol, and return [`ManifestStore`][virtualizarr.manifests.ManifestStore] objects wrapping obstore stores.
   ([#498](https://github.com/zarr-developers/VirtualiZarr/issues/498), [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
-- Adds a Zarr parser to `open_virtual_dataset`, which allows opening Zarr V3 stores as virtual datasets.
+- Added a [Zarr parser][virtualizarr.parsers.ZarrParser] that allows opening Zarr V3 stores as virtual datasets.
   ([#271](https://github.com/zarr-developers/VirtualiZarr/pull/271)) By [Raphael Hagen](https://github.com/norlandrhagen).
-- Added experimental ManifestStore ([#490](https://github.com/zarr-developers/VirtualiZarr/pull/490)).
-- Added `ManifestStore.to_virtual_dataset()` method ([#522](https://github.com/zarr-developers/VirtualiZarr/pull/522)).
+- Added [`ManifestStore`][virtualizarr.manifests.ManifestStore] for loading data from ManifestArrays by ([#490](https://github.com/zarr-developers/VirtualiZarr/pull/490))
+  By [Max Jones](https://github.com/maxrjones).
+- Added [`ManifestStore.to_virtual_dataset()`][virtualizarr.manifests.ManifestStore.to_virtual_dataset] method ([#522](https://github.com/zarr-developers/VirtualiZarr/pull/522)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Added experimental `open_virtual_mfdataset` function ([#345](https://github.com/zarr-developers/VirtualiZarr/issues/345), [#349](https://github.com/zarr-developers/VirtualiZarr/pull/349)).
+- Added [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] function ([#345](https://github.com/zarr-developers/VirtualiZarr/issues/345), [#349](https://github.com/zarr-developers/VirtualiZarr/pull/349)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added `datatree_to_icechunk` function for writing an `xarray.DataTree` to
   an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By [Chuck Daniels](https://github.com/chuckwondo).
-- Added a `.virtualize` custom accessor to `xarray.DataTree`, exposing the method
-  `xarray.DataTree.virtualize.to_icechunk()` for writing an `xarray.DataTree`
+- Added a `.vz` custom accessor to `xarray.DataTree`, exposing the method
+  `xarray.DataTree.vz.to_icechunk()` for writing an `xarray.DataTree`
   to an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By
   [Chuck Daniels](https://github.com/chuckwondo).
-- Now throws a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
+- Added a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Support big-endian data via zarr-python 3.0.9 and zarr v3's new data types system ([#618](https://github.com/zarr-developers/VirtualiZarr/issues/618), [#677](https://github.com/zarr-developers/VirtualiZarr/issues/677)) By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+- Support big-endian data via zarr-python 3.0.9 and zarr v3's new data types system ([#618](https://github.com/zarr-developers/VirtualiZarr/issues/618), [#677](https://github.com/zarr-developers/VirtualiZarr/issues/677)). By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+- Added a V1 -> V2 usage migration guide [#637](https://github.com/zarr-developers/VirtualiZarr/issues/637). By [Raphael Hagen](https://github.com/norlandrhagen).
 
 ### Breaking changes
 
-- As `virtualizarr.open_virtual_dataset` now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601))
+- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](migration_guide.md) for more details.
+- The recommended virtualizarr Xarray accessor name is `vz` rather than `virtualize`.
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose
   name matches the name of their only dimension (also known as "dimension coordinates").
@@ -41,8 +42,9 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Now by default when writing virtual chunks to Icechunk, the `last_updated_time` for the chunk will be set to the current time. This helps protect users against reading from stale or overwritten chunks stored in Icechunk, by default.
   ([#436](https://github.com/zarr-developers/VirtualiZarr/issues/436), [#480](https://github.com/zarr-developers/VirtualiZarr/pull/480)) by [Tom Nicholas](https://github.com/TomNicholas).
-
-### Deprecations
+- Minimum supported version of Icechunk is now `v1.0`
+- Minimum supported version of Zarr is now `v3.1.0`
+- Xarray is pinned to `v2025.6.0`. We expect to loosen the upper bound shortly.
 
 ### Bug fixes
 
@@ -70,6 +72,7 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Switched docs build to use mkdocs-material instead of sphinx ([#615](https://github.com/zarr-developers/VirtualiZarr/pull/615))
   By [Max Jones](https://github.com/maxrjones).
+- Moved examples into a `V1/` directory and adds notes that examples use the VirtualiZarr V1 syntax [#644](https://github.com/zarr-developers/VirtualiZarr/issues/644). By [Raphael Hagen](https://github.com/norlandrhagen).
 
 ### Internal Changes
 
