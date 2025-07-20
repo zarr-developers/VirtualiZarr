@@ -28,12 +28,6 @@ VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limite
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
 
-## Parser typing protocol
-
-All custom parsers must follow the `virtualizarr.parsers.typing.Parser` typing protocol.
-
-::: virtualizarr.parsers.typing.Parser
-
 ## Parallelization
 
 Parallelizing virtual reference generation can be done using a number of parallel execution frameworks.

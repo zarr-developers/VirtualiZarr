@@ -59,7 +59,7 @@ For example you may want to parallelize using the [dask library](https://www.das
 import virtualizarr as vz
 import dask
 
-tasks = [dask.delayed(vz.open_virtual_dataset)(path) for path in filepaths]
+tasks = [dask.delayed(vz.open_virtual_dataset)(url,registry) for url in urls]
 virtual_datasets = dask.compute(tasks)
 ```
 
@@ -80,7 +80,7 @@ This argument allows you to conveniently choose from a range of pre-defined para
 The resulting code only takes one function call to generate virtual references in parallel and combine them into one virtual dataset.
 
 ```python
-combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=<choice_of_executor>)
+combined_vds = vz.open_virtual_mfdataset(urls, parallel=<choice_of_executor>)
 ```
 
 VirtualiZarr's [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] is designed to mimic the API of xarray's [`open_mfdataset`][xarray.open_mfdataset], and so accepts all the same keyword argument options for combining.
@@ -106,7 +106,7 @@ You simply pass the executor class directly via the `parallel` kwarg to [`open_v
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
-combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=ThreadPoolExecutor)
+combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel=ThreadPoolExecutor)
 ```
 
 This can work well when virtualizing files in remote object storage because it parallelizes the issuing of HTTP GET requests for each file.
@@ -117,7 +117,7 @@ You can parallelize using `dask.delayed` automatically by passing `parallel='das
 This will select the [`DaskDelayedExecutor`][virtualizarr.parallel.DaskDelayedExecutor].
 
 ```python
-combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='dask')
+combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel='dask')
 ```
 
 This uses the same approach that [`open_mfdataset`][xarray.open_mfdataset] does when `parallel=True` is passed to it.
@@ -135,7 +135,7 @@ To run on lithops you need to configure lithops for the relevant compute backend
 Then you can use the [`LithopsEagerFunctionExecutor`][virtualizarr.parallel.LithopsEagerFunctionExecutor] simply via:
 
 ```python
-combined_vds = vz.open_virtual_mfdataset(filepaths, parallel='lithops')
+combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel='lithops')
 ```
 
 ### Custom Executors
@@ -155,7 +155,7 @@ class CustomExecutor(Executor):
     ) -> Iterator:
         ...
 
-combined_vds = vz.open_virtual_mfdataset(filepaths, parallel=CustomExecutor)
+combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel=CustomExecutor)
 ```
 
 ## Memory usage
@@ -197,9 +197,6 @@ The Kerchunk Parquet format is more scalable, but you may want to experiment wit
 
 Icechunk's format stores the virtual references in dedicated binary files, and can use "manifest splitting", together meaning that it should be a scalable way to store large numbers of references.
 
-!!! TODO
-    Put numbers on this by testing at large scale once manifest splitting is actually released in Icechunk.
-
 ## Tips for success
 
 Here are some assorted tips for successfully scaling VirtualiZarr.
@@ -212,15 +209,9 @@ One way to do this is to issue HTTP range requests only for each piece of metada
 This will download the absolute minimum amount of data in total, but issue a lot of HTTP requests, each of which can take a long time to be returned from high-latency object storage.
 This approach therefore uses the minimum amount of memory on the worker but takes more time.
 
-!!! TODO
-    Describe how this is the default with obstore
-
 The other extreme is to download the entire file up front.
 This downloads all the metadata by definition, but also all the actual data, which is likely millions of times more than you need for virtualization.
 This approach usually takes a lot less time on the worker but requires the maximum amount of memory - using this approach on every file in the dataset entails downloading the entire dataset across all workers!
-
-!!! TODO
-    How to enable this by passing `cache=True` to obstore
 
 There are various tricks one can use when fetching metadata, such as pre-fetching, minimum fetch sizes, or read-ahead caching strategies.
 All of these approaches will put your memory requirements somewhere in between the two extremes described above, and are not necessary for successful execution.
@@ -245,7 +236,7 @@ repo = ic.open(<repo_url>)
 for i, batch in enumerate(file_batches):
     session = repo.writable_session("main")
 
-    combined_batch_vds = vz.open_virtual_mfdataset(batch)
+    combined_batch_vds = vz.open_virtual_mfdataset(batch, registry=registry)
 
     combined_batch_vds.vz.to_icechunk(session.store, append_dim=...)
 
@@ -263,5 +254,5 @@ If you are batching your computation then you could retry each loop iteration if
 
 Instead what is more efficient is to use per-task retries at te executor level.
 
-!!! TODO
-    We plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
+
+In the future, we plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)

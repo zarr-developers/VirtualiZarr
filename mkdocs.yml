@@ -28,6 +28,7 @@ nav:
   - API Reference:
     - api/virtualizarr.md
     - Parsers:
+      - api/parsers/protocol.md
       - api/parsers/hdf5.md
       - api/parsers/fits.md
       - api/parsers/kerchunk.md
@@ -95,7 +96,7 @@ extra_css:
 plugins:
   - search
   - autorefs
-  - markdown-exec:
+  - markdown-exec
   - mkdocstrings:
       enable_inventory: true
       handlers:
