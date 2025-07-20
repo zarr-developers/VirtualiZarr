@@ -9,38 +9,37 @@ This is advanced material intended for 3rd-party developers, and assumes you hav
 
 ## What is a VirtualiZarr parser?
 
-All VirtualiZarr parsers are simply callables that accept a path to a file of a specific format and an instantiated [obstore](https://developmentseed.org/obstore/latest/) store to read data from it with, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of that file.
+All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
 
 ```python
-from virtualizarr.manifests import ManifestStore, ObjectStoreRegistry
+from virtualizarr.manifests import ManifestStore
+from virtualizarr.registry import ObjectStoreRegistry
 
 
-def custom_parser(file_url: str, object_store: ObjectStore) -> ManifestStore:
-    # access the file's contents, e.g. using the ObjectStore instance
-    readable_file = obstore.open_reader(object_store, file_url)
+def custom_parser(url: str, registry: ObjectStoreRegistry) -> ManifestStore:
+    # access the file's contents, e.g. using the ObjectStore instance in the registry
+    store, path_in_store = registry.resolve(url)
+    readable_file = obstore.open_reader(store, path_in_store)
 
     # parse the file contents to extract its metadata
     # this is generally where the format-specific logic lives
     manifestgroup: ManifestGroup = extract_metadata(readable_file)
-
-    # optionally create an object store registry, used to actually load chunk data from file later
-    registry = ObjectStoreRegistry({store_prefix: object_store})
 
     # construct the Manifeststore from the parsed metadata and the object store registry
     return ManifestStore(group=manifestgroup, registry=registry)
 
 
 vds = vz.open_virtual_dataset(
-    file_url,
-    object_store=object_store,
+    url,
+    registry=registry,
     parser=custom_parser,
 )
 ```
 
-All parsers _must_ follow this exact call signature, enforced at runtime by checking against the [`virtualizarr.parsers.typing.Parser`][] typing protocol.
+All parsers _must_ follow this exact call signature, enforced at runtime by checking against the [`virtualizarr.parsers.Parser`][] typing protocol.
 
 !!! note
-    The object store registry can technically be empty, but to be able to read actual chunks of data back from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] later, the registry needs to contain at least one [`ObjectStore`][obstore.store.ObjectStore] instance.
+    The object store registry can technically be empty, but to be able to read actual chunks of data back from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] later, the registry needs to contain at least one [`ObjectStore`][obstore.store.ObjectStore] matched to the URL prefix of the data sources.
 
     The only time you might want to use an empty object store registry is if you are attempting to parse a custom metadata-only references format without touching the original files they refer to -- i.e., a format like Kerchunk or DMR++, that doesn't contain actual binary data values.
 
@@ -72,24 +71,24 @@ This works because the [`ManifestStore`][virtualizarr.manifests.ManifestStore] c
 Reading data from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] can therefore be done using the zarr-python API directly:
 
 ```python
-manifest_store = parser(url, object_store)
+manifest_store = parser(url, registry)
 
 zarr_group = zarr.open_group(manifest_store)
 zarr_group.tree()
 ```
 or using xarray:
 ```python
-manifest_store = parser(url, object_store)
+manifest_store = parser(url, registry)
 
-ds = xr.open_zarr(manifest_store)
+ds = xr.open_zarr(manifest_store, zarr_format=3, consolidated=False)
 ```
 
 Note using xarray like this would produce an entirely non-virtual dataset, so is equivalent to passing
 
 ```python
 ds = vz.open_virtual_dataset(
-    file_url,
-    object_store=object_store,
+    url,
+    registry=registry,
     parser=parser,
     loadable_variables=<all_the_variable_names>,
 )
@@ -97,15 +96,15 @@ ds = vz.open_virtual_dataset(
 
 ## How is the parser called internally?
 
-The parser is passed to [`open_virtual_dataset`][virtualizarr.open_virtual_dataset], and immediately called on the file url to produce a [`ManifestStore`][virtualizarr.manifests.ManifestStore] instance.
+The parser is passed to [`open_virtual_dataset`][virtualizarr.open_virtual_dataset], and immediately called on the url to produce a [`ManifestStore`][virtualizarr.manifests.ManifestStore] instance.
 
 The [`ManifestStore`][virtualizarr.manifests.ManifestStore] is then converted to the xarray data model using [`ManifestStore.to_virtual_dataset`][virtualizarr.manifests.ManifestStore.to_virtual_dataset], which loads `loadable_variables` by reading from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] using [`xarray.open_zarr`][].
 
-This virtual dataset object is then returned to the user, so [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] is really a very thin wrapper around the parser and object store you pass in.
+This virtual dataset object is then returned to the user, so [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] is really a very thin wrapper around the parser.
 
 ## Parser-specific keyword arguments
 
-The [`Parser`][virtualizarr.parsers.typing.Parser] callable does not accept arbitrary optional keyword arguments.
+The [`Parser`][virtualizarr.parsers.Parser] `__call__` method does not accept arbitrary optional keyword arguments.
 
 However, extra information is often needed to fully map the archival format to the Zarr data model, for example if the format does not include array names or dimension names.
 
@@ -113,25 +112,27 @@ Instead, to pass arbitrary extra information to your parser callable, it is reco
 
 ```python
 class CustomParser:
-    def __init__(self, **kwargs) -> None:
-        self.kwargs = kwargs
+    def __init__(self, option_1: bool = False,  option_2: int | None = None) -> None:
+        self.option_1 = option_1
+        self.option_2 = option_2
 
-    def __call__(self, file_url: str, object_store: ObjectStore) -> ManifestStore:
-        # access the file's contents, e.g. using the ObjectStore instance
-        readable_file = obstore.open_reader(object_store, file_url)
+    def __call__(self, url: str, registry: ObjectStoreRegistry) -> ManifestStore:
+        # access the file's contents, e.g. using the ObjectStore instance in the registry
+        store, path_in_store = registry.resolve(url)
+        readable_file = obstore.open_reader(store, path_in_store)
 
         # parse the file contents to extract its metadata
         # this is generally where the format-specific logic lives
-        manifestgroup: ManifestGroup = extract_metadata(readable_file, **self.kwargs)
+        manifestgroup: ManifestGroup = extract_metadata(readable_file, option_1=self.option_1, option_2=self.option_2)
 
-        # construct the Manifeststore from the parsed metadata
-        return ManifestStore(...)
+        # construct the Manifeststore from the parsed metadata and the object store registry
+        return ManifestStore(group=manifestgroup, registry=registry)
 
-
+parser = CustomParser(option_1=True, option_2=6)
 vds = vz.open_virtual_dataset(
-    file_url,
-    object_store=object_store,
-    parser=CustomParser(**kwargs),
+    url,
+    registry=registry,
+    parser=parser,
 )
 ```
 
@@ -144,24 +145,17 @@ However there are few common approaches.
 
 ### Typical VirtualiZarr parsers
 
-The recommended way to implement a custom parser is simply to parse the given file yourself, and construct the [`ManifestStore`][virtualizarr.manifests.ManifestStore] object explicitly, component by component, extracting the metadata that you need.
+The recommended way to implement a custom parser by parsing a file of a given format, and construct the [`ManifestStore`][virtualizarr.manifests.ManifestStore] object explicitly, component by component, extracting the metadata that you need.
 
 Generally you want to follow steps like this:
 
 1.  Extract file header or magic bytes to confirm the file passed is the format your parser expects.
-
 2.  Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
-
 3.  For each array in the file:
-
     1.  Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
-
     2.  Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] object.
-
     3. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding `zarr.core.metadata.ArrayV3Metadata` and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
-
 4.  Group [`ManifestArray`][virtualizarr.manifests.ManifestArray]s into one or more [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] object as a `zarr.metadata.GroupMetadata` object. Remember that [`ManifestGroup`][virtualizarr.manifests.ManifestGroup]s can contain other groups as well as arrays.
-
 5.  Instantiate the final [`ManifestStore`][virtualizarr.manifests.ManifestStore] using the top-most [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] and return it.
 
 !!! note
@@ -190,8 +184,8 @@ memory_store = obstore.store.MemoryStore()
 memory_store.put("refs.json", ujson.dumps(refs).encode())
 
 registry = ObjectStoreRegistry({"memory://": memory_store})
-parser = KerchunkJSONParser(registry=registry)
-manifeststore = parser("refs.json", memory_store)
+parser = KerchunkJSONParser()
+manifeststore = parser("file:///Users/user/my-project/refs.json", registry)
 ```
 
 Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
@@ -242,11 +236,17 @@ For example we could test the ability of VirtualiZarr's in-built [`HDFParser`][v
 import xarray.testing as xrt
 
 from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 
-manifest_store = HDFParser("file.nc", object_store=obstore.LocalStore)
+project_directory = "/Users/user/my-project"
+project_url = f"file://{project_directory}"
+registry = ObjectStoreRegistry({project_url: LocalStore(prefix=project_directory)})
+parser = HDFParser()
+manifest_store = parser(url=f"{project_url}/netcdf-file.nc", registry=registry)
 
 with (
-    xr.open_dataset(manifest_store, engine="zarr") as actual,
+    xr.open_dataset(manifest_store, engine="zarr", zarr_format=3, consolidated=False) as actual,
     xr.open_dataset(manifest_store, backend="h5netcdf") as expected,
 ):
     xrt.assert_identical(actual, expected)

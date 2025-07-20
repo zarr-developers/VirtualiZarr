@@ -29,6 +29,7 @@ nav:
   - API Reference:
     - api/virtualizarr.md
     - Parsers:
+      - api/parsers/protocol.md
       - api/parsers/hdf5.md
       - api/parsers/fits.md
       - api/parsers/kerchunk.md

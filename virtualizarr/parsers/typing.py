@@ -12,23 +12,23 @@ class Parser(Protocol):
         self,
         url: str,
         registry: ObjectStoreRegistry,
-    ) -> ManifestStore: ...
+    ) -> ManifestStore:
+        """
+        Parse the contents of a given data source to produce a ManifestStore.
 
-    """
-    Parse the contents of a given data source to produce a ManifestStore.
+        Effectively maps the contents of the data source (including the metadata, compression codecs, chunk byte offsets)
+        to the Zarr data model.
 
-    Effectively maps the contents of the data source (including the metadata, compression codecs, chunk byte offsets)
-    to the Zarr data model.
+        Parameters
+        ----------
+        url
+            The URL of the input data source (e.g., "s3://bucket/file.nc").
+        registry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
-    Parameters
-    ----------
-    url
-        The URL of the input data source (e.g., "s3://bucket/file.nc").
-    registry
-        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
-
-    Returns
-    -------
-    ManifestStore
-        A ManifestStore which provides a Zarr representation of the parsed data source.
-    """
+        Returns
+        -------
+        ManifestStore
+            A ManifestStore which provides a Zarr representation of the parsed data source.
+        """
+        ...
