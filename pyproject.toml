@@ -224,6 +224,7 @@ show_error_codes = true
 module = [
     "docker",
     "fsspec.*",
+    "s3fs.*",
     "h5py",
     "kerchunk.*",
     "minio",
