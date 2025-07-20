@@ -21,7 +21,7 @@ vds = open_virtual_dataset("data1.nc")
 ```
 
 To provide a more extensible and reliable API, VirtualiZarr V2 requires more explicit configuration by the user.
-You now must pass in a valid [Parser][virtualizarr.parsers.Parser] and a [virtualizarr.registry.ObjectStoreRegistry][] to [virtualizarr.open_virtual_dataset][].
+You now must pass in a valid [Parser][virtualizarr.parsers.typing.Parser] and a [virtualizarr.registry.ObjectStoreRegistry][] to [virtualizarr.open_virtual_dataset][].
 This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust. It is most common for the
 [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] to contain one or more [ObjectStores][obstore.store.ObjectStore]
 for reading the original data, but some parsers may accept an empty [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].

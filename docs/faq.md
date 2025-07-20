@@ -66,12 +66,16 @@ No - you can simply open the Kerchunk-formatted references you already have into
 
 ```python
 from virtualizarr import open_virtual_dataset
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from obstore.store import LocalStore
 
-vds = open_virtual_dataset('combined.json', , object_store=LocalStore, parser=KerchunkJSONParser())
+project_dir="/Users/user/project-dir"
+project_url=f"file://{project_dir}"
+registry = ObjectStoreRegistry({project_url: LocalStore()})
+vds = open_virtual_dataset(f"{project_url}/combined.json", , registry=registry, parser=KerchunkJSONParser())
 # or
-vds = open_virtual_dataset('combined.parquet', object_store=LocalStore, parser=KerchunkParquetParser())
+vds = open_virtual_dataset(f"{project_url}/combined.parquet", registry=registry, parser=KerchunkParquetParser())
 
 vds.vz.to_icechunk(icechunkstore)
 ```
@@ -122,7 +126,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Component / Feature                                                      | Kerchunk                                                                                                                            | VirtualiZarr                                                                                                                                     |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Generation of references from archival files (1)**                     |                                                                                                                                     |                                                                                                                                                  |
-| From a netCDF4/HDF5 file                                                 | `kerchunk.hdf.SingleHdf5ToZarr`                                                                                                     | `open_virtual_dataset(..., parser=HDFParser())`, via `kerchunk.hdf.SingleHdf5ToZarr`                                                            |
+| From a netCDF4/HDF5 file                                                 | `kerchunk.hdf.SingleHdf5ToZarr`                                                                                                     | `open_virtual_dataset(..., parser=HDFParser())`                                                            |
 | From a netCDF3 file                                                      | `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                                    | `open_virtual_dataset(..., parser=NetCDF3Parser())`, via `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                     |
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=TIFFParser())`, via `kerchunk.tiff.tiff_to_zarr` or potentially `tifffile` (❌ Not yet implemented - see [issue #291](https://github.com/zarr-developers/VirtualiZarr/issues/291))                                                               |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())` (❌ Not yet implemented - see [issue #262](https://github.com/zarr-developers/VirtualiZarr/issues/262))                                                                                       |
