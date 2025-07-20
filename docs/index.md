@@ -115,6 +115,7 @@ icechunk_store = icechunk.in_memory_storage()
 repo = icechunk.Repository.create(icechunk_store)
 session = repo.writable_session("main")
 vds.vz.to_icechunk(session.store)
+session.commit("Create virtual store")
 ```
 
 See the [Usage docs page](usage.md) for more details.
