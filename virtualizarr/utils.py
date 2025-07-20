@@ -7,9 +7,10 @@ import json
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
 
 import obstore as obs
+from zarr.abc.codec import ArrayBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
-from virtualizarr.codecs import get_codec_config
+from virtualizarr.codecs import get_codec_config, zarr_codec_config_to_v2
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 # taken from zarr.core.common
@@ -132,22 +133,12 @@ def convert_v3_to_v2_metadata(
         The metadata object in v2 format.
     """
 
-    def _to_v2_codec(codec_config: dict) -> dict:
-        if name := codec_config.get("name", None):
-            return {"id": name, **codec_config["configuration"]}
-        elif codec_config.get("id", None):
-            return codec_config
-        else:
-            raise ValueError(
-                f"Expected a valid Zarr V2 or V3 codec dict, got {codec_config}"
-            )
-
     # TODO: Find a more robust way to exclude any bytes codecs
     # TODO: Test round-tripping big endian since that is stored in the bytes codec in V3; it should be included in data type instead for V2
     v2_codecs = [
-        _to_v2_codec(get_codec_config(codec))
+        zarr_codec_config_to_v2(get_codec_config(codec))
         for codec in v3_metadata.codecs
-        if codec.__class__.__name__ != "BytesCodec"
+        if not isinstance(codec, ArrayBytesCodec)
     ]
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,

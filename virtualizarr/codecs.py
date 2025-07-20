@@ -20,16 +20,30 @@ DeconstructedCodecPipeline = tuple[
 ]
 
 
-def numcodec_config_to_configurable(num_codec: dict) -> dict:
+def zarr_codec_config_to_v3(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
     """
+    # TODO: Special case Blosc codec
     if num_codec["id"].startswith("numcodecs."):
         return num_codec
 
     num_codec_copy = num_codec.copy()
     name = "numcodecs." + num_codec_copy.pop("id")
     return {"name": name, "configuration": num_codec_copy}
+
+
+def zarr_codec_config_to_v2(num_codec: dict) -> dict:
+    """
+    Convert a numcodecs codec into a zarr v2 configurable.
+    """
+    # TODO: Special case Blosc codec
+    if name := num_codec.get("name", None):
+        return {"id": name, **num_codec["configuration"]}
+    elif num_codec.get("id", None):
+        return num_codec
+    else:
+        raise ValueError(f"Expected a valid Zarr V2 or V3 codec dict, got {num_codec}")
 
 
 def extract_codecs(
