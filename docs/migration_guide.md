@@ -3,11 +3,11 @@
 VirtualiZarr V2 includes breaking changes and other conceptual differences relative to V1. The goal of this guide
 is to provide some context around the core changes and demonstrate the updated usage.
 
-## Breaking changes
+## Breaking API changes in `open_virtual_dataset`
 
-### Open_virtual_dataset
+### Filetype identification, parsers, and stores
 
-In V1 there was a lot of auto-magic guesswork of filetypes and urls happening under the hood.
+In V1 there was a lot of auto-magic guesswork of filetypes, urls, and types of remote storage happening under the hood.
 While this made it easy to get started, it could lead to a lot of foot-guns and unexpected behavior.
 
 For example, the following V1-style usage would guess that your data is in a NetCDF file format and that your data
@@ -73,6 +73,17 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
         parser=parser
     )
     ```
+
+### Deprecation of other kwargs
+
+We have removed some keyword arguments to `open_virtual_dataset` that were deprecated, saw little use, or now redundant. Specifically:
+
+- `indexes` - there is little need to control this separately from `loadable_variables`,
+- `cftime_variables`
+- `backend` - replaced by the `parser` kwarg,
+- `virtual_backend_kwargs` - replaced by arguments to the `parser` instance,
+- `reader_options` - replaced by arguments to the obstore store instance.
+- `virtual_array_class` - so far has not been needed,
 
 ## Missing features
 
