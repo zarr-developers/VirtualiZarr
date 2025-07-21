@@ -1,5 +1,3 @@
-import os
-import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,9 +13,9 @@ from zarr.core.buffer import default_buffer_prototype
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 from virtualizarr.writers.icechunk import generate_chunk_key
 from virtualizarr.xarray import separate_coords
-from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
 

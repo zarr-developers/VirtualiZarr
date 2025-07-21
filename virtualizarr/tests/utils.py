@@ -10,7 +10,6 @@ from obstore.store import LocalStore, ObjectStore, from_url
 from virtualizarr.parsers import HDFParser
 from virtualizarr.registry import ObjectStoreRegistry
 
-
 # Find location of pytest temporary data in what should be a cross-platform way. This should be the same as what pytest actually does - see https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
 # The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URL prefix without symlinks.
 PYTEST_TMP_DIRECTORY_URL_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"

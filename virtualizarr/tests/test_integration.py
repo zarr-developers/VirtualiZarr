@@ -29,7 +29,6 @@ from virtualizarr.tests import (
     requires_zarr_python,
     slow_test,
 )
-
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
