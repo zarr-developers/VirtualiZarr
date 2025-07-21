@@ -77,7 +77,6 @@ jobs:
           python -m pip install dist/virtualizarr*.whl
           python -c "import virtualizarr; print(virtualizarr.__version__)"
       - name: Publish package to TestPyPI
-        if: github.event_name == 'release'
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
           repository-url: https://test.pypi.org/legacy/
