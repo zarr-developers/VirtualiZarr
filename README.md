@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/zarr-developers/VirtualiZarr/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/zarr-developers/VirtualiZarr/actions?query=workflow%3ACI)
 [![Code coverage](https://codecov.io/gh/zarr-developers/VirtualiZarr/branch/main/graph/badge.svg?flag=unittests)](https://codecov.io/gh/zarr-developers/VirtualiZarr)
-[![Docs](https://readthedocs.org/projects/virtualizarr/badge/?version=latest)](https://virtualizarr.readthedocs.io/en/latest/)
+[![Docs](https://readthedocs.org/projects/virtualizarr/badge/?version=latest)](https://virtualizarr.readthedocs.io/latest/)
 [![Linted and Formatted with Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![pre-commit Enabled](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
@@ -22,26 +22,26 @@ The best way to distribute large scientific datasets is via the Cloud, in [Cloud
 
 **VirtualiZarr[^2] makes it easy to create "Virtual" Zarr datacubes, allowing performant access to archival data as if it were in the Cloud-Optimized [Zarr format](https://zarr.dev/), _without duplicating any data_.**
 
-Please see the [documentation](https://virtualizarr.readthedocs.io/en/stable/index.html).
+Please see the [documentation](https://virtualizarr.readthedocs.io/stable/index.html).
 
 ### Features
 
-* Create virtual references pointing to bytes inside an archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets).
-* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5, and has a pluggable system for supporting new formats.
-* Access data via the zarr-python API by reading from the zarr-compatible [`ManifestStore`](https://virtualizarr.readthedocs.io/en/latest/generated/virtualizarr.manifests.ManifestStore.html).
-* [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger datacube using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html).
+* Create virtual references pointing to bytes inside an archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/latest/usage.html#opening-files-as-virtual-datasets).
+* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5, and has a pluggable system for supporting new formats.
+* Access data via the zarr-python API by reading from the zarr-compatible [`ManifestStore`](https://virtualizarr.readthedocs.io/latest/generated/virtualizarr.manifests.ManifestStore.html).
+* [Combine data from multiple files](https://virtualizarr.readthedocs.io/latest/usage.html#combining-virtual-datasets) into one larger datacube using [xarray's combining functions](https://docs.xarray.dev/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/stable/generated/xarray.concat.html).
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
-* Users access the virtual datacube simply as a single zarr-compatible store using [`xarray.open_zarr`](https://docs.xarray.dev/en/stable/generated/xarray.open_zarr.html).
+* Users access the virtual datacube simply as a single zarr-compatible store using [`xarray.open_zarr`](https://docs.xarray.dev/stable/generated/xarray.open_zarr.html).
 
 ### Inspired by Kerchunk
 
 VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [Kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk but in a zarr-native way, and with a familiar array-like API.
 
-You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
+You now have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides [almost all the same features](https://virtualizarr.readthedocs.io/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) as Kerchunk.
 
 ### Development Status and Roadmap
 
-VirtualiZarr version 1 (mostly) achieved [feature parity](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
+VirtualiZarr version 1 (mostly) achieved [feature parity](https://virtualizarr.readthedocs.io/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare) with kerchunk's logic for combining datasets, providing an easier way to manipulate kerchunk references in memory and generate kerchunk reference files on disk.
 
 VirtualiZarr version 2 brings:
 
