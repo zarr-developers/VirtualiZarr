@@ -4,8 +4,6 @@
 import itertools
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
-import os
-import tempfile
 
 # Third-party imports
 import h5py  # type: ignore[import]
