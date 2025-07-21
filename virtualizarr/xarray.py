@@ -41,7 +41,6 @@ def open_virtual_dataset(
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
-    indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
     """
     Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
@@ -76,10 +75,6 @@ def open_virtual_dataset(
         Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
-    indexes
-        Indexes to use on the returned [xarray.Dataset][].
-        Default will read any 1D coordinate data to create in-memory Pandas indexes.
-        To avoid creating any indexes, pass `indexes={}`.
 
     Returns
     -------
@@ -97,7 +92,6 @@ def open_virtual_dataset(
     ds = manifest_store.to_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
-        indexes=indexes,
     )
     return ds.drop_vars(list(drop_variables or ()))
 
@@ -339,6 +333,7 @@ def construct_virtual_dataset(
     """
 
     if indexes is not None:
+        # TODO this could be supported by passing on to `open_zarr` below, but it's not public Xarray API yet.
         raise NotImplementedError()
 
     if group:
