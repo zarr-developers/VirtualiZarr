@@ -439,14 +439,6 @@ def test_nbytes(simple_netcdf4, local_registry):
 
 
 class TestOpenVirtualDatasetIndexes:
-    @pytest.mark.xfail(reason="not yet implemented")
-    def test_specify_no_indexes(self, netcdf4_file, local_registry):
-        parser = HDFParser()
-        with open_virtual_dataset(
-            url=netcdf4_file, registry=local_registry, parser=parser, indexes={}
-        ) as vds:
-            assert vds.indexes == {}
-
     @requires_hdf5plugin
     @requires_imagecodecs
     def test_create_default_indexes_for_loadable_variables(
@@ -460,7 +452,6 @@ class TestOpenVirtualDatasetIndexes:
                 url=netcdf4_file,
                 registry=local_registry,
                 parser=parser,
-                indexes=None,
                 loadable_variables=loadable_variables,
             ) as vds,
             open_dataset(netcdf4_file, decode_times=True) as ds,
