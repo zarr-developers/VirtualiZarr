@@ -462,7 +462,7 @@ def test_parse_dataset(group: str | None, warns: bool, netcdf4_file):
         with pytest.warns(UserWarning, match=f"ignoring group parameter {group!r}"):
             ms = drmpp.parse_dataset(object_store=store, group=group)
 
-    vds = ms.to_virtual_dataset(loadable_variables=None, indexes=None)
+    vds = ms.to_virtual_dataset()
 
     assert vds.sizes == {"lat": 25, "lon": 53, "time": 2920}
     assert vds.data_vars.keys() == {"air"}

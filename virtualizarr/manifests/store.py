@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import AsyncGenerator, Iterable, Mapping
+from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
@@ -282,7 +282,6 @@ class ManifestStore(Store):
         group="",
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
-        indexes: Mapping[str, xr.Index] | None = None,
     ) -> "xr.Dataset":
         """
         Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
@@ -312,7 +311,6 @@ class ManifestStore(Store):
             manifest_store=self,
             group=group,
             loadable_variables=loadable_variables,
-            indexes=indexes,
             decode_times=decode_times,
         )
 

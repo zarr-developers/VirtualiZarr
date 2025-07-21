@@ -41,7 +41,6 @@ def open_virtual_dataset(
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
-    indexes: Mapping[str, xr.Index] | None = None,
 ) -> xr.Dataset:
     """
     Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
@@ -76,10 +75,6 @@ def open_virtual_dataset(
         Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
-    indexes
-        Indexes to use on the returned [xarray.Dataset][].
-        Default will read any 1D coordinate data to create in-memory Pandas indexes.
-        To avoid creating any indexes, pass `indexes={}`.
 
     Returns
     -------
@@ -97,7 +92,6 @@ def open_virtual_dataset(
     ds = manifest_store.to_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
-        indexes=indexes,
     )
     return ds.drop_vars(list(drop_variables or ()))
 
@@ -329,7 +323,6 @@ def construct_virtual_dataset(
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
-    indexes: Mapping[str, xr.Index] | None = None,
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
@@ -337,9 +330,6 @@ def construct_virtual_dataset(
     containing the contents of one group.
 
     """
-
-    if indexes is not None:
-        raise NotImplementedError()
 
     if group:
         raise NotImplementedError("ManifestStore does not yet support nested groups")
