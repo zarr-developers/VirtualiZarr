@@ -1,6 +1,6 @@
 # Release notes
 
-## v2.0 (20th July 2025)
+## v2.0 (21th July 2025)
 
 ### New Features
 
