@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import AsyncGenerator, Iterable, Mapping
+from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
