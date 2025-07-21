@@ -10,7 +10,7 @@ import xarray.testing as xrt
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
 from virtualizarr.registry import ObjectStoreRegistry
-from virtualizarr.tests import requires_network
+from virtualizarr.tests import requires_network, slow_test
 from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset
 
@@ -346,6 +346,7 @@ def dmrparser(dmrpp_xml_str: str, filepath: str) -> DMRParser:
     return DMRParser(root=ET.fromstring(dmrpp_xml_str), data_filepath=filepath)
 
 
+@slow_test
 @requires_network
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 def test_NASA_dmrpp(data_url, dmrpp_url):
@@ -373,6 +374,7 @@ def test_NASA_dmrpp(data_url, dmrpp_url):
 
 
 @requires_network
+@slow_test
 @pytest.mark.parametrize("data_url, dmrpp_url", urls)
 def test_NASA_dmrpp_load(data_url, dmrpp_url):
     store = obstore_s3(

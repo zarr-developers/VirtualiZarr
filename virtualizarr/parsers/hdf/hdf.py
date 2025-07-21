@@ -8,7 +8,7 @@ from typing import (
 
 import numpy as np
 
-from virtualizarr.codecs import numcodec_config_to_configurable
+from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
     ChunkEntry,
     ChunkManifest,
@@ -71,9 +71,7 @@ def _construct_manifest_array(
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
-    codec_configs = [
-        numcodec_config_to_configurable(codec.get_config()) for codec in codecs
-    ]
+    codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
 
     fill_value = dataset.fillvalue.item()
     dims = tuple(_dataset_dims(dataset, group=group))

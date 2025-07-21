@@ -103,7 +103,7 @@ vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
 print(vds)
 ```
 
-The magic of VirtualiZarr is that you can persist the virtual dataset to disk in a chunk references format such as [Icechunk][https://icechunk.io/],
+The magic of VirtualiZarr is that you can persist the virtual dataset to disk in a chunk references format such as [Icechunk](https://icechunk.io/),
 meaning that the work of constructing the single coherent dataset only needs to happen once.
 For subsequent data access, you can use [xarray.open_zarr][] to open that Icechunk store, which on object storage is
 far faster than using [xarray.open_mfdataset][] to open the the original non-cloud-optimized files.

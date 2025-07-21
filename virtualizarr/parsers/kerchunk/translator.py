@@ -9,7 +9,7 @@ from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.codecs import (
-    numcodec_config_to_configurable,
+    zarr_codec_config_to_v3,
 )
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -65,9 +65,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
 
     # Ensure compressor is a list before unpacking
     codec_configs = [*filters, *(compressor if compressor is not None else [])]
-    numcodec_configs = [
-        numcodec_config_to_configurable(config) for config in codec_configs
-    ]
+    numcodec_configs = [zarr_codec_config_to_v3(config) for config in codec_configs]
     dimension_names = decoded_arr_refs_zarray["dimension_names"]
     return create_v3_array_metadata(
         chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
