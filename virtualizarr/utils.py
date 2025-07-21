@@ -133,8 +133,8 @@ def convert_v3_to_v2_metadata(
         The metadata object in v2 format.
     """
 
-    # TODO: Find a more robust way to exclude any bytes codecs
-    # TODO: Test round-tripping big endian since that is stored in the bytes codec in V3; it should be included in data type instead for V2
+    # TODO: Check that all ArrayBytesCodecs should in fact be excluded for V2 metadata storage.
+    # TODO: Test round-tripping big endian since that is stored in the bytes codec in V3; it should be included in data type instead for V2.
     v2_codecs = [
         zarr_codec_config_to_v2(get_codec_config(codec))
         for codec in v3_metadata.codecs
@@ -145,7 +145,9 @@ def convert_v3_to_v2_metadata(
         dtype=v3_metadata.data_type,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
-        filters=v2_codecs,
+        filters=v2_codecs
+        if v2_codecs
+        else None,  # Do not pass an empty list to ArrayV2Metadata
         compressor=None,
         order="C",
         attributes=v3_metadata.attributes,
