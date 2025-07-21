@@ -76,13 +76,13 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
 
 ### Deprecation of other kwargs
 
-We have removed some keyword arguments to `open_virtual_dataset` that were deprecated, saw little use, or now redundant. Specifically:
+We have removed some keyword arguments to `open_virtual_dataset` that were deprecated, saw little use, or are now redundant. Specifically:
 
 - `indexes` - there is little need to control this separately from `loadable_variables`,
 - `cftime_variables`
 - `backend` - replaced by the `parser` kwarg,
 - `virtual_backend_kwargs` - replaced by arguments to the `parser` instance,
-- `reader_options` - replaced by arguments to the obstore store instance.
+- `reader_options` - replaced by arguments to the ObjectStore instance.
 - `virtual_array_class` - so far has not been needed,
 
 ## Missing features
