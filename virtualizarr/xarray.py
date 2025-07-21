@@ -323,7 +323,6 @@ def construct_virtual_dataset(
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
-    indexes: Mapping[str, xr.Index] | None = None,
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
@@ -331,10 +330,6 @@ def construct_virtual_dataset(
     containing the contents of one group.
 
     """
-
-    if indexes is not None:
-        # TODO this could be supported by passing on to `open_zarr` below, but it's not public Xarray API yet.
-        raise NotImplementedError()
 
     if group:
         raise NotImplementedError("ManifestStore does not yet support nested groups")
