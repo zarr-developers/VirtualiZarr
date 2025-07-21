@@ -29,6 +29,7 @@ from virtualizarr.tests import (
     requires_zarr_python,
     slow_test,
 )
+from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
 
@@ -143,19 +144,16 @@ def roundtrip_as_in_memory_icechunk(
 
     config = icechunk.RepositoryConfig.default()
 
-    url_prefixes = ["file:///private/var/folders/70", "file:///tmp/"]
-
-    for url_prefix in url_prefixes:
-        container = icechunk.VirtualChunkContainer(
-            url_prefix=url_prefix,
-            store=icechunk.local_filesystem_store(url_prefix),
-        )
-        config.set_virtual_chunk_container(container)
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+    )
+    config.set_virtual_chunk_container(container)
 
     repo = icechunk.Repository.create(
         storage=storage,
         config=config,
-        authorize_virtual_chunk_access={prefix: None for prefix in url_prefixes},
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
     )
     session = repo.writable_session("main")
 

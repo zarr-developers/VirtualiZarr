@@ -1,5 +1,3 @@
-import os
-import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,6 +13,7 @@ from zarr.core.buffer import default_buffer_prototype
 from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 from virtualizarr.writers.icechunk import generate_chunk_key
 from virtualizarr.xarray import separate_coords
 
@@ -26,11 +25,6 @@ if TYPE_CHECKING:
         Repository,
         Storage,
     )
-
-
-# Find location of pytest temporary data in what should be a cross-platform way. This should be the same as what pytest actually does - see https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
-# The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URL prefix without symlinks.
-PYTEST_TMP_DIRECTORY_URL_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}"
 
 
 @pytest.fixture(scope="function")
