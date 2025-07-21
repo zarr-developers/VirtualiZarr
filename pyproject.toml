@@ -7,12 +7,11 @@ authors = [
     {name = "Max Jones", email = "max@developmentseed.org"},
     {name = "Raphael Hagen", email = "raphael@carbonplan.org"},
 ]
-license = {text = "Apache-2"}
+license = "Apache-2.0"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.11",
