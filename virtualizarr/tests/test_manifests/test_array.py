@@ -48,6 +48,18 @@ class TestInit:
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+    
+    def test_consistency_checks(self, array_v3_metadata):
+        chunks_dict = {
+            "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks_dict)
+        chunks = (1,)
+        shape = (2,)
+        metadata = array_v3_metadata(shape=shape, chunks=chunks)
+
+        with pytest.raises(ValueError, match="do not match shape of chunk grid"):
+            ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
 
 class TestResultType:
