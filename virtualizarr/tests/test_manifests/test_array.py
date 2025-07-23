@@ -50,10 +50,13 @@ class TestInit:
         assert marr.ndim == 3
     
     def test_consistency_checks(self, array_v3_metadata):
+        # create a manifest with only one chunk
         chunks_dict = {
             "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks_dict)
+        
+        # but array metadata implying there should be two chunks
         chunks = (1,)
         shape = (2,)
         metadata = array_v3_metadata(shape=shape, chunks=chunks)
