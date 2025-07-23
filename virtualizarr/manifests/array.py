@@ -366,7 +366,7 @@ def _possibly_expand_trailing_ellipsis(
     """
     final_dim_indexer = indexer[-1]
     if final_dim_indexer == ...:
-        if len(indexer) > ndim and ndim > 0:
+        if len(_strip_nones(indexer)) > ndim and ndim > 0:
             raise ValueError(
                 f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
                 f"but indexer={indexer} has length {len(indexer)} and array has {ndim} dimensions."
@@ -379,3 +379,7 @@ def _possibly_expand_trailing_ellipsis(
         return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
     else:
         return indexer
+
+
+def _strip_nones(indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]) -> tuple[Union[int, slice, EllipsisType, np.ndarray], ...]:
+    return tuple([ind for ind in indexer if ind is not None])
