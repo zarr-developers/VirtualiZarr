@@ -381,5 +381,7 @@ def _possibly_expand_trailing_ellipsis(
         return indexer
 
 
-def _strip_nones(indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]) -> tuple[Union[int, slice, EllipsisType, np.ndarray], ...]:
+def _strip_nones(
+    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
+) -> tuple[Union[int, slice, EllipsisType, np.ndarray], ...]:
     return tuple([ind for ind in indexer if ind is not None])
