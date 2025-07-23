@@ -444,6 +444,16 @@ class TestIndexing:
         marr = manifest_array(shape=(), chunks=())
         assert marr[...] == marr
 
+    def test_insert_newaxis_via_indexing_with_ellipsis(self, manifest_array):
+        # regression test for GH issue #728
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        new_marr = marr[None, ...]
+        assert new_marr.shape == (1, 2)
+        assert new_marr.chunks == (1, 1)
+
+        # TODO
+        # new_marr = marr[None]
+
 
 def test_to_xarray(array_v3_metadata):
     chunks = (5, 10)
