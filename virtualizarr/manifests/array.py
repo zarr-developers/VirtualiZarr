@@ -7,6 +7,7 @@ import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
 
 import virtualizarr.manifests.utils as utils
+from virtualizarr.utils import determine_chunk_grid_shape
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
@@ -64,7 +65,12 @@ class ManifestArray:
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
             )
 
-        # TODO check that the metadata shape and chunkmanifest shape are consistent with one another
+        # check that the metadata shape and chunkmanifest shape are consistent with one another
+        metadata_chunk_grid_shape = determine_chunk_grid_shape(shape=metadata.shape, chunks=metadata.chunks)
+        if _chunkmanifest.shape_chunk_grid != metadata_chunk_grid_shape:
+            raise ValueError("Set of virtual chunk keys in manifest do not match shape of chunk grid implied by array metadata. \n"
+                             f"Keys in chunkmanifest imply a chunk grid shape of {_chunkmanifest.shape_chunk_grid} but the metadata contains shape={_metadata.shape} and chunks={_metadata.chunks} which imply a chunk grid shape of {metadata_chunk_grid_shape}")
+
         # TODO also cover the special case of scalar arrays
 
         self._metadata = _metadata
