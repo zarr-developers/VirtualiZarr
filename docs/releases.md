@@ -12,7 +12,7 @@
 
 ### Internal changes
 
-## v2.0.0 (21th July 2025)
+## v2.0.0 (21st July 2025)
 
 ### New Features
 
