@@ -55,10 +55,12 @@ def check_shape_and_replace_ellipsis(
 ) -> T_SimpleIndexer:
     """Deal with any ellipses, potentially by expanding the indexer to match the shape of the array."""
     num_single_axis_indexing_expressions = len(
-        ind_1d for ind_1d in indexer if ind_1d is not None and ind_1d != ...
+        [ind_1d for ind_1d in indexer if ind_1d is not None and ind_1d is not ...]
     )
-    num_ellipses = indexer.count(...)
-
+    print(indexer)
+    num_ellipses = len(
+        [ind_1d for ind_1d in indexer if ind_1d is ...]
+    )
     if num_ellipses > 1:
         raise ValueError(
             f"Invalid indexer. Indexers containing multiple Ellipses are invalid, but indexer={indexer} contains {num_ellipses} ellipses"
@@ -77,6 +79,7 @@ def check_shape_and_replace_ellipsis(
             # TODO replace ellipses with 0 or more slice(None)s until there are arr_ndim single-axis indexing expressions (so ignoring Nones)
             raise
     else:  # num_ellipses == 0
+        # TODO add a note suggesting adding a trailing ellipsis?
         if num_single_axis_indexing_expressions != arr_ndim:
             raise ValueError(
                 f"Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions equal to the length of the array. "

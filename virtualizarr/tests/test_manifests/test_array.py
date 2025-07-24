@@ -431,6 +431,9 @@ class TestIndexing:
             ((2,), (1,), (0, None, 0)),
             ((2,), (1,), (0, ..., 0)),
             ((), (), (0)),
+            # valid in numpy but not in the array API standard
+            ((2,), (1,), None),
+            ((2,), (1,), (None, None)),
         ],
     )
     def test_invalid_indexer_shape(
@@ -444,7 +447,7 @@ class TestIndexing:
         ):
             marr[invalid_indexer]
 
-    @pytest.mark.parametrize("unsupported_indexer", [np.ndarray(0), slice(0)])
+    @pytest.mark.parametrize("unsupported_indexer", [np.ndarray(0)])
     def test_unsupported_index_types(self, manifest_array, unsupported_indexer):
         marr = manifest_array(shape=(2,), chunks=(1,))
 
@@ -467,23 +470,21 @@ class TestIndexing:
         "in_shape, in_chunks, indexer, out_shape, out_chunks",
         [
             # no-ops
-            ((2,), (1,), slice(None), (2), (1)),
-            ((2,), (1,), ..., (2), (1)),
-            ((2,), (1,), (..., slice(None)), (2), (1)),
-            ((2,), (1,), (slice(None), ...), (2), (1)),
+            ((2,), (1,), slice(None), (2,), (1,)),
+            ((2,), (1,), ..., (2,), (1,)),
+            ((2,), (1,), (..., slice(None)), (2,), (1,)),
+            ((2,), (1,), (slice(None), ...), (2,), (1,)),
             ((), (), ..., (), ()),
             ((), (), (), (), ()),
             # inserting new axes
-            ((2,), (1,), None, (1, 2), (1, 1)),
-            ((2,), (1,), (None, None), (1, 1, 2), (1, 1, 1)),
             ((2,), (1,), (None, ...), (1, 2), (1, 1)),
             ((2,), (1,), (..., None), (2, 1), (1, 1)),
-            ((), (), None, (1), (1)),
+            ((), (), None, (1,), (1,)),
             # subsetting chunks
-            ((2,), (1,), 0, (1), (1)),
-            ((2,), (1,), 1, (1), (1)),
-            ((2,), (1,), (0, ...), (1), (1)),
-            ((2,), (1,), (..., 0), (1), (1)),
+            ((2,), (1,), 0, (1,), (1,)),
+            ((2,), (1,), 1, (1,), (1,)),
+            ((2,), (1,), (0, ...), (1,), (1,)),
+            ((2,), (1,), (..., 0), (1,), (1,)),
         ],
     )
     def test_cases(
@@ -493,6 +494,8 @@ class TestIndexing:
         indexed = marr[indexer]
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
+
+    # TODO test unsupported values, e.g. slice(0)
 
 
 def test_to_xarray(array_v3_metadata):
