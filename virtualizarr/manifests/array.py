@@ -220,7 +220,7 @@ class ManifestArray:
 
         Only supports limited indexing, because in general you cannot slice inside of a compressed chunk.
         Mainly required because Xarray uses this instead of expand dims (by passing Nones) and often will index with a no-op.
-        
+
         Could potentially support indexing with slices aligned along chunk boundaries, but currently does not.
 
         Parameters

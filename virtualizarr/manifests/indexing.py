@@ -1,9 +1,7 @@
 from types import EllipsisType
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 import numpy as np
-from xarray.core.indexing import BasicIndexer
-
 
 from virtualizarr.manifests.array_api import expand_dims
 
@@ -56,13 +54,11 @@ def check_shape_and_maybe_replace_ellipsis(
     indexer: T_IndexerTuple, arr_ndim: int
 ) -> T_SimpleIndexer:
     """Deal with any ellipses, potentially by expanding the indexer to match the shape of the array."""
-    
+
     num_single_axis_indexing_expressions = len(
         [ind_1d for ind_1d in indexer if ind_1d is not None and ind_1d is not ...]
     )
-    num_ellipses = len(
-        [ind_1d for ind_1d in indexer if ind_1d is ...]
-    )
+    num_ellipses = len([ind_1d for ind_1d in indexer if ind_1d is ...])
 
     if num_ellipses > 1:
         raise ValueError(
@@ -79,7 +75,9 @@ def check_shape_and_maybe_replace_ellipsis(
                 f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
             )
         else:
-            return replace_single_ellipsis(indexer, arr_ndim, num_single_axis_indexing_expressions)
+            return replace_single_ellipsis(
+                indexer, arr_ndim, num_single_axis_indexing_expressions
+            )
     else:  # num_ellipses == 0
         # TODO add a note suggesting adding a trailing ellipsis like the array API standard does?
         if num_single_axis_indexing_expressions != arr_ndim:
@@ -93,54 +91,60 @@ def check_shape_and_maybe_replace_ellipsis(
             return indexer
 
 
-def replace_single_ellipsis(indexer: T_Indexer_1d, arr_ndim: int, num_single_axis_indexing_expressions: int) -> T_SimpleIndexer_1d:
+def replace_single_ellipsis(
+    indexer: T_Indexer_1d, arr_ndim: int, num_single_axis_indexing_expressions: int
+) -> T_SimpleIndexer_1d:
     """
     Replace ellipsis with 0 or more slice(None)s until there are ndim single-axis indexing expressions (so ignoring Nones).
     """
     indexer_as_list = list(indexer)
-    
+
     # find this position before modifying in-place
     position_of_ellipsis = indexer_as_list.index(...)
 
-    # need to remove the ellipsis separate from replacement, because the ellipsis may have been totally superfluous already, 
+    # need to remove the ellipsis separate from replacement, because the ellipsis may have been totally superfluous already,
     # and it still needs to be removed even if no further replacement will occur
     indexer_as_list.remove(...)
-    
+
     # replace ellipsis with the equivalent number of no-op slices
     num_extra_slices_needed = arr_ndim - num_single_axis_indexing_expressions
     new_slices = [slice(None)] * num_extra_slices_needed
 
     # insert multiple elements into one position
-    indexer_as_list[position_of_ellipsis: position_of_ellipsis] = new_slices
+    indexer_as_list[position_of_ellipsis:position_of_ellipsis] = new_slices
 
     return tuple(indexer_as_list)
 
 
 def apply_indexer(marr: "ManifestArray", indexer: T_SimpleIndexer) -> "ManifestArray":
     """
-    Aplpy the simplified indexer to all dimensions of the array.
+    Apply the simplified indexer to all dimensions of the array.
 
     Iterates over the axes and applies each indexer one-by-one.
     Encountering a None means inserting a new axis at that position.
     """
     # handles composition of subsetting and expanding dims by following the two-step approach described in https://github.com/data-apis/array-api/pull/408#issuecomment-1091056873
 
-    indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...] = tuple([ind_1d for ind_1d in indexer if ind_1d is not None])
+    indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...] = tuple(
+        [ind_1d for ind_1d in indexer if ind_1d is not None]
+    )
     output_arr = apply_selection(marr, indexer_without_newaxes)
-    
+
     for position, axis_indexer in enumerate(indexer):
         if axis_indexer is None:
             output_arr = expand_dims(output_arr, axis=position)
-    
+
     return output_arr
 
 
-def apply_selection(marr: "ManifestArray", indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...]) -> "ManifestArray":
+def apply_selection(
+    marr: "ManifestArray", indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...]
+) -> "ManifestArray":
     """Actually applies indexes to subset along each dimension."""
 
     # at this point there should be no ellipsis, no Nones, and one 1D indexer for each axis.
     assert len(indexer_without_newaxes) == marr.ndim
-    
+
     output_arr = marr
     for ind, axis_indexer in enumerate(indexer_without_newaxes):
         if isinstance(axis_indexer, slice):
@@ -162,7 +166,7 @@ def apply_selection(marr: "ManifestArray", indexer_without_newaxes: tuple[T_Basi
         else:
             # should never get here
             raise TypeError(f"Invalid indexer type: {axis_indexer}")
-        
+
     return output_arr
 
 

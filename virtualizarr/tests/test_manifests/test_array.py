@@ -491,32 +491,34 @@ class TestIndexing:
         indexed = marr[indexer]
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
-    
+
     def test_raise_on_multiple_ellipses(
-        self, manifest_array,
+        self,
+        manifest_array,
     ):
         marr = manifest_array(shape=(2,), chunks=(1,))
         with pytest.raises(ValueError, match="multiple Ellipses"):
-            indexed = marr[..., ...]
+            marr[..., ...]
 
     @pytest.mark.parametrize(
         "in_shape, in_chunks, indexer, out_shape, out_chunks",
         [
-            # subsetting chunks
-            ((2,), (1,), 0, (1,), (1,)),
-            ((2,), (1,), 1, (1,), (1,)),
-            ((2,), (1,), (0, ...), (1,), (1,)),
-            ((2,), (1,), (..., 0), (1,), (1,)),
+            # obvious no-ops
+            ((1,), (1,), 0, (1,), (1,)),
+            # requires chunk-aligned selection
+            pytest.param((2,), (1,), 0, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), 1, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), (0, ...), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), (..., 0), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
         ],
     )
-    def test_chunk_aligned_indexing_cases(
+    def test_chunk_selection_cases(
         self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
     ):
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
-        with pytest.raises(NotImplementedError, match="not yet supported"):
-            indexed = marr[indexer]
-        #assert indexed.shape == out_shape
-        #assert indexed.chunks == out_chunks
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
 
     # TODO test unsupported values, e.g. slice(0)
 
