@@ -1,5 +1,4 @@
 import warnings
-from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -10,10 +9,9 @@ import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
-    expand_dims,
 )
+from virtualizarr.manifests.indexing import T_ValidIndexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.manifests.indexing import index, T_Indexer
 
 
 class ManifestArray:
@@ -214,7 +212,7 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key: T_Indexer,
+        key: T_ValidIndexer,
         /,
     ) -> "ManifestArray":
         """
@@ -287,39 +285,3 @@ class ManifestArray:
             dims=dims,
             attrs=attrs,
         )
-
-
-def _possibly_expand_trailing_ellipsis(
-    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
-    ndim: int,
-):
-    """
-    Allows for passing indexers <= the shape of the array, so long as they end with an ellipsis.
-
-    For example:
-
-    marr[3, slice(2), ...]
-
-    where marr.ndim => 3.
-    """
-    final_dim_indexer = indexer[-1]
-    if final_dim_indexer == ...:
-        if len(_strip_nones(indexer)) > ndim and ndim > 0:
-            raise ValueError(
-                f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
-                f"but indexer={indexer} has length {len(indexer)} and array has {ndim} dimensions."
-                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
-                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
-            )
-
-        extra_slices_needed = ndim - (len(indexer) - 1)
-        *indexer_as_list, ellipsis = indexer
-        return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
-    else:
-        return indexer
-
-
-def _strip_nones(
-    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
-) -> tuple[Union[int, slice, EllipsisType, np.ndarray], ...]:
-    return tuple([ind for ind in indexer if ind is not None])
