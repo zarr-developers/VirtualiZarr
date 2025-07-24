@@ -133,7 +133,7 @@ def apply_indexer(marr: "ManifestArray", indexer: T_SimpleIndexer) -> "ManifestA
     
     for position, axis_indexer in enumerate(indexer):
         if axis_indexer is None:
-            output_arr = np.expand_dims(output_arr, axis=position)
+            output_arr = expand_dims(output_arr, axis=position)
     
     return output_arr
 

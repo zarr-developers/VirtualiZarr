@@ -216,9 +216,16 @@ class ManifestArray:
         /,
     ) -> "ManifestArray":
         """
-        Only supports extremely limited indexing.
+        Perform numpy-style indexing on this ManifestArray.
 
-        Only here because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
+        Only supports limited indexing, because in general you cannot slice inside of a compressed chunk.
+        Mainly required because Xarray uses this instead of expand dims (by passing Nones) and often will index with a no-op.
+        
+        Could potentially support indexing with slices aligned along chunk boundaries, but currently does not.
+
+        Parameters
+        ----------
+        key
         """
         return index(self, key)
 
