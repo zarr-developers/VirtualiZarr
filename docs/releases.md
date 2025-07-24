@@ -1,6 +1,18 @@
 # Release notes
 
-## v2.0 (21th July 2025)
+## v2.0.1 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+## v2.0.0 (21st July 2025)
 
 ### New Features
 
