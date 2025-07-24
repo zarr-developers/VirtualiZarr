@@ -10,7 +10,7 @@ from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
 )
-from virtualizarr.manifests.indexing import T_ValidIndexer, index
+from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 
 
@@ -212,7 +212,7 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key: T_ValidIndexer,
+        key: T_Indexer,
         /,
     ) -> "ManifestArray":
         """
