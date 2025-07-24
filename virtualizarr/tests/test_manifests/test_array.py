@@ -504,12 +504,17 @@ class TestIndexing:
         "in_shape, in_chunks, indexer, out_shape, out_chunks",
         [
             # obvious no-ops
+            ((2,), (1,), slice(0, 2), (2,), (1,)),
+            # reduces shape
             pytest.param((1,), (1,), 0, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
             # requires chunk-aligned selection
             pytest.param((2,), (1,), 0, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
             pytest.param((2,), (1,), 1, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
             pytest.param((2,), (1,), (0, ...), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
             pytest.param((2,), (1,), (..., 0), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), slice(0, 1), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), (..., slice(0, 1)), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param((2,), (1,), (slice(0, 1), ...), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
         ],
     )
     def test_chunk_selection_cases(
@@ -519,8 +524,6 @@ class TestIndexing:
         indexed = marr[indexer]
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
-
-    # TODO test unsupported values, e.g. slice(0)
 
 
 def test_to_xarray(array_v3_metadata):
