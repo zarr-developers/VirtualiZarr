@@ -1,6 +1,21 @@
 # Release notes
 
-## v2.0 (21th July 2025)
+## v2.0.1 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+- Rewrote the internals of `ManifestArray.__getitem__` to ensure it actually obeys the array API standard under myriad edge cases ([#734](https://github.com/zarr-developers/VirtualiZarr/pull/734)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+### Internal changes
+
+## v2.0.0 (21st July 2025)
 
 ### New Features
 

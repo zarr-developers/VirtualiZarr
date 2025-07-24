@@ -422,27 +422,178 @@ class TestIndexing:
         with pytest.raises(TypeError, match="indexer must be of type"):
             marr[dodgy_indexer]
 
-    @pytest.mark.parametrize("dodgy_indexer", [(5, 4), (5, ...)])
-    def test_invalid_indexer_shape(self, manifest_array, dodgy_indexer):
-        marr = manifest_array(shape=(4,), chunks=(2,))
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, invalid_indexer",
+        [
+            ((2,), (1,), (0, 0)),
+            ((2,), (1,), (0, None, 0)),
+            ((2,), (1,), (0, ..., 0)),
+            ((), (), (0)),
+            # valid in numpy but not in the array API standard
+            ((2,), (1,), None),
+            ((2,), (1,), (None, None)),
+        ],
+    )
+    def test_invalid_indexer_shape(
+        self, manifest_array, in_shape, in_chunks, invalid_indexer
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
 
         with pytest.raises(
             ValueError,
-            match="Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array",
+            match="Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions",
         ):
-            marr[dodgy_indexer]
+            marr[invalid_indexer]
 
-    @pytest.mark.parametrize("dodgy_indexer", [np.ndarray(5)])
-    def test_index_with_numpy_array_notimplemented(self, manifest_array, dodgy_indexer):
-        marr = manifest_array(shape=(4,), chunks=(2,))
+    @pytest.mark.parametrize("unsupported_indexer", [np.ndarray(0)])
+    def test_unsupported_index_types(self, manifest_array, unsupported_indexer):
+        marr = manifest_array(shape=(2,), chunks=(1,))
 
         with pytest.raises(NotImplementedError):
-            marr[dodgy_indexer]
+            marr[unsupported_indexer]
 
     def test_indexing_scalar_with_ellipsis(self, manifest_array):
         # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
         marr = manifest_array(shape=(), chunks=())
         assert marr[...] == marr
+
+    def test_insert_newaxis_via_indexing_with_ellipsis(self, manifest_array):
+        # regression test for GH issue #728
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        new_marr = marr[None, ...]
+        assert new_marr.shape == (1, 2)
+        assert new_marr.chunks == (1, 1)
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer, out_shape, out_chunks",
+        [
+            # no-ops
+            ((2,), (1,), slice(None), (2,), (1,)),
+            ((2,), (1,), ..., (2,), (1,)),
+            ((2,), (1,), (..., slice(None)), (2,), (1,)),
+            ((2,), (1,), (slice(None), ...), (2,), (1,)),
+            ((), (), ..., (), ()),
+            ((), (), (), (), ()),
+            # inserting new axes
+            ((2,), (1,), (None, slice(None)), (1, 2), (1, 1)),
+            ((2,), (1,), (slice(None), None), (2, 1), (1, 1)),
+            ((2,), (1,), (None, ...), (1, 2), (1, 1)),
+            ((2,), (1,), (..., None), (2, 1), (1, 1)),
+            ((), (), None, (1,), (1,)),
+        ],
+    )
+    def test_noops_and_broadcasting_cases(
+        self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
+
+    def test_raise_on_multiple_ellipses(
+        self,
+        manifest_array,
+    ):
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        with pytest.raises(ValueError, match="multiple Ellipses"):
+            marr[..., ...]
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer, out_shape, out_chunks",
+        [
+            # obvious no-ops
+            ((2,), (1,), slice(0, 2), (2,), (1,)),
+            # reduces shape
+            pytest.param(
+                (1,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            # requires chunk-aligned selection
+            pytest.param(
+                (2,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                1,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (0, ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., 0),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                slice(0, 1),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., slice(0, 1)),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (slice(0, 1), ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+        ],
+    )
+    def test_chunk_selection_cases(
+        self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
 
 
 def test_to_xarray(array_v3_metadata):
