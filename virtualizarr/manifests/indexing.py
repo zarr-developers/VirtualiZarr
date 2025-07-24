@@ -1,5 +1,5 @@
 from types import EllipsisType
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 import numpy as np
 
@@ -32,17 +32,18 @@ def index(marr: "ManifestArray", indexer: T_Indexer) -> "ManifestArray":
 def check_and_sanitize_indexer_type(key: T_Indexer) -> T_IndexerTuple:
     """Check for invalid input types, and narrow the return type to a tuple of valid 1D indexers."""
     if isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
-        indexer = (key,)
+        indexer = cast(T_IndexerTuple, (key,))
     elif isinstance(key, tuple):
         for dim_indexer in key:
             if (
-                not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
+                not isinstance(dim_indexer, (int, slice, np.ndarray))
                 and dim_indexer is not None
+                and dim_indexer is not ...
             ):
                 raise TypeError(
                     f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
                 )
-        indexer = key
+        indexer = cast(T_IndexerTuple, key)
     else:
         raise TypeError(
             f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
@@ -83,12 +84,12 @@ def check_shape_and_maybe_replace_ellipsis(
         if num_single_axis_indexing_expressions != arr_ndim:
             raise ValueError(bad_shape_error_msg)
         else:
-            return indexer
+            return cast(T_SimpleIndexer, indexer)
 
 
 def replace_single_ellipsis(
-    indexer: T_Indexer_1d, arr_ndim: int, num_single_axis_indexing_expressions: int
-) -> T_SimpleIndexer_1d:
+    indexer: T_IndexerTuple, arr_ndim: int, num_single_axis_indexing_expressions: int
+) -> T_SimpleIndexer:
     """
     Replace ellipsis with 0 or more slice(None)s until there are ndim single-axis indexing expressions (so ignoring Nones).
     """
@@ -108,7 +109,7 @@ def replace_single_ellipsis(
     # insert multiple elements into one position
     indexer_as_list[position_of_ellipsis:position_of_ellipsis] = new_slices
 
-    return tuple(indexer_as_list)
+    return cast(T_SimpleIndexer, tuple(indexer_as_list))
 
 
 def apply_indexer(marr: "ManifestArray", indexer: T_SimpleIndexer) -> "ManifestArray":
