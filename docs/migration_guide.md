@@ -39,7 +39,7 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
     store = S3Store(
         bucket=bucket,
         region="us-west-2",
-        skip_signature=True
+        skip_signature=True # required for this specific example data because the data is in a public bucket, so the S3Store shouldn't fetch and use credentials.
     )
     registry = ObjectStoreRegistry({f"s3://{bucket}": store})
     parser = HDFParser()
