@@ -65,7 +65,6 @@ def check_shape_and_maybe_replace_ellipsis(
             f"Invalid indexer. Indexers containing multiple Ellipses are invalid, but indexer={indexer} contains {num_ellipses} ellipses"
         )
     elif num_ellipses == 1:
-        # TODO expand ellipses
         if num_single_axis_indexing_expressions > arr_ndim:
             # TODO consolidate the two very similar error messages?
             raise ValueError(

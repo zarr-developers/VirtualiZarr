@@ -422,8 +422,6 @@ class TestIndexing:
         with pytest.raises(TypeError, match="indexer must be of type"):
             marr[dodgy_indexer]
 
-    # TODO check raises on >1 ellipses
-
     @pytest.mark.parametrize(
         "in_shape, in_chunks, invalid_indexer",
         [
@@ -506,15 +504,87 @@ class TestIndexing:
             # obvious no-ops
             ((2,), (1,), slice(0, 2), (2,), (1,)),
             # reduces shape
-            pytest.param((1,), (1,), 0, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param(
+                (1,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
             # requires chunk-aligned selection
-            pytest.param((2,), (1,), 0, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), 1, (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), (0, ...), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), (..., 0), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), slice(0, 1), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), (..., slice(0, 1)), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
-            pytest.param((2,), (1,), (slice(0, 1), ...), (1,), (1,), marks=pytest.mark.xfail(reason="Chunk-aligned indexing not yet implemented")),
+            pytest.param(
+                (2,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                1,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (0, ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., 0),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                slice(0, 1),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., slice(0, 1)),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (slice(0, 1), ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
         ],
     )
     def test_chunk_selection_cases(
