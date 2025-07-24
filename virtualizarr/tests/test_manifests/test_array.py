@@ -422,6 +422,8 @@ class TestIndexing:
         with pytest.raises(TypeError, match="indexer must be of type"):
             marr[dodgy_indexer]
 
+    # TODO check raises on >1 ellipses
+
     @pytest.mark.parametrize(
         "in_shape, in_chunks, invalid_indexer",
         [
@@ -438,7 +440,7 @@ class TestIndexing:
 
         with pytest.raises(
             ValueError,
-            match="Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array",
+            match="Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions",
         ):
             marr[invalid_indexer]
 
