@@ -490,6 +490,13 @@ class TestIndexing:
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
     
+    def test_raise_on_multiple_ellipses(
+        self, manifest_array,
+    ):
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        with pytest.raises(ValueError, match="multiple Ellipses"):
+            indexed = marr[..., ...]
+
     @pytest.mark.parametrize(
         "in_shape, in_chunks, indexer, out_shape, out_chunks",
         [

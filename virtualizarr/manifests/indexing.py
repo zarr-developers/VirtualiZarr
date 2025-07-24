@@ -76,10 +76,9 @@ def check_shape_and_replace_ellipsis(
                 f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
             )
         else:
-            # TODO replace ellipses with 0 or more slice(None)s until there are arr_ndim single-axis indexing expressions (so ignoring Nones)
-            raise
+            return replace_single_ellipsis(indexer, arr_ndim, num_single_axis_indexing_expressions)
     else:  # num_ellipses == 0
-        # TODO add a note suggesting adding a trailing ellipsis?
+        # TODO add a note suggesting adding a trailing ellipsis like the array API standard does?
         if num_single_axis_indexing_expressions != arr_ndim:
             raise ValueError(
                 f"Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions equal to the length of the array. "
@@ -89,6 +88,25 @@ def check_shape_and_replace_ellipsis(
             )
         else:
             return indexer
+
+
+def replace_single_ellipsis(indexer: T_Indexer_1d, arr_ndim: int, num_single_axis_indexing_expressions: int) -> T_SimpleIndexer_1d:
+    """replace ellipses with 0 or more slice(None)s until there are arr_ndim single-axis indexing expressions (so ignoring Nones)"""
+    # TODO check this works for num_extra_slices_needed == 0
+    indexer_as_list = list(indexer)
+    
+    position_of_ellipsis = indexer_as_list.index(...)
+    print(position_of_ellipsis)
+
+    indexer_as_list.remove(...)
+    
+    num_extra_slices_needed = arr_ndim - num_single_axis_indexing_expressions
+    print(position_of_ellipsis)
+    new_slices = [slice(None)] * num_extra_slices_needed
+
+    indexer_as_list[position_of_ellipsis: num_extra_slices_needed] = new_slices
+
+    return tuple(indexer_as_list)
 
 
 def apply_indexer(marr: "ManifestArray", indexer: T_SimpleIndexer) -> "ManifestArray":
