@@ -8,6 +8,9 @@
 
 ### Bug fixes
 
+- Rewrote the internals of `ManifestArray.__getitem__` to ensure it actually obeys the array API standard under myriad edge cases ([#734](https://github.com/zarr-developers/VirtualiZarr/pull/734)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
