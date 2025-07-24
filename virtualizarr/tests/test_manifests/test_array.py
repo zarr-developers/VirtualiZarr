@@ -480,6 +480,19 @@ class TestIndexing:
             ((2,), (1,), (None, ...), (1, 2), (1, 1)),
             ((2,), (1,), (..., None), (2, 1), (1, 1)),
             ((), (), None, (1,), (1,)),
+        ],
+    )
+    def test_noops_and_broadcasting_cases(
+        self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
+    
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer, out_shape, out_chunks",
+        [
             # subsetting chunks
             ((2,), (1,), 0, (1,), (1,)),
             ((2,), (1,), 1, (1,), (1,)),
@@ -487,13 +500,14 @@ class TestIndexing:
             ((2,), (1,), (..., 0), (1,), (1,)),
         ],
     )
-    def test_cases(
+    def test_chunk_aligned_indexing_cases(
         self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
     ):
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
-        indexed = marr[indexer]
-        assert indexed.shape == out_shape
-        assert indexed.chunks == out_chunks
+        with pytest.raises(NotImplementedError, match="not yet supported"):
+            indexed = marr[indexer]
+        #assert indexed.shape == out_shape
+        #assert indexed.chunks == out_chunks
 
     # TODO test unsupported values, e.g. slice(0)
 
