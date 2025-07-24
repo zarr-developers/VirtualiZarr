@@ -33,10 +33,7 @@ def index(marr: "ManifestArray", indexer: T_Indexer) -> "ManifestArray":
 
 def check_and_sanitize_indexer_type(key: T_Indexer) -> T_IndexerTuple:
     """Check for invalid input types, and narrow the return type to a tuple of valid 1D indexers."""
-    if isinstance(key, BasicIndexer):
-        # TODO does this ever come up?
-        indexer = key.tuple
-    elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
+    if isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
         indexer = (key,)
     elif isinstance(key, tuple):
         for dim_indexer in key:
