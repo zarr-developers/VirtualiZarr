@@ -64,28 +64,24 @@ def check_shape_and_maybe_replace_ellipsis(
         raise ValueError(
             f"Invalid indexer. Indexers containing multiple Ellipses are invalid, but indexer={indexer} contains {num_ellipses} ellipses"
         )
-    elif num_ellipses == 1:
+
+    bad_shape_error_msg = (
+        "Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions less than or equal to the length of the array. "
+        f"However indexer={indexer} has {num_single_axis_indexing_expressions} single-axis indexing expressions and array has {arr_ndim} dimensions."
+        "\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
+        "or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
+    )
+
+    if num_ellipses == 1:
         if num_single_axis_indexing_expressions > arr_ndim:
-            # TODO consolidate the two very similar error messages?
-            raise ValueError(
-                f"Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions less than or equal to the length of the array. "
-                f"However indexer={indexer} has {num_single_axis_indexing_expressions} single-axis indexing expressions and array has {arr_ndim} dimensions."
-                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
-                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
-            )
+            raise ValueError(bad_shape_error_msg)
         else:
             return replace_single_ellipsis(
                 indexer, arr_ndim, num_single_axis_indexing_expressions
             )
     else:  # num_ellipses == 0
-        # TODO add a note suggesting adding a trailing ellipsis like the array API standard does?
         if num_single_axis_indexing_expressions != arr_ndim:
-            raise ValueError(
-                f"Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions equal to the length of the array. "
-                f"However indexer={indexer} has {num_single_axis_indexing_expressions} single-axis indexing expressions and array has {arr_ndim} dimensions."
-                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
-                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
-            )
+            raise ValueError(bad_shape_error_msg)
         else:
             return indexer
 
