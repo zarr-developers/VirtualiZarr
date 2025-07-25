@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.os }} - ${{ matrix.environment }}-build
+    name: ${{ matrix.os }}-${{ matrix.environment }}-build
     runs-on: ${{ matrix.os }}
     defaults:
       run:
