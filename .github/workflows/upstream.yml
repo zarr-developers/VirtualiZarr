@@ -41,9 +41,25 @@ jobs:
         run: |
           pixi list --environment upstream
 
-      - name: Running Tests
+      - name: Determine test type
+        id: test-type
         run: |
-          pixi run -e upstream run-tests-xml-cov
+          if [[ "${{ github.event_name }}" == "pull_request" ]] && \
+             [[ "${{ contains(github.event.pull_request.labels.*.name, 'test-slow') }}" == "true" ]]; then
+            echo "run-slow=true" >> $GITHUB_OUTPUT
+            echo "Running slow tests due to 'test-slow' label"
+          else
+            echo "run-slow=false" >> $GITHUB_OUTPUT
+            echo "Running standard tests (skipping slow tests)"
+          fi
+
+      - name: Run Tests
+        run: |
+          if [[ "${{ steps.test-type.outputs.run-slow }}" == "true" ]]; then
+            pixi run -e upstream run-tests-including-slow
+          else
+            pixi run -e upstream run-tests-xml-cov
+          fi
 
       - name: Upload code coverage to Codecov
         uses: codecov/codecov-action@v3.1.4
