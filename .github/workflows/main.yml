@@ -18,15 +18,27 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.environment }}-build
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} - ${{ matrix.environment }}-build
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
         environment: [test-py311, test-py312, min-deps, minio]
+        # Is it a draft Pull Request (true or false)?
+        isDraft:
+          - ${{ github.event.pull_request.draft }}
+        # Only run jobs on Ubuntu for draft PRs
+        exclude:
+          - os: ubuntu-24.04-arm
+            isDraft: true
+          - os: macos-latest
+            isDraft: true
+          - os: windows-latest
+            isDraft: true
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.3
