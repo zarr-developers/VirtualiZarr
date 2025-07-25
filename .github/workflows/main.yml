@@ -30,9 +30,9 @@ jobs:
         environment: [test-py311, test-py312, min-deps, minio]
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.8.13
+      - uses: prefix-dev/setup-pixi@v0.8.3
         with:
-          pixi-version: v0.49.0
+          pixi-version: v0.41.4
           environments: ${{ matrix.environment }}
 
       - name: List installed libraries
@@ -77,9 +77,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.8.13
+      - uses: prefix-dev/setup-pixi@v0.8.3
         with:
-          pixi-version: v0.49.0
+          pixi-version: v0.41.4
 
       - name: List installed libraries
         run: |
