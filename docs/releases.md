@@ -8,6 +8,8 @@
 
 ### Bug fixes
 
+- Fixed bug caused by writing empty virtual chunks to Icechunk ([#745](https://github.com/zarr-developers/VirtualiZarr/pull/745)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Rewrote the internals of `ManifestArray.__getitem__` to ensure it actually obeys the array API standard under myriad edge cases ([#734](https://github.com/zarr-developers/VirtualiZarr/pull/734)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
