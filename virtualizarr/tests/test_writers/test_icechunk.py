@@ -890,9 +890,7 @@ def test_write_empty_chunk(
     # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/740
 
     # ManifestArray containing empty chunk
-    manifest = ChunkManifest(
-        {"0": {"path": "", "offset": 0, "length": 0}}
-    )
+    manifest = ChunkManifest({"0": {"path": "", "offset": 0, "length": 0}})
     metadata = array_v3_metadata(
         shape=(5,),
         chunks=(5,),
@@ -906,7 +904,9 @@ def test_write_empty_chunk(
     vds.vz.to_icechunk(icechunk_filestore)
 
     # when opened they should be treated as fill_value
-    roundtrip = xr.open_zarr(icechunk_filestore, zarr_format=3, consolidated=False, chunks={})
+    roundtrip = xr.open_zarr(
+        icechunk_filestore, zarr_format=3, consolidated=False, chunks={}
+    )
     expected_values = np.full(shape=(5,), fill_value=10, dtype=np.dtype("int32"))
     expected = xr.Variable(data=expected_values, dims=["x"])
     xrt.assert_identical(roundtrip["a"].variable, expected)
