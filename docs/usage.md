@@ -275,18 +275,30 @@ To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.V
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
 ```python exec="on" session="usage" source="material-block" result="code"
-# create an icechunk repository, session and write the virtual dataset to the session
+# create an icechunk repository, or open an existing one
 import icechunk
 storage = icechunk.in_memory_storage()
-
-# By default, local virtual references and public remote virtual references can be read without extra configuration.
 repo = icechunk.Repository.open_or_create(storage)
+
+# you need to explicitly grant permissions to icechunk to read from the locations of your archival files
+config = icechunk.RepositoryConfig.default()
+config.set_virtual_chunk_container(
+    icechunk.VirtualChunkContainer("s3://my-bucket", icechunk.s3_store(region="us-east-1", anonymous=True)),
+)
+
+# open a writable icechunk session to be able to add new contents to the store
 session = repo.writable_session("main")
 
-# write the virtual dataset to the session with the IcechunkStore
+# write the virtual dataset to the session's IcechunkStore instance, using VirtualiZarr's `.vz` accessor
 vds1.vz.to_icechunk(session.store)
+
+# commit your changes so that they are permanently available as a new snapshot
 snapshot_id = session.commit("Wrote first dataset")
 print(snapshot_id)
+
+# you probably want to persist the new permissions to be permanent, 
+# otherwise every user will have to repeat the `config.set_virtual_chunk_container` step just to read the data back later.
+repo.save_config()
 ```
 
 #### Append to an existing Icechunk Store
