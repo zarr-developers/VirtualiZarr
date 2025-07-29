@@ -296,8 +296,8 @@ vds1.vz.to_icechunk(session.store)
 snapshot_id = session.commit("Wrote first dataset")
 print(snapshot_id)
 
-# you probably want to persist the new permissions to be permanent, 
-# otherwise every user will have to repeat the `config.set_virtual_chunk_container` step just to read the data back later.
+# optionally persist the new permissions to be permanent, which you probably want
+# otherwise every user who wants to read the referenced virtual data back later will have to repeat the `config.set_virtual_chunk_container` step at read time.
 repo.save_config()
 ```
 
