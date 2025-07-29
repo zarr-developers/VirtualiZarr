@@ -304,7 +304,7 @@ repo.save_config()
 #### Append to an existing Icechunk Store
 
 You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument.
-This is especially useful for datasets that grow over time.
+This option is designed to behave similarly to the `append_dim` option to xarray's [xarray.Dataset.to_zarr][] method, and is especially useful for datasets that grow over time.
 
 !!! important
     Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
