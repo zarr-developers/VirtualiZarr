@@ -1,10 +1,8 @@
 # Release notes
 
-## v2.0.1 (unreleased)
+## v2.0.1 (30th July 2025)
 
-### New Features
-
-### Breaking changes
+Minor release to ensure compatibility with incoming changes to Icechunk.
 
 ### Bug fixes
 
@@ -17,8 +15,6 @@
 
 - Added recommendation to use `icechunk.Repository.save_config()` to persist `icechunk.VirtualChunkContainer`s ([#746](https://github.com/zarr-developers/VirtualiZarr/pull/746)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-
-### Internal changes
 
 ## v2.0.0 (21st July 2025)
 
