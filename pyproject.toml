@@ -177,7 +177,7 @@ run-mypy = { cmd = "mypy virtualizarr" }
 # Using '--dist loadscope' (rather than default of '--dist load' when '-n auto'
 # is used), reduces test hangs that appear to be macOS-related.
 run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --durations=10" }
-run-tests-including-slow = { cmd = "pytest -n auto --dist loadscope --run-network-tests --run-slow-tests --verbose --durations=10" }
+run-tests-including-slow = { cmd = "pytest -n auto --dist loadscope --run-network-tests --run-slow-tests --verbose --durations=10 --cov=virtualizarr --cov-report=xml" }
 run-tests-no-network = { cmd = "pytest -n auto --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
@@ -206,6 +206,7 @@ readthedocs = { cmd = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r site $READTHEDOC
 [tool.pixi.feature.minio.tasks]
 run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose" }
 run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose --cov-report=xml" }
+run-tests-including-slow= { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --run-slow-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
