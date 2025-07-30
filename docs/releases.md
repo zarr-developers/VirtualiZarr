@@ -15,6 +15,9 @@
 
 ### Documentation
 
+- Added recommendation to use `icechunk.Repository.save_config()` to persist `icechunk.VirtualChunkContainer`s ([#746](https://github.com/zarr-developers/VirtualiZarr/pull/746)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 ## v2.0.0 (21st July 2025)
