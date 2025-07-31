@@ -121,5 +121,18 @@ Anyone with commit privileges to the repository can issue a release, and you sho
 8. Edit the draft release notes for consistency.
 9. Select 'Publish' to publish the release. This should automatically upload the new release to [PyPI](https://pypi.org/project/virtualizarr/) and [conda-forge](https://anaconda.org/conda-forge/virtualizarr).
 10. Check that this has run successfully (PyPI should show the new version number very quickly, but conda-forge might take several hours).
-11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future. See [this commit](https://github.com/zarr-developers/VirtualiZarr/commit/e3912f08e22f2e3230af6eb1a2aacb5728822fa1) for an example (you can assume the next release will be numbered `vX.Y.Z+1`, but the number doesn't actually matter).
+11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future. You can assume the next release will be numbered `vX.Y.Z+1` where `vX.Y.Z` is the release just issued, but the number doesn't actually matter at this point. Just copy this template:
+    ```
+    ## vX.Y.Z+1 (unreleased)
+    
+    ### New Features
+
+    ### Breaking changes
+
+    ### Bug fixes
+
+    ### Documentation
+
+    ### Internal changes
+    ```
 12. (Optional) Advertise the release on social media 📣
