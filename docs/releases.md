@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.0.2 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.0.1 (30th July 2025)
 
 Minor release to ensure compatibility with incoming changes to Icechunk.
