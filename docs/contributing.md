@@ -124,7 +124,7 @@ Anyone with commit privileges to the repository can issue a release, and you sho
 11. Create and merge a PR to add a new empty section to the `docs/releases.rst` for the next release in the future. You can assume the next release will be numbered `vX.Y.Z+1` where `vX.Y.Z` is the release just issued, but the number doesn't actually matter at this point. Just copy this template:
     ```
     ## vX.Y.Z+1 (unreleased)
-    
+
     ### New Features
 
     ### Breaking changes
