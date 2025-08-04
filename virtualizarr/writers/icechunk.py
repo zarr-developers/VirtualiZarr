@@ -431,6 +431,7 @@ def write_manifest_virtual_refs(
             last_updated_at_checksum=last_updated_at,
         )
         for path, offset, length in it
+        if path
     ]
 
     store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)
