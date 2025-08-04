@@ -6,23 +6,143 @@ This page explains how to use VirtualiZarr. Review the [Data Structures](data_st
 
 VirtualiZarr is for creating and manipulating "virtual" references to pre-existing data stored in the cloud or on disk in a variety of formats, by representing it in terms of the [Zarr data model](https://zarr-specs.readthedocs.io/en/latest/specs.html) of chunked N-dimensional arrays.
 
-If you have data on cloud object storage that you're trying to virtualize, first create an [ObjectStore][obstore.store.ObjectStore] instance
-that can access your data. Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds).
+The first step to virtualizing data is to create an [ObjectStore][obstore.store.ObjectStore] instance
+that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
 
-```python exec="on" session="usage" source="material-block"
-import xarray as xr
-from obstore.store import from_url
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
-from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
+<!-- Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds). -->
 
-bucket = "s3://nex-gddp-cmip6"
-path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-url = f"{bucket}/{path}"
-store = from_url(bucket, region="us-west-2", skip_signature=True)
-registry = ObjectStoreRegistry({bucket: store})
-```
+
+=== "S3"
+
+    ```python exec="on" session="usage" source="material-block"
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "s3://nex-gddp-cmip6"
+    path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket, region="us-west-2", skip_signature=True)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "GCS"
+
+    ```python
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "gs://data-bucket"
+    path = "file-path/data.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "Azure"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "abfs://data-container"
+    path = "file-path/data.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "HTTP"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    # This examples uses a NetCDF file of CMIP6 from ESGF.
+    bucket  = 'https://esgf-data.ucar.edu'
+    path = 'thredds/fileServer/esg_dataroot/CMIP6/CMIP/NCAR/CESM2/historical/r3i1p1f1/day/tas/gn/v20190308/tas_day_CESM2_historical_r3i1p1f1_gn_19200101-19291231.nc'
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "CEPH / OSN"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import S3Store
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    endpoint = "https://nyu1.osn.mghpcc.org"
+    access_key_id = "<access_key_id>"
+    secret_access_key = "<secret_access_key>"
+    path = "<path_to_files>"
+    file = "filename.nc"
+    scheme = "s3://"
+
+    # create anon s3 store
+    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, skip_signature=True)
+
+    # create s3 store with aws-style credentials
+    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, access_key_id = aws_access_key_id, secret_access_key=aws_secret_access_key)
+
+    registry = ObjectStoreRegistry({f"{scheme}{path}": store})
+
+    ```
+
+=== "Local"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import LocalStore
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    from pathlib import Path
+
+    store_path = Path.cwd()
+    file_path = str(store_path / "data.nc")
+    file_url = f"file://{file_path}"
+
+    store = LocalStore(prefix=store_path)
+    registry = ObjectStoreRegistry({file_url: store})
+
+    ```
+
+
+
+
+
+
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
 
