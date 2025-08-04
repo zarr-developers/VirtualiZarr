@@ -1,5 +1,4 @@
 import warnings
-from types import EllipsisType
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -10,8 +9,8 @@ import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
-    expand_dims,
 )
+from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 
 
@@ -213,78 +212,22 @@ class ManifestArray:
 
     def __getitem__(
         self,
-        key: Union[
-            int,
-            slice,
-            EllipsisType,
-            None,
-            tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
-            np.ndarray,
-        ],
+        key: T_Indexer,
         /,
     ) -> "ManifestArray":
         """
-        Only supports extremely limited indexing.
+        Perform numpy-style indexing on this ManifestArray.
 
-        Only here because xarray will apparently attempt to index into its lazy indexing classes even if the operation would be a no-op anyway.
+        Only supports limited indexing, because in general you cannot slice inside of a compressed chunk.
+        Mainly required because Xarray uses this instead of expand dims (by passing Nones) and often will index with a no-op.
+
+        Could potentially support indexing with slices aligned along chunk boundaries, but currently does not.
+
+        Parameters
+        ----------
+        key
         """
-        from xarray.core.indexing import BasicIndexer
-
-        indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...]
-        # check type is valid
-        if isinstance(key, BasicIndexer):
-            indexer = key.tuple
-        elif isinstance(key, (int, slice, EllipsisType, np.ndarray)) or key is None:
-            if isinstance(key, np.ndarray):
-                raise NotImplementedError(
-                    f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
-                )
-            indexer = (key,)
-        elif isinstance(key, tuple):
-            for dim_indexer in key:
-                if (
-                    not isinstance(dim_indexer, (int, slice, EllipsisType, np.ndarray))
-                    and dim_indexer is not None
-                ):
-                    raise TypeError(
-                        f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
-                    )
-
-                if isinstance(key, np.ndarray):
-                    raise NotImplementedError(
-                        f"indexing with so-called 'fancy indexing' via numpy arrays is not supported. Got {key}"
-                    )
-
-            indexer = key
-        else:
-            raise TypeError(
-                f"indexer must be of type int, slice, ellipsis, None, or np.ndarray; or a tuple of such types. Got {key}"
-            )
-
-        # check value is valid
-        indexer = _possibly_expand_trailing_ellipsis(indexer, self.ndim)
-        if len(indexer) != self.ndim and self.ndim > 0:
-            raise ValueError(
-                f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
-                f"but indexer={indexer} has length {len(indexer)} and array has {self.ndim} dimensions."
-                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
-                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
-            )
-
-        if all(
-            isinstance(axis_indexer, slice) and axis_indexer == slice(None)
-            for axis_indexer in indexer
-        ):
-            # indexer is all slice(None)'s, so this is a no-op
-            return self
-        else:
-            output_arr = self
-            for ind, axis_indexer in enumerate(indexer):
-                if axis_indexer is None:
-                    output_arr = expand_dims(output_arr, axis=ind)
-                elif axis_indexer != slice(None):
-                    raise NotImplementedError(f"Doesn't support slicing with {indexer}")
-            return output_arr
+        return index(self, key)
 
     def rename_paths(
         self,
@@ -349,39 +292,3 @@ class ManifestArray:
             dims=dims,
             attrs=attrs,
         )
-
-
-def _possibly_expand_trailing_ellipsis(
-    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
-    ndim: int,
-):
-    """
-    Allows for passing indexers <= the shape of the array, so long as they end with an ellipsis.
-
-    For example:
-
-    marr[3, slice(2), ...]
-
-    where marr.ndim => 3.
-    """
-    final_dim_indexer = indexer[-1]
-    if final_dim_indexer == ...:
-        if len(_strip_nones(indexer)) > ndim and ndim > 0:
-            raise ValueError(
-                f"Invalid indexer for array. Indexer length must be less than or equal to the number of dimensions in the array, "
-                f"but indexer={indexer} has length {len(indexer)} and array has {ndim} dimensions."
-                f"\nIf concatenating using xarray, ensure all non-coordinate data variables to be concatenated include the concatenation dimension, "
-                f"or consider passing `data_vars='minimal'` and `coords='minimal'` to the xarray combining function."
-            )
-
-        extra_slices_needed = ndim - (len(indexer) - 1)
-        *indexer_as_list, ellipsis = indexer
-        return tuple(tuple(indexer_as_list) + (slice(None),) * extra_slices_needed)
-    else:
-        return indexer
-
-
-def _strip_nones(
-    indexer: tuple[Union[int, slice, EllipsisType, None, np.ndarray], ...],
-) -> tuple[Union[int, slice, EllipsisType, np.ndarray], ...]:
-    return tuple([ind for ind in indexer if ind is not None])
