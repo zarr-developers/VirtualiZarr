@@ -13,7 +13,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 <!-- Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds). -->
 
 
-=== "S3 Store"
+=== "S3"
 
     ```python exec="on" session="usage" source="material-block"
 
@@ -32,7 +32,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```
 
-=== "GCS Store"
+=== "GCS"
 
     ```python
     import xarray as xr
@@ -50,7 +50,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```
 
-=== "Azure Store"
+=== "Azure"
 
     ```python
 
@@ -69,7 +69,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```
 
-=== "HTTP Store"
+=== "HTTP"
 
     ```python
 
@@ -88,7 +88,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```
 
-=== "CEPH / OSN Store"
+=== "CEPH / OSN"
 
     ```python
 
@@ -116,7 +116,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```
 
-=== "Local Store"
+=== "Local"
 
     ```python
 
