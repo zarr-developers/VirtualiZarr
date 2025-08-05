@@ -381,8 +381,8 @@ class DMRParser:
         # Dimension info
         dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
-        if not dimension_tags:
-            raise ValueError("Variable has no dimensions")
+        # if not dimension_tags:
+        #     # raise ValueError("Variable has no dimensions")
         for dim in dimension_tags:
             dims.update(self._parse_dim(dim))
         # convert DAP dtype to numpy dtype
@@ -407,9 +407,13 @@ class DMRParser:
             if "fillValue" in chunks_tag.attrib:
                 fillValue_attrib = chunks_tag.attrib["fillValue"]
                 array_fill_value = np.array(fillValue_attrib).astype(dtype)[()]
-            chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
+            if chunks_shape:
+                chunkmanifest = self._parse_chunks(chunks_tag, chunks_shape)
+            else:
+                chunkmanifest = ChunkManifest(entries={}, shape=array_fill_value.shape)
             # Filters
             codecs = self._parse_filters(chunks_tag, dtype)
+
         # Attributes
         attrs: dict[str, Any] = {}
         for attr_tag in var_tag.iterfind("dap:Attribute", self._NS):
@@ -449,9 +453,14 @@ class DMRParser:
             # DMR++ build information that is not part of the dataset
             if attr_tag.attrib["name"] == "build_dmrpp_metadata":
                 return {}
-            raise ValueError(
-                "Nested attributes cannot be assigned to a variable or dataset"
-            )
+            else:
+                container_attr = attr_tag.attrib["name"]
+                warnings.warn(
+                    "This DMRpp contains a nested attribute "
+                    f"{container_attr}. Nested attributes cannot "
+                    "be assigned to a variable or dataset and will be dropped"
+                )
+                return {}
         dtype = np.dtype(self._DAP_NP_DTYPE[attr_tag.attrib["type"]])
         # if multiple Value tags are present, store as "key": "[v1, v2, ...]"
         for value_tag in attr_tag:
