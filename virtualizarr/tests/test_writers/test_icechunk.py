@@ -87,14 +87,14 @@ def synthetic_vds(synthetic_data):
         fill_value=zdtype.default_scalar(),
         codecs=[BytesCodec()],
         attributes={},
-        dimension_names=("x", "y"),
+        dimension_names=("y", "x"),
         storage_transformers=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
         metadata=metadata,
     )
-    foo = xr.Variable(data=ma, dims=["x", "y"], encoding={"scale_factor": 2})
+    foo = xr.Variable(data=ma, dims=["y", "x"], encoding={"scale_factor": 2})
     vds = xr.Dataset(
         {"foo": foo},
     )
@@ -474,13 +474,9 @@ class TestAppend:
     # Success cases
     ## When appending to a single virtual ref without encoding, it succeeds
     def test_append_virtual_ref_without_encoding(
-        self,
-        icechunk_repo: "Repository",
-        simple_netcdf4: str,
-        virtual_dataset: Callable,
+        self, icechunk_repo: "Repository", synthetic_vds
     ):
-        # generate virtual dataset
-        vds = virtual_dataset(url=simple_netcdf4)
+        vds = synthetic_vds.drop_encoding()
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.vz.to_icechunk(writable_session.store)
@@ -499,71 +495,41 @@ class TestAppend:
 
         read_session = icechunk_repo.readonly_session(branch="main")
         with (
-            xr.open_zarr(
-                read_session.store, consolidated=False, zarr_format=3
-            ) as array,
-            xr.open_dataset(simple_netcdf4) as expected_ds,
+            xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
         ):
-            expected_array = xr.concat([expected_ds, expected_ds, expected_ds], dim="x")
-            xrt.assert_identical(array, expected_array)
+            np.testing.assert_equal(
+                ds["foo"].data,
+                np.array([[0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]], dtype="int8"),
+            )
 
     def test_append_virtual_ref_with_encoding(
-        self,
-        icechunk_repo: "Repository",
-        netcdf4_files_factory: Callable,
-        virtual_dataset: Callable,
+        self, icechunk_repo: "Repository", synthetic_vds
     ):
-        scale_factor = 0.01
-        encoding = {"air": {"scale_factor": scale_factor}}
-        filepath1, filepath2 = netcdf4_files_factory(encoding=encoding)
-        vds1, vds2 = (
-            virtual_dataset(
-                url=filepath1,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                encoding={"scale_factor": scale_factor},
-                offset=15419,
-                length=15476000,
-            ),
-            virtual_dataset(
-                url=filepath2,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                encoding={"scale_factor": scale_factor},
-                offset=15419,
-                length=15476000,
-            ),
-        )
-
+        vds = synthetic_vds
         # Commit the first virtual dataset
-        icechunk_filestore = icechunk_repo.writable_session("main")
-        vds1.vz.to_icechunk(icechunk_filestore.store)
-        icechunk_filestore.commit(
+        writable_session = icechunk_repo.writable_session("main")
+        vds.vz.to_icechunk(writable_session.store)
+        writable_session.commit(
             "test commit"
         )  # need to commit it in order to append to it in the next lines
+        append_session = icechunk_repo.writable_session("main")
 
         # Append the same dataset to the same store
-        icechunk_filestore_append = icechunk_repo.writable_session("main")
-        vds2.vz.to_icechunk(icechunk_filestore_append.store, append_dim="time")
-        icechunk_filestore_append.commit("appended data")
+        vds.vz.to_icechunk(append_session.store, append_dim="x")
+        append_session.commit("appended data")
 
+        second_append_session = icechunk_repo.writable_session("main")
+        vds.vz.to_icechunk(second_append_session.store, append_dim="x")
+        second_append_session.commit("appended data again")
+
+        read_session = icechunk_repo.readonly_session(branch="main")
         with (
-            xr.open_dataset(filepath1) as expected_ds1,
-            xr.open_dataset(filepath2) as expected_ds2,
-            xr.open_zarr(
-                icechunk_filestore_append.store, consolidated=False, zarr_format=3
-            ) as new_ds,
+            xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
         ):
-            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time").drop_vars(
-                ["time", "lat", "lon"], errors="ignore"
+            np.testing.assert_equal(
+                ds["foo"].data,
+                np.array([[0, 2, 4, 6, 0, 2, 4, 6, 0, 2, 4, 6]], dtype="int8"),
             )
-            xrt.assert_equal(new_ds, expected_ds)
 
     ## When appending to a virtual ref with encoding, it succeeds
     @pytest.mark.asyncio
