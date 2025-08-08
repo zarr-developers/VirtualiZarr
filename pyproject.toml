@@ -20,7 +20,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray==2025.06.0",
+    "xarray",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
