@@ -568,7 +568,6 @@ class TestDetermineCoords:
 
 @requires_network
 class TestReadRemote:
-    @slow_test
     def test_anon_read_s3(self):
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
