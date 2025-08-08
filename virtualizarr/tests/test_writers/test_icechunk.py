@@ -55,12 +55,12 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
 
 
 @pytest.fixture()
-def synthetic_data_chunk(
+def synthetic_data(
     tmpdir: Path,
 ):
     filepath = f"{tmpdir}/data_chunk"
     store = obstore.store.LocalStore()
-    arr = np.array([0, 1, 2, 3], dtype="int8")
+    arr = np.arange(0, 8, dtype="int8")
     obstore.put(
         store,
         filepath,
@@ -119,8 +119,7 @@ def test_write_new_virtual_variable(
     #
 
     # check array attrs
-    # TODO somehow this is broken by setting the dimension names???
-    # assert dict(arr.attrs) == {"units": "km"}
+    assert dict(arr.attrs) == {"units": "km"}
 
     # check dimensions
     if isinstance(arr.metadata, ArrayV3Metadata):
@@ -130,14 +129,14 @@ def test_write_new_virtual_variable(
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    synthetic_data_chunk,
+    synthetic_data,
 ):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
-        {"0.0": {"path": synthetic_data_chunk, "offset": 0, "length": 4}}
+        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
     )
     data_type = np.int8
     zdtype = parse_data_type(data_type, zarr_format=3)
@@ -182,14 +181,14 @@ def test_set_single_virtual_ref_without_encoding(
 def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    synthetic_data_chunk,
+    synthetic_data,
 ):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
-        {"0.0": {"path": synthetic_data_chunk, "offset": 0, "length": 4}}
+        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
     )
     data_type = np.int8
     zdtype = parse_data_type(data_type, zarr_format=3)
@@ -234,28 +233,32 @@ def test_set_single_virtual_ref_with_encoding(
 
 
 def test_set_grid_virtual_refs(
-    icechunk_filestore: "IcechunkStore", netcdf4_file: Path, array_v3_metadata
+    icechunk_filestore: "IcechunkStore", synthetic_data, array_v3_metadata
 ):
-    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-    # vds = open_virtual_dataset(netcdf4_file, indexes={})
-
-    with open(netcdf4_file, "rb") as f:
-        f.seek(200)
-        actual_data = f.read(64)
-
     # instead for now just write out random byte ranges explicitly
     manifest = ChunkManifest(
         {
-            "0.0": {"path": netcdf4_file, "offset": 200, "length": 16},
-            "0.1": {"path": netcdf4_file, "offset": 216, "length": 16},
-            "1.0": {"path": netcdf4_file, "offset": 232, "length": 16},
-            "1.1": {"path": netcdf4_file, "offset": 248, "length": 16},
+            "0.0": {"path": synthetic_data, "offset": 0, "length": 4},
+            "0.1": {"path": synthetic_data, "offset": 4, "length": 4},
+            "1.0": {"path": synthetic_data, "offset": 0, "length": 4},
+            "1.1": {"path": synthetic_data, "offset": 4, "length": 4},
         }
     )
-    metadata = array_v3_metadata(
-        shape=(4, 4),
-        chunks=(2, 2),
-        codecs=None,
+    data_type = np.int8
+    zdtype = parse_data_type(data_type, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=(2, 8),
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": (1, 4)},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("x", "y"),
+        storage_transformers=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
@@ -273,23 +276,15 @@ def test_set_grid_virtual_refs(
     assert isinstance(air_array, zarr.Array)
 
     # check array metadata
-    assert air_array.shape == (4, 4)
-    assert air_array.chunks == (2, 2)
-    assert air_array.dtype == np.dtype("int32")
+    assert air_array.shape == (2, 8)
+    assert air_array.chunks == (1, 4)
+    assert air_array.dtype == np.dtype("int8")
 
     # check chunk references
-    npt.assert_equal(
-        air_array[:2, :2], np.frombuffer(actual_data[:16], "<i4").reshape(2, 2)
-    )
-    npt.assert_equal(
-        air_array[:2, 2:], np.frombuffer(actual_data[16:32], "<i4").reshape(2, 2)
-    )
-    npt.assert_equal(
-        air_array[2:, :2], np.frombuffer(actual_data[32:48], "<i4").reshape(2, 2)
-    )
-    npt.assert_equal(
-        air_array[2:, 2:], np.frombuffer(actual_data[48:], "<i4").reshape(2, 2)
-    )
+    npt.assert_equal(air_array[:1, :4], np.array([[0, 1, 2, 3]]))
+    npt.assert_equal(air_array[:1, 4:], np.array([[4, 5, 6, 7]]))
+    npt.assert_equal(air_array[1:, :4], np.array([[0, 1, 2, 3]]))
+    npt.assert_equal(air_array[1:, 4:], np.array([[4, 5, 6, 7]]))
 
 
 def test_write_loadable_variable(
