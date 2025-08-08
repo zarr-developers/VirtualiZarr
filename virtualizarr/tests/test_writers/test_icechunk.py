@@ -69,6 +69,38 @@ def synthetic_data(
     return filepath
 
 
+@pytest.fixture()
+def synthetic_vds(synthetic_data):
+    manifest = ChunkManifest(
+        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
+    )
+    data_type = np.int8
+    zdtype = parse_data_type(data_type, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=(1, 4),
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": (1, 4)},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("x", "y"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["x", "y"], encoding={"scale_factor": 2})
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+    return vds
+
+
 @pytest.fixture(scope="function")
 def icechunk_filestore(icechunk_repo: "Repository") -> "IcechunkStore":
     session = icechunk_repo.writable_session("main")
@@ -129,41 +161,10 @@ def test_write_new_virtual_variable(
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    synthetic_data,
+    synthetic_vds,
 ):
-    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-    # vds = open_virtual_dataset(netcdf4_file, indexes={})
-
-    # instead for now just write out byte ranges explicitly
-    manifest = ChunkManifest(
-        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
-    )
-    data_type = np.int8
-    zdtype = parse_data_type(data_type, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=(1, 4),
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": (1, 4)},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec()],
-        attributes={},
-        dimension_names=("x", "y"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    foo = xr.Variable(data=ma, dims=["x", "y"])
-    vds = xr.Dataset(
-        {"foo": foo},
-    )
-
-    vds.vz.to_icechunk(icechunk_filestore)
+    synthetic_vds = synthetic_vds.drop_encoding()
+    synthetic_vds.vz.to_icechunk(icechunk_filestore)
 
     icechunk_filestore.session.commit("test")
 
@@ -181,41 +182,9 @@ def test_set_single_virtual_ref_without_encoding(
 def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    synthetic_data,
+    synthetic_vds,
 ):
-    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
-    # vds = open_virtual_dataset(netcdf4_file, indexes={})
-
-    # instead for now just write out byte ranges explicitly
-    manifest = ChunkManifest(
-        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
-    )
-    data_type = np.int8
-    zdtype = parse_data_type(data_type, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=(1, 4),
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": (1, 4)},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec()],
-        attributes={},
-        dimension_names=("x", "y"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    foo = xr.Variable(data=ma, dims=["x", "y"], encoding={"scale_factor": 2})
-    vds = xr.Dataset(
-        {"foo": foo},
-    )
-
-    vds.vz.to_icechunk(icechunk_filestore)
+    synthetic_vds.vz.to_icechunk(icechunk_filestore)
 
     icechunk_filestore.session.commit("test")
 
