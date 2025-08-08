@@ -5,12 +5,15 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import numpy as np
 import numpy.testing as npt
+import obstore
 import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
+from zarr.codecs import BytesCodec
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.dtype import parse_data_type
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
@@ -49,6 +52,21 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
         config=config,
         authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
     )
+
+
+@pytest.fixture()
+def synthetic_data_chunk(
+    tmpdir: Path,
+):
+    filepath = f"{tmpdir}/data_chunk"
+    store = obstore.store.LocalStore()
+    arr = np.array([0, 1, 2, 3], dtype="int8")
+    obstore.put(
+        store,
+        filepath,
+        arr.tobytes(),
+    )
+    return filepath
 
 
 @pytest.fixture(scope="function")
@@ -112,20 +130,30 @@ def test_write_new_virtual_variable(
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    simple_netcdf4: Path,
-    array_v3_metadata,
+    synthetic_data_chunk,
 ):
     # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
     # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
     # instead for now just write out byte ranges explicitly
     manifest = ChunkManifest(
-        {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
+        {"0.0": {"path": synthetic_data_chunk, "offset": 0, "length": 4}}
     )
-    metadata = array_v3_metadata(
-        shape=(3, 4),
-        chunks=(3, 4),
-        codecs=None,
+    data_type = np.int8
+    zdtype = parse_data_type(data_type, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=(1, 4),
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": (1, 4)},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("x", "y"),
+        storage_transformers=None,
     )
     ma = ManifestArray(
         chunkmanifest=manifest,
@@ -141,24 +169,12 @@ def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore.session.commit("test")
 
     icechunk_readonly_session = icechunk_repo.readonly_session("main")
-    root_group = zarr.open_group(store=icechunk_readonly_session.store, mode="r")
-    array = root_group["foo"]
-
-    # check chunk references
-    # TODO we can't explicitly check that the path/offset/length is correct because
-    # icechunk doesn't yet expose any get_virtual_refs method
-
     with (
         xr.open_zarr(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as ds,
-        xr.open_dataset(simple_netcdf4) as expected_ds,
     ):
-        expected_array = expected_ds["foo"].to_numpy()
-
-        npt.assert_equal(array, expected_array)
-        xrt.assert_identical(ds.foo, expected_ds.foo)
-
+        np.testing.assert_equal(ds["foo"].data, np.array([[0, 1, 2, 3]], dtype="int8"))
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
@@ -166,62 +182,51 @@ def test_set_single_virtual_ref_without_encoding(
 def test_set_single_virtual_ref_with_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
-    netcdf4_file: Path,
-    array_v3_metadata,
+    synthetic_data_chunk,
 ):
-    with xr.open_dataset(netcdf4_file) as ds:
-        # We drop the coordinates because we don't have them in the zarr test case
-        expected_ds = ds.drop_vars(["lon", "lat", "time"])
+    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+    # vds = open_virtual_dataset(netcdf4_file, indexes={})
 
-        # instead, for now just write out byte ranges explicitly
-        manifest = ChunkManifest(
-            {"0.0.0": {"path": netcdf4_file, "offset": 15419, "length": 7738000}}
-        )
-        metadata = array_v3_metadata(
-            shape=(2920, 25, 53),
-            chunks=(2920, 25, 53),
-            codecs=None,
-            data_type=np.dtype("int16"),
-        )
-        ma = ManifestArray(
-            chunkmanifest=manifest,
-            metadata=metadata,
-        )
-        air = xr.Variable(
-            data=ma,
-            dims=["time", "lat", "lon"],
-            encoding={"scale_factor": 0.01},
-            attrs=expected_ds["air"].attrs,
-        )
-        vds = xr.Dataset({"air": air}, attrs=expected_ds.attrs)
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0": {"path": synthetic_data_chunk, "offset": 0, "length": 4}}
+    )
+    data_type = np.int8
+    zdtype = parse_data_type(data_type, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=(1, 4),
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": (1, 4)},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("x", "y"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["x", "y"], encoding={"scale_factor": 2})
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
 
-        vds.vz.to_icechunk(icechunk_filestore)
+    vds.vz.to_icechunk(icechunk_filestore)
 
-        icechunk_filestore.session.commit("test")
+    icechunk_filestore.session.commit("test")
 
-        icechunk_readonly_session = icechunk_repo.readonly_session("main")
-        root_group = zarr.open_group(store=icechunk_readonly_session.store, mode="r")
-        air_array = root_group["air"]
-        assert isinstance(air_array, zarr.Array)
-
-        # check array metadata
-        assert air_array.shape == (2920, 25, 53)
-        assert air_array.chunks == (2920, 25, 53)
-        assert air_array.dtype == np.dtype("int16")
-        assert air_array.attrs["scale_factor"] == 0.01
-
-        # check chunk references
-        # TODO we can't explicitly check that the path/offset/length is correct because
-        # icechunk doesn't yet expose any get_virtual_refs method
-
-        # check the data
-        with xr.open_zarr(
+    icechunk_readonly_session = icechunk_repo.readonly_session("main")
+    with (
+        xr.open_zarr(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
-        ) as actual_ds:
-            # Because we encode attributes, attributes may differ, for example
-            # actual_range for expected_ds.air is array([185.16, 322.1 ], dtype=float32)
-            # but encoded it is [185.16000366210935, 322.1000061035156]
-            xrt.assert_allclose(actual_ds, expected_ds)
+        ) as ds,
+    ):
+        np.testing.assert_equal(ds["foo"].data, np.array([[0, 2, 4, 6]], dtype="int8"))
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage
