@@ -6,23 +6,143 @@ This page explains how to use VirtualiZarr. Review the [Data Structures](data_st
 
 VirtualiZarr is for creating and manipulating "virtual" references to pre-existing data stored in the cloud or on disk in a variety of formats, by representing it in terms of the [Zarr data model](https://zarr-specs.readthedocs.io/en/latest/specs.html) of chunked N-dimensional arrays.
 
-If you have data on cloud object storage that you're trying to virtualize, first create an [ObjectStore][obstore.store.ObjectStore] instance
-that can access your data. Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds).
+The first step to virtualizing data is to create an [ObjectStore][obstore.store.ObjectStore] instance
+that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
 
-```python exec="on" session="usage" source="material-block"
-import xarray as xr
-from obstore.store import from_url
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
-from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
+<!-- Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds). -->
 
-bucket = "s3://nex-gddp-cmip6"
-path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-url = f"{bucket}/{path}"
-store = from_url(bucket, region="us-west-2", skip_signature=True)
-registry = ObjectStoreRegistry({bucket: store})
-```
+
+=== "S3"
+
+    ```python exec="on" session="usage" source="material-block"
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "s3://nex-gddp-cmip6"
+    path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket, region="us-west-2", skip_signature=True)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "GCS"
+
+    ```python
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "gs://data-bucket"
+    path = "file-path/data.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "Azure"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    bucket = "abfs://data-container"
+    path = "file-path/data.nc"
+    url = f"{bucket}/{path}"
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "HTTP"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import from_url
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    # This examples uses a NetCDF file of CMIP6 from ESGF.
+    bucket  = 'https://esgf-data.ucar.edu'
+    path = 'thredds/fileServer/esg_dataroot/CMIP6/CMIP/NCAR/CESM2/historical/r3i1p1f1/day/tas/gn/v20190308/tas_day_CESM2_historical_r3i1p1f1_gn_19200101-19291231.nc'
+    store = from_url(bucket)
+    registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "CEPH / OSN"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import S3Store
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    endpoint = "https://nyu1.osn.mghpcc.org"
+    access_key_id = "<access_key_id>"
+    secret_access_key = "<secret_access_key>"
+    path = "<path_to_files>"
+    file = "filename.nc"
+    scheme = "s3://"
+
+    # create anon s3 store
+    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, skip_signature=True)
+
+    # create s3 store with aws-style credentials
+    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, access_key_id = aws_access_key_id, secret_access_key=aws_secret_access_key)
+
+    registry = ObjectStoreRegistry({f"{scheme}{path}": store})
+
+    ```
+
+=== "Local"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import LocalStore
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    from pathlib import Path
+
+    store_path = Path.cwd()
+    file_path = str(store_path / "data.nc")
+    file_url = f"file://{file_path}"
+
+    store = LocalStore(prefix=store_path)
+    registry = ObjectStoreRegistry({file_url: store})
+
+    ```
+
+
+
+
+
+
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
 
@@ -275,24 +395,36 @@ To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.V
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
 ```python exec="on" session="usage" source="material-block" result="code"
-# create an icechunk repository, session and write the virtual dataset to the session
+# create an icechunk repository, or open an existing one
 import icechunk
 storage = icechunk.in_memory_storage()
-
-# By default, local virtual references and public remote virtual references can be read without extra configuration.
 repo = icechunk.Repository.open_or_create(storage)
+
+# you need to explicitly grant permissions to icechunk to read from the locations of your archival files
+config = icechunk.RepositoryConfig.default()
+config.set_virtual_chunk_container(
+    icechunk.VirtualChunkContainer("s3://my-bucket", icechunk.s3_store(region="us-east-1", anonymous=True)),
+)
+
+# open a writable icechunk session to be able to add new contents to the store
 session = repo.writable_session("main")
 
-# write the virtual dataset to the session with the IcechunkStore
+# write the virtual dataset to the session's IcechunkStore instance, using VirtualiZarr's `.vz` accessor
 vds1.vz.to_icechunk(session.store)
+
+# commit your changes so that they are permanently available as a new snapshot
 snapshot_id = session.commit("Wrote first dataset")
 print(snapshot_id)
+
+# optionally persist the new permissions to be permanent, which you probably want
+# otherwise every user who wants to read the referenced virtual data back later will have to repeat the `config.set_virtual_chunk_container` step at read time.
+repo.save_config()
 ```
 
 #### Append to an existing Icechunk Store
 
 You can append a virtual dataset to an existing Icechunk store using the `append_dim` argument.
-This is especially useful for datasets that grow over time.
+This option is designed to behave similarly to the `append_dim` option to xarray's [xarray.Dataset.to_zarr][] method, and is especially useful for datasets that grow over time.
 
 !!! important
     Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.

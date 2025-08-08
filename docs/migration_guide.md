@@ -39,7 +39,7 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
     store = S3Store(
         bucket=bucket,
         region="us-west-2",
-        skip_signature=True
+        skip_signature=True # required for this specific example data because the data is in a public bucket, so the S3Store shouldn't fetch and use credentials.
     )
     registry = ObjectStoreRegistry({f"s3://{bucket}": store})
     parser = HDFParser()
@@ -53,26 +53,33 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
 
 === "Local Store"
 
-    ```python
-    from pathlib import Path
+```python
 
-    from obstore.store import LocalStore
 
-    from virtualizarr import open_virtual_dataset
-    from virtualizarr.parsers import HDFParser
-    from virtualizarr.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 
-    path = Path('/Users/User/Documents/my-project/my-data.nc')
-    store = LocalStore(prefix=path.parent)
-    registry = ObjectStoreRegistry({f"file://{str(path.parent)}": store})
-    parser = HDFParser()
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import HDFParser
+from virtualizarr.registry import ObjectStoreRegistry
 
-    vds = open_virtual_dataset(
-        url = f"file://{str(path)}",
-        registry=registry,
-        parser=parser
-    )
-    ```
+from pathlib import Path
+
+store_path = Path.cwd()
+file_path = str(store_path / "tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc")
+file_url = f"file://{file_path}"
+
+store = LocalStore(prefix=store_path)
+registry = ObjectStoreRegistry({file_url: store})
+parser = HDFParser()
+
+vds = open_virtual_dataset(
+    url=file_url,
+    registry=registry,
+    parser=parser
+)
+    print(vds)
+
+```
 
 ### Deprecation of other kwargs
 
