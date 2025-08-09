@@ -86,7 +86,7 @@ all_writers = [
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
 upstream = [
-    # 'xarray @ git+https://github.com/pydata/xarray',
+    'xarray @ git+https://github.com/pydata/xarray',
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
