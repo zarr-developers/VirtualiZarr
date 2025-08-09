@@ -403,7 +403,7 @@ repo = icechunk.Repository.open_or_create(storage)
 # you need to explicitly grant permissions to icechunk to read from the locations of your archival files
 config = icechunk.RepositoryConfig.default()
 config.set_virtual_chunk_container(
-    icechunk.VirtualChunkContainer("s3://my-bucket", icechunk.s3_store(region="us-east-1", anonymous=True)),
+    icechunk.VirtualChunkContainer("s3://my-bucket/", icechunk.s3_store(region="us-east-1", anonymous=True)),
 )
 
 # open a writable icechunk session to be able to add new contents to the store
