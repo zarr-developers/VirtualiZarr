@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+import numcodecs
 import numpy as np
 import numpy.testing as npt
 import obstore
@@ -11,14 +12,13 @@ import xarray as xr
 import xarray.testing as xrt
 import zarr
 from zarr.codecs import BytesCodec
-from zarr.core.buffer import default_buffer_prototype
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.dtype import parse_data_type
 
+from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 from virtualizarr.writers.icechunk import generate_chunk_key
-from virtualizarr.xarray import separate_coords
 
 icechunk = pytest.importorskip("icechunk")
 
@@ -55,33 +55,28 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
 
 
 @pytest.fixture()
-def synthetic_data(
-    tmpdir: Path,
-):
+def synthetic_vds(tmpdir: Path):
     filepath = f"{tmpdir}/data_chunk"
     store = obstore.store.LocalStore()
-    arr = np.arange(0, 8, dtype="int8")
+    arr = np.repeat([[1, 2]], 3, axis=1)
+    shape = arr.shape
+    dtype = arr.dtype
+    buf = arr.tobytes()
     obstore.put(
         store,
         filepath,
-        arr.tobytes(),
+        buf,
     )
-    return filepath
-
-
-@pytest.fixture()
-def synthetic_vds(synthetic_data):
     manifest = ChunkManifest(
-        {"0.0": {"path": synthetic_data, "offset": 0, "length": 4}}
+        {"0.0": {"path": filepath, "offset": 0, "length": len(buf)}}
     )
-    data_type = np.int8
-    zdtype = parse_data_type(data_type, zarr_format=3)
+    zdtype = parse_data_type(dtype, zarr_format=3)
     metadata = ArrayV3Metadata(
-        shape=(1, 4),
+        shape=shape,
         data_type=zdtype,
         chunk_grid={
             "name": "regular",
-            "configuration": {"chunk_shape": (1, 4)},
+            "configuration": {"chunk_shape": shape},
         },
         chunk_key_encoding={"name": "default"},
         fill_value=zdtype.default_scalar(),
@@ -98,7 +93,117 @@ def synthetic_vds(synthetic_data):
     vds = xr.Dataset(
         {"foo": foo},
     )
-    return vds
+    return vds, arr
+
+
+@pytest.fixture()
+def synthetic_vds_grid(tmpdir: Path):
+    filepath = f"{tmpdir}/data_chunk"
+    store = obstore.store.LocalStore()
+    arr = np.repeat([[1, 2, 3, 4]], 2, axis=0)
+    shape = arr.shape
+    chunk_shape = (shape[0] // 2, shape[1] // 2)
+    chunk_length = np.prod(chunk_shape) * arr.dtype.itemsize
+    dtype = arr.dtype
+    buf = arr.tobytes()
+    obstore.put(
+        store,
+        filepath,
+        buf,
+    )
+    manifest = ChunkManifest(
+        {
+            "0.0": {"path": filepath, "offset": 0, "length": chunk_length},
+            "0.1": {"path": filepath, "offset": chunk_length, "length": chunk_length},
+            "1.0": {
+                "path": filepath,
+                "offset": chunk_length * 2,
+                "length": chunk_length,
+            },
+            "1.1": {
+                "path": filepath,
+                "offset": chunk_length * 3,
+                "length": chunk_length,
+            },
+        }
+    )
+    zdtype = parse_data_type(dtype, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=shape,
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": chunk_shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("y", "x"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["y", "x"])
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+    return vds, arr
+
+
+@pytest.fixture()
+def compressed_synthetic_vds(tmpdir: Path):
+    filepath = f"{tmpdir}/compressed_data_chunk"
+    store = obstore.store.LocalStore()
+    compressor = numcodecs.Zlib(level=9)
+    arr = np.repeat([[1, 2]], 3, axis=1)
+    dtype = arr.dtype
+    shape = arr.shape
+    compressed_buf = compressor.encode(arr.tobytes())
+    obstore.put(
+        store,
+        filepath,
+        compressed_buf,
+    )
+    manifest = ChunkManifest(
+        {"0.0": {"path": filepath, "offset": 0, "length": len(compressed_buf)}}
+    )
+    zdtype = parse_data_type(dtype, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=shape,
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec(), zarr_codec_config_to_v3(compressor.get_config())],
+        attributes={},
+        dimension_names=("y", "x"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["y", "x"])
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+    return vds, arr
+
+
+@pytest.fixture()
+def synthetic_vds_multiple_vars(synthetic_vds):
+    return (
+        xr.Dataset(
+            {"foo": synthetic_vds[0]["foo"], "bar": synthetic_vds[0]["foo"]},
+        ),
+        synthetic_vds[1],
+    )
 
 
 @pytest.fixture(scope="function")
@@ -163,8 +268,9 @@ def test_set_single_virtual_ref_without_encoding(
     icechunk_repo: "Repository",
     synthetic_vds,
 ):
-    synthetic_vds = synthetic_vds.drop_encoding()
-    synthetic_vds.vz.to_icechunk(icechunk_filestore)
+    vds, arr = synthetic_vds
+    vds = vds.drop_encoding()
+    vds.vz.to_icechunk(icechunk_filestore)
 
     icechunk_filestore.session.commit("test")
 
@@ -174,7 +280,7 @@ def test_set_single_virtual_ref_without_encoding(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as ds,
     ):
-        np.testing.assert_equal(ds["foo"].data, np.array([[0, 1, 2, 3]], dtype="int8"))
+        np.testing.assert_equal(ds["foo"].data, arr)
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
 
@@ -184,7 +290,8 @@ def test_set_single_virtual_ref_with_encoding(
     icechunk_repo: "Repository",
     synthetic_vds,
 ):
-    synthetic_vds.vz.to_icechunk(icechunk_filestore)
+    vds, arr = synthetic_vds
+    vds.vz.to_icechunk(icechunk_filestore)
 
     icechunk_filestore.session.commit("test")
 
@@ -194,66 +301,25 @@ def test_set_single_virtual_ref_with_encoding(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as ds,
     ):
-        np.testing.assert_equal(ds["foo"].data, np.array([[0, 2, 4, 6]], dtype="int8"))
+        np.testing.assert_equal(
+            ds["foo"].data, arr * 2
+        )  # Multiple original array by 2 to match scale factor
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage
     # them now.
 
 
-def test_set_grid_virtual_refs(
-    icechunk_filestore: "IcechunkStore", synthetic_data, array_v3_metadata
-):
-    # instead for now just write out random byte ranges explicitly
-    manifest = ChunkManifest(
-        {
-            "0.0": {"path": synthetic_data, "offset": 0, "length": 4},
-            "0.1": {"path": synthetic_data, "offset": 4, "length": 4},
-            "1.0": {"path": synthetic_data, "offset": 0, "length": 4},
-            "1.1": {"path": synthetic_data, "offset": 4, "length": 4},
-        }
-    )
-    data_type = np.int8
-    zdtype = parse_data_type(data_type, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=(2, 8),
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": (1, 4)},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec()],
-        attributes={},
-        dimension_names=("x", "y"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    air = xr.Variable(data=ma, dims=["y", "x"])
-    vds = xr.Dataset(
-        {"air": air},
-    )
+def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", synthetic_vds_grid):
+    vds, arr = synthetic_vds_grid
 
     vds.vz.to_icechunk(icechunk_filestore)
 
     root_group = zarr.group(store=icechunk_filestore)
-    air_array = root_group["air"]
-    assert isinstance(air_array, zarr.Array)
+    observed = root_group["foo"]
+    assert isinstance(observed, zarr.Array)
 
-    # check array metadata
-    assert air_array.shape == (2, 8)
-    assert air_array.chunks == (1, 4)
-    assert air_array.dtype == np.dtype("int8")
-
-    # check chunk references
-    npt.assert_equal(air_array[:1, :4], np.array([[0, 1, 2, 3]]))
-    npt.assert_equal(air_array[:1, 4:], np.array([[4, 5, 6, 7]]))
-    npt.assert_equal(air_array[1:, :4], np.array([[0, 1, 2, 3]]))
-    npt.assert_equal(air_array[1:, 4:], np.array([[4, 5, 6, 7]]))
+    npt.assert_equal(observed, arr)
 
 
 def test_write_loadable_variable(
@@ -476,7 +542,8 @@ class TestAppend:
     def test_append_virtual_ref_without_encoding(
         self, icechunk_repo: "Repository", synthetic_vds
     ):
-        vds = synthetic_vds.drop_encoding()
+        vds, arr = synthetic_vds
+        vds = vds.drop_encoding()
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.vz.to_icechunk(writable_session.store)
@@ -498,14 +565,13 @@ class TestAppend:
             xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
         ):
             np.testing.assert_equal(
-                ds["foo"].data,
-                np.array([[0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]], dtype="int8"),
+                ds["foo"].data, np.concatenate([arr, arr, arr], axis=1)
             )
 
     def test_append_virtual_ref_with_encoding(
         self, icechunk_repo: "Repository", synthetic_vds
     ):
-        vds = synthetic_vds
+        vds, arr = synthetic_vds
         # Commit the first virtual dataset
         writable_session = icechunk_repo.writable_session("main")
         vds.vz.to_icechunk(writable_session.store)
@@ -528,188 +594,67 @@ class TestAppend:
         ):
             np.testing.assert_equal(
                 ds["foo"].data,
-                np.array([[0, 2, 4, 6, 0, 2, 4, 6, 0, 2, 4, 6]], dtype="int8"),
+                np.concatenate([arr, arr, arr], axis=1) * 2,
             )
 
     ## When appending to a virtual ref with encoding, it succeeds
     @pytest.mark.asyncio
     async def test_append_with_multiple_root_arrays(
-        self,
-        icechunk_repo: "Repository",
-        netcdf4_files_factory: Callable,
-        virtual_variable: Callable,
-        virtual_dataset: Callable,
+        self, icechunk_repo: "Repository", synthetic_vds_multiple_vars
     ):
-        filepath1, filepath2 = netcdf4_files_factory(
-            encoding={"air": {"dtype": "float64", "chunksizes": (1460, 25, 53)}}
-        )
-
-        lon_manifest = virtual_variable(
-            filepath1,
-            shape=(53,),
-            chunk_shape=(53,),
-            dtype=np.dtype("float32"),
-            offset=5279,
-            length=212,
-            dims=["lon"],
-        )
-        lat_manifest = virtual_variable(
-            filepath1,
-            shape=(25,),
-            chunk_shape=(25,),
-            dtype=np.dtype("float32"),
-            offset=5179,
-            length=100,
-            dims=["lat"],
-        )
-        time_attrs = {
-            "standard_name": "time",
-            "long_name": "Time",
-            "units": "hours since 1800-01-01",
-            "calendar": "standard",
-        }
-        time_manifest1, time_manifest2 = [
-            virtual_variable(
-                filepath,
-                shape=(1460,),
-                chunk_shape=(1460,),
-                dtype=np.dtype("float32"),
-                offset=15498221,
-                length=5840,
-                dims=["time"],
-                attrs=time_attrs,
-            )
-            for filepath in [filepath1, filepath2]
-        ]
-        [[_, coords1], [_, coords2]] = [
-            separate_coords(
-                vars={"time": time_manifest, "lat": lat_manifest, "lon": lon_manifest},
-                indexes={},
-                coord_names=[],
-            )
-            for time_manifest in [time_manifest1, time_manifest2]
-        ]
-        vds1, vds2 = (
-            virtual_dataset(
-                url=filepath1,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                offset=18043,
-                length=15476000,
-                coords=coords1,
-            ),
-            virtual_dataset(
-                url=filepath2,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                offset=18043,
-                length=15476000,
-                coords=coords2,
-            ),
-        )
-
+        vds, arr = synthetic_vds_multiple_vars
         icechunk_filestore = icechunk_repo.writable_session("main")
-        vds1.vz.to_icechunk(icechunk_filestore.store)
-        icechunk_filestore.commit(
-            "test commit"
-        )  # need to commit it in order to append to it in the next lines
-        first_time_chunk_before_append = await icechunk_filestore.store.get(
-            "time/c/0", prototype=default_buffer_prototype()
-        )
+        vds.vz.to_icechunk(icechunk_filestore.store)
+        icechunk_filestore.commit("test commit")
 
         # Append the same dataset to the same store
         icechunk_filestore_append = icechunk_repo.writable_session("main")
-        vds2.vz.to_icechunk(icechunk_filestore_append.store, append_dim="time")
+        vds.vz.to_icechunk(icechunk_filestore_append.store, append_dim="x")
         icechunk_filestore_append.commit("appended data")
-        assert (
-            await icechunk_filestore_append.store.get(
-                "time/c/0", prototype=default_buffer_prototype()
-            )
-        ) == first_time_chunk_before_append
 
+        read_session = icechunk_repo.readonly_session(branch="main")
         with (
-            xr.open_zarr(
-                icechunk_filestore_append.store, consolidated=False, zarr_format=3
-            ) as ds,
-            xr.open_dataset(filepath1) as expected_ds1,
-            xr.open_dataset(filepath2) as expected_ds2,
+            xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
         ):
-            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
-            xrt.assert_equal(ds, expected_ds)
+            np.testing.assert_equal(
+                ds["foo"].data, np.concatenate([arr, arr], axis=1) * 2
+            )
+            np.testing.assert_equal(
+                ds["bar"].data, np.concatenate([arr, arr], axis=1) * 2
+            )
 
     # When appending to a virtual ref with compression, it succeeds
     def test_append_with_compression_succeeds(
         self,
         icechunk_repo: "Repository",
         netcdf4_files_factory: Callable,
-        virtual_dataset: Callable,
+        compressed_synthetic_vds,
     ):
-        encoding = {
-            "air": {
-                "zlib": True,
-                "complevel": 4,
-                "chunksizes": (1460, 25, 53),
-                "shuffle": False,
-            }
-        }
-        file1, file2 = netcdf4_files_factory(encoding=encoding)
-        # Generate compressed dataset
-        vds1, vds2 = (
-            virtual_dataset(
-                url=file1,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                codecs=[
-                    {"name": "bytes", "configuration": {"endian": "little"}},
-                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
-                ],
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                offset=18043,
-                length=3936114,
-            ),
-            virtual_dataset(
-                url=file2,
-                shape=(1460, 25, 53),
-                chunk_shape=(1460, 25, 53),
-                codecs=[
-                    {"name": "bytes", "configuration": {"endian": "little"}},
-                    {"name": "numcodecs.zlib", "configuration": {"level": 4}},
-                ],
-                dims=["time", "lat", "lon"],
-                dtype=np.dtype("float64"),
-                variable_name="air",
-                offset=18043,
-                length=3938672,
-            ),
-        )
+        vds, arr = compressed_synthetic_vds
+        # Commit the first virtual dataset
+        writable_session = icechunk_repo.writable_session("main")
+        vds.vz.to_icechunk(writable_session.store)
+        writable_session.commit(
+            "test commit"
+        )  # need to commit it in order to append to it in the next lines
+        append_session = icechunk_repo.writable_session("main")
 
-        # Commit the compressed dataset
-        icechunk_filestore = icechunk_repo.writable_session("main")
-        vds1.vz.to_icechunk(icechunk_filestore.store)
-        icechunk_filestore.commit("test commit")
+        # Append the same dataset to the same store
+        vds.vz.to_icechunk(append_session.store, append_dim="x")
+        append_session.commit("appended data")
 
-        # Append another dataset with compatible compression
-        icechunk_filestore_append = icechunk_repo.writable_session("main")
-        vds2.vz.to_icechunk(icechunk_filestore_append.store, append_dim="time")
-        icechunk_filestore_append.commit("appended data")
+        second_append_session = icechunk_repo.writable_session("main")
+        vds.vz.to_icechunk(second_append_session.store, append_dim="x")
+        second_append_session.commit("appended data again")
+
+        read_session = icechunk_repo.readonly_session(branch="main")
         with (
-            xr.open_zarr(
-                store=icechunk_filestore_append.store, consolidated=False, zarr_format=3
-            ) as ds,
-            xr.open_dataset(file1) as expected_ds1,
-            xr.open_dataset(file2) as expected_ds2,
+            xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
         ):
-            expected_ds = xr.concat([expected_ds1, expected_ds2], dim="time")
-            expected_ds = expected_ds.drop_vars(["lon", "lat", "time"], errors="ignore")
-            xrt.assert_equal(ds, expected_ds)
+            np.testing.assert_equal(
+                ds["foo"].data,
+                np.concatenate([arr, arr, arr], axis=1),
+            )
 
     ## When chunk shapes are different it fails
     def test_append_with_different_chunking_fails(
