@@ -434,4 +434,6 @@ def write_manifest_virtual_refs(
         if path
     ]
 
-    store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)
+    store.set_virtual_refs(
+        array_path=key_prefix, chunks=virtual_chunk_spec_list, validate_containers=False
+    )

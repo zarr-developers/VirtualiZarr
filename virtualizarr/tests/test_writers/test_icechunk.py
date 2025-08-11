@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 def icechunk_storage(tmp_path: Path) -> "Storage":
     from icechunk import Storage
 
-    return Storage.new_local_filesystem(str(tmp_path))
+    return Storage.new_local_filesystem(str(tmp_path) + "icechunk_0")
 
 
 @pytest.fixture(scope="function")
@@ -43,6 +43,20 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
         store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
     )
     config.set_virtual_chunk_container(container)
+
+    return icechunk.Repository.create(
+        storage=icechunk_storage,
+        config=config,
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+
+@pytest.fixture(scope="function")
+def icechunk_repo_no_chunk_container(tmp_path: Path) -> "Repository":
+    icechunk_storage = icechunk.Storage.new_local_filesystem(
+        str(tmp_path) + "icechunk_1"
+    )
+    config = icechunk.RepositoryConfig.default()
 
     return icechunk.Repository.create(
         storage=icechunk_storage,
@@ -161,6 +175,63 @@ def test_set_single_virtual_ref_without_encoding(
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage them now.
+
+
+def test_set_single_virtual_ref_without_encoding_no_chunk_container(
+    icechunk_repo_no_chunk_container: "Repository",
+    simple_netcdf4: Path,
+    array_v3_metadata,
+):
+    # TODO kerchunk doesn't work with zarr-python v3 yet so we can't use open_virtual_dataset and icechunk together!
+    # vds = open_virtual_dataset(netcdf4_file, indexes={})
+
+    # instead for now just write out byte ranges explicitly
+    manifest = ChunkManifest(
+        {"0.0": {"path": simple_netcdf4, "offset": 6144, "length": 48}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["x", "y"])
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+
+    # Commit changes to a repository without storage configuration
+    session = icechunk_repo_no_chunk_container.writable_session("main")
+    vds.vz.to_icechunk(session.store)
+
+    session.commit("test")
+
+    icechunk_storage = icechunk_repo_no_chunk_container.storage
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+    )
+    config = icechunk.RepositoryConfig.default()
+    config.set_virtual_chunk_container(container)
+
+    icechunk_repo = icechunk.Repository.open(
+        storage=icechunk_storage,
+        config=config,
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+    icechunk_readonly_session = icechunk_repo.readonly_session("main")
+
+    with (
+        xr.open_zarr(
+            store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
+        ) as ds,
+        xr.open_dataset(simple_netcdf4) as expected_ds,
+    ):
+        xrt.assert_identical(ds.foo, expected_ds.foo)
 
 
 def test_set_single_virtual_ref_with_encoding(
