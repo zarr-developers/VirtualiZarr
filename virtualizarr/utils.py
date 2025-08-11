@@ -140,7 +140,9 @@ def convert_v3_to_v2_metadata(
         for codec in v3_metadata.codecs
         if not isinstance(codec, ArrayBytesCodec)
     ]
-    # TODO: Remove convert_v3_to_v2_metadata and always encode V3 metadata. This logic is based on the (default) Bytes codec's endian property, but other codec pipelines could be store endianness elsewhere.
+    # TODO: Remove convert_v3_to_v2_metadata and always encode V3 metadata.
+    # This logic is based on the (default) Bytes codec's endian property,
+    # but other codec pipelines could store endianness elsewhere.
     big_endian = any(
         isinstance(codec, ArrayBytesCodec)
         and hasattr(codec, "endian")
