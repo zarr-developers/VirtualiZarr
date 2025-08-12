@@ -179,9 +179,6 @@ class ManifestStore(Store):
             key, marr.metadata.chunk_key_encoding.separator
         )
 
-        if manifest._paths.shape == (1,) and chunk_indexes == ():
-            # TODO: Kerchunk parsers (e.g., NetCDF3) are returning 1 dimensional arrays for scalar arrays, this should be addressed at the source of the issue rather than as a workaround
-            chunk_indexes = (0,)
         path = manifest._paths[chunk_indexes]
         if path == "":
             return None
