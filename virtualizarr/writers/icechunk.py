@@ -222,9 +222,7 @@ def validate_virtual_chunk_containers(
     ]
     # fastpath for common case that no virtual chunk containers have been set?
     if manifestarrays and not supported_prefixes:
-        raise ValueError(
-            f"No Virtual Chunk Containers set"
-        )
+        raise ValueError("No Virtual Chunk Containers set")
 
     # check all refs against existing virtual chunk containers
     for marr in manifestarrays:

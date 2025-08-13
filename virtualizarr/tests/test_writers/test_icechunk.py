@@ -21,10 +21,10 @@ icechunk = pytest.importorskip("icechunk")
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
+        Diff,
         IcechunkStore,
         Repository,
         Storage,
-        Diff,
     )
 
 
