@@ -184,3 +184,45 @@ def synthetic_vds_multiple_vars(synthetic_vds):
         ),
         synthetic_vds[1],
     )
+
+
+@pytest.fixture()
+def big_endian_synthetic_vds(tmpdir: Path):
+    filepath = f"{tmpdir}/data_chunk"
+    store = obstore.store.LocalStore()
+    arr = np.array([1, 2, 3, 4, 5, 6], dtype=">i4").reshape(3, 2)
+    shape = arr.shape
+    dtype = arr.dtype
+    buf = arr.tobytes()
+    obstore.put(
+        store,
+        filepath,
+        buf,
+    )
+    manifest = ChunkManifest(
+        {"0.0": {"path": filepath, "offset": 0, "length": len(buf)}}
+    )
+    zdtype = parse_data_type(dtype, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=shape,
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec(endian="big")],
+        attributes={},
+        dimension_names=("y", "x"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["y", "x"], encoding={"scale_factor": 2})
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+    return vds, arr
