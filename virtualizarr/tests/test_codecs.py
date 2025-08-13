@@ -199,7 +199,7 @@ class TestExtractCodecs:
 
         codecs = (CustomCodec(),)
         with pytest.raises(TypeError, match="All codecs must be valid zarr v3 codecs"):
-            extract_codecs(codecs)
+            extract_codecs(codecs)  # type: ignore[arg-type]
 
 
 class TestGetCodecConfig:
