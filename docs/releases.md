@@ -8,6 +8,9 @@
 
 ### Bug fixes
 
+- Fixed bug where VirtualiZarr was not raising if virtual chunk containers were not set. ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
