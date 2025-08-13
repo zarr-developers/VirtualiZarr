@@ -4,16 +4,16 @@
 
 ### New Features
 
-- Expose `validate_containers` kwarg in `.to_icechunk`, allowing it to be set to `False` ([#567](https://github.com/zarr-developers/VirtualiZarr/pull/567), [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)). 
+- Expose `validate_containers` kwarg in `.to_icechunk`, allowing it to be set to `False` ([#567](https://github.com/zarr-developers/VirtualiZarr/pull/567), [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
 ### Bug fixes
 
-- Fixed bug where VirtualiZarr was incorrectly failing to raise if virtual chunk containers with correct prefixes were not set for every virtual reference ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)). 
+- Fixed bug where VirtualiZarr was incorrectly failing to raise if virtual chunk containers with correct prefixes were not set for every virtual reference ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766). 
+- Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766).
   By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
