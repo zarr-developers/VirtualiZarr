@@ -366,13 +366,13 @@ def test_validate_containers(
 
     # assert that an error is raised when attempting to write to icechunk
     with pytest.raises(
-        ValueError, match="No Virtual Chunk Container set which matches prefix"
+        ValueError, match="No Virtual Chunk Container set which supports prefix"
     ):
         vds.vz.to_icechunk(icechunk_filestore)
 
     # assert that no uncommitted changes have been written to Icechunk session
     # Idea is that session has not been "polluted" with half-written changes
-    session = ...
+    session = icechunk_filestore.session
     diff = session.status
     # TODO I don't think this will work without adding __bool__ to icechunk's Diff class
     assert not diff
