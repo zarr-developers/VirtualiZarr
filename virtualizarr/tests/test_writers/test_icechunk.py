@@ -56,6 +56,48 @@ def icechunk_filestore(icechunk_repo: "Repository") -> "IcechunkStore":
     return session.store
 
 
+@pytest.fixture()
+def big_endian_synthetic_vds(tmpdir: Path):
+    filepath = f"{tmpdir}/data_chunk"
+    store = obstore.store.LocalStore()
+    arr = np.array([1, 2, 3, 4, 5, 6], dtype=">i4").reshape(3, 2)
+    shape = arr.shape
+    dtype = arr.dtype
+    buf = arr.tobytes()
+    obstore.put(
+        store,
+        filepath,
+        buf,
+    )
+    manifest = ChunkManifest(
+        {"0.0": {"path": filepath, "offset": 0, "length": len(buf)}}
+    )
+    zdtype = parse_data_type(dtype, zarr_format=3)
+    metadata = ArrayV3Metadata(
+        shape=shape,
+        data_type=zdtype,
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": shape},
+        },
+        chunk_key_encoding={"name": "default"},
+        fill_value=zdtype.default_scalar(),
+        codecs=[BytesCodec(endian="big")],
+        attributes={},
+        dimension_names=("y", "x"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    foo = xr.Variable(data=ma, dims=["y", "x"], encoding={"scale_factor": 2})
+    vds = xr.Dataset(
+        {"foo": foo},
+    )
+    return vds, arr
+
+
 @pytest.mark.parametrize("kwarg", [("group", {}), ("append_dim", {})])
 def test_invalid_kwarg_type(
     icechunk_filestore: "IcechunkStore",
@@ -145,9 +187,10 @@ def test_set_single_virtual_ref_with_encoding(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as ds,
     ):
-        np.testing.assert_equal(
-            ds["foo"].data, arr * 2
-        )  # Multiple original array by 2 to match scale factor
+        # We wrote a numpy array to a file and added encoding={"scale_factor": 2} to the
+        # metadata. So, we expect the array loaded by xarray to be twice the magnitude of
+        # the original numpy array if writing and applying the encoding is working properly.
+        np.testing.assert_equal(ds["foo"].data, arr * 2)
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage
@@ -164,6 +207,20 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", synthetic_vd
     assert isinstance(observed, zarr.Array)
 
     npt.assert_equal(observed, arr)
+
+
+def test_write_big_endian_value(icechunk_repo: "Repository", big_endian_synthetic_vds):
+    vds, arr = big_endian_synthetic_vds
+    vds = vds.drop_encoding()
+    # Commit the first virtual dataset
+    writable_session = icechunk_repo.writable_session("main")
+    vds.vz.to_icechunk(writable_session.store)
+    writable_session.commit("test commit")
+    read_session = icechunk_repo.readonly_session(branch="main")
+    with (
+        xr.open_zarr(read_session.store, consolidated=False, zarr_format=3) as ds,
+    ):
+        np.testing.assert_equal(ds["foo"].data, arr)
 
 
 def test_write_loadable_variable(

@@ -10,6 +10,7 @@
 
 - Unpin dependency on xarray, by adjusting our tests to pass despite minor changes to the bytes of netCDF files written between versions of xarray [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
   By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+- Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766). By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
 
