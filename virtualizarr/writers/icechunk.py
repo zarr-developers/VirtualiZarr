@@ -172,12 +172,21 @@ def virtual_datatree_to_icechunk(
     if store.read_only:
         raise ValueError("supplied store is read-only")
 
-    for path, subtree in vdt.subtree_with_keys:
-        tree = cast(xr.DataTree, subtree)  # subtree is typed as Unknown
+    def node_to_vds(node: xr.DataTree) -> xr.Dataset:
+        tree = cast(xr.DataTree, node)  # subtree is typed as Unknown
         at_root = tree is vdt
-        vds = tree.to_dataset(write_inherited_coords or at_root)
+        return tree.to_dataset(write_inherited_coords or at_root)
 
-        store_path = StorePath(store, path="" if at_root else tree.relative_to(vdt))
+    def get_store_path(subtree, vdt) -> StorePath:
+        at_root = subtree is vdt
+        return StorePath(store, path="" if at_root else subtree.relative_to(vdt))
+
+    virtual_datasets = [
+        (get_store_path(subtree, vdt), node_to_vds(subtree)) for subtree in vdt.subtree
+    ]
+
+    # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
+    for store_path, vds in virtual_datasets:
         group = Group.from_store(store=store_path, zarr_format=3)
 
         write_virtual_dataset_to_icechunk_group(
