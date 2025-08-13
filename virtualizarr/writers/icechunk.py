@@ -115,7 +115,7 @@ def virtual_dataset_to_icechunk(
     else:
         # create the group if it doesn't already exist
         group_object = Group.from_store(store=store_path, zarr_format=3)
-    
+
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
         store=store,
@@ -236,7 +236,6 @@ def validate_virtual_chunk_containers(
         raise ValueError("No Virtual Chunk Containers set")
 
     # check all refs against existing virtual chunk containers
-
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk?
