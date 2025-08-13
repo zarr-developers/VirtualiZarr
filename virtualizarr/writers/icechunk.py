@@ -217,7 +217,7 @@ def virtual_datatree_to_icechunk(
         )
 
 
-# TODO ideally I would be able to just call some Icechunk API to do this
+# TODO ideally I would be able to just call some Icechunk API to do this (see https://github.com/earth-mover/icechunk/issues/1167)
 def validate_virtual_chunk_containers(
     config: "RepositoryConfig", virtual_datasets: Iterable[xr.Dataset]
 ) -> None:
@@ -232,7 +232,7 @@ def validate_virtual_chunk_containers(
 
     # get the prefixes of all virtual chunk containers
     if config.virtual_chunk_containers is None:
-        # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers
+        # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers (see https://github.com/earth-mover/icechunk/issues/1168)
         supported_prefixes = set()
     else:
         supported_prefixes = set(config.virtual_chunk_containers.keys())
@@ -244,18 +244,9 @@ def validate_virtual_chunk_containers(
     # check all refs against existing virtual chunk containers
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
-        # is there a way to push this down to Icechunk?
-        it = np.nditer(
-            [marr.manifest._paths],  # type: ignore[arg-type]
-            flags=[
-                "refs_ok",
-                "multi_index",
-                "c_index",
-            ],
-            op_flags=[["readonly"]],  # type: ignore
-        )
-        for ref in it:
-            validate_single_ref(ref.item(), supported_prefixes)
+        # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
+        for ref in marr.manifest._paths.flat:
+            validate_single_ref(ref, supported_prefixes)
 
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
