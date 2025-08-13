@@ -107,14 +107,14 @@ def virtual_dataset_to_icechunk(
 
     store_path = StorePath(store, path=group or "")
 
+    if validate_containers:
+        validate_virtual_chunk_containers(store.session.config, [vds])
+
     if append_dim:
         group_object = Group.open(store=store_path, zarr_format=3)
     else:
         group_object = Group.from_store(store=store_path, zarr_format=3)
-
-    if validate_containers:
-        validate_virtual_chunk_containers(store.session.config, [vds])
-
+    
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
         store=store,
