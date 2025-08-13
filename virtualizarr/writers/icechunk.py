@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
 
 import numpy as np
 import xarray as xr
@@ -18,7 +18,10 @@ from virtualizarr.manifests.utils import (
 )
 
 if TYPE_CHECKING:
-    from icechunk import IcechunkStore  # type: ignore[import-not-found]
+    from icechunk import (
+        IcechunkStore,  # type: ignore[import-not-found]
+        RepositoryConfig,  # type: ignore[import-not-found]
+    )
 
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
@@ -105,6 +108,8 @@ def virtual_dataset_to_icechunk(
     else:
         group_object = Group.from_store(store=store_path, zarr_format=3)
 
+    validate_virtual_chunk_containers(store.session.config, [vds])
+
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
         store=store,
@@ -181,12 +186,16 @@ def virtual_datatree_to_icechunk(
         at_root = subtree is vdt
         return StorePath(store, path="" if at_root else subtree.relative_to(vdt))
 
-    virtual_datasets = [
+    # can't just use a dict because StorePath is not hashable
+    paths_and_virtual_datasets = [
         (get_store_path(subtree, vdt), node_to_vds(subtree)) for subtree in vdt.subtree
     ]
+    virtual_datasets = [pair[1] for pair in paths_and_virtual_datasets]
+
+    validate_virtual_chunk_containers(store.session.config, virtual_datasets)
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
-    for store_path, vds in virtual_datasets:
+    for store_path, vds in paths_and_virtual_datasets:
         group = Group.from_store(store=store_path, zarr_format=3)
 
         write_virtual_dataset_to_icechunk_group(
@@ -194,6 +203,44 @@ def virtual_datatree_to_icechunk(
             store=store,
             group=group,
             last_updated_at=last_updated_at,
+        )
+
+
+def validate_virtual_chunk_containers(
+    config: "RepositoryConfig", virtual_datasets: Iterable[xr.Dataset]
+) -> None:
+    """Check that all virtual refs have corresponding virtual chunk containers, before writing any of the refs."""
+
+    # get the prefixes of all virtual chunk containers
+    supported_prefixes = config.virtual_chunk_containers.keys()
+
+    all_manifestarrays = [
+        var.data
+        for dataset in virtual_datasets
+        for var in dataset.variables.values()
+        if isinstance(var.data, ManifestArray)
+    ]
+    # TODO fastpath for common case that no virtual chunk containers have been set?
+
+    # check all refs against existing virtual chunk containers
+    for marr in all_manifestarrays:
+        it = np.nditer(
+            [marr.manifest._paths],  # type: ignore[arg-type]
+            flags=[
+                "refs_ok",
+                "multi_index",
+                "c_index",
+            ],
+            op_flags=[["readonly"]],  # type: ignore
+        )
+        for ref in it:
+            validate_single_ref(ref.item(), supported_prefixes)
+
+
+def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
+    if not any(ref.startswith(prefix) for prefix in supported_prefixes):
+        raise ValueError(
+            f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
 
 
