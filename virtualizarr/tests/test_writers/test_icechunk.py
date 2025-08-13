@@ -76,7 +76,7 @@ def test_write_new_virtual_variable(
 ):
     vds = vds_with_manifest_arrays
 
-    vds.vz.to_icechunk(icechunk_filestore, group=group_path)
+    vds.vz.to_icechunk(icechunk_filestore, group=group_path, validate_containers=False)
 
     # check attrs
     group = zarr.group(store=icechunk_filestore, path=group_path)
@@ -511,7 +511,7 @@ def test_roundtrip_coords(
             "coord_0d": ([], manifest_array(shape=(), chunks=())),
         },
     )
-    vds.vz.to_icechunk(icechunk_filestore)
+    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
     icechunk_filestore.session.commit("test")
 
     icechunk_readonly_session = icechunk_repo.readonly_session("main")
@@ -940,7 +940,7 @@ def test_write_empty_chunk(
     vds = xr.Dataset({"a": ("x", marr)})
 
     # empty chunks should never be written
-    vds.vz.to_icechunk(icechunk_filestore)
+    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
 
     # when opened they should be treated as fill_value
     roundtrip = xr.open_zarr(
