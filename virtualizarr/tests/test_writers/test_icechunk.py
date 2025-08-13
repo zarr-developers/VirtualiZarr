@@ -301,9 +301,12 @@ def test_set_single_virtual_ref_with_encoding(
             store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
         ) as ds,
     ):
+        # We wrote a numpy array to a file and added encoding={"scale_factor": 2} to the
+        # metadata. So, we expect the array loaded by xarray to be twice the magnitude of
+        # the original numpy array if writing and applying the encoding is working properly.
         np.testing.assert_equal(
             ds["foo"].data, arr * 2
-        )  # Multiple original array by 2 to match scale factor
+        )
 
     # note: we don't need to test that committing works, because now we have confirmed
     # the refs are in the store (even uncommitted) it's icechunk's problem to manage
