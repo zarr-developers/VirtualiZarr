@@ -113,6 +113,7 @@ def virtual_dataset_to_icechunk(
     if append_dim:
         group_object = Group.open(store=store_path, zarr_format=3)
     else:
+        # create the group if it doesn't already exist
         group_object = Group.from_store(store=store_path, zarr_format=3)
     
     write_virtual_dataset_to_icechunk_group(
