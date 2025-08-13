@@ -214,16 +214,20 @@ def validate_virtual_chunk_containers(
     # get the prefixes of all virtual chunk containers
     supported_prefixes = config.virtual_chunk_containers.keys()
 
-    all_manifestarrays = [
+    manifestarrays = [
         var.data
         for dataset in virtual_datasets
         for var in dataset.variables.values()
         if isinstance(var.data, ManifestArray)
     ]
-    # TODO fastpath for common case that no virtual chunk containers have been set?
+    # fastpath for common case that no virtual chunk containers have been set?
+    if manifestarrays and not supported_prefixes:
+        raise ValueError(
+            f"No Virtual Chunk Containers set"
+        )
 
     # check all refs against existing virtual chunk containers
-    for marr in all_manifestarrays:
+    for marr in manifestarrays:
         it = np.nditer(
             [marr.manifest._paths],  # type: ignore[arg-type]
             flags=[
