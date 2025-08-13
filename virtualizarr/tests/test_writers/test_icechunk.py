@@ -3,24 +3,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-import numcodecs
 import numpy as np
 import numpy.testing as npt
-import obstore
 import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
-from zarr.codecs import BytesCodec
 from zarr.core.metadata import ArrayV3Metadata
-from zarr.dtype import parse_data_type
 
-from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 from virtualizarr.writers.icechunk import generate_chunk_key
 
 icechunk = pytest.importorskip("icechunk")
+
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
@@ -51,158 +47,6 @@ def icechunk_repo(icechunk_storage: "Storage", tmp_path: Path) -> "Repository":
         storage=icechunk_storage,
         config=config,
         authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
-    )
-
-
-@pytest.fixture()
-def synthetic_vds(tmpdir: Path):
-    filepath = f"{tmpdir}/data_chunk"
-    store = obstore.store.LocalStore()
-    arr = np.repeat([[1, 2]], 3, axis=1)
-    shape = arr.shape
-    dtype = arr.dtype
-    buf = arr.tobytes()
-    obstore.put(
-        store,
-        filepath,
-        buf,
-    )
-    manifest = ChunkManifest(
-        {"0.0": {"path": filepath, "offset": 0, "length": len(buf)}}
-    )
-    zdtype = parse_data_type(dtype, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=shape,
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": shape},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec()],
-        attributes={},
-        dimension_names=("y", "x"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    foo = xr.Variable(data=ma, dims=["y", "x"], encoding={"scale_factor": 2})
-    vds = xr.Dataset(
-        {"foo": foo},
-    )
-    return vds, arr
-
-
-@pytest.fixture()
-def synthetic_vds_grid(tmpdir: Path):
-    filepath = f"{tmpdir}/data_chunk"
-    store = obstore.store.LocalStore()
-    arr = np.repeat([[1, 2, 3, 4]], 2, axis=0)
-    shape = arr.shape
-    chunk_shape = (shape[0] // 2, shape[1] // 2)
-    chunk_length = np.prod(chunk_shape) * arr.dtype.itemsize
-    dtype = arr.dtype
-    buf = arr.tobytes()
-    obstore.put(
-        store,
-        filepath,
-        buf,
-    )
-    manifest = ChunkManifest(
-        {
-            "0.0": {"path": filepath, "offset": 0, "length": chunk_length},
-            "0.1": {"path": filepath, "offset": chunk_length, "length": chunk_length},
-            "1.0": {
-                "path": filepath,
-                "offset": chunk_length * 2,
-                "length": chunk_length,
-            },
-            "1.1": {
-                "path": filepath,
-                "offset": chunk_length * 3,
-                "length": chunk_length,
-            },
-        }
-    )
-    zdtype = parse_data_type(dtype, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=shape,
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": chunk_shape},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec()],
-        attributes={},
-        dimension_names=("y", "x"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    foo = xr.Variable(data=ma, dims=["y", "x"])
-    vds = xr.Dataset(
-        {"foo": foo},
-    )
-    return vds, arr
-
-
-@pytest.fixture()
-def compressed_synthetic_vds(tmpdir: Path):
-    filepath = f"{tmpdir}/compressed_data_chunk"
-    store = obstore.store.LocalStore()
-    compressor = numcodecs.Zlib(level=9)
-    arr = np.repeat([[1, 2]], 3, axis=1)
-    dtype = arr.dtype
-    shape = arr.shape
-    compressed_buf = compressor.encode(arr.tobytes())
-    obstore.put(
-        store,
-        filepath,
-        compressed_buf,
-    )
-    manifest = ChunkManifest(
-        {"0.0": {"path": filepath, "offset": 0, "length": len(compressed_buf)}}
-    )
-    zdtype = parse_data_type(dtype, zarr_format=3)
-    metadata = ArrayV3Metadata(
-        shape=shape,
-        data_type=zdtype,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": shape},
-        },
-        chunk_key_encoding={"name": "default"},
-        fill_value=zdtype.default_scalar(),
-        codecs=[BytesCodec(), zarr_codec_config_to_v3(compressor.get_config())],
-        attributes={},
-        dimension_names=("y", "x"),
-        storage_transformers=None,
-    )
-    ma = ManifestArray(
-        chunkmanifest=manifest,
-        metadata=metadata,
-    )
-    foo = xr.Variable(data=ma, dims=["y", "x"])
-    vds = xr.Dataset(
-        {"foo": foo},
-    )
-    return vds, arr
-
-
-@pytest.fixture()
-def synthetic_vds_multiple_vars(synthetic_vds):
-    return (
-        xr.Dataset(
-            {"foo": synthetic_vds[0]["foo"], "bar": synthetic_vds[0]["foo"]},
-        ),
-        synthetic_vds[1],
     )
 
 
