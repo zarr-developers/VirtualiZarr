@@ -338,6 +338,46 @@ def test_write_loadable_variable(
         npt.assert_equal(pressure_array, expected_array)
 
 
+def test_validate_containers(
+    icechunk_filestore: "IcechunkStore",
+    array_v3_metadata,
+    tmpdir: Path,
+) -> None:
+    # create some references referring to data that doesn't have a corresponding virtual chunk container
+    manifest = ChunkManifest(
+        {"0.0": {"path": "s3://bucket/path/file.nc", "offset": 0, "length": 100}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    vds = xr.Dataset(
+        {
+            "foo": (["x", "y"], ma),
+            # include some non-virtual data too
+            "bar": (["x", "y"], np.ones((3, 4))),
+        },
+    )
+
+    # assert that an error is raised when attempting to write to icechunk
+    with pytest.raises(
+        ValueError, match="No Virtual Chunk Container set which matches prefix"
+    ):
+        vds.vz.to_icechunk(icechunk_filestore)
+
+    # assert that no uncommitted changes have been written to Icechunk session
+    # Idea is that session has not been "polluted" with half-written changes
+    session = ...
+    diff = session.status
+    # TODO I don't think this will work without adding __bool__ to icechunk's Diff class
+    assert not diff
+
+
 def test_checksum(
     icechunk_filestore: "IcechunkStore",
     tmpdir: Path,
