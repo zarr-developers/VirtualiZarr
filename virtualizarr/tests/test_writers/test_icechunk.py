@@ -341,7 +341,6 @@ def test_write_loadable_variable(
 def test_validate_containers(
     icechunk_filestore: "IcechunkStore",
     array_v3_metadata,
-    tmpdir: Path,
 ) -> None:
     # create some references referring to data that doesn't have a corresponding virtual chunk container
     manifest = ChunkManifest(
@@ -373,6 +372,59 @@ def test_validate_containers(
     # assert that no uncommitted changes have been written to Icechunk session
     # Idea is that session has not been "polluted" with half-written changes
     session = icechunk_filestore.session
+    # TODO could use https://github.com/earth-mover/icechunk/issues/1165 if it gets implemented
+    assert not session.has_uncommitted_changes, session.status()
+
+
+@pytest.fixture(scope="function")
+def icechunk_repo_no_chunk_container(tmp_path: Path) -> "Repository":
+    icechunk_storage = icechunk.Storage.new_local_filesystem(
+        str(tmp_path) + "icechunk_1"
+    )
+    config = icechunk.RepositoryConfig.default()
+
+    return icechunk.Repository.create(
+        storage=icechunk_storage,
+        config=config,
+        # TODO do we need this?
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+
+# TODO test with zero virtual chunk containers
+def test_raise_if_zero_chunk_containers(
+    icechunk_repo_no_chunk_container: "Repository",
+    array_v3_metadata,
+):
+    # create some references referring to data that doesn't have a corresponding virtual chunk container
+    manifest = ChunkManifest(
+        {"0.0": {"path": "s3://bucket/path/file.nc", "offset": 0, "length": 100}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    vds = xr.Dataset(
+        {
+            "foo": (["x", "y"], ma),
+            # include some non-virtual data too
+            "bar": (["x", "y"], np.ones((3, 4))),
+        },
+    )
+
+    session = icechunk_repo_no_chunk_container.writable_session("main")
+
+    # assert that an error is raised when attempting to write to icechunk
+    with pytest.raises(ValueError, match="No Virtual Chunk Containers set"):
+        vds.vz.to_icechunk(session.store)
+
+    # assert that no uncommitted changes have been written to Icechunk session
+    # Idea is that session has not been "polluted" with half-written changes
     # TODO could use https://github.com/earth-mover/icechunk/issues/1165 if it gets implemented
     assert not session.has_uncommitted_changes, session.status()
 

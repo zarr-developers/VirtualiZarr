@@ -217,13 +217,11 @@ def virtual_datatree_to_icechunk(
         )
 
 
+# TODO ideally I would be able to just call some Icechunk API to do this
 def validate_virtual_chunk_containers(
     config: "RepositoryConfig", virtual_datasets: Iterable[xr.Dataset]
 ) -> None:
     """Check that all virtual refs have corresponding virtual chunk containers, before writing any of the refs."""
-
-    # get the prefixes of all virtual chunk containers
-    supported_prefixes = config.virtual_chunk_containers.keys()
 
     manifestarrays = [
         var.data
@@ -231,7 +229,15 @@ def validate_virtual_chunk_containers(
         for var in dataset.variables.values()
         if isinstance(var.data, ManifestArray)
     ]
-    # fastpath for common case that no virtual chunk containers have been set?
+
+    # get the prefixes of all virtual chunk containers
+    if config.virtual_chunk_containers is None:
+        # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers
+        supported_prefixes = set()
+    else:
+        supported_prefixes = set(config.virtual_chunk_containers.keys())
+
+    # fastpath for common case that no virtual chunk containers have been set
     if manifestarrays and not supported_prefixes:
         raise ValueError("No Virtual Chunk Containers set")
 
@@ -254,7 +260,6 @@ def validate_virtual_chunk_containers(
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
     if not any(ref.startswith(prefix) for prefix in supported_prefixes):
-        # TODO raise a dedicated error type
         raise ValueError(
             f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
