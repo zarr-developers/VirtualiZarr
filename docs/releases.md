@@ -14,6 +14,9 @@
 
 ### Internal changes
 
+- `extract_codecs` function inside `convert_to_codec_pipeline` now raises if it encounters a codec which does not inherit from the correct `zarr.abc.codec` base classes. ([#775](https://github.com/zarr-developers/VirtualiZarr/pull/775)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.0.1 (30th July 2025)
 
 Minor release to ensure compatibility with incoming changes to Icechunk.
