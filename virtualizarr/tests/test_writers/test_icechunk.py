@@ -21,7 +21,6 @@ icechunk = pytest.importorskip("icechunk")
 
 if TYPE_CHECKING:
     from icechunk import (  # type: ignore[import-not-found]
-        Diff,
         IcechunkStore,
         Repository,
         Storage,
@@ -374,23 +373,8 @@ def test_validate_containers(
     # assert that no uncommitted changes have been written to Icechunk session
     # Idea is that session has not been "polluted" with half-written changes
     session = icechunk_filestore.session
-    diff = session.status()
-    assert diff_is_empty(diff), diff
-
-
-def diff_is_empty(diff: "Diff") -> bool:
-    # TODO would be nicer to implement __bool__ on icechunk's Diff class
-    return not any(
-        [
-            bool(diff.deleted_arrays),
-            bool(diff.deleted_groups),
-            bool(diff.new_arrays),
-            bool(diff.new_groups),
-            bool(diff.updated_arrays),
-            bool(diff.updated_chunks),
-            bool(diff.updated_groups),
-        ]
-    )
+    # TODO could use https://github.com/earth-mover/icechunk/issues/1165 if it gets implemented
+    assert not session.has_uncommitted_changes, session.status()
 
 
 def test_checksum(
