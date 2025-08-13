@@ -77,6 +77,7 @@ class _VirtualiZarrDatasetAccessor:
         *,
         group: str | None = None,
         append_dim: str | None = None,
+        validate_containers: bool = True,
         last_updated_at: datetime | None = None,
     ) -> None:
         """
@@ -105,6 +106,9 @@ class _VirtualiZarrDatasetAccessor:
             Path of the group to write the dataset into (default: the root group).
         append_dim
             Dimension along which to append the virtual dataset.
+        validate_containers
+            If ``True``, raise if any virtual chunks have a refer to locations that don't
+            match any existing virtual chunk container set on this Icechunk repository.
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation. When not provided, the current time is used.
@@ -121,6 +125,7 @@ class _VirtualiZarrDatasetAccessor:
             store,
             group=group,
             append_dim=append_dim,
+            validate_containers=validate_containers,
             last_updated_at=last_updated_at,
         )
 
@@ -304,6 +309,7 @@ class _VirtualiZarrDataTreeAccessor:
         store: "IcechunkStore",
         *,
         write_inherited_coords: bool = False,
+        validate_containers: bool = True,
         last_updated_at: datetime | None = None,
     ) -> None:
         """
@@ -330,6 +336,9 @@ class _VirtualiZarrDataTreeAccessor:
             Otherwise, only write coordinates at the level at which they are
             originally defined. This saves disk space, but requires opening the
             full tree to load inherited coordinates.
+        validate_containers
+            If ``True``, raise if any virtual chunks have a refer to locations that don't
+            match any existing virtual chunk container set on this Icechunk repository.
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.
@@ -357,6 +366,7 @@ class _VirtualiZarrDataTreeAccessor:
             self.dt,
             store,
             write_inherited_coords=write_inherited_coords,
+            validate_containers=validate_containers,
             last_updated_at=last_updated_at,
         )
 

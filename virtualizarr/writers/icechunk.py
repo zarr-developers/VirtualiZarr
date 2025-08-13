@@ -33,6 +33,7 @@ def virtual_dataset_to_icechunk(
     *,
     group: Optional[str] = None,
     append_dim: Optional[str] = None,
+    validate_containers: bool = True,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """
@@ -51,6 +52,9 @@ def virtual_dataset_to_icechunk(
     append_dim
         Name of the dimension along which to append data. If provided, the dataset must
         have a dimension with this name.
+    validate_containers
+        If ``True``, raise if any virtual chunks have a refer to locations that don't
+        match any existing virtual chunk container set on this Icechunk repository.
     last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
@@ -108,7 +112,8 @@ def virtual_dataset_to_icechunk(
     else:
         group_object = Group.from_store(store=store_path, zarr_format=3)
 
-    validate_virtual_chunk_containers(store.session.config, [vds])
+    if validate_containers:
+        validate_virtual_chunk_containers(store.session.config, [vds])
 
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
@@ -124,6 +129,7 @@ def virtual_datatree_to_icechunk(
     store: "IcechunkStore",
     *,
     write_inherited_coords: bool = False,
+    validate_containers: bool = False,
     last_updated_at: datetime | None = None,
 ) -> None:
     """
@@ -142,6 +148,9 @@ def virtual_datatree_to_icechunk(
         tree. Otherwise, only write coordinates at the level at which they are
         originally defined. This saves disk space, but requires opening the
         full tree to load inherited coordinates.
+    validate_containers
+        If ``True``, raise if any virtual chunks have a refer to locations that don't
+        match any existing virtual chunk container set on this Icechunk repository.
     last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
@@ -192,7 +201,8 @@ def virtual_datatree_to_icechunk(
     ]
     virtual_datasets = [pair[1] for pair in paths_and_virtual_datasets]
 
-    validate_virtual_chunk_containers(store.session.config, virtual_datasets)
+    if validate_containers:
+        validate_virtual_chunk_containers(store.session.config, virtual_datasets)
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
     for store_path, vds in paths_and_virtual_datasets:
@@ -225,7 +235,10 @@ def validate_virtual_chunk_containers(
         raise ValueError("No Virtual Chunk Containers set")
 
     # check all refs against existing virtual chunk containers
+
     for marr in manifestarrays:
+        # TODO this loop over every virtual reference is likely inefficient in python,
+        # is there a way to push this down to Icechunk?
         it = np.nditer(
             [marr.manifest._paths],  # type: ignore[arg-type]
             flags=[
@@ -241,6 +254,7 @@ def validate_virtual_chunk_containers(
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
     if not any(ref.startswith(prefix) for prefix in supported_prefixes):
+        # TODO raise a dedicated error type
         raise ValueError(
             f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
@@ -492,4 +506,8 @@ def write_manifest_virtual_refs(
         if path
     ]
 
-    store.set_virtual_refs(array_path=key_prefix, chunks=virtual_chunk_spec_list)
+    store.set_virtual_refs(
+        array_path=key_prefix,
+        chunks=virtual_chunk_spec_list,
+        validate_containers=False,  # we already validated these before setting any refs
+    )
