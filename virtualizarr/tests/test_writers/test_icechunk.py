@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         IcechunkStore,
         Repository,
         Storage,
+        Diff,
     )
 
 
@@ -373,9 +374,23 @@ def test_validate_containers(
     # assert that no uncommitted changes have been written to Icechunk session
     # Idea is that session has not been "polluted" with half-written changes
     session = icechunk_filestore.session
-    diff = session.status
-    # TODO I don't think this will work without adding __bool__ to icechunk's Diff class
-    assert not diff
+    diff = session.status()
+    assert diff_is_empty(diff), diff
+
+
+def diff_is_empty(diff: "Diff") -> bool:
+    # TODO would be nicer to implement __bool__ on icechunk's Diff class
+    return not any(
+        [
+            bool(diff.deleted_arrays),
+            bool(diff.deleted_groups),
+            bool(diff.new_arrays),
+            bool(diff.new_groups),
+            bool(diff.updated_arrays),
+            bool(diff.updated_chunks),
+            bool(diff.updated_groups),
+        ]
+    )
 
 
 def test_checksum(
