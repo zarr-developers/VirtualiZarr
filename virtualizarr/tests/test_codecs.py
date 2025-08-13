@@ -191,6 +191,16 @@ class TestExtractCodecs:
             (),
         )
 
+    def test_raise_on_non_zarr_codec(self) -> None:
+        class CustomCodec:
+            """Custom codec which does not subclass from any of ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec."""
+
+            pass
+
+        codecs = (CustomCodec(),)
+        with pytest.raises(TypeError, match="All codecs must be valid zarr v3 codecs"):
+            extract_codecs(codecs)
+
 
 class TestGetCodecConfig:
     """Test the get_codec_config function."""
