@@ -336,6 +336,47 @@ DMRPP_XML_STRINGS = {
         </Dataset>
             """
     ),
+    "fill_value_scalar_no_chunks_nc4_url": textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="fill_value_scalar_no_chunks.nc4" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-477">
+            <Int32 name="data">
+                <Attribute name="_FillValue" type="Int32">
+                    <Value>-999</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="-999"/>
+            </Int32>
+            <Attribute name="long_name" type="String">
+                <Value>empty scalar data</Value>
+            </Attribute>
+            <Attribute name="drop_container_attribute" type="Container">
+                <Attribute name="created" type="String">
+                    <Value>2025-08-14T23:32:01Z</Value>
+                </Attribute>
+                <Attribute name="reason" type="String">
+                    <Value>container attributes are no longer supported</Value>
+                </Attribute>
+            </Attribute>
+            <Attribute name="build_dmrpp_metadata" type="Container">
+                <Attribute name="created" type="String">
+                    <Value>2025-08-14T23:32:01Z</Value>
+                </Attribute>
+                <Attribute name="build_dmrpp" type="String">
+                    <Value>3.21.1-477</Value>
+                </Attribute>
+                <Attribute name="bes" type="String">
+                    <Value>3.21.1-477</Value>
+                </Attribute>
+                <Attribute name="libdap" type="String">
+                    <Value>libdap-3.21.1-222</Value>
+                </Attribute>
+                <Attribute name="invocation" type="String">
+                    <Value>build_dmrpp -f /usr/share/hyrax/fill_value_scalar_no_chunks.nc4 -r fill_value_scalar_no_chunks.nc4.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
+                </Attribute>
+            </Attribute>
+        </Dataset>
+        """
+    ),
 }
 
 
@@ -535,3 +576,15 @@ def test_parse_attribute(netcdf4_file, attr_path, expected):
 
     result = parser._parse_attribute(parser.find_node_fqn(attr_path))
     assert result == expected
+
+
+def test_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
+    parsed_dmrpp = dmrparser(
+        DMRPP_XML_STRINGS["fill_value_scalar_no_chunks_nc4_url"],
+        filepath=fill_value_scalar_no_chunks_nc4_url,
+    )
+    store = obstore_local(url=f"file://{parsed_dmrpp.data_filepath}")
+    with pytest.warns(UserWarning):
+        parsed_vds = parsed_dmrpp.parse_dataset(object_store=store)
+        vds_g1 = parsed_vds.to_virtual_dataset()
+        assert vds_g1["data"].attrs == {"_FillValue": -999}
