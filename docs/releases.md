@@ -2,7 +2,7 @@
 
 ## v2.1.0 (14th August 2025)
 
-This release fixes a number of important bugs that could silently lead to referenced data being read back incorrectly. 
+This release fixes a number of important bugs that could silently lead to referenced data being read back incorrectly.
 In particular, note that writing virtual chunks to Icechunk now requires that all virtual chunk containers are set correctly by default.
 It also unpins our dependency on xarray, so that VirtualiZarr is compatible with the latest released version of Xarray.
 Please upgrade!
