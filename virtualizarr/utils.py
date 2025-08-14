@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Un
 import obstore as obs
 from zarr.abc.codec import ArrayBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.dtype import data_type_registry
 
 from virtualizarr.codecs import get_codec_config, zarr_codec_config_to_v2
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
@@ -134,15 +135,28 @@ def convert_v3_to_v2_metadata(
     """
 
     # TODO: Check that all ArrayBytesCodecs should in fact be excluded for V2 metadata storage.
-    # TODO: Test round-tripping big endian since that is stored in the bytes codec in V3; it should be included in data type instead for V2.
     v2_codecs = [
         zarr_codec_config_to_v2(get_codec_config(codec))
         for codec in v3_metadata.codecs
         if not isinstance(codec, ArrayBytesCodec)
     ]
+    # TODO: Remove convert_v3_to_v2_metadata and always encode V3 metadata.
+    # This logic is based on the (default) Bytes codec's endian property,
+    # but other codec pipelines could store endianness elsewhere.
+    big_endian = any(
+        isinstance(codec, ArrayBytesCodec)
+        and hasattr(codec, "endian")
+        and codec.endian.value == "big"
+        for codec in v3_metadata.codecs
+    )
+    if big_endian:
+        na_dtype = v3_metadata.data_type.to_native_dtype().newbyteorder(">")
+        dtype = data_type_registry.match_dtype(dtype=na_dtype)
+    else:
+        dtype = v3_metadata.data_type
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type,
+        dtype=dtype,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
         filters=v2_codecs

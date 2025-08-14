@@ -20,6 +20,8 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766).
   By [Max Jones](https://github.com/maxrjones)
+- Fix handling of big-endian data in Kerchunk references [#769](https://github.com/zarr-developers/VirtualiZarr/issues/769).
+  By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
 
