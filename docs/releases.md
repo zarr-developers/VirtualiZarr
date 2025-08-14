@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.1.1 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.1.0 (14th August 2025)
 
 This release fixes a number of important bugs that could silently lead to referenced data being read back incorrectly.
