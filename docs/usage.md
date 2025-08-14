@@ -397,7 +397,7 @@ import icechunk
 config = icechunk.RepositoryConfig.default()
 config.set_virtual_chunk_container(
     icechunk.VirtualChunkContainer(
-        url_prefix="s3://nex-gddp-cmip6/", 
+        url_prefix="s3://nex-gddp-cmip6/",
         icechunk.s3_store(region="us-west-2", anonymous=True),
     ),
 )
