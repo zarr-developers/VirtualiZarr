@@ -1,20 +1,14 @@
 # Release notes
 
-## v2.1.1 (unreleased)
+## v2.1.1 (14th August 2025)
 
-### New Features
-
-### Breaking changes
+Extremely minor release to ensure compatibility with the soon-to-be released version of xarray (likely named v2025.07.2).
 
 ### Bug fixes
 
 - Adjust for minor upcoming change in private xarray API `xarray.structure.combine._nested_combine`.
   ([#779](https://github.com/zarr-developers/VirtualiZarr/pull/779)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-
-### Documentation
-
-### Internal changes
 
 ## v2.1.0 (14th August 2025)
 
