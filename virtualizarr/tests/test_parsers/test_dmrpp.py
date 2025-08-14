@@ -6,6 +6,7 @@ from xml.etree import ElementTree as ET
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from packaging import version
 
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
@@ -91,7 +92,7 @@ DMRPP_XML_STRINGS = {
                     <Value>standard</Value>
                 </Attribute>
                 <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="7757515" nBytes="11680"/>
+                    <dmrpp:chunk offset="7757499" nBytes="11680"/>
                 </dmrpp:chunks>
             </Float32>
             <Int16 name="air">
@@ -139,7 +140,7 @@ DMRPP_XML_STRINGS = {
                 <Map name="/lat"/>
                 <Map name="/lon"/>
                 <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                    <dmrpp:chunk offset="15419" nBytes="7738000"/>
+                    <dmrpp:chunk offset="10283" nBytes="7738000"/>
                 </dmrpp:chunks>
             </Int16>
             <Attribute name="Conventions" type="String">
@@ -264,7 +265,7 @@ DMRPP_XML_STRINGS = {
                             <Value>standard</Value>
                         </Attribute>
                         <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                            <dmrpp:chunk offset="7757869" nBytes="11680"/>
+                            <dmrpp:chunk offset="7756034" nBytes="11680"/>
                         </dmrpp:chunks>
                     </Float32>
                     <Int16 name="air">
@@ -312,7 +313,7 @@ DMRPP_XML_STRINGS = {
                         <Map name="/test/group/lat"/>
                         <Map name="/test/group/lon"/>
                         <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                            <dmrpp:chunk offset="15773" nBytes="7738000"/>
+                            <dmrpp:chunk offset="10554" nBytes="7738000"/>
                         </dmrpp:chunks>
                     </Int16>
                     <Attribute name="Conventions" type="String">
@@ -477,6 +478,10 @@ def test_parse_dataset(group: str | None, warns: bool, netcdf4_file):
     assert vds.coords.keys() == {"lat", "lon", "time"}
 
 
+@pytest.mark.xfail(
+    version.parse(xr.__version__) < version.parse("2025.7.1"),
+    reason="Offsets in file changed",
+)
 def test_parse_dataset_nested(hdf5_groups_file):
     nested_groups_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=f"file://{hdf5_groups_file}"
