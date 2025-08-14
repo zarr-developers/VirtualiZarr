@@ -402,7 +402,7 @@ config.set_virtual_chunk_container(
 
 # create an in-memory icechunk repository
 storage = icechunk.in_memory_storage()
-repo = icechunk.Repository.open(storage, config)
+repo = icechunk.Repository.create(storage, config)
 
 # open a writable icechunk session to be able to add new contents to the store
 session = repo.writable_session("main")
