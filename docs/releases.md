@@ -10,6 +10,8 @@
 ### Breaking changes
 
 - Update minimum required version of Icechunk to `v1.1.2` [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774). By [Tom Nicholas](https://github.com/TomNicholas).
+- Unpin dependency on xarray, by adjusting our tests to pass despite minor changes to the bytes of netCDF files written between versions of xarray [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
 
