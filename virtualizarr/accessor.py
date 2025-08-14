@@ -109,6 +109,9 @@ class _VirtualiZarrDatasetAccessor:
         validate_containers
             If ``True``, raise if any virtual chunks have a refer to locations that don't
             match any existing virtual chunk container set on this Icechunk repository.
+
+            It is not generally recommended to set this to ``False``, because it can lead to
+            confusing runtime results and errors when reading data back.
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation. When not provided, the current time is used.
@@ -339,6 +342,9 @@ class _VirtualiZarrDataTreeAccessor:
         validate_containers
             If ``True``, raise if any virtual chunks have a refer to locations that don't
             match any existing virtual chunk container set on this Icechunk repository.
+
+            It is not generally recommended to set this to ``False``, because it can lead to
+            confusing runtime results and errors when reading data back.
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.

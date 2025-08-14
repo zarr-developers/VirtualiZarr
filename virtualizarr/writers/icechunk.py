@@ -55,6 +55,9 @@ def virtual_dataset_to_icechunk(
     validate_containers
         If ``True``, raise if any virtual chunks have a refer to locations that don't
         match any existing virtual chunk container set on this Icechunk repository.
+
+        It is not generally recommended to set this to ``False``, because it can lead to
+        confusing runtime results and errors when reading data back.
     last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
@@ -130,7 +133,7 @@ def virtual_datatree_to_icechunk(
     store: "IcechunkStore",
     *,
     write_inherited_coords: bool = False,
-    validate_containers: bool = False,
+    validate_containers: bool = True,
     last_updated_at: datetime | None = None,
 ) -> None:
     """
@@ -152,6 +155,9 @@ def virtual_datatree_to_icechunk(
     validate_containers
         If ``True``, raise if any virtual chunks have a refer to locations that don't
         match any existing virtual chunk container set on this Icechunk repository.
+
+        It is not generally recommended to set this to ``False``, because it can lead to
+        confusing runtime results and errors when reading data back.
     last_updated_at
         The time at which the virtual dataset was last updated. When specified, if any
         of the virtual chunks written in this session are modified in storage after this
