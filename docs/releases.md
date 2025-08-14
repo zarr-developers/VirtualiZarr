@@ -8,6 +8,8 @@
 
 ### Breaking changes
 
+- Update minimum required version of Icechunk to `v1.1.2` [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774). By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Bug fixes
 
 - Fixed bug where VirtualiZarr was incorrectly failing to raise if virtual chunk containers with correct prefixes were not set for every virtual reference ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)). By [Tom Nicholas](https://github.com/TomNicholas).
