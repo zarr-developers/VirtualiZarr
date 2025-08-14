@@ -9,6 +9,10 @@
 
 ### Breaking changes
 
+- Writing to Icechunk now requires that virtual chunk containers are set correctly for all virtual references by default.
+  ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  This change is needed because otherwise it can lead to situations in which attempting to read data back returns fill values instead of real data, silently! (See [#763](https://github.com/zarr-developers/VirtualiZarr/pull/763))
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Update minimum required version of Icechunk to `v1.1.2` [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774). By [Tom Nicholas](https://github.com/TomNicholas).
 - Unpin dependency on xarray, by adjusting our tests to pass despite minor changes to the bytes of netCDF files written between versions of xarray [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
   By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
@@ -16,7 +20,6 @@
 ### Bug fixes
 
 - Fixed bug where VirtualiZarr was incorrectly failing to raise if virtual chunk containers with correct prefixes were not set for every virtual reference ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
-  This could lead to situations in which attempting to read data back returned fill values instead of real data, silently!
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766).
   By [Max Jones](https://github.com/maxrjones)
