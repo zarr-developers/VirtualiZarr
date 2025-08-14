@@ -10,7 +10,9 @@ The first step to virtualizing data is to create an [ObjectStore][obstore.store.
 that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
 
 
-<!-- Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds). -->
+!!! note
+
+    Here, we use `skip_signature=True` because the data is public. We also need to set the cloud region for any data stored in AWS (this isn't required for all S3-compatible clouds).
 
 
 === "S3"
@@ -137,12 +139,6 @@ that can access your data. Available ObjectStores are described in the [obstore 
     registry = ObjectStoreRegistry({file_url: store})
 
     ```
-
-
-
-
-
-
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
 
@@ -285,7 +281,6 @@ combined_vds = xr.concat([vds1, vds2], dim='time')
 print(combined_vds)
 ```
 
-
 !!! note
     If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another.  Similarly, if there are data variables that do not include the concatenation dimension, you will likely need to specify `data_vars='minimal'`.
 
@@ -395,16 +390,21 @@ To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.V
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
 ```python exec="on" session="usage" source="material-block" result="code"
-# create an icechunk repository, or open an existing one
 import icechunk
-storage = icechunk.in_memory_storage()
-repo = icechunk.Repository.open_or_create(storage)
 
 # you need to explicitly grant permissions to icechunk to read from the locations of your archival files
+# we use `anonymous=True` because this is a public bucket, otherwise you need to set credentials explicitly
 config = icechunk.RepositoryConfig.default()
 config.set_virtual_chunk_container(
-    icechunk.VirtualChunkContainer("s3://my-bucket/", icechunk.s3_store(region="us-east-1", anonymous=True)),
+    icechunk.VirtualChunkContainer(
+        url_prefix="s3://nex-gddp-cmip6/",
+        store=icechunk.s3_store(region="us-west-2", anonymous=True),
+    ),
 )
+
+# create an in-memory icechunk repository that includes the virtual chunk containers
+storage = icechunk.in_memory_storage()
+repo = icechunk.Repository.create(storage, config)
 
 # open a writable icechunk session to be able to add new contents to the store
 session = repo.writable_session("main")

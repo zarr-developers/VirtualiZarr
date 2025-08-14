@@ -75,7 +75,7 @@ def test_write_new_virtual_variable(
 ):
     vds = vds_with_manifest_arrays
 
-    vds.vz.to_icechunk(icechunk_filestore, group=group_path)
+    vds.vz.to_icechunk(icechunk_filestore, group=group_path, validate_containers=False)
 
     # check attrs
     group = zarr.group(store=icechunk_filestore, path=group_path)
@@ -232,6 +232,97 @@ def test_write_loadable_variable(
         npt.assert_equal(pressure_array, expected_array)
 
 
+def test_validate_containers(
+    icechunk_filestore: "IcechunkStore",
+    array_v3_metadata,
+) -> None:
+    # create some references referring to data that doesn't have a corresponding virtual chunk container
+    manifest = ChunkManifest(
+        {"0.0": {"path": "s3://bucket/path/file.nc", "offset": 0, "length": 100}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    vds = xr.Dataset(
+        {
+            "foo": (["x", "y"], ma),
+            # include some non-virtual data too
+            "bar": (["x", "y"], np.ones((3, 4))),
+        },
+    )
+
+    # assert that an error is raised when attempting to write to icechunk
+    with pytest.raises(
+        ValueError, match="No Virtual Chunk Container set which supports prefix"
+    ):
+        vds.vz.to_icechunk(icechunk_filestore)
+
+    # assert that no uncommitted changes have been written to Icechunk session
+    # Idea is that session has not been "polluted" with half-written changes
+    session = icechunk_filestore.session
+    # TODO could use https://github.com/earth-mover/icechunk/issues/1165 if it gets implemented
+    assert not session.has_uncommitted_changes, session.status()
+
+
+@pytest.fixture(scope="function")
+def icechunk_repo_no_chunk_container(tmp_path: Path) -> "Repository":
+    icechunk_storage = icechunk.Storage.new_local_filesystem(
+        str(tmp_path) + "icechunk_1"
+    )
+    config = icechunk.RepositoryConfig.default()
+
+    return icechunk.Repository.create(
+        storage=icechunk_storage,
+        config=config,
+        # TODO do we need this?
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+
+# TODO test with zero virtual chunk containers
+def test_raise_if_zero_chunk_containers(
+    icechunk_repo_no_chunk_container: "Repository",
+    array_v3_metadata,
+):
+    # create some references referring to data that doesn't have a corresponding virtual chunk container
+    manifest = ChunkManifest(
+        {"0.0": {"path": "s3://bucket/path/file.nc", "offset": 0, "length": 100}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(
+        chunkmanifest=manifest,
+        metadata=metadata,
+    )
+    vds = xr.Dataset(
+        {
+            "foo": (["x", "y"], ma),
+            # include some non-virtual data too
+            "bar": (["x", "y"], np.ones((3, 4))),
+        },
+    )
+
+    session = icechunk_repo_no_chunk_container.writable_session("main")
+
+    # assert that an error is raised when attempting to write to icechunk
+    with pytest.raises(ValueError, match="No Virtual Chunk Containers set"):
+        vds.vz.to_icechunk(session.store)
+
+    # assert that no uncommitted changes have been written to Icechunk session
+    # Idea is that session has not been "polluted" with half-written changes
+    # TODO could use https://github.com/earth-mover/icechunk/issues/1165 if it gets implemented
+    assert not session.has_uncommitted_changes, session.status()
+
+
 def test_checksum(
     icechunk_filestore: "IcechunkStore",
     tmpdir: Path,
@@ -366,7 +457,7 @@ def test_roundtrip_coords(
             "coord_0d": ([], manifest_array(shape=(), chunks=())),
         },
     )
-    vds.vz.to_icechunk(icechunk_filestore)
+    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
     icechunk_filestore.session.commit("test")
 
     icechunk_readonly_session = icechunk_repo.readonly_session("main")
@@ -640,7 +731,7 @@ def test_write_empty_chunk(
     vds = xr.Dataset({"a": ("x", marr)})
 
     # empty chunks should never be written
-    vds.vz.to_icechunk(icechunk_filestore)
+    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
 
     # when opened they should be treated as fill_value
     roundtrip = xr.open_zarr(

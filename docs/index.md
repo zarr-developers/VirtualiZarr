@@ -108,11 +108,22 @@ meaning that the work of constructing the single coherent dataset only needs to 
 For subsequent data access, you can use [xarray.open_zarr][] to open that Icechunk store, which on object storage is
 far faster than using [xarray.open_mfdataset][] to open the the original non-cloud-optimized files.
 
-Let's persist the Virtual dataset using Icechunk. Here we store the dataset in a memory store but in most cases you'll store the virtual dataset in the cloud.
+Let's persist the Virtual dataset using Icechunk. First let's create an Icechunk configuration with permissions to access our data.
+
+```python exec="on" source="above" session="homepage"
+config = icechunk.RepositoryConfig.default()
+container = icechunk.VirtualChunkContainer(
+    url_prefix="s3://nex-gddp-cmip6/",
+    store=icechunk.s3_store(region="us-west-2", anonymous=True),
+)
+config.set_virtual_chunk_container(container)
+```
+
+Now we can store the references to our data. Here we store the references in an icechunk store that only lives in memory, but in most cases you'll store the "virtual" icechunk store in the cloud.
 
 ```python exec="on" source="above" session="homepage"
 icechunk_store = icechunk.in_memory_storage()
-repo = icechunk.Repository.create(icechunk_store)
+repo = icechunk.Repository.create(icechunk_store, config)
 session = repo.writable_session("main")
 vds.vz.to_icechunk(session.store)
 session.commit("Create virtual store")

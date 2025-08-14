@@ -74,7 +74,7 @@ all_parsers = [
 
 # writers
 icechunk = [
-    "icechunk>=1.0.0",
+    "icechunk>=1.1.2",
 ]
 kerchunk = ["fastparquet"]
 
