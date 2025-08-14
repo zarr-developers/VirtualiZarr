@@ -17,6 +17,7 @@ import xarray as xr
 import xarray.indexes
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
+from xarray.core import dtypes
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
@@ -261,6 +262,7 @@ def open_virtual_mfdataset(
                 ids=ids,
                 join=join,
                 combine_attrs=combine_attrs,
+                fill_value=dtypes.NA,
             )
         elif combine == "by_coords":
             # Redo ordering from coordinates, ignoring how they were ordered
