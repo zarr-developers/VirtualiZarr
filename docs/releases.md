@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.1.2 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.1.1 (14th August 2025)
 
 Extremely minor release to ensure compatibility with the soon-to-be released version of xarray (likely named v2025.07.2).
