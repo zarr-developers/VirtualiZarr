@@ -281,7 +281,6 @@ combined_vds = xr.concat([vds1, vds2], dim='time')
 print(combined_vds)
 ```
 
-
 !!! note
     If you have any virtual coordinate variables, you will likely need to specify the keyword arguments `coords='minimal'` and `compat='override'` to `xarray.concat()`, because the default behaviour of xarray will attempt to load coordinates in order to check their compatibility with one another.  Similarly, if there are data variables that do not include the concatenation dimension, you will likely need to specify `data_vars='minimal'`.
 
@@ -391,16 +390,19 @@ To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.V
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
 ```python exec="on" session="usage" source="material-block" result="code"
-
 import icechunk
 
 # you need to explicitly grant permissions to icechunk to read from the locations of your archival files
+# we use `anonymous=True` because this is a public bucket, otherwise you need to set credentials explicitly
 config = icechunk.RepositoryConfig.default()
 config.set_virtual_chunk_container(
-    icechunk.VirtualChunkContainer("s3://my-bucket/", icechunk.s3_store(region="us-east-1", anonymous=True)),
+    icechunk.VirtualChunkContainer(
+        url_prefix="s3://nex-gddp-cmip6/", 
+        icechunk.s3_store(region="us-west-2", anonymous=True),
+    ),
 )
 
-# create an in-memory icechunk repository
+# create an in-memory icechunk repository that includes the virtual chunk containers
 storage = icechunk.in_memory_storage()
 repo = icechunk.Repository.create(storage, config)
 
