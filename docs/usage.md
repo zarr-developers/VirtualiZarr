@@ -10,7 +10,9 @@ The first step to virtualizing data is to create an [ObjectStore][obstore.store.
 that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
 
 
-<!-- Here, we use `skip_signature=True` because the data is public. We need to set the region for any data stored AWS (this isn't required for all S3-compatible clouds). -->
+!!! note
+
+    Here, we use `skip_signature=True` because the data is public. We also need to set the cloud region for any data stored in AWS (this isn't required for all S3-compatible clouds).
 
 
 === "S3"
@@ -137,12 +139,6 @@ that can access your data. Available ObjectStores are described in the [obstore 
     registry = ObjectStoreRegistry({file_url: store})
 
     ```
-
-
-
-
-
-
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
 
