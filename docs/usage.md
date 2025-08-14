@@ -391,16 +391,18 @@ To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.V
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
 ```python exec="on" session="usage" source="material-block" result="code"
-# create an icechunk repository, or open an existing one
+
 import icechunk
-storage = icechunk.in_memory_storage()
-repo = icechunk.Repository.open_or_create(storage)
 
 # you need to explicitly grant permissions to icechunk to read from the locations of your archival files
 config = icechunk.RepositoryConfig.default()
 config.set_virtual_chunk_container(
     icechunk.VirtualChunkContainer("s3://my-bucket/", icechunk.s3_store(region="us-east-1", anonymous=True)),
 )
+
+# create an in-memory icechunk repository
+storage = icechunk.in_memory_storage()
+repo = icechunk.Repository.open(storage, config)
 
 # open a writable icechunk session to be able to add new contents to the store
 session = repo.writable_session("main")
