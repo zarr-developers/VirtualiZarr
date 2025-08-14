@@ -184,7 +184,6 @@ class ManifestStore(Store):
             return None
         offset = manifest._offsets[chunk_indexes]
         length = manifest._lengths[chunk_indexes]
-
         # Get the configured object store instance that matches the path
         store, path_after_prefix = self._registry.resolve(path)
         if not store:

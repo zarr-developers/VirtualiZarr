@@ -50,10 +50,19 @@ def extract_codecs(
     codecs: CodecPipeline,
 ) -> DeconstructedCodecPipeline:
     """Extracts various codec types."""
+
     arrayarray_codecs: tuple[ArrayArrayCodec, ...] = ()
     arraybytes_codec: ArrayBytesCodec | None = None
     bytesbytes_codecs: tuple[BytesBytesCodec, ...] = ()
     for codec in codecs:
+        if not isinstance(codec, (ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec)):
+            raise TypeError(
+                "All codecs must be valid zarr v3 codecs, "
+                f"but supplied codec {codec} does not subclass any of "
+                "``zarr.abc.codec.ArrayArrayCodec``, ``zarr.abc.codec.ArrayBytesCodec``, or ``zarr.abc.codec.BytesBytesCodec``. "
+                "Please see https://zarr.readthedocs.io/en/stable/user-guide/extending.html#custom-codecs for details on how to specify custom zarr codecs."
+            )
+
         if isinstance(codec, ArrayArrayCodec):
             arrayarray_codecs += (codec,)
         if isinstance(codec, ArrayBytesCodec):
