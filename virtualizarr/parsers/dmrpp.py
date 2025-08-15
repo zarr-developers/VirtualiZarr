@@ -381,8 +381,6 @@ class DMRParser:
         # Dimension info
         dims: dict[str, int] = {}
         dimension_tags = self._find_dimension_tags(var_tag)
-        # if not dimension_tags:
-        #     # raise ValueError("Variable has no dimensions")
         for dim in dimension_tags:
             dims.update(self._parse_dim(dim))
         # convert DAP dtype to numpy dtype
