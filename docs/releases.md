@@ -1,6 +1,6 @@
 # Release notes
 
-## v2.0.2 (unreleased)
+## v2.1.2 (unreleased)
 
 ### New Features
 
@@ -11,6 +11,57 @@
 ### Documentation
 
 ### Internal changes
+
+## v2.1.1 (14th August 2025)
+
+Extremely minor release to ensure compatibility with the soon-to-be released version of xarray (likely named v2025.07.2).
+
+### Bug fixes
+
+- Adjust for minor upcoming change in private xarray API `xarray.structure.combine._nested_combine`.
+  ([#779](https://github.com/zarr-developers/VirtualiZarr/pull/779)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+## v2.1.0 (14th August 2025)
+
+This release fixes a number of important bugs that could silently lead to referenced data being read back incorrectly.
+In particular, note that writing virtual chunks to Icechunk now requires that all virtual chunk containers are set correctly by default.
+It also unpins our dependency on xarray, so that VirtualiZarr is compatible with the latest released version of Xarray.
+Please upgrade!
+
+### New Features
+
+- Expose `validate_containers` kwarg in `.to_icechunk`, allowing it to be set to `False` ([#567](https://github.com/zarr-developers/VirtualiZarr/pull/567), [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+- Writing to Icechunk now requires that virtual chunk containers are set correctly for all virtual references by default.
+  ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  This change is needed because otherwise it can lead to situations in which attempting to read data back returns fill values instead of real data, silently! (See [#763](https://github.com/zarr-developers/VirtualiZarr/pull/763))
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Update minimum required version of Icechunk to `v1.1.2` [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774). By [Tom Nicholas](https://github.com/TomNicholas).
+- Unpin dependency on xarray, by adjusting our tests to pass despite minor changes to the bytes of netCDF files written between versions of xarray [#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- Fixed bug where VirtualiZarr was incorrectly failing to raise if virtual chunk containers with correct prefixes were not set for every virtual reference ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix handling of big-endian data in Icechunk by making sure that non-default zarr serializers are included in the zarr array metadata [#766](https://github.com/zarr-developers/VirtualiZarr/issues/766).
+  By [Max Jones](https://github.com/maxrjones)
+- Fix handling of big-endian data in Kerchunk references [#769](https://github.com/zarr-developers/VirtualiZarr/issues/769).
+  By [Max Jones](https://github.com/maxrjones)
+
+### Documentation
+
+- Updated Icechunk examples now that virtual chunk containers are required by default ([#774](https://github.com/zarr-developers/VirtualiZarr/pull/774)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- `extract_codecs` function inside `convert_to_codec_pipeline` now raises if it encounters a codec which does not inherit from the correct `zarr.abc.codec` base classes. ([#775](https://github.com/zarr-developers/VirtualiZarr/pull/775)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.0.1 (30th July 2025)
 

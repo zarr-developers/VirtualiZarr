@@ -184,7 +184,6 @@ class ManifestStore(Store):
             return None
         offset = manifest._offsets[chunk_indexes]
         length = manifest._lengths[chunk_indexes]
-
         # Get the configured object store instance that matches the path
         store, path_after_prefix = self._registry.resolve(path)
         if not store:
@@ -195,10 +194,11 @@ class ManifestStore(Store):
         path_in_store = urlparse(path).path
         if hasattr(store, "prefix") and store.prefix:
             prefix = str(store.prefix).lstrip("/")
-            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
         elif hasattr(store, "url"):
             prefix = urlparse(store.url).path.lstrip("/")
-            path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
+        else:
+            prefix = ""
+        path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
