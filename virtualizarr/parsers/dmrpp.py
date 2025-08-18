@@ -277,8 +277,17 @@ class DMRParser:
         manifest_dict: dict[str, ManifestArray] = {}
         for var_tag in self._find_var_tags(root):
             if var_tag.attrib["name"] not in self.skip_variables:
-                variable = self._parse_variable(var_tag)
-                manifest_dict[var_tag.attrib["name"]] = variable
+                try:
+                    variable = self._parse_variable(var_tag)
+                    manifest_dict[var_tag.attrib["name"]] = variable
+                except (UnboundLocalError, ValueError):
+                    name = var_tag.attrib["name"]
+                    warnings.warn(
+                        f"This DMRpp contains the variable {name} that could not"
+                        " be parsed. Consider adding it to the list  of skipped "
+                        "variables, or opening an issue to help resolve this"
+                    )
+                    # print("failed:", var_tag.attrib["name"])
 
         # Attributes
         attrs: dict[str, str] = {}
