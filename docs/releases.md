@@ -21,6 +21,12 @@ Extremely minor release to ensure compatibility with the soon-to-be released ver
 - Adjust for minor upcoming change in private xarray API `xarray.structure.combine._nested_combine`.
   ([#779](https://github.com/zarr-developers/VirtualiZarr/pull/779)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Enable `DMRPParser` to process scalar, dimensionless variables that lack chunks are present.
+  ([#666](https://github.com/zarr-developers/VirtualiZarr/pull/757)).
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
+- Enable `DMRPParser` to parse flattened dmrpp metadata reference files, which contain container attributes.
+  ([#581](https://github.com/zarr-developers/VirtualiZarr/pull/757)).
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 
 ## v2.1.0 (14th August 2025)
 
