@@ -287,7 +287,6 @@ class DMRParser:
                         " be parsed. Consider adding it to the list  of skipped "
                         "variables, or opening an issue to help resolve this"
                     )
-                    # print("failed:", var_tag.attrib["name"])
 
         # Attributes
         attrs: dict[str, str] = {}
