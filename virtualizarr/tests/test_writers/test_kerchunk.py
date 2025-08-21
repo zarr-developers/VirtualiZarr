@@ -5,7 +5,6 @@ import xarray as xr
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.utils import JSON, convert_v3_to_v2_metadata, kerchunk_refs_as_json
@@ -194,12 +193,18 @@ class TestAccessor:
         }
 
 
-def testconvert_v3_to_v2_metadata(array_v3_metadata):
+@pytest.mark.parametrize("endian,expected_dtype_char", [("little", "<"), ("big", ">")])
+def test_convert_v3_to_v2_metadata(
+    array_v3_metadata, endian: str, expected_dtype_char: str
+):
     shape = (5, 20)
     chunks = (5, 10)
     codecs = [
-        ARRAYBYTES_CODEC,
-        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {"name": "bytes", "configuration": {"endian": endian}},
+        {
+            "name": "numcodecs.delta",
+            "configuration": {"dtype": f"{expected_dtype_char}i8"},
+        },
         {
             "name": "numcodecs.blosc",
             "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
@@ -211,19 +216,25 @@ def testconvert_v3_to_v2_metadata(array_v3_metadata):
 
     assert isinstance(v2_metadata, ArrayV2Metadata)
     assert v2_metadata.shape == shape
-    assert v2_metadata.dtype.to_native_dtype() == np.dtype("int32")
+    expected_dtype = np.dtype(f"{expected_dtype_char}i4")  # assuming int32
+    assert v2_metadata.dtype.to_native_dtype() == expected_dtype
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
-    compressor_config = v2_metadata.filters[1].get_config()
+
+    assert v2_metadata.filters
+    filter_codec, compressor_codec = v2_metadata.filters
+    compressor_config = compressor_codec.get_config()
     assert compressor_config["id"] == "blosc"
     assert compressor_config["cname"] == "zstd"
     assert compressor_config["clevel"] == 5
     assert compressor_config["shuffle"] == 1
     assert compressor_config["blocksize"] == 0
-    filters_config = v2_metadata.filters[0].get_config()
+
+    filters_config = filter_codec.get_config()
     assert filters_config["id"] == "delta"
-    assert filters_config["dtype"] == "<i8"
-    assert filters_config["astype"] == "<i8"
+    expected_delta_dtype = f"{expected_dtype_char}i8"
+    assert filters_config["dtype"] == expected_delta_dtype
+    assert filters_config["astype"] == expected_delta_dtype
     assert v2_metadata.attributes == {}
 
 

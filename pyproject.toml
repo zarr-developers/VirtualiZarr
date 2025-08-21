@@ -20,7 +20,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray==2025.06.0",
+    "xarray>=2025.3.0",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
@@ -74,7 +74,7 @@ all_parsers = [
 
 # writers
 icechunk = [
-    "icechunk>=1.0.0",
+    "icechunk>=1.1.2",
 ]
 kerchunk = ["fastparquet"]
 
@@ -86,7 +86,7 @@ all_writers = [
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
 upstream = [
-    # 'xarray @ git+https://github.com/pydata/xarray',
+    'xarray @ git+https://github.com/pydata/xarray',
     'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',

@@ -6,6 +6,7 @@ from xml.etree import ElementTree as ET
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from packaging import version
 
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
@@ -91,7 +92,7 @@ DMRPP_XML_STRINGS = {
                     <Value>standard</Value>
                 </Attribute>
                 <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="7757515" nBytes="11680"/>
+                    <dmrpp:chunk offset="7757499" nBytes="11680"/>
                 </dmrpp:chunks>
             </Float32>
             <Int16 name="air">
@@ -139,7 +140,7 @@ DMRPP_XML_STRINGS = {
                 <Map name="/lat"/>
                 <Map name="/lon"/>
                 <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                    <dmrpp:chunk offset="15419" nBytes="7738000"/>
+                    <dmrpp:chunk offset="10283" nBytes="7738000"/>
                 </dmrpp:chunks>
             </Int16>
             <Attribute name="Conventions" type="String">
@@ -264,7 +265,7 @@ DMRPP_XML_STRINGS = {
                             <Value>standard</Value>
                         </Attribute>
                         <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                            <dmrpp:chunk offset="7757869" nBytes="11680"/>
+                            <dmrpp:chunk offset="7756034" nBytes="11680"/>
                         </dmrpp:chunks>
                     </Float32>
                     <Int16 name="air">
@@ -312,7 +313,7 @@ DMRPP_XML_STRINGS = {
                         <Map name="/test/group/lat"/>
                         <Map name="/test/group/lon"/>
                         <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                            <dmrpp:chunk offset="15773" nBytes="7738000"/>
+                            <dmrpp:chunk offset="10554" nBytes="7738000"/>
                         </dmrpp:chunks>
                     </Int16>
                     <Attribute name="Conventions" type="String">
@@ -335,6 +336,47 @@ DMRPP_XML_STRINGS = {
             </Group>
         </Dataset>
             """
+    ),
+    "fill_value_scalar_no_chunks_nc4_url": textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="fill_value_scalar_no_chunks.nc4" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-477">
+            <Int32 name="data">
+                <Attribute name="_FillValue" type="Int32">
+                    <Value>-999</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="-999"/>
+            </Int32>
+            <Attribute name="long_name" type="String">
+                <Value>empty scalar data</Value>
+            </Attribute>
+            <Attribute name="drop_container_attribute" type="Container">
+                <Attribute name="created" type="String">
+                    <Value>2025-08-14T23:32:01Z</Value>
+                </Attribute>
+                <Attribute name="reason" type="String">
+                    <Value>container attributes are no longer supported</Value>
+                </Attribute>
+            </Attribute>
+            <Attribute name="build_dmrpp_metadata" type="Container">
+                <Attribute name="created" type="String">
+                    <Value>2025-08-14T23:32:01Z</Value>
+                </Attribute>
+                <Attribute name="build_dmrpp" type="String">
+                    <Value>3.21.1-477</Value>
+                </Attribute>
+                <Attribute name="bes" type="String">
+                    <Value>3.21.1-477</Value>
+                </Attribute>
+                <Attribute name="libdap" type="String">
+                    <Value>libdap-3.21.1-222</Value>
+                </Attribute>
+                <Attribute name="invocation" type="String">
+                    <Value>build_dmrpp -f /usr/share/hyrax/fill_value_scalar_no_chunks.nc4 -r fill_value_scalar_no_chunks.nc4.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
+                </Attribute>
+            </Attribute>
+        </Dataset>
+        """
     ),
 }
 
@@ -477,6 +519,10 @@ def test_parse_dataset(group: str | None, warns: bool, netcdf4_file):
     assert vds.coords.keys() == {"lat", "lon", "time"}
 
 
+@pytest.mark.xfail(
+    version.parse(xr.__version__) < version.parse("2025.7.1"),
+    reason="Offsets in file changed",
+)
 def test_parse_dataset_nested(hdf5_groups_file):
     nested_groups_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=f"file://{hdf5_groups_file}"
@@ -535,3 +581,15 @@ def test_parse_attribute(netcdf4_file, attr_path, expected):
 
     result = parser._parse_attribute(parser.find_node_fqn(attr_path))
     assert result == expected
+
+
+def test_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
+    parsed_dmrpp = dmrparser(
+        DMRPP_XML_STRINGS["fill_value_scalar_no_chunks_nc4_url"],
+        filepath=fill_value_scalar_no_chunks_nc4_url,
+    )
+    store = obstore_local(url=f"file://{parsed_dmrpp.data_filepath}")
+    with pytest.warns(UserWarning):
+        parsed_vds = parsed_dmrpp.parse_dataset(object_store=store)
+        vds_g1 = parsed_vds.to_virtual_dataset()
+        assert vds_g1["data"].attrs == {"_FillValue": -999}
