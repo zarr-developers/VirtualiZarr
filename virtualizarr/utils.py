@@ -145,7 +145,7 @@ def convert_v3_to_v2_metadata(
     # but other codec pipelines could store endianness elsewhere.
     big_endian = any(
         isinstance(codec, ArrayBytesCodec)
-        and hasattr(codec, "endian")
+        and getattr(codec, "endian", None) is not None
         and codec.endian.value == "big"
         for codec in v3_metadata.codecs
     )
