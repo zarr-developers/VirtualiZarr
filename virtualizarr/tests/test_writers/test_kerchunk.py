@@ -222,7 +222,7 @@ def test_convert_v3_to_v2_metadata(
 
     assert isinstance(v2_metadata, ArrayV2Metadata)
     assert v2_metadata.shape == shape
-    expected_dtype = np.dtype(f"{expected_dtype_char}i4")  # assuming int32
+    expected_dtype = np.dtype(f"{expected_dtype_char}{dtype}")
     assert v2_metadata.dtype.to_native_dtype() == expected_dtype
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
