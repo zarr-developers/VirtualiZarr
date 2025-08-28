@@ -165,25 +165,18 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-
-        if key == "zarr.json":
-            # Return group metadata
-            return self._group.metadata.to_buffer_dict(
-                prototype=default_buffer_prototype()
-            )["zarr.json"]
-        elif key.endswith("zarr.json"):
+        node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
+        if key.endswith("zarr.json"):
             # Return metadata
-            node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
             return node.metadata.to_buffer_dict(prototype=default_buffer_prototype())[
                 "zarr.json"
             ]
-        marr = get_deepest_group_or_array(self._group, key.split("/")[:-1])
-        if isinstance(marr, ManifestGroup):
+        if isinstance(node, ManifestGroup):
             raise ValueError(f"Could not find nested array containing {key}")
-        manifest = marr.manifest
+        manifest = node.manifest
 
         chunk_indexes = parse_manifest_index(
-            key, marr.metadata.chunk_key_encoding.separator
+            key, node.metadata.chunk_key_encoding.separator
         )
 
         path = manifest._paths[chunk_indexes]
