@@ -16,6 +16,7 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
+from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import construct_chunk_pattern
 from virtualizarr.registry import ObjectStoreRegistry
@@ -96,6 +97,12 @@ def parse_manifest_index(
     )
     return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
+def get_deepest_group_or_array(node: ManifestGroup, key: list[str]) -> ManifestGroup | ManifestArray:
+    for var in key:
+        if var in node.arrays:
+            return node.arrays[var] 
+        node = node.groups[var]
+    return node
 
 class ManifestStore(Store):
     """
@@ -165,14 +172,14 @@ class ManifestStore(Store):
                 prototype=default_buffer_prototype()
             )["zarr.json"]
         elif key.endswith("zarr.json"):
-            # Return array metadata
-            # TODO: Handle nested groups
-            var, _ = key.split("/")
-            return self._group.arrays[var].metadata.to_buffer_dict(
-                prototype=default_buffer_prototype()
-            )["zarr.json"]
-        var = key.split("/")[0]
-        marr = self._group.arrays[var]
+            # Return metadata
+            node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
+            return node.metadata.to_buffer_dict(prototype=default_buffer_prototype())[
+                "zarr.json"
+            ]
+        marr = get_deepest_group_or_array(self._group, key.split("/")[:-1])
+        if isinstance(marr, ManifestGroup):
+            raise ValueError(f"Could not find nested array containing {key}")
         manifest = marr.manifest
 
         chunk_indexes = parse_manifest_index(
