@@ -97,12 +97,16 @@ def parse_manifest_index(
     )
     return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
-def get_deepest_group_or_array(node: ManifestGroup, key: list[str]) -> ManifestGroup | ManifestArray:
+
+def get_deepest_group_or_array(
+    node: ManifestGroup, key: list[str]
+) -> ManifestGroup | ManifestArray:
     for var in key:
         if var in node.arrays:
-            return node.arrays[var] 
+            return node.arrays[var]
         node = node.groups[var]
     return node
+
 
 class ManifestStore(Store):
     """

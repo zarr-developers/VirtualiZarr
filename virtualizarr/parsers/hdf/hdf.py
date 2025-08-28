@@ -120,7 +120,11 @@ def _construct_manifest_group(
             if isinstance(dataset := g[key], h5py.Dataset)
         }
         groups = {
-            key: _construct_manifest_group(filepath, reader, group = str(Path(group) / key) if group is not None else key)
+            key: _construct_manifest_group(
+                filepath,
+                reader,
+                group=str(Path(group) / key) if group is not None else key,
+            )
             for key in g.keys()
             if key not in drop_variables
             if isinstance(g[key], h5py.Group)
