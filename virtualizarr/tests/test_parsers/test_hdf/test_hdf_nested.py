@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 
 import h5py
 import numpy as np
@@ -16,7 +17,8 @@ def test_nested_h5(tmp_path: Path):
     manifest_store = manifest_store_from_hdf_url(f"file://{h5_path}")
     z = zarr.open_group(manifest_store, mode="r", zarr_format=3)
     with h5py.File(h5_path, mode="r") as f:
-        np.testing.assert_array_equal(f["bar"][...], z["bar"][...])
+        np.testing.assert_array_equal(f["bar"][...], cast(zarr.Array, z["bar"])[...])
         np.testing.assert_array_equal(
-            f["a_group"]["foo"][...], z["a_group"]["foo"][...]
+            f["a_group"]["foo"][...],
+            cast(zarr.Array, cast(zarr.Group, z["a_group"])["foo"])[...],
         )
