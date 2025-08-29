@@ -4,6 +4,10 @@
 
 ### New Features
 
+- Allow nested-groups inside `ManifestStore` and `ManifestGroup` objects.
+  ([#790](https://github.com/zarr-developers/VirtualiZarr/pull/790)).
+  By [Ilan Gold](https://github.com/ilan-gold)
+
 ### Breaking changes
 
 ### Bug fixes
