@@ -146,7 +146,7 @@ def convert_v3_to_v2_metadata(
     big_endian = any(
         isinstance(codec, ArrayBytesCodec)
         and getattr(codec, "endian", None) is not None
-        and codec.endian.value == "big"
+        and codec.endian.value == "big"  # type: ignore[attr-defined]
         for codec in v3_metadata.codecs
     )
     if big_endian:
