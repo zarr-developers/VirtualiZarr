@@ -11,6 +11,8 @@
 ### Documentation
 
 ### Internal changes
+- Change default Icechunk writing behavior to not validate or write "empty" chunks.
+  ([#791](https://github.com/zarr-developers/VirtualiZarr/pull/791))
 
 ## v2.1.1 (14th August 2025)
 
