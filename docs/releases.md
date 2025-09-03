@@ -2,20 +2,20 @@
 
 ## v2.1.2 (3rd September 2025)
 
-Patch release with bug fixes for the DMRPParser and Icechunk usage with empty chunks.
+Patch release with minor bug fixes for the DMRPParser and Icechunk writing behavior.
 
 ### Bug fixes
 
 - Enable `DMRPParser` to process scalar, dimensionless variables that lack chunks are present.
   ([#666](https://github.com/zarr-developers/VirtualiZarr/pull/757)).
-  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez).
 - Enable `DMRPParser` to parse flattened dmrpp metadata reference files, which contain container attributes.
   ([#581](https://github.com/zarr-developers/VirtualiZarr/pull/757)).
-  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez).
+- Support dtypes without an endianness ([#787](https://github.com/zarr-developers/VirtualiZarr/pull/787)). By [Justus Magin](https://github.com/keewis).
 
 ### Internal changes
-- Change default Icechunk writing behavior to not validate or write "empty" chunks.
-  ([#791](https://github.com/zarr-developers/VirtualiZarr/pull/791))
+- Change default Icechunk writing behavior to not validate or write "empty" chunks ([#791](https://github.com/zarr-developers/VirtualiZarr/pull/791)). By [Sean Harkins](https://github.com/sharkinsspatial).
 
 ## v2.1.1 (14th August 2025)
 
