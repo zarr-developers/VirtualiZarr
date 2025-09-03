@@ -170,6 +170,7 @@ numpy = "==2.0.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
 obstore = "==0.5.1"
+icechunk = "==1.1.2"
 
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]
