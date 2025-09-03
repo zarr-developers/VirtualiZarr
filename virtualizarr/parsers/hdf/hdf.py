@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Iterable,
@@ -98,7 +99,6 @@ def _construct_manifest_group(
     """
     Construct a virtual Group from a HDF dataset.
     """
-
     import h5py
 
     with h5py.File(reader, mode="r") as f:
@@ -116,11 +116,22 @@ def _construct_manifest_group(
         arrays = {
             key: _construct_manifest_array(filepath, dataset, group_name)
             for key in g.keys()
-            if key not in drop_variables and isinstance(dataset := g[key], h5py.Dataset)
+            if key not in drop_variables
+            if isinstance(dataset := g[key], h5py.Dataset)
+        }
+        groups = {
+            key: _construct_manifest_group(
+                filepath,
+                reader,
+                group=str(Path(group) / key) if group is not None else key,
+            )
+            for key in g.keys()
+            if key not in drop_variables
+            if isinstance(g[key], h5py.Group)
         }
         attributes = _extract_attrs(g)
 
-    return ManifestGroup(arrays=arrays, attributes=attributes)
+    return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
 
 
 class HDFParser:

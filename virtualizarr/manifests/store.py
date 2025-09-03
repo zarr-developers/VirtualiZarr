@@ -16,6 +16,7 @@ from zarr.abc.store import (
 from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
 from zarr.core.common import BytesLike
 
+from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import construct_chunk_pattern
 from virtualizarr.registry import ObjectStoreRegistry
@@ -97,6 +98,16 @@ def parse_manifest_index(
     return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
+def get_deepest_group_or_array(
+    node: ManifestGroup, key: list[str]
+) -> ManifestGroup | ManifestArray:
+    for var in key:
+        if var in node.arrays:
+            return node.arrays[var]
+        node = node.groups[var]
+    return node
+
+
 class ManifestStore(Store):
     """
     A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
@@ -158,25 +169,18 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-
-        if key == "zarr.json":
-            # Return group metadata
-            return self._group.metadata.to_buffer_dict(
-                prototype=default_buffer_prototype()
-            )["zarr.json"]
-        elif key.endswith("zarr.json"):
-            # Return array metadata
-            # TODO: Handle nested groups
-            var, _ = key.split("/")
-            return self._group.arrays[var].metadata.to_buffer_dict(
-                prototype=default_buffer_prototype()
-            )["zarr.json"]
-        var = key.split("/")[0]
-        marr = self._group.arrays[var]
-        manifest = marr.manifest
+        node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
+        if key.endswith("zarr.json"):
+            # Return metadata
+            return node.metadata.to_buffer_dict(prototype=default_buffer_prototype())[
+                "zarr.json"
+            ]
+        if isinstance(node, ManifestGroup):
+            raise ValueError(f"Could not find nested array containing {key}")
+        manifest = node.manifest
 
         chunk_indexes = parse_manifest_index(
-            key, marr.metadata.chunk_key_encoding.separator
+            key, node.metadata.chunk_key_encoding.separator
         )
 
         path = manifest._paths[chunk_indexes]

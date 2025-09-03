@@ -40,13 +40,7 @@ class ManifestGroup(
         self._metadata = GroupMetadata(attributes=attributes)
 
         _arrays: Mapping[str, ManifestArray] = {} if arrays is None else arrays
-
-        if groups:
-            # TODO add support for nested groups
-            raise NotImplementedError
-        else:
-            _groups: Mapping[str, ManifestGroup] = {} if groups is None else groups
-
+        _groups: Mapping[str, ManifestGroup] = {} if groups is None else groups
         for name, arr in _arrays.items():
             if not isinstance(arr, ManifestArray):
                 raise TypeError(
