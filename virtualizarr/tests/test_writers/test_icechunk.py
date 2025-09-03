@@ -731,7 +731,7 @@ def test_write_empty_chunk(
     vds = xr.Dataset({"a": ("x", marr)})
 
     # empty chunks should never be written
-    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
+    vds.vz.to_icechunk(icechunk_filestore)
 
     # when opened they should be treated as fill_value
     roundtrip = xr.open_zarr(
