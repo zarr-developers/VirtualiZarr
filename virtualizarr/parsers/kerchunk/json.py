@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 
 import ujson
+from obstore.store import MemoryStore
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
@@ -55,6 +56,8 @@ class KerchunkJSONParser:
         """
         store, path_after_prefix = registry.resolve(url)
 
+        cache = MemoryStore()
+
         # we need the whole thing so just get the entire contents in one request
         resp = store.get(path_after_prefix)
         content = resp.bytes().to_bytes()
@@ -65,5 +68,8 @@ class KerchunkJSONParser:
             group=self.group,
             fs_root=self.fs_root,
             skip_variables=self.skip_variables,
+            cache=cache,
         )
+
+        registry.register("memory://kerchunk/", cache)
         return ManifestStore(group=manifestgroup, registry=registry)

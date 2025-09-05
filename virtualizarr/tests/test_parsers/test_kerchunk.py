@@ -276,31 +276,6 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
             assert set(vds.variables) == set(netcdf4_virtual_dataset.variables)
 
 
-@requires_kerchunk
-def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_registry):
-    # For now, we raise a NotImplementedError if we read existing references that have inlined data
-    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
-
-    ref_filepath = tmp_path / "ref.json"
-
-    import ujson
-
-    with open(ref_filepath, "w") as json_file:
-        ujson.dump(netcdf4_inlined_ref, json_file)
-
-    parser = KerchunkJSONParser()
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
-        with open_virtual_dataset(
-            url=ref_filepath.as_posix(),
-            registry=local_registry,
-            parser=parser,
-        ) as _:
-            pass
-
-
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
 def test_skip_variables(refs_file_factory, skip_variables, local_registry):
     refs_file = refs_file_factory()
@@ -314,16 +289,9 @@ def test_skip_variables(refs_file_factory, skip_variables, local_registry):
 
 
 @requires_kerchunk
-def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_registry):
-    refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
-    ref_filepath = tmp_path / "ref.json"
-    with open(ref_filepath.as_posix(), "w") as json_file:
-        ujson.dump(refs, json_file)
-
+def test_load_manifest(tmp_path, netcdf4_file, netcdf4_inlined_ref, local_registry):
     parser = KerchunkJSONParser()
-    manifest_store = parser(
-        url=f"file://{ref_filepath.as_posix()}", registry=local_registry
-    )
+    manifest_store = parser(url=netcdf4_inlined_ref, registry=local_registry)
     with (
         xr.open_dataset(
             netcdf4_file,
