@@ -19,6 +19,7 @@ VALID_URI_PREFIXES = {
     "file:///",
     "http://",
     "https://",
+    "memory://",
 }
 
 
