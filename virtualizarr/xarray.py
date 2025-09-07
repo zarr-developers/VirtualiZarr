@@ -22,6 +22,7 @@ from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
@@ -333,8 +334,13 @@ def construct_virtual_dataset(
 
     """
 
-    if group:
-        raise NotImplementedError("ManifestStore does not yet support nested groups")
+    # TODO: Remove private API `._group`
+    if group or any(
+        isinstance(maybe_group, ManifestGroup) for maybe_group in manifest_store._group
+    ):
+        raise NotImplementedError(
+            "Converting a ManifestStore to an xarray object is not yet supported with nested groups"
+        )
     else:
         manifestgroup = manifest_store._group
 
