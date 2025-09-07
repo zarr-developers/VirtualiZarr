@@ -176,7 +176,9 @@ class ManifestStore(Store):
                 "zarr.json"
             ]
         if isinstance(node, ManifestGroup):
-            raise ValueError(f"Could not find nested array containing {key}")
+            raise ValueError(
+                "Key requested is a group but the key does not end in `zarr.json`"
+            )
         manifest = node.manifest
 
         chunk_indexes = parse_manifest_index(
