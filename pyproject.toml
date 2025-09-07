@@ -20,7 +20,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.3.0",
+    "xarray>=2025.03.0",
     "numpy>=2.0.0",
     "universal-pathlib",
     "numcodecs>=0.15.1",
@@ -170,6 +170,7 @@ numpy = "==2.0.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
 obstore = "==0.5.1"
+icechunk = "==1.1.2"
 
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]
