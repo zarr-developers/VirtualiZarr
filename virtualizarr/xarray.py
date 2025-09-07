@@ -336,7 +336,8 @@ def construct_virtual_dataset(
 
     # TODO: Remove private API `._group`
     if group or any(
-        isinstance(maybe_group, ManifestGroup) for maybe_group in manifest_store._group
+        isinstance(maybe_group, ManifestGroup)
+        for maybe_group in manifest_store._group.values()
     ):
         raise NotImplementedError(
             "Converting a ManifestStore to an xarray object is not yet supported with nested groups"

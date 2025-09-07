@@ -2,6 +2,7 @@ import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
 from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
@@ -129,11 +130,36 @@ class TestManifestGroupFromHDF:
         manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
         assert len(manifest_store._group.arrays) == 3
 
-    def test_nested_groups_are_ignored(self, nested_group_hdf5_url):
+    def test_nested_groups_are_ignored_when_group_is_specificed(
+        self, nested_group_hdf5_url
+    ):
         manifest_store = manifest_store_from_hdf_url(
             nested_group_hdf5_url, group="group"
         )
         assert len(manifest_store._group.arrays) == 1
+
+    @pytest.mark.parametrize("group_key", [None, "group"])
+    def test_nested_h5_fails_dataset_Creation(self, nested_group_hdf5_url, group_key):
+        manifest_store = manifest_store_from_hdf_url(
+            nested_group_hdf5_url, group=group_key
+        )
+        with pytest.raises(NotImplementedError, match="Converting a ManifestStore"):
+            manifest_store.to_virtual_dataset()
+
+    def test_nested_groups_are_detected(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(nested_group_hdf5_url)
+        assert len(manifest_store._group["group"]["nested_group"].arrays) == 1
+
+    def test_nested_data(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(nested_group_hdf5_url)
+        z = zarr.open_group(manifest_store, mode="r", zarr_format=3)
+
+        with h5py.File(nested_group_hdf5_url.split("file://")[-1], mode="r") as f:
+            np.testing.assert_array_equal(f["group"]["data"], z["group"]["data"][...])
+            np.testing.assert_array_equal(
+                f["group"]["nested_group"]["data"][...],
+                z["group"]["nested_group"]["data"][...],
+            )
 
     def test_drop_variables(self, multiple_datasets_hdf5_url, local_registry):
         parser = HDFParser(drop_variables=["data2"])

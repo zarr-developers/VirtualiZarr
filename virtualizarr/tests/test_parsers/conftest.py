@@ -151,7 +151,8 @@ def nested_group_hdf5_url(tmp_path: Path) -> str:
         g = f.create_group("group")
         data = np.random.random((10, 10))
         g.create_dataset("data", data=data)
-        g.create_group("nested_group")
+        g_nested = g.create_group("nested_group")
+        g_nested.create_dataset("data", data=data)
 
     return f"file://{filepath}"
 
