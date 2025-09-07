@@ -193,17 +193,21 @@ class TestAccessor:
         }
 
 
-@pytest.mark.parametrize("endian,expected_dtype_char", [("little", "<"), ("big", ">")])
+@pytest.mark.parametrize(
+    ["dtype", "endian", "expected_dtype_char"],
+    [("i8", "little", "<"), ("i8", "big", ">"), ("i1", None, "|")],
+)
 def test_convert_v3_to_v2_metadata(
-    array_v3_metadata, endian: str, expected_dtype_char: str
+    array_v3_metadata, dtype: str, endian: str | None, expected_dtype_char: str
 ):
     shape = (5, 20)
     chunks = (5, 10)
+
     codecs = [
         {"name": "bytes", "configuration": {"endian": endian}},
         {
             "name": "numcodecs.delta",
-            "configuration": {"dtype": f"{expected_dtype_char}i8"},
+            "configuration": {"dtype": f"{expected_dtype_char}{dtype}"},
         },
         {
             "name": "numcodecs.blosc",
@@ -211,12 +215,14 @@ def test_convert_v3_to_v2_metadata(
         },
     ]
 
-    v3_metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+    v3_metadata = array_v3_metadata(
+        data_type=np.dtype(dtype), shape=shape, chunks=chunks, codecs=codecs
+    )
     v2_metadata = convert_v3_to_v2_metadata(v3_metadata)
 
     assert isinstance(v2_metadata, ArrayV2Metadata)
     assert v2_metadata.shape == shape
-    expected_dtype = np.dtype(f"{expected_dtype_char}i4")  # assuming int32
+    expected_dtype = np.dtype(f"{expected_dtype_char}{dtype}")
     assert v2_metadata.dtype.to_native_dtype() == expected_dtype
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
@@ -232,7 +238,7 @@ def test_convert_v3_to_v2_metadata(
 
     filters_config = filter_codec.get_config()
     assert filters_config["id"] == "delta"
-    expected_delta_dtype = f"{expected_dtype_char}i8"
+    expected_delta_dtype = f"{expected_dtype_char}{dtype}"
     assert filters_config["dtype"] == expected_delta_dtype
     assert filters_config["astype"] == expected_delta_dtype
     assert v2_metadata.attributes == {}

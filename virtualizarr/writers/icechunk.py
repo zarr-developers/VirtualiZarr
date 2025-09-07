@@ -252,7 +252,8 @@ def validate_virtual_chunk_containers(
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
         for ref in marr.manifest._paths.flat:
-            validate_single_ref(ref, supported_prefixes)
+            if ref:
+                validate_single_ref(ref, supported_prefixes)
 
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
@@ -418,7 +419,7 @@ def write_virtual_variable_to_icechunk(
             name=name,
             shape=metadata.shape,
             chunks=metadata.chunks,
-            dtype=metadata.data_type.to_native_dtype(),
+            dtype=metadata.data_type,
             filters=filters,
             compressors=compressors,
             serializer=serializer,
