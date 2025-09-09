@@ -11,4 +11,3 @@ The following examples demonstrate the use of VirtualiZarr to create virtual dat
 2. [Parallel reference generation using Coiled Functions](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/coiled/terraclimate.ipynb)
 3. [Serverless parallel reference generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/virtualizarr-with-lithops)
 4. [MUR SST Virtual and Zarr Icechunk Store Generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/V1/examples/mursst-icechunk-with-lithops)
-
