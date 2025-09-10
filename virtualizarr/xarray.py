@@ -333,6 +333,7 @@ def construct_virtual_dataset(
 
     """
 
+    # TODO: Remove private API `._group`
     if group:
         raise NotImplementedError("ManifestStore does not yet support nested groups")
     else:

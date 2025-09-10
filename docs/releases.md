@@ -1,5 +1,21 @@
 # Release notes
 
+## v2.1.3 (unreleased)
+
+### New Features
+
+- Allow nested-groups inside `ManifestStore` and `ManifestGroup` objects and update `HDFParser` to be able to create nested `zarr.Group` objects.
+  ([#790](https://github.com/zarr-developers/VirtualiZarr/pull/790)).
+  By [Ilan Gold](https://github.com/ilan-gold)
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.1.2 (3rd September 2025)
 
 Patch release with minor bug fixes for the DMRPParser and Icechunk writing behavior.

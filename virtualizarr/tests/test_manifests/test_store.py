@@ -145,6 +145,7 @@ def _generate_manifest_store(
             "bar": manifest_array,
             "scalar": scalar_manifest_array,
         },
+        groups={"subgroup": ManifestGroup(arrays={"foo": manifest_array})},
         attributes={"Zarr": "Hooray!"},
     )
     registry = ObjectStoreRegistry({prefix: store})
@@ -205,7 +206,10 @@ def empty_memory_store():
         fill_value=0,
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
-    manifest_group = ManifestGroup(arrays={"foo": manifest_array})
+    sub_group = ManifestGroup(arrays={"foo": manifest_array})
+    manifest_group = ManifestGroup(
+        arrays={"foo": manifest_array}, groups={"subgroup": sub_group}
+    )
     registry = ObjectStoreRegistry({"memory://": store})
     return ManifestStore(registry=registry, group=manifest_group)
 
@@ -228,6 +232,16 @@ class TestManifestStore:
         store = request.getfixturevalue(manifest_store)
         observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
         assert observed is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["empty_memory_store"],
+    )
+    async def test_get_group_key_fails(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        with pytest.raises(ValueError, match=r"Key requested is a group"):
+            await store.get("subgroup", prototype=default_buffer_prototype())
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -269,10 +283,14 @@ class TestManifestStore:
         "manifest_store",
         ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
-    async def test_get_metadata(self, manifest_store, request):
+    @pytest.mark.parametrize(
+        "subgroup",
+        ["", "subgroup/"],
+    )
+    async def test_get_metadata(self, manifest_store, request, subgroup):
         store = request.getfixturevalue(manifest_store)
         observed = await store.get(
-            "foo/zarr.json", prototype=default_buffer_prototype()
+            f"{subgroup}foo/zarr.json", prototype=default_buffer_prototype()
         )
         metadata = json.loads(observed.to_bytes())
         assert metadata["chunk_grid"]["configuration"]["chunk_shape"] == [2, 2]
