@@ -158,7 +158,7 @@ here we used the [HDFParser][virtualizarr.parsers.HDFParser].
 ```python exec="on" session="usage" source="material-block"
 parser = HDFParser()
 vds = open_virtual_dataset(
-  url=f"{bucket}/{path}",
+  url=file_url,
   parser=parser,
   registry=registry,
 )
