@@ -3,8 +3,10 @@ from __future__ import annotations
 import re
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias, Mapping
 from urllib.parse import urlparse
+
+from xarray.coders import CFDatetimeCoder, CFTimedeltaCoder
 
 from zarr.abc.store import (
     ByteRequest,
@@ -281,7 +283,8 @@ class ManifestStore(Store):
         self,
         group="",
         loadable_variables: Iterable[str] | None = None,
-        decode_times: bool | None = None,
+        decode_times: bool | CFDatetimeCoder | Mapping[str, bool | CFDatetimeCoder] | None = None,
+        decode_timedelta: bool | CFTimedeltaCoder | Mapping[str, bool | CFTimedeltaCoder] | None = None,
     ) -> "xr.Dataset":
         """
         Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
@@ -294,6 +297,8 @@ class ManifestStore(Store):
         ----------
         group : str
         loadable_variables : Iterable[str], optional
+        decode_times : bool, optional
+        decode_timedelta : bool, optional
 
         Returns
         -------
@@ -312,6 +317,7 @@ class ManifestStore(Store):
             group=group,
             loadable_variables=loadable_variables,
             decode_times=decode_times,
+            decode_timedelta=decode_timedelta,
         )
 
 

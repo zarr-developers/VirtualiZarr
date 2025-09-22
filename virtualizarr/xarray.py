@@ -19,6 +19,7 @@ from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core import dtypes
 from xarray.core.types import NestedSequence
+from xarray.coders import CFDatetimeCoder, CFTimedeltaCoder
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.manifests import ManifestStore
@@ -41,7 +42,8 @@ def open_virtual_dataset(
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
-    decode_times: bool | None = None,
+    decode_times: bool | CFDatetimeCoder | Mapping[str, bool | CFDatetimeCoder] | None = None,
+    decode_timedelta: bool | CFTimedeltaCoder | Mapping[str, bool | CFTimedeltaCoder] = None
 ) -> xr.Dataset:
     """
     Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
@@ -76,7 +78,17 @@ def open_virtual_dataset(
         Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
-
+    decode_timedelta
+        Bool, CFTimedeltaCoder, or dict-like, optional
+        If True, decode variables and coordinates with time units in
+        {"days", "hours", "minutes", "seconds", "milliseconds", "microseconds"}
+        into timedelta objects. If False, leave them encoded as numbers.
+        If None (default), assume the same value of ``decode_times``; if
+        ``decode_times`` is a :py:class:`coders.CFDatetimeCoder` instance, this
+        takes the form of a :py:class:`coders.CFTimedeltaCoder` instance with a
+        matching ``time_unit``.
+        Pass a mapping, e.g. ``{"my_variable": False}``,
+        to toggle this feature per-variable individually.
     Returns
     -------
     vds
@@ -93,6 +105,7 @@ def open_virtual_dataset(
     ds = manifest_store.to_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
+        decode_timedelta=decode_timedelta,
     )
     return ds.drop_vars(list(drop_variables or ()))
 
@@ -325,6 +338,7 @@ def construct_virtual_dataset(
     group: str | None = None,
     loadable_variables: Iterable[Hashable] | None = None,
     decode_times: bool | None = None,
+    decode_timedelta: bool | None = None,
     reader_options: Optional[dict] = None,
 ) -> xr.Dataset:
     """
@@ -347,6 +361,7 @@ def construct_virtual_dataset(
         zarr_format=3,
         chunks=None,
         decode_times=decode_times,
+        decode_timedelta=decode_timedelta,
     ) as loadable_ds:
         return replace_virtual_with_loadable_vars(
             fully_virtual_ds, loadable_ds, loadable_variables
