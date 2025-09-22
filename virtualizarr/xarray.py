@@ -17,9 +17,9 @@ import xarray as xr
 import xarray.indexes
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
+from xarray.coders import CFDatetimeCoder, CFTimedeltaCoder
 from xarray.core import dtypes
 from xarray.core.types import NestedSequence
-from xarray.coders import CFDatetimeCoder, CFTimedeltaCoder
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
 from virtualizarr.manifests import ManifestStore
@@ -42,8 +42,13 @@ def open_virtual_dataset(
     parser: Parser,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
-    decode_times: bool | CFDatetimeCoder | Mapping[str, bool | CFDatetimeCoder] | None = None,
-    decode_timedelta: bool | CFTimedeltaCoder | Mapping[str, bool | CFTimedeltaCoder] = None
+    decode_times: bool
+    | CFDatetimeCoder
+    | Mapping[str, bool | CFDatetimeCoder]
+    | None = None,
+    decode_timedelta: bool
+    | CFTimedeltaCoder
+    | Mapping[str, bool | CFTimedeltaCoder] = None,
 ) -> xr.Dataset:
     """
     Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
