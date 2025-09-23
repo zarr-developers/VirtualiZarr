@@ -237,15 +237,23 @@ def open_virtual_mfdataset(
         open_func = _open
 
     executor = get_executor(parallel=parallel)
-    with executor() as exec:
-        # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
+    # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
+    # we accept an instance of the class, or the class
+    if isinstance(executor, Executor):
         virtual_datasets = list(
-            exec.map(
+            executor.map(
                 open_func,
                 paths1d,
             )
         )
-
+    else:
+        with executor() as exec:
+            virtual_datasets = list(
+                exec.map(
+                    open_func,
+                    paths1d,
+                )
+            )
     # TODO add file closers
 
     # Combine all datasets, closing them in case of a ValueError

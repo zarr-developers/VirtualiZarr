@@ -32,6 +32,8 @@ def get_executor(
         return SerialExecutor
     elif inspect.isclass(parallel) and issubclass(parallel, Executor):
         return parallel
+    elif isinstance(parallel, Executor):
+        return parallel
     else:
         raise ValueError(
             f"Unrecognized argument to ``parallel``: {parallel}"
