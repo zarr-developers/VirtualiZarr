@@ -1,12 +1,51 @@
 import numpy as np
 import pandas as pd
+import pytest
+import xarray as xr
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
-from conftest import ARRAYBYTES_CODEC
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
-from virtualizarr.utils import convert_v3_to_v2_metadata
+from virtualizarr.utils import JSON, convert_v3_to_v2_metadata, kerchunk_refs_as_json
+
+
+def test_deserialize_to_json():
+    refs = {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            ".zattrs": "{}",
+            "a/.zarray": '{"shape":[2,3],"chunks":[2,3],"fill_value":0,"order":"C","filters":null,"dimension_separator":".","compressor":null,"attributes":{},"zarr_format":2,"dtype":"<i8"}',
+            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            "a/0.0": ["/test.nc", 6144, 48],
+        },
+    }
+    json_expected: JSON = {
+        "version": 1,
+        "refs": {
+            ".zgroup": {"zarr_format": 2},
+            ".zattrs": {},
+            "a/.zarray": {
+                "shape": [2, 3],
+                "chunks": [2, 3],
+                "fill_value": 0,
+                "order": "C",
+                "filters": None,
+                "dimension_separator": ".",
+                "compressor": None,
+                "attributes": {},
+                "zarr_format": 2,
+                "dtype": "<i8",
+            },
+            "a/.zattrs": {
+                "_ARRAY_DIMENSIONS": ["x", "y"],
+            },
+            "a/0.0": ["/test.nc", 6144, 48],
+        },
+    }
+    refs_as_json = kerchunk_refs_as_json(refs)
+    assert refs_as_json == json_expected
 
 
 @requires_kerchunk
@@ -38,8 +77,10 @@ class TestAccessor:
             },
         }
 
-        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
-        assert result_ds_refs == expected_ds_refs
+        result_ds_refs = ds.vz.to_kerchunk(format="dict")
+        assert kerchunk_refs_as_json(result_ds_refs) == kerchunk_refs_as_json(
+            expected_ds_refs
+        )
 
     def test_accessor_to_kerchunk_dict_empty(self, array_v3_metadata):
         manifest = ChunkManifest(entries={}, shape=(1, 1))
@@ -65,8 +106,10 @@ class TestAccessor:
             },
         }
 
-        result_ds_refs = ds.virtualize.to_kerchunk(format="dict")
-        assert result_ds_refs == expected_ds_refs
+        result_ds_refs = ds.vz.to_kerchunk(format="dict")
+        assert kerchunk_refs_as_json(result_ds_refs) == kerchunk_refs_as_json(
+            expected_ds_refs
+        )
 
     def test_accessor_to_kerchunk_json(self, tmp_path, array_v3_metadata):
         import ujson
@@ -88,7 +131,7 @@ class TestAccessor:
 
         filepath = tmp_path / "refs.json"
 
-        ds.virtualize.to_kerchunk(filepath, format="json")
+        ds.vz.to_kerchunk(filepath, format="json")
 
         with open(filepath) as json_file:
             loaded_refs = ujson.load(json_file)
@@ -103,7 +146,9 @@ class TestAccessor:
                 "a/0.0": ["/test.nc", 6144, 48],
             },
         }
-        assert loaded_refs == expected_ds_refs
+        assert kerchunk_refs_as_json(loaded_refs) == kerchunk_refs_as_json(
+            expected_ds_refs
+        )
 
     @requires_fastparquet
     def test_accessor_to_kerchunk_parquet(self, tmp_path, array_v3_metadata):
@@ -128,7 +173,7 @@ class TestAccessor:
 
         filepath = tmp_path / "refs"
 
-        ds.virtualize.to_kerchunk(filepath, format="parquet", record_size=2)
+        ds.vz.to_kerchunk(filepath, format="parquet", record_size=2)
 
         with open(tmp_path / "refs" / ".zmetadata") as f:
             meta = ujson.load(f)
@@ -148,34 +193,58 @@ class TestAccessor:
         }
 
 
-def testconvert_v3_to_v2_metadata(array_v3_metadata):
+@pytest.mark.parametrize(
+    ["dtype", "endian", "expected_dtype_char"],
+    [("i8", "little", "<"), ("i8", "big", ">"), ("i1", None, "|")],
+)
+def test_convert_v3_to_v2_metadata(
+    array_v3_metadata, dtype: str, endian: str | None, expected_dtype_char: str
+):
     shape = (5, 20)
     chunks = (5, 10)
+
     codecs = [
-        ARRAYBYTES_CODEC,
-        {"name": "numcodecs.delta", "configuration": {"dtype": "<i8"}},
+        {"name": "bytes", "configuration": {"endian": endian}},
+        {
+            "name": "numcodecs.delta",
+            "configuration": {"dtype": f"{expected_dtype_char}{dtype}"},
+        },
         {
             "name": "numcodecs.blosc",
             "configuration": {"cname": "zstd", "clevel": 5, "shuffle": 1},
         },
     ]
 
-    v3_metadata = array_v3_metadata(shape=shape, chunks=chunks, codecs=codecs)
+    v3_metadata = array_v3_metadata(
+        data_type=np.dtype(dtype), shape=shape, chunks=chunks, codecs=codecs
+    )
     v2_metadata = convert_v3_to_v2_metadata(v3_metadata)
 
     assert isinstance(v2_metadata, ArrayV2Metadata)
     assert v2_metadata.shape == shape
-    assert v2_metadata.dtype == np.dtype("int32")
+    expected_dtype = np.dtype(f"{expected_dtype_char}{dtype}")
+    assert v2_metadata.dtype.to_native_dtype() == expected_dtype
     assert v2_metadata.chunks == chunks
     assert v2_metadata.fill_value == 0
-    compressor_config = v2_metadata.compressor.get_config()
+
+    assert v2_metadata.filters
+    filter_codec, compressor_codec = v2_metadata.filters
+    compressor_config = compressor_codec.get_config()
     assert compressor_config["id"] == "blosc"
     assert compressor_config["cname"] == "zstd"
     assert compressor_config["clevel"] == 5
     assert compressor_config["shuffle"] == 1
     assert compressor_config["blocksize"] == 0
-    filters_config = v2_metadata.filters[0].get_config()
+
+    filters_config = filter_codec.get_config()
     assert filters_config["id"] == "delta"
-    assert filters_config["dtype"] == "<i8"
-    assert filters_config["astype"] == "<i8"
+    expected_delta_dtype = f"{expected_dtype_char}{dtype}"
+    assert filters_config["dtype"] == expected_delta_dtype
+    assert filters_config["astype"] == expected_delta_dtype
     assert v2_metadata.attributes == {}
+
+
+def test_warn_if_no_virtual_vars():
+    non_virtual_ds = xr.Dataset({"foo": ("x", [10, 20, 30]), "x": ("x", [1, 2, 3])})
+    with pytest.warns(UserWarning, match="non-virtual"):
+        non_virtual_ds.vz.to_kerchunk()

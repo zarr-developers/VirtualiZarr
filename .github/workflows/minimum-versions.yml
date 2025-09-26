@@ -1,0 +1,56 @@
+name: Minimum-versions
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+    - 'docs/**'
+  pull_request:
+    branches: [ "main" ]
+    types: [opened, reopened, synchronize, labeled]
+    paths-ignore:
+    - 'docs/**'
+  schedule:
+    - cron: "0 0 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-upstream:
+    name: minimum-versions-build
+    if: |
+      always()
+      && (
+          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+          || contains( github.event.pull_request.labels.*.name, 'test-upstream')
+      )
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          pixi-version: v0.41.4
+          environments: minimum-versions
+
+      - name: List installed libraries
+        run: |
+          pixi install --environment minimum-versions
+          pixi list --environment minimum-versions
+      - name: Running Tests
+        run: |
+          pixi run -e minimum-versions run-tests-xml-cov
+
+      - name: Upload code coverage to Codecov
+        uses: codecov/codecov-action@v3.1.4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          env_vars: OS,PYTHON
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

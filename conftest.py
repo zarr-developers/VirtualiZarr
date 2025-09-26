@@ -10,12 +10,14 @@ import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
+from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
 # Local imports
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import ceildiv
 
 
@@ -26,6 +28,11 @@ def pytest_addoption(parser):
         "--run-network-tests",
         action="store_true",
         help="runs tests requiring a network connection",
+    )
+    parser.addoption(
+        "--run-slow-tests",
+        action="store_true",
+        help="runs slow tests",
     )
     parser.addoption(
         "--run-minio-tests",
@@ -42,6 +49,8 @@ def pytest_runtest_setup(item):
         )
     if "minio" in item.keywords and not item.config.getoption("--run-minio-tests"):
         pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
+    if "slow" in item.keywords and not item.config.getoption("--run-slow-tests"):
+        pytest.skip("set --run-slow-tests to run slow tests")
 
 
 def _xarray_subset():
@@ -56,6 +65,11 @@ def zarr_store(tmpdir, request):
     ds.to_zarr(filepath, zarr_format=request.param)
     ds.close()
     return filepath
+
+
+@pytest.fixture()
+def local_registry():
+    return ObjectStoreRegistry({"file://": LocalStore()})
 
 
 @pytest.fixture()
@@ -87,7 +101,8 @@ ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
 def _generate_chunk_entries(
     shape: tuple[int, ...],
     chunks: tuple[int, ...],
-    entry_generator: Callable[[tuple[int, ...]], dict[str, Any]],
+    itemsize: int,
+    entry_generator: Callable[[tuple[int, ...], tuple[int, ...], int], dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
     """
     Generate chunk entries for a manifest based on shape and chunks.
@@ -112,30 +127,29 @@ def _generate_chunk_entries(
     )
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,))}
+        return {"0": entry_generator((0,), (0,), itemsize)}
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]
     )
-    return {join(ind): entry_generator(ind) for ind in all_possible_combos}
+    return {
+        join(ind): entry_generator(ind, chunks, itemsize) for ind in all_possible_combos
+    }
 
 
-def _offset_from_chunk_key(ind: tuple[int, ...]) -> int:
-    """Generate an offset value from chunk indices."""
-    return sum(ind) * 10
-
-
-def _length_from_chunk_key(ind: tuple[int, ...]) -> int:
+def _length_from_chunk_key(chunks: tuple[int, ...], itemsize: int) -> int:
     """Generate a length value from chunk indices."""
-    return sum(ind) + 5
+    return int(np.prod(chunks) * itemsize)
 
 
-def _entry_from_chunk_key(ind: tuple[int, ...]) -> dict[str, str | int]:
+def _entry_from_chunk_key(
+    ind: tuple[int, ...], chunks: tuple[int, ...], itemsize: int
+) -> dict[str, str | int]:
     """Generate a (somewhat) unique manifest entry from a given chunk key."""
     entry = {
         "path": f"/foo.{str(join(ind))}.nc",
-        "offset": _offset_from_chunk_key(ind),
-        "length": _length_from_chunk_key(ind),
+        "offset": 0,
+        "length": _length_from_chunk_key(chunks, itemsize),
     }
     return entry  # type: ignore[return-value]
 
@@ -150,7 +164,9 @@ def _generate_chunk_manifest(
     """Generate a chunk manifest with sequential offsets for each chunk."""
     current_offset = [offset]  # Use list to allow mutation in closure
 
-    def sequential_entry_generator(ind: tuple[int, ...]) -> dict[str, Any]:
+    def sequential_entry_generator(
+        ind: tuple[int, ...], chunks: tuple[int, ...], itemsize: int
+    ) -> dict[str, Any]:
         entry = {
             "path": netcdf4_file,
             "offset": current_offset[0],
@@ -159,7 +175,7 @@ def _generate_chunk_manifest(
         current_offset[0] += length
         return entry
 
-    entries = _generate_chunk_entries(shape, chunks, sequential_entry_generator)
+    entries = _generate_chunk_entries(shape, chunks, 32, sequential_entry_generator)
     return ChunkManifest(entries)
 
 
@@ -256,8 +272,19 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 def netcdf4_virtual_dataset(netcdf4_file):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.tests.utils import obstore_local
 
-    with open_virtual_dataset(netcdf4_file, loadable_variables=[]) as ds:
+    store = obstore_local(url=netcdf4_file)
+    registry = ObjectStoreRegistry()
+    registry.register("file://", store)
+    parser = HDFParser()
+    with open_virtual_dataset(
+        url=netcdf4_file,
+        registry=registry,
+        parser=parser,
+        loadable_variables=[],
+    ) as ds:
         yield ds
 
 
@@ -349,13 +376,20 @@ def manifest_array(array_v3_metadata):
     def _manifest_array(
         shape: tuple = (5, 2),
         chunks: tuple = (5, 2),
+        data_type: np.dtype = np.dtype("int32"),
         codecs: list[dict] | None = [ARRAYBYTES_CODEC, ZLIB_CODEC],
         dimension_names: Iterable[str] | None = None,
     ):
         metadata = array_v3_metadata(
-            shape=shape, chunks=chunks, codecs=codecs, dimension_names=dimension_names
+            shape=shape,
+            chunks=chunks,
+            data_type=data_type,
+            codecs=codecs,
+            dimension_names=dimension_names,
         )
-        entries = _generate_chunk_entries(shape, chunks, _entry_from_chunk_key)
+        entries = _generate_chunk_entries(
+            shape, chunks, data_type.itemsize, _entry_from_chunk_key
+        )
         chunkmanifest = ChunkManifest(entries=entries)
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
 
@@ -367,7 +401,7 @@ def virtual_variable(array_v3_metadata: Callable) -> Callable:
     """Generate a virtual variable with configurable parameters."""
 
     def _virtual_variable(
-        file_uri: str,
+        url: str,
         shape: tuple[int, ...] = (3, 4),
         chunk_shape: tuple[int, ...] = (3, 4),
         dtype: np.dtype = np.dtype("int32"),
@@ -380,7 +414,7 @@ def virtual_variable(array_v3_metadata: Callable) -> Callable:
         attrs: dict[str, Any] = {},
     ) -> xr.Variable:
         manifest = _generate_chunk_manifest(
-            file_uri,
+            url,
             shape=shape,
             chunks=chunk_shape,
             offset=offset,
@@ -409,7 +443,7 @@ def virtual_dataset(virtual_variable: Callable) -> Callable:
     """Generate a virtual dataset with configurable parameters."""
 
     def _virtual_dataset(
-        file_uri: str,
+        url: str,
         shape: tuple[int, ...] = (3, 4),
         chunk_shape: tuple[int, ...] = (3, 4),
         dtype: np.dtype = np.dtype("int32"),
@@ -422,9 +456,9 @@ def virtual_dataset(virtual_variable: Callable) -> Callable:
         dims: Optional[list[str]] = None,
         coords: Optional[xr.Coordinates] = None,
     ) -> xr.Dataset:
-        with xr.open_dataset(file_uri) as ds:
+        with xr.open_dataset(url) as ds:
             var = virtual_variable(
-                file_uri=file_uri,
+                url=url,
                 shape=shape,
                 chunk_shape=chunk_shape,
                 dtype=dtype,

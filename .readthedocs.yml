@@ -12,8 +12,3 @@ build:
     - pixi install --environment docs
     - pixi run build-docs
     - pixi run readthedocs
-
-# Build documentation in the doc/ directory with Sphinx
-sphinx:
-  configuration: docs/conf.py
-  fail_on_warning: true

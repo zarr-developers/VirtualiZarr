@@ -9,7 +9,7 @@ from conftest import (
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 
-class TestManifestArray:
+class TestInit:
     def test_manifest_array(self, array_v3_metadata):
         chunks_dict = {
             "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
@@ -48,6 +48,23 @@ class TestManifestArray:
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+
+
+class TestResultType:
+    def test_idempotent(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+
+        assert np.result_type(marr1) == marr1.dtype
+        assert np.result_type(marr1, marr1.dtype) == marr1.dtype
+        assert np.result_type(marr1, marr2) == marr1.dtype
+
+    def test_raises(self, manifest_array):
+        marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))
+        marr2 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int64"))
+
+        with pytest.raises(ValueError, match="inconsistent"):
+            np.result_type(marr1, marr2)
 
 
 class TestEquals:
@@ -121,9 +138,9 @@ class TestBroadcast:
         assert expanded.shape == (3, 2)
         assert expanded.chunks == (1, 2)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
-            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 5},
+            "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
+            "2.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
         }
 
     def test_broadcast_new_axis(self, manifest_array):
@@ -132,9 +149,9 @@ class TestBroadcast:
         assert expanded.shape == (1, 3)
         assert expanded.chunks == (1, 1)
         assert expanded.manifest.dict() == {
-            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
-            "0.1": {"path": "file:///foo.1.nc", "offset": 10, "length": 6},
-            "0.2": {"path": "file:///foo.2.nc", "offset": 20, "length": 7},
+            "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
+            "0.1": {"path": "file:///foo.1.nc", "offset": 0, "length": 4},
+            "0.2": {"path": "file:///foo.2.nc", "offset": 0, "length": 4},
         }
 
     def test_broadcast_scalar(self, manifest_array):
@@ -143,14 +160,14 @@ class TestBroadcast:
         assert marr.shape == ()
         assert marr.chunks == ()
         assert marr.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
         assert expanded.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 5},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
     @pytest.mark.parametrize(
@@ -377,13 +394,24 @@ def test_refuse_combine(array_v3_metadata):
         with pytest.raises(NotImplementedError, match="different codecs"):
             func([marr1, marr2], axis=0)
 
-    metadata_copy = metadata_common.to_dict().copy()
-    metadata_copy["data_type"] = np.dtype("int64")
-    metadata_wrong_dtype = ArrayV3Metadata.from_dict(metadata_copy)
+    metadata_wrong_dtype = array_v3_metadata(
+        shape=shape, chunks=chunks, data_type=np.dtype("int64")
+    )
     marr2 = ManifestArray(metadata=metadata_wrong_dtype, chunkmanifest=chunkmanifest2)
     for func in [np.concatenate, np.stack]:
         with pytest.raises(ValueError, match="inconsistent dtypes"):
             func([marr1, marr2], axis=0)
+
+    metadata_variable_chunk = array_v3_metadata(
+        shape=shape,
+        chunks=(4, 1, 19),
+    )
+    marr = ManifestArray(metadata=metadata_variable_chunk, chunkmanifest=chunkmanifest2)
+    with pytest.raises(
+        ValueError,
+        match="Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. Concat input 0 has array length 5 along the concatenation axis which is not evenly divisible by chunk length 4.",
+    ):
+        np.concatenate([marr, marr], axis=0)
 
 
 class TestIndexing:
@@ -394,19 +422,178 @@ class TestIndexing:
         with pytest.raises(TypeError, match="indexer must be of type"):
             marr[dodgy_indexer]
 
-    @pytest.mark.parametrize("dodgy_indexer", [(5, 4), (5, ...)])
-    def test_invalid_indexer_shape(self, manifest_array, dodgy_indexer):
-        marr = manifest_array(shape=(4,), chunks=(2,))
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, invalid_indexer",
+        [
+            ((2,), (1,), (0, 0)),
+            ((2,), (1,), (0, None, 0)),
+            ((2,), (1,), (0, ..., 0)),
+            ((), (), (0)),
+            # valid in numpy but not in the array API standard
+            ((2,), (1,), None),
+            ((2,), (1,), (None, None)),
+        ],
+    )
+    def test_invalid_indexer_shape(
+        self, manifest_array, in_shape, in_chunks, invalid_indexer
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
 
-        with pytest.raises(ValueError, match="Invalid indexer for array with ndim"):
-            marr[dodgy_indexer]
+        with pytest.raises(
+            ValueError,
+            match="Invalid indexer for array. Indexer must contain a number of single-axis indexing expressions",
+        ):
+            marr[invalid_indexer]
 
-    @pytest.mark.parametrize("dodgy_indexer", [np.ndarray(5)])
-    def test_index_with_numpy_array_notimplemented(self, manifest_array, dodgy_indexer):
-        marr = manifest_array(shape=(4,), chunks=(2,))
+    @pytest.mark.parametrize("unsupported_indexer", [np.ndarray(0)])
+    def test_unsupported_index_types(self, manifest_array, unsupported_indexer):
+        marr = manifest_array(shape=(2,), chunks=(1,))
 
         with pytest.raises(NotImplementedError):
-            marr[dodgy_indexer]
+            marr[unsupported_indexer]
+
+    def test_indexing_scalar_with_ellipsis(self, manifest_array):
+        # regression test for https://github.com/zarr-developers/VirtualiZarr/pull/641
+        marr = manifest_array(shape=(), chunks=())
+        assert marr[...] == marr
+
+    def test_insert_newaxis_via_indexing_with_ellipsis(self, manifest_array):
+        # regression test for GH issue #728
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        new_marr = marr[None, ...]
+        assert new_marr.shape == (1, 2)
+        assert new_marr.chunks == (1, 1)
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer, out_shape, out_chunks",
+        [
+            # no-ops
+            ((2,), (1,), slice(None), (2,), (1,)),
+            ((2,), (1,), ..., (2,), (1,)),
+            ((2,), (1,), (..., slice(None)), (2,), (1,)),
+            ((2,), (1,), (slice(None), ...), (2,), (1,)),
+            ((), (), ..., (), ()),
+            ((), (), (), (), ()),
+            # inserting new axes
+            ((2,), (1,), (None, slice(None)), (1, 2), (1, 1)),
+            ((2,), (1,), (slice(None), None), (2, 1), (1, 1)),
+            ((2,), (1,), (None, ...), (1, 2), (1, 1)),
+            ((2,), (1,), (..., None), (2, 1), (1, 1)),
+            ((), (), None, (1,), (1,)),
+        ],
+    )
+    def test_noops_and_broadcasting_cases(
+        self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
+
+    def test_raise_on_multiple_ellipses(
+        self,
+        manifest_array,
+    ):
+        marr = manifest_array(shape=(2,), chunks=(1,))
+        with pytest.raises(ValueError, match="multiple Ellipses"):
+            marr[..., ...]
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer, out_shape, out_chunks",
+        [
+            # obvious no-ops
+            ((2,), (1,), slice(0, 2), (2,), (1,)),
+            # reduces shape
+            pytest.param(
+                (1,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            # requires chunk-aligned selection
+            pytest.param(
+                (2,),
+                (1,),
+                0,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                1,
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (0, ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., 0),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                slice(0, 1),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (..., slice(0, 1)),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+            pytest.param(
+                (2,),
+                (1,),
+                (slice(0, 1), ...),
+                (1,),
+                (1,),
+                marks=pytest.mark.xfail(
+                    reason="Chunk-aligned indexing not yet implemented"
+                ),
+            ),
+        ],
+    )
+    def test_chunk_selection_cases(
+        self, manifest_array, in_shape, in_chunks, indexer, out_shape, out_chunks
+    ):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        indexed = marr[indexer]
+        assert indexed.shape == out_shape
+        assert indexed.chunks == out_chunks
 
 
 def test_to_xarray(array_v3_metadata):

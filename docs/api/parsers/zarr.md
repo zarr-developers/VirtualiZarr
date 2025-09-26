@@ -1,0 +1,3 @@
+# Zarr
+
+::: virtualizarr.parsers.ZarrParser

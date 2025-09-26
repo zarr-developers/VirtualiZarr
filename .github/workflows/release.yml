@@ -6,7 +6,7 @@ on:
   # push:
   #   branches: [ "main" ]
   pull_request:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -78,7 +78,7 @@ jobs:
           python -c "import virtualizarr; print(virtualizarr.__version__)"
       - name: Publish package to TestPyPI
         if: github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@v1.8.14
+        uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
           repository-url: https://test.pypi.org/legacy/
           # verbose: true
@@ -98,4 +98,4 @@ jobs:
           name: releases
           path: dist
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.14
+        uses: pypa/gh-action-pypi-publish@v1.12.4

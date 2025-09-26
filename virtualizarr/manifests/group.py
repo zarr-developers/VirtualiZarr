@@ -26,18 +26,18 @@ class ManifestGroup(
     def __init__(
         self,
         arrays: Mapping[str, ManifestArray] | None = None,
-        groups: Mapping[str, "ManifestGroup"] | None = None,
+        groups: Mapping[str, ManifestGroup] | None = None,
         attributes: dict | None = None,
     ) -> None:
         """
-        Create a ManifestGroup containing ManifestArrays and/or sub-groups, as well as any group-level metadata.
+        Create a ManifestGroup containing [ManifestArrays][virtualizarr.manifests.ManifestArray] and/or sub-groups, as well as any group-level metadata.
 
         Parameters
         ----------
         arrays : Mapping[str, ManifestArray], optional
-            ManifestArray objects to represent virtual zarr arrays.
+            [ManifestArray][virtualizarr.manifests.ManifestArray] objects to represent virtual zarr arrays.
         groups : Mapping[str, ManifestGroup], optional
-            ManifestGroup objects to represent virtual zarr subgroups.
+            [ManifestGroup][virtualizarr.manifests.ManifestGroup] objects to represent virtual zarr subgroups.
         attributes : dict, optional
             Zarr attributes to add as zarr group metadata.
         """
@@ -113,7 +113,7 @@ class ManifestGroup(
 
     def to_virtual_dataset(self) -> xr.Dataset:
         """
-        Create a "virtual" xarray.Dataset containing the contents of one zarr group.
+        Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
 
         All variables in the returned Dataset will be "virtual", i.e. they will wrap ManifestArray objects.
         """

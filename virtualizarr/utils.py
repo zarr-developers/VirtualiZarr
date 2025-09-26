@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import copy
 import importlib
 import io
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
-from urllib.parse import urlparse
+import json
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
 
-from zarr.abc.codec import ArrayArrayCodec, BytesBytesCodec
+import obstore as obs
+from zarr.abc.codec import ArrayBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.dtype import data_type_registry
 
-from virtualizarr.codecs import extract_codecs, get_codec_config
+from virtualizarr.codecs import get_codec_config, zarr_codec_config_to_v2
+from virtualizarr.types.kerchunk import KerchunkStoreRefs
+
+# taken from zarr.core.common
+JSON = str | int | float | Mapping[str, "JSON"] | Sequence["JSON"] | None
+
 
 if TYPE_CHECKING:
     import fsspec.core
     import fsspec.spec
-    import upath
     from obstore import ReadableFile
     from obstore.store import ObjectStore
 
@@ -28,14 +34,24 @@ class ObstoreReader:
     _reader: ReadableFile
 
     def __init__(self, store: ObjectStore, path: str) -> None:
-        import obstore as obs
+        """
+        Create an obstore file reader that implements the read, readall, seek, and tell methods, which
+        can be used in libraries that expect file-like objects.
 
-        parsed = urlparse(path)
-
-        self._reader = obs.open_reader(store, parsed.path)
+        Parameters
+        ----------
+        store
+            [ObjectStore][obstore.store.ObjectStore] for reading the file.
+        path
+            The path to the file within the store. This should not include the prefix.
+        """
+        self._reader = obs.open_reader(store, path)
 
     def read(self, size: int, /) -> bytes:
         return self._reader.read(size).to_bytes()
+
+    def readall(self) -> bytes:
+        return self._reader.read().to_bytes()
 
     def seek(self, offset: int, whence: int = 0, /):
         # TODO: Check on default for whence
@@ -43,61 +59,6 @@ class ObstoreReader:
 
     def tell(self) -> int:
         return self._reader.tell()
-
-
-@dataclass
-class _FsspecFSFromFilepath:
-    """Class to create fsspec Filesystem from input filepath.
-
-    Parameters
-    ----------
-    filepath : str
-        Input filepath
-    reader_options : dict, optional
-        dict containing kwargs to pass to file opener, by default {}
-    fs : Option | None
-        The fsspec filesystem object, created in __post_init__
-
-    """
-
-    filepath: str
-    reader_options: Optional[dict] = field(default_factory=dict)
-    fs: fsspec.AbstractFileSystem = field(init=False)
-    upath: upath.core.UPath = field(init=False)
-
-    def open_file(self) -> OpenFileType:
-        """Calls `.open` on fsspec.Filesystem instantiation using self.filepath as an input.
-
-        Returns
-        -------
-        OpenFileType
-            file opened with fsspec
-        """
-        return self.fs.open(self.filepath)
-
-    def read_bytes(self, bytes: int) -> bytes:
-        with self.open_file() as of:
-            return of.read(bytes)
-
-    def get_mapper(self):
-        """Returns a mapper for use with Zarr"""
-        return self.fs.get_mapper(self.filepath)
-
-    def __post_init__(self) -> None:
-        """Initialize the fsspec filesystem object"""
-        import fsspec
-        from upath import UPath
-
-        if not isinstance(self.filepath, UPath):
-            upath = UPath(self.filepath)
-
-        self.upath = upath
-        self.protocol = upath.protocol
-
-        self.reader_options = self.reader_options or {}
-        storage_options = self.reader_options.get("storage_options", {})  # type: ignore
-
-        self.fs = fsspec.filesystem(self.protocol, **storage_options)
 
 
 def check_for_collisions(
@@ -162,9 +123,9 @@ def convert_v3_to_v2_metadata(
 
     Parameters
     ----------
-    v3_metadata : ArrayV3Metadata
+    v3_metadata
         The metadata object in v3 format.
-    fill_value : Any, optional
+    fill_value
         Override the fill value from v3 metadata.
 
     Returns
@@ -172,34 +133,57 @@ def convert_v3_to_v2_metadata(
     ArrayV2Metadata
         The metadata object in v2 format.
     """
-    import warnings
 
-    array_filters: tuple[ArrayArrayCodec, ...]
-    bytes_compressors: tuple[BytesBytesCodec, ...]
-    array_filters, _, bytes_compressors = extract_codecs(v3_metadata.codecs)
-    # Handle compressor configuration
-    compressor_config: dict[str, Any] | None = None
-    if bytes_compressors:
-        if len(bytes_compressors) > 1:
-            warnings.warn(
-                "Multiple compressors found in v3 metadata. Using the first compressor, "
-                "others will be ignored. This may affect data compatibility.",
-                UserWarning,
-            )
-        compressor_config = get_codec_config(bytes_compressors[0])
-
-    # Handle filter configurations
-    filter_configs = [get_codec_config(filter_) for filter_ in array_filters]
-
+    # TODO: Check that all ArrayBytesCodecs should in fact be excluded for V2 metadata storage.
+    v2_codecs = [
+        zarr_codec_config_to_v2(get_codec_config(codec))
+        for codec in v3_metadata.codecs
+        if not isinstance(codec, ArrayBytesCodec)
+    ]
+    # TODO: Remove convert_v3_to_v2_metadata and always encode V3 metadata.
+    # This logic is based on the (default) Bytes codec's endian property,
+    # but other codec pipelines could store endianness elsewhere.
+    big_endian = any(
+        isinstance(codec, ArrayBytesCodec)
+        and getattr(codec, "endian", None) is not None
+        and codec.endian.value == "big"  # type: ignore[attr-defined]
+        for codec in v3_metadata.codecs
+    )
+    if big_endian:
+        na_dtype = v3_metadata.data_type.to_native_dtype().newbyteorder(">")
+        dtype = data_type_registry.match_dtype(dtype=na_dtype)
+    else:
+        dtype = v3_metadata.data_type
     v2_metadata = ArrayV2Metadata(
         shape=v3_metadata.shape,
-        dtype=v3_metadata.data_type.to_numpy(),
+        dtype=dtype,
         chunks=v3_metadata.chunks,
         fill_value=fill_value or v3_metadata.fill_value,
-        compressor=compressor_config,
-        filters=filter_configs,
+        filters=v2_codecs
+        if v2_codecs
+        else None,  # Do not pass an empty list to ArrayV2Metadata
+        compressor=None,
         order="C",
         attributes=v3_metadata.attributes,
         dimension_separator=".",  # Assuming '.' as default dimension separator
     )
     return v2_metadata
+
+
+def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
+    """
+    Normalizes all Kerchunk references into true JSON all the way down.
+
+    See https://github.com/zarr-developers/VirtualiZarr/issues/679 for context as to why this is needed.
+    """
+
+    normalized_result: dict[str, JSON] = copy.deepcopy(refs)
+    v0_refs: dict[str, JSON] = refs["refs"]
+
+    for k, v in v0_refs.items():
+        # check for strings because the value could be for a chunk, in which case it is already a list like ["/test.nc", 6144, 48]
+        # this is a rather fragile way to discover if we're looking at a chunk key or not, but it should work...
+        if isinstance(v, str):
+            normalized_result["refs"][k] = json.loads(v)  # type: ignore[index]
+
+    return normalized_result

@@ -8,11 +8,34 @@ from zarr.core.metadata.v3 import (
     parse_dimension_names,
     parse_shapelike,
 )
+from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 if TYPE_CHECKING:
     from .array import ManifestArray
+
+
+def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]) -> str:
+    """
+    Produces a pattern for finding a chunk indices from key within a Zarr store using [re.match][] or [re.search][].
+
+    Parameters
+    ----------
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
+
+    Returns
+    -------
+    String representation of regular expression for a chunk key index
+    """
+
+    integer_pattern = r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
+    separator = (
+        rf"\{chunk_key_encoding}" if chunk_key_encoding == "." else chunk_key_encoding
+    )
+    pattern = rf"{integer_pattern}+({separator}{integer_pattern})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
+    return pattern
 
 
 def create_v3_array_metadata(
@@ -27,7 +50,7 @@ def create_v3_array_metadata(
 ) -> ArrayV3Metadata:
     """
     Create an ArrayV3Metadata instance with standard configuration.
-    This function encapsulates common patterns used across different readers.
+    This function encapsulates common patterns used across different parsers.
 
     Parameters
     ----------
@@ -53,15 +76,16 @@ def create_v3_array_metadata(
     ArrayV3Metadata
         A configured ArrayV3Metadata instance with standard defaults
     """
+    zdtype = parse_data_type(data_type, zarr_format=3)
     return ArrayV3Metadata(
         shape=shape,
-        data_type=data_type,
+        data_type=zdtype,
         chunk_grid={
             "name": "regular",
             "configuration": {"chunk_shape": chunk_shape},
         },
         chunk_key_encoding=chunk_key_encoding,
-        fill_value=fill_value,
+        fill_value=zdtype.default_scalar() if fill_value is None else fill_value,
         codecs=convert_to_codec_pipeline(
             codecs=codecs or [],
             dtype=data_type,
@@ -133,28 +157,24 @@ def check_same_shapes(shapes: list[tuple[int, ...]]) -> None:
             )
 
 
-# TODO remove this once https://github.com/zarr-developers/zarr-python/issues/2929 is solved upstream
-def metadata_identical(metadata1: ArrayV3Metadata, metadata2: ArrayV3Metadata) -> bool:
-    """Checks the metadata of two zarr arrays are identical, including special treatment for NaN fill_values."""
-    metadata_dict1 = metadata1.to_dict()
-    metadata_dict2 = metadata2.to_dict()
-
-    # fill_value is a special case because numpy NaNs cannot be compared using __eq__, see https://stackoverflow.com/a/10059796
-    fill_value1 = metadata_dict1.pop("fill_value")
-    fill_value2 = metadata_dict2.pop("fill_value")
-    if np.isnan(fill_value1) and np.isnan(fill_value2):  # type: ignore[arg-type]
-        fill_values_equal = fill_value1.dtype == fill_value2.dtype  # type: ignore[union-attr]
-    else:
-        fill_values_equal = fill_value1 == fill_value2
-
-    # everything else in ArrayV3Metadata is a string, Enum, or Dataclass
-    return fill_values_equal and metadata_dict1 == metadata_dict2
-
-
 def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]:
     new_l = list(t)
     new_l.pop(pos)
     return tuple(new_l)
+
+
+def check_no_partial_chunks_on_concat_axis(
+    shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
+):
+    """Check that there are no partial chunks along the concatenation axis"""
+    # loop over the arrays to be concatenated
+    for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        if shape[axis] % chunk_shape[axis] > 0:
+            raise ValueError(
+                "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
+                f"Concat input {i} has array length {shape[axis]} along the concatenation axis which is not "
+                f"evenly divisible by chunk length {chunk_shape[axis]}."
+            )
 
 
 def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis: int):

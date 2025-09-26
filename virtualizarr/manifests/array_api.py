@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
 
@@ -7,6 +7,7 @@ from virtualizarr.utils import determine_chunk_grid_shape
 from .manifest import ChunkManifest
 from .utils import (
     check_combinable_zarr_arrays,
+    check_no_partial_chunks_on_concat_axis,
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
@@ -33,12 +34,22 @@ def implements(numpy_function):
 
 
 @implements(np.result_type)
-def result_type(*arrays_and_dtypes) -> np.dtype:
+def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtype:
     """Called by xarray to ensure all arguments to concat have the same dtype."""
-    first_dtype, *other_dtypes = (np.dtype(obj) for obj in arrays_and_dtypes)
+    from virtualizarr.manifests.array import ManifestArray
+
+    dtypes = (
+        obj.dtype if isinstance(obj, ManifestArray) else np.dtype(obj)
+        for obj in arrays_and_dtypes
+    )
+    first_dtype, *other_dtypes = dtypes
+    unique_dtypes = set(dtypes)
     for other_dtype in other_dtypes:
         if other_dtype != first_dtype:
-            raise ValueError("dtypes not all consistent")
+            raise ValueError(
+                f"Cannot combine arrays with inconsistent dtypes, but got {len(unique_dtypes)} distinct dtypes: {unique_dtypes}"
+            )
+
     return first_dtype
 
 
@@ -75,7 +86,9 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
+    arr_chunks = [arr.chunks for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+    check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
     # find what new array shape must be
     new_length_along_concat_axis = sum([shape[axis] for shape in arr_shapes])

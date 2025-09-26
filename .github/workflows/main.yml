@@ -2,11 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   pull_request:
-    branches: [ "main" , "develop"]
+    branches: [ "main" ]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -24,6 +24,7 @@ jobs:
       run:
         shell: bash -l {0}
     strategy:
+      fail-fast: false
       matrix:
         environment: [test-py311, test-py312, min-deps, minio]
     steps:
@@ -51,3 +52,24 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  check-docs:
+    name: check-docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          pixi-version: v0.41.4
+
+      - name: List installed libraries
+        run: |
+          pixi install --environment docs
+          pixi list --environment docs
+
+      - name: Check documentation build for warnings
+        run: |
+          pixi run -e docs check-docs

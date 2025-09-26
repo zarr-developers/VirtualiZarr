@@ -4,6 +4,7 @@ import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
+from zarr.codecs import BytesCodec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
@@ -19,10 +20,11 @@ DeconstructedCodecPipeline = tuple[
 ]
 
 
-def numcodec_config_to_configurable(num_codec: dict) -> dict:
+def zarr_codec_config_to_v3(num_codec: dict) -> dict:
     """
     Convert a numcodecs codec into a zarr v3 configurable.
     """
+    # TODO: Special case Blosc codec
     if num_codec["id"].startswith("numcodecs."):
         return num_codec
 
@@ -31,14 +33,36 @@ def numcodec_config_to_configurable(num_codec: dict) -> dict:
     return {"name": name, "configuration": num_codec_copy}
 
 
+def zarr_codec_config_to_v2(num_codec: dict) -> dict:
+    """
+    Convert a numcodecs codec into a zarr v2 configurable.
+    """
+    # TODO: Special case Blosc codec
+    if name := num_codec.get("name", None):
+        return {"id": name, **num_codec["configuration"]}
+    elif num_codec.get("id", None):
+        return num_codec
+    else:
+        raise ValueError(f"Expected a valid Zarr V2 or V3 codec dict, got {num_codec}")
+
+
 def extract_codecs(
     codecs: CodecPipeline,
 ) -> DeconstructedCodecPipeline:
     """Extracts various codec types."""
+
     arrayarray_codecs: tuple[ArrayArrayCodec, ...] = ()
     arraybytes_codec: ArrayBytesCodec | None = None
     bytesbytes_codecs: tuple[BytesBytesCodec, ...] = ()
     for codec in codecs:
+        if not isinstance(codec, (ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec)):
+            raise TypeError(
+                "All codecs must be valid zarr v3 codecs, "
+                f"but supplied codec {codec} does not subclass any of "
+                "``zarr.abc.codec.ArrayArrayCodec``, ``zarr.abc.codec.ArrayBytesCodec``, or ``zarr.abc.codec.BytesBytesCodec``. "
+                "Please see https://zarr.readthedocs.io/en/stable/user-guide/extending.html#custom-codecs for details on how to specify custom zarr codecs."
+            )
+
         if isinstance(codec, ArrayArrayCodec):
             arrayarray_codecs += (codec,)
         if isinstance(codec, ArrayBytesCodec):
@@ -57,14 +81,13 @@ def convert_to_codec_pipeline(
 
     Parameters
     ----------
-    dtype : np.dtype
-    codecs: list[dict] | None
+    dtype
+    codecs
 
     Returns
     -------
     BatchedCodecPipeline
     """
-    from zarr.core.array import _get_default_chunk_encoding_v3
     from zarr.registry import get_codec_class
 
     zarr_codecs: tuple[ArrayArrayCodec | ArrayBytesCodec | BytesBytesCodec, ...] = ()
@@ -78,7 +101,10 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        arraybytes_codec = _get_default_chunk_encoding_v3(dtype)[1]
+        if dtype.byteorder == ">":
+            arraybytes_codec = BytesCodec(endian="big")
+        else:
+            arraybytes_codec = BytesCodec()
 
     codec_pipeline = BatchedCodecPipeline(
         array_array_codecs=arrayarray_codecs,

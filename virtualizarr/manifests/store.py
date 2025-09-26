@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import pickle
+import re
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
 
 from zarr.abc.store import (
@@ -13,32 +13,24 @@ from zarr.abc.store import (
     Store,
     SuffixByteRequest,
 )
-from zarr.core.buffer import Buffer, default_buffer_prototype
-from zarr.core.buffer.core import BufferPrototype
+from zarr.core.buffer import Buffer, BufferPrototype, default_buffer_prototype
+from zarr.core.common import BytesLike
 
-from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.vendor.zarr.core.metadata import dict_to_buffer
+from virtualizarr.manifests.utils import construct_chunk_pattern
+from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Iterable, Mapping
-    from typing import Any
+    from obstore.store import (
+        ObjectStore,
+    )
+
+    StoreDict: TypeAlias = dict[str, ObjectStore]
 
     import xarray as xr
-    from obstore.store import (
-        ObjectStore,  # type: ignore[import-not-found]
-    )
-    from zarr.core.buffer import BufferPrototype
-    from zarr.core.common import BytesLike
+
 
 __all__ = ["ManifestStore"]
-
-
-_ALLOWED_EXCEPTIONS: tuple[type[Exception], ...] = (
-    FileNotFoundError,
-    IsADirectoryError,
-    NotADirectoryError,
-)
 
 
 @dataclass
@@ -51,241 +43,113 @@ class StoreRequest:
     """The key within the store to request."""
 
 
-async def list_dir_from_manifest_arrays(
-    arrays: Mapping[str, ManifestArray], prefix: str
-) -> AsyncGenerator[str]:
-    """Create the expected results for Zarr's `store.list_dir()` from an Xarray DataArrray or Dataset
+def get_store_prefix(url: str) -> str:
+    """
+    Get a logical prefix to use for a url in an ObjectStoreRegistry
+    """
+    scheme, netloc, *_ = urlparse(url)
+    return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
+
+
+def parse_manifest_index(
+    key: str, chunk_key_encoding: Literal[".", "/"] = "."
+) -> tuple[int, ...]:
+    """
+    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
+    data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
+    containing paths, offsets, and lengths in ManifestArrays.
 
     Parameters
     ----------
-    arrays : Mapping[str, ManifestArrays]
-    prefix : str
+    key
+        The key in the Zarr store to parse.
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
 
     Returns
     -------
-    AsyncIterator[str]
+    tuple containing chunk indexes.
+
+    Raises
+    ------
+    ValueError
+        Raised if the key does not match the expected node structure for a chunk according the
+        [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
+
     """
-    # TODO shouldn't this just accept a ManifestGroup instead?
-    # Start with expected group level metadata
-    raise NotImplementedError
+    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
+    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
+    if key.endswith("/c"):
+        return ()
 
-
-def get_zarr_metadata(manifest_group: ManifestGroup, key: str) -> Buffer:
-    """
-    Generate the expected Zarr V3 metadata from a virtual dataset.
-
-    Group metadata is returned for all Datasets and Array metadata
-    is returned for all DataArrays.
-
-    Combines the ManifestArray metadata with the attrs from the DataArray
-    and adds `dimension_names` for all arrays if not already provided.
-
-    Parameters
-    ----------
-    manifest_group : ManifestGroup
-    key : str
-
-    Returns
-    -------
-    Buffer
-    """
-    # If requesting the root metadata, return the standard group metadata with additional dataset specific attributes
-
-    if key == "zarr.json":
-        metadata = manifest_group.metadata.to_dict()
-        return dict_to_buffer(metadata, prototype=default_buffer_prototype())
-    else:
-        var, _ = key.split("/")
-        metadata = manifest_group.arrays[var].metadata.to_dict()
-        return dict_to_buffer(metadata, prototype=default_buffer_prototype())
-
-
-def parse_manifest_index(key: str, chunk_key_encoding: str = ".") -> tuple[int, ...]:
-    """
-    Splits `key` provided to a zarr store into the variable indicated
-    by the first part and the chunk index from the 3rd through last parts,
-    which can be used to index into the ndarrays containing paths, offsets,
-    and lengths in ManifestArrays.
-
-    Parameters
-    ----------
-    key : str
-    chunk_key_encoding : str
-
-    Returns
-    -------
-    tuple containing chunk indexes
-    """
-    if key.endswith("c"):
-        # Scalar arrays hold the data in the "c" key
-        raise NotImplementedError(
-            "Scalar arrays are not yet supported by ManifestStore"
-        )
-    parts = key.split(
-        "c/"
-    )  # TODO: Open an issue upstream about the Zarr spec indicating this should be f"c{chunk_key_encoding}" rather than always "c/"
-    return tuple(int(ind) for ind in parts[1].split(chunk_key_encoding))
-
-
-def _find_bucket_region(bucket_name: str) -> str:
-    import requests
-
-    resp = requests.head(f"https://{bucket_name}.s3.amazonaws.com")
-    region = resp.headers.get("x-amz-bucket-region")
-    if not region:
+    pattern = construct_chunk_pattern(chunk_key_encoding)
+    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
+    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
+    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
+    match = re.search(pattern, key)
+    if not match:
         raise ValueError(
-            f"Unable to automatically determine region for bucket {bucket_name}"
+            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
         )
-    return region
-
-
-def default_object_store(filepath: str) -> ObjectStore:
-    import obstore as obs
-
-    parsed = urlparse(filepath)
-
-    if parsed.scheme in ["", "file"]:
-        return obs.store.LocalStore()
-    if parsed.scheme == "s3":
-        bucket = parsed.netloc
-        return obs.store.S3Store(
-            bucket=bucket,
-            client_options={"allow_http": True},
-            skip_signature=True,
-            virtual_hosted_style_request=False,
-            region=_find_bucket_region(bucket),
-        )
-    if parsed.scheme in ["http", "https"]:
-        base_url = f"{parsed.scheme}://{parsed.netloc}"
-        return obs.store.HTTPStore.from_url(base_url)
-    raise NotImplementedError(f"{parsed.scheme} is not yet supported")
-
-
-class ObjectStoreRegistry:
-    """
-    ObjectStoreRegistry maps the URL scheme and netloc to ObjectStore instances. This register allows
-    Zarr Store implementations (e.g., ManifestStore) to read from different ObjectStore instances.
-    """
-
-    _stores: dict[str, ObjectStore]
-
-    @classmethod
-    def __init__(self, stores: dict[str, ObjectStore] | None = None):
-        stores = stores or {}
-        for store in stores.values():
-            if not store.__class__.__module__.startswith("obstore"):
-                raise TypeError(f"expected ObjectStore class, got {store!r}")
-        self._stores = stores
-
-    def register_store(self, url: str, store: ObjectStore):
-        """
-        Register a store using the given url
-
-        If a store with the same key existed before, it is replaced
-        """
-        parsed = urlparse(url)
-        scheme = parsed.scheme or "file"
-        self._stores[f"{scheme}://{parsed.netloc}"] = store
-
-    def get_store(self, url: str) -> ObjectStore:
-        """
-        Get a suitable store for the provided URL. For example:
-
-            - URL with scheme file:/// or no scheme will return the default LocalFS store
-            - URL with scheme s3://bucket/ will return the S3 store
-
-        If no `ObjectStore` is found for the `url`, ad-hoc discovery may be executed depending on the
-        `url`. An `ObjectStore` may be lazily created and registered.
-
-        Parameters:
-        -----------
-        url : str
-            A url to identify the appropriate object_store instance based on the URL scheme and netloc.
-        Returns:
-        --------
-        StoreRequest
-        """
-        parsed = urlparse(url)
-        store = self._stores.get(f"{parsed.scheme}://{parsed.netloc}")
-        if not store:
-            store = default_object_store(url)
-            self.register_store(url, store)
-        return store
+    chunk_component = (
+        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    )
+    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 class ManifestStore(Store):
     """
-    A read-only Zarr store that uses obstore to access data on AWS, GCP, Azure. The requests
-    from the Zarr API are redirected using the :class:`virtualizarr.manifests.ManifestGroup` containing
-    multiple :class:`virtualizarr.manifests.ManifestArray`,
-    allowing for virtually interfacing with underlying data in other file format.
+    A read-only Zarr store that uses obstore to read data from inside arbitrary files on AWS, GCP, Azure, or a local filesystem.
+
+    The requests from the Zarr API are redirected using the [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing
+    multiple [ManifestArray][virtualizarr.manifests.ManifestArray], allowing for virtually interfacing with underlying data in other file formats.
 
     Parameters
     ----------
-    group : ManifestGroup
+    group
         Root group of the store.
-        Contains group metadata, ManifestArrays, and any subgroups.
-    store_registry : ObjectStoreRegistry
-        ObjectStoreRegistry that maps the URL scheme and netloc to ObjectStore instances,
+        Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
+    registry : ObjectStoreRegistry
+        [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
     --------
     ManifestStore is experimental and subject to API changes without notice. Please
     raise an issue with any comments/concerns about the store.
-
-    Notes
-    -----
-    Modified from https://github.com/zarr-developers/zarr-python/pull/1661
     """
 
+    #  Modified from https://github.com/zarr-developers/zarr-python/pull/1661
+
     _group: ManifestGroup
-    _store_registry: ObjectStoreRegistry
+    _registry: ObjectStoreRegistry
 
     def __eq__(self, value: object):
         NotImplementedError
 
     def __init__(
-        self, group: ManifestGroup, *, store_registry: ObjectStoreRegistry | None = None
+        self, group: ManifestGroup, *, registry: ObjectStoreRegistry | None = None
     ) -> None:
         """Instantiate a new ManifestStore.
 
         Parameters
         ----------
-        manifest_group : ManifestGroup
-            Manifest Group containing Group metadata and mapping variable names to ManifestArrays
-        store_registry : ObjectStoreRegistry
-            A registry mapping the URL scheme and netloc to ObjectStore instances,
-            allowing ManifestStores to read from different ObjectStore instances.
+        group
+            [ManifestGroup][virtualizarr.manifests.ManifestGroup] containing Group metadata and mapping variable names to ManifestArrays
+        registry
+            A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+            allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
         """
 
-        # TODO: Don't allow stores with prefix
         if not isinstance(group, ManifestGroup):
             raise TypeError
 
         super().__init__(read_only=True)
-        if store_registry is None:
-            store_registry = ObjectStoreRegistry()
-        self._store_registry = store_registry
+        self._registry = ObjectStoreRegistry() if registry is None else registry
         self._group = group
 
     def __str__(self) -> str:
-        return f"ManifestStore(group={self._group}, stores={self._store_registry})"
-
-    def __getstate__(self) -> dict[Any, Any]:
-        state = self.__dict__.copy()
-        stores = state["_store_registry"]._stores.copy()
-        for k, v in stores.items():
-            stores[k] = pickle.dumps(v)
-        state["_store_registry"] = stores
-        return state
-
-    def __setstate__(self, state: dict[Any, Any]) -> None:
-        stores = state["_store_registry"].copy()
-        for k, v in stores.items():
-            stores[k] = pickle.loads(v)
-        state["_store_registry"] = ObjectStoreRegistry(stores)
-        self.__dict__.update(state)
+        return f"ManifestStore(group={self._group}, registry={self._registry})"
 
     async def get(
         self,
@@ -294,10 +158,19 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        import obstore as obs
 
-        if key.endswith("zarr.json"):
-            return get_zarr_metadata(self._group, key)
+        if key == "zarr.json":
+            # Return group metadata
+            return self._group.metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
+        elif key.endswith("zarr.json"):
+            # Return array metadata
+            # TODO: Handle nested groups
+            var, _ = key.split("/")
+            return self._group.arrays[var].metadata.to_buffer_dict(
+                prototype=default_buffer_prototype()
+            )["zarr.json"]
         var = key.split("/")[0]
         marr = self._group.arrays[var]
         manifest = marr.manifest
@@ -305,29 +178,40 @@ class ManifestStore(Store):
         chunk_indexes = parse_manifest_index(
             key, marr.metadata.chunk_key_encoding.separator
         )
-        path = manifest._paths[*chunk_indexes]
-        offset = manifest._offsets[*chunk_indexes]
-        length = manifest._lengths[*chunk_indexes]
+
+        path = manifest._paths[chunk_indexes]
+        if path == "":
+            return None
+        offset = manifest._offsets[chunk_indexes]
+        length = manifest._lengths[chunk_indexes]
         # Get the configured object store instance that matches the path
-        store = self._store_registry.get_store(path)
-        # Truncate path to match Obstore expectations
-        key = urlparse(path).path
+        store, path_after_prefix = self._registry.resolve(path)
+        if not store:
+            raise ValueError(
+                f"Could not find a store to use for {path} in the store registry"
+            )
+
+        path_in_store = urlparse(path).path
+        if hasattr(store, "prefix") and store.prefix:
+            prefix = str(store.prefix).lstrip("/")
+        elif hasattr(store, "url"):
+            prefix = urlparse(store.url).path.lstrip("/")
+        else:
+            prefix = ""
+        path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
         # Transform the input byte range to account for the chunk location in the file
         chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
             byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
         )
+
         # Actually get the bytes
-        try:
-            bytes = await obs.get_range_async(
-                store,
-                key,
-                start=byte_range.start,
-                end=byte_range.end,
-            )
-            return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
-        except _ALLOWED_EXCEPTIONS:
-            return None
+        bytes = await store.get_range_async(
+            path_in_store,
+            start=byte_range.start,
+            end=byte_range.end,
+        )
+        return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
 
     async def get_partial_values(
         self,
@@ -398,10 +282,9 @@ class ManifestStore(Store):
         group="",
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
-        indexes: Mapping[str, xr.Index] | None = None,
     ) -> "xr.Dataset":
         """
-        Create a "virtual" xarray dataset containing the contents of one zarr group.
+        Create a "virtual" [xarray.Dataset][] containing the contents of one zarr group.
 
         Will ignore the contents of any other groups in the store.
 
@@ -419,11 +302,15 @@ class ManifestStore(Store):
 
         from virtualizarr.xarray import construct_virtual_dataset
 
+        if loadable_variables and self._registry.map is None:
+            raise ValueError(
+                f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
+            )
+
         return construct_virtual_dataset(
             manifest_store=self,
             group=group,
             loadable_variables=loadable_variables,
-            indexes=indexes,
             decode_times=decode_times,
         )
 
