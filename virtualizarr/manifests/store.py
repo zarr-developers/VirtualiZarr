@@ -277,6 +277,11 @@ class ManifestStore(Store):
         for k in self._group.arrays.keys():
             yield k
 
+    @property
+    def supports_consolidated_metadata(self) -> bool:
+        # docstring inherited
+        return False
+
     def to_virtual_dataset(
         self,
         group="",
