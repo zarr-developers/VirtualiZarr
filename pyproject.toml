@@ -73,6 +73,7 @@ all_parsers = [
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
     "virtualizarr[kerchunk_parquet]",
+    "virtualizarr[tiff]",
 ]
 
 # writers
