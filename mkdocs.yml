@@ -35,6 +35,7 @@ nav:
       - api/parsers/netcdf3.md
       - api/parsers/zarr.md
       - api/parsers/dmrpp.md
+      - api/parsers/tiff.md
     - api/serialization.md
     - api/developer.md
   - "migration_guide.md"
