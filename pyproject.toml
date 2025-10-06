@@ -59,6 +59,9 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
+tiff = [
+    "virtual-tiff",
+]
 kerchunk_parquet = [
    "virtualizarr[remote]",
    "fastparquet",
