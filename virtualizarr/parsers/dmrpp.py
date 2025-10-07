@@ -367,9 +367,10 @@ class DMRParser:
             # Dim tags contain a fully qualified name that references a Dimension tag elsewhere in the DMR++
             dim_tags = root.findall("dap:Dim", self._NS)
             for d in dim_tags:
-                dimension_tag = self.find_node_fqn(d.attrib["name"])
-                if dimension_tag is not None:
-                    dimension_tags.append(dimension_tag)
+                if "name" in d.attrib:
+                    dimension_tag = self.find_node_fqn(d.attrib["name"])
+                    if dimension_tag is not None:
+                        dimension_tags.append(dimension_tag)
         return dimension_tags
 
     def _parse_variable(self, var_tag: ET.Element) -> ManifestArray:
