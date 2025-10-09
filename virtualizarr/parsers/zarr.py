@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from pathlib import Path  # noqa
 from typing import TYPE_CHECKING, Any, Hashable
 
-import numpy as np
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -19,18 +18,6 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  # noqa
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
-
-FillValueT = bool | str | float | int | list | None
-
-ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
-    # numpy dtypes's hierarchy lets us avoid checking for all the widths
-    # https://numpy.org/doc/stable/reference/arrays.scalars.html
-    np.dtype("bool").kind: False,
-    np.dtype("int").kind: 0,
-    np.dtype("float").kind: 0.0,
-    np.dtype("complex").kind: [0.0, 0.0],
-    np.dtype("datetime64").kind: 0,
-}
 
 if TYPE_CHECKING:
     import zarr
@@ -77,12 +64,7 @@ async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str) -> ChunkM
 
 
 def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
-    fill_value = zarr_array.metadata.fill_value
-    if fill_value is not None:
-        fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
-
     zarr_format = zarr_array.metadata.zarr_format
-
     if zarr_format == 2:
         # TODO: Once we want to support V2, we will have to deconstruct the
         # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
