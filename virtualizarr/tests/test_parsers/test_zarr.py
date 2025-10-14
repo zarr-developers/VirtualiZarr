@@ -121,7 +121,7 @@ def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar: zarr.Array):
     assert chunk_map["c"]["length"] == 10
 
 
-def test_get_metadata(zarr_store_scalar: zarr.Array):
+def test_get_metadata(zarr_array_fill_value: zarr.Array):
     # Check that the `get_metadata` function is assigning fill_values
-    zarr_array_metadata = get_metadata(zarr_array=zarr_store_scalar)
-    assert zarr_array_metadata.fill_value == zarr_store_scalar.metadata.fill_value
+    zarr_array_metadata = get_metadata(zarr_array=zarr_array_fill_value)
+    assert zarr_array_metadata.fill_value == zarr_array_fill_value.metadata.fill_value
