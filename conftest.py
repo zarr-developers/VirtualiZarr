@@ -72,12 +72,12 @@ def local_registry():
     return ObjectStoreRegistry({"file://": LocalStore()})
 
 
-@pytest.fixture()
-def zarr_store_scalar(tmpdir):
+@pytest.fixture(params=["int8", "uint8", "float32"])
+def zarr_store_scalar(tmpdir, request):
     import zarr
 
     store = zarr.storage.MemoryStore()
-    zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype="int8")
+    zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype=request.param)
     zarr_store_scalar[()] = 42
     return zarr_store_scalar
 
