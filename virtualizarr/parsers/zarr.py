@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path  # noqa
 from typing import TYPE_CHECKING, Any, Hashable
 
+import zarr
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -22,8 +23,10 @@ from virtualizarr.vendor.zarr.core.common import _concurrent_map
 if TYPE_CHECKING:
     import zarr
 
+ZarrArrayType = zarr.AsyncArray | zarr.Array
 
-async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, path: str) -> dict:
+
+async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
@@ -57,13 +60,13 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, path: str) -> di
     }
 
 
-async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str) -> ChunkManifest:
+async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
     """Build a ChunkManifest from a dictionary"""
     chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
     return ChunkManifest(chunk_map)
 
 
-def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
+def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
     if zarr_format == 2:
         # TODO: Once we want to support V2, we will have to deconstruct the
@@ -71,7 +74,7 @@ def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
         raise NotImplementedError("Reading Zarr V2 currently not supported.")
 
     elif zarr_format == 3:
-        return zarr_array.metadata
+        return zarr_array.metadata  # type: ignore[return-value]
 
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")
