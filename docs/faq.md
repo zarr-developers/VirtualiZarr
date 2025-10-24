@@ -124,7 +124,7 @@ You have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides
 !!! note
 
     "Kerchunk" is really two things: a python library and an on-disk format for storing virtual references.
-    This question compares the Kerchunk python library to the VirtualiZarr python library. 
+    This question compares the Kerchunk python library to the VirtualiZarr python library.
     For a discussion of the pros and cons of serializing into the Kerchunk references format, see the [next question](#which-format-should-i-save-my-virtual-references-as).
 
 Users of Kerchunk may find the following comparison table useful, which shows which features of Kerchunk map on to which features of VirtualiZarr.
@@ -179,7 +179,7 @@ Icechunk provides several compelling advantages over either Kerchunk format:
 - **Incremental overwriting** - VirtualiZarr's `.to_icechunk` API allows you to write to a specific region. This is more difficult to do safely when writing to Kerchunk's format because it would generally require editing part of a single file.
 - **Mix "native" and virtual chunks** - Icechunk's manifests can store any mixture of virtual chunks and "native" zarr chunks. Kerchunk's formats cannot do this ("inlined" chunks are something separate).
 <<<<<<< HEAD
-- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)). 
+- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)).
 =======
 - **Ensure referenced data has not changed** - An inherent risk of the virtual references approach is someone could overwrite, update, or delete the referenced archival file between the time when the virtual references were parsed and the time that a user attempts to read the data. With Kerchunk this scenario could lead to incorrect data being returned silently. In Icechunk, the last-modified time of each file is also saved, and checked at read-time. Therefore a user will get a clear error if a file has been touched since the virtual references were created.
 - **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)).
