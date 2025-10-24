@@ -8,6 +8,10 @@
 
 ### Bug fixes
 
+- `ZarrParser` no longer uses `ZARR_DEFAULT_FILL_VALUE` lookup to infer missing `fill_value`.
+  ([#666](https://github.com/zarr-developers/VirtualiZarr/pull/812)).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
+
 ### Documentation
 
 ### Internal changes

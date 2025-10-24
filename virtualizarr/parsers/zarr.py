@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path  # noqa
 from typing import TYPE_CHECKING, Any, Hashable
 
-import numpy as np
+import zarr
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -20,23 +20,13 @@ from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri  
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
-FillValueT = bool | str | float | int | list | None
-
-ZARR_DEFAULT_FILL_VALUE: dict[str, FillValueT] = {
-    # numpy dtypes's hierarchy lets us avoid checking for all the widths
-    # https://numpy.org/doc/stable/reference/arrays.scalars.html
-    np.dtype("bool").kind: False,
-    np.dtype("int").kind: 0,
-    np.dtype("float").kind: 0.0,
-    np.dtype("complex").kind: [0.0, 0.0],
-    np.dtype("datetime64").kind: 0,
-}
-
 if TYPE_CHECKING:
     import zarr
 
+ZarrArrayType = zarr.AsyncArray | zarr.Array
 
-async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, path: str) -> dict:
+
+async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
@@ -70,26 +60,21 @@ async def get_chunk_mapping_prefix(zarr_array: zarr.AsyncArray, path: str) -> di
     }
 
 
-async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str) -> ChunkManifest:
+async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
     """Build a ChunkManifest from a dictionary"""
     chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
     return ChunkManifest(chunk_map)
 
 
-def get_metadata(zarr_array: zarr.AsyncArray[Any]) -> ArrayV3Metadata:
-    fill_value = zarr_array.metadata.fill_value
-    if fill_value is not None:
-        fill_value = ZARR_DEFAULT_FILL_VALUE[zarr_array.metadata.fill_value.dtype.kind]
-
+def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
-
     if zarr_format == 2:
         # TODO: Once we want to support V2, we will have to deconstruct the
         # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
         raise NotImplementedError("Reading Zarr V2 currently not supported.")
 
     elif zarr_format == 3:
-        return zarr_array.metadata
+        return zarr_array.metadata  # type: ignore[return-value]
 
     else:
         raise NotImplementedError("Zarr format is not recognized as v2 or v3.")

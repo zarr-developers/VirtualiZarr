@@ -1,12 +1,15 @@
 import numpy as np
 import pytest
+import zarr
 from obstore.store import LocalStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
-from virtualizarr.parsers.zarr import get_chunk_mapping_prefix
+from virtualizarr.parsers.zarr import get_chunk_mapping_prefix, get_metadata
 from virtualizarr.registry import ObjectStoreRegistry
+
+ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 
 @pytest.mark.parametrize(
@@ -105,7 +108,7 @@ class TestOpenVirtualDatasetZarr:
                 assert expected == actual
 
 
-def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar):
+def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar: ZarrArrayType):
     # Use a scalar zarr store with a /c/ representing the scalar:
     # https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/default/index.html#description
 
@@ -118,3 +121,9 @@ def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar):
     )
     assert chunk_map["c"]["offset"] == 0
     assert chunk_map["c"]["length"] == 10
+
+
+def test_get_metadata(zarr_array_fill_value: ZarrArrayType):
+    # Check that the `get_metadata` function is assigning fill_values
+    zarr_array_metadata = get_metadata(zarr_array=zarr_array_fill_value)
+    assert zarr_array_metadata.fill_value == zarr_array_fill_value.metadata.fill_value
