@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.1.3 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.1.2 (3rd September 2025)
 
 Patch release with minor bug fixes for the DMRPParser and Icechunk writing behavior.
