@@ -10,6 +10,9 @@
 
 ### Documentation
 
+- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 ## v2.1.2 (3rd September 2025)
