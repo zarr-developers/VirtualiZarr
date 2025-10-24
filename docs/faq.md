@@ -126,7 +126,7 @@ You have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides
     "Kerchunk" is really two things: a python library and an on-disk format for storing virtual references. 
 
     This question compares the Kerchunk python library to the VirtualiZarr python library. 
-    For a discussion of the pros and cons of serializing into the Kerchunk references format, see the next question.
+    For a discussion of the pros and cons of serializing into the Kerchunk references format, see the [next question](#which-format-should-i-save-my-virtual-references-as).
 
 Users of Kerchunk may find the following comparison table useful, which shows which features of Kerchunk map on to which features of VirtualiZarr.
 
@@ -184,7 +184,7 @@ However a direct head-to-head comparison of the scalability of these formats has
 
 Conversely, the two Kerchunk formats have some advantages over Icechunk:
 - **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses flatbuffers, which are standardized but not human-readable.
-- **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with a smaller number of roundtrips . However this time taken will almost always be negligible compared to the time taken to parse the archival file formats.
+- **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with a smaller number of roundtrips. However this time taken will almost always be negligible compared to the time taken to parse the archival file formats.
 
 (Note that in theory both formats could generalize to store data which does not use the Zarr data model, but in practice neither has ever been used for this purpose.)
 
