@@ -175,9 +175,10 @@ class ManifestStore(Store):
         marr = self._group.arrays[var]
         manifest = marr.manifest
 
-        chunk_indexes = parse_manifest_index(
-            key, marr.metadata.chunk_key_encoding.separator
+        separator: Literal[".", "/"] = getattr(
+            marr.metadata.chunk_key_encoding, "separator", "."
         )
+        chunk_indexes = parse_manifest_index(key, separator)
 
         path = manifest._paths[chunk_indexes]
         if path == "":
@@ -246,11 +247,6 @@ class ManifestStore(Store):
 
     async def delete(self, key: str) -> None:
         raise NotImplementedError
-
-    @property
-    def supports_partial_writes(self) -> bool:
-        # docstring inherited
-        return False
 
     async def set_partial_values(
         self, key_start_values: Iterable[tuple[str, int, BytesLike]]

@@ -10,6 +10,7 @@ import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
 from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
@@ -72,10 +73,14 @@ def local_registry():
     return ObjectStoreRegistry({"file://": LocalStore()})
 
 
-@pytest.fixture()
-def zarr_store_scalar(tmpdir):
-    import zarr
+@pytest.fixture(params=["int8", "uint8", "float32"])
+def zarr_array_fill_value(request):
+    store = zarr.storage.MemoryStore()
+    return zarr.create_array(store=store, shape=(), dtype=request.param)
 
+
+@pytest.fixture()
+def zarr_store_scalar():
     store = zarr.storage.MemoryStore()
     zarr_store_scalar = zarr.create_array(store=store, shape=(), dtype="int8")
     zarr_store_scalar[()] = 42
