@@ -15,11 +15,7 @@ ZarrArrayType = zarr.AsyncArray | zarr.Array
 @pytest.mark.parametrize(
     "zarr_store",
     [
-        pytest.param(
-            2,
-            id="Zarr V2",
-            marks=pytest.mark.skip(reason="Zarr V2 not currently supported."),
-        ),
+        pytest.param(2, id="Zarr V2"),
         pytest.param(3, id="Zarr V3"),
     ],
     indirect=True,
