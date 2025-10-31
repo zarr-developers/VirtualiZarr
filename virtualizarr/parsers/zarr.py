@@ -71,8 +71,58 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     if zarr_format == 2:
         # TODO: Once we want to support V2, we will have to deconstruct the
         # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
-        raise NotImplementedError("Reading Zarr V2 currently not supported.")
-
+    if zarr_format == 2:
+        from zarr.metadata.migrate_v3 import _convert_array_metadata
+        from zarr.core.metadata import ArrayV2Metadata
+        
+        # Try standard conversion first
+        try:
+            v3_metadata = _convert_array_metadata(zarr_array.metadata)
+        except TypeError as e:
+            # Handle the specific case where V2 has fill_value=None
+            if "Cannot convert object None" in str(e) and zarr_array.metadata.fill_value is None:
+                # Get the V2 metadata as a dict and update fill_value
+                v2_dict = zarr_array.metadata.to_dict()
+                v2_dict['fill_value'] = 0  # Temporary value
+                
+                # Create new V2 metadata with the temporary fill value
+                temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
+                
+                # Convert to V3
+                v3_metadata = _convert_array_metadata(temp_v2)
+                
+                # Get the proper default fill value from the V3 DataType
+                default_fill = v3_metadata.data_type.default_scalar()
+                
+                # Update the V3 metadata with the correct default
+                v3_dict = v3_metadata.to_dict()
+                v3_dict['fill_value'] = default_fill.item()
+                
+                # Recreate the V3 metadata with the proper default
+                v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+            else:
+                raise
+        
+        # CRITICAL: Ensure dimension_names are set from _ARRAY_DIMENSIONS attribute
+        if v3_metadata.dimension_names is None:
+            # V2 stores dimension names in the _ARRAY_DIMENSIONS attribute
+            if hasattr(zarr_array.metadata, 'attributes') and zarr_array.metadata.attributes:
+                dim_names = zarr_array.metadata.attributes.get('_ARRAY_DIMENSIONS', None)
+                if dim_names:
+                    # Update the V3 metadata with the actual dimension names
+                    v3_dict = v3_metadata.to_dict()
+                    v3_dict['dimension_names'] = dim_names
+                    v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+                else:
+                    # Generate unique dimension names based on array name
+                    array_name = zarr_array.name.lstrip('/')
+                    dim_names = [f'{array_name}_dim_{i}' for i in range(len(zarr_array.shape))]
+                    v3_dict = v3_metadata.to_dict()
+                    v3_dict['dimension_names'] = dim_names
+                    v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+        
+        return v3_metadata
+    
     elif zarr_format == 3:
         return zarr_array.metadata  # type: ignore[return-value]
 
