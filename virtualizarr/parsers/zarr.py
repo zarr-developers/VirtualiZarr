@@ -65,6 +65,8 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
             return {}
 
         metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
+
+        metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
         chunk_keys = []
         for key_tuple in prefix_keys:
             key = key_tuple[0]
