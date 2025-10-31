@@ -120,7 +120,6 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
 def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
-    if zarr_format == 2:
         # TODO: Once we want to support V2, we will have to deconstruct the
         # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
     if zarr_format == 2:
