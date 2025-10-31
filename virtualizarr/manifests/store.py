@@ -126,18 +126,18 @@ def parse_manifest_index(
     
     # Fall back to the original regex approach if needed
     pattern = construct_chunk_pattern(chunk_key_encoding)
-    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
-    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
-    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
+    pattern = rf"(?:^|/)c{re.escape(chunk_key_encoding)}{pattern}"
     match = re.search(pattern, key)
-    if not match:
-        raise ValueError(
-            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
-        )
-    chunk_component = (
-        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    if match is not None:
+        indices = match.groups()
+        # Filter out None values and non-digit strings
+        indices = [idx for idx in indices if idx is not None and idx.isdigit()]
+        if indices:
+            return tuple(int(idx) for idx in indices)
+    
+    raise ValueError(
+        f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
     )
-    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 class ManifestStore(Store):
