@@ -29,35 +29,73 @@ ZarrArrayType = zarr.AsyncArray | zarr.Array
 async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict:
     """Create a dictionary to pass into ChunkManifest __init__"""
 
-    # TODO: For when we want to support reading V2 we should parse the /c/ and "/" between chunks
-    if zarr_array.shape == ():
-        # If we have a scalar array `c`
-        # https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/default/index.html#description
-
-        prefix = zarr_array.name.lstrip("/") + "/c"
-        prefix_keys = [(prefix,)]
-        _lengths = [await zarr_array.store.getsize("c")]
-        _dict_keys = ["c"]
-        _paths = [path + "/" + _dict_keys[0]]
-
-    else:
-        prefix = zarr_array.name.lstrip("/") + "/c/"
+    zarr_format = zarr_array.metadata.zarr_format
+    
+    if zarr_format == 2:
+        # V2 chunk paths don't have /c/ prefix
+        # They're like "array_name/0.0.0" or "array_name/0"
+        prefix = zarr_array.name.lstrip("/") + "/"
+        
+        if zarr_array.shape == ():
+            # V2 scalar arrays have a single chunk at "0"
+            chunk_key = "0"
+            size = await zarr_array.store.getsize(prefix + chunk_key)
+            return {"0": {"path": path + "/" + prefix + chunk_key, "offset": 0, "length": size}}
+        
+        # List all files for the array
         prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
-        chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
-        _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-        _paths = [path + "/" + prefix + key for key in chunk_keys]
-
-    _offsets = [0] * len(_lengths)
-    return {
-        key: {"path": path, "offset": offset, "length": length}
-        for key, path, offset, length in zip(
-            _dict_keys,
-            _paths,
-            _offsets,
-            _lengths,
-        )
-    }
+        if not prefix_keys:
+            return {}
+        
+        # Filter out metadata files (.zarray, .zattrs, .zgroup, etc.)
+        metadata_files = {'.zarray', '.zattrs', '.zgroup', '.zmetadata'}
+        chunk_keys = []
+        for key_tuple in prefix_keys:
+            key = key_tuple[0]
+            # Get the file name after the prefix
+            file_name = key.split(prefix)[1] if prefix in key else key.split("/")[-1]
+            # Only include if it's not a metadata file
+            if file_name not in metadata_files:
+                chunk_keys.append(key)
+        
+        if not chunk_keys:
+            return {}
+            
+        # Now process only actual chunk files
+        _lengths = await _concurrent_map([(k,) for k in chunk_keys], zarr_array.store.getsize)
+        
+        # Extract chunk keys (remove the array name prefix)
+        _dict_keys = [key.split(prefix)[1] for key in chunk_keys]
+        _paths = [path + "/" + key for key in chunk_keys]
+        _offsets = [0] * len(_lengths)
+        
+        return {
+            key: {"path": path, "offset": offset, "length": length}
+            for key, path, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
+        }
+    
+    else:  # V3
+        # V3 chunk paths have /c/ prefix
+        if zarr_array.shape == ():
+            # If we have a scalar array `c`
+            prefix = zarr_array.name.lstrip("/") + "/c"
+            prefix_keys = [(prefix,)]
+            _lengths = [await zarr_array.store.getsize("c")]
+            _dict_keys = ["c"]
+            _paths = [path + "/" + _dict_keys[0]]
+        else:
+            prefix = zarr_array.name.lstrip("/") + "/c/"
+            prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+            _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+            chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
+            _dict_keys = [key.replace("/", ".") for key in chunk_keys]
+            _paths = [path + "/" + prefix + key for key in chunk_keys]
+        
+        _offsets = [0] * len(_lengths)
+        return {
+            key: {"path": path, "offset": offset, "length": length}
+            for key, path, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
+        }
 
 
 async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
