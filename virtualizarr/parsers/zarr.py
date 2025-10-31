@@ -156,22 +156,31 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         from zarr.metadata.migrate_v3 import _convert_array_metadata
 
         # Convert V2 metadata to V3
+        v2_metadata = zarr_array.metadata
+        assert isinstance(v2_metadata, ArrayV2Metadata)
+
         try:
-            v3_metadata = _convert_array_metadata(zarr_array.metadata)
+            v3_metadata = _convert_array_metadata(v2_metadata)
         except TypeError as e:
             # Handle None fill_value case
             if (
                 "Cannot convert object None" in str(e)
-                and zarr_array.metadata.fill_value is None
+                and v2_metadata.fill_value is None
             ):
-                v2_dict = zarr_array.metadata.to_dict()
+                v2_dict = v2_metadata.to_dict()
                 v2_dict["fill_value"] = 0
                 temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
                 v3_metadata = _convert_array_metadata(temp_v2)
 
                 # Replace with proper default for the data type
+                default_scalar = v3_metadata.data_type.default_scalar()
+                fill_value = (
+                    default_scalar.item()
+                    if hasattr(default_scalar, "item")
+                    else default_scalar
+                )
                 v3_dict = v3_metadata.to_dict()
-                v3_dict["fill_value"] = v3_metadata.data_type.default_scalar().item()
+                v3_dict["fill_value"] = fill_value
                 v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
             else:
                 raise
@@ -179,15 +188,14 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         # Set dimension names from attributes or generate defaults
         if v3_metadata.dimension_names is None:
             v3_dict = v3_metadata.to_dict()
-            if (
-                hasattr(zarr_array.metadata, "attributes")
-                and zarr_array.metadata.attributes
-            ):
-                dim_names = zarr_array.metadata.attributes.get("_ARRAY_DIMENSIONS")
+            if hasattr(v2_metadata, "attributes") and v2_metadata.attributes:
+                dim_names = v2_metadata.attributes.get("_ARRAY_DIMENSIONS")
                 if dim_names:
                     v3_dict["dimension_names"] = dim_names
                 else:
-                    array_name = zarr_array.name.lstrip("/")
+                    array_name = (
+                        zarr_array.name.lstrip("/") if zarr_array.name else "array"
+                    )
                     v3_dict["dimension_names"] = [
                         f"{array_name}_dim_{i}" for i in range(len(zarr_array.shape))
                     ]
