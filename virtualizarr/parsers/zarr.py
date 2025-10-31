@@ -65,8 +65,6 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
             return {}
 
         metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
-
-        metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
         chunk_keys = []
         for key_tuple in prefix_keys:
             key = key_tuple[0]
@@ -188,17 +186,12 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         # Set dimension names from attributes or generate defaults
         if v3_metadata.dimension_names is None:
             v3_dict = v3_metadata.to_dict()
+            dim_names = None
             if hasattr(v2_metadata, "attributes") and v2_metadata.attributes:
                 dim_names = v2_metadata.attributes.get("_ARRAY_DIMENSIONS")
-                if dim_names:
-                    v3_dict["dimension_names"] = dim_names
-                else:
-                    array_name = (
-                        zarr_array.name.lstrip("/") if zarr_array.name else "array"
-                    )
-                    v3_dict["dimension_names"] = [
-                        f"{array_name}_dim_{i}" for i in range(len(zarr_array.shape))
-                    ]
+
+            if dim_names:
+                v3_dict["dimension_names"] = dim_names
             else:
                 array_name = zarr_array.name.lstrip("/") if zarr_array.name else "array"
                 v3_dict["dimension_names"] = [
@@ -206,7 +199,7 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
                 ]
             v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
-        # CRITICAL: Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
+        # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
         # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
         # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
         v3_dict = v3_metadata.to_dict()
@@ -322,8 +315,6 @@ class ZarrParser:
         """
 
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
-        import asyncio
-
         object_store, _ = registry.resolve(path)
         zarr_store = ObjectStore(store=object_store)
         manifest_group = asyncio.run(
