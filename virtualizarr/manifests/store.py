@@ -77,55 +77,24 @@ def parse_manifest_index(
         [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
 
     """
-    import re
-    
+    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
+    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
     if key.endswith("/c"):
         return ()
-    
-    if "/c/" not in key and "/c." not in key:
-        # This is likely a V2 key
-        parts = key.split("/")
-        if len(parts) >= 2:
-            # Get everything after the array name
-            chunk_part = "/".join(parts[1:])
-            # Try to parse as chunk indices
-            if chunk_key_encoding == ".":
-                # Format like "0.1.2"
-                if "." in chunk_part:
-                    indices = chunk_part.split(".")
-                else:
-                    indices = [chunk_part]
-                if all(idx.isdigit() for idx in indices):
-                    return tuple(int(idx) for idx in indices)
-            else:  # chunk_key_encoding == "/"
-                # Format like "0/1/2" or just "0"
-                indices = chunk_part.split("/") if "/" in chunk_part else [chunk_part]
-                if all(idx.isdigit() for idx in indices):
-                    return tuple(int(idx) for idx in indices)
-    
-    if "/c/" in key:
-        _, chunk_part = key.split("/c/", 1)
-        indices = chunk_part.split("/")
-        if all(idx.isdigit() for idx in indices):
-            return tuple(int(idx) for idx in indices)
-    elif "/c." in key:
-        _, chunk_part = key.split("/c.", 1)
-        indices = chunk_part.split(".")
-        if all(idx.isdigit() for idx in indices):
-            return tuple(int(idx) for idx in indices)
-    
+
     pattern = construct_chunk_pattern(chunk_key_encoding)
-    pattern = rf"(?:^|/)c{re.escape(chunk_key_encoding)}{pattern}"
+    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
+    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
+    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
     match = re.search(pattern, key)
-    if match is not None:
-        indices = match.groups()
-        indices = [idx for idx in indices if idx is not None and idx.isdigit()]
-        if indices:
-            return tuple(int(idx) for idx in indices)
-    
-    raise ValueError(
-        f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+    if not match:
+        raise ValueError(
+            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+        )
+    chunk_component = (
+        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
     )
+    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 class ManifestStore(Store):
