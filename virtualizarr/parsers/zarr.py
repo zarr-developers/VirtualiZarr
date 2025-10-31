@@ -101,6 +101,20 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
 async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
     """Build a ChunkManifest from a dictionary"""
     chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
+
+     # If no chunks found (e.g., inline data in V2), provide the shape
+    if not chunk_map:
+        # Calculate the chunk grid shape from array shape and chunk shape
+        import math
+        array_shape = zarr_array.shape
+        chunk_shape = zarr_array.chunks
+        
+        if array_shape and chunk_shape:
+            chunk_grid_shape = tuple(
+                math.ceil(s / c) for s, c in zip(array_shape, chunk_shape)
+            )
+            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+    
     return ChunkManifest(chunk_map)
 
 
