@@ -32,39 +32,30 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
     zarr_format = zarr_array.metadata.zarr_format
     
     if zarr_format == 2:
-        # V2 chunk paths don't have /c/ prefix
-        # They're like "array_name/0.0.0" or "array_name/0"
         prefix = zarr_array.name.lstrip("/") + "/"
         
         if zarr_array.shape == ():
-            # V2 scalar arrays have a single chunk at "0"
             chunk_key = "0"
             size = await zarr_array.store.getsize(prefix + chunk_key)
             return {"0": {"path": path + "/" + prefix + chunk_key, "offset": 0, "length": size}}
         
-        # List all files for the array
         prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
         if not prefix_keys:
             return {}
         
-        # Filter out metadata files (.zarray, .zattrs, .zgroup, etc.)
         metadata_files = {'.zarray', '.zattrs', '.zgroup', '.zmetadata'}
         chunk_keys = []
         for key_tuple in prefix_keys:
             key = key_tuple[0]
-            # Get the file name after the prefix
             file_name = key.split(prefix)[1] if prefix in key else key.split("/")[-1]
-            # Only include if it's not a metadata file
             if file_name not in metadata_files:
                 chunk_keys.append(key)
         
         if not chunk_keys:
             return {}
             
-        # Now process only actual chunk files
         _lengths = await _concurrent_map([(k,) for k in chunk_keys], zarr_array.store.getsize)
         
-        # Extract chunk keys (remove the array name prefix)
         _dict_keys = [key.split(prefix)[1] for key in chunk_keys]
         _paths = [path + "/" + key for key in chunk_keys]
         _offsets = [0] * len(_lengths)
@@ -75,9 +66,7 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
         }
     
     else:  # V3
-        # V3 chunk paths have /c/ prefix
         if zarr_array.shape == ():
-            # If we have a scalar array `c`
             prefix = zarr_array.name.lstrip("/") + "/c"
             prefix_keys = [(prefix,)]
             _lengths = [await zarr_array.store.getsize("c")]
@@ -102,9 +91,7 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     """Build a ChunkManifest from a dictionary"""
     chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
 
-     # If no chunks found (e.g., inline data in V2), provide the shape
     if not chunk_map:
-        # Calculate the chunk grid shape from array shape and chunk shape
         import math
         array_shape = zarr_array.shape
         chunk_shape = zarr_array.chunks
@@ -120,52 +107,38 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
 def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
-        # TODO: Once we want to support V2, we will have to deconstruct the
-        # zarr_array codecs etc. and reconstruct them with create_v3_array_metadata
     if zarr_format == 2:
         from zarr.metadata.migrate_v3 import _convert_array_metadata
         from zarr.core.metadata import ArrayV2Metadata
         
-        # Try standard conversion first
         try:
             v3_metadata = _convert_array_metadata(zarr_array.metadata)
         except TypeError as e:
-            # Handle the specific case where V2 has fill_value=None
             if "Cannot convert object None" in str(e) and zarr_array.metadata.fill_value is None:
-                # Get the V2 metadata as a dict and update fill_value
                 v2_dict = zarr_array.metadata.to_dict()
                 v2_dict['fill_value'] = 0  # Temporary value
                 
-                # Create new V2 metadata with the temporary fill value
                 temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
                 
-                # Convert to V3
                 v3_metadata = _convert_array_metadata(temp_v2)
                 
-                # Get the proper default fill value from the V3 DataType
                 default_fill = v3_metadata.data_type.default_scalar()
                 
-                # Update the V3 metadata with the correct default
                 v3_dict = v3_metadata.to_dict()
                 v3_dict['fill_value'] = default_fill.item()
                 
-                # Recreate the V3 metadata with the proper default
                 v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
             else:
                 raise
         
-        # CRITICAL: Ensure dimension_names are set from _ARRAY_DIMENSIONS attribute
         if v3_metadata.dimension_names is None:
-            # V2 stores dimension names in the _ARRAY_DIMENSIONS attribute
             if hasattr(zarr_array.metadata, 'attributes') and zarr_array.metadata.attributes:
                 dim_names = zarr_array.metadata.attributes.get('_ARRAY_DIMENSIONS', None)
                 if dim_names:
-                    # Update the V3 metadata with the actual dimension names
                     v3_dict = v3_metadata.to_dict()
                     v3_dict['dimension_names'] = dim_names
                     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
                 else:
-                    # Generate unique dimension names based on array name
                     array_name = zarr_array.name.lstrip('/')
                     dim_names = [f'{array_name}_dim_{i}' for i in range(len(zarr_array.shape))]
                     v3_dict = v3_metadata.to_dict()

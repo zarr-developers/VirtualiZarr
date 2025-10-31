@@ -65,8 +65,6 @@ class TestOpenVirtualDatasetZarr:
             assert "0.0.0" in vds["air"].data.manifest.dict().keys()
 
     def test_virtual_dataset_zarr_attrs(self, zarr_store):
-        import zarr
-
         zg = zarr.open_group(zarr_store)
         store = LocalStore(prefix=zarr_store)
         registry = ObjectStoreRegistry({f"file://{zarr_store}": store})

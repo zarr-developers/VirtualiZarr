@@ -79,13 +79,9 @@ def parse_manifest_index(
     """
     import re
     
-    # Keys ending in `/c` are scalar arrays
     if key.endswith("/c"):
         return ()
     
-    # Check if this looks like a V2 key (no /c/ prefix)
-    # V2: "array_name/0" or "array_name/0.1.2"
-    # V3: "array_name/c/0" or "array_name/c.0.1.2" or "array_name/c/0/0/0"
     if "/c/" not in key and "/c." not in key:
         # This is likely a V2 key
         parts = key.split("/")
@@ -107,30 +103,22 @@ def parse_manifest_index(
                 if all(idx.isdigit() for idx in indices):
                     return tuple(int(idx) for idx in indices)
     
-    # Handle V3 pattern (with /c/ or /c. prefix)
-    # For V3, we need to extract the part after /c/ or /c.
     if "/c/" in key:
-        # Split on /c/ and take everything after
         _, chunk_part = key.split("/c/", 1)
-        # Now parse the chunk indices
         indices = chunk_part.split("/")
         if all(idx.isdigit() for idx in indices):
             return tuple(int(idx) for idx in indices)
     elif "/c." in key:
-        # Split on /c. and take everything after  
         _, chunk_part = key.split("/c.", 1)
-        # Now parse the chunk indices
         indices = chunk_part.split(".")
         if all(idx.isdigit() for idx in indices):
             return tuple(int(idx) for idx in indices)
     
-    # Fall back to the original regex approach if needed
     pattern = construct_chunk_pattern(chunk_key_encoding)
     pattern = rf"(?:^|/)c{re.escape(chunk_key_encoding)}{pattern}"
     match = re.search(pattern, key)
     if match is not None:
         indices = match.groups()
-        # Filter out None values and non-digit strings
         indices = [idx for idx in indices if idx is not None and idx.isdigit()]
         if indices:
             return tuple(int(idx) for idx in indices)
