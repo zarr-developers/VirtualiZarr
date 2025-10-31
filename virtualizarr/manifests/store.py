@@ -77,11 +77,10 @@ def parse_manifest_index(
         [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
 
     """
-    import re
-    
+
     if key.endswith("/c"):
         return ()
-    
+
     if "/c/" not in key and "/c." not in key:
         # This is likely a V2 key
         parts = key.split("/")
@@ -102,7 +101,7 @@ def parse_manifest_index(
                 indices = chunk_part.split("/") if "/" in chunk_part else [chunk_part]
                 if all(idx.isdigit() for idx in indices):
                     return tuple(int(idx) for idx in indices)
-    
+
     if "/c/" in key:
         _, chunk_part = key.split("/c/", 1)
         indices = chunk_part.split("/")
@@ -113,7 +112,7 @@ def parse_manifest_index(
         indices = chunk_part.split(".")
         if all(idx.isdigit() for idx in indices):
             return tuple(int(idx) for idx in indices)
-    
+
     pattern = construct_chunk_pattern(chunk_key_encoding)
     pattern = rf"(?:^|/)c{re.escape(chunk_key_encoding)}{pattern}"
     match = re.search(pattern, key)
@@ -122,7 +121,7 @@ def parse_manifest_index(
         indices = [idx for idx in indices if idx is not None and idx.isdigit()]
         if indices:
             return tuple(int(idx) for idx in indices)
-    
+
     raise ValueError(
         f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
     )

@@ -30,41 +30,49 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
     """Create a dictionary to pass into ChunkManifest __init__"""
 
     zarr_format = zarr_array.metadata.zarr_format
-    
+
     if zarr_format == 2:
         prefix = zarr_array.name.lstrip("/") + "/"
-        
+
         if zarr_array.shape == ():
             chunk_key = "0"
             size = await zarr_array.store.getsize(prefix + chunk_key)
-            return {"0": {"path": path + "/" + prefix + chunk_key, "offset": 0, "length": size}}
-        
+            return {
+                "0": {
+                    "path": path + "/" + prefix + chunk_key,
+                    "offset": 0,
+                    "length": size,
+                }
+            }
+
         prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
         if not prefix_keys:
             return {}
-        
-        metadata_files = {'.zarray', '.zattrs', '.zgroup', '.zmetadata'}
+
+        metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
         chunk_keys = []
         for key_tuple in prefix_keys:
             key = key_tuple[0]
             file_name = key.split(prefix)[1] if prefix in key else key.split("/")[-1]
             if file_name not in metadata_files:
                 chunk_keys.append(key)
-        
+
         if not chunk_keys:
             return {}
-            
-        _lengths = await _concurrent_map([(k,) for k in chunk_keys], zarr_array.store.getsize)
-        
+
+        _lengths = await _concurrent_map(
+            [(k,) for k in chunk_keys], zarr_array.store.getsize
+        )
+
         _dict_keys = [key.split(prefix)[1] for key in chunk_keys]
         _paths = [path + "/" + key for key in chunk_keys]
         _offsets = [0] * len(_lengths)
-        
+
         return {
             key: {"path": path, "offset": offset, "length": length}
             for key, path, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
         }
-    
+
     else:  # V3
         if zarr_array.shape == ():
             prefix = zarr_array.name.lstrip("/") + "/c"
@@ -79,7 +87,7 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
             chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
             _dict_keys = [key.replace("/", ".") for key in chunk_keys]
             _paths = [path + "/" + prefix + key for key in chunk_keys]
-        
+
         _offsets = [0] * len(_lengths)
         return {
             key: {"path": path, "offset": offset, "length": length}
@@ -93,60 +101,71 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
     if not chunk_map:
         import math
+
         array_shape = zarr_array.shape
         chunk_shape = zarr_array.chunks
-        
+
         if array_shape and chunk_shape:
             chunk_grid_shape = tuple(
                 math.ceil(s / c) for s, c in zip(array_shape, chunk_shape)
             )
             return ChunkManifest(chunk_map, shape=chunk_grid_shape)
-    
+
     return ChunkManifest(chunk_map)
 
 
 def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
     zarr_format = zarr_array.metadata.zarr_format
     if zarr_format == 2:
-        from zarr.metadata.migrate_v3 import _convert_array_metadata
         from zarr.core.metadata import ArrayV2Metadata
-        
+        from zarr.metadata.migrate_v3 import _convert_array_metadata
+
         try:
             v3_metadata = _convert_array_metadata(zarr_array.metadata)
         except TypeError as e:
-            if "Cannot convert object None" in str(e) and zarr_array.metadata.fill_value is None:
+            if (
+                "Cannot convert object None" in str(e)
+                and zarr_array.metadata.fill_value is None
+            ):
                 v2_dict = zarr_array.metadata.to_dict()
-                v2_dict['fill_value'] = 0  # Temporary value
-                
+                v2_dict["fill_value"] = 0  # Temporary value
+
                 temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
-                
+
                 v3_metadata = _convert_array_metadata(temp_v2)
-                
+
                 default_fill = v3_metadata.data_type.default_scalar()
-                
+
                 v3_dict = v3_metadata.to_dict()
-                v3_dict['fill_value'] = default_fill.item()
-                
+                v3_dict["fill_value"] = default_fill.item()
+
                 v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
             else:
                 raise
-        
+
         if v3_metadata.dimension_names is None:
-            if hasattr(zarr_array.metadata, 'attributes') and zarr_array.metadata.attributes:
-                dim_names = zarr_array.metadata.attributes.get('_ARRAY_DIMENSIONS', None)
+            if (
+                hasattr(zarr_array.metadata, "attributes")
+                and zarr_array.metadata.attributes
+            ):
+                dim_names = zarr_array.metadata.attributes.get(
+                    "_ARRAY_DIMENSIONS", None
+                )
                 if dim_names:
                     v3_dict = v3_metadata.to_dict()
-                    v3_dict['dimension_names'] = dim_names
+                    v3_dict["dimension_names"] = dim_names
                     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
                 else:
-                    array_name = zarr_array.name.lstrip('/')
-                    dim_names = [f'{array_name}_dim_{i}' for i in range(len(zarr_array.shape))]
+                    array_name = zarr_array.name.lstrip("/")
+                    dim_names = [
+                        f"{array_name}_dim_{i}" for i in range(len(zarr_array.shape))
+                    ]
                     v3_dict = v3_metadata.to_dict()
-                    v3_dict['dimension_names'] = dim_names
+                    v3_dict["dimension_names"] = dim_names
                     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
-        
+
         return v3_metadata
-    
+
     elif zarr_format == 3:
         return zarr_array.metadata  # type: ignore[return-value]
 

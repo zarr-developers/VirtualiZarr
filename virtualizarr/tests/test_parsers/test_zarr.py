@@ -21,7 +21,6 @@ ZarrArrayType = zarr.AsyncArray | zarr.Array
             # marks=pytest.mark.skip(reason="Zarr V2 not currently supported."),
         ),
         pytest.param(3, id="Zarr V3"),
-
     ],
     indirect=True,
 )
@@ -96,12 +95,14 @@ class TestOpenVirtualDatasetZarr:
                 expected = zg[array].metadata.to_dict()
                 # Check attributes
                 assert expected["attributes"] == vds[array].attrs
-                
+
                 # Check dimension names - handling V2 vs V3 difference
                 zarr_format = zg[array].metadata.zarr_format
                 if zarr_format == 2:
                     # V2 stores dimensions in attributes
-                    expected_dims = expected.get("attributes", {}).get("_ARRAY_DIMENSIONS", None)
+                    expected_dims = expected.get("attributes", {}).get(
+                        "_ARRAY_DIMENSIONS", None
+                    )
                     if expected_dims:
                         assert expected_dims == list(vds[array].dims)
                     # If no _ARRAY_DIMENSIONS, VirtualiZarr generates dimension names
