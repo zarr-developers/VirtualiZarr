@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import zarr
 from zarr.api.asynchronous import open_group as open_group_async
@@ -38,20 +38,37 @@ def join_url(base: str, key: str) -> str:
     return base.rstrip("/") + "/" + key.lstrip("/")
 
 
-async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict:
-    """
-    Create a mapping of chunk coordinates to their storage locations.
+@runtime_checkable
+class ZarrVersionStrategy(Protocol):
+    """Protocol for handling version-specific Zarr operations."""
 
-    Returns a dictionary mapping chunk keys (pure coordinates like "0.1.2")
-    to their file paths, offsets, and lengths.
-    """
-    zarr_format = zarr_array.metadata.zarr_format
-    name = getattr(zarr_array, "name", "") or ""
-    name = name.lstrip("/")
+    async def get_chunk_mapping(
+        self, zarr_array: ZarrArrayType, path: str
+    ) -> dict[str, dict[str, Any]]:
+        """Get mapping of chunk coordinates to storage locations."""
+        ...
 
-    if zarr_format == 2:
+    def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
+        """Get V3 metadata for the array (converting if necessary)."""
+        ...
+
+
+class ZarrV2Strategy:
+    """Strategy for handling Zarr V2 arrays."""
+
+    async def get_chunk_mapping(
+        self, zarr_array: ZarrArrayType, path: str
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Create a mapping of chunk coordinates to their storage locations for V2 arrays.
+
+        V2 uses paths like: array_name/0.1.2 or array_name/0/1/2
+        """
+        name = getattr(zarr_array, "name", "") or ""
+        name = name.lstrip("/")
         prefix = f"{name}/" if name else ""
 
+        # Handle scalar arrays
         if zarr_array.shape == ():
             chunk_key = "0"
             object_key = f"{prefix}{chunk_key}"
@@ -97,63 +114,19 @@ async def get_chunk_mapping_prefix(zarr_array: ZarrArrayType, path: str) -> dict
             for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
         }
 
-    # V3
-    else:
-        if zarr_array.shape == ():
-            prefix = f"{name}/c" if name else "c"
-            size = await zarr_array.store.getsize(prefix)
-            return {"c": {"path": join_url(path, prefix), "offset": 0, "length": size}}
+    def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
+        """
+        Convert V2 metadata to V3 format.
 
-        prefix = f"{name}/c/" if name else "c/"
-        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        if not prefix_keys:
-            return {}
-
-        _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
-        chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
-        _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-        _paths = [join_url(path, prefix + key) for key in chunk_keys]
-        _offsets = [0] * len(_lengths)
-
-        return {
-            key: {"path": p, "offset": offset, "length": length}
-            for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
-        }
-
-
-async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
-    """Build a ChunkManifest from chunk coordinate mappings."""
-    chunk_map = await get_chunk_mapping_prefix(zarr_array=zarr_array, path=path)
-
-    if not chunk_map:
-        import math
-
-        if zarr_array.shape and zarr_array.chunks:
-            chunk_grid_shape = tuple(
-                math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
-            )
-            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
-
-    return ChunkManifest(chunk_map)
-
-
-def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
-    """
-    Get V3 metadata for an array, converting from V2 if necessary.
-
-    For V2 arrays, this performs a complete conversion to V3 metadata including:
-    - Converting the metadata structure
-    - Handling None fill values
-    - Setting dimension names from attributes or generating defaults
-    - Replacing V2ChunkKeyEncoding with V3's DefaultChunkKeyEncoding
-    """
-    zarr_format = zarr_array.metadata.zarr_format
-
-    if zarr_format == 2:
+        Handles:
+        - Converting metadata structure
+        - None fill values
+        - Setting dimension names from attributes or generating defaults
+        - Replacing V2ChunkKeyEncoding with V3's DefaultChunkKeyEncoding
+        """
         from zarr.core.metadata import ArrayV2Metadata
         from zarr.metadata.migrate_v3 import _convert_array_metadata
 
-        # Convert V2 metadata to V3
         v2_metadata = zarr_array.metadata
         assert isinstance(v2_metadata, ArrayV2Metadata)
 
@@ -208,11 +181,109 @@ def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
 
         return v3_metadata
 
-    elif zarr_format == 3:
+
+class ZarrV3Strategy:
+    """Strategy for handling Zarr V3 arrays."""
+
+    async def get_chunk_mapping(
+        self, zarr_array: ZarrArrayType, path: str
+    ) -> dict[str, dict[str, Any]]:
+        """
+        Create a mapping of chunk coordinates to their storage locations for V3 arrays.
+
+        V3 uses paths like: array_name/c/0/1/2
+        """
+        name = getattr(zarr_array, "name", "") or ""
+        name = name.lstrip("/")
+
+        # Handle scalar arrays
+        if zarr_array.shape == ():
+            prefix = f"{name}/c" if name else "c"
+            size = await zarr_array.store.getsize(prefix)
+            return {"c": {"path": join_url(path, prefix), "offset": 0, "length": size}}
+
+        prefix = f"{name}/c/" if name else "c/"
+        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
+        if not prefix_keys:
+            return {}
+
+        _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
+        chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
+        _dict_keys = [key.replace("/", ".") for key in chunk_keys]
+        _paths = [join_url(path, prefix + key) for key in chunk_keys]
+        _offsets = [0] * len(_lengths)
+
+        return {
+            key: {"path": p, "offset": offset, "length": length}
+            for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
+        }
+
+    def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
+        """Return V3 metadata as-is (no conversion needed)."""
         return zarr_array.metadata  # type: ignore[return-value]
 
+
+def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
+    """
+    Factory function to get the appropriate strategy for a Zarr array.
+
+    Parameters
+    ----------
+    zarr_array
+        The Zarr array to get a strategy for.
+
+    Returns
+    -------
+    ZarrVersionStrategy
+        The appropriate strategy instance for the array's Zarr format version.
+
+    Raises
+    ------
+    NotImplementedError
+        If the Zarr format version is not supported.
+    """
+    zarr_format = zarr_array.metadata.zarr_format
+    if zarr_format == 2:
+        return ZarrV2Strategy()
+    elif zarr_format == 3:
+        return ZarrV3Strategy()
     else:
         raise NotImplementedError(f"Zarr format {zarr_format} is not supported")
+
+
+async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
+    """Build a ChunkManifest from chunk coordinate mappings."""
+    strategy = get_strategy(zarr_array)
+    chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
+
+    if not chunk_map:
+        import math
+
+        if zarr_array.shape and zarr_array.chunks:
+            chunk_grid_shape = tuple(
+                math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
+            )
+            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+
+    return ChunkManifest(chunk_map)
+
+
+def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
+    """
+    Get V3 metadata for an array, converting from V2 if necessary.
+
+    Parameters
+    ----------
+    zarr_array
+        The Zarr array to get metadata for.
+
+    Returns
+    -------
+    ArrayV3Metadata
+        V3 metadata for the array.
+    """
+    strategy = get_strategy(zarr_array)
+    return strategy.get_metadata(zarr_array)
 
 
 async def _construct_manifest_array(
@@ -256,16 +327,13 @@ async def _construct_manifest_group(
     manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
     # Set V3 group metadata to ensure zarr/xarray uses V3 semantics
-    try:
-        from zarr.core.group import GroupMetadata
+    from zarr.core.group import GroupMetadata
 
-        manifest_group._metadata = GroupMetadata(
-            attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
-            zarr_format=3,
-            consolidated_metadata=None,
-        )
-    except Exception:
-        pass
+    manifest_group._metadata = GroupMetadata(
+        attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
+        zarr_format=3,
+        consolidated_metadata=None,
+    )
 
     return manifest_group
 
