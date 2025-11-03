@@ -339,25 +339,73 @@ async def _construct_manifest_group(
 
 
 class ZarrParser:
+    """
+    Parser for creating virtual references to existing Zarr stores.
+
+    The ZarrParser creates lightweight virtual references to chunks in existing
+    Zarr stores without copying data. It supports both Zarr V2 and V3 formats,
+    automatically converting V2 metadata to V3 format.
+
+    Parameters
+    ----------
+    group : str, optional
+        Path to a specific group within the Zarr store to use as the root.
+        Uses forward slashes for nested groups (e.g., "model/output").
+        Default is None, which uses the store's root group.
+    skip_variables : iterable of str, optional
+        Names of variables (arrays) to exclude when creating the virtual store.
+        Useful for filtering out auxiliary data or large variables that aren't
+        needed. Default is None, which includes all variables.
+
+    Attributes
+    ----------
+    group : str or None
+        The group path to use as root.
+    skip_variables : iterable of str or None
+        Variables to exclude from virtualization.
+
+    Methods
+    -------
+    __call__(url, registry)
+        Create a virtual representation of a Zarr store.
+
+    See Also
+    --------
+    virtualizarr.open_virtual_dataset : High-level function for opening virtual datasets.
+
+    Notes
+    -----
+    The parser handles both Zarr V2 and V3 stores transparently. When reading
+    V2 stores, metadata is automatically converted to V3 format to ensure
+    consistent handling across versions. This includes:
+
+    - Converting the metadata structure from V2 to V3 specification
+    - Handling `None` fill values with appropriate defaults
+    - Setting dimension names from `_ARRAY_DIMENSIONS` attributes or generating defaults
+    - Replacing V2ChunkKeyEncoding with V3's DefaultChunkKeyEncoding
+
+    The parser preserves array attributes and handles empty arrays (no chunks)
+    gracefully. Metadata files (.zarray, .zattrs, .zgroup, .zmetadata) are
+    automatically filtered out when listing chunks.
+    """
+
     def __init__(
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
     ):
         """
-        Instantiate a parser with parser-specific parameters that can be used in the
-        `__call__` method.
+        Instantiate a parser with parser-specific parameters that can be used in the `__call__` method.
 
         Parameters
         ----------
-        group
-            The group within the original Zarr store to be used as the root group for the
-            ManifestStore (default: the Zarr store's root group).
-        skip_variables
-            Variables in the Zarr store that will be ignored when creating the ManifestStore
-            (default: `None`, do not ignore any variables).
+        group : str | None, optional (default: None)
+            The group within the original Zarr store to be used as the root group for
+            the ManifestStore (default: the Zarr store's root group).
+        skip_variables : Iterable[str] | None, optional (default: None)
+            Variables in the Zarr store that will be ignored when creating the
+            `ManifestStore` (default: None, do not ignore any variables).
         """
-
         self.group = group
         self.skip_variables = skip_variables
 
@@ -367,21 +415,66 @@ class ZarrParser:
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given Zarr store to produce a VirtualiZarr ManifestStore.
+        Parse the metadata and byte offsets from a given Zarr store to produce a
+        VirtualiZarr ManifestStore.
 
         Parameters
         ----------
-        url
-            The URL to the input Zarr store (e.g., "s3://bucket/store.zarr").
-        registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        url : str
+            URL or path to the Zarr store. Supports various protocols:
+
+            - Local filesystem: "file:///path/to/store.zarr" or "/path/to/store.zarr"
+            - S3: "s3://bucket/path/to/store.zarr"
+            - Google Cloud Storage: "gs://bucket/path/to/store.zarr"
+            - Azure Blob Storage: "az://container/path/to/store.zarr"
+            - HTTP/HTTPS: "https://example.com/store.zarr"
+
+        registry : ObjectStoreRegistry
+            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for
+            resolving urls and reading data.
 
         Returns
         -------
-        ManifestStore
-            A ManifestStore which provides a virtual Zarr representation of the parsed data source.
-        """
+        [ManifestStore][virtualizarr.manifests.ManifestStore]
+            A virtual representation of the Zarr store containing array metadata
+            (converted to V3 format if source is V2), chunk manifests with
+            references to original chunk locations, group structure and attributes,
+            and references to the object store for data access.
 
+        Raises
+        ------
+        ValueError
+            If the URL cannot be resolved or normalized.
+        KeyError
+            If the registry doesn't contain an appropriate store for the URL.
+        NotImplementedError
+            If the Zarr store uses an unsupported format version.
+
+        See Also
+        --------
+        virtualizarr.open_virtual_dataset : High-level interface for virtual datasets.
+        virtualizarr.manifests.ManifestStore : The returned virtual store object.
+
+        Notes
+        -----
+        The parsing process follows these steps:
+
+        1. Normalizes and validates the input URL
+        2. Resolves the appropriate object store from the registry
+        3. Opens the Zarr group asynchronously
+        4. Iterates through arrays (excluding those in `skip_variables`)
+        5. For each array:
+
+           - Converts V2 metadata to V3 if necessary
+           - Builds chunk manifests with file paths and byte ranges
+           - Preserves attributes and dimension names
+
+        6. Constructs a ManifestGroup with V3 metadata
+        7. Returns a ManifestStore wrapping the virtual representation
+
+        No data is copied during this process; the ManifestStore contains
+        only lightweight references to the original chunks.
+        """
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
         zarr_store = ObjectStore(store=object_store)
