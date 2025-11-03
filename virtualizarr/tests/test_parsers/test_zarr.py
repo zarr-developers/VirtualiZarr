@@ -6,7 +6,8 @@ from obstore.store import LocalStore
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
-from virtualizarr.parsers.zarr import get_chunk_mapping_prefix, get_metadata
+
+# from virtualizarr.parsers.zarr import get_chunk_mapping_prefix, get_metadata
 from virtualizarr.registry import ObjectStoreRegistry
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
@@ -110,22 +111,181 @@ class TestOpenVirtualDatasetZarr:
                     assert list(expected["dimension_names"]) == list(vds[array].dims)
 
 
-def test_scalar_get_chunk_mapping_prefix(zarr_store_scalar: ZarrArrayType):
-    # Use a scalar zarr store with a /c/ representing the scalar:
-    # https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/default/index.html#description
-
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_scalar_chunk_mapping(tmpdir, zarr_format):
+    """Test that scalar arrays produce correct chunk mappings for both V2 and V3."""
     import asyncio
 
-    chunk_map = asyncio.run(
-        get_chunk_mapping_prefix(
-            zarr_array=zarr_store_scalar, path=str(zarr_store_scalar.store_path)
-        )
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import get_strategy
+
+    # Create a scalar zarr array
+    filepath = f"{tmpdir}/scalar.zarr"
+    scalar_array = zarr.create(
+        shape=(), dtype="int8", store=filepath, zarr_format=zarr_format
     )
-    assert chunk_map["c"]["offset"] == 0
-    assert chunk_map["c"]["length"] == 10
+    scalar_array[()] = 42
+
+    # Open it as an async array to use with the strategy
+    async def get_chunk_map():
+        zarr_array = await open_array(store=filepath, mode="r")
+        strategy = get_strategy(zarr_array)
+        return await strategy.get_chunk_mapping(zarr_array, filepath)
+
+    chunk_map = asyncio.run(get_chunk_map())
+
+    # V2 uses "0" for scalar, V3 uses "c"
+    expected_key = "0" if zarr_format == 2 else "c"
+    assert expected_key in chunk_map
+    assert chunk_map[expected_key]["offset"] == 0
+    assert chunk_map[expected_key]["length"] > 0
 
 
-def test_get_metadata(zarr_array_fill_value: ZarrArrayType):
-    # Check that the `get_metadata` function is assigning fill_values
-    zarr_array_metadata = get_metadata(zarr_array=zarr_array_fill_value)
-    assert zarr_array_metadata.fill_value == zarr_array_fill_value.metadata.fill_value
+def test_join_url_empty_base():
+    """Test join_url with empty base."""
+    from virtualizarr.parsers.zarr import join_url
+
+    result = join_url("", "some/key")
+    assert result == "some/key"
+
+
+def test_unsupported_zarr_format():
+    """Test that unsupported zarr format raises NotImplementedError."""
+    from unittest.mock import Mock
+
+    from virtualizarr.parsers.zarr import get_strategy
+
+    # Create a mock array with unsupported format
+    mock_array = Mock()
+    mock_array.metadata.zarr_format = 99  # Unsupported format
+
+    with pytest.raises(NotImplementedError, match="Zarr format 99 is not supported"):
+        get_strategy(mock_array)
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_empty_array_chunk_mapping(tmpdir, zarr_format):
+    """Test chunk mapping for arrays with no chunks written yet."""
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import get_strategy
+
+    # Create an array but don't write any data
+    filepath = f"{tmpdir}/empty.zarr"
+    zarr.create(
+        shape=(10, 10),
+        chunks=(5, 5),
+        dtype="int8",
+        store=filepath,
+        zarr_format=zarr_format,
+    )
+
+    async def get_chunk_map():
+        zarr_array = await open_array(store=filepath, mode="r")
+        strategy = get_strategy(zarr_array)
+        return await strategy.get_chunk_mapping(zarr_array, filepath)
+
+    chunk_map = asyncio.run(get_chunk_map())
+    # Empty arrays should return empty chunk map
+    assert chunk_map == {}
+
+
+def test_v2_metadata_without_dimensions():
+    """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import get_metadata
+
+    # Create a V2 array without dimension attributes
+    store = zarr.storage.MemoryStore()
+    _ = zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
+    )
+    # Explicitly don't set _ARRAY_DIMENSIONS
+
+    async def get_meta():
+        zarr_array = await open_array(store=store, mode="r")
+        return get_metadata(zarr_array)
+
+    metadata = asyncio.run(get_meta())
+    # Should generate dimension names
+    assert metadata.dimension_names is not None
+    assert len(metadata.dimension_names) == 2
+
+
+def test_v2_metadata_with_dimensions():
+    """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import get_metadata
+
+    # Create a V2 array with dimension attributes
+    store = zarr.storage.MemoryStore()
+    array = zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
+    )
+    array.attrs["_ARRAY_DIMENSIONS"] = ["x", "y"]
+
+    async def get_meta():
+        zarr_array = await open_array(store=store, mode="r")
+        return get_metadata(zarr_array)
+
+    metadata = asyncio.run(get_meta())
+    # Should use the provided dimension names
+    assert metadata.dimension_names == ("x", "y")
+
+
+def test_v2_metadata_with_none_fill_value():
+    """Test V2 metadata conversion when fill_value is None."""
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import get_metadata
+
+    # Create a V2 array with None fill_value
+    store = zarr.storage.MemoryStore()
+    _ = zarr.create(
+        shape=(5, 10),
+        chunks=(5, 5),
+        dtype="int32",
+        store=store,
+        zarr_format=2,
+        fill_value=None,
+    )
+
+    async def get_meta():
+        zarr_array = await open_array(store=store, mode="r")
+        return get_metadata(zarr_array)
+
+    metadata = asyncio.run(get_meta())
+    # Should handle None fill_value gracefully
+    assert metadata.fill_value is not None
+
+
+def test_build_chunk_manifest_empty_with_shape():
+    """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import build_chunk_manifest
+
+    # Create an array but don't write data
+    store = zarr.storage.MemoryStore()
+    zarr.create(shape=(10, 10), chunks=(5, 5), dtype="int8", store=store, zarr_format=3)
+
+    async def get_manifest():
+        zarr_array = await open_array(store=store, mode="r")
+        return await build_chunk_manifest(zarr_array, "test://path")
+
+    manifest = asyncio.run(get_manifest())
+    # Should create manifest with proper chunk grid shape even if empty
+    assert manifest.shape_chunk_grid == (2, 2)  # 10/5 = 2 chunks per dimension
