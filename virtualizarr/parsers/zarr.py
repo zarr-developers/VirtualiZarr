@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
 import zarr
 from zarr.api.asynchronous import open_group as open_group_async
@@ -38,22 +39,23 @@ def join_url(base: str, key: str) -> str:
     return base.rstrip("/") + "/" + key.lstrip("/")
 
 
-@runtime_checkable
-class ZarrVersionStrategy(Protocol):
-    """Protocol for handling version-specific Zarr operations."""
+class ZarrVersionStrategy(ABC):
+    """Abstract base class for handling version-specific Zarr operations."""
 
+    @abstractmethod
     async def get_chunk_mapping(
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
         """Get mapping of chunk coordinates to storage locations."""
         ...
 
+    @abstractmethod
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Get V3 metadata for the array (converting if necessary)."""
         ...
 
 
-class ZarrV2Strategy:
+class ZarrV2Strategy(ZarrVersionStrategy):
     """Strategy for handling Zarr V2 arrays."""
 
     async def get_chunk_mapping(
@@ -182,7 +184,7 @@ class ZarrV2Strategy:
         return v3_metadata
 
 
-class ZarrV3Strategy:
+class ZarrV3Strategy(ZarrVersionStrategy):
     """Strategy for handling Zarr V3 arrays."""
 
     async def get_chunk_mapping(
