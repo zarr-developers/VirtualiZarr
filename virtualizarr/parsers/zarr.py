@@ -238,7 +238,13 @@ def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
 
 
 async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
-    """Build a ChunkManifest from chunk coordinate mappings."""
+    """Build a ChunkManifest from chunk coordinate mappings.
+
+    Note: Chunk keys are discovered by listing what's actually in storage rather than
+    generating all possible keys from the chunk grid. Zarr allows chunks to be missing
+    (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
+    missing, Zarr will return the fill_value for those regions when the array is read.
+    """
     strategy = get_strategy(zarr_array)
     chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
 
