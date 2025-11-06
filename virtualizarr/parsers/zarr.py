@@ -61,11 +61,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
     async def get_chunk_mapping(
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
-        """
-        Create a mapping of chunk coordinates to their storage locations for V2 arrays.
-
-        V2 uses paths like: array_name/0.1.2 or array_name/0/1/2
-        """
+        """Create a mapping of chunk coordinates to their storage locations for V2 arrays."""
         name = getattr(zarr_array, "name", "") or ""
         name = name.lstrip("/")
         prefix = f"{name}/" if name else ""
@@ -112,20 +108,12 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         _offsets = [0] * len(_lengths)
 
         return {
-            key: {"path": p, "offset": offset, "length": length}
+            key: {"path": p, "offset": 0, "length": length}
             for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
         }
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
-        """
-        Convert V2 metadata to V3 format.
-
-        Handles:
-        - Converting metadata structure
-        - None fill values
-        - Setting dimension names from attributes or generating defaults
-        - Replacing V2ChunkKeyEncoding with V3's DefaultChunkKeyEncoding
-        """
+        """Convert V2 metadata to V3 format."""
         from zarr.core.metadata import ArrayV2Metadata
         from zarr.metadata.migrate_v3 import _convert_array_metadata
 
@@ -190,11 +178,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
     async def get_chunk_mapping(
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
-        """
-        Create a mapping of chunk coordinates to their storage locations for V3 arrays.
-
-        V3 uses paths like: array_name/c/0/1/2
-        """
+        """Create a mapping of chunk coordinates to their storage locations for V3 arrays."""
         name = getattr(zarr_array, "name", "") or ""
         name = name.lstrip("/")
 
@@ -374,21 +358,6 @@ class ZarrParser:
     See Also
     --------
     virtualizarr.open_virtual_dataset : High-level function for opening virtual datasets.
-
-    Notes
-    -----
-    The parser handles both Zarr V2 and V3 stores transparently. When reading
-    V2 stores, metadata is automatically converted to V3 format to ensure
-    consistent handling across versions. This includes:
-
-    - Converting the metadata structure from V2 to V3 specification
-    - Handling `None` fill values with appropriate defaults
-    - Setting dimension names from `_ARRAY_DIMENSIONS` attributes or generating defaults
-    - Replacing V2ChunkKeyEncoding with V3's DefaultChunkKeyEncoding
-
-    The parser preserves array attributes and handles empty arrays (no chunks)
-    gracefully. Metadata files (.zarray, .zattrs, .zgroup, .zmetadata) are
-    automatically filtered out when listing chunks.
     """
 
     def __init__(
@@ -438,10 +407,8 @@ class ZarrParser:
         Returns
         -------
         [ManifestStore][virtualizarr.manifests.ManifestStore]
-            A virtual representation of the Zarr store containing array metadata
-            (converted to V3 format if source is V2), chunk manifests with
-            references to original chunk locations, group structure and attributes,
-            and references to the object store for data access.
+            A virtual representation of the Zarr store with references to
+            the original chunk locations.
 
         Raises
         ------
@@ -456,26 +423,6 @@ class ZarrParser:
         --------
         virtualizarr.open_virtual_dataset : High-level interface for virtual datasets.
         virtualizarr.manifests.ManifestStore : The returned virtual store object.
-
-        Notes
-        -----
-        The parsing process follows these steps:
-
-        1. Normalizes and validates the input URL
-        2. Resolves the appropriate object store from the registry
-        3. Opens the Zarr group asynchronously
-        4. Iterates through arrays (excluding those in `skip_variables`)
-        5. For each array:
-
-           - Converts V2 metadata to V3 if necessary
-           - Builds chunk manifests with file paths and byte ranges
-           - Preserves attributes and dimension names
-
-        6. Constructs a ManifestGroup with V3 metadata
-        7. Returns a ManifestStore wrapping the virtual representation
-
-        No data is copied during this process; the ManifestStore contains
-        only lightweight references to the original chunks.
         """
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
