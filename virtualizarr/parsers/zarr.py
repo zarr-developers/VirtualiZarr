@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import zarr
 from zarr.api.asynchronous import open_group as open_group_async
+from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
 
@@ -317,10 +318,6 @@ async def _construct_manifest_group(
     }
 
     manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
-
-    # Set V3 group metadata to ensure zarr/xarray uses V3 semantics
-    from zarr.core.group import GroupMetadata
-
     manifest_group._metadata = GroupMetadata(
         attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
         zarr_format=3,
