@@ -289,3 +289,62 @@ def test_build_chunk_manifest_empty_with_shape():
     manifest = asyncio.run(get_manifest())
     # Should create manifest with proper chunk grid shape even if empty
     assert manifest.shape_chunk_grid == (2, 2)  # 10/5 = 2 chunks per dimension
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
+    """Test that arrays with some missing chunks (sparse arrays) are handled correctly.
+
+    This test verifies that VirtualiZarr correctly handles the case where some chunks
+    exist but others are missing. Zarr allows this for sparse data, and when chunks
+    are missing, Zarr returns the fill_value for those regions. VirtualiZarr should
+    preserve this sparsity in the manifest rather than generating entries for all
+    possible chunks based on the chunk grid.
+    """
+    import asyncio
+
+    from zarr.api.asynchronous import open_array
+
+    from virtualizarr.parsers.zarr import build_chunk_manifest
+
+    # Create a zarr array with a 3x3 chunk grid (9 possible chunks)
+    filepath = f"{tmpdir}/sparse.zarr"
+    arr = zarr.create(
+        shape=(30, 30),
+        chunks=(10, 10),
+        dtype="float32",
+        store=filepath,
+        zarr_format=zarr_format,
+        fill_value=np.nan,
+    )
+
+    # Only write data to some chunks, leaving others missing (sparse)
+    # Write to chunks (0,0), (1,1), and (2,2) - a diagonal pattern
+    arr[0:10, 0:10] = 1.0  # chunk 0.0
+    arr[10:20, 10:20] = 2.0  # chunk 1.1
+    arr[20:30, 20:30] = 3.0  # chunk 2.2
+    # Chunks (0,1), (0,2), (1,0), (1,2), (2,0), (2,1) are intentionally left unwritten
+
+    async def get_manifest():
+        zarr_array = await open_array(store=filepath, mode="r")
+        return await build_chunk_manifest(zarr_array, filepath)
+
+    manifest = asyncio.run(get_manifest())
+
+    # The manifest should only contain the 3 chunks we actually wrote
+    assert len(manifest.dict()) == 3, f"Expected 3 chunks, got {len(manifest.dict())}"
+
+    # Verify the expected chunks are present
+    assert "0.0" in manifest.dict(), "Chunk 0.0 should be present"
+    assert "1.1" in manifest.dict(), "Chunk 1.1 should be present"
+    assert "2.2" in manifest.dict(), "Chunk 2.2 should be present"
+
+    # Verify missing chunks are not in the manifest
+    missing_chunks = ["0.1", "0.2", "1.0", "1.2", "2.0", "2.1"]
+    for chunk_key in missing_chunks:
+        assert chunk_key not in manifest.dict(), (
+            f"Chunk {chunk_key} should not be present (it's missing/sparse)"
+        )
+
+    # The chunk grid shape should still reflect the full array dimensions
+    assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
