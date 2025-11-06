@@ -226,7 +226,11 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
         # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
         # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
-        if "attributes" in v3_dict and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]:
+        if (
+            "attributes" in v3_dict
+            and isinstance(v3_dict["attributes"], dict)
+            and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
+        ):
             del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
             v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
         v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
@@ -245,9 +249,14 @@ class ZarrV3Strategy(ZarrVersionStrategy):
         # Check for sharding - not yet supported
         from zarr.codecs import ShardingCodec
 
-        if any(
-            isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
-        ):
+        # Type narrowing: V3 strategy only handles V3 arrays with V3 metadata
+        metadata = zarr_array.metadata
+        if not isinstance(metadata, ArrayV3Metadata):
+            raise TypeError(
+                f"Expected ArrayV3Metadata in V3 strategy, got {type(metadata)}"
+            )
+
+        if any(isinstance(codec, ShardingCodec) for codec in metadata.codecs):
             raise NotImplementedError(
                 "Zarr V3 arrays with sharding are not yet supported. "
                 "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
