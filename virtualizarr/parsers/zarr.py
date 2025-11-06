@@ -242,6 +242,19 @@ class ZarrV3Strategy(ZarrVersionStrategy):
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
         """Create a mapping of chunk coordinates to their storage locations for V3 arrays."""
+        # Check for sharding - not yet supported
+        from zarr.codecs import ShardingCodec
+
+        if any(
+            isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
+        ):
+            raise NotImplementedError(
+                "Zarr V3 arrays with sharding are not yet supported. "
+                "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
+                "which VirtualiZarr does not currently handle. "
+                "Reading sharded arrays without proper offset handling would result in corrupted data."
+            )
+
         name = _get_array_name(zarr_array)
 
         # Handle scalar arrays
