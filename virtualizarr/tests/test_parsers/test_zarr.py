@@ -1,13 +1,14 @@
 import numpy as np
 import pytest
+import xarray as xr
 import zarr
 from obstore.store import LocalStore
+from zarr.api.asynchronous import open_array
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
-
-# from virtualizarr.parsers.zarr import get_chunk_mapping_prefix, get_metadata
+from virtualizarr.parsers.zarr import build_chunk_manifest, get_metadata, get_strategy
 from virtualizarr.registry import ObjectStoreRegistry
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
@@ -19,7 +20,6 @@ ZarrArrayType = zarr.AsyncArray | zarr.Array
         pytest.param(
             2,
             id="Zarr V2",
-            # marks=pytest.mark.skip(reason="Zarr V2 not currently supported."),
         ),
         pytest.param(3, id="Zarr V3"),
     ],
@@ -94,19 +94,14 @@ class TestOpenVirtualDatasetZarr:
                 assert isinstance(vds[array].data, ManifestArray)
                 # compare manifest array ArrayV3Metadata
                 expected = zg[array].metadata.to_dict()
-                # Check attributes
-                assert expected["attributes"] == vds[array].attrs
 
-                # Check dimension names - handling V2 vs V3 difference
-                zarr_format = zg[array].metadata.zarr_format
-                if zarr_format == 2:
-                    # V2 stores dimensions in attributes
-                    expected_dims = expected.get("attributes", {}).get(
-                        "_ARRAY_DIMENSIONS", None
-                    )
-                    if expected_dims:
-                        assert expected_dims == list(vds[array].dims)
-                    # If no _ARRAY_DIMENSIONS, VirtualiZarr generates dimension names
+                # Check attributes - V2 to V3 conversion removes _ARRAY_DIMENSIONS
+                expected_attrs = expected["attributes"].copy()
+                if "_ARRAY_DIMENSIONS" in expected_attrs:
+                    # V2 stores dimensions in attributes, VirtualiZarr converts to V3 dimension_names
+                    expected_dims = expected_attrs["_ARRAY_DIMENSIONS"]
+                    del expected_attrs["_ARRAY_DIMENSIONS"]
+                    assert expected_dims == list(vds[array].dims)
                 else:  # V3
                     assert list(expected["dimension_names"]) == list(vds[array].dims)
 
@@ -115,10 +110,6 @@ class TestOpenVirtualDatasetZarr:
 def test_scalar_chunk_mapping(tmpdir, zarr_format):
     """Test that scalar arrays produce correct chunk mappings for both V2 and V3."""
     import asyncio
-
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import get_strategy
 
     # Create a scalar zarr array
     filepath = f"{tmpdir}/scalar.zarr"
@@ -154,8 +145,6 @@ def test_unsupported_zarr_format():
     """Test that unsupported zarr format raises NotImplementedError."""
     from unittest.mock import Mock
 
-    from virtualizarr.parsers.zarr import get_strategy
-
     # Create a mock array with unsupported format
     mock_array = Mock()
     mock_array.metadata.zarr_format = 99  # Unsupported format
@@ -168,10 +157,6 @@ def test_unsupported_zarr_format():
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
     import asyncio
-
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import get_strategy
 
     # Create an array but don't write any data
     filepath = f"{tmpdir}/empty.zarr"
@@ -197,10 +182,6 @@ def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
     import asyncio
 
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import get_metadata
-
     # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
     _ = zarr.create(
@@ -222,10 +203,6 @@ def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
     import asyncio
 
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import get_metadata
-
     # Create a V2 array with dimension attributes
     store = zarr.storage.MemoryStore()
     array = zarr.create(
@@ -245,10 +222,6 @@ def test_v2_metadata_with_dimensions():
 def test_v2_metadata_with_none_fill_value():
     """Test V2 metadata conversion when fill_value is None."""
     import asyncio
-
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import get_metadata
 
     # Create a V2 array with None fill_value
     store = zarr.storage.MemoryStore()
@@ -274,10 +247,6 @@ def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
     import asyncio
 
-    from zarr.api.asynchronous import open_array
-
-    from virtualizarr.parsers.zarr import build_chunk_manifest
-
     # Create an array but don't write data
     store = zarr.storage.MemoryStore()
     zarr.create(shape=(10, 10), chunks=(5, 5), dtype="int8", store=store, zarr_format=3)
@@ -302,8 +271,6 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     possible chunks based on the chunk grid.
     """
     import asyncio
-
-    from zarr.api.asynchronous import open_array
 
     from virtualizarr.parsers.zarr import build_chunk_manifest
 
@@ -348,3 +315,41 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
 
     # The chunk grid shape should still reflect the full array dimensions
     assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
+    """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
+    import numpy as _np
+
+    from virtualizarr.parsers import ZarrParser
+
+    # Create a small Dataset with chunking
+    ds = xr.Dataset(
+        {"data": (("x", "y"), _np.arange(36).reshape(6, 6).astype("float32"))},
+        coords={"x": _np.arange(6), "y": _np.arange(6)},
+    )
+
+    filepath = f"{tmpdir}/roundtrip.zarr"
+    # Ensure multiple chunks to exercise manifest generation
+    ds.to_zarr(
+        filepath,
+        encoding={"data": {"chunks": (2, 2)}},
+        consolidated=False,
+        zarr_format=zarr_format,
+    )
+
+    # Build a registry and generate a ManifestStore from the parser
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+    manifeststore = parser(url=filepath, registry=registry)
+
+    # Open the original zarr and the manifest-backed store and compare
+    with xr.open_dataset(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)

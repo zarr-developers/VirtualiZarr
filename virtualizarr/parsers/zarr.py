@@ -121,31 +121,25 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         v2_metadata = zarr_array.metadata
         assert isinstance(v2_metadata, ArrayV2Metadata)
 
-        try:
-            v3_metadata = _convert_array_metadata(v2_metadata)
-        except TypeError as e:
-            # Handle None fill_value case
-            if (
-                "Cannot convert object None" in str(e)
-                and v2_metadata.fill_value is None
-            ):
-                v2_dict = v2_metadata.to_dict()
-                v2_dict["fill_value"] = 0
-                temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
-                v3_metadata = _convert_array_metadata(temp_v2)
+        if v2_metadata.fill_value is None:
+            v2_dict = v2_metadata.to_dict()
+            v2_dict["fill_value"] = 0
+            temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
+            v3_metadata = _convert_array_metadata(temp_v2)
 
-                # Replace with proper default for the data type
-                default_scalar = v3_metadata.data_type.default_scalar()
-                fill_value = (
-                    default_scalar.item()
-                    if hasattr(default_scalar, "item")
-                    else default_scalar
-                )
-                v3_dict = v3_metadata.to_dict()
-                v3_dict["fill_value"] = fill_value
-                v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
-            else:
-                raise
+            # Replace with proper default for the data type
+            default_scalar = v3_metadata.data_type.default_scalar()
+            fill_value = (
+                default_scalar.item()
+                if hasattr(default_scalar, "item")
+                else default_scalar
+            )
+            v3_dict = v3_metadata.to_dict()
+            v3_dict["fill_value"] = fill_value
+            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+        else:
+            # Normal conversion; allow other errors to propagate.
+            v3_metadata = _convert_array_metadata(v2_metadata)
 
         # Set dimension names from attributes or generate defaults
         if v3_metadata.dimension_names is None:
@@ -163,10 +157,14 @@ class ZarrV2Strategy(ZarrVersionStrategy):
                 ]
             v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
+        v3_dict = v3_metadata.to_dict()
+
         # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
         # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
         # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
-        v3_dict = v3_metadata.to_dict()
+        if "attributes" in v3_dict and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]:
+            del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
+            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
         v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
         v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
