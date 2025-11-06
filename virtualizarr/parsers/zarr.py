@@ -40,6 +40,93 @@ def join_url(base: str, key: str) -> str:
     return base.rstrip("/") + "/" + key.lstrip("/")
 
 
+def _get_array_name(zarr_array: ZarrArrayType) -> str:
+    """Extract and normalize the array name."""
+    name = getattr(zarr_array, "name", "") or ""
+    return name.lstrip("/")
+
+
+def _normalize_chunk_keys(chunk_keys: list[str], prefix: str) -> list[str]:
+    """
+    Normalize chunk keys to dot-separated coordinates.
+
+    Strips the prefix from each key and replaces '/' with '.' for coordinate notation.
+    """
+    chunk_coords = [
+        k[len(prefix) :] if prefix and k.startswith(prefix) else k for k in chunk_keys
+    ]
+    return [coord.replace("/", ".") for coord in chunk_coords]
+
+
+async def _handle_scalar_array(
+    zarr_array: ZarrArrayType, path: str, scalar_key: str
+) -> dict[str, dict[str, Any]]:
+    """
+    Handle scalar arrays (shape == ()).
+
+    Parameters
+    ----------
+    zarr_array
+        The scalar Zarr array.
+    path
+        Base path for constructing chunk paths.
+    scalar_key
+        The storage key for the scalar value (e.g., "0" for V2, "c" for V3).
+
+    Returns
+    -------
+    dict
+        Mapping with a single entry for the scalar chunk.
+    """
+    size = await zarr_array.store.getsize(scalar_key)
+    actual_path = join_url(path, scalar_key)
+    return {
+        "0" if scalar_key == "0" else "c": {
+            "path": actual_path,
+            "offset": 0,
+            "length": size,
+        }
+    }
+
+
+async def _build_chunk_mapping(
+    chunk_keys: list[str], zarr_array: ZarrArrayType, path: str, prefix: str
+) -> dict[str, dict[str, Any]]:
+    """
+    Build chunk mapping from a list of chunk keys.
+
+    Parameters
+    ----------
+    chunk_keys
+        List of storage keys for chunks.
+    zarr_array
+        The Zarr array.
+    path
+        Base path for constructing chunk paths.
+    prefix
+        Prefix to strip from chunk keys.
+
+    Returns
+    -------
+    dict
+        Mapping of normalized chunk coordinates to storage locations.
+    """
+    if not chunk_keys:
+        return {}
+
+    lengths = await _concurrent_map(
+        [(k,) for k in chunk_keys], zarr_array.store.getsize
+    )
+    dict_keys = _normalize_chunk_keys(chunk_keys, prefix)
+    paths = [join_url(path, k) for k in chunk_keys]
+    offsets = [0] * len(lengths)
+
+    return {
+        key: {"path": p, "offset": offset, "length": length}
+        for key, p, offset, length in zip(dict_keys, paths, offsets, lengths)
+    }
+
+
 class ZarrVersionStrategy(ABC):
     """Abstract base class for handling version-specific Zarr operations."""
 
@@ -63,17 +150,13 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
         """Create a mapping of chunk coordinates to their storage locations for V2 arrays."""
-        name = getattr(zarr_array, "name", "") or ""
-        name = name.lstrip("/")
+        name = _get_array_name(zarr_array)
         prefix = f"{name}/" if name else ""
 
         # Handle scalar arrays
         if zarr_array.shape == ():
-            chunk_key = "0"
-            object_key = f"{prefix}{chunk_key}"
-            size = await zarr_array.store.getsize(object_key)
-            actual_path = join_url(path, object_key)
-            return {"0": {"path": actual_path, "offset": 0, "length": size}}
+            scalar_key = f"{prefix}0"
+            return await _handle_scalar_array(zarr_array, path, scalar_key)
 
         # List all keys under the array prefix, filtering out metadata files
         prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
@@ -92,26 +175,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             if file_name not in metadata_files:
                 chunk_keys.append(key)
 
-        if not chunk_keys:
-            return {}
-
-        _lengths = await _concurrent_map(
-            [(k,) for k in chunk_keys], zarr_array.store.getsize
-        )
-        chunk_coords = [
-            k[len(prefix) :] if prefix and k.startswith(prefix) else k
-            for k in chunk_keys
-        ]
-
-        # Normalize to dot-separated coordinates (V2 can use either '/' or '.')
-        _dict_keys = [coord.replace("/", ".") for coord in chunk_coords]
-        _paths = [join_url(path, k) for k in chunk_keys]
-        _offsets = [0] * len(_lengths)
-
-        return {
-            key: {"path": p, "offset": 0, "length": length}
-            for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
-        }
+        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
@@ -178,30 +242,21 @@ class ZarrV3Strategy(ZarrVersionStrategy):
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
         """Create a mapping of chunk coordinates to their storage locations for V3 arrays."""
-        name = getattr(zarr_array, "name", "") or ""
-        name = name.lstrip("/")
+        name = _get_array_name(zarr_array)
 
         # Handle scalar arrays
         if zarr_array.shape == ():
-            prefix = f"{name}/c" if name else "c"
-            size = await zarr_array.store.getsize(prefix)
-            return {"c": {"path": join_url(path, prefix), "offset": 0, "length": size}}
+            scalar_key = f"{name}/c" if name else "c"
+            return await _handle_scalar_array(zarr_array, path, scalar_key)
 
+        # List chunk keys under the c/ subdirectory
         prefix = f"{name}/c/" if name else "c/"
         prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
         if not prefix_keys:
             return {}
 
-        _lengths = await _concurrent_map(prefix_keys, zarr_array.store.getsize)
-        chunk_keys = [x[0].split(prefix)[1] for x in prefix_keys]
-        _dict_keys = [key.replace("/", ".") for key in chunk_keys]
-        _paths = [join_url(path, prefix + key) for key in chunk_keys]
-        _offsets = [0] * len(_lengths)
-
-        return {
-            key: {"path": p, "offset": offset, "length": length}
-            for key, p, offset, length in zip(_dict_keys, _paths, _offsets, _lengths)
-        }
+        chunk_keys = [x[0] for x in prefix_keys]
+        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata as-is (no conversion needed)."""
