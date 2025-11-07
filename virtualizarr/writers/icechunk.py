@@ -419,7 +419,7 @@ def write_virtual_variable_to_icechunk(
             name=name,
             shape=metadata.shape,
             chunks=metadata.chunks,
-            dtype=metadata.data_type,
+            dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
             compressors=compressors,
             serializer=serializer,
