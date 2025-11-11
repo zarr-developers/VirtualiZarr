@@ -233,6 +233,32 @@ def test_v2_metadata_without_dimensions():
 
 
 @pytest.mark.skipif(
+    version.parse(zarr.__version__) >= version.parse("3.1.3"),
+    reason="Test only relevant for zarr<3.1.3",
+)
+def test_v2_metadata_raises_import_error_on_old_zarr():
+    """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
+    import asyncio
+
+    # Create a V2 array without dimension attributes
+    store = zarr.storage.MemoryStore()
+    _ = zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
+    )
+
+    async def get_meta():
+        zarr_array = await open_array(store=store, mode="r")
+        return get_metadata(zarr_array)
+
+    # Should raise ImportError with helpful message
+    with pytest.raises(
+        ImportError,
+        match=r"Zarr-Python>=3\.1\.3 is required for parsing Zarr V2 into Zarr V3.*Found Zarr version",
+    ):
+        asyncio.run(get_meta())
+
+
+@pytest.mark.skipif(
     version.parse(zarr.__version__) < version.parse("3.1.3"),
     reason="Requires zarr>=3.1.3 for V2->V3 metadata conversion",
 )

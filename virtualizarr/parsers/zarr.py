@@ -185,7 +185,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             from zarr.metadata.migrate_v3 import _convert_array_metadata
         except (ImportError, AttributeError):
             raise ImportError(
-                f"Zarr-Python>=3.1.3 is required for Zarr V2 -> V3 conversion. "
+                f"Zarr-Python>=3.1.3 is required for parsing Zarr V2 into Zarr V3. "
                 f"Found Zarr version '{zarr.__version__}'"
             )
 
