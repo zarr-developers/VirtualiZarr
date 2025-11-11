@@ -171,6 +171,12 @@ class ManifestStore(Store):
             return self._group.arrays[var].metadata.to_buffer_dict(
                 prototype=default_buffer_prototype()
             )["zarr.json"]
+        elif key.endswith((".zattrs", ".zgroup", ".zarray", ".zmetadata")):
+            # Zarr-Python expects store classes to return None when metadata JSONs are not found.
+            # Zarr-Python uses this behavior to distinguish between V2/V3 and consolidated/unconsolidated stores.
+            # This upstream behavior will hopefully change in the future to be more Zarr-hierarchy aware, in
+            # which case this may need refactoring.
+            return None
         var = key.split("/")[0]
         marr = self._group.arrays[var]
         manifest = marr.manifest
