@@ -146,7 +146,7 @@ class TestManifestGroupFromHDF:
         manifest_store = manifest_store_from_hdf_url(nested_group_hdf5_url)
         z = zarr.open_group(manifest_store, mode="r", zarr_format=3)
 
-        with h5py.File(nested_group_hdf5_url.split("file://")[-1], mode="r") as f:
+        with h5py.File(nested_group_hdf5_url.removeprefix("file://"), mode="r") as f:
             np.testing.assert_array_equal(f["group"]["data"], z["group"]["data"][...])
             np.testing.assert_array_equal(
                 f["group"]["nested_group"]["data"][...],
