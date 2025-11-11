@@ -99,7 +99,7 @@ def parse_manifest_index(
 
 
 def get_deepest_group_or_array(
-    node: ManifestGroup, key: list[str]
+    node: ManifestGroup, key: Iterable[str]
 ) -> ManifestGroup | ManifestArray:
     for var in key:
         if var in node.arrays:
