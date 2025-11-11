@@ -4,6 +4,10 @@
 
 ### New Features
 
+- `ZarrParser` now handles Zarr V2 and V3 array parsing.
+  ([#565](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
+  By [Neil Schroeder](https://github.com/neilSchroeder)
+
 ### Breaking changes
 
 ### Bug fixes
