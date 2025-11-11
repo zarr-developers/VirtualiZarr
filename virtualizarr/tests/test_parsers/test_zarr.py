@@ -3,6 +3,7 @@ import pytest
 import xarray as xr
 import zarr
 from obstore.store import LocalStore
+from packaging import version
 from zarr.api.asynchronous import open_array
 
 from virtualizarr import open_virtual_dataset
@@ -20,6 +21,10 @@ ZarrArrayType = zarr.AsyncArray | zarr.Array
         pytest.param(
             2,
             id="Zarr V2",
+            marks=pytest.mark.skipif(
+                version.parse(zarr.__version__) < version.parse("3.1.3"),
+                reason="Zarr V2 requires zarr>=3.1.3",
+            ),
         ),
         pytest.param(3, id="Zarr V3"),
     ],
@@ -106,7 +111,19 @@ class TestOpenVirtualDatasetZarr:
                     assert list(expected["dimension_names"]) == list(vds[array].dims)
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@pytest.mark.parametrize(
+    "zarr_format",
+    [
+        pytest.param(
+            2,
+            marks=pytest.mark.skipif(
+                version.parse(zarr.__version__) < version.parse("3.1.3"),
+                reason="Zarr format 2 parsing requires zarr>=3.1.3",
+            ),
+        ),
+        3,
+    ],
+)
 def test_scalar_chunk_mapping(tmpdir, zarr_format):
     """Test that scalar arrays produce correct chunk mappings for both V2 and V3."""
     import asyncio
@@ -153,7 +170,19 @@ def test_unsupported_zarr_format():
         get_strategy(mock_array)
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@pytest.mark.parametrize(
+    "zarr_format",
+    [
+        pytest.param(
+            2,
+            marks=pytest.mark.skipif(
+                version.parse(zarr.__version__) < version.parse("3.1.3"),
+                reason="Zarr format 2 parsing requires zarr>=3.1.3",
+            ),
+        ),
+        3,
+    ],
+)
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
     import asyncio
@@ -178,6 +207,10 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     assert chunk_map == {}
 
 
+@pytest.mark.skipif(
+    version.parse(zarr.__version__) < version.parse("3.1.3"),
+    reason="Requires zarr>=3.1.3 for V2->V3 metadata conversion",
+)
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
     import asyncio
@@ -199,6 +232,10 @@ def test_v2_metadata_without_dimensions():
     assert len(metadata.dimension_names) == 2
 
 
+@pytest.mark.skipif(
+    version.parse(zarr.__version__) < version.parse("3.1.3"),
+    reason="Requires zarr>=3.1.3 for V2->V3 metadata conversion",
+)
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
     import asyncio
@@ -219,6 +256,10 @@ def test_v2_metadata_with_dimensions():
     assert metadata.dimension_names == ("x", "y")
 
 
+@pytest.mark.skipif(
+    version.parse(zarr.__version__) < version.parse("3.1.3"),
+    reason="Requires zarr>=3.1.3 for V2->V3 metadata conversion",
+)
 def test_v2_metadata_with_none_fill_value():
     """Test V2 metadata conversion when fill_value is None."""
     import asyncio
@@ -260,7 +301,19 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)  # 10/5 = 2 chunks per dimension
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@pytest.mark.parametrize(
+    "zarr_format",
+    [
+        pytest.param(
+            2,
+            marks=pytest.mark.skipif(
+                version.parse(zarr.__version__) < version.parse("3.1.3"),
+                reason="Zarr format 2 parsing requires zarr>=3.1.3",
+            ),
+        ),
+        3,
+    ],
+)
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly.
 
@@ -317,7 +370,19 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@pytest.mark.parametrize(
+    "zarr_format",
+    [
+        pytest.param(
+            2,
+            marks=pytest.mark.skipif(
+                version.parse(zarr.__version__) < version.parse("3.1.3"),
+                reason="Zarr format 2 parsing requires zarr>=3.1.3",
+            ),
+        ),
+        3,
+    ],
+)
 def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
     import numpy as _np
