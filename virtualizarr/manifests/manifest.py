@@ -1,11 +1,11 @@
 import re
 from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
 from pathlib import PosixPath
-from typing import Any, Callable, NewType, Tuple, TypedDict, cast
+from typing import Any, Callable, NewType, TypedDict, cast
 
 import numpy as np
 
-from virtualizarr.manifests.utils import construct_chunk_pattern
+from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
 
 # doesn't guarantee that writers actually handle these
@@ -228,7 +228,7 @@ class ChunkManifest:
             path, offset, length = entry.values()
             entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
-            split_key = split(key)
+            split_key = parse_manifest_index(key)
             paths[split_key] = entry["path"]
             offsets[split_key] = entry["offset"]
             lengths[split_key] = entry["length"]
@@ -348,7 +348,7 @@ class ChunkManifest:
         return self._paths.nbytes + self._offsets.nbytes + self._lengths.nbytes
 
     def __getitem__(self, key: ChunkKey) -> ChunkEntry:
-        indices = split(key)
+        indices = parse_manifest_index(key)
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
@@ -472,17 +472,13 @@ class ChunkManifest:
         )
 
 
-def split(key: ChunkKey) -> Tuple[int, ...]:
-    return tuple(int(i) for i in key.split("."))
-
-
 def join(inds: Iterable[Any]) -> ChunkKey:
     return cast(ChunkKey, ".".join(str(i) for i in list(inds)))
 
 
 def get_ndim_from_key(key: str) -> int:
     """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
-    return len(key.split("."))
+    return len(parse_manifest_index(key))
 
 
 def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
@@ -507,7 +503,10 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
 
 def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
     # find max chunk index along each dimension
-    zipped_indices = zip(*[split(key) for key in chunk_keys])
+    if list(chunk_keys) == ["c"]:
+        # Scalar array, cannot be split
+        return ()
+    zipped_indices = zip(*[parse_manifest_index(key) for key in chunk_keys])
     chunk_grid_shape = tuple(
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )
