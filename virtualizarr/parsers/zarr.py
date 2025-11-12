@@ -290,8 +290,24 @@ class ZarrV3Strategy(ZarrVersionStrategy):
         return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
-        """Return V3 metadata as-is (no conversion needed)."""
-        return zarr_array.metadata  # type: ignore[return-value]
+        """Return V3 metadata, ensuring dimension_names are properly set."""
+        v3_metadata = zarr_array.metadata  # type: ignore[return-value]
+
+        # Ensure dimension_names are set for xarray compatibility
+        if v3_metadata.dimension_names is None:
+            v3_dict = v3_metadata.to_dict()
+            if zarr_array.shape == ():
+                # Scalar arrays should have empty dimension names
+                v3_dict["dimension_names"] = []
+            else:
+                # Generate default dimension names for regular arrays
+                array_name = zarr_array.name.lstrip("/") if zarr_array.name else "array"
+                v3_dict["dimension_names"] = [
+                    f"{array_name}_dim_{i}" for i in range(len(zarr_array.shape))
+                ]
+            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+
+        return v3_metadata
 
 
 def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
