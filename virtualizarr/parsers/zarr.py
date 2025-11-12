@@ -80,8 +80,10 @@ async def _handle_scalar_array(
     """
     size = await zarr_array.store.getsize(scalar_key)
     actual_path = join_url(path, scalar_key)
+    chunk_key = "scalar_chunk"
+
     return {
-        "0": {
+        chunk_key: {
             "path": actual_path,
             "offset": 0,
             "length": size,
