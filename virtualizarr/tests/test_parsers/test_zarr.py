@@ -3,6 +3,7 @@ import pytest
 import xarray as xr
 import zarr
 from obstore.store import LocalStore
+from packaging import version
 from zarr.api.asynchronous import open_array
 
 from virtualizarr import open_virtual_dataset
@@ -13,18 +14,36 @@ from virtualizarr.registry import ObjectStoreRegistry
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
-
-@pytest.mark.parametrize(
-    "zarr_store",
-    [
-        pytest.param(
-            2,
-            id="Zarr V2",
-        ),
-        pytest.param(3, id="Zarr V3"),
-    ],
-    indirect=True,
+SKIP_OLDER_ZARR_PYTHON = pytest.mark.skipif(
+    version.parse(zarr.__version__) < version.parse("3.1.3"),
+    reason="Zarr V2 requires zarr>=3.1.3",
 )
+
+SKIP_NEWER_ZARR_PYTHON = pytest.mark.skipif(
+    version.parse(zarr.__version__) >= version.parse("3.1.3"),
+    reason="Test only relevant for zarr<3.1.3",
+)
+
+
+def zarr_versions(param_name="zarr_format", indirect=False):
+    """
+    Reusable parametrize decorator for Zarr V2 and V3 versions.
+
+    Args:
+        param_name: Name of the parameter ('zarr_format' or 'zarr_store')
+        indirect: Whether to use indirect parametrization (True for fixtures)
+    """
+    return pytest.mark.parametrize(
+        param_name,
+        [
+            pytest.param(2, id="Zarr V2", marks=SKIP_OLDER_ZARR_PYTHON),
+            pytest.param(3, id="Zarr V3"),
+        ],
+        indirect=indirect,
+    )
+
+
+@zarr_versions(param_name="zarr_store", indirect=True)
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
         # check loadable variables
@@ -106,7 +125,7 @@ class TestOpenVirtualDatasetZarr:
                     assert list(expected["dimension_names"]) == list(vds[array].dims)
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@zarr_versions()
 def test_scalar_chunk_mapping(tmpdir, zarr_format):
     """Test that scalar arrays produce correct chunk mappings for both V2 and V3."""
     import asyncio
@@ -153,7 +172,7 @@ def test_unsupported_zarr_format():
         get_strategy(mock_array)
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@zarr_versions()
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
     import asyncio
@@ -178,6 +197,7 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     assert chunk_map == {}
 
 
+@SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
     import asyncio
@@ -199,6 +219,30 @@ def test_v2_metadata_without_dimensions():
     assert len(metadata.dimension_names) == 2
 
 
+@SKIP_NEWER_ZARR_PYTHON
+def test_v2_metadata_raises_import_error_on_old_zarr():
+    """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
+    import asyncio
+
+    # Create a V2 array without dimension attributes
+    store = zarr.storage.MemoryStore()
+    _ = zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
+    )
+
+    async def get_meta():
+        zarr_array = await open_array(store=store, mode="r")
+        return get_metadata(zarr_array)
+
+    # Should raise ImportError with helpful message
+    with pytest.raises(
+        ImportError,
+        match=r"Zarr-Python>=3\.1\.3 is required for parsing Zarr V2 into Zarr V3.*Found Zarr version",
+    ):
+        asyncio.run(get_meta())
+
+
+@SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
     import asyncio
@@ -219,6 +263,7 @@ def test_v2_metadata_with_dimensions():
     assert metadata.dimension_names == ("x", "y")
 
 
+@SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_with_none_fill_value():
     """Test V2 metadata conversion when fill_value is None."""
     import asyncio
@@ -260,7 +305,7 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)  # 10/5 = 2 chunks per dimension
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly.
 
@@ -317,7 +362,7 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
 
 
-@pytest.mark.parametrize("zarr_format", [2, 3])
+@zarr_versions()
 def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
     import numpy as _np
