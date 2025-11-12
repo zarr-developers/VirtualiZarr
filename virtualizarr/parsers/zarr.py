@@ -81,7 +81,7 @@ async def _handle_scalar_array(
     size = await zarr_array.store.getsize(scalar_key)
     actual_path = join_url(path, scalar_key)
     return {
-        "0" if scalar_key == "0" else "c": {
+        "0": {
             "path": actual_path,
             "offset": 0,
             "length": size,
