@@ -32,9 +32,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.8.3
+      - uses: prefix-dev/setup-pixi@v0.9.3
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.59.0
           environments: minimum-versions
 
       - name: List installed libraries
@@ -46,7 +46,7 @@ jobs:
           pixi run -e minimum-versions run-tests-xml-cov
 
       - name: Upload code coverage to Codecov
-        uses: codecov/codecov-action@v3.1.4
+        uses: codecov/codecov-action@v5.5.1
         with:
           file: ./coverage.xml
           flags: unittests
