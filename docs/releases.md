@@ -4,6 +4,9 @@
 
 ### New Features
 
+- Allow nested-groups inside `ManifestStore` and `ManifestGroup` objects and update `HDFParser` to be able to create nested `zarr.Group` objects.
+  ([#790](https://github.com/zarr-developers/VirtualiZarr/pull/790)).
+  By [Ilan Gold](https://github.com/ilan-gold)
 - `ZarrParser` now handles Zarr V2 and V3 array parsing.
   ([#565](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
   By [Neil Schroeder](https://github.com/neilSchroeder)

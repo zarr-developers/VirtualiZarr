@@ -42,6 +42,22 @@ class TestHDFManifestStore:
         ) as rountripped_ds:
             xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
+    def test_roundtrip_simple_virtualdataset_guess_zarr_format(self, tmpdir, basic_ds):
+        """
+        Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore, relying
+        on xarray/zarr to guess the zarr format and unconsolidated store metadata.
+        """
+
+        filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        url = f"file://{filepath}"
+        basic_ds.to_netcdf(filepath, engine="h5netcdf")
+        manifest_store = manifest_store_from_hdf_url(url)
+        with xr.open_dataset(
+            manifest_store,
+            engine="zarr",
+        ) as rountripped_ds:
+            xr.testing.assert_allclose(basic_ds, rountripped_ds)
+
     def test_rountrip_partial_chunk_virtualdataset(self, tmpdir, basic_ds):
         "Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore with a single partial chunk"
 
