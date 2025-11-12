@@ -377,7 +377,7 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
                 paths=paths,
                 offsets=offsets,
                 lengths=lengths,
-                validate_paths=False,  # Skip path validation since we trust the parser
+                validate_paths=False,
             )
 
     return ChunkManifest(chunk_map)
