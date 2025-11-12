@@ -145,10 +145,12 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
 
     chunk_map = asyncio.run(get_chunk_map())
 
-    # Both V2 and V3 use "0" as the chunk key (though V3 stores at path "c")
-    assert "0" in chunk_map
-    assert chunk_map["0"]["offset"] == 0
-    assert chunk_map["0"]["length"] > 0
+    # Both V2 and V3 now use "scalar_chunk"
+    expected_key = "scalar_chunk"
+
+    assert expected_key in chunk_map
+    assert chunk_map[expected_key]["offset"] == 0
+    assert chunk_map[expected_key]["length"] > 0
 
 
 def test_join_url_empty_base():
@@ -157,6 +159,50 @@ def test_join_url_empty_base():
 
     result = join_url("", "some/key")
     assert result == "some/key"
+
+
+@zarr_versions()
+def test_scalar_loadable_variables(tmpdir, zarr_format):
+    """Test that scalar arrays work correctly when included in loadable_variables for both V2 and V3."""
+    from obstore.store import LocalStore
+    from virtualizarr import open_virtual_dataset
+    from virtualizarr.parsers.zarr import ZarrParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    # Create a zarr group with scalar array
+    filepath = f"{tmpdir}/scalar_test.zarr"
+
+    # Create zarr with scalar
+    root_group = zarr.open_group(filepath, mode="w", zarr_format=zarr_format)
+    scalar_array = root_group.create_array("my_scalar", shape=(), dtype="float64")
+    scalar_array[()] = 123.45
+
+    # Set up VirtualiZarr
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+
+    # Test: Load scalar variable through VirtualiZarr with loadable_variables
+    # This was the original failing case from the bug report
+    with open_virtual_dataset(
+        url=filepath,
+        registry=registry,
+        parser=parser,
+        loadable_variables=["my_scalar"],  # Include scalar in loadable_variables
+    ) as vds:
+        # Check that scalar is loaded as actual data (not ManifestArray)
+        assert "my_scalar" in vds.data_vars
+        scalar_var = vds["my_scalar"]
+
+        # Access the scalar data
+        scalar_data = scalar_var.to_numpy()
+
+        # Verify it's loaded correctly
+        import numpy as np
+
+        assert isinstance(scalar_data, np.ndarray)
+        assert scalar_data.shape == ()
+        assert float(scalar_data) == 123.45
 
 
 def test_unsupported_zarr_format():
@@ -353,9 +399,9 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     # Verify missing chunks are not in the manifest
     missing_chunks = ["0.1", "0.2", "1.0", "1.2", "2.0", "2.1"]
     for chunk_key in missing_chunks:
-        assert chunk_key not in manifest.dict(), (
-            f"Chunk {chunk_key} should not be present (it's missing/sparse)"
-        )
+        assert (
+            chunk_key not in manifest.dict()
+        ), f"Chunk {chunk_key} should not be present (it's missing/sparse)"
 
     # The chunk grid shape should still reflect the full array dimensions
     assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
