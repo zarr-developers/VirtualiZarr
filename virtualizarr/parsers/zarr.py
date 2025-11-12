@@ -291,7 +291,15 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata, ensuring dimension_names are properly set."""
-        v3_metadata = zarr_array.metadata  # type: ignore[return-value]
+        metadata = zarr_array.metadata
+
+        # Type narrowing: V3 strategy only handles V3 arrays with V3 metadata
+        if not isinstance(metadata, ArrayV3Metadata):
+            raise TypeError(
+                f"Expected ArrayV3Metadata in V3 strategy, got {type(metadata)}"
+            )
+
+        v3_metadata = metadata
 
         # Ensure dimension_names are set for xarray compatibility
         if v3_metadata.dimension_names is None:
@@ -368,13 +376,15 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
         chunk_entries = list(chunk_map.values())
         if chunk_entries:
             entry = chunk_entries[0]
-            paths = np.array(entry["path"], dtype=np.dtypes.StringDType())
+            # Create scalar arrays with proper types for ChunkManifest.from_arrays
+            paths = np.array([entry["path"]], dtype=np.dtypes.StringDType()).reshape(())
             offsets = np.array(entry["offset"], dtype=np.uint64)
             lengths = np.array(entry["length"], dtype=np.uint64)
 
             # Use from_arrays to bypass chunk key validation
+            # Type ignore needed due to numpy dtype variance in type system
             return ChunkManifest.from_arrays(
-                paths=paths,
+                paths=paths,  # type: ignore[arg-type]
                 offsets=offsets,
                 lengths=lengths,
                 validate_paths=False,
@@ -412,7 +422,7 @@ async def _construct_manifest_array(
 
 async def _construct_manifest_group(
     path: str,
-    store: zarr.storage.ObjectStore,
+    store: ObjectStore,
     *,
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
