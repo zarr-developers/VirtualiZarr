@@ -165,6 +165,7 @@ def test_join_url_empty_base():
 def test_scalar_loadable_variables(tmpdir, zarr_format):
     """Test that scalar arrays work correctly when included in loadable_variables for both V2 and V3."""
     from obstore.store import LocalStore
+
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers.zarr import ZarrParser
     from virtualizarr.registry import ObjectStoreRegistry
@@ -399,9 +400,9 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     # Verify missing chunks are not in the manifest
     missing_chunks = ["0.1", "0.2", "1.0", "1.2", "2.0", "2.1"]
     for chunk_key in missing_chunks:
-        assert (
-            chunk_key not in manifest.dict()
-        ), f"Chunk {chunk_key} should not be present (it's missing/sparse)"
+        assert chunk_key not in manifest.dict(), (
+            f"Chunk {chunk_key} should not be present (it's missing/sparse)"
+        )
 
     # The chunk grid shape should still reflect the full array dimensions
     assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
