@@ -1,6 +1,6 @@
 # Release notes
 
-## v2.1.3 (unreleased)
+## v2.2.0 (12th November 2025)
 
 ### New Features
 
@@ -10,14 +10,20 @@
 - `ZarrParser` now handles Zarr V2 and V3 array parsing.
   ([#565](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
   By [Neil Schroeder](https://github.com/neilSchroeder)
+- Add Virtual TIFF as an optional dependency for TIFF parsing.
+  ([#810](https://github.com/zarr-developers/VirtualiZarr/pull/810))
+  By [Max Jones](https://github.com/maxrjones)
 
 ### Breaking changes
 
 ### Bug fixes
 
 - `ZarrParser` no longer uses `ZARR_DEFAULT_FILL_VALUE` lookup to infer missing `fill_value`.
-  ([#666](https://github.com/zarr-developers/VirtualiZarr/pull/812)).
+  ([#812](https://github.com/zarr-developers/VirtualiZarr/pull/812)).
   By [Raphael Hagen](https://github.com/norlandrhagen).
+- Return None for Zarr V2/consolidated metadata requests.
+  ([#827](https://github.com/zarr-developers/VirtualiZarr/pull/827)).
+  By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
 
