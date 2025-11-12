@@ -257,6 +257,11 @@ class ManifestStore(Store):
         # docstring inherited
         return False
 
+    @property
+    def supports_partial_writes(self) -> Literal[False]:
+        # docstring inherited
+        return False
+
     async def delete(self, key: str) -> None:
         raise NotImplementedError
 
