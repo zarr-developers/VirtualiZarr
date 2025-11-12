@@ -358,6 +358,28 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
             )
             return ChunkManifest(chunk_map, shape=chunk_grid_shape)
 
+    # Handle scalar arrays specially to avoid validation issues
+    # Scalar arrays have shape=() and generate chunk keys that don't match numeric patterns
+    if zarr_array.shape == ():
+        import numpy as np
+
+        # For scalar arrays, we have a single chunk
+        # Extract the path, offset, and length from the chunk_map
+        chunk_entries = list(chunk_map.values())
+        if chunk_entries:
+            entry = chunk_entries[0]
+            paths = np.array(entry["path"], dtype=np.dtypes.StringDType())
+            offsets = np.array(entry["offset"], dtype=np.uint64)
+            lengths = np.array(entry["length"], dtype=np.uint64)
+
+            # Use from_arrays to bypass chunk key validation
+            return ChunkManifest.from_arrays(
+                paths=paths,
+                offsets=offsets,
+                lengths=lengths,
+                validate_paths=False,  # Skip path validation since we trust the parser
+            )
+
     return ChunkManifest(chunk_map)
 
 
