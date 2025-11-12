@@ -1,5 +1,14 @@
 # Release notes
 
+## v2.2.1 ()
+
+### Bug fixes
+
+- `ZarrParser` correctly handles scalar V2 and V3 arrays. 
+  ([[#834](https://github.com/zarr-developers/VirtualiZarr/issues/834)]) 
+  By [Neil Schroeder](https://github.com/neilSchroeder)
+
+
 ## v2.2.0 (12th November 2025)
 
 ### New Features

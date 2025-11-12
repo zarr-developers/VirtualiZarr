@@ -145,11 +145,10 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
 
     chunk_map = asyncio.run(get_chunk_map())
 
-    # V2 uses "0" for scalar, V3 uses "c"
-    expected_key = "0" if zarr_format == 2 else "c"
-    assert expected_key in chunk_map
-    assert chunk_map[expected_key]["offset"] == 0
-    assert chunk_map[expected_key]["length"] > 0
+    # Both V2 and V3 use "0" as the chunk key (though V3 stores at path "c")
+    assert "0" in chunk_map
+    assert chunk_map["0"]["offset"] == 0
+    assert chunk_map["0"]["length"] > 0
 
 
 def test_join_url_empty_base():
