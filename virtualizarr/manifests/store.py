@@ -118,21 +118,13 @@ def _get_deepest_group_or_array(
         - The deepest node reached (ManifestGroup or ManifestArray)
         - String with remaining unmatched key portion
     """
-    key_list = key.split("/")
-    for i, var in enumerate(key_list):
-        if isinstance(node, ManifestArray):
-            # Can't traverse deeper through an array
-            return node, "/".join(key_list[i:])
-        if var in node.arrays:
-            node = node.arrays[var]
-        elif var in node.groups:
-            node = node.groups[var]
-        else:
-            # Can't traverse deeper - return last node and remainder
-            return node, "/".join(key_list[i:])
-
-    # All parts matched - return empty tuple for remainder
-    return node, ""
+    var, suffix = key.split("/", 1) if "/" in key else (key, "")
+    if var in node.arrays:
+        return node.arrays[var], suffix
+    if var in node.groups:
+        return _get_deepest_group_or_array(node.groups[var], suffix)
+    # Can't traverse deeper - return last node and remainder
+    return node, suffix or var
 
 
 class ManifestStore(Store):
