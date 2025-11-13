@@ -99,7 +99,7 @@ def parse_manifest_index(
 
 
 def _get_deepest_group_or_array(
-    node: ManifestGroup, key: str
+    node: ManifestGroup | ManifestArray, key: str
 ) -> tuple[ManifestGroup | ManifestArray, str]:
     """
     Traverse the manifest hierarchy as deeply as possible following the given key path.
@@ -315,7 +315,7 @@ class ManifestStore(Store):
         # docstring
         # Navigate to the target node
         if not prefix:
-            node = self._group
+            node: ManifestArray | ManifestGroup = self._group
             suffix = ""
         else:
             node, suffix = _get_deepest_group_or_array(self._group, prefix)
