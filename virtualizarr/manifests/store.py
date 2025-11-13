@@ -99,7 +99,7 @@ def parse_manifest_index(
 
 
 def _get_deepest_group_or_array(
-    node: ManifestGroup | ManifestArray, key: str
+    node: ManifestGroup, key: str
 ) -> tuple[ManifestGroup | ManifestArray, str]:
     """
     Traverse the manifest hierarchy as deeply as possible following the given key path.
