@@ -1,7 +1,14 @@
 import re
-from collections.abc import ItemsView, Iterable, Iterator, KeysView, ValuesView
+from collections.abc import (
+    Callable,
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    ValuesView,
+)
 from pathlib import PosixPath
-from typing import Any, Callable, NewType, TypedDict, cast
+from typing import Any, NewType, TypedDict, cast
 
 import numpy as np
 
