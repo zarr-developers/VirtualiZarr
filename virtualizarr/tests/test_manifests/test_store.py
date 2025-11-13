@@ -333,6 +333,8 @@ class TestManifestStore:
         assert observed == ()
         observed = await _collect_aiterator(store.list_dir("foo/"))
         assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
+        observed = await _collect_aiterator(store.list_dir("subgroup/foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:
