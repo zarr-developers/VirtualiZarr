@@ -312,13 +312,9 @@ class ManifestStore(Store):
         raise NotImplementedError
 
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
-        # docstring
+        # docstring inherited
         # Navigate to the target node
-        if not prefix:
-            node: ManifestArray | ManifestGroup = self._group
-            suffix = ""
-        else:
-            node, suffix = _get_deepest_group_or_array(self._group, prefix)
+        node, suffix = _get_deepest_group_or_array(self._group, prefix)
         # Zarr-Python lists using a per-path basis, so we don't have anything to list
         # as long as there is a suffix remaining and we require a '.' chunk separator in the ManifestArrays
         if suffix:
@@ -329,18 +325,16 @@ class ManifestStore(Store):
             yield "zarr.json"
             for member_name in node._members.keys():
                 yield member_name
-        elif isinstance(node, ManifestArray):
-            # TODO: Support listing when using other chunk_key_encodings
-            if (
-                separator := getattr(
-                    node.metadata.chunk_key_encoding, "separator", None
-                )
-                != "."
-            ):
-                raise NotImplementedError(
-                    f"Array listing only supports '.' as chunk key separator, "
-                    f"got {separator!r}"
-                )
+        # TODO: Support listing when using other chunk_key_encodings
+        elif (
+            separator := getattr(node.metadata.chunk_key_encoding, "separator", None)
+            != "."
+        ):
+            raise NotImplementedError(
+                f"Array listing only supports '.' as chunk key separator, "
+                f"got {separator!r}"
+            )
+        else:
             # Arrays contain a metadata document and chunks
             yield "zarr.json"
             if node.shape == ():
