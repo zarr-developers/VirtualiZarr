@@ -504,7 +504,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
 def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
     # find max chunk index along each dimension
     chunk_keys = tuple(chunk_keys)
-    
+
     if chunk_keys == ("c",):
         # Scalar array, cannot be split
         return ()
