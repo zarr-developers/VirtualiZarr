@@ -326,7 +326,15 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
-        assert observed == ("zarr.json", "foo", "bar", "scalar")
+        assert observed == ("zarr.json", "foo", "bar", "scalar", "subgroup")
+        observed = await _collect_aiterator(store.list_dir("scalar"))
+        assert observed == ("zarr.json", "c")
+        observed = await _collect_aiterator(store.list_dir("scalar/d"))
+        assert observed == ()
+        observed = await _collect_aiterator(store.list_dir("foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
+        observed = await _collect_aiterator(store.list_dir("subgroup/foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:
