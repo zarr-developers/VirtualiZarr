@@ -503,10 +503,12 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
 
 def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
     # find max chunk index along each dimension
-    if list(chunk_keys) == ["c"]:
+    chunk_keys = tuple(chunk_keys)
+    
+    if chunk_keys == ("c",):
         # Scalar array, cannot be split
         return ()
-    zipped_indices = zip(*[parse_manifest_index(key) for key in chunk_keys])
+    zipped_indices = zip(*map(parse_manifest_index, chunk_keys))
     chunk_grid_shape = tuple(
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )
