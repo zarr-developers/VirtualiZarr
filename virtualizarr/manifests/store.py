@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
@@ -18,7 +17,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.manifests.utils import construct_chunk_pattern
+from virtualizarr.manifests.utils import parse_manifest_index
 from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
@@ -50,52 +49,6 @@ def get_store_prefix(url: str) -> str:
     """
     scheme, netloc, *_ = urlparse(url)
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
-
-
-def parse_manifest_index(
-    key: str, chunk_key_encoding: Literal[".", "/"] = "."
-) -> tuple[int, ...]:
-    """
-    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
-    data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
-    containing paths, offsets, and lengths in ManifestArrays.
-
-    Parameters
-    ----------
-    key
-        The key in the Zarr store to parse.
-    chunk_key_encoding
-        The chunk key separator used in the Zarr store.
-
-    Returns
-    -------
-    tuple containing chunk indexes.
-
-    Raises
-    ------
-    ValueError
-        Raised if the key does not match the expected node structure for a chunk according the
-        [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
-
-    """
-    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
-    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
-    if key.endswith("/c") or key == "c":
-        return ()
-
-    pattern = construct_chunk_pattern(chunk_key_encoding)
-    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
-    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
-    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
-    match = re.search(pattern, key)
-    if not match:
-        raise ValueError(
-            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
-        )
-    chunk_component = (
-        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
-    )
-    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 def _get_deepest_group_or_array(
@@ -209,7 +162,7 @@ class ManifestStore(Store):
         separator: Literal[".", "/"] = getattr(
             node.metadata.chunk_key_encoding, "separator", "."
         )
-        chunk_indexes = parse_manifest_index(suffix, separator)
+        chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
 
         path = manifest._paths[chunk_indexes]
         if path == "":
