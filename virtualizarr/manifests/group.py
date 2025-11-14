@@ -128,9 +128,11 @@ class ManifestGroup(
 
     def to_virtual_datasets(self) -> dict[str, xr.Dataset]:
         """
-        Create a "virtual" [xarray.DataTree][] containing the contents of one zarr group.
+        Create a dictionary containing virtual datasets for all the sub-groups of a ManifestGroup. All the
+        variables in the datasets will be "virtual", i.e., they will wrap ManifestArray objects.
 
-        All variables in the returned DataTree will be "virtual", i.e. they will wrap ManifestArray objects.
+        It is convenient to have a separate `to_virtual_datasets` function from `to_virtual_datatree` so that
+        it can be called recursively without needing to use `DataTree.to_dict() and `.from_dict()` repeatedly.
         """
         result = {"": self.to_virtual_dataset()}
 
@@ -150,5 +152,10 @@ class ManifestGroup(
         return result
 
     def to_virtual_datatree(self) -> xr.DataTree:
+        """
+        Create a "virtual" [xarray.DataTree][] containing the contents of one zarr group.
+
+        All variables in the returned DataTree will be "virtual", i.e. they will wrap ManifestArray objects.
+        """
         datasets = self.to_virtual_datasets()
         return xr.DataTree.from_dict(datasets)
