@@ -75,6 +75,11 @@ class ManifestGroup(
         """Subgroups contained in this group."""
         return {k: v for k, v in self._members.items() if isinstance(v, ManifestGroup)}
 
+    @property
+    def contains_groups(self) -> bool:
+        """True if this group has subgroups."""
+        return any(isinstance(v, ManifestGroup) for v in self._members.values())
+
     def __getitem__(self, path: str) -> "ManifestArray | ManifestGroup":
         """Obtain a group member."""
         if "/" in path:
@@ -125,3 +130,30 @@ class ManifestGroup(
             coord_names=coord_names,
             attrs=attributes,
         )
+
+    def to_virtual_datasets(self) -> dict[str, xr.Dataset]:
+        """
+        Create a "virtual" [xarray.DataTree][] containing the contents of one zarr group.
+
+        All variables in the returned DataTree will be "virtual", i.e. they will wrap ManifestArray objects.
+        """
+        result = {"": self.to_virtual_dataset()}
+
+        # Recursively process all subgroups
+        for group_name, subgroup in self.groups.items():
+            subgroup_datasets = subgroup.to_virtual_datasets()
+
+            # Add the subgroup's datasets with proper path prefixes
+            for subpath, dataset in subgroup_datasets.items():
+                if subpath == "":
+                    # Direct child group
+                    full_path = group_name
+                else:
+                    # Nested subgroup
+                    full_path = f"{group_name}/{subpath}"
+                result[full_path] = dataset
+        return result
+
+    def to_virtual_datatree(self) -> xr.DataTree:
+        datasets = self.to_virtual_datasets()
+        return xr.DataTree.from_dict(datasets)

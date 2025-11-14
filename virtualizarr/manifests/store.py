@@ -374,6 +374,46 @@ class ManifestStore(Store):
             decode_times=decode_times,
         )
 
+    def to_virtual_datatree(
+        self,
+        group="",
+        *,
+        drop_variables: Iterable[str] | None = None,
+        loadable_variables: Iterable[str] | None = None,
+        decode_times: bool | None = None,
+    ) -> "xr.DataTree":
+        """
+        Create a "virtual" [xarray.Datatree][] containing the contents of a zarr group. Default is the root group and all sub-groups.
+
+        Will ignore the contents of any other groups in the store.
+
+        Requires xarray.
+
+        Parameters
+        ----------
+        group : Group to convert to a virtual DataTree
+        drop_variables
+            Variables in the data source to drop before returning.
+        loadable_variables
+            Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
+        decode_times
+            Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
+
+        Returns
+        -------
+        vdt : xarray.Datatree
+        """
+
+        from virtualizarr.xarray import construct_virtual_datatree
+
+        return construct_virtual_datatree(
+            manifest_store=self,
+            group=group,
+            loadable_variables=loadable_variables,
+            decode_times=decode_times,
+            drop_variables=drop_variables,
+        )
+
 
 def _transform_byte_range(
     byte_range: ByteRequest | None, *, chunk_start: int, chunk_end_exclusive: int

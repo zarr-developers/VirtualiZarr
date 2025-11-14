@@ -21,7 +21,7 @@ from xarray.core import dtypes
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests import ManifestArray, ManifestGroup, ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
@@ -32,6 +32,68 @@ if TYPE_CHECKING:
         CombineAttrsOptions,
         CompatOptions,
         JoinOptions,
+    )
+
+
+def open_virtual_datatree(
+    url: str,
+    registry: ObjectStoreRegistry,
+    parser: Parser,
+    *,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+) -> xr.DataTree:
+    """
+    Open an archival data source as an [xarray.Datatree][] wrapping virtualized zarr arrays.
+
+    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
+
+    Xarray indexes can optionally be created (the default behaviour is to create indexes for any 1D coordinate variables). To avoid creating any xarray indexes pass ``indexes={}``.
+
+    Parameters
+    ----------
+    url
+        The url of the data source to virtualize. The URL should include a scheme. For example:
+
+        - `url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local data source.
+        - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
+
+    registry
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+    parser
+        A parser to use for the given data source. For example:
+
+        - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
+        - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
+        - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
+        - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
+        - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+    drop_variables
+        Variables in the data source to drop before returning.
+    loadable_variables
+        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
+    decode_times
+        Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
+
+    Returns
+    -------
+    vds
+        An [xarray.DataTree][] containing virtual chunk references for all variables.
+    """
+    filepath = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
+
+    manifest_store = parser(
+        url=filepath,
+        registry=registry,
+    )
+
+    return manifest_store.to_virtual_datatree(
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        drop_variables=drop_variables,
     )
 
 
@@ -352,6 +414,44 @@ def construct_virtual_dataset(
         return replace_virtual_with_loadable_vars(
             fully_virtual_ds, loadable_ds, loadable_variables
         )
+
+
+def construct_virtual_datatree(
+    manifest_store: ManifestStore,
+    group: str = "",
+    *,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+) -> xr.DataTree:
+    """
+    Construct a fully or partly virtual datatree from a ManifestStore.
+    """
+    fully_loadable_datatree = xr.open_datatree(
+        manifest_store,  # type: ignore[arg-type]
+        group=group,
+        engine="zarr",
+        consolidated=False,
+        zarr_format=3,
+        decode_times=decode_times,
+    )
+    if group:
+        node = manifest_store._group[group]
+    else:
+        node = manifest_store._group
+    if isinstance(node, ManifestArray):
+        node = ManifestGroup(arrays={group: node}, attributes={})
+    fully_virtual_datatree = node.to_virtual_datatree()
+
+    partially_loaded_datasets = {}
+    for name, virtual_node in fully_virtual_datatree.subtree_with_keys:
+        loadable_node = fully_loadable_datatree[name]
+        node_dataset = replace_virtual_with_loadable_vars(
+            virtual_node.to_dataset(), loadable_node.to_dataset(), loadable_variables
+        )
+        node_dataset = node_dataset.drop_vars(list(drop_variables or ()))
+        partially_loaded_datasets[name] = node_dataset
+    return xr.DataTree.from_dict(partially_loaded_datasets)
 
 
 def replace_virtual_with_loadable_vars(
