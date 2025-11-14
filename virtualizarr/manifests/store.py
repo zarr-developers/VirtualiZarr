@@ -383,7 +383,7 @@ class ManifestStore(Store):
         decode_times: bool | None = None,
     ) -> "xr.DataTree":
         """
-        Create a "virtual" [xarray.Datatree][] containing the contents of a zarr group. Default is the root group and all sub-groups.
+        Create a "virtual" [xarray.DataTree][] containing the contents of a zarr group. Default is the root group and all sub-groups.
 
         Will ignore the contents of any other groups in the store.
 
@@ -401,7 +401,7 @@ class ManifestStore(Store):
 
         Returns
         -------
-        vdt : xarray.Datatree
+        vdt : xarray.DataTree
         """
 
         from virtualizarr.xarray import construct_virtual_datatree
