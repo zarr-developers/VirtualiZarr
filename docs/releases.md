@@ -1,5 +1,22 @@
 # Release notes
 
+## v2.2.1 (TBD)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+- Allow storing scalar arrays under 'c' key. ([#836](https://github.com/zarr-developers/VirtualiZarr/pull/836)).
+  By [Max Jones](https://github.com/maxrjones)
+- Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
+  By [Max Jones](https://github.com/maxrjones)
+
+### Documentation
+
+### Internal changes
+
 ## v2.2.0 (12th November 2025)
 
 ### New Features
