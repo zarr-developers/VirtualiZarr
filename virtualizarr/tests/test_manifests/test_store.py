@@ -54,9 +54,14 @@ if TYPE_CHECKING:
         (("c1.2/abc/c/0", "/"), (0,)),
     ],
 )
-def test_parse_manifest_index(val, expected):
+def test_parse_manifest_index(
+    val,
+    expected,
+):
     key, chunk_key_encoding = val
-    assert parse_manifest_index(key, chunk_key_encoding) == expected
+    assert (
+        parse_manifest_index(key, chunk_key_encoding, expand_pattern=True) == expected
+    )
 
 
 @pytest.mark.parametrize(
