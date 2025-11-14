@@ -51,14 +51,33 @@ def get_store_prefix(url: str) -> str:
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
-def get_deepest_group_or_array(
-    node: ManifestGroup, key: Iterable[str]
-) -> ManifestGroup | ManifestArray:
-    for var in key:
-        if var in node.arrays:
-            return node.arrays[var]
-        node = node.groups[var]
-    return node
+def _get_deepest_group_or_array(
+    node: ManifestGroup, key: str
+) -> tuple[ManifestGroup | ManifestArray, str]:
+    """
+    Traverse the manifest hierarchy as deeply as possible following the given key path.
+
+    Traversal stops when:
+    - A key part doesn't match any array or group in the current node
+    - A ManifestArray is reached (arrays cannot be traversed further)
+    - All key parts have been successfully matched
+
+    Args:
+        node: The starting ManifestGroup to begin traversal from
+        key: The key to use to traverse through groups and arrays
+
+    Returns:
+        A tuple containing:
+        - The deepest node reached (ManifestGroup or ManifestArray)
+        - String with remaining unmatched key portion
+    """
+    var, suffix = key.split("/", 1) if "/" in key else (key, "")
+    if var in node.arrays:
+        return node.arrays[var], suffix
+    if var in node.groups:
+        return _get_deepest_group_or_array(node.groups[var], suffix)
+    # Can't traverse deeper - return last node and remainder
+    return node, suffix or var
 
 
 class ManifestStore(Store):
@@ -122,13 +141,13 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
-        if key.endswith("zarr.json"):
+        node, suffix = _get_deepest_group_or_array(self._group, key)
+        if suffix.endswith("zarr.json"):
             # Return metadata
             return node.metadata.to_buffer_dict(prototype=default_buffer_prototype())[
                 "zarr.json"
             ]
-        elif key.endswith((".zattrs", ".zgroup", ".zarray", ".zmetadata")):
+        elif suffix.endswith((".zattrs", ".zgroup", ".zarray", ".zmetadata")):
             # Zarr-Python expects store classes to return None when metadata JSONs are not found.
             # Zarr-Python uses this behavior to distinguish between V2/V3 and consolidated/unconsolidated stores.
             # This upstream behavior will hopefully change in the future to be more Zarr-hierarchy aware, in
@@ -239,9 +258,37 @@ class ManifestStore(Store):
 
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
-        yield "zarr.json"
-        for k in self._group.arrays.keys():
-            yield k
+        # Navigate to the target node
+        node, suffix = _get_deepest_group_or_array(self._group, prefix)
+        # Zarr-Python lists using a per-path basis, so we don't have anything to list
+        # as long as there is a suffix remaining and we require a '.' chunk separator in the ManifestArrays
+        if suffix:
+            return
+        # List contents based on node type
+        if isinstance(node, ManifestGroup):
+            # Groups contain a metadata document and the name of sub-groups/arrays
+            yield "zarr.json"
+            for member_name in node._members.keys():
+                yield member_name
+        # TODO: Support listing when using other chunk_key_encodings
+        elif (
+            separator := getattr(node.metadata.chunk_key_encoding, "separator", None)
+            != "."
+        ):
+            raise NotImplementedError(
+                f"Array listing only supports '.' as chunk key separator, "
+                f"got {separator!r}"
+            )
+        else:
+            # Arrays contain a metadata document and chunks
+            yield "zarr.json"
+            if node.shape == ():
+                # Scalar arrays have a single chunk named 'c'
+                yield "c"
+            else:
+                # Multi-dimensional arrays have chunks named 'c.{key}'
+                for chunk_key in node.manifest.keys():
+                    yield f"c.{chunk_key}"
 
     def to_virtual_dataset(
         self,
