@@ -75,11 +75,6 @@ class ManifestGroup(
         """Subgroups contained in this group."""
         return {k: v for k, v in self._members.items() if isinstance(v, ManifestGroup)}
 
-    @property
-    def contains_groups(self) -> bool:
-        """True if this group has subgroups."""
-        return any(isinstance(v, ManifestGroup) for v in self._members.values())
-
     def __getitem__(self, path: str) -> "ManifestArray | ManifestGroup":
         """Obtain a group member."""
         if "/" in path:
