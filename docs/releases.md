@@ -1,10 +1,6 @@
 # Release notes
 
-## v2.2.1 (TBD)
-
-### New Features
-
-### Breaking changes
+## v2.2.1 (17th November 2025)
 
 ### Bug fixes
 
@@ -12,10 +8,6 @@
   By [Max Jones](https://github.com/maxrjones)
 - Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
   By [Max Jones](https://github.com/maxrjones)
-
-### Documentation
-
-### Internal changes
 
 ## v2.2.0 (12th November 2025)
 
