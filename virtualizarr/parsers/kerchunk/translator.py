@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
+import uuid
 from collections.abc import Iterable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import ujson
@@ -23,6 +25,11 @@ from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
 from virtualizarr.utils import determine_chunk_grid_shape
+
+if TYPE_CHECKING:
+    from obstore.store import (
+        ObjectStore,
+    )
 
 
 def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
@@ -67,6 +74,7 @@ def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     codec_configs = [*filters, *(compressor if compressor is not None else [])]
     numcodec_configs = [zarr_codec_config_to_v3(config) for config in codec_configs]
     dimension_names = decoded_arr_refs_zarray["dimension_names"]
+
     return create_v3_array_metadata(
         chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
         data_type=dtype,
@@ -83,6 +91,7 @@ def manifestgroup_from_kerchunk_refs(
     group: str | None = None,
     fs_root: str | None = None,
     skip_variables: Iterable[str] | None = None,
+    cache: ObjectStore | None = None,
 ) -> ManifestGroup:
     """
     Construct a ManifestGroup from a dictionary of kerchunk references.
@@ -98,6 +107,8 @@ def manifestgroup_from_kerchunk_refs(
         Required if any paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     skip_variables
         Variables to ignore when creating the ManifestGroup.
+    cache
+        ObjectStore to use for caching in-lined data variables
 
     Returns
     -------
@@ -114,7 +125,9 @@ def manifestgroup_from_kerchunk_refs(
 
     # TODO support iterating over multiple nested groups
     marrs = {
-        arr_name: manifestarray_from_kerchunk_refs(refs, arr_name, fs_root=fs_root)
+        arr_name: manifestarray_from_kerchunk_refs(
+            refs, arr_name, fs_root=fs_root, cache=cache
+        )
         for arr_name in arr_names
     }
 
@@ -168,6 +181,7 @@ def manifestarray_from_kerchunk_refs(
     refs: KerchunkStoreRefs,
     var_name: str,
     fs_root: str | None = None,
+    cache: ObjectStore | None = None,
 ) -> ManifestArray:
     """Create a single ManifestArray by reading specific keys of a kerchunk references dict."""
 
@@ -177,7 +191,9 @@ def manifestarray_from_kerchunk_refs(
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     if chunk_dict:
-        manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
+        manifest = manifest_from_kerchunk_chunk_dict(
+            chunk_dict, fs_root=fs_root, cache=cache
+        )
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
@@ -198,11 +214,28 @@ def manifestarray_from_kerchunk_refs(
     return marr
 
 
+def manifest_from_inline_reference(
+    kerchunk_chunk_dict: dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
+    cache: ObjectStore,
+) -> ChunkManifest:
+    data = base64.b64decode(kerchunk_chunk_dict["0"].lstrip("base64:"))
+    key = str(uuid.uuid4())
+    cache.put(key, data)
+    return ChunkManifest(
+        {"0": {"path": f"memory://kerchunk/{key}", "offset": 0, "length": len(data)}}
+    )
+
+
 def manifest_from_kerchunk_chunk_dict(
     kerchunk_chunk_dict: dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
     fs_root: str | None = None,
+    cache: ObjectStore | None = None,
 ) -> ChunkManifest:
     """Create a single ChunkManifest from the mapping of keys to chunk information stored inside kerchunk array refs."""
+
+    if reference := kerchunk_chunk_dict.get("0"):
+        if isinstance(reference, str) and reference.startswith("base64:"):
+            return manifest_from_inline_reference(kerchunk_chunk_dict, cache)
 
     chunk_entries: dict[ChunkKey, ChunkEntry] = {}
     for k, v in kerchunk_chunk_dict.items():
