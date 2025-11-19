@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 requires-python = ">=3.11"
 dynamic = ["version"]
@@ -151,13 +152,9 @@ virtualizarr = { path = ".", editable = true }
 [tool.pixi.feature.py311.dependencies]
 python = "3.11.*"
 
-# Define a feature set for Python 3.12
-[tool.pixi.feature.py312.dependencies]
-python = "3.12.*"
-
-# Define a feature set for Python 3.13
-[tool.pixi.feature.py313.dependencies]
-python = "3.13.*"
+# Define a feature set for Python 3.14
+[tool.pixi.feature.py314.dependencies]
+python = "3.14.*"
 
 # Define a feature set for S3 testing with MinIO
 [tool.pixi.feature.minio.pypi-dependencies]
@@ -197,14 +194,14 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"]
 test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py312", "minio"]
+test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"] # test against python 3.14
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py314", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "tiff", "hdf5-lib", "minimum-versions"]
-upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py313"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py313"]
-docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py314"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py314"]
+docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"]
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
