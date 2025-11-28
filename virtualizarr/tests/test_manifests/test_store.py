@@ -227,6 +227,7 @@ class TestManifestStore:
         assert not local_store.supports_deletes
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
+        assert not local_store.supports_consolidated_metadata
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
