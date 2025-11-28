@@ -1,5 +1,13 @@
 # Release notes
 
+## Unreleased
+
+### New Features
+
+- Set `supports_consolidated_metadata` property on `ManifestStore` to `False`.
+  ([809](https://github.com/zarr-developers/VirtualiZarr/pull/809)).
+  By [Julia Signell](https://github.com/jsignell).
+
 ## v2.2.1 (17th November 2025)
 
 ### Bug fixes
