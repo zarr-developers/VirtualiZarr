@@ -29,7 +29,6 @@ dependencies = [
     "packaging",
     "zarr>=3.1.0",
     "obstore>=0.5.1",
-    "virtual-tiff>=0.2.0",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
