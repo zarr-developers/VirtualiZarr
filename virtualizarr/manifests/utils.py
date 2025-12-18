@@ -1,3 +1,4 @@
+import re
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -14,6 +15,55 @@ from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 if TYPE_CHECKING:
     from .array import ManifestArray
+
+
+def parse_manifest_index(
+    key: str, chunk_key_encoding: Literal[".", "/"] = ".", expand_pattern: bool = False
+) -> tuple[int, ...]:
+    """
+    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
+    data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
+    containing paths, offsets, and lengths in ManifestArrays.
+
+    Parameters
+    ----------
+    key
+        The key in the Zarr store to parse.
+    chunk_key_encoding
+        The chunk key separator used in the Zarr store.
+    expand_pattern
+        Whether to expand the pattern matching to include /c to protect against group structures that look like chunks
+
+    Returns
+    -------
+    tuple containing chunk indexes.
+
+    Raises
+    ------
+    ValueError
+        Raised if the key does not match the expected node structure for a chunk according the
+        [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
+
+    """
+    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
+    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
+    if key.endswith("/c") or key == "c":
+        return ()
+
+    pattern = construct_chunk_pattern(chunk_key_encoding)
+    if expand_pattern:
+        # Expand pattern to include `/c` to protect against group structures that look like chunk structures
+        pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
+    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
+    match = re.search(pattern, key)
+    if not match:
+        raise ValueError(
+            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+        )
+    chunk_component = (
+        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
+    )
+    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
 
 
 def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]) -> str:
@@ -34,7 +84,7 @@ def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]) -> str:
     separator = (
         rf"\{chunk_key_encoding}" if chunk_key_encoding == "." else chunk_key_encoding
     )
-    pattern = rf"{integer_pattern}+({separator}{integer_pattern})*$"  # matches 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
+    pattern = rf"(c|{integer_pattern}+({separator}{integer_pattern})*)$"  # matches the character "c" or 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
     return pattern
 
 

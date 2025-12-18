@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
@@ -18,7 +17,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.manifests.utils import construct_chunk_pattern
+from virtualizarr.manifests.utils import parse_manifest_index
 from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
@@ -52,60 +51,33 @@ def get_store_prefix(url: str) -> str:
     return "" if scheme in {"", "file"} else f"{scheme}://{netloc}"
 
 
-def parse_manifest_index(
-    key: str, chunk_key_encoding: Literal[".", "/"] = "."
-) -> tuple[int, ...]:
+def _get_deepest_group_or_array(
+    node: ManifestGroup, key: str
+) -> tuple[ManifestGroup | ManifestArray, str]:
     """
-    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
-    data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
-    containing paths, offsets, and lengths in ManifestArrays.
+    Traverse the manifest hierarchy as deeply as possible following the given key path.
 
-    Parameters
-    ----------
-    key
-        The key in the Zarr store to parse.
-    chunk_key_encoding
-        The chunk key separator used in the Zarr store.
+    Traversal stops when:
+    - A key part doesn't match any array or group in the current node
+    - A ManifestArray is reached (arrays cannot be traversed further)
+    - All key parts have been successfully matched
 
-    Returns
-    -------
-    tuple containing chunk indexes.
+    Args:
+        node: The starting ManifestGroup to begin traversal from
+        key: The key to use to traverse through groups and arrays
 
-    Raises
-    ------
-    ValueError
-        Raised if the key does not match the expected node structure for a chunk according the
-        [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
-
+    Returns:
+        A tuple containing:
+        - The deepest node reached (ManifestGroup or ManifestArray)
+        - String with remaining unmatched key portion
     """
-    # Keys ending in `/c` are scalar arrays. The paths, offsets, and lengths in a chunk manifest
-    # of a scalar array should also be scalar arrays that can be indexed with an empty tuple.
-    if key.endswith("/c"):
-        return ()
-
-    pattern = construct_chunk_pattern(chunk_key_encoding)
-    # Expand pattern to include `/c` to protect against group structures that look like chunk structures
-    pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
-    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
-    match = re.search(pattern, key)
-    if not match:
-        raise ValueError(
-            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
-        )
-    chunk_component = (
-        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
-    )
-    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
-
-
-def get_deepest_group_or_array(
-    node: ManifestGroup, key: Iterable[str]
-) -> ManifestGroup | ManifestArray:
-    for var in key:
-        if var in node.arrays:
-            return node.arrays[var]
-        node = node.groups[var]
-    return node
+    var, suffix = key.split("/", 1) if "/" in key else (key, "")
+    if var in node.arrays:
+        return node.arrays[var], suffix
+    if var in node.groups:
+        return _get_deepest_group_or_array(node.groups[var], suffix)
+    # Can't traverse deeper - return last node and remainder
+    return node, suffix or var
 
 
 class ManifestStore(Store):
@@ -169,13 +141,13 @@ class ManifestStore(Store):
         byte_range: ByteRequest | None = None,
     ) -> Buffer | None:
         # docstring inherited
-        node = get_deepest_group_or_array(self._group, key.split("/")[:-1])
-        if key.endswith("zarr.json"):
+        node, suffix = _get_deepest_group_or_array(self._group, key)
+        if suffix.endswith("zarr.json"):
             # Return metadata
             return node.metadata.to_buffer_dict(prototype=default_buffer_prototype())[
                 "zarr.json"
             ]
-        elif key.endswith((".zattrs", ".zgroup", ".zarray", ".zmetadata")):
+        elif suffix.endswith((".zattrs", ".zgroup", ".zarray", ".zmetadata")):
             # Zarr-Python expects store classes to return None when metadata JSONs are not found.
             # Zarr-Python uses this behavior to distinguish between V2/V3 and consolidated/unconsolidated stores.
             # This upstream behavior will hopefully change in the future to be more Zarr-hierarchy aware, in
@@ -190,7 +162,7 @@ class ManifestStore(Store):
         separator: Literal[".", "/"] = getattr(
             node.metadata.chunk_key_encoding, "separator", "."
         )
-        chunk_indexes = parse_manifest_index(key, separator)
+        chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
 
         path = manifest._paths[chunk_indexes]
         if path == "":
@@ -286,9 +258,42 @@ class ManifestStore(Store):
 
     async def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
         # docstring inherited
-        yield "zarr.json"
-        for k in self._group.arrays.keys():
-            yield k
+        # Navigate to the target node
+        node, suffix = _get_deepest_group_or_array(self._group, prefix)
+        # Zarr-Python lists using a per-path basis, so we don't have anything to list
+        # as long as there is a suffix remaining and we require a '.' chunk separator in the ManifestArrays
+        if suffix:
+            return
+        # List contents based on node type
+        if isinstance(node, ManifestGroup):
+            # Groups contain a metadata document and the name of sub-groups/arrays
+            yield "zarr.json"
+            for member_name in node._members.keys():
+                yield member_name
+        # TODO: Support listing when using other chunk_key_encodings
+        elif (
+            separator := getattr(node.metadata.chunk_key_encoding, "separator", None)
+            != "."
+        ):
+            raise NotImplementedError(
+                f"Array listing only supports '.' as chunk key separator, "
+                f"got {separator!r}"
+            )
+        else:
+            # Arrays contain a metadata document and chunks
+            yield "zarr.json"
+            if node.shape == ():
+                # Scalar arrays have a single chunk named 'c'
+                yield "c"
+            else:
+                # Multi-dimensional arrays have chunks named 'c.{key}'
+                for chunk_key in node.manifest.keys():
+                    yield f"c.{chunk_key}"
+
+    @property
+    def supports_consolidated_metadata(self) -> bool:
+        # docstring inherited
+        return False
 
     def to_virtual_dataset(
         self,

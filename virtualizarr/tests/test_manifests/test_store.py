@@ -54,9 +54,14 @@ if TYPE_CHECKING:
         (("c1.2/abc/c/0", "/"), (0,)),
     ],
 )
-def test_parse_manifest_index(val, expected):
+def test_parse_manifest_index(
+    val,
+    expected,
+):
     key, chunk_key_encoding = val
-    assert parse_manifest_index(key, chunk_key_encoding) == expected
+    assert (
+        parse_manifest_index(key, chunk_key_encoding, expand_pattern=True) == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -222,6 +227,7 @@ class TestManifestStore:
         assert not local_store.supports_deletes
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
+        assert not local_store.supports_consolidated_metadata
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -326,7 +332,15 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
-        assert observed == ("zarr.json", "foo", "bar", "scalar")
+        assert observed == ("zarr.json", "foo", "bar", "scalar", "subgroup")
+        observed = await _collect_aiterator(store.list_dir("scalar"))
+        assert observed == ("zarr.json", "c")
+        observed = await _collect_aiterator(store.list_dir("scalar/d"))
+        assert observed == ()
+        observed = await _collect_aiterator(store.list_dir("foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
+        observed = await _collect_aiterator(store.list_dir("subgroup/foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:

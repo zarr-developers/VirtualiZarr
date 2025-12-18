@@ -400,6 +400,41 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
+@zarr_versions()
+def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
+    """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
+
+    from virtualizarr.parsers import ZarrParser
+
+    # Create a small Dataset with a scalar
+    ds = xr.Dataset(
+        {"data": 42.0},
+    )
+
+    filepath = f"{tmpdir}/roundtrip.zarr"
+    # Ensure multiple chunks to exercise manifest generation
+    ds.to_zarr(
+        filepath,
+        consolidated=False,
+        zarr_format=zarr_format,
+    )
+
+    # Build a registry and generate a ManifestStore from the parser
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+    manifeststore = parser(url=filepath, registry=registry)
+
+    # Open the original zarr and the manifest-backed store and compare
+    with xr.open_dataset(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)
+
+
 def test_sharded_array_raises_error(tmpdir):
     """Test that attempting to virtualize a sharded Zarr V3 array raises NotImplementedError."""
     filepath = f"{tmpdir}/test_sharded.zarr"
