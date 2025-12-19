@@ -8,6 +8,7 @@ from typing import (
 )
 
 import numpy as np
+from obspec_utils import ObstoreReader
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -22,7 +23,7 @@ from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import ObstoreReader, soft_import
+from virtualizarr.utils import soft_import
 
 h5py = soft_import("h5py", "reading hdf files", strict=False)
 

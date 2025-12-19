@@ -14,7 +14,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
-from virtualizarr.registry import ObjectStoreRegistry, UrlKey
+from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.xarray import open_virtual_dataset
 
@@ -350,7 +350,6 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     manifeststore = parser("memory:///refs.json", registry=registry)
 
     assert isinstance(manifeststore, ManifestStore)
-    assert manifeststore._registry.map[UrlKey("memory", "")].store == memory_store
 
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(

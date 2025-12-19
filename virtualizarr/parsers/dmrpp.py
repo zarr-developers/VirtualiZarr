@@ -5,6 +5,7 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
+from obspec_utils import ObstoreReader
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
@@ -17,7 +18,6 @@ from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import ObstoreReader
 
 
 class DMRPPParser:

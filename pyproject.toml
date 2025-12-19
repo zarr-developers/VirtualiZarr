@@ -29,6 +29,7 @@ dependencies = [
     "packaging",
     "zarr>=3.1.0",
     "obstore>=0.5.1",
+    "obspec_utils>=0.4.0",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
