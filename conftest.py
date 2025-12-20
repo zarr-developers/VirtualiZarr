@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
@@ -18,7 +19,6 @@ from xarray.core.variable import Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import ceildiv
 
 

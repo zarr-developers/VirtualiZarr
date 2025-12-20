@@ -7,6 +7,7 @@ import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -14,7 +15,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.xarray import open_virtual_dataset
 

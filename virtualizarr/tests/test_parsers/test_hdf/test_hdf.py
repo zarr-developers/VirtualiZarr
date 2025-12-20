@@ -3,11 +3,11 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,

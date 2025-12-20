@@ -15,7 +15,8 @@ See the page on data structures for more information.
 
 ## Registry
 
-::: virtualizarr.registry.ObjectStoreRegistry
+... note
+    `virtualizarr.registry.ObjectStoreRegistry has been deprecated. Please use [obspec_utils.ObjectStoreRegistry][] instead.
 
 ## Array API
 

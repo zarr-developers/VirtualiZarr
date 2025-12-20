@@ -1,9 +1,9 @@
 import pytest
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import S3Store
 from xarray import Dataset
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_network, requires_tiff
 
 virtual_tiff = pytest.importorskip("virtual_tiff")

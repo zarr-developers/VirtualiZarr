@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import LocalStore, from_url
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
@@ -19,7 +20,6 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser, ZarrParser
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,

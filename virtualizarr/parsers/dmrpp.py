@@ -5,7 +5,7 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils import ObstoreReader
+from obspec_utils import ObjectStoreRegistry, ObstoreReader
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
@@ -16,7 +16,6 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
 
 
@@ -54,7 +53,7 @@ class DMRPPParser:
         url
             The URL of the input DMR++ file (e.g., "s3://bucket/file.dmrpp").
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

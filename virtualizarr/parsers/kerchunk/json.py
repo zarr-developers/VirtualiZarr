@@ -1,10 +1,10 @@
 from collections.abc import Iterable
 
 import ujson
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
-from virtualizarr.registry import ObjectStoreRegistry
 
 
 class KerchunkJSONParser:
@@ -46,7 +46,7 @@ class KerchunkJSONParser:
         url
             The URL of the input Kerchunk JSON (e.g., "s3://bucket/kerchunk.json").
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

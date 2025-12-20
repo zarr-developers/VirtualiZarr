@@ -9,11 +9,12 @@ This is advanced material intended for 3rd-party developers, and assumes you hav
 
 ## What is a VirtualiZarr parser?
 
-All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
+All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
 
 ```python
+from obspec_utils import ObjectStoreRegistry
+
 from virtualizarr.manifests import ManifestStore
-from virtualizarr.registry import ObjectStoreRegistry
 
 
 def custom_parser(url: str, registry: ObjectStoreRegistry) -> ManifestStore:
@@ -234,10 +235,11 @@ For example we could test the ability of VirtualiZarr's in-built [`HDFParser`][v
 
 ```python
 import xarray.testing as xrt
+from obspec_utils import ObjectStoreRegistry
+from obstore.store import LocalStore
 
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
-from obstore.store import LocalStore
+
 
 project_directory = "/Users/user/my-project"
 project_url = f"file://{project_directory}"

@@ -4,10 +4,10 @@ from urllib.parse import urlparse
 import numpy as np
 import pytest
 import xarray as xr
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,

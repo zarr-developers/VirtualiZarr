@@ -1,9 +1,10 @@
 from collections.abc import Iterable
 from pathlib import Path
 
+from obspec_utils import ObjectStoreRegistry
+
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
-from virtualizarr.registry import ObjectStoreRegistry
 
 
 class NetCDF3Parser:
@@ -44,7 +45,7 @@ class NetCDF3Parser:
         url
             The URL of the input NetCDF3 file (e.g., "s3://bucket/file.nc").
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
