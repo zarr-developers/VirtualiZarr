@@ -264,7 +264,17 @@ def test_v2_metadata_with_dimensions():
 
 
 @SKIP_OLDER_ZARR_PYTHON
-def test_v2_metadata_with_none_fill_value():
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        "int32",
+        "uint8",
+        "float64",
+        "bool",
+        "U10",
+    ],
+)
+def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
     import asyncio
 
@@ -273,7 +283,7 @@ def test_v2_metadata_with_none_fill_value():
     _ = zarr.create(
         shape=(5, 10),
         chunks=(5, 5),
-        dtype="int32",
+        dtype=dtype,
         store=store,
         zarr_format=2,
         fill_value=None,
