@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import zarr
 from zarr.api.asynchronous import open_group as open_group_async
+from zarr.core.dtype import parse_dtype
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -194,20 +195,10 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
         if v2_metadata.fill_value is None:
             v2_dict = v2_metadata.to_dict()
-            v2_dict["fill_value"] = 0
+            v2_dtype = parse_dtype(v2_dict['dtype'], format=2)
+            v2_dict["fill_value"] = v2_dtype.default_scalar()
             temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
             v3_metadata = _convert_array_metadata(temp_v2)
-
-            # Replace with proper default for the data type
-            default_scalar = v3_metadata.data_type.default_scalar()
-            fill_value = (
-                default_scalar.item()
-                if hasattr(default_scalar, "item")
-                else default_scalar
-            )
-            v3_dict = v3_metadata.to_dict()
-            v3_dict["fill_value"] = fill_value
-            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
         else:
             # Normal conversion; allow other errors to propagate.
             v3_metadata = _convert_array_metadata(v2_metadata)
