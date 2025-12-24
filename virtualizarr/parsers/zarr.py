@@ -195,7 +195,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
         if v2_metadata.fill_value is None:
             v2_dict = v2_metadata.to_dict()
-            v2_dtype = parse_dtype(v2_dict['dtype'], format=2)
+            v2_dtype = parse_dtype(v2_dict['dtype'], zarr_format=2)
             v2_dict["fill_value"] = v2_dtype.default_scalar()
             temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
             v3_metadata = _convert_array_metadata(temp_v2)
