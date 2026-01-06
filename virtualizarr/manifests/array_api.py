@@ -97,9 +97,14 @@ def concatenate(
     new_shape[axis] = new_length_along_concat_axis
 
     # do concatenation of entries in manifest
-    concatenated_paths = np.concatenate(
-        [arr.manifest._paths for arr in arrays],
-        axis=axis,
+    concatenated_paths = (
+        cast(  # `np.concatenate` is type hinted as if the output could have Any dtype
+            np.ndarray[Any, np.dtypes.StringDType],
+            np.concatenate(
+                [arr.manifest._paths for arr in arrays],
+                axis=axis,
+            ),
+        )
     )
     concatenated_offsets = np.concatenate(
         [arr.manifest._offsets for arr in arrays],
