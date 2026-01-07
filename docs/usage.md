@@ -360,7 +360,7 @@ See the page on [Scaling](scaling.md) for tips on how to create large numbers of
 
 ## Changing the prefix of urls in the virtual dataset
 
-You can update the urls stored in a manifest or virtual dataset without changing the byte range information using the [virtualizarr.VirtualiZarrDatasetAccessor.rename_paths][] accessor method.
+You can update the urls stored in a manifest or virtual dataset without changing the byte range information using the [virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths][] accessor method.
 
 For example, you may want to rename urls according to a function to reflect having moved the location of the referenced files from local storage to an S3 bucket.
 
@@ -385,7 +385,7 @@ Once we've combined references to all the chunks of all our archival files into 
 
 We can store these references using [Icechunk](https://icechunk.io/).
 `Icechunk` is an open-source, cloud-native transactional tensor storage engine that is fully compatible with Zarr-Python version 3, as it conforms to the Zarr V3 specification.
-To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.VirtualiZarrDatasetAccessor.to_icechunk][] accessor method.
+To export our virtual dataset to an `Icechunk` Store, we use the [virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_icechunk][] accessor method.
 
 Here we use a memory store but in real use-cases you'll probably want to use [icechunk.local_filesystem_storage][], [icechunk.s3_storage][], [icechunk.azure_storage][], [icechunk.gcs_storage][], or a similar storage class.
 
@@ -443,7 +443,7 @@ See the [Icechunk documentation](https://icechunk.io/en/latest/virtual/) for mor
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for serializing virtual datasets as a JSON file or Parquet directory.
 
-To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the [virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk][] accessor method.
+To write out all the references in the virtual dataset as a single kerchunk-compliant JSON or parquet file, you can use the [virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk][] accessor method.
 
 ```python
 combined_vds.vz.to_kerchunk('output/combined.json', format='json')
@@ -516,4 +516,4 @@ vds = open_virtual_dataset(
 # the path in the virtual dataset will now be 'file:///data_directory/file.nc'
 ```
 
-Note that as the virtualizarr [virtualizarr.VirtualiZarrDatasetAccessor.to_kerchunk][] method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.
+Note that as the virtualizarr [virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk][] method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.
