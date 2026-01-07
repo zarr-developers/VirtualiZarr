@@ -8,10 +8,14 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from xarray import Dataset, open_dataset
+from xarray import Dataset, open_dataset, open_datatree
 from xarray.core.indexes import Index
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr import (
+    open_virtual_dataset,
+    open_virtual_datatree,
+    open_virtual_mfdataset,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
 from virtualizarr.registry import ObjectStoreRegistry
@@ -654,6 +658,39 @@ class TestOpenVirtualDatasetHDFGroup:
             assert list(vds.variables) == ["bar"]
             assert isinstance(vds["bar"].data, ManifestArray)
             assert vds["bar"].shape == (2,)
+
+    def test_open_virtual_datatree_raises(
+        self, netcdf4_file_with_data_in_multiple_groups, local_registry
+    ):
+        parser = HDFParser()
+        with pytest.raises(
+            ValueError, match="group '/subgroup' is not aligned with its parents"
+        ):
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_multiple_groups,
+                registry=local_registry,
+                parser=parser,
+            )
+
+    def test_open_virtual_datatree(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        parser = HDFParser()
+        with open_virtual_datatree(
+            url=netcdf4_file_with_data_in_sibling_groups,
+            registry=local_registry,
+            parser=parser,
+        ) as vdt:
+            with open_datatree(
+                netcdf4_file_with_data_in_sibling_groups, engine="h5netcdf"
+            ) as dt:
+                vdt.isomorphic(dt)
+                assert list(vdt["/subgroup1"].variables) == ["foo"]
+                assert isinstance(vdt["/subgroup1"]["foo"].data, ManifestArray)
+                assert vdt["/subgroup1"]["foo"].shape == (3,)
+                assert list(vdt["/subgroup2"].variables) == ["bar"]
+                assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+                assert vdt["/subgroup2"]["bar"].shape == (2,)
 
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(
