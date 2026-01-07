@@ -45,11 +45,9 @@ def open_virtual_datatree(
     decode_times: bool | None = None,
 ) -> xr.DataTree:
     """
-    Open an archival data source as an [xarray.Datatree][] wrapping virtualized zarr arrays.
+    Open an archival data source as an [xarray.DataTree][] wrapping virtualized zarr arrays.
 
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
-
-    Xarray indexes can optionally be created (the default behaviour is to create indexes for any 1D coordinate variables). To avoid creating any xarray indexes pass ``indexes={}``.
 
     Parameters
     ----------
@@ -71,6 +69,8 @@ def open_virtual_datatree(
         - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtual_tiff.VirtualTIFF][] for virtualizing TIFFs.
+
     drop_variables
         Variables in the data source to drop before returning.
     loadable_variables
@@ -110,8 +110,6 @@ def open_virtual_dataset(
 
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
 
-    Xarray indexes can optionally be created (the default behaviour is to create indexes for any 1D coordinate variables). To avoid creating any xarray indexes pass ``indexes={}``.
-
     Parameters
     ----------
     url
@@ -131,6 +129,7 @@ def open_virtual_dataset(
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
         - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtual_tiff.VirtualTIFF][] for virtualizing TIFFs.
 
     drop_variables
         Variables in the data source to drop before returning.
