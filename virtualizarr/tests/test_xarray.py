@@ -692,6 +692,21 @@ class TestOpenVirtualDatasetHDFGroup:
                 assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
                 assert vdt["/subgroup2"]["bar"].shape == (2,)
 
+    def test_open_virtual_datatree_all_vars_loaded(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        parser = HDFParser()
+        with open_virtual_datatree(
+            url=netcdf4_file_with_data_in_sibling_groups,
+            registry=local_registry,
+            parser=parser,
+            loadable_variables=["foo", "bar"],
+        ) as vdt:
+            with open_datatree(
+                netcdf4_file_with_data_in_sibling_groups, engine="h5netcdf"
+            ) as dt:
+                xr.testing.assert_allclose(vdt, dt)
+
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(
         self, netcdf4_file_with_data_in_multiple_groups, group, local_registry
