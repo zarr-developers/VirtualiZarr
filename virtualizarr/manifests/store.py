@@ -290,6 +290,11 @@ class ManifestStore(Store):
                 for chunk_key in node.manifest.keys():
                     yield f"c.{chunk_key}"
 
+    @property
+    def supports_consolidated_metadata(self) -> bool:
+        # docstring inherited
+        return False
+
     def to_virtual_dataset(
         self,
         group="",

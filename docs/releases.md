@@ -1,10 +1,14 @@
 # Release notes
 
-## v2.2.1 (TBD)
+## Unreleased
 
 ### New Features
 
-### Breaking changes
+- Set `supports_consolidated_metadata` property on `ManifestStore` to `False`.
+  ([809](https://github.com/zarr-developers/VirtualiZarr/pull/809)).
+  By [Julia Signell](https://github.com/jsignell).
+
+## v2.2.1 (17th November 2025)
 
 ### Bug fixes
 
@@ -12,10 +16,6 @@
   By [Max Jones](https://github.com/maxrjones)
 - Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
   By [Max Jones](https://github.com/maxrjones)
-
-### Documentation
-
-### Internal changes
 
 ## v2.2.0 (12th November 2025)
 
