@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import zarr
 from zarr.api.asynchronous import open_group as open_group_async
@@ -195,7 +195,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
         if v2_metadata.fill_value is None:
             v2_dict = v2_metadata.to_dict()
-            v2_dtype = parse_dtype(v2_dict["dtype"], zarr_format=2)
+            v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
             fill_value = v2_dtype.default_scalar()
             v2_dict["fill_value"] = (
                 fill_value.item() if hasattr(fill_value, "item") else fill_value
