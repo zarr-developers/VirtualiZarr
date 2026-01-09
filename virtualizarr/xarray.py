@@ -426,6 +426,11 @@ def construct_virtual_datatree(
     """
     Construct a fully or partly virtual datatree from a ManifestStore.
     """
+    node = manifest_store._group[group] if group else manifest_store._group
+
+    if isinstance(node, ManifestArray):
+        node = ManifestGroup(arrays={group: node}, attributes={})
+
     fully_loadable_datatree = xr.open_datatree(
         manifest_store,  # type: ignore[arg-type]
         group=group,
@@ -434,22 +439,16 @@ def construct_virtual_datatree(
         zarr_format=3,
         decode_times=decode_times,
     )
-    if group:
-        node = manifest_store._group[group]
-    else:
-        node = manifest_store._group
-    if isinstance(node, ManifestArray):
-        node = ManifestGroup(arrays={group: node}, attributes={})
-    fully_virtual_datatree = node.to_virtual_datatree()
 
-    partially_loaded_datasets = {}
-    for name, virtual_node in fully_virtual_datatree.subtree_with_keys:
-        loadable_node = fully_loadable_datatree[name]
-        node_dataset = replace_virtual_with_loadable_vars(
-            virtual_node.to_dataset(), loadable_node.to_dataset(), loadable_variables
-        )
-        node_dataset = node_dataset.drop_vars(list(drop_variables or ()))
-        partially_loaded_datasets[name] = node_dataset
+    partially_loaded_datasets = {
+        name: replace_virtual_with_loadable_vars(
+            virtual_node.to_dataset(),
+            fully_loadable_datatree[name].to_dataset(),
+            loadable_variables,
+        ).drop_vars(list(drop_variables or ()))
+        for name, virtual_node in node.to_virtual_datatree().subtree_with_keys
+    }
+
     return xr.DataTree.from_dict(partially_loaded_datasets)
 
 
