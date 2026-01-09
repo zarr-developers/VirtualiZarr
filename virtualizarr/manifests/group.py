@@ -126,7 +126,7 @@ class ManifestGroup(
             attrs=attributes,
         )
 
-    def to_virtual_datasets(self) -> dict[str, xr.Dataset]:
+    def to_virtual_datasets(self) -> Mapping[str, xr.Dataset]:
         """
         Create a dictionary containing virtual datasets for all the sub-groups of a ManifestGroup. All the
         variables in the datasets will be "virtual", i.e., they will wrap ManifestArray objects.
@@ -157,5 +157,4 @@ class ManifestGroup(
 
         All variables in the returned DataTree will be "virtual", i.e. they will wrap ManifestArray objects.
         """
-        datasets = self.to_virtual_datasets()
-        return xr.DataTree.from_dict(datasets)
+        return xr.DataTree.from_dict(self.to_virtual_datasets())
