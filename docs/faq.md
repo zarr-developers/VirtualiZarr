@@ -65,10 +65,11 @@ In general once the Icechunk specification reaches a stable v1.0, we would recom
 No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can manipulate them, or re-save them into a new format, such as  [Icechunk](https://icechunk.io/):
 
 ```python
-from virtualizarr import open_virtual_dataset
-from virtualizarr.registry import ObjectStoreRegistry
-from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from obstore.store import LocalStore
+from obspec_utils import ObjectStoreRegistry
+
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 
 project_dir="/Users/user/project-dir"
 project_url=f"file://{project_dir}"

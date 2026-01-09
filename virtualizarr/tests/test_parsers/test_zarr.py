@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import LocalStore
 from packaging import version
 from zarr.api.asynchronous import open_array
@@ -10,7 +11,6 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import build_chunk_manifest, get_metadata, get_strategy
-from virtualizarr.registry import ObjectStoreRegistry
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 

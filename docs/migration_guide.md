@@ -21,19 +21,19 @@ vds = open_virtual_dataset("data1.nc")
 ```
 
 To provide a more extensible and reliable API, VirtualiZarr V2 requires more explicit configuration by the user.
-You now must pass in a valid [Parser][virtualizarr.parsers.typing.Parser] and a [virtualizarr.registry.ObjectStoreRegistry][] to [virtualizarr.open_virtual_dataset][].
+You now must pass in a valid [Parser][virtualizarr.parsers.typing.Parser] and a [obspec_utils.ObjectStoreRegistry][] to [virtualizarr.open_virtual_dataset][].
 This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust. It is most common for the
-[ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] to contain one or more [ObjectStores][obstore.store.ObjectStore]
-for reading the original data, but some parsers may accept an empty [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry].
+[ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] to contain one or more [ObjectStores][obstore.store.ObjectStore]
+for reading the original data, but some parsers may accept an empty [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry].
 
 === "S3 Store"
 
     ```python exec="on" source="material-block" session="migration" result="code"
     from obstore.store import S3Store
+    from obspec_utils import ObjectStoreRegistry
 
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers import HDFParser
-    from virtualizarr.registry import ObjectStoreRegistry
 
     bucket = "nex-gddp-cmip6"
     store = S3Store(
@@ -57,10 +57,10 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
 
 
 from obstore.store import LocalStore
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 
 from pathlib import Path
 
@@ -116,15 +116,15 @@ vds.vz.to_icechunk(icechunk_store)
 In Virtualizarr V1 if you wanted to access the underlying chunks of a dataset, you first had to write the reference to disk. From there you could read those references back into Xarray and access the chunks like you would with a normal Xarray dataset.
 
 In V2 you can now **directly read the chunks from a Parser into Xarray without writing them to disk first**. 🤯
-Since each `Parser` is now responsible for creating a [ManifestStore][virtualizarr.manifests.ManifestStore] and the [ManifestStore][virtualizarr.manifests.ManifestStore] has the ability to fetch data through any [ObjectStore][obstore.store.ObjectStore] in the [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry]. You
+Since each `Parser` is now responsible for creating a [ManifestStore][virtualizarr.manifests.ManifestStore] and the [ManifestStore][virtualizarr.manifests.ManifestStore] has the ability to fetch data through any [ObjectStore][obstore.store.ObjectStore] in the [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry]. You
 can load data using the [ManifestStore][virtualizarr.manifests.ManifestStore] via either Zarr or Xarray. Here's an example using Xarray:
 
 ```python exec="on" source="material-block" session="migration" result="code"
 import xarray as xr
 from obstore.store import S3Store
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 
 bucket = "nex-gddp-cmip6"
 store = S3Store(

@@ -1,9 +1,9 @@
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import NetCDF3Parser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_kerchunk, requires_network, requires_scipy
 from virtualizarr.tests.utils import obstore_http
 

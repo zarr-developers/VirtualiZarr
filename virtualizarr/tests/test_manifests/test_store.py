@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import obstore as obs
 import pytest
+from obspec_utils import ObjectStoreRegistry
 from obstore.store import MemoryStore
 from zarr.abc.store import (
     OffsetByteRequest,
@@ -24,7 +25,6 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.store import parse_manifest_index
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
