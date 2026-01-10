@@ -709,6 +709,28 @@ class TestOpenVirtualDatasetHDFGroup:
         ):
             xr.testing.assert_allclose(vdt, dt)
 
+    def test_open_virtual_datatree_drop_vars(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with (
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+                drop_variables=["foo"],
+            ) as vdt,
+            open_datatree(
+                netcdf4_file_with_data_in_sibling_groups,
+                engine="h5netcdf",
+                drop_variables=["foo"],
+            ) as dt,
+        ):
+            vdt.isomorphic(dt)
+            assert list(vdt["/subgroup1"].variables) == []
+            assert list(vdt["/subgroup2"].variables) == ["bar"]
+            assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+            assert vdt["/subgroup2"]["bar"].shape == (2,)
+
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(
         self, netcdf4_file_with_data_in_multiple_groups, group, local_registry
