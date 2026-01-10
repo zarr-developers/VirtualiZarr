@@ -215,6 +215,17 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 
 
 @pytest.fixture
+def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path) -> str:
+    """Create a NetCDF4 file with data in sibling groups."""
+    filepath = tmp_path / "test.nc"
+    ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
+    ds1.to_netcdf(filepath, group="subgroup1")
+    ds2 = xr.DataArray([4, 5], name="bar").to_dataset()
+    ds2.to_netcdf(filepath, group="subgroup2", mode="a")
+    return str(filepath)
+
+
+@pytest.fixture
 def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
     """Factory fixture to create multiple NetCDF4 files."""
 

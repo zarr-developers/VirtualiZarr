@@ -21,7 +21,7 @@ from xarray.core import dtypes
 from xarray.core.types import NestedSequence
 from xarray.structure.combine import _infer_concat_order_from_positions, _nested_combine
 
-from virtualizarr.manifests import ManifestStore
+from virtualizarr.manifests import ManifestArray, ManifestGroup, ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
@@ -35,20 +35,20 @@ if TYPE_CHECKING:
     )
 
 
-def open_virtual_dataset(
+def open_virtual_datatree(
     url: str,
     registry: ObjectStoreRegistry,
     parser: Parser,
+    *,
     drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
-) -> xr.Dataset:
+) -> xr.DataTree:
     """
-    Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
+    Open an archival data source as an [xarray.DataTree][] wrapping virtualized zarr arrays.
 
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
-
-    Xarray indexes can optionally be created (the default behaviour is to create indexes for any 1D coordinate variables). To avoid creating any xarray indexes pass ``indexes={}``.
+    Coordinate variables are loaded by default following xarray's behavior.
 
     Parameters
     ----------
@@ -69,6 +69,170 @@ def open_virtual_dataset(
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
         - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtual_tiff.VirtualTIFF][] for virtualizing TIFFs.
+
+    drop_variables
+        Variables in the data source to drop before returning.
+
+        Variable names are matched by their simple name (not a path). Matching is applied uniformly
+        across all groups in the DataTree. For example, ``drop_variables=["time"]`` will drop any variable
+        named "time" from every group that contains it.
+
+        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
+        To drop variables from specific groups only, open the DataTree first and then use xarray's
+        ``.drop_vars()`` method on the desired nodes.
+
+        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
+
+    loadable_variables
+        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays. If
+        ``None`` (the default), dimension coordinate variables (1D variables whose name matches
+        their dimension) will be loaded automatically to enable xarray indexing.
+
+        Variable names are matched by their simple name (not a path). Matching is applied uniformly
+        across all groups in the DataTree. For example, ``loadable_variables=["time", "lat", "lon"]``
+        will load any variable with those names from every group that contains them.
+
+        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
+        To load variables from specific groups only, you would need to open groups separately using
+        ``open_virtual_dataset`` with the parser's ``group`` parameter.
+
+        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
+
+    decode_times
+        Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
+
+    Returns
+    -------
+    vds
+        An [xarray.DataTree][] containing virtual chunk references for all variables.
+
+    Examples
+    --------
+
+    Virtualize a Cloud Optimized GeoTIFF (COG) using [virtual_tiff.VirtualTIFF][]:
+
+    ```python
+    from obstore.store import S3Store
+
+    from virtualizarr import open_virtual_datatree
+    from virtualizarr.registry import ObjectStoreRegistry
+    from virtual_tiff import VirtualTIFF
+
+    # Access a public Sentinel-2 COG from AWS
+    store = S3Store("sentinel-cogs", region="us-west-2", skip_signature=True)
+    registry = ObjectStoreRegistry({"s3://sentinel-cogs/": store})
+    url = "s3://sentinel-cogs/sentinel-s2-l2a-cogs/12/S/UF/2022/6/S2B_12SUF_20220609_0_L2A/B04.tif"
+    parser = VirtualTIFF(ifd_layout="nested")
+
+    with open_virtual_datatree(url=url, parser=parser, registry=registry) as vdt:
+        print(vdt)
+    ```
+
+    Virtualize a NetCDF4 file using the the [virtualizarr.parsers.HDFParser][]:
+
+    ```python
+    from obstore.store import HTTPStore
+
+    from virtualizarr import open_virtual_datatree
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    base = "https://github.com"
+    url = f"{base}/pydata/xarray-data/raw/refs/heads/master/precipitation.nc4"
+
+    store = HTTPStore(base)
+
+    parser = HDFParser()
+    registry = ObjectStoreRegistry({base: store})
+
+    vdt = open_virtual_datatree(url=url, registry=registry, parser=parser)
+    print(vdt)
+    ```
+
+    Load prevent loading variables from any groups (default loads the coordinate variables "time", "lat", and "lon"):
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+        loadable_variables=[],
+    )
+    ```
+
+    Drop the "lon" variable from all groups:
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+        drop_variables=["lon"],
+    )
+    ```
+
+    Drop variables from a specific group after opening:
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+    )
+    vdt["/observed"] = vdt["/observed"].to_dataset().drop_vars(["lon"])
+    ```
+
+    """
+    filepath = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
+
+    manifest_store = parser(
+        url=filepath,
+        registry=registry,
+    )
+
+    return manifest_store.to_virtual_datatree(
+        loadable_variables=loadable_variables,
+        decode_times=decode_times,
+        drop_variables=drop_variables,
+    )
+
+
+def open_virtual_dataset(
+    url: str,
+    registry: ObjectStoreRegistry,
+    parser: Parser,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+) -> xr.Dataset:
+    """
+    Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
+
+    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
+    Coordinate variables are loaded by default following xarray's behavior.
+
+    Parameters
+    ----------
+    url
+        The url of the data source to virtualize. The URL should include a scheme. For example:
+
+        - `url="file:///Users/my-name/Documents/my-project/my-data.nc"` for a local data source.
+        - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
+
+    registry
+        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+    parser
+        A parser to use for the given data source. For example:
+
+        - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
+        - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
+        - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
+        - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
+        - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
+        - [virtual_tiff.VirtualTIFF][] for virtualizing TIFFs.
 
     drop_variables
         Variables in the data source to drop before returning.
@@ -352,6 +516,43 @@ def construct_virtual_dataset(
         return replace_virtual_with_loadable_vars(
             fully_virtual_ds, loadable_ds, loadable_variables
         )
+
+
+def construct_virtual_datatree(
+    manifest_store: ManifestStore,
+    group: str = "",
+    *,
+    drop_variables: Iterable[str] | None = None,
+    loadable_variables: Iterable[str] | None = None,
+    decode_times: bool | None = None,
+) -> xr.DataTree:
+    """
+    Construct a fully or partly virtual datatree from a ManifestStore.
+    """
+    node = manifest_store._group[group] if group else manifest_store._group
+
+    if isinstance(node, ManifestArray):
+        node = ManifestGroup(arrays={group: node}, attributes={})
+
+    fully_loadable_datatree = xr.open_datatree(
+        manifest_store,  # type: ignore[arg-type]
+        group=group,
+        engine="zarr",
+        consolidated=False,
+        zarr_format=3,
+        decode_times=decode_times,
+    )
+
+    partially_loaded_datasets = {
+        name: replace_virtual_with_loadable_vars(
+            virtual_node.to_dataset(),
+            fully_loadable_datatree[name].to_dataset(),
+            loadable_variables,
+        ).drop_vars(list(drop_variables or ()), errors="ignore")
+        for name, virtual_node in node.to_virtual_datatree().subtree_with_keys
+    }
+
+    return xr.DataTree.from_dict(partially_loaded_datasets)
 
 
 def replace_virtual_with_loadable_vars(
