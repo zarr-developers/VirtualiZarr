@@ -48,6 +48,7 @@ def open_virtual_datatree(
     Open an archival data source as an [xarray.DataTree][] wrapping virtualized zarr arrays.
 
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
+    Coordinate variables are loaded by default following xarray's behavior.
 
     Parameters
     ----------
@@ -73,8 +74,32 @@ def open_virtual_datatree(
 
     drop_variables
         Variables in the data source to drop before returning.
+
+        Variable names are matched by their simple name (not a path). Matching is applied uniformly
+        across all groups in the DataTree. For example, ``drop_variables=["time"]`` will drop any variable
+        named "time" from every group that contains it.
+
+        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
+        To drop variables from specific groups only, open the DataTree first and then use xarray's
+        ``.drop_vars()`` method on the desired nodes.
+
+        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
+
     loadable_variables
-        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
+        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays. If
+        ``None`` (the default), dimension coordinate variables (1D variables whose name matches
+        their dimension) will be loaded automatically to enable xarray indexing.
+
+        Variable names are matched by their simple name (not a path). Matching is applied uniformly
+        across all groups in the DataTree. For example, ``loadable_variables=["time", "lat", "lon"]``
+        will load any variable with those names from every group that contains them.
+
+        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
+        To load variables from specific groups only, you would need to open groups separately using
+        ``open_virtual_dataset`` with the parser's ``group`` parameter.
+
+        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
+
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
 
@@ -82,6 +107,83 @@ def open_virtual_datatree(
     -------
     vds
         An [xarray.DataTree][] containing virtual chunk references for all variables.
+
+    Examples
+    --------
+
+    Virtualize a Cloud Optimized GeoTIFF (COG) using [virtual_tiff.VirtualTIFF][]:
+
+    ```python
+    from obstore.store import S3Store
+
+    from virtualizarr import open_virtual_datatree
+    from virtualizarr.registry import ObjectStoreRegistry
+    from virtual_tiff import VirtualTIFF
+
+    # Access a public Sentinel-2 COG from AWS
+    store = S3Store("sentinel-cogs", region="us-west-2", skip_signature=True)
+    registry = ObjectStoreRegistry({"s3://sentinel-cogs/": store})
+    url = "s3://sentinel-cogs/sentinel-s2-l2a-cogs/12/S/UF/2022/6/S2B_12SUF_20220609_0_L2A/B04.tif"
+    parser = VirtualTIFF(ifd_layout="nested")
+
+    with open_virtual_datatree(url=url, parser=parser, registry=registry) as vdt:
+        print(vdt)
+    ```
+
+    Virtualize a NetCDF4 file using the the [virtualizarr.parsers.HDFParser][]:
+
+    ```python
+    from obstore.store import HTTPStore
+
+    from virtualizarr import open_virtual_datatree
+    from virtualizarr.parsers import HDFParser
+    from virtualizarr.registry import ObjectStoreRegistry
+
+    base = "https://github.com"
+    url = f"{base}/pydata/xarray-data/raw/refs/heads/master/precipitation.nc4"
+
+    store = HTTPStore(base)
+
+    parser = HDFParser()
+    registry = ObjectStoreRegistry({base: store})
+
+    vdt = open_virtual_datatree(url=url, registry=registry, parser=parser)
+    print(vdt)
+    ```
+
+    Load prevent loading variables from any groups (default loads the coordinate variables "time", "lat", and "lon"):
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+        loadable_variables=[],
+    )
+    ```
+
+    Drop the "lon" variable from all groups:
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+        drop_variables=["lon"],
+    )
+    ```
+
+    Drop variables from a specific group after opening:
+
+    ```python
+    vdt = open_virtual_datatree(
+        url=url,
+        registry=registry,
+        parser=parser,
+    )
+    vdt["/observed"] = vdt["/observed"].to_dataset().drop_vars(["lon"])
+    ```
+
     """
     filepath = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
 
@@ -109,6 +211,7 @@ def open_virtual_dataset(
     Open an archival data source as an [xarray.Dataset][] wrapping virtualized zarr arrays.
 
     No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
+    Coordinate variables are loaded by default following xarray's behavior.
 
     Parameters
     ----------
@@ -445,7 +548,7 @@ def construct_virtual_datatree(
             virtual_node.to_dataset(),
             fully_loadable_datatree[name].to_dataset(),
             loadable_variables,
-        ).drop_vars(list(drop_variables or ()))
+        ).drop_vars(list(drop_variables or ()), errors="ignore")
         for name, virtual_node in node.to_virtual_datatree().subtree_with_keys
     }
 
