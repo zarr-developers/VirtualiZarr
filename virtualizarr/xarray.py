@@ -46,8 +46,8 @@ def open_virtual_datatree(
     """
     Open an archival data source as an [xarray.DataTree][] wrapping virtualized zarr arrays.
 
-    No data variables will be loaded unless specified in the ``loadable_variables`` kwarg (in which case they will open as lazily indexed arrays using xarray's standard lazy indexing classes).
-    Coordinate variables are loaded by default following xarray's behavior.
+    See the `loadable_variables` kwarg for a description of which data variables are loaded vs.
+    virtualized.
 
     Parameters
     ----------
