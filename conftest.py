@@ -220,7 +220,7 @@ def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path) -> str:
     filepath = tmp_path / "test.nc"
     ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
     ds1.to_netcdf(filepath, group="subgroup1")
-    ds2 = xr.DataArray([4, 5], name="bar").to_dataset()
+    ds2 = xr.DataArray([4, 5], coords={"x": [0, 1]}, dims="x", name="bar").to_dataset()
     ds2.to_netcdf(filepath, group="subgroup2", mode="a")
     return str(filepath)
 

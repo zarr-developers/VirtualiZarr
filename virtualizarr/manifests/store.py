@@ -336,7 +336,6 @@ class ManifestStore(Store):
         self,
         group="",
         *,
-        drop_variables: Iterable[str] | None = None,
         loadable_variables: Iterable[str] | None = None,
         decode_times: bool | None = None,
     ) -> "xr.DataTree":
@@ -350,8 +349,6 @@ class ManifestStore(Store):
         Parameters
         ----------
         group : Group to convert to a virtual DataTree
-        drop_variables
-            Variables in the data source to drop before returning.
         loadable_variables
             Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays.
         decode_times
@@ -369,7 +366,6 @@ class ManifestStore(Store):
             group=group,
             loadable_variables=loadable_variables,
             decode_times=decode_times,
-            drop_variables=drop_variables,
         )
 
 

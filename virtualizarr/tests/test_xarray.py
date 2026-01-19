@@ -689,11 +689,13 @@ class TestOpenVirtualDatasetHDFGroup:
             assert list(vdt["/subgroup1"].variables) == ["foo"]
             assert isinstance(vdt["/subgroup1"]["foo"].data, ManifestArray)
             assert vdt["/subgroup1"]["foo"].shape == (3,)
-            assert list(vdt["/subgroup2"].variables) == ["bar"]
+            assert list(vdt["/subgroup2"].variables) == ["bar", "x"]
             assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+            assert isinstance(vdt["/subgroup2"]["x"].data, np.ndarray)
             assert vdt["/subgroup2"]["bar"].shape == (2,)
+            assert vdt["/subgroup2"]["x"].shape == (2,)
 
-    def test_open_virtual_datatree_all_vars_loaded(
+    def test_open_virtual_datatree_no_vars_loaded(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
         with (
@@ -701,35 +703,46 @@ class TestOpenVirtualDatasetHDFGroup:
                 url=netcdf4_file_with_data_in_sibling_groups,
                 registry=local_registry,
                 parser=HDFParser(),
-                loadable_variables=["foo", "bar"],
+                loadable_variables=[],
             ) as vdt,
             open_datatree(
                 netcdf4_file_with_data_in_sibling_groups, engine="h5netcdf"
             ) as dt,
         ):
-            xr.testing.assert_allclose(vdt, dt)
+            vdt.isomorphic(dt)
+            assert list(vdt["/subgroup1"].variables) == ["foo"]
+            assert isinstance(vdt["/subgroup1"]["foo"].data, ManifestArray)
+            assert vdt["/subgroup1"]["foo"].shape == (3,)
+            assert list(vdt["/subgroup2"].variables) == ["bar", "x"]
+            assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+            assert isinstance(vdt["/subgroup2"]["x"].data, ManifestArray)
+            assert vdt["/subgroup2"]["bar"].shape == (2,)
+            assert vdt["/subgroup2"]["x"].shape == (2,)
+
+    def test_open_virtual_datatree_all_vars_loaded(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with pytest.raises(
+            NotImplementedError,
+            match=r"Only `loadable_variables=\[\]` or `loadable_variables=None` are supported, got loadable_variables",
+        ):
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+                loadable_variables=["foo", "bar"],
+            )
 
     def test_open_virtual_datatree_drop_vars(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
-        with (
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
             open_virtual_datatree(
                 url=netcdf4_file_with_data_in_sibling_groups,
                 registry=local_registry,
                 parser=HDFParser(),
                 drop_variables=["foo"],
-            ) as vdt,
-            open_datatree(
-                netcdf4_file_with_data_in_sibling_groups,
-                engine="h5netcdf",
-                drop_variables=["foo"],
-            ) as dt,
-        ):
-            vdt.isomorphic(dt)
-            assert list(vdt["/subgroup1"].variables) == []
-            assert list(vdt["/subgroup2"].variables) == ["bar"]
-            assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
-            assert vdt["/subgroup2"]["bar"].shape == (2,)
+            )
 
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(

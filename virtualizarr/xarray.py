@@ -40,7 +40,6 @@ def open_virtual_datatree(
     registry: ObjectStoreRegistry,
     parser: Parser,
     *,
-    drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
 ) -> xr.DataTree:
@@ -72,33 +71,13 @@ def open_virtual_datatree(
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
         - [virtual_tiff.VirtualTIFF][] for virtualizing TIFFs.
 
-    drop_variables
-        Variables in the data source to drop before returning.
-
-        Variable names are matched by their simple name (not a path). Matching is applied uniformly
-        across all groups in the DataTree. For example, ``drop_variables=["time"]`` will drop any variable
-        named "time" from every group that contains it.
-
-        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
-        To drop variables from specific groups only, open the DataTree first and then use xarray's
-        ``.drop_vars()`` method on the desired nodes.
-
-        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
-
     loadable_variables
-        Variables in the data source to load as Dask/NumPy arrays instead of as virtual arrays. If
-        ``None`` (the default), dimension coordinate variables (1D variables whose name matches
+        If ``None`` (the default), dimension coordinate variables (1D variables whose name matches
         their dimension) will be loaded automatically to enable xarray indexing.
 
-        Variable names are matched by their simple name (not a path). Matching is applied uniformly
-        across all groups in the DataTree. For example, ``loadable_variables=["time", "lat", "lon"]``
-        will load any variable with those names from every group that contains them.
+        If an empty iterable, no variables will be loaded.
 
-        Path-like strings (e.g., ``"/group1/time"``) are ignored unless they match a specific variable name.
-        To load variables from specific groups only, you would need to open groups separately using
-        ``open_virtual_dataset`` with the parser's ``group`` parameter.
-
-        Unlike xarray's opening functions, errors are not raised when a specified variable is not found.
+        Other options are not yet supported.
 
     decode_times
         Bool that is passed into [xarray.open_dataset][]. Allows time to be decoded into a datetime object.
@@ -162,17 +141,6 @@ def open_virtual_datatree(
     )
     ```
 
-    Drop the "lon" variable from all groups:
-
-    ```python
-    vdt = open_virtual_datatree(
-        url=url,
-        registry=registry,
-        parser=parser,
-        drop_variables=["lon"],
-    )
-    ```
-
     Drop variables from a specific group after opening:
 
     ```python
@@ -187,6 +155,10 @@ def open_virtual_datatree(
     """
     filepath = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
 
+    if loadable_variables:
+        raise NotImplementedError(
+            f"Only `loadable_variables=[]` or `loadable_variables=None` are supported, got loadable_variables={loadable_variables}"
+        )
     manifest_store = parser(
         url=filepath,
         registry=registry,
@@ -195,7 +167,6 @@ def open_virtual_datatree(
     return manifest_store.to_virtual_datatree(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
-        drop_variables=drop_variables,
     )
 
 
@@ -522,7 +493,6 @@ def construct_virtual_datatree(
     manifest_store: ManifestStore,
     group: str = "",
     *,
-    drop_variables: Iterable[str] | None = None,
     loadable_variables: Iterable[str] | None = None,
     decode_times: bool | None = None,
 ) -> xr.DataTree:
@@ -548,7 +518,7 @@ def construct_virtual_datatree(
             virtual_node.to_dataset(),
             fully_loadable_datatree[name].to_dataset(),
             loadable_variables,
-        ).drop_vars(list(drop_variables or ()), errors="ignore")
+        )
         for name, virtual_node in node.to_virtual_datatree().subtree_with_keys
     }
 
