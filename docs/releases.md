@@ -11,6 +11,13 @@
   ([809](https://github.com/zarr-developers/VirtualiZarr/pull/809)).
   By [Julia Signell](https://github.com/jsignell).
 
+### Internal changes
+
+- Remove the undocumented and broken wrapper of Kerchunk's TIFF parser in
+  favor of VirtualTIFF.
+  ([849](https://github.com/zarr-developers/VirtualiZarr/pull/849)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ## v2.2.1 (17th November 2025)
 
 ### Bug fixes
