@@ -13,8 +13,7 @@
 
 ### Internal changes
 
-- Remove the undocumented and broken wrapper of Kerchunk's TIFF parser in
-  favor of VirtualTIFF.
+- Remove the undocumented/unfunctional wrapper of Kerchunk's TIFF parser.
   ([849](https://github.com/zarr-developers/VirtualiZarr/pull/849)).
   By [Max Jones](https://github.com/maxrjones).
 
@@ -24,7 +23,7 @@
 
 - Allow storing scalar arrays under 'c' key. ([#836](https://github.com/zarr-developers/VirtualiZarr/pull/836)).
   By [Max Jones](https://github.com/maxrjones)
-- Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
+- Improve ManifestStore.list_dir for arrays and nested groups. ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
   By [Max Jones](https://github.com/maxrjones)
 
 ## v2.2.0 (12th November 2025)
