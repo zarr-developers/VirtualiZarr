@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## v2.3.0 (20th January 2026)
 
 ### New Features
 
