@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## v2.3.0 (20th January 2026)
 
 ### New Features
 
@@ -11,13 +11,19 @@
   ([809](https://github.com/zarr-developers/VirtualiZarr/pull/809)).
   By [Julia Signell](https://github.com/jsignell).
 
+### Internal changes
+
+- Remove the undocumented/unfunctional wrapper of Kerchunk's TIFF parser.
+  ([849](https://github.com/zarr-developers/VirtualiZarr/pull/849)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ## v2.2.1 (17th November 2025)
 
 ### Bug fixes
 
 - Allow storing scalar arrays under 'c' key. ([#836](https://github.com/zarr-developers/VirtualiZarr/pull/836)).
   By [Max Jones](https://github.com/maxrjones)
-- Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
+- Improve ManifestStore.list_dir for arrays and nested groups. ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
   By [Max Jones](https://github.com/maxrjones)
 
 ## v2.2.0 (12th November 2025)
