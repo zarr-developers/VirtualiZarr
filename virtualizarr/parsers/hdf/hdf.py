@@ -8,7 +8,8 @@ from typing import (
 )
 
 import numpy as np
-from obspec_utils import ObjectStoreRegistry, ObstoreReader
+from obspec_utils.registry import ObjectStoreRegistry
+from obspec_utils.obspec import BufferedStoreReader
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -169,7 +170,7 @@ class HDFParser:
         url
             The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
         registry
-            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -177,7 +178,7 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = ObstoreReader(store=store, path=path_in_store)
+        reader = BufferedStoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,

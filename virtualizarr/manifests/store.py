@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
 
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -93,7 +93,7 @@ class ManifestStore(Store):
         Root group of the store.
         Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     registry : ObjectStoreRegistry
-        [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+        [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings

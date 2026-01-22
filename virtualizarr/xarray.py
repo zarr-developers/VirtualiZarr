@@ -15,7 +15,7 @@ from typing import (
 
 import xarray as xr
 import xarray.indexes
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core import dtypes
@@ -59,7 +59,7 @@ def open_virtual_dataset(
         - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
-        An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
         A parser to use for the given data source. For example:
 
@@ -144,7 +144,7 @@ def open_virtual_mfdataset(
     urls
         Same as in [virtualizarr.open_virtual_dataset][]
     registry
-        An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
         Same as in [xarray.open_mfdataset][]
     compat

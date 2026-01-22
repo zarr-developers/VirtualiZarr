@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore, from_url
 
 from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC

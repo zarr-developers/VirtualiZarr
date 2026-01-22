@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pytest
 import xarray as xr
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import HDFParser

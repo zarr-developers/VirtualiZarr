@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset, open_dataset
 from xarray.core.indexes import Index
 

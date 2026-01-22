@@ -1,5 +1,5 @@
 import pytest
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset
 
 from virtualizarr import open_virtual_dataset

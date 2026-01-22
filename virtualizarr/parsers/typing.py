@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
 
@@ -25,7 +25,7 @@ class Parser(Protocol):
         url
             The URL of the input data source (e.g., "s3://bucket/file.nc").
         registry
-            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------

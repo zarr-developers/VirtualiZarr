@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset

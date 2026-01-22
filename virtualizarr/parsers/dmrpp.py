@@ -5,7 +5,8 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils import ObjectStoreRegistry, ObstoreReader
+from obspec_utils.registry import ObjectStoreRegistry
+from obspec_utils.obspec import BufferedStoreReader
 from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
@@ -53,7 +54,7 @@ class DMRPPParser:
         url
             The URL of the input DMR++ file (e.g., "s3://bucket/file.dmrpp").
         registry
-            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -61,7 +62,7 @@ class DMRPPParser:
             A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = ObstoreReader(store=store, path=path_in_store)
+        reader = BufferedStoreReader(store=store, path=path_in_store)
         file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore, ObjectStore, from_url
 
 from virtualizarr.parsers import HDFParser

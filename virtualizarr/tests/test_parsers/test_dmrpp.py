@@ -6,7 +6,7 @@ from xml.etree import ElementTree as ET
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from packaging import version
 
 from virtualizarr.parsers import DMRPPParser, HDFParser

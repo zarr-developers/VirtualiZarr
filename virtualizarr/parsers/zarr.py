@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import zarr
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV3Metadata
@@ -486,7 +486,7 @@ class ZarrParser:
             - HTTP/HTTPS: "https://example.com/store.zarr"
 
         registry : ObjectStoreRegistry
-            An [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] for
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
             resolving urls and reading data.
 
         Returns

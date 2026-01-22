@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import obstore as obs
 import pytest
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import MemoryStore
 from zarr.abc.store import (
     OffsetByteRequest,
