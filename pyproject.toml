@@ -103,6 +103,7 @@ upstream = [
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+    'virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff',
 ]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
