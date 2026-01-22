@@ -36,7 +36,7 @@ First, import the necessary functions and classes:
 import icechunk
 import obstore
 
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.parsers import HDFParser

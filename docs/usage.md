@@ -24,7 +24,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     bucket = "s3://nex-gddp-cmip6"
     path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
@@ -42,7 +42,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     bucket = "gs://data-bucket"
     path = "file-path/data.nc"
@@ -56,7 +56,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     ```python
     import xarray as xr
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
     from obstore.store import from_url
 
 
@@ -77,7 +77,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     import xarray as xr
     from obstore.store import from_url
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser
@@ -96,7 +96,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     import xarray as xr
     from obstore.store import S3Store
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser
@@ -124,7 +124,7 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     import xarray as xr
     from obstore.store import LocalStore
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser

@@ -66,7 +66,7 @@ No - you can simply open the Kerchunk-formatted references you already have into
 
 ```python
 from obstore.store import LocalStore
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser

@@ -30,7 +30,7 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
 
     ```python exec="on" source="material-block" session="migration" result="code"
     from obstore.store import S3Store
-    from obspec_utils import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers import HDFParser
@@ -57,7 +57,7 @@ for reading the original data, but some parsers may accept an empty [ObjectStore
 
 
 from obstore.store import LocalStore
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
@@ -122,7 +122,7 @@ can load data using the [ManifestStore][virtualizarr.manifests.ManifestStore] vi
 ```python exec="on" source="material-block" session="migration" result="code"
 import xarray as xr
 from obstore.store import S3Store
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.parsers import HDFParser
 

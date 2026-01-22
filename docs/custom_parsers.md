@@ -12,7 +12,7 @@ This is advanced material intended for 3rd-party developers, and assumes you hav
 All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
 
 ```python
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
 
@@ -235,7 +235,7 @@ For example we could test the ability of VirtualiZarr's in-built [`HDFParser`][v
 
 ```python
 import xarray.testing as xrt
-from obspec_utils import ObjectStoreRegistry
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
 
 from virtualizarr.parsers import HDFParser
