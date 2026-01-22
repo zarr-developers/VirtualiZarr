@@ -9,7 +9,7 @@ This is advanced material intended for 3rd-party developers, and assumes you hav
 
 ## What is a VirtualiZarr parser?
 
-All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][obspec_utils.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
+All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
 
 ```python
 from obspec_utils import ObjectStoreRegistry
