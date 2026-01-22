@@ -8,8 +8,8 @@ from typing import (
 )
 
 import numpy as np
+from obspec_utils.obspec import ParallelStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
-from obspec_utils.obspec import BufferedStoreReader
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -92,7 +92,7 @@ def _construct_manifest_array(
 
 def _construct_manifest_group(
     filepath: str,
-    reader: ObstoreReader,
+    reader: ParallelStoreReader,
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
@@ -178,7 +178,7 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = BufferedStoreReader(store=store, path=path_in_store)
+        reader = ParallelStoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,
