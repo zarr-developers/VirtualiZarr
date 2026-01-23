@@ -8,10 +8,14 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
-from xarray import Dataset, open_dataset
+from xarray import Dataset, open_dataset, open_datatree
 from xarray.core.indexes import Index
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr import (
+    open_virtual_dataset,
+    open_virtual_datatree,
+    open_virtual_mfdataset,
+)
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
 from virtualizarr.registry import ObjectStoreRegistry
@@ -654,6 +658,91 @@ class TestOpenVirtualDatasetHDFGroup:
             assert list(vds.variables) == ["bar"]
             assert isinstance(vds["bar"].data, ManifestArray)
             assert vds["bar"].shape == (2,)
+
+    def test_open_virtual_datatree_raises(
+        self, netcdf4_file_with_data_in_multiple_groups, local_registry
+    ):
+        parser = HDFParser()
+        with pytest.raises(
+            ValueError, match="group '/subgroup' is not aligned with its parents"
+        ):
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_multiple_groups,
+                registry=local_registry,
+                parser=parser,
+            )
+
+    def test_open_virtual_datatree(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with (
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+            ) as vdt,
+            open_datatree(
+                netcdf4_file_with_data_in_sibling_groups, engine="h5netcdf"
+            ) as dt,
+        ):
+            vdt.isomorphic(dt)
+            assert list(vdt["/subgroup1"].variables) == ["foo"]
+            assert isinstance(vdt["/subgroup1"]["foo"].data, ManifestArray)
+            assert vdt["/subgroup1"]["foo"].shape == (3,)
+            assert list(vdt["/subgroup2"].variables) == ["bar", "x"]
+            assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+            assert isinstance(vdt["/subgroup2"]["x"].data, np.ndarray)
+            assert vdt["/subgroup2"]["bar"].shape == (2,)
+            assert vdt["/subgroup2"]["x"].shape == (2,)
+
+    def test_open_virtual_datatree_no_vars_loaded(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with (
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+                loadable_variables=[],
+            ) as vdt,
+            open_datatree(
+                netcdf4_file_with_data_in_sibling_groups, engine="h5netcdf"
+            ) as dt,
+        ):
+            vdt.isomorphic(dt)
+            assert list(vdt["/subgroup1"].variables) == ["foo"]
+            assert isinstance(vdt["/subgroup1"]["foo"].data, ManifestArray)
+            assert vdt["/subgroup1"]["foo"].shape == (3,)
+            assert list(vdt["/subgroup2"].variables) == ["bar", "x"]
+            assert isinstance(vdt["/subgroup2"]["bar"].data, ManifestArray)
+            assert isinstance(vdt["/subgroup2"]["x"].data, ManifestArray)
+            assert vdt["/subgroup2"]["bar"].shape == (2,)
+            assert vdt["/subgroup2"]["x"].shape == (2,)
+
+    def test_open_virtual_datatree_all_vars_loaded(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with pytest.raises(
+            NotImplementedError,
+            match=r"Only `loadable_variables=\[\]` or `loadable_variables=None` are supported, got loadable_variables",
+        ):
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+                loadable_variables=["foo", "bar"],
+            )
+
+    def test_open_virtual_datatree_drop_vars(
+        self, netcdf4_file_with_data_in_sibling_groups, local_registry
+    ):
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            open_virtual_datatree(
+                url=netcdf4_file_with_data_in_sibling_groups,
+                registry=local_registry,
+                parser=HDFParser(),
+                drop_variables=["foo"],
+            )
 
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(

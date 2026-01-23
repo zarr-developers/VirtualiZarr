@@ -4,7 +4,11 @@ from virtualizarr.accessor import (
     VirtualiZarrDatasetAccessor,
     VirtualiZarrDataTreeAccessor,
 )
-from virtualizarr.xarray import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr.xarray import (
+    open_virtual_dataset,
+    open_virtual_datatree,
+    open_virtual_mfdataset,
+)
 
 try:
     __version__ = _version("virtualizarr")
@@ -18,4 +22,5 @@ __all__ = [
     "VirtualiZarrDataTreeAccessor",
     "open_virtual_dataset",
     "open_virtual_mfdataset",
+    "open_virtual_datatree",
 ]
