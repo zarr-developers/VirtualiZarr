@@ -97,7 +97,7 @@ upstream = [
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
     'zarr @ git+https://github.com/zarr-developers/zarr-python',
-    'obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils@parallel-reader',
+    'obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     's3fs @ git+https://github.com/fsspec/s3fs',
