@@ -4,12 +4,20 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Iterable,
 )
 
 import numpy as np
-from obspec_utils.obspec import EagerStoreReader
+from obspec_utils.obspec import (
+    ParallelStoreReader,
+    ReadableFile,
+    ReadableStore,
+)
 from obspec_utils.registry import ObjectStoreRegistry
+
+# Type alias for reader factories
+ReaderFactory = Callable[[ReadableStore, str], ReadableFile]
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -92,7 +100,7 @@ def _construct_manifest_array(
 
 def _construct_manifest_group(
     filepath: str,
-    reader: EagerStoreReader,
+    reader: ReadableFile,
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
@@ -140,6 +148,7 @@ class HDFParser:
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
+        reader_factory: ReaderFactory = ParallelStoreReader,
     ):
         """
         Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
@@ -152,9 +161,15 @@ class HDFParser:
         drop_variables
             Variables in the file that will be ignored when creating the ManifestStore
             (default: `None`, do not ignore any variables).
+        reader_factory
+            A callable that creates a file-like reader from a store and path.
+            Must return an object implementing the
+            [ReadableFile][obspec_utils.obspec.ReadableFile] protocol.
+            Default is [ParallelStoreReader][obspec_utils.obspec.ParallelStoreReader].
         """
         self.group = group
         self.drop_variables = drop_variables
+        self.reader_factory = reader_factory
 
     def __call__(
         self,
@@ -178,7 +193,7 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = EagerStoreReader(store=store, path=path_in_store)
+        reader = self.reader_factory(store, path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,
