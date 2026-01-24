@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "virtualizarr @ git+https://github.com/maxrjones/VirtualiZarr@obspec-utils-readablefile-protocol",
+#     "virtualizarr @ git+https://github.com/zarr-developers/VirtualiZarr@main",
 #     "obstore",
 #     "obspec-utils",
 #     "xarray",
