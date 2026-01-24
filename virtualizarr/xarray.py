@@ -193,7 +193,7 @@ def open_virtual_dataset(
         - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
-        An [ObjectStoreRegistry][obsec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
         A parser to use for the given data source. For example:
 

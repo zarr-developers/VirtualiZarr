@@ -37,6 +37,8 @@
 
   - Added `obspec_utils>=0.4.0` as a required dependency. This package provides the `ObjectStoreRegistry` and `EagerStoreReader` classes that were previously part of VirtualiZarr.
 
+  - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
+
   - The HDF parser now uses `EagerStoreReader` from `obspec_utils` with optimized 16 MB request sizes for improved performance when reading file metadata.
 
 ## v2.3.0 (20th January 2026)
