@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
+from obspec_utils.obspec import ReadableFile, ReadableStore
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
+
+# Type alias for reader factories
+ReaderFactory = Callable[[ReadableStore, str], ReadableFile]
 
 
 @runtime_checkable

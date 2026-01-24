@@ -4,7 +4,6 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Callable,
     Iterable,
 )
 
@@ -12,12 +11,8 @@ import numpy as np
 from obspec_utils.obspec import (
     ParallelStoreReader,
     ReadableFile,
-    ReadableStore,
 )
 from obspec_utils.registry import ObjectStoreRegistry
-
-# Type alias for reader factories
-ReaderFactory = Callable[[ReadableStore, str], ReadableFile]
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -29,6 +24,7 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
+from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
 from virtualizarr.utils import soft_import
