@@ -57,7 +57,7 @@ class KerchunkJSONParser:
 
         # we need the whole thing so just get the entire contents in one request
         resp = store.get(path_after_prefix)
-        content = resp.bytes().to_bytes()
+        content = memoryview(resp.buffer()).tobytes()
         refs = ujson.loads(content)
 
         manifestgroup = manifestgroup_from_kerchunk_refs(

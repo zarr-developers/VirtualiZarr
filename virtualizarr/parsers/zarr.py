@@ -511,7 +511,7 @@ class ZarrParser:
         """
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
-        zarr_store = ObjectStore(store=object_store)
+        zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
         manifest_group = asyncio.run(
             _construct_manifest_group(
                 store=zarr_store,

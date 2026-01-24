@@ -340,7 +340,7 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_re
 
 def test_parse_dict_via_memorystore(array_v3_metadata):
     # generate some example kerchunk references
-    refs: dict = gen_ds_refs()
+    refs = gen_ds_refs()
 
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", ujson.dumps(refs).encode())

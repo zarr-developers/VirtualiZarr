@@ -5,9 +5,8 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils.obspec import BufferedStoreReader
+from obspec_utils.obspec import BufferedStoreReader, ReadableStore
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import ObjectStore
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -139,7 +138,7 @@ class DMRParser:
 
     def parse_dataset(
         self,
-        object_store: ObjectStore,
+        object_store: ReadableStore,
         group: str | None = None,
     ) -> ManifestStore:
         """
