@@ -1,6 +1,20 @@
 # Release notes
 
-## v2.4.0 (unreleased)
+## vX.Y.Z+1 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+## v2.4.0 (24th January 2026)
+
+This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
 
 ### New Features
 
