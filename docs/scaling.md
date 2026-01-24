@@ -219,6 +219,62 @@ All of these approaches will put your memory requirements somewhere in between t
 Generally if you have access only to a limited amount of RAM you want to avoid caching to avoid running out of memory, whereas if you are able to scale out across many workers (e.g. serverlessly using lithops) your job will complete faster if you cache the files.
 Caching a file onto a worker requires that the memory available on that worker is greater than the size of the file.
 
+#### Using obspec-utils store wrappers
+
+The [obspec-utils](https://github.com/virtual-zarr/obspec-utils) library provides two store wrappers that can significantly improve performance when virtualizing remote files:
+
+1. **`SplittingReadableStore`**: Accelerates downloading large files by splitting a single `get()` request into multiple parallel `get_ranges()` calls. This takes advantage of cloud storage's high per-request bandwidth.
+
+2. **`CachingReadableStore`**: Caches entire files in memory after first access. Subsequent accesses (including range requests) are served from the cache. Uses LRU eviction when the cache exceeds its maximum size.
+
+These wrappers compose together in a pipeline:
+
+```python
+from obstore.store import from_url
+from obspec_utils.cache import CachingReadableStore
+from obspec_utils.splitting import SplittingReadableStore
+from virtualizarr.registry import ObjectStoreRegistry
+import virtualizarr as vz
+
+# Create the base store
+bucket = "s3://noaa-goes16"
+base_store = from_url(bucket, region="us-east-1", skip_signature=True)
+
+# Wrap with SplittingReadableStore for parallel fetching
+# (splits large files into parallel range requests)
+splitting_store = SplittingReadableStore(base_store)
+
+# Wrap with CachingReadableStore to cache fetched files
+# (default max_size is 256 MB)
+caching_store = CachingReadableStore(splitting_store, max_size=512 * 1024 * 1024)
+
+# Create the registry with the wrapped store
+registry = ObjectStoreRegistry({bucket: caching_store})
+
+# Now virtualize - the file will be fetched quickly via parallel requests
+# and cached for reuse during metadata parsing
+vds = vz.open_virtual_dataset(url, registry=registry, parser=vz.parsers.HDFParser())
+```
+
+The data flow is:
+
+```
+VirtualiZarr reads metadata
+    -> CachingReadableStore (cache miss, forwards request)
+        -> SplittingReadableStore (parallel fetch)
+            -> S3 (multiple concurrent range requests)
+        <- Reassembled file data
+    <- Cached for subsequent reads
+<- Metadata extracted from cached data
+```
+
+!!! note
+    **Thread Safety**: `CachingReadableStore` is thread-safe and works correctly with `ThreadPoolExecutor`.
+
+    **Distributed Limitations**: The cache is local to each process. In distributed settings (Dask distributed, ProcessPoolExecutor, Lithops), each worker maintains its own independent cache. This is typically acceptable when workloads are partitioned by file (each worker processes different files).
+
+See the [GOES-16 example](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes_with_caching_stores.py) for a complete working example.
+
 ### Batching
 
 You don't need to create and write virtual references for all your files in one go.
