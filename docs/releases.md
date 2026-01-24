@@ -1,5 +1,44 @@
 # Release notes
 
+## v2.4.0 (unreleased)
+
+### Breaking changes
+
+- Move ObjectStoreRegistry and Reader functionality to obspec_utils .
+  ([844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
+  By [Max Jones](https://github.com/maxrjones).
+  - `ObjectStoreRegistry` has moved from `virtualizarr.registry` to `obspec_utils.registry`. The old import path still works but emits a `DeprecationWarning` and will be removed in a future release.
+
+    **Before:**
+    ```python
+    from virtualizarr.registry import ObjectStoreRegistry
+    ```
+
+    **After:**
+    ```python
+    from obspec_utils.registry import ObjectStoreRegistry
+    ```
+
+  - `ObstoreReader` has been removed from `virtualizarr.utils`. Use `EagerStoreReader` from `obspec_utils.obspec` instead.
+
+    **Before:**
+    ```python
+    from virtualizarr.utils import ObstoreReader
+
+    reader = ObstoreReader(store=store, path=path)
+    ```
+
+    **After:**
+    ```python
+    from obspec_utils.obspec import EagerStoreReader
+
+    reader = EagerStoreReader(store=store, path=path)
+    ```
+
+  - Added `obspec_utils>=0.4.0` as a required dependency. This package provides the `ObjectStoreRegistry` and `EagerStoreReader` classes that were previously part of VirtualiZarr.
+
+  - The HDF parser now uses `EagerStoreReader` from `obspec_utils` with optimized 16 MB request sizes for improved performance when reading file metadata.
+
 ## v2.3.0 (20th January 2026)
 
 ### New Features

@@ -96,7 +96,7 @@ def open_virtual_datatree(
     from obstore.store import S3Store
 
     from virtualizarr import open_virtual_datatree
-    from virtualizarr.registry import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
     from virtual_tiff import VirtualTIFF
 
     # Access a public Sentinel-2 COG from AWS
@@ -116,7 +116,7 @@ def open_virtual_datatree(
 
     from virtualizarr import open_virtual_datatree
     from virtualizarr.parsers import HDFParser
-    from virtualizarr.registry import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     base = "https://github.com"
     url = f"{base}/pydata/xarray-data/raw/refs/heads/master/precipitation.nc4"
@@ -193,7 +193,7 @@ def open_virtual_dataset(
         - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
-        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obsec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
         A parser to use for the given data source. For example:
 
