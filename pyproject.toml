@@ -28,7 +28,8 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.1.0",
-    "obstore>=0.5.1",
+    "obstore>=0.7.0",
+    "obspec_utils>=0.7.0",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -96,6 +97,7 @@ upstream = [
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
     'zarr @ git+https://github.com/zarr-developers/zarr-python',
+    'obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     's3fs @ git+https://github.com/fsspec/s3fs',
@@ -179,7 +181,7 @@ xarray = "==2025.6.0"
 numpy = "==2.0.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
-obstore = "==0.5.1"
+obstore = "==0.7.0"
 icechunk = "==1.1.2"
 
 # Define commands to run within the test environments

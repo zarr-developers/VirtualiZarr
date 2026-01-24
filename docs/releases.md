@@ -1,5 +1,24 @@
 # Release notes
 
+## v2.4.0 (unreleased)
+
+### New Features
+
+- Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
+  ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Breaking changes
+
+- Move ObjectStoreRegistry and Reader functionality to obspec_utils
+  ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
+  By [Max Jones](https://github.com/maxrjones).
+
+    - `ObjectStoreRegistry` has moved from `virtualizarr.registry` to `obspec_utils.registry`. The old import path still works but emits a `DeprecationWarning` and will be removed in a future release.
+    - `ObstoreReader` has been removed from `virtualizarr.utils`. This should not break user's code, as it was not part of the public/documented API. See [obspec_utils](https://obspec-utils.readthedocs.io/en/latest/api/obspec/) for public file handlers.
+    - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
+    - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
+
 ## v2.3.0 (20th January 2026)
 
 ### New Features

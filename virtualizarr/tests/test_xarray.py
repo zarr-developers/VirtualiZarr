@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset, open_dataset, open_datatree
 from xarray.core.indexes import Index
 
@@ -18,7 +19,6 @@ from virtualizarr import (
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_dask,
     requires_hdf5plugin,

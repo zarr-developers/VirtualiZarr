@@ -6,11 +6,11 @@ from xml.etree import ElementTree as ET
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils.registry import ObjectStoreRegistry
 from packaging import version
 
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.parsers.dmrpp import DMRParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_network, slow_test
 from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset

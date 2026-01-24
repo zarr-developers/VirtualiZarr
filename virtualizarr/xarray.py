@@ -15,6 +15,7 @@ from typing import (
 
 import xarray as xr
 import xarray.indexes
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import DataArray, Dataset, Index, combine_by_coords
 from xarray.backends.common import _find_absolute_paths
 from xarray.core import dtypes
@@ -25,7 +26,6 @@ from virtualizarr.manifests import ManifestArray, ManifestGroup, ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
-from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -58,7 +58,7 @@ def open_virtual_datatree(
         - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
-        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
         A parser to use for the given data source. For example:
 
@@ -96,7 +96,7 @@ def open_virtual_datatree(
     from obstore.store import S3Store
 
     from virtualizarr import open_virtual_datatree
-    from virtualizarr.registry import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
     from virtual_tiff import VirtualTIFF
 
     # Access a public Sentinel-2 COG from AWS
@@ -116,7 +116,7 @@ def open_virtual_datatree(
 
     from virtualizarr import open_virtual_datatree
     from virtualizarr.parsers import HDFParser
-    from virtualizarr.registry import ObjectStoreRegistry
+    from obspec_utils.registry import ObjectStoreRegistry
 
     base = "https://github.com"
     url = f"{base}/pydata/xarray-data/raw/refs/heads/master/precipitation.nc4"
@@ -193,7 +193,7 @@ def open_virtual_dataset(
         - `url="s3://my-bucket/my-project/my-data.nc"` for a remote data source on an S3 compatible cloud.
 
     registry
-        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     parser
         A parser to use for the given data source. For example:
 
@@ -279,7 +279,7 @@ def open_virtual_mfdataset(
     urls
         Same as in [virtualizarr.open_virtual_dataset][]
     registry
-        An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+        An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
     concat_dim
         Same as in [xarray.open_mfdataset][]
     compat

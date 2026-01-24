@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
 from urllib.parse import urlparse
 
+from obspec_utils.registry import ObjectStoreRegistry
 from zarr.abc.store import (
     ByteRequest,
     OffsetByteRequest,
@@ -18,7 +19,6 @@ from zarr.core.common import BytesLike
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import parse_manifest_index
-from virtualizarr.registry import ObjectStoreRegistry
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -93,7 +93,7 @@ class ManifestStore(Store):
         Root group of the store.
         Contains group metadata, [ManifestArrays][virtualizarr.manifests.ManifestArray], and any subgroups.
     registry : ObjectStoreRegistry
-        [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
+        [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that maps the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
         allowing ManifestStores to read from different ObjectStore instances.
 
     Warnings
