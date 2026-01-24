@@ -5,7 +5,7 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils.obspec import BufferedStoreReader, ReadableStore
+from obspec_utils.obspec import EagerStoreReader, ReadableStore
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
@@ -61,7 +61,7 @@ class DMRPPParser:
             A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = BufferedStoreReader(store=store, path=path_in_store)
+        reader = EagerStoreReader(store=store, path=path_in_store)
         file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 

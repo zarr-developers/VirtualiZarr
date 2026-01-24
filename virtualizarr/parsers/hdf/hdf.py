@@ -178,9 +178,7 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = EagerStoreReader(
-            store=store, path=path_in_store, chunk_size=16 * 1024 * 1024
-        )  # Read entire file, using 16 MB requests
+        reader = EagerStoreReader(store=store, path=path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,
