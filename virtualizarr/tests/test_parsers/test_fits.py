@@ -1,9 +1,9 @@
 import pytest
+from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import FITSParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import requires_kerchunk, requires_network
 from virtualizarr.tests.utils import obstore_s3
 

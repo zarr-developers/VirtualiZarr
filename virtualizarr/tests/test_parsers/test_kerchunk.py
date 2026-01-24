@@ -7,6 +7,7 @@ import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -14,7 +15,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
-from virtualizarr.registry import ObjectStoreRegistry, UrlKey
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.xarray import open_virtual_dataset
 
@@ -340,7 +340,7 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_re
 
 def test_parse_dict_via_memorystore(array_v3_metadata):
     # generate some example kerchunk references
-    refs: dict = gen_ds_refs()
+    refs = gen_ds_refs()
 
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", ujson.dumps(refs).encode())
@@ -350,7 +350,6 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     manifeststore = parser("memory:///refs.json", registry=registry)
 
     assert isinstance(manifeststore, ManifestStore)
-    assert manifeststore._registry.map[UrlKey("memory", "")].store == memory_store
 
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(

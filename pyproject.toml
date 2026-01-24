@@ -28,7 +28,8 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.1.0",
-    "obstore>=0.5.1",
+    "obstore>=0.7.0",
+    "obspec_utils>=0.7.0",
 ]
 
 # Dependency sets under optional-dependencies are available via PyPI
@@ -60,6 +61,9 @@ fits = [
     "kerchunk>=0.2.8",
     "astropy",
 ]
+tiff = [
+    "virtual-tiff",
+]
 kerchunk_parquet = [
    "virtualizarr[remote]",
    "fastparquet",
@@ -71,6 +75,7 @@ all_parsers = [
     "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
     "virtualizarr[kerchunk_parquet]",
+    "virtualizarr[tiff]",
 ]
 
 # writers
@@ -92,11 +97,13 @@ upstream = [
     'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
     'ujson @ git+https://github.com/ultrajson/ultrajson',
     'zarr @ git+https://github.com/zarr-developers/zarr-python',
+    'obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils',
     # optional dependencies
     'astropy @ git+https://github.com/astropy/astropy',
     's3fs @ git+https://github.com/fsspec/s3fs',
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
+    'virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff',
 ]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
@@ -174,7 +181,7 @@ xarray = "==2025.6.0"
 numpy = "==2.0.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
-obstore = "==0.5.1"
+obstore = "==0.7.0"
 icechunk = "==1.1.2"
 
 # Define commands to run within the test environments
@@ -193,14 +200,14 @@ run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py313"]
-test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py312", "minio"]
-minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "minimum-versions"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
+test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py312"] # test against python 3.12
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py312", "minio"]
+minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "tiff", "hdf5-lib", "minimum-versions"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py313"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "all_parsers", "all_writers", "py313"]
-docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "py313"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py313"]
+docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]

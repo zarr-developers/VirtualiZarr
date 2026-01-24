@@ -65,10 +65,11 @@ In general once the Icechunk specification reaches a stable v1.0, we would recom
 No - you can simply open the Kerchunk-formatted references you already have into VirtualiZarr directly. Then you can manipulate them, or re-save them into a new format, such as  [Icechunk](https://icechunk.io/):
 
 ```python
-from virtualizarr import open_virtual_dataset
-from virtualizarr.registry import ObjectStoreRegistry
-from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from obstore.store import LocalStore
+from obspec_utils.registry import ObjectStoreRegistry
+
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 
 project_dir="/Users/user/project-dir"
 project_url=f"file://{project_dir}"
@@ -128,7 +129,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | **Generation of references from archival files (1)**                     |                                                                                                                                     |                                                                                                                                                  |
 | From a netCDF4/HDF5 file                                                 | `kerchunk.hdf.SingleHdf5ToZarr`                                                                                                     | `open_virtual_dataset(..., parser=HDFParser())`                                                            |
 | From a netCDF3 file                                                      | `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                                    | `open_virtual_dataset(..., parser=NetCDF3Parser())`, via `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                     |
-| From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=TIFFParser())`, via `kerchunk.tiff.tiff_to_zarr` or potentially `tifffile` (❌ Not yet implemented - see [issue #291](https://github.com/zarr-developers/VirtualiZarr/issues/291))                                                               |
+| From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=VirtualTIFF())`, via [virtual_tiff](https://github.com/virtual-zarr/virtual-tiff)                                                              |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())` (❌ Not yet implemented - see [issue #262](https://github.com/zarr-developers/VirtualiZarr/issues/262))                                                                                       |
 | From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |

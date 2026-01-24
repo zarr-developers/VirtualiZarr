@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
 from xarray.core.variable import Variable
 
@@ -18,7 +19,6 @@ from xarray.core.variable import Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.utils import ceildiv
 
 
@@ -211,6 +211,17 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
     ds1.to_netcdf(filepath)
     ds2 = xr.DataArray([4, 5], name="bar").to_dataset()
     ds2.to_netcdf(filepath, group="subgroup", mode="a")
+    return str(filepath)
+
+
+@pytest.fixture
+def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path) -> str:
+    """Create a NetCDF4 file with data in sibling groups."""
+    filepath = tmp_path / "test.nc"
+    ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
+    ds1.to_netcdf(filepath, group="subgroup1")
+    ds2 = xr.DataArray([4, 5], coords={"x": [0, 1]}, dims="x", name="bar").to_dataset()
+    ds2.to_netcdf(filepath, group="subgroup2", mode="a")
     return str(filepath)
 
 

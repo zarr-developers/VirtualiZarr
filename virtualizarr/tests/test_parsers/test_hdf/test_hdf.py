@@ -2,11 +2,12 @@ import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -129,11 +130,28 @@ class TestManifestGroupFromHDF:
         manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
         assert len(manifest_store._group.arrays) == 3
 
-    def test_nested_groups_are_ignored(self, nested_group_hdf5_url):
+    def test_nested_groups_are_ignored_when_group_is_specificed(
+        self, nested_group_hdf5_url
+    ):
         manifest_store = manifest_store_from_hdf_url(
             nested_group_hdf5_url, group="group"
         )
         assert len(manifest_store._group.arrays) == 1
+
+    def test_nested_groups_are_detected(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(nested_group_hdf5_url)
+        assert len(manifest_store._group["group"]["nested_group"].arrays) == 1
+
+    def test_nested_data(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(nested_group_hdf5_url)
+        z = zarr.open_group(manifest_store, mode="r", zarr_format=3)
+
+        with h5py.File(nested_group_hdf5_url.removeprefix("file://"), mode="r") as f:
+            np.testing.assert_array_equal(f["group"]["data"], z["group"]["data"][...])
+            np.testing.assert_array_equal(
+                f["group"]["nested_group"]["data"][...],
+                z["group"]["nested_group"]["data"][...],
+            )
 
     def test_drop_variables(self, multiple_datasets_hdf5_url, local_registry):
         parser = HDFParser(drop_variables=["data2"])

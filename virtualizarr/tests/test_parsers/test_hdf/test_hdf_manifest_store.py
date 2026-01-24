@@ -4,10 +4,10 @@ from urllib.parse import urlparse
 import numpy as np
 import pytest
 import xarray as xr
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_minio,
@@ -39,6 +39,22 @@ class TestHDFManifestStore:
         manifest_store = manifest_store_from_hdf_url(url)
         with xr.open_dataset(
             manifest_store, engine="zarr", consolidated=False, zarr_format=3
+        ) as rountripped_ds:
+            xr.testing.assert_allclose(basic_ds, rountripped_ds)
+
+    def test_roundtrip_simple_virtualdataset_guess_zarr_format(self, tmpdir, basic_ds):
+        """
+        Roundtrip a dataset to/from NetCDF with the HDF reader and ManifestStore, relying
+        on xarray/zarr to guess the zarr format and unconsolidated store metadata.
+        """
+
+        filepath = f"{tmpdir}/basic_ds_roundtrip.nc"
+        url = f"file://{filepath}"
+        basic_ds.to_netcdf(filepath, engine="h5netcdf")
+        manifest_store = manifest_store_from_hdf_url(url)
+        with xr.open_dataset(
+            manifest_store,
+            engine="zarr",
         ) as rountripped_ds:
             xr.testing.assert_allclose(basic_ds, rountripped_ds)
 
