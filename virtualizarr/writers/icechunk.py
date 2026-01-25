@@ -468,27 +468,27 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
-    from icechunk import VirtualChunkSpec
+    import pyarrow as pa
 
     if group.name == "/":
         key_prefix = arr_name
     else:
         key_prefix = f"{group.name}/{arr_name}"
 
-    # loop over every reference in the ChunkManifest for that array
-    # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
-    # but Icechunk need to expose a suitable API first
-    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
+    # Convert manifest arrays to PyArrow arrays (zero-copy where possible)
+    # Flatten in C-order to match how icechunk iterates over chunk grid
+    locations = pa.array(manifest._paths.ravel())
+    offsets = pa.array(manifest._offsets.ravel(), type=pa.uint64())
+    lengths = pa.array(manifest._lengths.ravel(), type=pa.uint64())
 
-    it = np.nditer(
-        [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
-        flags=[
-            "refs_ok",
-            "multi_index",
-            "c_index",
-        ],
-        op_flags=[["readonly"]] * 3,  # type: ignore
-    )
+    # Compute chunk grid offset for append operations
+    if append_axis is not None and existing_num_chunks is not None:
+        arr_offset = tuple(
+            existing_num_chunks if axis == append_axis else 0
+            for axis in range(len(manifest.shape_chunk_grid))
+        )
+    else:
+        arr_offset = None
 
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
@@ -498,20 +498,13 @@ def write_manifest_virtual_refs(
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
-    virtual_chunk_spec_list = [
-        VirtualChunkSpec(
-            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
-            location=path.item(),
-            offset=offset.item(),
-            length=length.item(),
-            last_updated_at_checksum=last_updated_at,
-        )
-        for path, offset, length in it
-        if path
-    ]
-
-    store.set_virtual_refs(
+    store.set_virtual_refs_arr(
         array_path=key_prefix,
-        chunks=virtual_chunk_spec_list,
+        chunk_grid_shape=manifest.shape_chunk_grid,
+        locations=locations,
+        offsets=offsets,
+        lengths=lengths,
+        checksum=last_updated_at,
+        arr_offset=arr_offset,
         validate_containers=False,  # we already validated these before setting any refs
     )

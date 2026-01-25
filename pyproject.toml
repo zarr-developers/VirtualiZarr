@@ -81,6 +81,7 @@ all_parsers = [
 # writers
 icechunk = [
     "icechunk>=1.1.2",
+    "pyarrow",
 ]
 kerchunk = ["fastparquet"]
 
