@@ -4,9 +4,8 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
-import pyarrow as pa
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
@@ -295,6 +294,7 @@ def write_virtual_dataset_to_icechunk_group(
         )
 
     # Then write the virtual variables to the same group
+    # TODO concurrently write using async version of icechunk method
     for name, var in virtual_variables.items():
         write_virtual_variable_to_icechunk(
             store=store,
@@ -379,9 +379,6 @@ def write_virtual_variable_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from zarr import Array
-
-    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
@@ -449,7 +446,12 @@ def write_manifest_virtual_refs(
     existing_num_chunks: Optional[int] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
-    """Write all the virtual references for one array manifest at once."""
+    """
+    Write all the virtual references for one array manifest at once.
+
+    Uses pyarrow to pass the manifests to icechunk with minimal copying.
+    """
+    import pyarrow as pa
 
     if group.name == "/":
         key_prefix = arr_name
