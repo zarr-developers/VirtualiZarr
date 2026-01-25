@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
 
-import numpy as np
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
+import pyarrow as pa
 
 from virtualizarr.codecs import get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -440,24 +440,6 @@ def write_virtual_variable_to_icechunk(
     )
 
 
-def generate_chunk_key(
-    index: tuple[int, ...],
-    append_axis: Optional[int] = None,
-    existing_num_chunks: Optional[int] = None,
-) -> list[int]:
-    if append_axis and append_axis >= len(index):
-        raise ValueError(
-            f"append_axis {append_axis} is greater than the number of indices {len(index)}"
-        )
-
-    return [
-        ind + existing_num_chunks
-        if axis is append_axis and existing_num_chunks is not None
-        else ind
-        for axis, ind in enumerate(index)
-    ]
-
-
 def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: "Group",
@@ -468,7 +450,6 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
-    import pyarrow as pa
 
     if group.name == "/":
         key_prefix = arr_name
