@@ -109,6 +109,7 @@ def virtual_dataset_to_icechunk(
 
     store_path = StorePath(store, path=group or "")
 
+    # TODO move this to where it can benefit from being done using pyarrow
     if validate_containers:
         validate_virtual_chunk_containers(store.session.config, [vds])
 
@@ -248,8 +249,7 @@ def validate_virtual_chunk_containers(
 
     # check all refs against existing virtual chunk containers
     for marr in manifestarrays:
-        # TODO this loop over every virtual reference is likely inefficient in python,
-        # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
+        # TODO use pyarrow.compute.startwith instead
         for ref in marr.manifest._paths.flat:
             if ref:
                 validate_single_ref(ref, supported_prefixes)
