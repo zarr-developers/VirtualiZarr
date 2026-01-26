@@ -464,7 +464,7 @@ def write_manifest_virtual_refs(
     # so we convert to a Python list first
     import time
     t0 = time.perf_counter()
-    locations = pa.array(manifest._paths.ravel().tolist())
+    locations = pa.array(manifest._paths.ravel())
     t1 = time.perf_counter()
     offsets = pa.array(manifest._offsets.ravel(), type=pa.uint64())
     lengths = pa.array(manifest._lengths.ravel(), type=pa.uint64())
