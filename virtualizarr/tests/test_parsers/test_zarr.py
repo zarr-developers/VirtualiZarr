@@ -272,6 +272,10 @@ def test_v2_metadata_with_dimensions():
         "float64",
         "bool",
         "U10",
+        "datetime64[s]",
+        "timedelta64[s]",
+        "S10",
+        "V10",
     ],
 )
 def test_v2_metadata_with_none_fill_value(dtype):
