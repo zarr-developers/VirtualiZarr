@@ -463,13 +463,14 @@ def write_manifest_virtual_refs(
     # Note: manifest._paths uses numpy StringDType which PyArrow doesn't support,
     # so we convert to a Python list first
     import time
+
     t0 = time.perf_counter()
     locations = pa.array(manifest._paths.ravel().tolist())
     t1 = time.perf_counter()
     offsets = pa.array(manifest._offsets.ravel(), type=pa.uint64())
     lengths = pa.array(manifest._lengths.ravel(), type=pa.uint64())
     t2 = time.perf_counter()
-    print(f"  [DEBUG] paths->pyarrow: {t1-t0:.2f}s, offsets+lengths: {t2-t1:.2f}s")
+    print(f"  [DEBUG] paths->pyarrow: {t1 - t0:.2f}s, offsets+lengths: {t2 - t1:.2f}s")
 
     # Compute chunk grid offset for append operations
     if append_axis is not None and existing_num_chunks is not None:
@@ -500,4 +501,4 @@ def write_manifest_virtual_refs(
         validate_containers=False,  # we already validated these before setting any refs
     )
     t4 = time.perf_counter()
-    print(f"  [DEBUG] set_virtual_refs_arr: {t4-t3:.2f}s")
+    print(f"  [DEBUG] set_virtual_refs_arr: {t4 - t3:.2f}s")
