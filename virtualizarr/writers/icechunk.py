@@ -464,8 +464,11 @@ def write_manifest_virtual_refs(
     # so we convert to a Python list first
     import time
 
+    # TODO currently we are still passing empty chunk locations (which virtualizarr stores with url="") to icechunk - can we avoid that somehow?
+
     t0 = time.perf_counter()
-    # Ideally we would avoid creating this python list here
+    # TODO: Ideally we would avoid creating this python list here
+    # I think we could do pa.array(iter(manifest._paths.ravel()), size=...)
     locations = pa.array(manifest._paths.ravel().tolist())
     t1 = time.perf_counter()
     offsets = pa.array(manifest._offsets.ravel(), type=pa.uint64())
