@@ -80,8 +80,9 @@ all_parsers = [
 
 # writers
 icechunk = [
+    # TODO this will need to become icehunk 2.0 for passing arrow arrays
     "icechunk>=1.1.2",
-    "pyarrow",
+    "pyarrow>=23.0.0",
 ]
 kerchunk = ["fastparquet"]
 
