@@ -36,9 +36,10 @@ First, import the necessary functions and classes:
 import icechunk
 import obstore
 
+from obspec_utils.registry import ObjectStoreRegistry
+
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 ```
 
 Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
@@ -67,7 +68,7 @@ path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_s
 store = obstore.store.from_url(bucket, region="us-west-2", skip_signature=True)
 ```
 
-We also need to create an [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] that
+We also need to create an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that
 maps the URL structure to the ObjectStore.
 
 ```python exec="on" source="above" session="homepage"

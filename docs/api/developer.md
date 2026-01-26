@@ -15,9 +15,8 @@ See the page on data structures for more information.
 
 ## Registry
 
-::: virtualizarr.registry.Url
-[Urls][virtualizarr.registry.Url] should be parseable by [urllib.parse.urlparse][].
-::: virtualizarr.registry.ObjectStoreRegistry
+... note
+    `virtualizarr.registry.ObjectStoreRegistry has been deprecated. Please use [obspec_utils.registry.ObjectStoreRegistry][] instead.
 
 ## Array API
 

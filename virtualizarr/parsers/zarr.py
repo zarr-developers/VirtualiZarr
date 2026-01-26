@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import zarr
+from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.dtype import parse_dtype
 from zarr.core.group import GroupMetadata
@@ -20,7 +21,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
 if TYPE_CHECKING:
@@ -478,7 +478,7 @@ class ZarrParser:
             - HTTP/HTTPS: "https://example.com/store.zarr"
 
         registry : ObjectStoreRegistry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
             resolving urls and reading data.
 
         Returns
@@ -503,7 +503,7 @@ class ZarrParser:
         """
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
-        zarr_store = ObjectStore(store=object_store)
+        zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
         manifest_group = asyncio.run(
             _construct_manifest_group(
                 store=zarr_store,

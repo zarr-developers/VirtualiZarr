@@ -5,9 +5,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from obspec_utils.registry import ObjectStoreRegistry
+
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types.kerchunk import (
     KerchunkStoreRefs,
 )
@@ -68,7 +69,7 @@ class KerchunkParquetParser:
         url
             The URL of the input parquet directory (e.g., "s3://bucket/my-kerchunk-references.parq").
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
