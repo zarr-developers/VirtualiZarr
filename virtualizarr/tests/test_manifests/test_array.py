@@ -131,6 +131,39 @@ class TestEquals:
         assert result.all()
 
 
+class TestAstype:
+    def test_astype_same_dtype(self, manifest_array):
+        """Test that astype with the same dtype returns self."""
+        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32"))
+        result = marr.astype(np.dtype("int32"))
+        assert result is marr
+
+    def test_astype_string_upcast(self, manifest_array):
+        """Test that astype allows string dtype upcasting (e.g., <U16 to <U)."""
+        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("<U16"))
+        # np.dtype("<U") is the generic unicode type without length specification
+        result = marr.astype(np.dtype("<U"))
+        assert result is marr
+
+    def test_astype_bytes_upcast(self, manifest_array):
+        """Test that astype allows bytes dtype upcasting (e.g., |S1 to |S)."""
+        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("|S1"))
+        result = marr.astype(np.dtype("|S"))
+        assert result is marr
+
+    def test_astype_incompatible_dtype_raises(self, manifest_array):
+        """Test that astype with incompatible dtype raises NotImplementedError."""
+        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32"))
+        with pytest.raises(NotImplementedError):
+            marr.astype(np.dtype("float64"))
+
+    def test_astype_string_to_int_raises(self, manifest_array):
+        """Test that astype from string to int raises NotImplementedError."""
+        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("<U16"))
+        with pytest.raises(NotImplementedError):
+            marr.astype(np.dtype("int32"))
+
+
 class TestBroadcast:
     def test_broadcast_existing_axis(self, manifest_array):
         marr = manifest_array(shape=(1, 2), chunks=(1, 2))
