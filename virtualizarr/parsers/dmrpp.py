@@ -1,11 +1,12 @@
 import io
 import warnings
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils.obspec import EagerStoreReader, ReadableStore
+from obspec import Get, GetRanges, Head
+from obspec_utils.readers import EagerStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
@@ -20,6 +21,18 @@ from virtualizarr.types import ChunkKey
 
 
 class DMRPPParser:
+    """Parser for OPeNDAP DMR++ XML files."""
+
+    class Store(Get, GetRanges, Head, Protocol):
+        """
+        Store protocol required by DMRPPParser.
+
+        DMRPPParser uses EagerStoreReader which requires Get + GetRanges + Head
+        protocols to fetch the DMR++ XML file efficiently using parallel requests.
+        """
+
+        pass
+
     def __init__(
         self,
         group: str | None = None,
@@ -42,10 +55,10 @@ class DMRPPParser:
     def __call__(
         self,
         url: str,
-        registry: ObjectStoreRegistry,
+        registry: ObjectStoreRegistry["DMRPPParser.Store"],
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given DMR++ file to product a
+        Parse the metadata and byte offsets from a given DMR++ file to produce a
         VirtualiZarr ManifestStore.
 
         Parameters
@@ -53,7 +66,10 @@ class DMRPPParser:
         url
             The URL of the input DMR++ file (e.g., "s3://bucket/file.dmrpp").
         registry
-            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
+            resolving urls and reading data. The registry must contain stores that
+            implement the [DMRPPParser.Store][virtualizarr.parsers.dmrpp.DMRPPParser.Store]
+            protocol (Get + GetRanges + Head).
 
         Returns
         -------
@@ -138,7 +154,7 @@ class DMRParser:
 
     def parse_dataset(
         self,
-        object_store: ReadableStore,
+        object_store: Get,
         group: str | None = None,
     ) -> ManifestStore:
         """
@@ -178,7 +194,7 @@ class DMRParser:
             )
 
         manifest_group = self._parse_dataset(dataset_element)
-        registry = ObjectStoreRegistry()
+        registry: ObjectStoreRegistry[Get] = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
 
         return ManifestStore(registry=registry, group=manifest_group)

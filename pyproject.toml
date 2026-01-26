@@ -28,6 +28,7 @@ dependencies = [
     "ujson",
     "packaging",
     "zarr>=3.1.0",
+    "obspec>=0.1.0",
     "obstore>=0.7.0",
     "obspec_utils>=0.8.0",
 ]
