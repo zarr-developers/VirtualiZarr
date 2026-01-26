@@ -134,7 +134,9 @@ class TestEquals:
 class TestAstype:
     def test_astype_same_dtype(self, manifest_array):
         """Test that astype with the same dtype returns self."""
-        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32"))
+        marr = manifest_array(
+            shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32")
+        )
         result = marr.astype(np.dtype("int32"))
         assert result is marr
 
@@ -153,7 +155,9 @@ class TestAstype:
 
     def test_astype_incompatible_dtype_raises(self, manifest_array):
         """Test that astype with incompatible dtype raises NotImplementedError."""
-        marr = manifest_array(shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32"))
+        marr = manifest_array(
+            shape=(5, 10), chunks=(5, 10), data_type=np.dtype("int32")
+        )
         with pytest.raises(NotImplementedError):
             marr.astype(np.dtype("float64"))
 
