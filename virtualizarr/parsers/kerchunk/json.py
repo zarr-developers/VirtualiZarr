@@ -1,6 +1,8 @@
 from collections.abc import Iterable
+from typing import Protocol
 
 import ujson
+from obspec import Get
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
@@ -8,6 +10,18 @@ from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk
 
 
 class KerchunkJSONParser:
+    """Parser for Kerchunk JSON reference files."""
+
+    class Store(Get, Protocol):
+        """
+        Store protocol required by KerchunkJSONParser.
+
+        KerchunkJSONParser only needs to fetch the entire JSON file, so it
+        requires only the Get protocol from obspec.
+        """
+
+        pass
+
     def __init__(
         self,
         group: str | None = None,
@@ -35,7 +49,7 @@ class KerchunkJSONParser:
     def __call__(
         self,
         url: str,
-        registry: ObjectStoreRegistry,
+        registry: ObjectStoreRegistry["KerchunkJSONParser.Store"],
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given Kerchunk JSON to produce a
@@ -46,7 +60,10 @@ class KerchunkJSONParser:
         url
             The URL of the input Kerchunk JSON (e.g., "s3://bucket/kerchunk.json").
         registry
-            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
+            resolving urls and reading data. The registry must contain stores that
+            implement the [KerchunkJSONParser.Store][virtualizarr.parsers.kerchunk.json.KerchunkJSONParser.Store]
+            protocol (Get operation).
 
         Returns
         -------

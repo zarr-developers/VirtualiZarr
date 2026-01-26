@@ -231,8 +231,7 @@ These wrappers compose together in a pipeline:
 
 ```python
 from obstore.store import from_url
-from obspec_utils.cache import CachingReadableStore
-from obspec_utils.splitting import SplittingReadableStore
+from obspec_utils.wrappers import CachingReadableStore, SplittingReadableStore
 from virtualizarr.registry import ObjectStoreRegistry
 import virtualizarr as vz
 

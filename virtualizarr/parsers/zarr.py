@@ -4,9 +4,10 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import zarr
+from obspec import Get, Head, HeadAsync, List, ListAsync
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.group import GroupMetadata
@@ -445,6 +446,18 @@ class ZarrParser:
     virtualizarr.open_virtual_dataset : High-level function for opening virtual datasets.
     """
 
+    class Store(Get, List, ListAsync, Head, HeadAsync, Protocol):
+        """
+        Store protocol required by ZarrParser.
+
+        ZarrParser needs listing capabilities to discover chunks and head/size
+        operations to determine chunk sizes. This protocol composes the minimal
+        obspec protocols required. Get is included as it's the base protocol
+        required by ObjectStoreRegistry.
+        """
+
+        pass
+
     def __init__(
         self,
         group: str | None = None,
@@ -468,7 +481,7 @@ class ZarrParser:
     def __call__(
         self,
         url: str,
-        registry: ObjectStoreRegistry,
+        registry: ObjectStoreRegistry[ZarrParser.Store],
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given Zarr store to produce a
@@ -485,9 +498,11 @@ class ZarrParser:
             - Azure Blob Storage: "az://container/path/to/store.zarr"
             - HTTP/HTTPS: "https://example.com/store.zarr"
 
-        registry : ObjectStoreRegistry
+        registry : ObjectStoreRegistry[ZarrParser.Store]
             An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
-            resolving urls and reading data.
+            resolving urls and reading data. The registry must contain stores that
+            implement the [ZarrParser.Store][virtualizarr.parsers.zarr.ZarrParser.Store]
+            protocol (List + Head operations).
 
         Returns
         -------

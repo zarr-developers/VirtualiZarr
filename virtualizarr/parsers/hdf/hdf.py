@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Iterable,
+    Protocol,
 )
 
 import numpy as np
-from obspec_utils.obspec import (
-    ParallelStoreReader,
-    ReadableFile,
-)
+from obspec import Get, GetRanges, Head
+from obspec_utils.protocols import ReadableFile
+from obspec_utils.readers import ParallelStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
@@ -140,6 +140,19 @@ def _construct_manifest_group(
 
 
 class HDFParser:
+    """Parser for HDF5 and NetCDF4 files."""
+
+    class Store(Get, GetRanges, Head, Protocol):
+        """
+        Store protocol required by HDFParser (with default ParallelStoreReader).
+
+        HDFParser uses a configurable reader_factory to create file-like readers.
+        The default ParallelStoreReader requires Get + GetRanges + Head protocols.
+        If using a different reader_factory, the store requirements may differ.
+        """
+
+        pass
+
     def __init__(
         self,
         group: str | None = None,
@@ -160,8 +173,9 @@ class HDFParser:
         reader_factory
             A callable that creates a file-like reader from a store and path.
             Must return an object implementing the
-            [ReadableFile][obspec_utils.obspec.ReadableFile] protocol.
-            Default is [ParallelStoreReader][obspec_utils.obspec.ParallelStoreReader].
+            [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
+            Default is [ParallelStoreReader][obspec_utils.readers.ParallelStoreReader],
+            which requires stores implementing Get + GetRanges + Head.
         """
         self.group = group
         self.drop_variables = drop_variables
@@ -170,7 +184,7 @@ class HDFParser:
     def __call__(
         self,
         url: str,
-        registry: ObjectStoreRegistry,
+        registry: ObjectStoreRegistry[HDFParser.Store],
     ) -> ManifestStore:
         """
         Parse the metadata and byte offsets from a given HDF5/NetCDF4 file to produce a VirtualiZarr
@@ -179,9 +193,12 @@ class HDFParser:
         Parameters
         ----------
         url
-            The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
+            The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/file.nc"`).
         registry
-            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for
+            resolving urls and reading data. The registry must contain stores that
+            implement the [HDFParser.Store][virtualizarr.parsers.hdf.hdf.HDFParser.Store]
+            protocol (Get + GetRanges + Head) when using the default ParallelStoreReader.
 
         Returns
         -------

@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from typing import Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
-from obspec_utils.obspec import ReadableFile, ReadableStore
+from obspec_utils.protocols import ReadableFile
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
 
 # Type alias for reader factories
-ReaderFactory = Callable[[ReadableStore, str], ReadableFile]
+# Store type is Any because different readers have different protocol requirements:
+# - BufferedStoreReader needs Get + GetRange
+# - EagerStoreReader needs Get + GetRanges + Head
+# - ParallelStoreReader needs Get + GetRanges + Head
+# Each reader's __init__ declares its specific Store protocol for static type checking.
+# At runtime, missing methods will raise AttributeError when called.
+ReaderFactory = Callable[[Any, str], ReadableFile]
 
 
 @runtime_checkable
