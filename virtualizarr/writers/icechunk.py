@@ -2,23 +2,37 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
 
-import pyarrow as pa
-import pyarrow.compute as pc
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.utils import (
+    check_compatible_encodings,
+    check_same_chunk_shapes,
+    check_same_codecs,
+    check_same_dtypes,
+    check_same_ndims,
+    check_same_shapes_except_on_concat_axis,
+)
+
+if TYPE_CHECKING:
+    import pyarrow as pa
+
+    from icechunk import (
+        IcechunkStore,  # type: ignore[import-not-found]
+        RepositoryConfig,  # type: ignore[import-not-found]
+    )
 
 
 @dataclass(frozen=True)
 class ArrowChunkManifest:
     """Arrow-backed chunk manifest for efficient validation and writing to icechunk."""
 
-    locations: pa.StringArray
-    offsets: pa.UInt64Array
-    lengths: pa.UInt64Array
+    locations: "pa.StringArray"
+    offsets: "pa.UInt64Array"
+    lengths: "pa.UInt64Array"
     shape_chunk_grid: tuple[int, ...]
 
     @classmethod
@@ -27,6 +41,8 @@ class ArrowChunkManifest:
 
         Empty paths (representing missing chunks) are converted to nulls.
         """
+        import pyarrow as pa
+
         n_chunks = len(manifest)
         paths_flat = manifest._paths.ravel()
 
@@ -55,22 +71,6 @@ def _extract_arrow_manifests(vds: xr.Dataset) -> dict[str, ArrowChunkManifest]:
         for name, var in vds.variables.items()
         if isinstance(var.data, ManifestArray)
     }
-
-
-from virtualizarr.manifests.utils import (
-    check_compatible_encodings,
-    check_same_chunk_shapes,
-    check_same_codecs,
-    check_same_dtypes,
-    check_same_ndims,
-    check_same_shapes_except_on_concat_axis,
-)
-
-if TYPE_CHECKING:
-    from icechunk import (
-        IcechunkStore,  # type: ignore[import-not-found]
-        RepositoryConfig,  # type: ignore[import-not-found]
-    )
 
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
@@ -317,9 +317,11 @@ def validate_arrow_manifests(
 
 
 def _validate_locations_pyarrow(
-    locations: pa.StringArray, supported_prefixes: list[str]
+    locations: "pa.StringArray", supported_prefixes: list[str]
 ) -> None:
     """Validate that all non-null locations start with a supported prefix."""
+    import pyarrow.compute as pc
+
     if not supported_prefixes:
         return
 
