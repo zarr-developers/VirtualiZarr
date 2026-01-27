@@ -257,9 +257,7 @@ def test_validate_containers(
     )
 
     # assert that an error is raised when attempting to write to icechunk
-    with pytest.raises(
-        ValueError, match="does not start with any supported prefix"
-    ):
+    with pytest.raises(ValueError, match="does not start with any supported prefix"):
         vds.vz.to_icechunk(icechunk_filestore)
 
     # assert that no uncommitted changes have been written to Icechunk session

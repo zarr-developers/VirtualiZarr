@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from typing import cast, TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, cast
 
 import xarray as xr
 
-from virtualizarr.manifests import ChunkManifest
-from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -39,14 +38,20 @@ class ArrowChunkManifest:
                 paths_flat.tolist(), type=pa.string(), size=n_chunks, mask=null_mask
             ),
             offsets=pa.array(
-                manifest._offsets.ravel(), type=pa.uint64(), size=n_chunks, mask=null_mask
+                manifest._offsets.ravel(),
+                type=pa.uint64(),
+                size=n_chunks,
+                mask=null_mask,
             ),
             lengths=pa.array(
-                manifest._lengths.ravel(), type=pa.uint64(), size=n_chunks, mask=null_mask
+                manifest._lengths.ravel(),
+                type=pa.uint64(),
+                size=n_chunks,
+                mask=null_mask,
             ),
             shape_chunk_grid=manifest.shape_chunk_grid,
         )
-    
+
 
 def extract_arrow_manifests(vds: xr.Dataset) -> dict[str, ArrowChunkManifest]:
     """Extract all manifests from a dataset and convert to Arrow format."""
