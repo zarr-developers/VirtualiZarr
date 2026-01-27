@@ -1,13 +1,12 @@
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
+from typing import TYPE_CHECKING, List, Optional, Union, cast
 
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
 from virtualizarr.codecs import extract_codecs, get_codecs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -16,64 +15,29 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
+from virtualizarr.writers.arrow import (
+    ArrowChunkManifest,
+    extract_arrow_manifests,
+    validate_location_prefixes,
+)
 
 if TYPE_CHECKING:
-    import pyarrow as pa
-
-    from icechunk import (
-        IcechunkStore,  # type: ignore[import-not-found]
-        RepositoryConfig,  # type: ignore[import-not-found]
-    )
-
-
-@dataclass(frozen=True)
-class ArrowChunkManifest:
-    """Arrow-backed chunk manifest for efficient validation and writing to icechunk."""
-
-    locations: "pa.StringArray"
-    offsets: "pa.UInt64Array"
-    lengths: "pa.UInt64Array"
-    shape_chunk_grid: tuple[int, ...]
-
-    @classmethod
-    def from_manifest(cls, manifest: ChunkManifest) -> "ArrowChunkManifest":
-        """Convert a ChunkManifest to Arrow arrays.
-
-        Empty paths (representing missing chunks) are converted to nulls.
-        """
-        import pyarrow as pa
-
-        n_chunks = len(manifest)
-        paths_flat = manifest._paths.ravel()
-
-        # Create null mask from empty strings (True = null)
-        null_mask = paths_flat == ""
-
-        # Create arrays with mask applied during construction (no extra copies)
-        return cls(
-            locations=pa.array(
-                paths_flat.tolist(), type=pa.string(), size=n_chunks, mask=null_mask
-            ),
-            offsets=pa.array(
-                manifest._offsets.ravel(), type=pa.uint64(), size=n_chunks, mask=null_mask
-            ),
-            lengths=pa.array(
-                manifest._lengths.ravel(), type=pa.uint64(), size=n_chunks, mask=null_mask
-            ),
-            shape_chunk_grid=manifest.shape_chunk_grid,
-        )
-
-
-def _extract_arrow_manifests(vds: xr.Dataset) -> dict[str, ArrowChunkManifest]:
-    """Extract all manifests from a dataset and convert to Arrow format."""
-    return {
-        name: ArrowChunkManifest.from_manifest(cast(ManifestArray, var.data).manifest)
-        for name, var in vds.variables.items()
-        if isinstance(var.data, ManifestArray)
-    }
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+
+
+def _get_chunk_container_prefixes(store: "IcechunkStore") -> list[str]:
+    """Extract the virtual chunk container prefixes from an icechunk store's config."""
+    config = store.session.config
+
+    # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers
+    # (see https://github.com/earth-mover/icechunk/issues/1168)
+    if config.virtual_chunk_containers is None:
+        raise ValueError("No Virtual Chunk Containers set")
+
+    return list(config.virtual_chunk_containers.keys())
 
 
 def virtual_dataset_to_icechunk(
@@ -160,11 +124,14 @@ def virtual_dataset_to_icechunk(
     store_path = StorePath(store, path=group or "")
 
     # Convert all manifests to Arrow format upfront (for efficient validation and writing)
-    arrow_manifests = _extract_arrow_manifests(vds)
+    arrow_manifests = extract_arrow_manifests(vds)
 
     # Validate all manifests before writing any
     if validate_containers:
-        validate_arrow_manifests(store.session.config, arrow_manifests.values())
+        supported_prefixes = _get_chunk_container_prefixes(store)
+        validate_location_prefixes(
+            arrow_manifests.values(), valid_prefixes=supported_prefixes
+        )
 
     if append_dim:
         group_object = Group.open(store=store_path, zarr_format=3)
@@ -263,7 +230,7 @@ def virtual_datatree_to_icechunk(
 
     # Convert all manifests to Arrow format upfront (for efficient validation and writing)
     all_arrow_manifests = [
-        (store_path, vds, _extract_arrow_manifests(vds))
+        (store_path, vds, extract_arrow_manifests(vds))
         for store_path, vds in paths_and_virtual_datasets
     ]
 
@@ -274,7 +241,8 @@ def virtual_datatree_to_icechunk(
             for _, _, arrow_manifests in all_arrow_manifests
             for manifest in arrow_manifests.values()
         ]
-        validate_arrow_manifests(store.session.config, all_manifests)
+        supported_prefixes = _get_chunk_container_prefixes(store)
+        validate_location_prefixes(all_manifests, supported_prefixes)
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
     for store_path, vds, arrow_manifests in all_arrow_manifests:
@@ -286,61 +254,6 @@ def virtual_datatree_to_icechunk(
             group=group,
             arrow_manifests=arrow_manifests,
             last_updated_at=last_updated_at,
-        )
-
-
-# TODO ideally I would be able to just call some Icechunk API to do this (see https://github.com/earth-mover/icechunk/issues/1167)
-def validate_arrow_manifests(
-    config: "RepositoryConfig", arrow_manifests: Iterable[ArrowChunkManifest]
-) -> None:
-    """
-    Validate that all virtual refs have corresponding virtual chunk containers.
-
-    Uses PyArrow compute for efficient validation of large manifests.
-    """
-    arrow_manifests = list(arrow_manifests)
-
-    # get the prefixes of all virtual chunk containers
-    if config.virtual_chunk_containers is None:
-        # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers (see https://github.com/earth-mover/icechunk/issues/1168)
-        supported_prefixes: list[str] = []
-    else:
-        supported_prefixes = list(config.virtual_chunk_containers.keys())
-
-    # fastpath for common case that no virtual chunk containers have been set
-    if arrow_manifests and not supported_prefixes:
-        raise ValueError("No Virtual Chunk Containers set")
-
-    # validate all manifests using PyArrow compute
-    for manifest in arrow_manifests:
-        _validate_locations_pyarrow(manifest.locations, supported_prefixes)
-
-
-def _validate_locations_pyarrow(
-    locations: "pa.StringArray", supported_prefixes: list[str]
-) -> None:
-    """Validate that all non-null locations start with a supported prefix."""
-    import pyarrow.compute as pc
-
-    if not supported_prefixes:
-        return
-
-    # Build a mask of locations that match at least one prefix
-    # Nulls (missing chunks) become null in the result and are skipped
-    matches = pc.starts_with(locations, supported_prefixes[0])
-    for prefix in supported_prefixes[1:]:
-        matches = pc.or_(matches, pc.starts_with(locations, prefix))
-
-    # Check if all non-null locations match at least one prefix
-    all_match = pc.all(matches, skip_nulls=True)
-    if all_match.is_valid and not all_match.as_py():
-        # Find first invalid location to report in error
-        invalid = pc.invert(pc.fill_null(matches, True))
-        invalid_indices = pc.indices_nonzero(invalid)
-        first_invalid_idx = invalid_indices[0].as_py()
-        invalid_location = locations[first_invalid_idx].as_py()
-        raise ValueError(
-            f"No Virtual Chunk Container set which supports prefix of path {invalid_location}"
         )
 
 
