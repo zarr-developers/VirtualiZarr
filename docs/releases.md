@@ -8,6 +8,10 @@
 
 ### Bug fixes
 
+- Fix setting `fill_value` for Zarr V2 arrays if data type is a subtype of integer or float.
+  ([#845](https://github.com/zarr-developers/VirtualiZarr/pull/845)).
+  By [Hauke Schulz](https://github.com/observingClouds).
+
 ### Documentation
 
 ### Internal changes
