@@ -178,7 +178,7 @@ class DMRParser:
             )
 
         manifest_group = self._parse_dataset(dataset_element)
-        registry = ObjectStoreRegistry()
+        registry: ObjectStoreRegistry = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
 
         return ManifestStore(registry=registry, group=manifest_group)
