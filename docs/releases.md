@@ -6,6 +6,8 @@
 
 ### Breaking changes
 
+- Minimum required version of `obspec_utils` is now `0.9.0`.
+
 ### Bug fixes
 
 - Fix setting `fill_value` for Zarr V2 arrays if data type is a subtype of integer or float.
@@ -16,6 +18,7 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Raise clearer error when kerchunk references have malformed codec specifications.
   ([#864](https://github.com/zarr-developers/VirtualiZarr/pull/864)).
+- Fixed warnings caused by outdated imports from `obspec_utils` ([#863](https://github.com/zarr-developers/VirtualiZarr/pull/863)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation

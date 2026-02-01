@@ -5,7 +5,8 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obspec_utils.obspec import EagerStoreReader, ReadableStore
+from obspec_utils.protocols import ReadableStore
+from obspec_utils.readers import EagerStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
