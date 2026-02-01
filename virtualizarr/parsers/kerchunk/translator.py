@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import cast
-import math
 
 import numpy as np
 import ujson
@@ -227,7 +227,9 @@ def chunkentry_from_kerchunk(
     from upath import UPath
 
     if not isinstance(path_and_byte_range_info, list):
-        raise TypeError(f"Malformed Kerchunk chunk reference found. Expected JSON to deserialize to a list, but got type {type(path_and_byte_range_info)}")
+        raise TypeError(
+            f"Malformed Kerchunk chunk reference found. Expected JSON to deserialize to a list, but got type {type(path_and_byte_range_info)}"
+        )
 
     if len(path_and_byte_range_info) == 1:
         path = path_and_byte_range_info[0]
@@ -244,7 +246,9 @@ def chunkentry_from_kerchunk(
                 offset = 0
                 length = 0
             else:
-                raise TypeError(f"Malformed Kerchunk chunk reference found. The JSON found deserialized to a single-element list, and hence expected element to be a string, but found value {path}, of type {type(path)}")
+                raise TypeError(
+                    f"Malformed Kerchunk chunk reference found. The JSON found deserialized to a single-element list, and hence expected element to be a string, but found value {path}, of type {type(path)}"
+                )
 
     else:
         path, offset, length = path_and_byte_range_info
