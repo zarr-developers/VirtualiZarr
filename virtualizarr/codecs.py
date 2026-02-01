@@ -25,7 +25,9 @@ def zarr_codec_config_to_v3(num_codec: dict) -> dict:
     Convert a numcodecs codec into a zarr v3 configurable.
     """
     if not isinstance(num_codec, dict):
-        raise TypeError(f"Expected codec config to be a dict, but got value {num_codec} of type {type(num_codec)}")
+        raise TypeError(
+            f"Expected codec config to be a dict, but got value {num_codec} of type {type(num_codec)}"
+        )
 
     # TODO: Special case Blosc codec
     if num_codec["id"].startswith("numcodecs."):
