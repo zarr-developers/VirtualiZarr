@@ -142,6 +142,19 @@ def test_empty_chunk_manifest(refs_file_factory, local_registry):
         assert vds["a"].chunksizes == {"x": 50, "y": 100}
 
 
+def test_null_chunk_reference_treated_as_missing():
+    """Test that a kerchunk chunk reference containing NaN (from JSON null) is treated as missing."""
+    from virtualizarr.parsers.kerchunk.translator import chunkentry_from_kerchunk
+
+    # In kerchunk parquet format, a JSON null in the chunk reference deserializes to NaN
+    # This should be interpreted as a missing/uninitialized chunk
+    chunk_entry = chunkentry_from_kerchunk([float("nan")])
+
+    assert chunk_entry["path"] == ""
+    assert chunk_entry["offset"] == 0
+    assert chunk_entry["length"] == 0
+
+
 def test_handle_relative_paths(refs_file_factory, local_registry):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
