@@ -8,8 +8,8 @@ from typing import (
 )
 
 import numpy as np
-from obspec_utils.readers import BlockStoreReader
 from obspec_utils.protocols import ReadableFile
+from obspec_utils.readers import BlockStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
