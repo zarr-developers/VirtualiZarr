@@ -215,7 +215,7 @@ def manifest_from_kerchunk_chunk_dict(
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
 
-    chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
+        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
     return ChunkManifest(entries=chunk_entries)
 
 
