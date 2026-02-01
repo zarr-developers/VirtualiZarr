@@ -356,6 +356,31 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_re
             pass
 
 
+@requires_kerchunk
+@pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
+def test_notimplemented_read_inline_refs_parquet(
+    tmp_path, netcdf4_inlined_ref, local_registry
+):
+    # Test that parquet references with inlined data raise NotImplementedError
+    # https://github.com/zarr-developers/VirtualiZarr/issues/489
+    from kerchunk.df import refs_to_dataframe
+
+    ref_filepath = tmp_path / "ref.parquet"
+    refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
+
+    parser = KerchunkParquetParser()
+    with pytest.raises(
+        NotImplementedError,
+        match="Reading inlined reference data is currently not supported",
+    ):
+        with open_virtual_dataset(
+            url=ref_filepath.as_posix(),
+            registry=local_registry,
+            parser=parser,
+        ) as _:
+            pass
+
+
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
 def test_skip_variables(refs_file_factory, skip_variables, local_registry):
     refs_file = refs_file_factory()
