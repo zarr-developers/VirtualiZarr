@@ -54,9 +54,9 @@ Run this example with uv:
 
 import time
 
-from obspec_utils.wrappers import CachingReadableStore, SplittingReadableStore
 from obspec_utils.readers import BufferedStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
+from obspec_utils.wrappers import CachingReadableStore, SplittingReadableStore
 from obstore.store import from_url
 
 import virtualizarr as vz
