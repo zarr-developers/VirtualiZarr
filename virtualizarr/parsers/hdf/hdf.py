@@ -8,10 +8,8 @@ from typing import (
 )
 
 import numpy as np
-from obspec_utils.obspec import (
-    ParallelStoreReader,
-    ReadableFile,
-)
+from obspec_utils.readers import BlockStoreReader
+from obspec_utils.protocols import ReadableFile
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
@@ -144,7 +142,7 @@ class HDFParser:
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        reader_factory: ReaderFactory = ParallelStoreReader,
+        reader_factory: ReaderFactory = BlockStoreReader,
     ):
         """
         Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
@@ -161,7 +159,7 @@ class HDFParser:
             A callable that creates a file-like reader from a store and path.
             Must return an object implementing the
             [ReadableFile][obspec_utils.obspec.ReadableFile] protocol.
-            Default is [ParallelStoreReader][obspec_utils.obspec.ParallelStoreReader].
+            Default is [BlockStoreReader][obspec_utils.obspec.BlockStoreReader].
         """
         self.group = group
         self.drop_variables = drop_variables
