@@ -155,6 +155,48 @@ def test_null_chunk_reference_treated_as_missing():
     assert chunk_entry["length"] == 0
 
 
+@requires_kerchunk
+@pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
+def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
+    """
+    Integration test: kerchunk parquet with sparse chunks (some missing) should work.
+
+    This tests reading a kerchunk parquet where not all chunks are present,
+    which is a common case for sparse arrays.
+    """
+    from kerchunk.df import refs_to_dataframe
+
+    # Create refs with only one chunk defined (sparse array)
+    refs = {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":0,"filters":null,"order":"C","shape":[4,3],"zarr_format":2}',
+            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            "a/0.0": ["/test1.nc", 6144, 48],
+            # a/1.0 is intentionally missing - sparse array
+        },
+    }
+
+    ref_filepath = tmp_path / "sparse.parq"
+    refs_to_dataframe(fo=refs, url=str(ref_filepath))
+
+    parser = KerchunkParquetParser()
+    with open_virtual_dataset(
+        url=str(ref_filepath),
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        assert "a" in vds.variables
+        manifest = vds["a"].data.manifest.dict()
+        # Chunk 0.0 should have valid reference
+        assert manifest["0.0"]["path"] == "file:///test1.nc"
+        assert manifest["0.0"]["offset"] == 6144
+        assert manifest["0.0"]["length"] == 48
+        # Chunk 1.0 is not in manifest (sparse array - missing chunks omitted)
+        assert "1.0" not in manifest
+
+
 def test_handle_relative_paths(refs_file_factory, local_registry):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
