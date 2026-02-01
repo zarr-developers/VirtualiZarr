@@ -158,8 +158,8 @@ class HDFParser:
         reader_factory
             A callable that creates a file-like reader from a store and path.
             Must return an object implementing the
-            [ReadableFile][obspec_utils.obspec.ReadableFile] protocol.
-            Default is [BlockStoreReader][obspec_utils.obspec.BlockStoreReader].
+            [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
+            Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
         """
         self.group = group
         self.drop_variables = drop_variables
