@@ -316,7 +316,7 @@ def test_notimplemented_read_inline_refs_parquet(
     parser = KerchunkParquetParser()
     with pytest.raises(
         NotImplementedError,
-        match="contains inlined chunk data",
+        match="Reading inlined reference data is currently not supported",
     ):
         with open_virtual_dataset(
             url=ref_filepath.as_posix(),
