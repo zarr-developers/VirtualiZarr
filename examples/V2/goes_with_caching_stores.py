@@ -55,7 +55,7 @@ Run this example with uv:
 import time
 
 from obspec_utils.cache import CachingReadableStore
-from obspec_utils.obspec import BufferedStoreReader
+from obspec_utils.readers import BufferedStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 from obspec_utils.splitting import SplittingReadableStore
 from obstore.store import from_url
