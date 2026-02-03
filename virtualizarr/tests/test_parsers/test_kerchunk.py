@@ -7,6 +7,7 @@ import pytest
 import ujson
 import xarray as xr
 import xarray.testing as xrt
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -14,7 +15,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
-from virtualizarr.registry import ObjectStoreRegistry, UrlKey
 from virtualizarr.tests import has_fastparquet, requires_kerchunk
 from virtualizarr.xarray import open_virtual_dataset
 
@@ -140,6 +140,61 @@ def test_empty_chunk_manifest(refs_file_factory, local_registry):
         assert isinstance(vds["a"].data, ManifestArray)
         assert vds["a"].sizes == {"x": 100, "y": 200}
         assert vds["a"].chunksizes == {"x": 50, "y": 100}
+
+
+def test_null_chunk_reference_treated_as_missing():
+    """Test that a kerchunk chunk reference containing NaN (from JSON null) is treated as missing."""
+    from virtualizarr.parsers.kerchunk.translator import chunkentry_from_kerchunk
+
+    # In kerchunk parquet format, a JSON null in the chunk reference deserializes to NaN
+    # This should be interpreted as a missing/uninitialized chunk
+    chunk_entry = chunkentry_from_kerchunk([float("nan")])
+
+    assert chunk_entry["path"] == ""
+    assert chunk_entry["offset"] == 0
+    assert chunk_entry["length"] == 0
+
+
+@requires_kerchunk
+@pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
+def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
+    """
+    Integration test: kerchunk parquet with sparse chunks (some missing) should work.
+
+    This tests reading a kerchunk parquet where not all chunks are present,
+    which is a common case for sparse arrays.
+    """
+    from kerchunk.df import refs_to_dataframe
+
+    # Create refs with only one chunk defined (sparse array)
+    refs = {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            "a/.zarray": '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":0,"filters":null,"order":"C","shape":[4,3],"zarr_format":2}',
+            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            "a/0.0": ["/test1.nc", 6144, 48],
+            # a/1.0 is intentionally missing - sparse array
+        },
+    }
+
+    ref_filepath = tmp_path / "sparse.parq"
+    refs_to_dataframe(fo=refs, url=str(ref_filepath))
+
+    parser = KerchunkParquetParser()
+    with open_virtual_dataset(
+        url=str(ref_filepath),
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        assert "a" in vds.variables
+        manifest = vds["a"].data.manifest.dict()
+        # Chunk 0.0 should have valid reference
+        assert manifest["0.0"]["path"] == "file:///test1.nc"
+        assert manifest["0.0"]["offset"] == 6144
+        assert manifest["0.0"]["length"] == 48
+        # Chunk 1.0 is not in manifest (sparse array - missing chunks omitted)
+        assert "1.0" not in manifest
 
 
 def test_handle_relative_paths(refs_file_factory, local_registry):
@@ -301,6 +356,31 @@ def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_re
             pass
 
 
+@requires_kerchunk
+@pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
+def test_notimplemented_read_inline_refs_parquet(
+    tmp_path, netcdf4_inlined_ref, local_registry
+):
+    # Test that parquet references with inlined data raise NotImplementedError
+    # https://github.com/zarr-developers/VirtualiZarr/issues/489
+    from kerchunk.df import refs_to_dataframe
+
+    ref_filepath = tmp_path / "ref.parquet"
+    refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
+
+    parser = KerchunkParquetParser()
+    with pytest.raises(
+        NotImplementedError,
+        match="Reading inlined reference data is currently not supported",
+    ):
+        with open_virtual_dataset(
+            url=ref_filepath.as_posix(),
+            registry=local_registry,
+            parser=parser,
+        ) as _:
+            pass
+
+
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
 def test_skip_variables(refs_file_factory, skip_variables, local_registry):
     refs_file = refs_file_factory()
@@ -340,7 +420,7 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_re
 
 def test_parse_dict_via_memorystore(array_v3_metadata):
     # generate some example kerchunk references
-    refs: dict = gen_ds_refs()
+    refs = gen_ds_refs()
 
     memory_store = obstore.store.MemoryStore()
     memory_store.put("refs.json", ujson.dumps(refs).encode())
@@ -350,7 +430,6 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     manifeststore = parser("memory:///refs.json", registry=registry)
 
     assert isinstance(manifeststore, ManifestStore)
-    assert manifeststore._registry.map[UrlKey("memory", "")].store == memory_store
 
     # assert metadata parsed correctly
     expected_metadata = array_v3_metadata(

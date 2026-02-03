@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
 from packaging import version
 from zarr.api.asynchronous import open_array
@@ -10,7 +11,6 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import build_chunk_manifest, get_metadata, get_strategy
-from virtualizarr.registry import ObjectStoreRegistry
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
@@ -264,7 +264,21 @@ def test_v2_metadata_with_dimensions():
 
 
 @SKIP_OLDER_ZARR_PYTHON
-def test_v2_metadata_with_none_fill_value():
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        "int32",
+        "uint8",
+        "float64",
+        "bool",
+        "U10",
+        "datetime64[s]",
+        "timedelta64[s]",
+        "S10",
+        "V10",
+    ],
+)
+def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
     import asyncio
 
@@ -273,7 +287,7 @@ def test_v2_metadata_with_none_fill_value():
     _ = zarr.create(
         shape=(5, 10),
         chunks=(5, 5),
-        dtype="int32",
+        dtype=dtype,
         store=store,
         zarr_format=2,
         fill_value=None,

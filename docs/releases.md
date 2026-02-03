@@ -1,12 +1,67 @@
 # Release notes
 
-## Unreleased
+## vX.Y.Z+1 (unreleased)
 
 ### New Features
 
+### Breaking changes
+
+- Minimum required version of `obspec_utils` is now `0.9.0`.
+
+### Bug fixes
+
+- Fix setting `fill_value` for Zarr V2 arrays if data type is a subtype of integer or float.
+  ([#845](https://github.com/zarr-developers/VirtualiZarr/pull/845)).
+  By [Hauke Schulz](https://github.com/observingClouds).
+- Fix reading kerchunk parquet references with sparse arrays (missing chunks represented as NULL).
+  ([#864](https://github.com/zarr-developers/VirtualiZarr/pull/864)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Raise clearer error when kerchunk references have malformed codec specifications.
+  ([#864](https://github.com/zarr-developers/VirtualiZarr/pull/864)).
+- Fixed warnings caused by outdated imports from `obspec_utils` ([#863](https://github.com/zarr-developers/VirtualiZarr/pull/863)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+### Internal changes
+
+## v2.4.0 (24th January 2026)
+
+This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
+
+### New Features
+
+- Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
+  ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Breaking changes
+
+- Move ObjectStoreRegistry and Reader functionality to obspec_utils
+  ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
+  By [Max Jones](https://github.com/maxrjones).
+
+    - `ObjectStoreRegistry` has moved from `virtualizarr.registry` to `obspec_utils.registry`. The old import path still works but emits a `DeprecationWarning` and will be removed in a future release.
+    - `ObstoreReader` has been removed from `virtualizarr.utils`. This should not break user's code, as it was not part of the public/documented API. See [obspec_utils](https://obspec-utils.readthedocs.io/en/latest/api/obspec/) for public file handlers.
+    - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
+    - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
+
+## v2.3.0 (20th January 2026)
+
+### New Features
+
+- Implement `open_virtual_datatree`.
+  ([838](https://github.com/zarr-developers/VirtualiZarr/pull/838)).
+  By [Max Jones](https://github.com/maxrjones).
 - Set `supports_consolidated_metadata` property on `ManifestStore` to `False`.
   ([809](https://github.com/zarr-developers/VirtualiZarr/pull/809)).
   By [Julia Signell](https://github.com/jsignell).
+
+### Internal changes
+
+- Remove the undocumented/unfunctional wrapper of Kerchunk's TIFF parser.
+  ([849](https://github.com/zarr-developers/VirtualiZarr/pull/849)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ## v2.2.1 (17th November 2025)
 
@@ -14,7 +69,7 @@
 
 - Allow storing scalar arrays under 'c' key. ([#836](https://github.com/zarr-developers/VirtualiZarr/pull/836)).
   By [Max Jones](https://github.com/maxrjones)
-- Improve ManifestStore.list_dir for arrays and nested groups ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
+- Improve ManifestStore.list_dir for arrays and nested groups. ([#837](https://github.com/zarr-developers/VirtualiZarr/pull/837))
   By [Max Jones](https://github.com/maxrjones)
 
 ## v2.2.0 (12th November 2025)
@@ -61,6 +116,7 @@ Patch release with minor bug fixes for the DMRPParser and Icechunk writing behav
 - Support dtypes without an endianness ([#787](https://github.com/zarr-developers/VirtualiZarr/pull/787)). By [Justus Magin](https://github.com/keewis).
 
 ### Internal changes
+
 - Change default Icechunk writing behavior to not validate or write "empty" chunks ([#791](https://github.com/zarr-developers/VirtualiZarr/pull/791)). By [Sean Harkins](https://github.com/sharkinsspatial).
 
 ## v2.1.1 (14th August 2025)
@@ -145,10 +201,10 @@ Minor release to ensure compatibility with incoming changes to Icechunk.
 - Added [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] function ([#345](https://github.com/zarr-developers/VirtualiZarr/issues/345), [#349](https://github.com/zarr-developers/VirtualiZarr/pull/349)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Added `datatree_to_icechunk` function for writing an `xarray.DataTree` to
-  an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By [Chuck Daniels](https://github.com/chuckwondo).
+  an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)). By [Chuck Daniels](https://github.com/chuckwondo).
 - Added a `.vz` custom accessor to `xarray.DataTree`, exposing the method
   `xarray.DataTree.vz.to_icechunk()` for writing an `xarray.DataTree`
-  to an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)).  By
+  to an Icechunk store ([#244](https://github.com/zarr-developers/VirtualiZarr/issues/244)). By
   [Chuck Daniels](https://github.com/chuckwondo).
 - Added a warning if you attempt to write an entirely non-virtual dataset to a virtual references format ([#657](https://github.com/zarr-developers/VirtualiZarr/pull/657)).
   By [Tom Nicholas](https://github.com/TomNicholas).
@@ -207,16 +263,16 @@ Minor release to ensure compatibility with incoming changes to Icechunk.
 ### Internal Changes
 
 - `ManifestArrays` now internally use [zarr.core.metadata.v3.ArrayV3Metadata](https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/metadata/v3.py). This replaces the `ZArray` class that was previously used to store metadata about manifest arrays. ([#429](https://github.com/zarr-developers/VirtualiZarr/pull/429)) By [Aimee Barciauskas](https://github.com/abarciauskas-bgse). Notable internal changes:
-    - Make zarr-python a required dependency with a minimum version `>=3.0.2`.
-    - Specify a minimum numcodecs version of `>=0.15.1`.
-    - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
-    - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
-      - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see [parse_named_configuration](https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130)) to valid Zarr V3 codec classes.
-    - Parser changes are minimal.
-    - Writer changes:
-      - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
-    - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported ([zarr-python issue #2324](https://github.com/zarr-developers/zarr-python/issues/2324)).
-    - zarr-python 3.0 does not yet support datetime and timedelta data types ([zarr-python issue #2616](https://github.com/zarr-developers/zarr-python/issues/2616)).
+  - Make zarr-python a required dependency with a minimum version `>=3.0.2`.
+  - Specify a minimum numcodecs version of `>=0.15.1`.
+  - When creating a `ManifestArray`, the `metadata` property should be an `zarr.core.metadata.v3.ArrayV3Metadata` object. There is a helper function `create_v3_array_metadata` which should be used, as it has some useful defaults and includes `convert_to_codec_pipeline` (see next bullet).
+  - The function `convert_to_codec_pipeline` ensures the codec pipeline passed to `ArrayV3Metadata` has valid codecs in the expected order (`ArrayArrayCodec`s, `ArrayBytesCodec`, `BytesBytesCodec`s) and includes the required `ArrayBytesCodec` using the default for the data type.
+    - Note: `convert_to_codec_pipeline` uses the zarr-python function `get_codec_class` to convert codec configurations (i.e. `dict`s with a name and configuration key, see [parse_named_configuration](https://github.com/zarr-developers/zarr-python/blob/v3.0.2/src/zarr/core/common.py#L116-L130)) to valid Zarr V3 codec classes.
+  - Parser changes are minimal.
+  - Writer changes:
+    - Kerchunk uses Zarr version format 2 so we convert `ArrayV3Metadata` to `ArrayV2Metadata` using the `convert_v3_to_v2_metadata` function. This means the `to_kerchunk_json` function is now a bit more complex because we're converting `ArrayV2Metadata` filters and compressor to serializable objects.
+  - zarr-python 3.0 does not yet support the big endian data type. This means that FITS and NetCDF-3 are not currently supported ([zarr-python issue #2324](https://github.com/zarr-developers/zarr-python/issues/2324)).
+  - zarr-python 3.0 does not yet support datetime and timedelta data types ([zarr-python issue #2616](https://github.com/zarr-developers/zarr-python/issues/2616)).
 - The continuous integration workflows and developer environment now use [pixi](https://pixi.sh/latest/) ([#407](https://github.com/zarr-developers/VirtualiZarr/pull/407)).
 - Added `loadable_variables` kwarg to `ManifestStore.to_virtual_dataset`.
   ([#543](https://github.com/zarr-developers/VirtualiZarr/pull/543)) By [Tom Nicholas](https://github.com/TomNicholas).
@@ -278,14 +334,14 @@ It also fixes a number of bugs, adds minor features, changes the default reader 
 - Added a `.nbytes` accessor method which displays the bytes needed to hold the virtual references in memory.
   ([#167](https://github.com/zarr-developers/VirtualiZarr/issues/167), [#227](https://github.com/zarr-developers/VirtualiZarr/pull/227)) By [Tom Nicholas](https://github.com/TomNicholas).
 - Upgrade icechunk dependency to `>=0.1.0a12`. ([#406](https://github.com/zarr-developers/VirtualiZarr/pull/406)) By [Julia Signell](https://github.com/jsignell).
-- Sync with Icechunk v0.1.0a8  ([#368](https://github.com/zarr-developers/VirtualiZarr/pull/368)) By [Matthew Iannucci](https://github.com/mpiannucci). This also adds support
+- Sync with Icechunk v0.1.0a8 ([#368](https://github.com/zarr-developers/VirtualiZarr/pull/368)) By [Matthew Iannucci](https://github.com/mpiannucci). This also adds support
   for the `to_icechunk` method to add timestamps as checksums when writing virtual references to an icechunk store. This
   is useful for ensuring that virtual references are not stale when reading from an icechunk store, which can happen if the
   underlying data has changed since the virtual references were written.
 - Add `group=None` keyword-only parameter to the
   `VirtualiZarrDatasetAccessor.to_icechunk` method to allow writing to a nested group
   at a specified group path (rather than defaulting to the root group, when no group is
-  specified).  ([#341](https://github.com/zarr-developers/VirtualiZarr/issues/341)) By [Chuck Daniels](https://github.com/chuckwondo).
+  specified). ([#341](https://github.com/zarr-developers/VirtualiZarr/issues/341)) By [Chuck Daniels](https://github.com/chuckwondo).
 
 ### Breaking changes
 
@@ -298,8 +354,8 @@ It also fixes a number of bugs, adds minor features, changes the default reader 
   ([#18](https://github.com/zarr-developers/VirtualiZarr/issues/18), [#357](https://github.com/zarr-developers/VirtualiZarr/pull/357), [#358](https://github.com/zarr-developers/VirtualiZarr/pull/358)) By [Tom Nicholas](https://github.com/TomNicholas).
 - The `append_dim` and `last_updated_at` parameters of the
   `VirtualiZarrDatasetAccessor.to_icechunk` method are now keyword-only parameters,
-  rather than positional or keyword.  This change is breaking _only_ where arguments for
-  these parameters are currently given positionally.  ([#341](https://github.com/zarr-developers/VirtualiZarr/issues/341)) By
+  rather than positional or keyword. This change is breaking _only_ where arguments for
+  these parameters are currently given positionally. ([#341](https://github.com/zarr-developers/VirtualiZarr/issues/341)) By
   [Chuck Daniels](https://github.com/chuckwondo).
 - The default backend for netCDF4 and HDF5 is now the custom `HDFVirtualBackend` replacing
   the previous default which was a wrapper around the kerchunk backend.
@@ -316,7 +372,7 @@ It also fixes a number of bugs, adds minor features, changes the default reader 
   ([#336](https://github.com/zarr-developers/VirtualiZarr/issues/336), [#338](https://github.com/zarr-developers/VirtualiZarr/pull/338)) By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix bug in HDF reader where dimension names of dimensions in a subgroup would be incorrect.
   ([#364](https://github.com/zarr-developers/VirtualiZarr/issues/364), [#366](https://github.com/zarr-developers/VirtualiZarr/pull/366)) By [Tom Nicholas](https://github.com/TomNicholas).
-- Fix bug in dmrpp reader so _FillValue is included in variables' encodings.
+- Fix bug in dmrpp reader so \_FillValue is included in variables' encodings.
   ([#369](https://github.com/zarr-developers/VirtualiZarr/pull/369)) By [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
 - Fix bug passing arguments to FITS reader, and test it on Hubble Space Telescope data.
   ([#363](https://github.com/zarr-developers/VirtualiZarr/pull/363)) By [Tom Nicholas](https://github.com/TomNicholas).

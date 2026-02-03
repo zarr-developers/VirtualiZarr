@@ -8,6 +8,9 @@ from typing import (
 )
 
 import numpy as np
+from obspec_utils.protocols import ReadableFile
+from obspec_utils.readers import BlockStoreReader
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -19,10 +22,10 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
+from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import ObstoreReader, soft_import
+from virtualizarr.utils import soft_import
 
 h5py = soft_import("h5py", "reading hdf files", strict=False)
 
@@ -91,7 +94,7 @@ def _construct_manifest_array(
 
 def _construct_manifest_group(
     filepath: str,
-    reader: ObstoreReader,
+    reader: ReadableFile,
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
@@ -139,6 +142,7 @@ class HDFParser:
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
+        reader_factory: ReaderFactory = BlockStoreReader,
     ):
         """
         Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
@@ -151,9 +155,15 @@ class HDFParser:
         drop_variables
             Variables in the file that will be ignored when creating the ManifestStore
             (default: `None`, do not ignore any variables).
+        reader_factory
+            A callable that creates a file-like reader from a store and path.
+            Must return an object implementing the
+            [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
+            Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
         """
         self.group = group
         self.drop_variables = drop_variables
+        self.reader_factory = reader_factory
 
     def __call__(
         self,
@@ -169,7 +179,7 @@ class HDFParser:
         url
             The URL of the input HDF5/NetCDF4 file (e.g., `"s3://bucket/store.zarr"`).
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -177,7 +187,7 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = ObstoreReader(store=store, path=path_in_store)
+        reader = self.reader_factory(store, path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,

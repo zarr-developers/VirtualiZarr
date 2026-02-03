@@ -7,7 +7,7 @@ from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
-from virtualizarr.utils import JSON, convert_v3_to_v2_metadata, kerchunk_refs_as_json
+from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json
 
 
 def test_deserialize_to_json():
@@ -21,7 +21,7 @@ def test_deserialize_to_json():
             "a/0.0": ["/test.nc", 6144, 48],
         },
     }
-    json_expected: JSON = {
+    json_expected = {
         "version": 1,
         "refs": {
             ".zgroup": {"zarr_format": 2},

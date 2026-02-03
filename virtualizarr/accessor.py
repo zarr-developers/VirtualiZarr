@@ -7,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     Generator,
-    Iterable,
     Literal,
     overload,
 )
@@ -28,7 +27,6 @@ def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            all_vars: Iterable[xr.Variable]
             match cls_name:
                 case "Dataset":
                     all_vars = self.ds.variables.values()

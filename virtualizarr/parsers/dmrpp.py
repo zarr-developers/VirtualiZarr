@@ -5,7 +5,9 @@ from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
 import numpy as np
-from obstore.store import ObjectStore
+from obspec_utils.protocols import ReadableStore
+from obspec_utils.readers import EagerStoreReader
+from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -15,9 +17,7 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import ObstoreReader
 
 
 class DMRPPParser:
@@ -54,7 +54,7 @@ class DMRPPParser:
         url
             The URL of the input DMR++ file (e.g., "s3://bucket/file.dmrpp").
         registry
-            An [ObjectStoreRegistry][virtualizarr.registry.ObjectStoreRegistry] for resolving urls and reading data.
+            An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] for resolving urls and reading data.
 
         Returns
         -------
@@ -62,7 +62,7 @@ class DMRPPParser:
             A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = ObstoreReader(store=store, path=path_in_store)
+        reader = EagerStoreReader(store=store, path=path_in_store)
         file_bytes = reader.readall()
         stream = io.BytesIO(file_bytes)
 
@@ -139,7 +139,7 @@ class DMRParser:
 
     def parse_dataset(
         self,
-        object_store: ObjectStore,
+        object_store: ReadableStore,
         group: str | None = None,
     ) -> ManifestStore:
         """
@@ -179,7 +179,7 @@ class DMRParser:
             )
 
         manifest_group = self._parse_dataset(dataset_element)
-        registry = ObjectStoreRegistry()
+        registry: ObjectStoreRegistry = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
 
         return ManifestStore(registry=registry, group=manifest_group)

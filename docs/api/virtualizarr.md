@@ -9,6 +9,9 @@ Users can use xarray for every step apart from reading and serializing virtual r
 
 ::: virtualizarr.open_virtual_mfdataset
 
+::: virtualizarr.open_virtual_datatree
+
+
 ## Information
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes
