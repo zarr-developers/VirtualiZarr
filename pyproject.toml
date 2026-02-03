@@ -145,7 +145,7 @@ requires = [
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
 
 # Add the editable project pip install to the default group
 [tool.pixi.pypi-dependencies]
