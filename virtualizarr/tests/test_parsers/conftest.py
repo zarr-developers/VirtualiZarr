@@ -476,3 +476,19 @@ def big_endian_dtype_hdf5_file(tmpdir):
     dset = f["data"]
     dset[...] = 10
     return filepath
+
+
+@pytest.fixture()
+def complex64_hdf5_file(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "complex64.nc")
+
+    with h5py.File(filepath, "w") as f:
+        data = np.array([1 + 2j, 3 + 4j, 5 + 6j], dtype=np.complex64)
+        fill_value = np.complex64(-9999 - 9999j)
+        dset = f.create_dataset(name="data", data=data, chunks=True)
+        dim_scale = f.create_dataset(name="x", data=np.arange(3), chunks=True)
+        dim_scale.make_scale()
+        dset.dims[0].attach_scale(dim_scale)
+        dset.attrs["_FillValue"] = fill_value
+
+    return filepath

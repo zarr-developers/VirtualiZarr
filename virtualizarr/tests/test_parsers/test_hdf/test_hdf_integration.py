@@ -13,6 +13,32 @@ from virtualizarr.tests import (
 from virtualizarr.tests.test_integration import roundtrip_as_in_memory_icechunk
 
 
+class TestComplex64:
+    def test_complex64_fill_value_encoding(self, complex64_hdf5_file, local_registry):
+        """Test that complex64 data with _FillValue is correctly encoded using zarr-python."""
+        import numpy as np
+
+        from virtualizarr.parsers.utils import encode_cf_fill_value
+
+        # Verify encoding works correctly
+        fill_value = np.complex64(-9999 - 9999j)
+        encoded = encode_cf_fill_value(np.array([fill_value]), np.dtype("complex64"))
+        assert encoded == (-9999.0, -9999.0)
+
+        # Verify the HDF parser can read the file and encode the fill value
+        parser = HDFParser()
+        url = f"file://{complex64_hdf5_file}"
+        manifest_store = parser(url=url, registry=local_registry)
+
+        # Access the ManifestArray through the ManifestStore's group
+        manifest_array = manifest_store._group["data"]
+
+        # The _FillValue attribute should be encoded as a tuple (zarr-python format)
+        fill_value_attr = manifest_array.metadata.attributes["_FillValue"]
+        assert isinstance(fill_value_attr, (list, tuple))
+        assert fill_value_attr == (-9999.0, -9999.0)
+
+
 @requires_kerchunk
 @requires_hdf5plugin
 @requires_imagecodecs

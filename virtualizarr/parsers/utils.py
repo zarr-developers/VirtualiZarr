@@ -1,5 +1,6 @@
 import numpy as np
 from xarray.backends.zarr import FillValueCoder
+from zarr.core.dtype import get_data_type_from_native_dtype
 
 FillValueType = (
     int
@@ -36,5 +37,10 @@ def encode_cf_fill_value(
         fillvalue = fill_value.item()
     else:
         fillvalue = fill_value
-    encoded_fillvalue = FillValueCoder.encode(fillvalue, target_dtype)
-    return encoded_fillvalue
+
+    # xarray's FillValueCoder doesn't support complex types, use zarr-python for those
+    if target_dtype.kind == "c":
+        zdtype = get_data_type_from_native_dtype(target_dtype)
+        return zdtype.to_json_scalar(fillvalue, zarr_format=2)
+
+    return FillValueCoder.encode(fillvalue, target_dtype)
