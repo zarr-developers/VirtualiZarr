@@ -74,7 +74,7 @@ from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 project_dir="/Users/user/project-dir"
 project_url=f"file://{project_dir}"
 registry = ObjectStoreRegistry({project_url: LocalStore()})
-vds = open_virtual_dataset(f"{project_url}/combined.json", , registry=registry, parser=KerchunkJSONParser())
+vds = open_virtual_dataset(f"{project_url}/combined.json", registry=registry, parser=KerchunkJSONParser())
 # or
 vds = open_virtual_dataset(f"{project_url}/combined.parquet", registry=registry, parser=KerchunkParquetParser())
 
