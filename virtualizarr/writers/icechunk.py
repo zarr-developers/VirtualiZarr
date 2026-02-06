@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
+from typing import TYPE_CHECKING, List, Optional, Union, cast
 
-import numpy as np
 import xarray as xr
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
-from virtualizarr.codecs import get_codecs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.codecs import extract_codecs, get_codecs
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -16,15 +15,29 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
 )
+from virtualizarr.writers.arrow import (
+    ArrowChunkManifest,
+    extract_arrow_manifests,
+    validate_location_prefixes,
+)
 
 if TYPE_CHECKING:
-    from icechunk import (
-        IcechunkStore,  # type: ignore[import-not-found]
-        RepositoryConfig,  # type: ignore[import-not-found]
-    )
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+
+
+def _get_chunk_container_prefixes(store: "IcechunkStore") -> list[str]:
+    """Extract the virtual chunk container prefixes from an icechunk store's config."""
+    config = store.session.config
+
+    # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers
+    # (see https://github.com/earth-mover/icechunk/issues/1168)
+    if config.virtual_chunk_containers is None:
+        raise ValueError("No Virtual Chunk Containers set")
+
+    return list(config.virtual_chunk_containers.keys())
 
 
 def virtual_dataset_to_icechunk(
@@ -110,8 +123,15 @@ def virtual_dataset_to_icechunk(
 
     store_path = StorePath(store, path=group or "")
 
+    # Convert all manifests to Arrow format upfront (for efficient validation and writing)
+    arrow_manifests = extract_arrow_manifests(vds)
+
+    # Validate all manifests before writing any
     if validate_containers:
-        validate_virtual_chunk_containers(store.session.config, [vds])
+        supported_prefixes = _get_chunk_container_prefixes(store)
+        validate_location_prefixes(
+            arrow_manifests.values(), valid_prefixes=supported_prefixes
+        )
 
     if append_dim:
         group_object = Group.open(store=store_path, zarr_format=3)
@@ -123,6 +143,7 @@ def virtual_dataset_to_icechunk(
         vds=vds,
         store=store,
         group=group_object,
+        arrow_manifests=arrow_manifests,
         append_dim=append_dim,
         last_updated_at=last_updated_at,
     )
@@ -206,60 +227,33 @@ def virtual_datatree_to_icechunk(
     paths_and_virtual_datasets = [
         (get_store_path(subtree, vdt), node_to_vds(subtree)) for subtree in vdt.subtree
     ]
-    virtual_datasets = [pair[1] for pair in paths_and_virtual_datasets]
 
+    # Convert all manifests to Arrow format upfront (for efficient validation and writing)
+    all_arrow_manifests = [
+        (store_path, vds, extract_arrow_manifests(vds))
+        for store_path, vds in paths_and_virtual_datasets
+    ]
+
+    # Validate all manifests before writing any
     if validate_containers:
-        validate_virtual_chunk_containers(store.session.config, virtual_datasets)
+        all_manifests = [
+            manifest
+            for _, _, arrow_manifests in all_arrow_manifests
+            for manifest in arrow_manifests.values()
+        ]
+        supported_prefixes = _get_chunk_container_prefixes(store)
+        validate_location_prefixes(all_manifests, supported_prefixes)
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
-    for store_path, vds in paths_and_virtual_datasets:
+    for store_path, vds, arrow_manifests in all_arrow_manifests:
         group = Group.from_store(store=store_path, zarr_format=3)
 
         write_virtual_dataset_to_icechunk_group(
             vds=vds,
             store=store,
             group=group,
+            arrow_manifests=arrow_manifests,
             last_updated_at=last_updated_at,
-        )
-
-
-# TODO ideally I would be able to just call some Icechunk API to do this (see https://github.com/earth-mover/icechunk/issues/1167)
-def validate_virtual_chunk_containers(
-    config: "RepositoryConfig", virtual_datasets: Iterable[xr.Dataset]
-) -> None:
-    """Check that all virtual refs have corresponding virtual chunk containers, before writing any of the refs."""
-
-    manifestarrays = [
-        var.data
-        for dataset in virtual_datasets
-        for var in dataset.variables.values()
-        if isinstance(var.data, ManifestArray)
-    ]
-
-    # get the prefixes of all virtual chunk containers
-    if config.virtual_chunk_containers is None:
-        # TODO for some reason Icechunk returns None instead of an empty dict if there are zero containers (see https://github.com/earth-mover/icechunk/issues/1168)
-        supported_prefixes = set()
-    else:
-        supported_prefixes = set(config.virtual_chunk_containers.keys())
-
-    # fastpath for common case that no virtual chunk containers have been set
-    if manifestarrays and not supported_prefixes:
-        raise ValueError("No Virtual Chunk Containers set")
-
-    # check all refs against existing virtual chunk containers
-    for marr in manifestarrays:
-        # TODO this loop over every virtual reference is likely inefficient in python,
-        # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
-        for ref in marr.manifest._paths.flat:
-            if ref:
-                validate_single_ref(ref, supported_prefixes)
-
-
-def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
-    if not any(ref.startswith(prefix) for prefix in supported_prefixes):
-        raise ValueError(
-            f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
 
 
@@ -267,6 +261,7 @@ def write_virtual_dataset_to_icechunk_group(
     vds: xr.Dataset,
     store: "IcechunkStore",
     group: Group,
+    arrow_manifests: dict[str, ArrowChunkManifest],
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -295,12 +290,14 @@ def write_virtual_dataset_to_icechunk_group(
         )
 
     # Then write the virtual variables to the same group
+    # TODO concurrently write using async version of icechunk method
     for name, var in virtual_variables.items():
         write_virtual_variable_to_icechunk(
             store=store,
             group=group,
             name=name,  # type: ignore[arg-type]
             var=var,
+            arrow_manifest=arrow_manifests[name],
             append_dim=append_dim,
             last_updated_at=last_updated_at,
         )
@@ -375,13 +372,11 @@ def write_virtual_variable_to_icechunk(
     group: "Group",
     name: str,
     var: xr.Variable,
+    arrow_manifest: ArrowChunkManifest,
     append_dim: Optional[str] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from zarr import Array
-
-    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
@@ -433,62 +428,40 @@ def write_virtual_variable_to_icechunk(
         store=store,
         group=group,
         arr_name=name,
-        manifest=ma.manifest,
+        arrow_manifest=arrow_manifest,
         append_axis=append_axis,
         existing_num_chunks=existing_num_chunks,
         last_updated_at=last_updated_at,
     )
 
 
-def generate_chunk_key(
-    index: tuple[int, ...],
-    append_axis: Optional[int] = None,
-    existing_num_chunks: Optional[int] = None,
-) -> list[int]:
-    if append_axis and append_axis >= len(index):
-        raise ValueError(
-            f"append_axis {append_axis} is greater than the number of indices {len(index)}"
-        )
-
-    return [
-        ind + existing_num_chunks
-        if axis is append_axis and existing_num_chunks is not None
-        else ind
-        for axis, ind in enumerate(index)
-    ]
-
-
 def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: "Group",
     arr_name: str,
-    manifest: ChunkManifest,
+    arrow_manifest: ArrowChunkManifest,
     append_axis: Optional[int] = None,
     existing_num_chunks: Optional[int] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
-    """Write all the virtual references for one array manifest at once."""
-    from icechunk import VirtualChunkSpec
+    """
+    Write all the virtual references for one array manifest at once.
 
+    Uses pyarrow to pass the manifests to icechunk with minimal copying.
+    """
     if group.name == "/":
         key_prefix = arr_name
     else:
         key_prefix = f"{group.name}/{arr_name}"
 
-    # loop over every reference in the ChunkManifest for that array
-    # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
-    # but Icechunk need to expose a suitable API first
-    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
-
-    it = np.nditer(
-        [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
-        flags=[
-            "refs_ok",
-            "multi_index",
-            "c_index",
-        ],
-        op_flags=[["readonly"]] * 3,  # type: ignore
-    )
+    # Compute chunk grid offset for append operations
+    if append_axis is not None and existing_num_chunks is not None:
+        arr_offset = tuple(
+            existing_num_chunks if axis == append_axis else 0
+            for axis in range(len(arrow_manifest.shape_chunk_grid))
+        )
+    else:
+        arr_offset = None
 
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
@@ -498,20 +471,13 @@ def write_manifest_virtual_refs(
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
-    virtual_chunk_spec_list = [
-        VirtualChunkSpec(
-            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
-            location=path.item(),
-            offset=offset.item(),
-            length=length.item(),
-            last_updated_at_checksum=last_updated_at,
-        )
-        for path, offset, length in it
-        if path
-    ]
-
-    store.set_virtual_refs(
+    store.set_virtual_refs_arr(
         array_path=key_prefix,
-        chunks=virtual_chunk_spec_list,
+        chunk_grid_shape=arrow_manifest.shape_chunk_grid,
+        locations=arrow_manifest.locations,
+        offsets=arrow_manifest.offsets,
+        lengths=arrow_manifest.lengths,
+        checksum=last_updated_at,
+        arr_offset=arr_offset,
         validate_containers=False,  # we already validated these before setting any refs
     )

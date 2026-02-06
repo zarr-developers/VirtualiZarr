@@ -132,7 +132,8 @@ def _generate_chunk_entries(
     )
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,), (0,), itemsize)}
+        # Scalar arrays should not use this function - use ChunkManifest.from_arrays instead
+        raise ValueError("Use ChunkManifest.from_arrays for scalar arrays")
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]
@@ -403,10 +404,24 @@ def manifest_array(array_v3_metadata):
             codecs=codecs,
             dimension_names=dimension_names,
         )
-        entries = _generate_chunk_entries(
-            shape, chunks, data_type.itemsize, _entry_from_chunk_key
-        )
-        chunkmanifest = ChunkManifest(entries=entries)
+
+        if shape == ():
+            # For scalar arrays, use from_arrays with 0-dimensional numpy arrays.
+            # This avoids ambiguity around chunk keys ("c" vs "0") - the dict-based
+            # ChunkManifest constructor infers shape from chunk keys, but scalar
+            # chunk key conventions differ between zarr versions. Using from_arrays
+            # with shape=() arrays is unambiguous, matching what the HDF parser does.
+            chunkmanifest = ChunkManifest.from_arrays(
+                paths=np.array("file:///foo.nc", dtype=np.dtypes.StringDType()),
+                offsets=np.array(0, dtype=np.uint64),
+                lengths=np.array(data_type.itemsize, dtype=np.uint64),
+            )
+        else:
+            entries = _generate_chunk_entries(
+                shape, chunks, data_type.itemsize, _entry_from_chunk_key
+            )
+            chunkmanifest = ChunkManifest(entries=entries)
+
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
 
     return _manifest_array

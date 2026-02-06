@@ -196,15 +196,16 @@ class TestBroadcast:
         marr = manifest_array(shape=(), chunks=())
         assert marr.shape == ()
         assert marr.chunks == ()
+        # Scalar manifests created with from_arrays have empty string key
         assert marr.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
+            "": {"path": "file:///foo.nc", "offset": 0, "length": 4},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.chunks == (1,)
         assert expanded.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
+            "0": {"path": "file:///foo.nc", "offset": 0, "length": 4},
         }
 
     @pytest.mark.parametrize(
