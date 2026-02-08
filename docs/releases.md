@@ -4,6 +4,10 @@
 
 ### New Features
 
+- Added `region` parameter to `to_icechunk()`.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
+
 ### Breaking changes
 
 - Minimum required version of `obspec_utils` is now `0.9.0`.
@@ -24,6 +28,10 @@
 ### Documentation
 
 ### Internal changes
+
+- Changed `virtualizarr.writers.icechunk.generate_chunk_key` signature and implementation to be compatible with `region` parameter.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
 
 ## v2.4.0 (24th January 2026)
 
