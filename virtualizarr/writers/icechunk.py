@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast, Literal
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
 
 import numpy as np
 import xarray as xr
-from xarray.backends.zarr import encode_zarr_attr_value, ZarrStore as XarrayZarrStore
+from xarray.backends.zarr import ZarrStore as XarrayZarrStore
+from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
 from virtualizarr.codecs import get_codecs
@@ -34,7 +35,7 @@ def virtual_dataset_to_icechunk(
     *,
     group: Optional[str] = None,
     append_dim: Optional[str] = None,
-    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
+    region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
     validate_containers: bool = True,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -180,7 +181,7 @@ def virtual_datatree_to_icechunk(
         time, icechunk will raise an error at runtime when trying to read the virtual
         chunk. When not specified, icechunk will not check for modifications to the
         virtual chunks at runtime.
-    kwargs
+    **kwargs
         Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
     Raises
@@ -287,7 +288,7 @@ def write_virtual_dataset_to_icechunk_group(
     store: "IcechunkStore",
     group: Group,
     append_dim: Optional[str] = None,
-    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
+    region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     if region is not None:
@@ -297,7 +298,7 @@ def write_virtual_dataset_to_icechunk_group(
             write_region=region,
             consolidate_on_close=False,
             close_store_on_close=False,
-            mode='r+',
+            mode="r+",
         )
         vds = xarray_store._validate_and_autodetect_region(vds)
         region = xarray_store._write_region
@@ -318,10 +319,10 @@ def write_virtual_dataset_to_icechunk_group(
     # First write all the non-virtual variables
     if loadable_variables:
         if append_dim is None and region is None:
-            mode = 'a'
+            mode = "a"
         else:
             # let xarray set it automatically, 'a' for append_dim and 'r+' for region
-            mode = None  
+            mode = None
         loadable_ds = xr.Dataset(loadable_variables)
         loadable_ds.to_zarr(  # type: ignore[call-overload]
             store,
@@ -446,7 +447,9 @@ def write_virtual_variable_to_icechunk(
             array=group[name],
             axis=append_axis,
         )
-        chunk_offsets = tuple(existing_num_chunks if dim == append_dim else 0 for dim in dims)
+        chunk_offsets = tuple(
+            existing_num_chunks if dim == append_dim else 0 for dim in dims
+        )
 
         # resize the array
         resize_array(
@@ -463,9 +466,11 @@ def write_virtual_variable_to_icechunk(
             dim_region = region.get(dim, slice(None))
             start = dim_region.start if dim_region.start is not None else 0
             if start % chunk_size != 0:
-                raise ValueError(f'Trying to write variable {name!r} to region ' +
-                    f'{region!r} in dimension {dim!r}, but it is not aligned to whole ' +
-                    f'chunks of size {chunk_size!r}')
+                raise ValueError(
+                    f"Trying to write variable {name!r} to region "
+                    + f"{region!r} in dimension {dim!r}, but it is not aligned to whole "
+                    + f"chunks of size {chunk_size!r}"
+                )
             chunk_offsets.append(start // chunk_size)
         chunk_offsets = tuple(chunk_offsets)
     else:

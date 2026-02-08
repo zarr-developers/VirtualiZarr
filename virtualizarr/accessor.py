@@ -1,5 +1,6 @@
 import warnings
 from collections import deque
+from collections.abc import Mapping
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -10,7 +11,6 @@ from typing import (
     Literal,
     overload,
 )
-from collections.abc import Mapping
 
 import xarray as xr
 
@@ -76,7 +76,7 @@ class _VirtualiZarrDatasetAccessor:
         *,
         group: str | None = None,
         append_dim: str | None = None,
-        region: Literal['auto'] | Mapping[str, Literal['auto'] | slice] | None = None,
+        region: Literal["auto"] | Mapping[str, Literal["auto"] | slice] | None = None,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
     ) -> None:
@@ -356,7 +356,7 @@ class _VirtualiZarrDataTreeAccessor:
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.
-        kwargs
+        **kwargs
             Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
         Raises
