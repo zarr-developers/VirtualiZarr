@@ -115,19 +115,18 @@ docs = [
 ]
 dev = [
     "codecov",
-    "mypy",
     "pandas-stubs",
     "pooch",
     "pre-commit",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-mypy",
     "pytest-xdist",
     "ruff",
     "s3fs",
     "lithops",
     "dask",
+    "ty>=0.0.2",
 ]
 
 [project.urls]
@@ -186,7 +185,7 @@ icechunk = "==1.1.2"
 
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]
-run-mypy = { cmd = "mypy virtualizarr" }
+run-ty = { cmd = "ty check" }
 # Using '--dist loadscope' (rather than default of '--dist load' when '-n auto'
 # is used), reduces test hangs that appear to be macOS-related.
 run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --durations=10" }
@@ -229,24 +228,12 @@ exclude = ["docs", "tests", "tests.*", "docs.*"]
 [tool.setuptools.package-data]
 datatree = ["py.typed"]
 
-[tool.mypy]
-files = "virtualizarr/**/*.py"
-show_error_codes = true
+[tool.ty.src]
+include = ["virtualizarr"]
+exclude = ["docs", ".eggs"]
 
-[[tool.mypy.overrides]]
-module = [
-    "docker",
-    "fsspec.*",
-    "s3fs.*",
-    "h5py",
-    "kerchunk.*",
-    "minio",
-    "numcodecs.*",
-    "ujson",
-    "zarr",
-    "requests",
-]
-ignore_missing_imports = true
+[tool.ty.rules]
+unresolved-import = "ignore"
 
 [tool.ruff]
 # Same as Black.
