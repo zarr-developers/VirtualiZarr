@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Iterable, List, Optional, Union, cast, Literal
+from collections.abc import Mapping
 
 import numpy as np
 import xarray as xr
-from xarray.backends.zarr import encode_zarr_attr_value
+from xarray.backends.zarr import encode_zarr_attr_value, ZarrStore as XarrayZarrStore
 from zarr import Array, Group
 
 from virtualizarr.codecs import get_codecs
@@ -33,6 +34,7 @@ def virtual_dataset_to_icechunk(
     *,
     group: Optional[str] = None,
     append_dim: Optional[str] = None,
+    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
     validate_containers: bool = True,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -52,8 +54,14 @@ def virtual_dataset_to_icechunk(
     append_dim
         Name of the dimension along which to append data. If provided, the dataset must
         have a dimension with this name.
+    region
+        Optional mapping from dimension names to either a) ``"auto"``, or b) integer
+        slices, indicating the region of existing zarr array(s) in which to write
+        this dataset's data.
+
+        See ``xarray.Dataset.to_zarr`` documentation for details.
     validate_containers
-        If ``True``, raise if any virtual chunks have a refer to locations that don't
+        If ``True``, raise if any virtual chunks refer to locations that don't
         match any existing virtual chunk container set on this Icechunk repository.
 
         It is not generally recommended to set this to ``False``, because it can lead to
@@ -94,6 +102,12 @@ def virtual_dataset_to_icechunk(
             f"append_dim: expected type Optional[str], but got type {type(append_dim)}"
         )
 
+    if not isinstance(region, (type(None), str, Mapping)):
+        raise TypeError(
+            "region: expected type Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]],"
+            f" but got type {type(last_updated_at)}"
+        )
+
     if not isinstance(last_updated_at, (type(None), datetime)):
         raise TypeError(
             "last_updated_at: expected type Optional[datetime],"
@@ -113,7 +127,7 @@ def virtual_dataset_to_icechunk(
     if validate_containers:
         validate_virtual_chunk_containers(store.session.config, [vds])
 
-    if append_dim:
+    if append_dim or region:
         group_object = Group.open(store=store_path, zarr_format=3)
     else:
         # create the group if it doesn't already exist
@@ -124,6 +138,7 @@ def virtual_dataset_to_icechunk(
         store=store,
         group=group_object,
         append_dim=append_dim,
+        region=region,
         last_updated_at=last_updated_at,
     )
 
@@ -135,6 +150,7 @@ def virtual_datatree_to_icechunk(
     write_inherited_coords: bool = False,
     validate_containers: bool = True,
     last_updated_at: datetime | None = None,
+    **kwargs,
 ) -> None:
     """
     Write an xarray dataset to an Icechunk store.
@@ -153,7 +169,7 @@ def virtual_datatree_to_icechunk(
         originally defined. This saves disk space, but requires opening the
         full tree to load inherited coordinates.
     validate_containers
-        If ``True``, raise if any virtual chunks have a refer to locations that don't
+        If ``True``, raise if any virtual chunks refer to locations that don't
         match any existing virtual chunk container set on this Icechunk repository.
 
         It is not generally recommended to set this to ``False``, because it can lead to
@@ -164,6 +180,8 @@ def virtual_datatree_to_icechunk(
         time, icechunk will raise an error at runtime when trying to read the virtual
         chunk. When not specified, icechunk will not check for modifications to the
         virtual chunks at runtime.
+    kwargs
+        Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
     Raises
     ------
@@ -220,6 +238,7 @@ def virtual_datatree_to_icechunk(
             store=store,
             group=group,
             last_updated_at=last_updated_at,
+            **kwargs,
         )
 
 
@@ -268,8 +287,22 @@ def write_virtual_dataset_to_icechunk_group(
     store: "IcechunkStore",
     group: Group,
     append_dim: Optional[str] = None,
+    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
+    if region is not None:
+        xarray_store = XarrayZarrStore(
+            zarr_group=group,
+            append_dim=append_dim,
+            write_region=region,
+            consolidate_on_close=False,
+            close_store_on_close=False,
+            mode='r+',
+        )
+        vds = xarray_store._validate_and_autodetect_region(vds)
+        region = xarray_store._write_region
+        xarray_store.close()
+
     virtual_variables = {
         name: var
         for name, var in vds.variables.items()
@@ -284,14 +317,20 @@ def write_virtual_dataset_to_icechunk_group(
 
     # First write all the non-virtual variables
     if loadable_variables:
+        if append_dim is None and region is None:
+            mode = 'a'
+        else:
+            # let xarray set it automatically, 'a' for append_dim and 'r+' for region
+            mode = None  
         loadable_ds = xr.Dataset(loadable_variables)
         loadable_ds.to_zarr(  # type: ignore[call-overload]
             store,
             group=group.name,
             zarr_format=3,
             consolidated=False,
-            mode="a",
+            mode=mode,
             append_dim=append_dim,
+            region=region,
         )
 
     # Then write the virtual variables to the same group
@@ -302,6 +341,7 @@ def write_virtual_dataset_to_icechunk_group(
             name=name,  # type: ignore[arg-type]
             var=var,
             append_dim=append_dim,
+            region=region,
             last_updated_at=last_updated_at,
         )
 
@@ -376,6 +416,7 @@ def write_virtual_variable_to_icechunk(
     name: str,
     var: xr.Variable,
     append_dim: Optional[str] = None,
+    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
@@ -411,6 +452,9 @@ def write_virtual_variable_to_icechunk(
             manifest_array=ma,
             append_axis=append_axis,
         )
+    elif region is not None:
+        check_compatible_arrays(ma, group[name])
+        check_compatible_encodings(var.encoding, group[name].attrs)
     else:
         append_axis = None
         # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
