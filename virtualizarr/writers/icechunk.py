@@ -399,7 +399,7 @@ def get_axis(
 
 
 def check_compatible_arrays(
-    ma: "ManifestArray", existing_array: "Array", append_axis: int
+    ma: "ManifestArray", existing_array: "Array", append_axis: int | None
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
@@ -407,7 +407,8 @@ def check_compatible_arrays(
     check_same_chunk_shapes([arr.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
-    check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+    if append_axis is not None:
+        check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
 def write_virtual_variable_to_icechunk(
@@ -416,7 +417,7 @@ def write_virtual_variable_to_icechunk(
     name: str,
     var: xr.Variable,
     append_dim: Optional[str] = None,
-    region: Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]] = None,
+    region: Optional[Mapping[str, slice]] = None,
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
@@ -445,6 +446,7 @@ def write_virtual_variable_to_icechunk(
             array=group[name],
             axis=append_axis,
         )
+        chunk_offsets = tuple(existing_num_chunks if dim == append_dim else 0 for dim in dims)
 
         # resize the array
         resize_array(
@@ -453,10 +455,21 @@ def write_virtual_variable_to_icechunk(
             append_axis=append_axis,
         )
     elif region is not None:
-        check_compatible_arrays(ma, group[name])
+        check_compatible_arrays(ma, group[name], append_axis=None)
         check_compatible_encodings(var.encoding, group[name].attrs)
+
+        chunk_offsets = []
+        for dim, chunk_size in zip(dims, group[name].chunks):
+            dim_region = region.get(dim, slice(None))
+            start = dim_region.start if dim_region.start is not None else 0
+            if start % chunk_size != 0:
+                raise ValueError(f'Trying to write variable {name!r} to region ' +
+                    f'{region!r} in dimension {dim!r}, but it is not aligned to whole ' +
+                    f'chunks of size {chunk_size!r}')
+            chunk_offsets.append(start // chunk_size)
+        chunk_offsets = tuple(chunk_offsets)
     else:
-        append_axis = None
+        chunk_offsets = tuple(0 for _ in dims)
         # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
         filters, serializer, compressors = extract_codecs(metadata.codecs)
         arr = group.require_array(
@@ -478,28 +491,16 @@ def write_virtual_variable_to_icechunk(
         group=group,
         arr_name=name,
         manifest=ma.manifest,
-        append_axis=append_axis,
-        existing_num_chunks=existing_num_chunks,
+        chunk_index_offsets=chunk_offsets,
         last_updated_at=last_updated_at,
     )
 
 
 def generate_chunk_key(
     index: tuple[int, ...],
-    append_axis: Optional[int] = None,
-    existing_num_chunks: Optional[int] = None,
+    chunk_index_offsets: tuple[int, ...],
 ) -> list[int]:
-    if append_axis and append_axis >= len(index):
-        raise ValueError(
-            f"append_axis {append_axis} is greater than the number of indices {len(index)}"
-        )
-
-    return [
-        ind + existing_num_chunks
-        if axis is append_axis and existing_num_chunks is not None
-        else ind
-        for axis, ind in enumerate(index)
-    ]
+    return [index + offset for index, offset in zip(index, chunk_index_offsets)]
 
 
 def write_manifest_virtual_refs(
@@ -507,8 +508,7 @@ def write_manifest_virtual_refs(
     group: "Group",
     arr_name: str,
     manifest: ChunkManifest,
-    append_axis: Optional[int] = None,
-    existing_num_chunks: Optional[int] = None,
+    chunk_index_offsets: tuple[int, ...],
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
@@ -544,7 +544,7 @@ def write_manifest_virtual_refs(
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
-            index=generate_chunk_key(it.multi_index, append_axis, existing_num_chunks),
+            index=generate_chunk_key(it.multi_index, chunk_index_offsets),
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
