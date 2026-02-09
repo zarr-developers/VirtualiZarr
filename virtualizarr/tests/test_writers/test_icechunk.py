@@ -702,7 +702,7 @@ class TestRegion:
         init_session.commit("test commit")
         return icechunk_repo
 
-    def test_initialized_repo_is_empty(initialized_repo):
+    def test_initialized_repo_is_empty(self, initialized_repo):
         with (
             xr.open_zarr(
                 initialized_repo.readonly_session("main").store,
