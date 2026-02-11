@@ -3,7 +3,7 @@ from typing import Any, Callable, Union
 
 import numpy as np
 import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -48,11 +48,6 @@ class ManifestArray:
         else:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
-
-        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
-            raise NotImplementedError(
-                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
-            )
 
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
