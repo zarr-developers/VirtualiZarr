@@ -29,7 +29,7 @@
 
 ### Internal changes
 
-- Changed `virtualizarr.writers.icechunk.generate_chunk_key` signature and implementation to be compatible with `region` parameter.
+- Inlined `virtualizarr.writers.icechunk.generate_chunk_key` in `virtualizarr.writers.icechunk.write_manifest_virtual_refs`, and deleted the original function.
   ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
   By [Vladislav Wohlrath](https://github.com/vladidobro).
 

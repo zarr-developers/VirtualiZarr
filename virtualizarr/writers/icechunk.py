@@ -293,17 +293,7 @@ def write_virtual_dataset_to_icechunk_group(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     if region is not None:
-        xarray_store = XarrayZarrStore(
-            zarr_group=group,
-            append_dim=append_dim,
-            write_region=region,
-            consolidate_on_close=False,
-            close_store_on_close=False,
-            mode="r+",
-        )
-        vds = xarray_store._validate_and_autodetect_region(vds)
-        region = xarray_store._write_region
-        xarray_store.close()
+        vds, region = validate_and_autodetect_region(group, vds, region)
 
     virtual_variables = {
         name: var
@@ -372,6 +362,33 @@ def update_attributes(
         for k, v in encoding.items():
             if k in ENCODING_KEYS:
                 zarr_node.attrs[k] = encode_zarr_attr_value(v)
+
+
+def validate_and_autodetect_region(
+    group: Group,
+    vds: xr.Dataset,
+    region: Literal["auto"] | Mapping[str, Literal["auto"] | slice],
+) -> tuple[xr.Dataset, dict[str, slice]]:
+    """
+    Convert regions like `"auto"` and `{"dim": "auto"}` into concrete `dict[str, slice]`
+    in a way which is maximally compatible with xarray's `to_zarr`.
+    The method itself is quite complicated, we call into xarray
+    so we do not have to reimplement the logic.
+
+    This function uses xarray's internal private functions and can break at any time.
+    """
+    xarray_store = XarrayZarrStore(
+        zarr_group=group,
+        append_dim=None,
+        write_region=region,
+        consolidate_on_close=False,
+        close_store_on_close=False,
+        mode="r+",
+    )
+    vds = xarray_store._validate_and_autodetect_region(vds)
+    region = xarray_store._write_region
+    xarray_store.close()
+    return vds, region
 
 
 def num_chunks(
@@ -519,13 +536,6 @@ def write_virtual_variable_to_icechunk(
     )
 
 
-def generate_chunk_key(
-    index: tuple[int, ...],
-    chunk_index_offsets: tuple[int, ...],
-) -> list[int]:
-    return [index + offset for index, offset in zip(index, chunk_index_offsets)]
-
-
 def write_manifest_virtual_refs(
     store: "IcechunkStore",
     group: "Group",
@@ -567,7 +577,10 @@ def write_manifest_virtual_refs(
 
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
-            index=generate_chunk_key(it.multi_index, chunk_index_offsets),
+            index=[
+                index + offset
+                for index, offset in zip(it.multi_index, chunk_index_offsets)
+            ],
             location=path.item(),
             offset=offset.item(),
             length=length.item(),
