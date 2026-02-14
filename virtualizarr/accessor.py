@@ -1,5 +1,6 @@
 import warnings
 from collections import deque
+from collections.abc import Mapping
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -75,6 +76,7 @@ class _VirtualiZarrDatasetAccessor:
         *,
         group: str | None = None,
         append_dim: str | None = None,
+        region: Literal["auto"] | Mapping[str, Literal["auto"] | slice] | None = None,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
     ) -> None:
@@ -104,6 +106,12 @@ class _VirtualiZarrDatasetAccessor:
             Path of the group to write the dataset into (default: the root group).
         append_dim
             Dimension along which to append the virtual dataset.
+        region
+            Optional mapping from dimension names to either a) ``"auto"``, or b) integer
+            slices, indicating the region of existing zarr array(s) in which to write
+            this dataset's data.
+
+            See ``xarray.Dataset.to_zarr`` documentation for details.
         validate_containers
             If ``True``, raise if any virtual chunks have a refer to locations that don't
             match any existing virtual chunk container set on this Icechunk repository.
@@ -126,6 +134,7 @@ class _VirtualiZarrDatasetAccessor:
             store,
             group=group,
             append_dim=append_dim,
+            region=region,
             validate_containers=validate_containers,
             last_updated_at=last_updated_at,
         )
@@ -312,6 +321,7 @@ class _VirtualiZarrDataTreeAccessor:
         write_inherited_coords: bool = False,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
+        **kwargs,
     ) -> None:
         """
         Write an xarray DataTree to an Icechunk store.
@@ -346,6 +356,8 @@ class _VirtualiZarrDataTreeAccessor:
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.
+        **kwargs
+            Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
         Raises
         ------
@@ -372,6 +384,7 @@ class _VirtualiZarrDataTreeAccessor:
             write_inherited_coords=write_inherited_coords,
             validate_containers=validate_containers,
             last_updated_at=last_updated_at,
+            **kwargs,
         )
 
 
