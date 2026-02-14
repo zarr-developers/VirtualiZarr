@@ -17,6 +17,7 @@ from virtualizarr.manifests.utils import (
     check_same_dtypes,
     check_same_ndims,
     check_same_shapes_except_on_concat_axis,
+    check_same_shapes_except_axes,
 )
 
 if TYPE_CHECKING:
@@ -400,7 +401,10 @@ def get_axis(
 
 
 def check_compatible_arrays(
-    ma: "ManifestArray", existing_array: "Array", append_axis: int | None
+    ma: "ManifestArray", 
+    existing_array: "Array", 
+    append_axis: int | None,
+    except_axes: list[int] | None = None,
 ):
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
@@ -410,6 +414,8 @@ def check_compatible_arrays(
     arr_shapes = [ma.shape, existing_array.shape]
     if append_axis is not None:
         check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
+    if except_axes is not None:
+        check_same_shapes_except_axes(arr_shapes, except_axes)
 
 
 def write_virtual_variable_to_icechunk(
@@ -458,12 +464,15 @@ def write_virtual_variable_to_icechunk(
             append_axis=append_axis,
         )
     elif region is not None:
-        check_compatible_arrays(ma, group[name], append_axis=None)
+        check_compatible_arrays(ma, group[name], append_axis=None, except_axes=[get_axis(dims, region_dim) for region_dim in region.keys() if region_dim in dims])
         check_compatible_encodings(var.encoding, group[name].attrs)
 
-        chunk_offsets = []
+        chunk_offsets: list[int] = []
         for dim, chunk_size in zip(dims, group[name].chunks):
-            dim_region = region.get(dim, slice(None))
+            if dim not in region:
+                chunk_offsets.append(0)
+                continue
+            dim_region = region[dim]
             start = dim_region.start if dim_region.start is not None else 0
             if start % chunk_size != 0:
                 raise ValueError(
