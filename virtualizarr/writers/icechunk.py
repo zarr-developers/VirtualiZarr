@@ -16,8 +16,8 @@ from virtualizarr.manifests.utils import (
     check_same_codecs,
     check_same_dtypes,
     check_same_ndims,
-    check_same_shapes_except_on_concat_axis,
     check_same_shapes_except_axes,
+    check_same_shapes_except_on_concat_axis,
 )
 
 if TYPE_CHECKING:
@@ -401,8 +401,8 @@ def get_axis(
 
 
 def check_compatible_arrays(
-    ma: "ManifestArray", 
-    existing_array: "Array", 
+    ma: "ManifestArray",
+    existing_array: "Array",
     append_axis: int | None,
     except_axes: list[int] | None = None,
 ):
@@ -464,7 +464,16 @@ def write_virtual_variable_to_icechunk(
             append_axis=append_axis,
         )
     elif region is not None:
-        check_compatible_arrays(ma, group[name], append_axis=None, except_axes=[get_axis(dims, region_dim) for region_dim in region.keys() if region_dim in dims])
+        check_compatible_arrays(
+            ma,
+            group[name],
+            append_axis=None,
+            except_axes=[
+                get_axis(dims, region_dim)
+                for region_dim in region.keys()
+                if region_dim in dims
+            ],
+        )
         check_compatible_encodings(var.encoding, group[name].attrs)
 
         chunk_offsets: list[int] = []
