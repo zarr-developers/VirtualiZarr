@@ -229,7 +229,8 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    old_chunk_shape = x.chunks
+    # broadcast_to only applies to regular chunk grids
+    old_chunk_shape: tuple[int, ...] = x.chunks  # type: ignore[assignment]
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )

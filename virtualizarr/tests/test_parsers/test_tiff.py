@@ -6,6 +6,7 @@ from obstore.store import LocalStore, S3Store
 from xarray import Dataset, DataTree
 
 from virtualizarr import open_virtual_dataset, open_virtual_datatree
+from virtualizarr.manifests.array import has_rectilinear_chunk_grid_support
 from virtualizarr.tests import requires_network, requires_tiff, requires_tifffile
 
 virtual_tiff = pytest.importorskip("virtual_tiff")
@@ -46,6 +47,10 @@ def test_virtual_tiff_dataset() -> None:
 
 @requires_tiff
 @requires_tifffile
+@pytest.mark.skipif(
+    not has_rectilinear_chunk_grid_support,
+    reason="requires zarr with RectilinearChunkGrid support",
+)
 def test_concat_rectilinear_tiff_datasets(tmp_path) -> None:
     """Test concatenating two virtual TIFF datasets with rectilinear chunk grids.
 
@@ -84,14 +89,14 @@ def test_concat_rectilinear_tiff_datasets(tmp_path) -> None:
         assert vds1["0"].sizes == {"y": 100, "x": 50}
         assert vds2["0"].sizes == {"y": 100, "x": 50}
 
-        # Verify both datasets have rectilinear chunk grids
-        from zarr.core.chunk_grids import RectilinearChunkGrid
+        # Verify both datasets have rectilinear (non-regular) chunk grids
+        from zarr.core.chunk_grids import RegularChunkGrid
 
-        assert isinstance(
-            vds1["0"].variable.data.metadata.chunk_grid, RectilinearChunkGrid
+        assert not isinstance(
+            vds1["0"].variable.data.metadata.chunk_grid, RegularChunkGrid
         )
-        assert isinstance(
-            vds2["0"].variable.data.metadata.chunk_grid, RectilinearChunkGrid
+        assert not isinstance(
+            vds2["0"].variable.data.metadata.chunk_grid, RegularChunkGrid
         )
 
         # Concatenate along a new dimension

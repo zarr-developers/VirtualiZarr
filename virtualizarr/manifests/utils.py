@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -178,7 +179,7 @@ def check_same_codecs(codecs: list[Any]) -> None:
             )
 
 
-def check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
+def check_same_chunk_shapes(chunks_list: list[Sequence]) -> None:
     """Check all the chunk shapes are the same"""
 
     first_chunks, *other_chunks_list = chunks_list
@@ -278,7 +279,7 @@ def check_compatible_arrays(
 def copy_and_replace_metadata(
     old_metadata: ArrayV3Metadata,
     new_shape: list[int] | None = None,
-    new_chunks: list[int] | None = None,
+    new_chunks: list | None = None,
     new_dimension_names: Iterable[str] | None | Literal["default"] = "default",
     new_attributes: dict | None = None,
 ) -> ArrayV3Metadata:

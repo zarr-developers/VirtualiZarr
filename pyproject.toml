@@ -62,7 +62,7 @@ fits = [
     "astropy",
 ]
 tiff = [
-    "virtual-tiff @ git+https://github.com/virtual-zarr/virtual-tiff@rectilinear-chunks",
+    "virtual-tiff",
 ]
 kerchunk_parquet = [
    "virtualizarr[remote]",
@@ -180,6 +180,7 @@ rust = "*"
 [tool.pixi.feature.rectilinear.pypi-dependencies]
 zarr = { git = "https://github.com/jhamman/zarr-python.git", branch = "feature/rectilinear-chunk-grid" }
 xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "variable-chunking" }
+virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "rectilinear-chunks" }
 
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"

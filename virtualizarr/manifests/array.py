@@ -3,14 +3,13 @@ from typing import Any, Callable, Union
 
 import numpy as np
 import xarray as xr
+from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-try:
-    from zarr.core.chunk_grids import RegularChunkGrid
-
-    has_rectilinear_chunk_grid_support = True
-except ImportError:
-    has_rectilinear_chunk_grid_support = False
+has_rectilinear_chunk_grid_support = hasattr(
+    __import__("zarr.core.chunk_grids", fromlist=["RectilinearChunkGrid"]),
+    "RectilinearChunkGrid",
+)
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -90,7 +89,7 @@ class ManifestArray:
         if has_rectilinear_chunk_grid_support and not isinstance(
             self._metadata.chunk_grid, RegularChunkGrid
         ):
-            return self._metadata.chunk_grid.chunk_shapes
+            return self._metadata.chunk_grid.chunk_shapes  # type: ignore[attr-defined]
         return self._metadata.chunks
 
     @property
