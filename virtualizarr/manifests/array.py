@@ -5,6 +5,13 @@ import numpy as np
 import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
+try:
+    from zarr.core.chunk_grids import RegularChunkGrid
+
+    has_rectilinear_chunk_grid_support = True
+except ImportError:
+    has_rectilinear_chunk_grid_support = False
+
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
@@ -73,10 +80,17 @@ class ManifestArray:
         return self._metadata
 
     @property
-    def chunks(self) -> tuple[int, ...]:
+    def chunks(self) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
         """
         Individual chunk size by number of elements.
+
+        For RegularChunkGrid, returns a tuple of ints (e.g., (30, 50)).
+        For RectilinearChunkGrid, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
         """
+        if has_rectilinear_chunk_grid_support and not isinstance(
+            self._metadata.chunk_grid, RegularChunkGrid
+        ):
+            return self._metadata.chunk_grid.chunk_shapes
         return self._metadata.chunks
 
     @property
