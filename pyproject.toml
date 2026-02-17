@@ -62,7 +62,7 @@ fits = [
     "astropy",
 ]
 tiff = [
-    "virtual-tiff",
+    "virtual-tiff @ git+https://github.com/virtual-zarr/virtual-tiff@rectilinear-chunks",
 ]
 kerchunk_parquet = [
    "virtualizarr[remote]",
@@ -128,6 +128,7 @@ dev = [
     "s3fs",
     "lithops",
     "dask",
+    "tifffile>=2026.2.16,<2027"
 ]
 
 [project.urls]
@@ -176,6 +177,10 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+[tool.pixi.feature.rectilinear.pypi-dependencies]
+zarr = { git = "https://github.com/jhamman/zarr-python.git", branch = "feature/rectilinear-chunk-grid" }
+xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "variable-chunking" }
+
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"
 numpy = "==2.0.0"
@@ -206,6 +211,7 @@ test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "ke
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py312", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "tiff", "hdf5-lib", "minimum-versions"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py313"]
+rectilinear = ["dev", "test", "tiff", "hdf5-lib", "rectilinear", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
 
