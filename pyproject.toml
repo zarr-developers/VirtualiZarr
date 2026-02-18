@@ -219,6 +219,7 @@ readthedocs = { cmd = "rm -rf $READTHEDOCS_OUTPUT/html && cp -r site $READTHEDOC
 [tool.pixi.feature.minio.tasks]
 run-tests = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose" }
 run-tests-xml-cov = { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --verbose --cov-report=xml" }
+run-tests-including-slow= { cmd = "pytest virtualizarr/tests/test_manifests/test_store.py virtualizarr/tests/test_parsers/test_hdf/test_hdf_manifest_store.py --run-minio-tests --run-network-tests --run-slow-tests --verbose --cov-report=xml" }
 
 [tool.setuptools_scm]
 fallback_version = "9999"
