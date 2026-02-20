@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import obstore as obs
 import pytest
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import MemoryStore
 from zarr.abc.store import (
     OffsetByteRequest,
@@ -24,7 +25,6 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.store import parse_manifest_index
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.registry import ObjectStoreRegistry
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -54,9 +54,14 @@ if TYPE_CHECKING:
         (("c1.2/abc/c/0", "/"), (0,)),
     ],
 )
-def test_parse_manifest_index(val, expected):
+def test_parse_manifest_index(
+    val,
+    expected,
+):
     key, chunk_key_encoding = val
-    assert parse_manifest_index(key, chunk_key_encoding) == expected
+    assert (
+        parse_manifest_index(key, chunk_key_encoding, expand_pattern=True) == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -145,6 +150,7 @@ def _generate_manifest_store(
             "bar": manifest_array,
             "scalar": scalar_manifest_array,
         },
+        groups={"subgroup": ManifestGroup(arrays={"foo": manifest_array})},
         attributes={"Zarr": "Hooray!"},
     )
     registry = ObjectStoreRegistry({prefix: store})
@@ -205,7 +211,10 @@ def empty_memory_store():
         fill_value=0,
     )
     manifest_array = ManifestArray(metadata=array_metadata, chunkmanifest=manifest)
-    manifest_group = ManifestGroup(arrays={"foo": manifest_array})
+    sub_group = ManifestGroup(arrays={"foo": manifest_array})
+    manifest_group = ManifestGroup(
+        arrays={"foo": manifest_array}, groups={"subgroup": sub_group}
+    )
     registry = ObjectStoreRegistry({"memory://": store})
     return ManifestStore(registry=registry, group=manifest_group)
 
@@ -218,6 +227,7 @@ class TestManifestStore:
         assert not local_store.supports_deletes
         assert not local_store.supports_writes
         assert not local_store.supports_partial_writes
+        assert not local_store.supports_consolidated_metadata
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -228,6 +238,16 @@ class TestManifestStore:
         store = request.getfixturevalue(manifest_store)
         observed = await store.get("foo/c.0.0", prototype=default_buffer_prototype())
         assert observed is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "manifest_store",
+        ["empty_memory_store"],
+    )
+    async def test_get_group_key_fails(self, manifest_store, request):
+        store = request.getfixturevalue(manifest_store)
+        with pytest.raises(ValueError, match=r"Key requested is a group"):
+            await store.get("subgroup", prototype=default_buffer_prototype())
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -269,10 +289,14 @@ class TestManifestStore:
         "manifest_store",
         ["local_store", pytest.param("s3_store", marks=requires_minio)],
     )
-    async def test_get_metadata(self, manifest_store, request):
+    @pytest.mark.parametrize(
+        "subgroup",
+        ["", "subgroup/"],
+    )
+    async def test_get_metadata(self, manifest_store, request, subgroup):
         store = request.getfixturevalue(manifest_store)
         observed = await store.get(
-            "foo/zarr.json", prototype=default_buffer_prototype()
+            f"{subgroup}foo/zarr.json", prototype=default_buffer_prototype()
         )
         metadata = json.loads(observed.to_bytes())
         assert metadata["chunk_grid"]["configuration"]["chunk_shape"] == [2, 2]
@@ -308,7 +332,15 @@ class TestManifestStore:
     async def test_list_dir(self, manifest_store, request) -> None:
         store = request.getfixturevalue(manifest_store)
         observed = await _collect_aiterator(store.list_dir(""))
-        assert observed == ("zarr.json", "foo", "bar", "scalar")
+        assert observed == ("zarr.json", "foo", "bar", "scalar", "subgroup")
+        observed = await _collect_aiterator(store.list_dir("scalar"))
+        assert observed == ("zarr.json", "c")
+        observed = await _collect_aiterator(store.list_dir("scalar/d"))
+        assert observed == ()
+        observed = await _collect_aiterator(store.list_dir("foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
+        observed = await _collect_aiterator(store.list_dir("subgroup/foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
 
     @pytest.mark.asyncio
     async def test_store_raises(self, local_store) -> None:

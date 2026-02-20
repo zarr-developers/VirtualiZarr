@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
+from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore, ObjectStore, from_url
 
 from virtualizarr.parsers import HDFParser
-from virtualizarr.registry import ObjectStoreRegistry
 
 # Find location of pytest temporary data in what should be a cross-platform way. This should be the same as what pytest actually does - see https://docs.pytest.org/en/stable/how-to/tmp_path.html#temporary-directory-location-and-retention
 # The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URL prefix without symlinks.
@@ -41,7 +41,7 @@ def obstore_http(url: str) -> ObjectStore:
 
 
 def manifest_store_from_hdf_url(url, group: str | None = None):
-    registry = ObjectStoreRegistry()
+    registry: ObjectStoreRegistry = ObjectStoreRegistry()
     registry.register(url, obstore_local(url=url))
     parser = HDFParser(group=group)
     return parser(url=url, registry=registry)

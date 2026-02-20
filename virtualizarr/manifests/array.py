@@ -148,7 +148,9 @@ class ManifestArray:
             return _isnan(self.shape)
         return NotImplemented
 
-    def __array__(self, dtype: np.typing.DTypeLike = None) -> np.ndarray:
+    def __array__(
+        self, dtype: np.typing.DTypeLike | None = None, copy: bool | None = None
+    ) -> np.ndarray:
         raise NotImplementedError(
             "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
         )
@@ -205,7 +207,7 @@ class ManifestArray:
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""
-        if dtype != self.dtype:
+        if not np.issubdtype(self.dtype, dtype):
             raise NotImplementedError()
         else:
             return self
