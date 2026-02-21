@@ -583,7 +583,7 @@ def test_parse_attribute(netcdf4_file, attr_path, expected):
     assert result == expected
 
 
-def test_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
+def test_dmrpp_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
     parsed_dmrpp = dmrparser(
         DMRPP_XML_STRINGS["fill_value_scalar_no_chunks_nc4_url"],
         filepath=fill_value_scalar_no_chunks_nc4_url,
@@ -593,3 +593,172 @@ def test_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
         parsed_vds = parsed_dmrpp.parse_dataset(object_store=store)
         vds_g1 = parsed_vds.to_virtual_dataset()
         assert vds_g1["data"].attrs == {"_FillValue": -999}
+
+
+def test_dmrpp_phony_dim_naming():
+    dmrpp_xml_str = textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="phony_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Float32 name="data">
+                <Dim size="10"/>
+                <Dim size="20"/>
+                <Attribute name="_FillValue" type="Float32">
+                    <Value>NaN</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="nan" byteOrder="LE">
+                    <dmrpp:chunk offset="100" nBytes="800"/>
+                </dmrpp:chunks>
+            </Float32>
+        </Dataset>
+        """
+    )
+    parser = dmrparser(dmrpp_xml_str, filepath="file:///phony_test.nc")
+    var = parser._parse_variable(parser.find_node_fqn("/data"))
+    assert var.metadata.dimension_names == ("phony_dim_0", "phony_dim_1")
+    assert var.shape == (10, 20)
+
+
+def test_dmrpp_validation_issues_accumulation():
+    dmrpp_xml_str = textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="validation_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Dimension name="lat" size="25"/>
+            <Float32 name="data">
+                <Dim name="/lat"/>
+                <Attribute type="Float32">
+                    <Value>1.0</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="nan" byteOrder="LE">
+                    <dmrpp:chunk offset="100" nBytes="100"/>
+                </dmrpp:chunks>
+            </Float32>
+        </Dataset>
+        """
+    )
+    parser = dmrparser(dmrpp_xml_str, filepath="file:///validation_test.nc")
+    parser._parse_dataset(parser.root)
+    assert len(parser._validation_issues) > 0
+    assert any(
+        "Missing required attribute 'name'" in issue
+        for issue in parser._validation_issues
+    )
+
+
+def test_dmrpp_get_attrib_with_missing_optional():
+    dmrpp_xml_str = textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Dimension name="lat" size="25"/>
+        </Dataset>
+        """
+    )
+    parser = dmrparser(dmrpp_xml_str, filepath="file:///test.nc")
+    dimension = parser.root.find("dap:Dimension", parser._NS)
+    result = parser._get_attrib(dimension, "nonexistent")
+    assert result is None
+    assert len(parser._validation_issues) == 1
+
+
+def test_dmrpp_get_attrib_with_required_missing():
+    dmrpp_xml_str = textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Dimension name="lat" size="25"/>
+        </Dataset>
+        """
+    )
+    parser = dmrparser(dmrpp_xml_str, filepath="file:///test.nc")
+    dimension = parser.root.find("dap:Dimension", parser._NS)
+    with pytest.raises(ValueError, match="Missing required attribute 'nonexistent'"):
+        parser._get_attrib(dimension, "nonexistent", required=True)
+
+
+def test_dmrpp_mixed_named_and_unnamed_dimensions():
+    dmrpp_xml_str = textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="mixed_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Dimension name="time" size="10"/>
+            <Dimension name="lat" size="30"/>
+            <Float32 name="data">
+                <Dim name="/time"/>
+                <Dim size="20"/>
+                <Dim name="/lat"/>
+                <Attribute name="_FillValue" type="Float32">
+                    <Value>NaN</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="nan" byteOrder="LE">
+                    <dmrpp:chunk offset="100" nBytes="24000"/>
+                </dmrpp:chunks>
+            </Float32>
+        </Dataset>
+        """
+    )
+    parser = dmrparser(dmrpp_xml_str, filepath="file:///mixed_test.nc")
+    var = parser._parse_variable(parser.find_node_fqn("/data"))
+    assert var.metadata.dimension_names == ("time", "phony_dim_1", "lat")
+    assert var.shape == (10, 20, 30)
+
+
+def test_dmrpp_simple(dmrpp_xml_simple):
+    """Test parsing a simple valid DMR++ XML creates virtual chunk manifests."""
+    parser = dmrparser(dmrpp_xml_simple, filepath="file:///simple.nc")
+
+    # Parse dataset
+    manifest_store = parser.parse_dataset(
+        object_store=obstore_local(url="file:///"), group="/"
+    )
+
+    # Verify manifest store is created
+    assert manifest_store is not None
+
+    # Verify dimensions are parsed correctly from the manifest group (accessing private _group for testing)
+    manifest_group = manifest_store._group
+    assert manifest_group is not None
+
+    # The manifest group should have arrays with correct dimensions
+    assert "temperature" in manifest_group.arrays
+    temperature_array = manifest_group.arrays["temperature"]
+    assert temperature_array.shape == (25, 53)
+
+    # Verify chunk manifest exists
+    temperature_manifest = temperature_array.manifest.dict()
+    assert len(temperature_manifest) > 0
+
+    # Verify chunk manifest entries have expected structure
+    for key, chunk_info in temperature_manifest.items():
+        assert "path" in chunk_info
+        assert "offset" in chunk_info
+        assert "length" in chunk_info
+        assert chunk_info["path"] == "file:///simple.nc"
+        assert isinstance(chunk_info["offset"], int)
+        assert isinstance(chunk_info["length"], int)
+
+
+def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
+    """Test that validation issues are accumulated for missing attributes."""
+    parser = dmrparser(
+        dmrpp_xml_with_missing_attrib, filepath="file:///validation_test.nc"
+    )
+
+    # Parse dataset - this should accumulate validation issues
+    manifest_store = parser.parse_dataset(
+        object_store=obstore_local(url="file:///"), group="/"
+    )
+
+    # Verify that validation issues were accumulated
+    assert len(parser._validation_issues) > 0
+
+    # Check that the issues mention missing attributes
+    assert any(
+        "Missing required attribute 'name'" in issue
+        for issue in parser._validation_issues
+    )
+
+    # Verify manifest store was still created (parser continues despite issues)
+    assert manifest_store is not None
+    assert manifest_store._group is not None
