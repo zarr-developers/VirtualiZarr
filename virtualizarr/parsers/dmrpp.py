@@ -133,10 +133,10 @@ class DMRParser:
         """
         self.root = root
         self._validation_issues: list[str] = []
+        data_filepath_from_root = self._get_attrib(self.root, "name", required=True)
+        assert data_filepath_from_root is not None  # required=True guarantees non-None
         self.data_filepath = (
-            data_filepath
-            if data_filepath is not None
-            else self._get_attrib(self.root, "name", required=True)
+            data_filepath if data_filepath is not None else data_filepath_from_root
         )
         self.skip_variables = skip_variables or ()
 
