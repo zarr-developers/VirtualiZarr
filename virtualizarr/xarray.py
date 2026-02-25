@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
+import sys
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
-from concurrent.futures import Executor
+from concurrent.futures import Executor, ProcessPoolExecutor
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -232,6 +234,36 @@ def open_virtual_dataset(
     return ds.drop_vars(list(drop_variables or ()))
 
 
+class _OpenAndPreprocess:
+    """
+    Picklable callable for opening and optionally preprocessing a virtual dataset.
+
+    Defined at module level as a class with ``__call__`` so it can be serialized
+    by both ``ProcessPoolExecutor`` (requires pickling) and lithops (requires a
+    ``__call__`` method — see https://github.com/lithops-cloud/lithops/issues/1428).
+    """
+
+    def __init__(
+        self,
+        registry: ObjectStoreRegistry,
+        parser: Parser,
+        preprocess: Callable[[Dataset], Dataset] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.registry = registry
+        self.parser = parser
+        self.preprocess = preprocess
+        self.kwargs = kwargs
+
+    def __call__(self, path: str) -> Dataset:
+        ds = open_virtual_dataset(
+            url=path, registry=self.registry, parser=self.parser, **self.kwargs
+        )
+        if self.preprocess is not None:
+            ds = self.preprocess(ds)
+        return ds
+
+
 def open_virtual_mfdataset(
     urls: (
         str
@@ -352,27 +384,23 @@ def open_virtual_mfdataset(
 
     # TODO this refactored preprocess and executor logic should be upstreamed into xarray - see https://github.com/pydata/xarray/pull/9932
 
-    if preprocess:
-        # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
-
-        def _open_and_preprocess(path: str) -> xr.Dataset:
-            ds = open_virtual_dataset(
-                url=path, registry=registry, parser=parser, **kwargs
-            )
-            return preprocess(ds)
-
-        open_func = _open_and_preprocess
-    else:
-
-        def _open(path: str) -> xr.Dataset:
-            return open_virtual_dataset(
-                url=path, registry=registry, parser=parser, **kwargs
-            )
-
-        open_func = _open
+    open_func = _OpenAndPreprocess(
+        registry=registry,
+        parser=parser,
+        preprocess=preprocess,
+        **kwargs,
+    )
 
     executor = get_executor(parallel=parallel)
-    with executor() as exec:
+
+    # On Linux, the default multiprocessing start method is "fork", which can
+    # cause deadlocks when the parent process has threads (e.g. in notebooks).
+    # Use "forkserver" to avoid this.
+    executor_kwargs: dict = {}
+    if executor is ProcessPoolExecutor and sys.platform == "linux":
+        executor_kwargs["mp_context"] = mp.get_context("forkserver")
+
+    with executor(**executor_kwargs) as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
