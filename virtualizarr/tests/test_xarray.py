@@ -891,7 +891,13 @@ class TestOpenVirtualMFDataset:
         [
             False,
             ThreadPoolExecutor,
-            pytest.param(ProcessPoolExecutor, marks=pytest.mark.xfail(reason="See https://github.com/zarr-developers/VirtualiZarr/pull/889", strict=True)),
+            pytest.param(
+                ProcessPoolExecutor,
+                marks=pytest.mark.xfail(
+                    reason="See https://github.com/zarr-developers/VirtualiZarr/pull/889",
+                    strict=True,
+                ),
+            ),
             pytest.param("dask", marks=requires_dask),
             pytest.param("lithops", marks=requires_lithops),
         ],
