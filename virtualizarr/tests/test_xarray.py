@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -891,6 +891,7 @@ class TestOpenVirtualMFDataset:
         [
             False,
             ThreadPoolExecutor,
+            ProcessPoolExecutor,
             pytest.param("dask", marks=requires_dask),
             pytest.param("lithops", marks=requires_lithops),
         ],
@@ -905,10 +906,6 @@ class TestOpenVirtualMFDataset:
     def test_parallel_open(
         self, netcdf4_files_factory, parallel, preprocess, local_registry
     ):
-        if parallel == "lithops":
-            pytest.xfail(
-                "TODO - investigate intermittent test failures with lithops executor"
-            )
         filepath1, filepath2 = netcdf4_files_factory()
         parser = HDFParser()
         with (
