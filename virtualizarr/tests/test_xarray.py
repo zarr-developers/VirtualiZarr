@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
