@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -891,6 +891,7 @@ class TestOpenVirtualMFDataset:
         [
             False,
             ThreadPoolExecutor,
+            ProcessPoolExecutor,
             pytest.param("dask", marks=requires_dask),
             pytest.param("lithops", marks=requires_lithops),
         ],
