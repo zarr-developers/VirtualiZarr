@@ -97,14 +97,14 @@ VirtualiZarr comes with a small selection of executors you can choose from when 
 The simplest executor is the [`SerialExecutor`][virtualizarr.parallel.SerialExecutor], which executes all the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls in serial, not in parallel.
 It is the default executor.
 
-### Threads or Processes
+### Threads
 
-One way to parallelize creating virtual references from a single machine is to across multiple threads or processes.
-For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] or ~[`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor]~[^1] class from the [`concurrent.futures`][] module in the python standard library.
+One way to parallelize creating virtual references from a single machine is to use multiple threads.
+For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
 You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
-!!! warning
-    [^1]: `ProcessPoolExecutor` does not currently work with VirtualiZarr. For progress on a fix, see [PR #889](https://github.com/zarr-developers/VirtualiZarr/pull/889).
+!!! note
+    We are also working on adding support for [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor], see [PR #889](https://github.com/zarr-developers/VirtualiZarr/pull/889).
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
