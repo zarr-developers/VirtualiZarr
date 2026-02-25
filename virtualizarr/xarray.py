@@ -5,6 +5,7 @@ import os
 import sys
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -234,6 +235,34 @@ def open_virtual_dataset(
     return ds.drop_vars(list(drop_variables or ()))
 
 
+@contextmanager
+def _suppress_main_reimport():
+    """
+    Temporarily hide ``__main__``'s ``__file__`` and ``__spec__`` so that
+    multiprocessing's ``forkserver``/``spawn`` start methods do not try to
+    re-import the calling script or notebook in child processes.
+
+    Without this, ``forkserver`` causes infinite recursion in scripts that
+    lack an ``if __name__ == '__main__':`` guard, and ``BrokenProcessPool``
+    in notebooks where ``__main__`` is the interactive session.
+
+    Safe to use when the callable sent to the executor is defined in a
+    proper installed module (e.g. ``virtualizarr.xarray``), not ``__main__``.
+    """
+    import __main__
+
+    _sentinel = object()
+    saved_file = __main__.__dict__.pop("__file__", _sentinel)
+    saved_spec = __main__.__dict__.pop("__spec__", _sentinel)
+    try:
+        yield
+    finally:
+        if saved_file is not _sentinel:
+            __main__.__file__ = saved_file
+        if saved_spec is not _sentinel:
+            __main__.__spec__ = saved_spec
+
+
 class _OpenAndPreprocess:
     """
     Picklable callable for opening and optionally preprocessing a virtual dataset.
@@ -395,12 +424,15 @@ def open_virtual_mfdataset(
 
     # On Linux, the default multiprocessing start method is "fork", which can
     # cause deadlocks when the parent process has threads (e.g. in notebooks).
-    # Use "forkserver" to avoid this.
+    # Use "forkserver" to avoid this, and suppress __main__ re-import so it
+    # works in scripts (without if __name__ == '__main__') and notebooks.
     executor_kwargs: dict = {}
+    main_guard = nullcontext()
     if executor is ProcessPoolExecutor and sys.platform == "linux":
         executor_kwargs["mp_context"] = mp.get_context("forkserver")
+        main_guard = _suppress_main_reimport()
 
-    with executor(**executor_kwargs) as exec:
+    with main_guard, executor(**executor_kwargs) as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
