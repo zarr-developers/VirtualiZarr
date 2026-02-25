@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
+import sys
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
-from concurrent.futures import Executor
+from concurrent.futures import Executor, ProcessPoolExecutor
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -390,7 +392,15 @@ def open_virtual_mfdataset(
     )
 
     executor = get_executor(parallel=parallel)
-    with executor() as exec:
+
+    # On Linux, the default multiprocessing start method is "fork", which can
+    # cause deadlocks when the parent process has threads (e.g. in notebooks).
+    # Use "forkserver" to avoid this.
+    executor_kwargs: dict = {}
+    if executor is ProcessPoolExecutor and sys.platform == "linux":
+        executor_kwargs["mp_context"] = mp.get_context("forkserver")
+
+    with executor(**executor_kwargs) as exec:
         # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
         virtual_datasets = list(
             exec.map(
