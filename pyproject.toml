@@ -50,6 +50,8 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 
+zarr = ["arro3-core"]
+
 # kerchunk-based parsers
 netcdf3 = [
     "virtualizarr[remote]",
@@ -208,6 +210,9 @@ minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
+
+[tool.pixi.dependencies]
+pytest = "*"
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]

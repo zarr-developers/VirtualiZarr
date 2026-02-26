@@ -100,6 +100,7 @@ async def _build_chunk_mapping(
 
     Uses obstore's list_async with Arrow output to get chunk paths and sizes
     in a single Rust-level call, avoiding per-chunk getsize calls.
+    # https://github.com/zarr-developers/VirtualiZarr/issues/891
 
     Parameters
     ----------
@@ -330,6 +331,8 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
         offsets_arr[idx] = entry["offset"]
         lengths_arr[idx] = entry["length"]
 
+    # Construct the python ChunkManifest object's numpy arrays directly from the Arrow arrays, minimizing memory copies (i.e. the opposite of what I did in Pass manifests to icechunk as pyarrow arrays #861)
+    # TODO: I think we still have a arrow->dict->arrow conversion happening
     return ChunkManifest.from_arrays(
         paths=paths_arr,
         offsets=offsets_arr,
