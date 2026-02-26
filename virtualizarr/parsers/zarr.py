@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
@@ -19,8 +20,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.vendor.zarr.core.common import _concurrent_map
+from virtualizarr.manifests.manifest import (
+    parse_manifest_index,
+    validate_and_normalize_path_to_uri,
+)
 
 if TYPE_CHECKING:
     import zarr
@@ -90,33 +93,43 @@ async def _handle_scalar_array(
 
 
 async def _build_chunk_mapping(
-    chunk_keys: list[str], zarr_array: ZarrArrayType, path: str, prefix: str
+    zarr_array: ZarrArrayType, path: str, prefix: str
 ) -> dict[str, dict[str, Any]]:
     """
-    Build chunk mapping from a list of chunk keys.
+    Build chunk mapping by listing the object store with obstore.
+
+    Uses obstore's list_async with Arrow output to get chunk paths and sizes
+    in a single Rust-level call, avoiding per-chunk getsize calls.
 
     Parameters
     ----------
-    chunk_keys
-        List of storage keys for chunks.
     zarr_array
         The Zarr array.
     path
         Base path for constructing chunk paths.
     prefix
-        Prefix to strip from chunk keys.
+        Prefix to list and strip from chunk keys.
 
     Returns
     -------
     dict
         Mapping of normalized chunk coordinates to storage locations.
     """
+
+    size_map: dict[str, int] = {}
+    stream = zarr_array.store.store.list_async(prefix=prefix, return_arrow=True)
+    async for batch in stream:
+        size_map.update(
+            zip(batch.column("path").to_pylist(), batch.column("size").to_pylist())
+        )
+
+    # filter out metadata files
+    chunk_keys = [k for k in size_map if not k.split("/")[-1].startswith(".")]
+
     if not chunk_keys:
         return {}
 
-    lengths = await _concurrent_map(
-        [(k,) for k in chunk_keys], zarr_array.store.getsize
-    )
+    lengths = [size_map[k] for k in chunk_keys]
     dict_keys = _normalize_chunk_keys(chunk_keys, prefix)
     paths = [join_url(path, k) for k in chunk_keys]
     offsets = [0] * len(lengths)
@@ -158,24 +171,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             scalar_key = f"{prefix}0"
             return await _handle_scalar_array(zarr_array, path, scalar_key)
 
-        # List all keys under the array prefix, filtering out metadata files
-        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        if not prefix_keys:
-            return {}
-
-        metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
-        chunk_keys = []
-        for key_tuple in prefix_keys:
-            key = key_tuple[0]
-            file_name = (
-                key[len(prefix) :]
-                if prefix and key.startswith(prefix)
-                else key.split("/")[-1]
-            )
-            if file_name not in metadata_files:
-                chunk_keys.append(key)
-
-        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
@@ -272,12 +268,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
         # List chunk keys under the c/ subdirectory
         prefix = f"{name}/c/" if name else "c/"
-        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        if not prefix_keys:
-            return {}
-
-        chunk_keys = [x[0] for x in prefix_keys]
-        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata as-is (no conversion needed)."""
@@ -322,17 +313,28 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     """
     strategy = get_strategy(zarr_array)
     chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
+    chunk_grid_shape = zarr_array._chunk_grid_shape
 
     if not chunk_map:
-        import math
+        return ChunkManifest(chunk_map, shape=chunk_grid_shape)
 
-        if zarr_array.shape and zarr_array.chunks:
-            chunk_grid_shape = tuple(
-                math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
-            )
-            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+    # Pre-allocate N-D numpy arrays shaped like the chunk grid.
+    # Empty string paths indicate missing chunks (sparse arrays).
+    paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
+    offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+    lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
 
-    return ChunkManifest(chunk_map)
+    for key, entry in chunk_map.items():
+        idx = parse_manifest_index(key)
+        paths_arr[idx] = entry["path"]
+        offsets_arr[idx] = entry["offset"]
+        lengths_arr[idx] = entry["length"]
+
+    return ChunkManifest.from_arrays(
+        paths=paths_arr,
+        offsets=offsets_arr,
+        lengths=lengths_arr,
+    )
 
 
 def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
