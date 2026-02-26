@@ -97,11 +97,14 @@ VirtualiZarr comes with a small selection of executors you can choose from when 
 The simplest executor is the [`SerialExecutor`][virtualizarr.parallel.SerialExecutor], which executes all the [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] calls in serial, not in parallel.
 It is the default executor.
 
-### Threads or Processes
+### Threads
 
-One way to parallelize creating virtual references from a single machine is to across multiple threads or processes.
-For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] or [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
+One way to parallelize creating virtual references from a single machine is to use multiple threads.
+For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
 You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
+
+!!! note
+    We are also working on adding support for [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor], see [PR #889](https://github.com/zarr-developers/VirtualiZarr/pull/889).
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -110,6 +113,10 @@ combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel=Threa
 ```
 
 This can work well when virtualizing files in remote object storage because it parallelizes the issuing of HTTP GET requests for each file.
+
+!!! warning
+    Some file parsers, such as the [`HDFParser`][virtualizarr.parsers.HDFParser], rely on C libraries (e.g. HDF5) that hold a process-level lock, which means `ThreadPoolExecutor` will effectively run in serial despite using multiple threads.
+    If you need true parallelism with such parsers, consider using `parallel='lithops'` or `parallel='dask'` instead. If no lithops config file is present (see the [Lithops](#lithops) section), lithops will default to using the [localhost executor](https://lithops-cloud.github.io/docs/source/api_futures.html#lithops.executors.LocalhostExecutor) on the current host, which spawns separate processes that bypass the GIL limitation. These are currently your best options when the file parser is not thread-safe.
 
 ### Dask Delayed
 

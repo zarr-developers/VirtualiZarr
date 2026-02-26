@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -891,6 +891,13 @@ class TestOpenVirtualMFDataset:
         [
             False,
             ThreadPoolExecutor,
+            pytest.param(
+                ProcessPoolExecutor,
+                marks=pytest.mark.xfail(
+                    reason="See https://github.com/zarr-developers/VirtualiZarr/pull/889",
+                    strict=True,
+                ),
+            ),
             pytest.param("dask", marks=requires_dask),
             pytest.param("lithops", marks=requires_lithops),
         ],
