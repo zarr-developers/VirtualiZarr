@@ -13,7 +13,6 @@ from pathlib import PosixPath
 from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
-import pyarrow as pa
 
 from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
