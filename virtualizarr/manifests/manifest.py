@@ -11,6 +11,7 @@ from pathlib import PosixPath
 from typing import Any, NewType, TypedDict, cast
 
 import numpy as np
+import pyarrow as pa
 
 from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
@@ -321,6 +322,54 @@ class ChunkManifest:
         obj._lengths = lengths
 
         return obj
+
+    @classmethod
+    def _from_arrow(
+        cls,
+        *,
+        chunk_keys: "pa.Array",
+        paths: "pa.Array",
+        sizes: "pa.Array",
+        chunk_grid_shape: tuple[int, ...],
+    ) -> "ChunkManifest":
+        """
+        Create a ChunkManifest directly from PyArrow arrays.
+
+
+        Parameters
+        ----------
+        chunk_keys
+            Normalized dot-separated chunk keys e.g. "1.2", as a PyArrow Utf8 array.
+        paths
+            Full paths to chunks, as a PyArrow Utf8 array.
+        sizes
+            Chunk sizes in bytes, as a PyArrow UInt64 array.
+        chunk_grid_shape
+            Shape of the chunk grid, used to pre-allocate numpy arrays.
+        """
+        import pyarrow.compute as pc
+
+        paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
+        offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+        lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+
+        if len(chunk_keys) > 0:
+            # split "1.2" into  [1, 2], then reshape to (n_chunks, ndim), use for indexing
+            ndim = len(chunk_grid_shape)
+            indices_flat = pc.cast(
+                pc.split_pattern(chunk_keys, pattern=".").flatten(), pa.int64()
+            ).to_numpy()
+            indices_2d = indices_flat.reshape(-1, ndim)
+            idx_tuple = tuple(indices_2d[:, i] for i in range(ndim))
+
+            paths_arr[idx_tuple] = paths.to_numpy(zero_copy_only=False)
+            lengths_arr[idx_tuple] = sizes.to_numpy()
+
+        return cls.from_arrays(
+            paths=paths_arr,
+            offsets=offsets_arr,
+            lengths=lengths_arr,
+        )
 
     @property
     def ndim_chunk_grid(self) -> int:

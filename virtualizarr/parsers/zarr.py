@@ -26,6 +26,7 @@ from virtualizarr.manifests.manifest import (
 )
 
 if TYPE_CHECKING:
+    import pyarrow as pa
     import zarr
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
@@ -94,13 +95,12 @@ async def _handle_scalar_array(
 
 async def _build_chunk_mapping(
     zarr_array: ZarrArrayType, path: str, prefix: str
-) -> dict[str, dict[str, Any]]:
+) -> tuple["pa.Array", "pa.Array", "pa.Array"] | None:
     """
     Build chunk mapping by listing the object store with obstore.
 
     Uses obstore's list_async with Arrow output to get chunk paths and sizes
     in a single Rust-level call, avoiding per-chunk getsize calls.
-    # https://github.com/zarr-developers/VirtualiZarr/issues/891
 
     Parameters
     ----------
@@ -113,32 +113,48 @@ async def _build_chunk_mapping(
 
     Returns
     -------
-    dict
-        Mapping of normalized chunk coordinates to storage locations.
+    Tuple of (normalized_keys, full_paths, sizes) as PyArrow arrays, or None if no chunks found.
     """
+    import pyarrow as pa
+    import pyarrow.compute as pc
 
-    size_map: dict[str, int] = {}
+    path_batches = []
+    size_batches = []
     stream = zarr_array.store.store.list_async(prefix=prefix, return_arrow=True)
     async for batch in stream:
-        size_map.update(
-            zip(batch.column("path").to_pylist(), batch.column("size").to_pylist())
+        pa_path_col = pa.array(batch.column("path"))
+        not_metadata = pc.invert(
+            pc.or_(
+                pc.match_substring(pa_path_col, pattern="/."),
+                pc.starts_with(pa_path_col, "."),
+            )
         )
 
-    # filter out metadata files
-    chunk_keys = [k for k in size_map if not k.split("/")[-1].startswith(".")]
+        filtered_paths = pa_path_col.filter(not_metadata)
+        filtered_sizes = pa.array(batch.column("size")).filter(not_metadata)
+        path_batches.append(filtered_paths)
+        size_batches.append(filtered_sizes)
 
-    if not chunk_keys:
-        return {}
+    if not path_batches:
+        return None
 
-    lengths = [size_map[k] for k in chunk_keys]
-    dict_keys = _normalize_chunk_keys(chunk_keys, prefix)
-    paths = [join_url(path, k) for k in chunk_keys]
-    offsets = [0] * len(lengths)
+    all_paths = pa.concat_arrays(path_batches)
+    all_sizes = pa.concat_arrays(size_batches)
 
-    return {
-        key: {"path": p, "offset": offset, "length": length}
-        for key, p, offset, length in zip(dict_keys, paths, offsets, lengths)
-    }
+    if len(all_paths) == 0:
+        return None
+    # normalize: strip prefix, replace / with .
+    stripped = pc.utf8_replace_slice(
+        all_paths, start=0, stop=len(prefix), replacement=""
+    )
+    normalized_keys = pc.replace_substring(stripped, pattern="/", replacement=".")
+
+    # construct full paths
+    full_paths = pc.binary_join_element_wise(
+        pa.scalar(path.rstrip("/")), all_paths, "/"
+    )
+
+    return normalized_keys, full_paths, all_sizes
 
 
 class ZarrVersionStrategy(ABC):
@@ -313,30 +329,43 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
     strategy = get_strategy(zarr_array)
-    chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
     chunk_grid_shape = zarr_array._chunk_grid_shape
 
-    if not chunk_map:
-        return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+    # For scalar arrays use _from_arrays
+    chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
+    if zarr_array.shape == ():
+        if not chunk_map:
+            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+        paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
+        offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+        lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+        for key, entry in chunk_map.items():
+            idx = parse_manifest_index(key)
+            paths_arr[idx] = entry["path"]
+            offsets_arr[idx] = entry["offset"]
+            lengths_arr[idx] = entry["length"]
+        return ChunkManifest.from_arrays(
+            paths=paths_arr, offsets=offsets_arr, lengths=lengths_arr
+        )
 
-    # Pre-allocate N-D numpy arrays shaped like the chunk grid.
-    # Empty string paths indicate missing chunks (sparse arrays).
-    paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
-    offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
-    lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+    # for non scalar arrays, use the new _from_arrow method
+    name = _get_array_name(zarr_array)
+    if zarr_array.metadata.zarr_format == 3:
+        prefix = f"{name}/c/" if name else "c/"
+    else:
+        prefix = f"{name}/" if name else ""
 
-    for key, entry in chunk_map.items():
-        idx = parse_manifest_index(key)
-        paths_arr[idx] = entry["path"]
-        offsets_arr[idx] = entry["offset"]
-        lengths_arr[idx] = entry["length"]
+    result = await _build_chunk_mapping(zarr_array, path, prefix)
 
-    # Construct the python ChunkManifest object's numpy arrays directly from the Arrow arrays, minimizing memory copies (i.e. the opposite of what I did in Pass manifests to icechunk as pyarrow arrays #861)
-    # TODO: I think we still have a arrow->dict->arrow conversion happening
-    return ChunkManifest.from_arrays(
-        paths=paths_arr,
-        offsets=offsets_arr,
-        lengths=lengths_arr,
+    if result is None:
+        return ChunkManifest({}, shape=chunk_grid_shape)
+
+    normalized_keys, full_paths, sizes = result
+    return ChunkManifest._from_arrow(
+        chunk_keys=normalized_keys,
+        paths=full_paths,
+        sizes=sizes,
+        chunk_grid_shape=chunk_grid_shape,
     )
 
 

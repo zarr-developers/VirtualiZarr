@@ -193,11 +193,11 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
         obs_store = ObsLocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
-        strategy = get_strategy(zarr_array)
-        return await strategy.get_chunk_mapping(zarr_array, filepath)
+        manifest = await build_chunk_manifest(zarr_array, filepath)
+        return manifest.dict()
 
-    chunk_map = asyncio.run(get_chunk_map())
-    assert chunk_map == {}
+    result = asyncio.run(get_chunk_map())
+    assert result == {}
 
 
 @SKIP_OLDER_ZARR_PYTHON
