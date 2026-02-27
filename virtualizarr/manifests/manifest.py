@@ -334,46 +334,46 @@ class ChunkManifest:
         paths: "pa.StringArray",
         offsets: "pa.UInt64Array",
         lengths: "pa.UInt64Array",
+        shape: tuple[int, ...] | None = None,
     ) -> "ChunkManifest":
         """
-        Create a ChunkManifest directly from PyArrow arrays.
+        Create a ChunkManifest from flat 1D PyArrow arrays.
 
+        Avoids intermediate Python dicts by converting Arrow arrays directly
+        to the numpy arrays used internally by ChunkManifest.
 
         Parameters
         ----------
-        chunk_keys
-            Normalized dot-separated chunk keys e.g. "1.2", as a PyArrow Utf8 array.
         paths
-            Full paths to chunks, as a PyArrow Utf8 array.
-        sizes
-            Chunk sizes in bytes, as a PyArrow UInt64 array.
-        chunk_grid_shape
-            Shape of the chunk grid, used to pre-allocate numpy arrays.
+            Full paths to chunks, as a PyArrow StringArray. Nulls represent missing chunks.
+        offsets
+            Byte offsets of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        lengths
+            Byte lengths of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        shape
+            Shape to reshape the flat arrays into. If None, arrays are used as-is (1D).
         """
         import pyarrow as pa
         import pyarrow.compute as pc
 
-        paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
-        offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
-        lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
-
-        if len(chunk_keys) > 0:
-            # split "1.2" into  [1, 2], then reshape to (n_chunks, ndim), use for indexing
-            ndim = len(chunk_grid_shape)
-            indices_flat = pc.cast(
-                pc.split_pattern(chunk_keys, pattern=".").flatten(), pa.int64()
-            ).to_numpy()
-            indices_2d = indices_flat.reshape(-1, ndim)
-            idx_tuple = tuple(indices_2d[:, i] for i in range(ndim))
-
-            paths_arr[idx_tuple] = paths.to_numpy(zero_copy_only=False)
-            lengths_arr[idx_tuple] = sizes.to_numpy()
-
-        return cls.from_arrays(
-            paths=paths_arr,
-            offsets=offsets_arr,
-            lengths=lengths_arr,
+        paths_np = (
+            pc.if_else(pc.is_null(paths), "", paths)
+            .to_numpy(zero_copy_only=False)
+            .astype(np.dtypes.StringDType())
         )
+        offsets_np = pc.if_else(
+            pc.is_null(offsets), pa.scalar(0, pa.uint64()), offsets
+        ).to_numpy(zero_copy_only=False)
+        lengths_np = pc.if_else(
+            pc.is_null(lengths), pa.scalar(0, pa.uint64()), lengths
+        ).to_numpy(zero_copy_only=False)
+
+        if shape is not None:
+            paths_np = paths_np.reshape(shape)
+            offsets_np = offsets_np.reshape(shape)
+            lengths_np = lengths_np.reshape(shape)
+
+        return cls.from_arrays(paths=paths_np, offsets=offsets_np, lengths=lengths_np)
 
     @property
     def ndim_chunk_grid(self) -> int:
