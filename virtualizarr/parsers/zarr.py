@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.core.dtype import parse_dtype
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -183,6 +182,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         from zarr.core.metadata import ArrayV2Metadata
 
         try:
+            from zarr.core.dtype import parse_dtype
             from zarr.metadata.migrate_v3 import _convert_array_metadata
         except (ImportError, AttributeError):
             raise ImportError(
