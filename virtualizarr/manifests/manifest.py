@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections.abc import (
     Callable,
@@ -8,13 +10,16 @@ from collections.abc import (
     ValuesView,
 )
 from pathlib import PosixPath
-from typing import Any, NewType, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
 import pyarrow as pa
 
 from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
+
+if TYPE_CHECKING:
+    import pyarrow as pa
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -347,6 +352,7 @@ class ChunkManifest:
         chunk_grid_shape
             Shape of the chunk grid, used to pre-allocate numpy arrays.
         """
+        import pyarrow as pa
         import pyarrow.compute as pc
 
         paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
