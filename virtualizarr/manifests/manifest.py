@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections.abc import (
     Callable,
@@ -8,12 +10,15 @@ from collections.abc import (
     ValuesView,
 )
 from pathlib import PosixPath
-from typing import Any, NewType, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
 
 from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
+
+if TYPE_CHECKING:
+    import pyarrow as pa
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -321,6 +326,54 @@ class ChunkManifest:
         obj._lengths = lengths
 
         return obj
+
+    @classmethod
+    def _from_arrow(
+        cls,
+        *,
+        paths: "pa.StringArray",
+        offsets: "pa.UInt64Array",
+        lengths: "pa.UInt64Array",
+        shape: tuple[int, ...] | None = None,
+    ) -> "ChunkManifest":
+        """
+        Create a ChunkManifest from flat 1D PyArrow arrays.
+
+        Avoids intermediate Python dicts by converting Arrow arrays directly
+        to the numpy arrays used internally by ChunkManifest.
+
+        Parameters
+        ----------
+        paths
+            Full paths to chunks, as a PyArrow StringArray. Nulls represent missing chunks.
+        offsets
+            Byte offsets of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        lengths
+            Byte lengths of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        shape
+            Shape to reshape the flat arrays into. If None, arrays are used as-is (1D).
+        """
+        import pyarrow as pa
+        import pyarrow.compute as pc
+
+        paths_np = (
+            pc.if_else(pc.is_null(paths), "", paths)
+            .to_numpy(zero_copy_only=False)
+            .astype(np.dtypes.StringDType())
+        )
+        offsets_np = pc.if_else(
+            pc.is_null(offsets), pa.scalar(0, pa.uint64()), offsets
+        ).to_numpy(zero_copy_only=False)
+        lengths_np = pc.if_else(
+            pc.is_null(lengths), pa.scalar(0, pa.uint64()), lengths
+        ).to_numpy(zero_copy_only=False)
+
+        if shape is not None:
+            paths_np = paths_np.reshape(shape)
+            offsets_np = offsets_np.reshape(shape)
+            lengths_np = lengths_np.reshape(shape)
+
+        return cls.from_arrays(paths=paths_np, offsets=offsets_np, lengths=lengths_np)
 
     @property
     def ndim_chunk_grid(self) -> int:

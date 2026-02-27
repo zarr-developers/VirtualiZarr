@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
@@ -19,10 +20,13 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.vendor.zarr.core.common import _concurrent_map
+from virtualizarr.manifests.manifest import (
+    parse_manifest_index,
+    validate_and_normalize_path_to_uri,
+)
 
 if TYPE_CHECKING:
+    import pyarrow as pa
     import zarr
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
@@ -90,41 +94,67 @@ async def _handle_scalar_array(
 
 
 async def _build_chunk_mapping(
-    chunk_keys: list[str], zarr_array: ZarrArrayType, path: str, prefix: str
-) -> dict[str, dict[str, Any]]:
+    zarr_array: ZarrArrayType, path: str, prefix: str
+) -> tuple["pa.Array", "pa.Array", "pa.Array"] | None:
     """
-    Build chunk mapping from a list of chunk keys.
+    Build chunk mapping by listing the object store with obstore.
+
+    Uses obstore's list_async with Arrow output to get chunk paths and sizes
+    in a single Rust-level call, avoiding per-chunk getsize calls.
 
     Parameters
     ----------
-    chunk_keys
-        List of storage keys for chunks.
     zarr_array
         The Zarr array.
     path
         Base path for constructing chunk paths.
     prefix
-        Prefix to strip from chunk keys.
+        Prefix to list and strip from chunk keys.
 
     Returns
     -------
-    dict
-        Mapping of normalized chunk coordinates to storage locations.
+    Tuple of (normalized_keys, full_paths, sizes) as PyArrow arrays, or None if no chunks found.
     """
-    if not chunk_keys:
-        return {}
+    import pyarrow as pa
+    import pyarrow.compute as pc
 
-    lengths = await _concurrent_map(
-        [(k,) for k in chunk_keys], zarr_array.store.getsize
+    path_batches = []
+    size_batches = []
+    stream = zarr_array.store.store.list_async(prefix=prefix, return_arrow=True)
+    async for batch in stream:
+        pa_path_col = pa.array(batch.column("path"))
+        not_metadata = pc.invert(
+            pc.or_(
+                pc.match_substring(pa_path_col, pattern="/."),
+                pc.starts_with(pa_path_col, "."),
+            )
+        )
+
+        filtered_paths = pa_path_col.filter(not_metadata)
+        filtered_sizes = pa.array(batch.column("size")).filter(not_metadata)
+        path_batches.append(filtered_paths)
+        size_batches.append(filtered_sizes)
+
+    if not path_batches:
+        return None
+
+    all_paths = pa.concat_arrays(path_batches)
+    all_sizes = pa.concat_arrays(size_batches)
+
+    if len(all_paths) == 0:
+        return None
+    # normalize: strip prefix, replace / with .
+    stripped = pc.utf8_replace_slice(
+        all_paths, start=0, stop=len(prefix), replacement=""
     )
-    dict_keys = _normalize_chunk_keys(chunk_keys, prefix)
-    paths = [join_url(path, k) for k in chunk_keys]
-    offsets = [0] * len(lengths)
+    normalized_keys = pc.replace_substring(stripped, pattern="/", replacement=".")
 
-    return {
-        key: {"path": p, "offset": offset, "length": length}
-        for key, p, offset, length in zip(dict_keys, paths, offsets, lengths)
-    }
+    # construct full paths
+    full_paths = pc.binary_join_element_wise(
+        pa.scalar(path.rstrip("/")), all_paths, "/"
+    )
+
+    return normalized_keys, full_paths, all_sizes
 
 
 class ZarrVersionStrategy(ABC):
@@ -142,6 +172,15 @@ class ZarrVersionStrategy(ABC):
         """Get V3 metadata for the array (converting if necessary)."""
         ...
 
+    @abstractmethod
+    def get_prefix(self, zarr_array: ZarrArrayType) -> str:
+        """Get the storage prefix for chunk listing."""
+        ...
+
+    @abstractmethod
+    def validate(self, zarr_array: ZarrArrayType) -> None:
+        """Validate that the array can be virtualized."""
+
 
 class ZarrV2Strategy(ZarrVersionStrategy):
     """Strategy for handling Zarr V2 arrays."""
@@ -158,24 +197,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             scalar_key = f"{prefix}0"
             return await _handle_scalar_array(zarr_array, path, scalar_key)
 
-        # List all keys under the array prefix, filtering out metadata files
-        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        if not prefix_keys:
-            return {}
-
-        metadata_files = {".zarray", ".zattrs", ".zgroup", ".zmetadata"}
-        chunk_keys = []
-        for key_tuple in prefix_keys:
-            key = key_tuple[0]
-            file_name = (
-                key[len(prefix) :]
-                if prefix and key.startswith(prefix)
-                else key.split("/")[-1]
-            )
-            if file_name not in metadata_files:
-                chunk_keys.append(key)
-
-        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
@@ -237,6 +259,13 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
         return v3_metadata
 
+    def get_prefix(self, zarr_array: ZarrArrayType) -> str:
+        name = _get_array_name(zarr_array)
+        return f"{name}/" if name else ""
+
+    def validate(self, zarr_array: ZarrArrayType) -> None:
+        pass  # no restrictions for V2
+
 
 class ZarrV3Strategy(ZarrVersionStrategy):
     """Strategy for handling Zarr V3 arrays."""
@@ -272,16 +301,28 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
         # List chunk keys under the c/ subdirectory
         prefix = f"{name}/c/" if name else "c/"
-        prefix_keys = [(x,) async for x in zarr_array.store.list_prefix(prefix)]
-        if not prefix_keys:
-            return {}
-
-        chunk_keys = [x[0] for x in prefix_keys]
-        return await _build_chunk_mapping(chunk_keys, zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata as-is (no conversion needed)."""
         return zarr_array.metadata  # type: ignore[return-value]
+
+    def get_prefix(self, zarr_array: ZarrArrayType) -> str:
+        name = _get_array_name(zarr_array)
+        return f"{name}/c/" if name else "c/"
+
+    def validate(self, zarr_array: ZarrArrayType) -> None:
+        from zarr.codecs import ShardingCodec
+
+        if any(
+            isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
+        ):
+            raise NotImplementedError(
+                "Zarr V3 arrays with sharding are not yet supported. "
+                "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
+                "which VirtualiZarr does not currently handle. "
+                "Reading sharded arrays without proper offset handling would result in corrupted data."
+            )
 
 
 def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
@@ -320,19 +361,84 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+
     strategy = get_strategy(zarr_array)
-    chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
+    chunk_grid_shape = zarr_array._chunk_grid_shape
 
-    if not chunk_map:
-        import math
-
-        if zarr_array.shape and zarr_array.chunks:
-            chunk_grid_shape = tuple(
-                math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
-            )
+    # scalar arrays go through the dict path instead of the pure arrow bit
+    if zarr_array.shape == ():
+        chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
+        if not chunk_map:
             return ChunkManifest(chunk_map, shape=chunk_grid_shape)
+        paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
+        offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+        lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
+        for key, entry in chunk_map.items():
+            idx = parse_manifest_index(key)
+            paths_arr[idx] = entry["path"]
+            offsets_arr[idx] = entry["offset"]
+            lengths_arr[idx] = entry["length"]
+        return ChunkManifest.from_arrays(
+            paths=paths_arr, offsets=offsets_arr, lengths=lengths_arr
+        )
 
-    return ChunkManifest(chunk_map)
+    # check for v3 sharding / prefix update
+    strategy.validate(zarr_array)
+    prefix = strategy.get_prefix(zarr_array)
+
+    result = await _build_chunk_mapping(zarr_array, path, prefix)
+
+    if result is None:
+        return ChunkManifest({}, shape=chunk_grid_shape)
+
+    normalized_keys, full_paths, all_lengths = result
+
+    # Incoming: lots of LLM arrow mumbo jumbo for sparse arrays
+
+    # compute flat positions for each listed chunk (C-order)
+    ndim = len(chunk_grid_shape)
+    if ndim == 1:
+        # 1D shortcut: we can bypass in the simple case
+        flat_positions = pc.cast(normalized_keys, pa.int64())
+        total_size = chunk_grid_shape[0]
+    else:
+        # compute C-order strides and dot with per-dimension indices
+        stride = 1
+        strides = []
+        for s in reversed(chunk_grid_shape):
+            strides.insert(0, stride)
+            stride *= s
+        total_size = stride
+
+        flat_positions = pa.repeat(pa.scalar(0, pa.int64()), len(normalized_keys))
+        for dim, dim_stride in enumerate(strides):
+            dim_indices = pc.list_slice(
+                pc.split_pattern(normalized_keys, pattern="."), dim, dim + 1
+            ).flatten()
+            flat_positions = pc.add(
+                flat_positions,
+                pc.multiply(pc.cast(dim_indices, pa.int64()), dim_stride),
+            )
+
+    # scatter listed chunks into dense flat arrow arrays via join on flat index
+    # How will this left join scale? poorly?
+    updates = pa.table(
+        {"idx": flat_positions, "path": full_paths, "length": all_lengths}
+    )
+    dense = (
+        pa.table({"idx": pa.array(range(total_size), type=pa.int64())})
+        .join(updates, "idx", join_type="left outer")
+        .sort_by("idx")
+    )
+
+    return ChunkManifest._from_arrow(
+        paths=dense["path"].combine_chunks(),
+        offsets=pa.repeat(pa.scalar(0, type=pa.uint64()), total_size),
+        lengths=dense["length"].combine_chunks(),
+        shape=chunk_grid_shape,
+    )
 
 
 def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
