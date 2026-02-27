@@ -331,10 +331,9 @@ class ChunkManifest:
     def _from_arrow(
         cls,
         *,
-        chunk_keys: "pa.Array",
-        paths: "pa.Array",
-        sizes: "pa.Array",
-        chunk_grid_shape: tuple[int, ...],
+        paths: "pa.StringArray",
+        offsets: "pa.UInt64Array",
+        lengths: "pa.UInt64Array",
     ) -> "ChunkManifest":
         """
         Create a ChunkManifest directly from PyArrow arrays.
