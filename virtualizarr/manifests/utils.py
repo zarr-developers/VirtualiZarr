@@ -213,6 +213,12 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
     return tuple(new_l)
 
 
+def _remove_elements_at_positions(
+    t: tuple[int, ...], pos: list[int]
+) -> tuple[int, ...]:
+    return tuple(x for i, x in enumerate(t) if i not in pos)
+
+
 def check_no_partial_chunks_on_concat_axis(
     shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
 ):
@@ -224,6 +230,23 @@ def check_no_partial_chunks_on_concat_axis(
                 "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
                 f"Concat input {i} has array length {shape[axis]} along the concatenation axis which is not "
                 f"evenly divisible by chunk length {chunk_shape[axis]}."
+            )
+
+
+def check_same_shapes_except_axes(
+    shapes: list[tuple[int, ...]], except_axes: list[int]
+):
+    """Check that shapes are compatible for concatenation"""
+
+    shapes_without_axes = [
+        _remove_elements_at_positions(shape, except_axes) for shape in shapes
+    ]
+
+    first_shape, *other_shapes = shapes_without_axes
+    for other_shape in other_shapes:
+        if other_shape != first_shape:
+            raise ValueError(
+                f"Cannot concatenate arrays with shapes {[shape for shape in shapes]}"
             )
 
 

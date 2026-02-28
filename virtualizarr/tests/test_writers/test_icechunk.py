@@ -13,7 +13,6 @@ from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
-from virtualizarr.writers.icechunk import generate_chunk_key
 
 icechunk = pytest.importorskip("icechunk")
 
@@ -394,47 +393,6 @@ def test_checksum(
         npt.assert_equal(pressure_array, arr)
 
 
-def test_generate_chunk_key_no_offset():
-    # Test case without any offset (append_axis and existing_num_chunks are None)
-    index = (1, 2, 3)
-    result = generate_chunk_key(index)
-    assert result == [1, 2, 3], (
-        "The chunk key should match the index without any offset."
-    )
-
-
-def test_generate_chunk_key_with_offset():
-    # Test case with offset on append_axis 1
-    index = (1, 2, 3)
-    append_axis = 1
-    existing_num_chunks = 5
-    result = generate_chunk_key(
-        index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
-    )
-    assert result == [1, 7, 3], "The chunk key should offset the second index by 5."
-
-
-def test_generate_chunk_key_zero_offset():
-    # Test case where existing_num_chunks is 0 (no offset should be applied)
-    index = (4, 5, 6)
-    append_axis = 1
-    existing_num_chunks = 0
-    result = generate_chunk_key(
-        index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
-    )
-    assert result == [4, 5, 6], (
-        "No offset should be applied when existing_num_chunks is 0."
-    )
-
-
-def test_generate_chunk_key_append_axis_out_of_bounds():
-    # Edge case where append_axis is out of bounds
-    index = (3, 4)
-    append_axis = 2  # This is out of bounds for a 2D index
-    with pytest.raises(ValueError):
-        generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
-
-
 def test_roundtrip_coords(
     manifest_array, icechunk_filestore: "IcechunkStore", icechunk_repo: "Repository"
 ):
@@ -548,8 +506,7 @@ class TestAppend:
             )
 
     ## When appending to a virtual ref with encoding, it succeeds
-    @pytest.mark.asyncio
-    async def test_append_with_multiple_root_arrays(
+    def test_append_with_multiple_root_arrays(
         self, icechunk_repo: "Repository", synthetic_vds_multiple_vars
     ):
         vds, arr = synthetic_vds_multiple_vars
@@ -708,6 +665,310 @@ class TestAppend:
             match="append_dim 'z' does not match any existing dataset dimensions",
         ):
             vds.vz.to_icechunk(icechunk_filestore_append.store, append_dim="z")
+
+
+class TestRegion:
+    @pytest.fixture()
+    def combined_synthetic_vds(self, synthetic_vds):
+        vds, arr = synthetic_vds
+        vds = vds.drop_encoding()
+        vds_grid = [
+            [
+                vds.assign_coords(
+                    y=range(chunk_y * len(vds.y), (chunk_y + 1) * len(vds.y)),
+                    x=range(chunk_x * len(vds.x), (chunk_x + 1) * len(vds.x)),
+                )
+                for chunk_x in range(3)
+            ]
+            for chunk_y in range(3)
+        ]
+        combined_empty_vds = xr.combine_nested(vds_grid, concat_dim=["y", "x"])
+        # delete all references, this is so we can just write the coordinates
+        # and zarr metadata to the store. This is typically done instead with
+        # dask arrays and "compute=False", but we better not depend on dask just for this
+        combined_empty_vds["foo"].data = ManifestArray(
+            metadata=combined_empty_vds["foo"].data.metadata,
+            chunkmanifest=ChunkManifest({}, shape=combined_empty_vds["foo"].data.shape),
+        )
+        return vds, arr, vds_grid, combined_empty_vds
+
+    @pytest.fixture(scope="function")
+    def initialized_repo(self, icechunk_repo: "Repository", combined_synthetic_vds):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        # initialize empty
+        init_session = icechunk_repo.writable_session("main")
+        combined_empty_vds.vz.to_icechunk(init_session.store)
+        init_session.commit("test commit")
+        return icechunk_repo
+
+    def test_initialized_repo_is_empty(self, initialized_repo):
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            assert np.all(ds["foo"].data == 0)  # fill_value is 0
+
+    def test_write_region_auto(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][1]
+        write_session = initialized_repo.writable_session("main")
+        my_vds.vz.to_icechunk(write_session.store, region="auto")
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_explicit_auto(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][1]
+        write_session = initialized_repo.writable_session("main")
+        my_vds.vz.to_icechunk(write_session.store, region={"y": "auto", "x": "auto"})
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_explicit(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][1]
+        write_session = initialized_repo.writable_session("main")
+        my_vds.vz.to_icechunk(
+            write_session.store,
+            region={
+                "y": slice(len(vds["y"]), 2 * len(vds["y"])),
+                "x": slice(len(vds["x"]), 2 * len(vds["x"])),
+            },
+        )
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_multiple(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = xr.combine_nested(vds_grid[1], concat_dim=["x"])
+        write_session = initialized_repo.writable_session("main")
+        my_vds.vz.to_icechunk(write_session.store, region="auto")
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_writes_whole_unspecified_dim(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        # the virtual dataset spans all of dimension 'x', for which it doesn't have coordinates
+        # and we want to write to a region in 'y'
+        my_vds = xr.combine_nested(vds_grid[1], concat_dim=["x"])
+        my_vds = my_vds.drop_vars("x")
+        write_session = initialized_repo.writable_session("main")
+        my_vds.vz.to_icechunk(write_session.store, region={"y": "auto"})
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]).broadcast_like(ds)
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_auto_without_dimension(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        """
+        When the coordinate for an "auto" dimension is missing, xarray
+        assumes that we want to write starting at index 0, even
+        if the written dataset doesn't span the whole dimension.
+        So VirtualiZarr behaves consistently with xarray here.
+        """
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][0]
+        my_vds_to_insert = my_vds.drop_vars("x")
+        write_session = initialized_repo.writable_session("main")
+        my_vds_to_insert.vz.to_icechunk(write_session.store, region="auto")
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_explicit_auto_without_dimension(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        """
+        When the coordinate for an "auto" dimension is missing, xarray
+        assumes that we want to write starting at index 0, even
+        if the written dataset doesn't span the whole dimension.
+        So VirtualiZarr behaves consistently with xarray here.
+        """
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][0]
+        my_vds_to_insert = my_vds.drop_vars("x")
+        write_session = initialized_repo.writable_session("main")
+        my_vds_to_insert.vz.to_icechunk(
+            write_session.store, region={"y": "auto", "x": "auto"}
+        )
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                initialized_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
+
+    def test_write_region_unaligned_chunks_raises(
+        self,
+        initialized_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        my_vds = vds_grid[1][1]
+        my_vds = my_vds.assign_coords(x=my_vds["x"] - 1)
+        write_session = initialized_repo.writable_session("main")
+        with pytest.raises(ValueError, match="is not aligned to whole chunks"):
+            my_vds.vz.to_icechunk(
+                write_session.store, region={"y": "auto", "x": "auto"}
+            )
+
+    @pytest.mark.xfail(
+        reason="This doesn't work in xarray either, maybe not even intended?",
+    )
+    def test_write_datatree_region(
+        self,
+        icechunk_repo: "Repository",
+        combined_synthetic_vds,
+    ):
+        vds, arr, vds_grid, combined_empty_vds = combined_synthetic_vds
+
+        combined_empty_vdt = xr.DataTree.from_dict({"nested/group": combined_empty_vds})
+        init_session = icechunk_repo.writable_session("main")
+        combined_empty_vdt.vz.to_icechunk(init_session.store)
+        init_session.commit("init repo")
+
+        my_vds = vds_grid[1][1]
+        write_session = icechunk_repo.writable_session("main")
+        my_vdt = xr.DataTree.from_dict({"nested/group": my_vds})
+        my_vdt.vz.to_icechunk(write_session.store, region="auto")
+        write_session.commit("test commit")
+
+        # check that references are written
+        with (
+            xr.open_zarr(
+                icechunk_repo.readonly_session("main").store,
+                consolidated=False,
+                zarr_format=3,
+                group="nested/group",
+            ) as ds,
+        ):
+            is_written = ds["y"].isin(my_vds["y"]) & ds["x"].isin(my_vds["x"])
+            xrt.assert_allclose(
+                is_written,
+                ds["foo"] != 0,
+            )
 
 
 # TODO test with S3 / minio
