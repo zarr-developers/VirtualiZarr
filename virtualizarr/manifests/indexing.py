@@ -2,8 +2,11 @@ from types import EllipsisType
 from typing import TYPE_CHECKING, TypeAlias, cast
 
 import numpy as np
+from zarr.core.chunk_grids import RegularChunkGrid
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
+from .manifest import ChunkManifest
 
 # indexer with only basic selectors, no new axes or ellipsis
 T_BasicIndexer_1d: TypeAlias = int | slice | np.ndarray
@@ -147,18 +150,18 @@ def apply_selection(
     for axis, (length, indexer_1d) in enumerate(
         zip(marr.shape, indexer_without_newaxes)
     ):
-        output_arr = apply_selection_1d(output_arr, indexer_1d, length)
+        output_arr = apply_selection_1d(output_arr, indexer_1d, axis, length)
 
     return output_arr
 
 
 def apply_selection_1d(
-    marr: "ManifestArray", indexer_1d: T_BasicIndexer_1d, length: int
+    marr: "ManifestArray", indexer_1d: T_BasicIndexer_1d, axis: int, length: int
 ) -> "ManifestArray":
     """
     Actually index the ManifestArray along 1 dimension.
 
-    Notice that none of these options actually do any indexing right now!
+    Notice that most of these options don't actually do any indexing right now!
     """
 
     if isinstance(indexer_1d, slice):
@@ -169,10 +172,27 @@ def apply_selection_1d(
                 f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
             )
     elif isinstance(indexer_1d, int):
-        # TODO cover possibility of indexing into a length-1 dimension (which just removes that dimension)?
-        raise NotImplementedError(
-            f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
-        )
+        if length == 1:
+            shape = marr.metadata.shape
+            chunk_shape = marr.metadata.chunk_grid.chunk_shape
+            metadata = ArrayV3Metadata.from_dict(
+                marr.metadata.to_dict() | dict(
+                    shape=shape[:axis] + shape[axis + 1:],
+                    chunk_grid=RegularChunkGrid(chunk_shape=chunk_shape[:axis] + chunk_shape[axis + 1:]),
+                    dimension_names=None, # TODO
+                )
+            )
+            manifest = ChunkManifest.from_arrays(
+                paths=np.squeeze(marr.manifest._paths, axis=axis),
+                offsets=np.squeeze(marr.manifest._offsets, axis=axis),
+                lengths=np.squeeze(marr.manifest._lengths, axis=axis),
+                validate_paths=False
+            )
+            marr = marr.__class__(metadata, manifest)
+        else:
+            raise NotImplementedError(
+                f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
+            )
     elif isinstance(indexer_1d, np.ndarray):
         raise NotImplementedError(
             f"Unsupported indexer. So-called 'fancy indexing' via numpy arrays is not supported, but received {indexer_1d}"
