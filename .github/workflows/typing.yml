@@ -20,8 +20,8 @@ env:
   PIP_ROOT_USER_ACTION: ignore
 
 jobs:
-  mypy:
-    name: mypy
+  ty:
+    name: ty
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,4 +34,4 @@ jobs:
           pixi list --environment test
       - name: Type check
         run: |
-          pixi run -e test run-mypy
+          pixi run -e test ty check
