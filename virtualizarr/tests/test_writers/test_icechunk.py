@@ -13,7 +13,6 @@ from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
-from virtualizarr.writers.icechunk import generate_chunk_key
 
 icechunk = pytest.importorskip("icechunk")
 
@@ -258,9 +257,7 @@ def test_validate_containers(
     )
 
     # assert that an error is raised when attempting to write to icechunk
-    with pytest.raises(
-        ValueError, match="No Virtual Chunk Container set which supports prefix"
-    ):
+    with pytest.raises(ValueError, match="does not start with any supported prefix"):
         vds.vz.to_icechunk(icechunk_filestore)
 
     # assert that no uncommitted changes have been written to Icechunk session
@@ -392,47 +389,6 @@ def test_checksum(
         pressure_array = root_group["pressure"]
         assert isinstance(pressure_array, zarr.Array)
         npt.assert_equal(pressure_array, arr)
-
-
-def test_generate_chunk_key_no_offset():
-    # Test case without any offset (append_axis and existing_num_chunks are None)
-    index = (1, 2, 3)
-    result = generate_chunk_key(index)
-    assert result == [1, 2, 3], (
-        "The chunk key should match the index without any offset."
-    )
-
-
-def test_generate_chunk_key_with_offset():
-    # Test case with offset on append_axis 1
-    index = (1, 2, 3)
-    append_axis = 1
-    existing_num_chunks = 5
-    result = generate_chunk_key(
-        index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
-    )
-    assert result == [1, 7, 3], "The chunk key should offset the second index by 5."
-
-
-def test_generate_chunk_key_zero_offset():
-    # Test case where existing_num_chunks is 0 (no offset should be applied)
-    index = (4, 5, 6)
-    append_axis = 1
-    existing_num_chunks = 0
-    result = generate_chunk_key(
-        index, append_axis=append_axis, existing_num_chunks=existing_num_chunks
-    )
-    assert result == [4, 5, 6], (
-        "No offset should be applied when existing_num_chunks is 0."
-    )
-
-
-def test_generate_chunk_key_append_axis_out_of_bounds():
-    # Edge case where append_axis is out of bounds
-    index = (3, 4)
-    append_axis = 2  # This is out of bounds for a 2D index
-    with pytest.raises(ValueError):
-        generate_chunk_key(index, append_axis=append_axis, existing_num_chunks=1)
 
 
 def test_roundtrip_coords(
