@@ -3,7 +3,13 @@ from typing import Any, Callable, Union
 
 import numpy as np
 import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
+from zarr.core.chunk_grids import RegularChunkGrid
+from zarr.core.metadata.v3 import ArrayV3Metadata
+
+has_rectilinear_chunk_grid_support = hasattr(
+    __import__("zarr.core.chunk_grids", fromlist=["RectilinearChunkGrid"]),
+    "RectilinearChunkGrid",
+)
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -49,11 +55,6 @@ class ManifestArray:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
 
-        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
-            raise NotImplementedError(
-                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
-            )
-
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
@@ -78,10 +79,17 @@ class ManifestArray:
         return self._metadata
 
     @property
-    def chunks(self) -> tuple[int, ...]:
+    def chunks(self) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
         """
         Individual chunk size by number of elements.
+
+        For RegularChunkGrid, returns a tuple of ints (e.g., (30, 50)).
+        For RectilinearChunkGrid, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
         """
+        if has_rectilinear_chunk_grid_support and not isinstance(
+            self._metadata.chunk_grid, RegularChunkGrid
+        ):
+            return self._metadata.chunk_grid.chunk_shapes  # type: ignore[attr-defined]
         return self._metadata.chunks
 
     @property
