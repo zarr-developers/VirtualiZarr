@@ -10,6 +10,9 @@
 
 ### Bug fixes
 
+- Fix handling of scalar Zarr V3 arrays with None dimension_names.
+  ([#897](https://github.com/zarr-developers/VirtualiZarr/pull/897)).
+  By [Lars Buntemeyer](https://github.com/larsbuntemeyer).
 - Fix setting `fill_value` for Zarr V2 arrays if data type is a subtype of integer or float.
   ([#845](https://github.com/zarr-developers/VirtualiZarr/pull/845)).
   By [Hauke Schulz](https://github.com/observingClouds).
