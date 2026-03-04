@@ -4,7 +4,8 @@ import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Coroutine
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
@@ -25,6 +26,7 @@ from virtualizarr.vendor.zarr.core.common import _concurrent_map
 if TYPE_CHECKING:
     import zarr
 
+T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 
@@ -401,6 +403,27 @@ async def _construct_manifest_group(
     return manifest_group
 
 
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine, handling the case where an event loop is already running.
+
+    In environments like Jupyter notebooks, an event loop is already running,
+    so ``asyncio.run()`` raises ``RuntimeError``. In that case we run the
+    coroutine in a separate thread with its own event loop.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop – the simple path.
+        return asyncio.run(coro)
+
+    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(asyncio.run, coro)
+        return future.result()
+
+
 class ZarrParser:
     """
     Parser for creating virtual references to existing Zarr stores.
@@ -504,12 +527,11 @@ class ZarrParser:
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
         zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
-        manifest_group = asyncio.run(
-            _construct_manifest_group(
-                store=zarr_store,
-                path=url,
-                group=self.group,
-                skip_variables=self.skip_variables,
-            )
+        coro = _construct_manifest_group(
+            store=zarr_store,
+            path=url,
+            group=self.group,
+            skip_variables=self.skip_variables,
         )
+        manifest_group = _run_async(coro)
         return ManifestStore(registry=registry, group=manifest_group)
