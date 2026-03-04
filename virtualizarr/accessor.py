@@ -249,7 +249,7 @@ class _VirtualiZarrDatasetAccessor:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> ds.vz.rename_paths(local_to_s3_url)
+        >>> ds.vz.rename_paths(local_to_s3_url)  # doctest: +SKIP
         """
 
         new_ds = self.ds.copy()
