@@ -1,7 +1,18 @@
 import inspect
+import multiprocessing as mp
 import warnings
-from concurrent.futures import Executor, Future
-from typing import Any, Callable, Iterable, Iterator, Literal, TypeVar
+from concurrent.futures import Executor, Future, ProcessPoolExecutor
+from functools import partial
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Iterator,
+    Literal,
+    ParamSpec,
+    TypeVar,
+)
 
 __all__ = [
     "SerialExecutor",
@@ -15,28 +26,38 @@ __all__ = [
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
 
 
+P = ParamSpec("P")
 # Type variable for return type
 T = TypeVar("T")
 
 
 def get_executor(
-    parallel: Literal["dask", "lithops"] | type[Executor] | Literal[False],
-) -> type[Executor]:
-    """Get an executor that follows the concurrent.futures.Executor ABC API."""
+    parallel: Literal["dask", "lithops", False] | type[Executor],
+) -> Callable[..., Executor]:
+    """Get a callable with a return type that follows the concurrent.futures.Executor ABC API."""
 
     if parallel == "dask":
         return DaskDelayedExecutor
-    elif parallel == "lithops":
+    if parallel == "lithops":
         return LithopsEagerFunctionExecutor
-    elif parallel is False:
+    if parallel is False:
         return SerialExecutor
-    elif inspect.isclass(parallel) and issubclass(parallel, Executor):
+    if parallel is ProcessPoolExecutor:
+        # TODO Once we drop support for python <3.13, we can remove this context
+        # dance because from 3.14 onward, POSIX defaults to "forkserver" rather
+        # than "fork".
+        method = mp.get_context().get_start_method()
+        context = mp.get_context("forkserver" if method == "fork" else method)
+        return partial(ProcessPoolExecutor, mp_context=context)
+    if inspect.isclass(parallel) and issubclass(parallel, Executor):
         return parallel
-    else:
-        raise ValueError(
-            f"Unrecognized argument to ``parallel``: {parallel}"
-            "Please supply either ``'dask'``, ``'lithops'``, ``False``, or a concrete subclass of ``concurrent.futures.Executor``."
-        )
+
+    raise ValueError(
+        f"Invalid value for `parallel`: {parallel}.  Please supply "
+        "either the string 'dask' or 'lithops', or a concrete subclass of "
+        "concurrent.futures.Executor.  To obtain a serial executor, specify "
+        "the boolean value `False`."
+    )
 
 
 class SerialExecutor(Executor):
@@ -110,18 +131,6 @@ class SerialExecutor(Executor):
         Generator of results
         """
         return map(fn, *iterables)
-
-    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
-        """
-        Shutdown the executor.
-
-        Parameters
-        ----------
-        wait
-            Whether to wait for pending futures (always True for serial executor)
-        """
-        # In a serial executor, shutdown is a no-op
-        pass
 
 
 class DaskDelayedExecutor(Executor):
@@ -211,31 +220,48 @@ class DaskDelayedExecutor(Executor):
         # Compute all tasks
         return iter(dask.compute(*delayed_tasks))
 
-    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
-        """
-        Shutdown the executor
-
-        Parameters
-        ----------
-        wait
-            Whether to wait for pending futures (always True for serial executor))
-        """
-        # For Dask.delayed, shutdown is essentially a no-op
-        pass
-
 
 class LithopsEagerFunctionExecutor(Executor):
     """
-    Lithops-based function executor which follows the [concurrent.futures.Executor][] API.
+    Lithops-based function executor that follows the [concurrent.futures.Executor][] API.
 
-    Only required because lithops doesn't follow the [concurrent.futures.Executor][] API, see https://github.com/lithops-cloud/lithops/issues/1427.
+    Only required because lithops doesn't follow the [concurrent.futures.Executor][] API.
+    See https://github.com/lithops-cloud/lithops/issues/1427.
     """
+
+    class compatible_callable(Generic[P, T]):
+        """Wraps a callable to make it fully compatible with Lithops.
+
+        This wrapper deals with 2 oddities in Lithops:
+
+        1. Use of `functools.partial`, which Lithops fails to recognize as being
+           callable.  This is likely due to the builtin `partial` class using
+           slots, which causes Lithops to not recognize the `__call__` method as
+           a method.  See https://github.com/lithops-cloud/lithops/issues/1428.
+        2. Use of generic function wrappers that define generic `args` and
+           `kwargs` parameters.  In this case, because of the way Lithops
+           inspects function signatures to determine how to pass arguments, it
+           does not properly "spread" arguments as normally expected.  Instead,
+           it collects all positional arguments and associates them with the
+           keyword argument `"args"`, which is utterly unhelpful.
+        """
+
+        def __init__(self, f: Callable[P, T]):
+            self.f = f
+
+        def __call__(self, *args: P.args, **kwargs: P.kwargs) -> T:
+            if not args and "args" in kwargs:
+                # Lithops collected all positional args into an "args" kwarg,
+                # so we're undoing that nonsense here.
+                args = kwargs.pop("args", ())  # type: ignore
+
+            return self.f(*args, **kwargs)
 
     def __init__(self, **kwargs) -> None:
         import lithops  # type: ignore[import-untyped]
 
         # Create Lithops client with optional configuration
-        self.lithops_client = lithops.FunctionExecutor(**kwargs)
+        self.lithops_client = lithops.FunctionExecutor(**kwargs).__enter__()
 
         # Track submitted futures
         self._futures: list[Future] = []
@@ -263,7 +289,11 @@ class LithopsEagerFunctionExecutor(Executor):
 
         try:
             # Submit to Lithops
-            lithops_future = self.lithops_client.call_async(fn, *args, **kwargs)
+            lithops_future = self.lithops_client.call_async(
+                LithopsEagerFunctionExecutor.compatible_callable(fn),
+                *args,
+                **kwargs,
+            )
 
             # Add a callback to set the result or exception
             def _on_done(lithops_result):
@@ -294,7 +324,8 @@ class LithopsEagerFunctionExecutor(Executor):
         """
         Apply a function to an iterable using lithops.
 
-        Only needed because [lithops.executors.FunctionExecutor.map][lithops.executors.FunctionExecutor.map] returns futures, unlike [concurrent.futures.Executor.map][].
+        Only needed because [lithops.executors.FunctionExecutor.map][lithops.executors.FunctionExecutor.map]
+        returns futures, unlike [concurrent.futures.Executor.map][].
 
         Parameters
         ----------
@@ -309,14 +340,13 @@ class LithopsEagerFunctionExecutor(Executor):
         -------
         Generator of results
         """
-        import lithops  # type: ignore[import-untyped]
+        fexec = self.lithops_client
+        futures = fexec.map(
+            LithopsEagerFunctionExecutor.compatible_callable(fn),
+            list(zip(*iterables)),
+        )
 
-        fexec = lithops.FunctionExecutor()
-
-        futures = fexec.map(fn, *iterables)
-        results = fexec.get_result(futures)
-
-        return results
+        return fexec.get_result(futures)  # type: ignore
 
     def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
         """
@@ -327,5 +357,4 @@ class LithopsEagerFunctionExecutor(Executor):
         wait
             Whether to wait for pending futures.
         """
-        # Should this call lithops .clean() method?
-        pass
+        self.lithops_client.__exit__(None, None, None)
