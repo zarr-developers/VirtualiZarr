@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import AsyncGenerator, Coroutine, Iterable
 from pathlib import Path
-from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import zarr
@@ -28,6 +27,40 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
+
+
+class _FixedObjectStore(ObjectStore):
+    """Workaround for zarr-python bug where ``ObjectStore.list_dir`` uses
+    ``str.lstrip`` instead of ``str.removeprefix`` to strip the prefix from
+    returned keys.  ``lstrip`` strips *characters* rather than a substring,
+    which silently corrupts names when the prefix shares characters with the
+    next path component (e.g. prefix ``subdir/data.zarr/`` + key ``temp``
+    → ``lstrip`` returns ``emp`` because ``t`` is in the character set).
+
+    See: https://github.com/zarr-developers/zarr-python/issues/2778
+    """
+
+    def list_dir(self, prefix: str) -> AsyncGenerator[str, None]:
+        import obstore as obs
+
+        coroutine = obs.list_with_delimiter_async(self.store, prefix=prefix)
+        return self._fixed_transform_list_dir(coroutine, prefix)
+
+    @staticmethod
+    async def _fixed_transform_list_dir(
+        list_result_coroutine: Any, prefix: str
+    ) -> AsyncGenerator[str, None]:
+        list_result = await list_result_coroutine
+        prefixes = [
+            obj.removeprefix(prefix).lstrip("/")
+            for obj in list_result["common_prefixes"]
+        ]
+        objects = [
+            obj["path"].removeprefix(prefix).lstrip("/")
+            for obj in list_result["objects"]
+        ]
+        for item in prefixes + objects:
+            yield item
 
 
 def join_url(base: str, key: str) -> str:
@@ -368,11 +401,18 @@ async def _construct_manifest_group(
     path: str,
     store: zarr.storage.ObjectStore,
     *,
+    store_path: str = "",
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestGroup:
     """Construct a ManifestGroup from a zarr group."""
-    zarr_group = await open_group_async(store=store, path=group, mode="r")
+    zarr_open_path = store_path
+    if group:
+        zarr_open_path = f"{store_path}/{group}" if store_path else group
+
+    zarr_group = await open_group_async(
+        store=store, path=zarr_open_path or None, mode="r"
+    )
 
     zarr_array_keys = [key async for key in zarr_group.array_keys()]
     _skip_variables = [] if skip_variables is None else list(skip_variables)
@@ -413,10 +453,8 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        # No running loop – the simple path.
         return asyncio.run(coro)
 
-    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
     import concurrent.futures
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
@@ -525,11 +563,20 @@ class ZarrParser:
         virtualizarr.manifests.ManifestStore : The returned virtual store object.
         """
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
-        object_store, _ = registry.resolve(path)
-        zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
+        object_store, store_path = registry.resolve(path)
+        zarr_store = _FixedObjectStore(store=object_store)  # type: ignore[type-var]
+        if store_path:
+            suffix = "/" + store_path
+            if url.endswith(suffix):
+                store_root_url = url[: -len(suffix)]
+            else:
+                store_root_url = url.removesuffix(store_path).rstrip("/")
+        else:
+            store_root_url = url
         coro = _construct_manifest_group(
             store=zarr_store,
-            path=url,
+            path=store_root_url,
+            store_path=store_path,
             group=self.group,
             skip_variables=self.skip_variables,
         )

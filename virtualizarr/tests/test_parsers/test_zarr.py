@@ -464,11 +464,7 @@ def test_run_async_without_running_loop():
 
 
 def test_run_async_with_running_loop():
-    """Test _run_async works inside a running event loop (e.g. Jupyter notebooks).
-
-    This simulates the notebook environment where asyncio.run() would raise
-    RuntimeError because an event loop is already running.
-    """
+    """Test _run_async works inside a running event loop (e.g. Jupyter notebooks)."""
     import asyncio
 
     async def coro():
@@ -507,6 +503,32 @@ def test_zarr_parser_works_inside_running_event_loop(tmpdir, zarr_format):
         with xr.open_dataset(
             filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
         ) as expected:
+            xr.testing.assert_identical(actual, expected)
+
+
+@zarr_versions()
+def test_parser_with_nested_store_path(tmpdir, zarr_format):
+    """Test ZarrParser when the zarr store is nested inside the object store root (e.g. cloud buckets)."""
+    parent_dir = f"{tmpdir}/bucket_root"
+    filepath = f"{parent_dir}/subdir/data.zarr"
+
+    ds = xr.Dataset(
+        {"temp": (("x", "y"), np.arange(12, dtype="float32").reshape(3, 4))},
+    )
+    ds.to_zarr(filepath, consolidated=False, zarr_format=zarr_format)
+
+    store = LocalStore(prefix=parent_dir)
+    registry = ObjectStoreRegistry({f"file://{parent_dir}": store})
+    parser = ZarrParser()
+
+    manifeststore = parser(url=filepath, registry=registry)
+
+    with xr.open_dataset(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
             xr.testing.assert_identical(actual, expected)
 
 
