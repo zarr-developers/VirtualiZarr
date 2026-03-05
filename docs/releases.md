@@ -20,6 +20,8 @@
   ([#864](https://github.com/zarr-developers/VirtualiZarr/pull/864)).
 - Fixed warnings caused by outdated imports from `obspec_utils` ([#863](https://github.com/zarr-developers/VirtualiZarr/pull/863)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Allow `ZarrParser` to work from inside a running event loop (e.g. inside a Jupyter Notebook) ([#900](https://github.com/zarr-developers/VirtualiZarr/pull/900))
+  By [Julius Busecke](https://github.com/jbusecke).
 
 ### Documentation
 
