@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import math
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Coroutine, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, TypeVar, cast
 
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.group import GroupMetadata
-from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
@@ -22,9 +24,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
-if TYPE_CHECKING:
-    import zarr
-
+T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 
@@ -179,7 +179,6 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
-        from zarr.core.metadata import ArrayV2Metadata
 
         try:
             from zarr.core.dtype import parse_dtype
@@ -324,8 +323,6 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
 
     if not chunk_map:
-        import math
-
         if zarr_array.shape and zarr_array.chunks:
             chunk_grid_shape = tuple(
                 math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
@@ -399,6 +396,25 @@ async def _construct_manifest_group(
     )
 
     return manifest_group
+
+
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine, handling the case where an event loop is already running.
+
+    In environments like Jupyter notebooks, an event loop is already running,
+    so ``asyncio.run()`` raises ``RuntimeError``. In that case we run the
+    coroutine in a separate thread with its own event loop.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop – the simple path.
+        return asyncio.run(coro)
+
+    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(asyncio.run, coro)
+        return future.result()
 
 
 class ZarrParser:
@@ -504,12 +520,11 @@ class ZarrParser:
         path = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
         object_store, _ = registry.resolve(path)
         zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
-        manifest_group = asyncio.run(
-            _construct_manifest_group(
-                store=zarr_store,
-                path=url,
-                group=self.group,
-                skip_variables=self.skip_variables,
-            )
+        coro = _construct_manifest_group(
+            store=zarr_store,
+            path=url,
+            group=self.group,
+            skip_variables=self.skip_variables,
         )
+        manifest_group = _run_async(coro)
         return ManifestStore(registry=registry, group=manifest_group)
