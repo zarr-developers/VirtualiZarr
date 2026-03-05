@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
 from collections.abc import Coroutine
+import math
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import zarr
@@ -14,6 +16,8 @@ from zarr.core.dtype import parse_dtype
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
+from zarr.core.metadata import ArrayV2Metadata
+
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -24,8 +28,6 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
 
-if TYPE_CHECKING:
-    import zarr
 
 T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
@@ -182,7 +184,6 @@ class ZarrV2Strategy(ZarrVersionStrategy):
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
-        from zarr.core.metadata import ArrayV2Metadata
 
         try:
             from zarr.metadata.migrate_v3 import _convert_array_metadata
@@ -326,8 +327,6 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
 
     if not chunk_map:
-        import math
-
         if zarr_array.shape and zarr_array.chunks:
             chunk_grid_shape = tuple(
                 math.ceil(s / c) for s, c in zip(zarr_array.shape, zarr_array.chunks)
@@ -417,8 +416,6 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
         return asyncio.run(coro)
 
     # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
-    import concurrent.futures
-
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(asyncio.run, coro)
         return future.result()
