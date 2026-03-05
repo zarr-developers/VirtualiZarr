@@ -2,22 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-from abc import ABC, abstractmethod
-from collections.abc import Iterable
-from pathlib import Path
-from collections.abc import Coroutine
 import math
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from abc import ABC, abstractmethod
+from collections.abc import Coroutine, Iterable
+from pathlib import Path
+from typing import Any, TypeVar, cast
 
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.dtype import parse_dtype
 from zarr.core.group import GroupMetadata
-from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
-from zarr.core.metadata import ArrayV2Metadata
-
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -27,7 +24,6 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.vendor.zarr.core.common import _concurrent_map
-
 
 T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
