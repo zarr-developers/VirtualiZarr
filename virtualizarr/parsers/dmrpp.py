@@ -191,6 +191,14 @@ class DMRParser:
                     meta["attributes"]["_FillValue"], meta["data_type"]
                 )
                 meta["attributes"]["_FillValue"] = encoded_cf_fill_value
+
+            if "inline" in meta:
+                raise NotImplementedError(
+                    "Reading inlined reference data is currently not supported."
+                    "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
+                )
+                meta.pop("inline", None)
+
             metadata = create_v3_array_metadata(**meta)
             manifest_dict[var] = ManifestArray(
                 metadata=metadata, chunkmanifest=chunkmanifest
