@@ -41,7 +41,7 @@ remote = [
     "requests",
     "aiohttp",
     "s3fs",
-    "pydap @ git+https://github.com/pydap/pydap.git",
+    "pydap @ git+https://github.com/pydap/pydap.git@refs/pull/659/merge",
 ]
 
 # non-kerchunk-based parsers
