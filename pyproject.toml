@@ -41,6 +41,7 @@ remote = [
     "requests",
     "aiohttp",
     "s3fs",
+    "pydap @ git+https://github.com/pydap/pydap.git",
 ]
 
 # non-kerchunk-based parsers
