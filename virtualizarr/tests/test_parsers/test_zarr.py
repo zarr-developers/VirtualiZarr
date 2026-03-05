@@ -18,7 +18,6 @@ from virtualizarr.parsers.zarr import (
     build_chunk_manifest,
     get_metadata,
     get_strategy,
-    build_chunk_manifest,
     join_url,
 )
 
