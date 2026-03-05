@@ -168,7 +168,7 @@ def apply_selection_1d(
         if slice_is_no_op(indexer_1d, axis_length=length):
             pass
         else:
-            NotImplementedError(
+            raise NotImplementedError(
                 f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
             )
     elif isinstance(indexer_1d, int):
