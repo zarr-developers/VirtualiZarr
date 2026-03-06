@@ -305,10 +305,14 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
                 ujson.dump(example_reference_dict, json_file)
             parser = KerchunkJSONParser(fs_root="file://")
         if reference_format == "parquet":
+            import pandas as pd
             from kerchunk.df import refs_to_dataframe
 
             ref_filepath = tmp_path / "ref.parquet"
-            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+            with pd.option_context("future.infer_string", False):
+                refs_to_dataframe(
+                    fo=example_reference_dict, url=ref_filepath.as_posix()
+                )
             parser = KerchunkParquetParser(fs_root="file://")
         expected_refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
         with open_virtual_dataset(
