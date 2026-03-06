@@ -26,7 +26,7 @@
   `get_executor` function to ensure `ProcessPoolExecutor` uses `"forkserver"`
   mode on platforms that default to `"fork"`
   ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
-  Daniels](@chuckwondo).
+  Daniels](https://github.com/chuckwondo).
 
 ### Documentation
 
