@@ -489,7 +489,7 @@ def test_split_groups(hdf5_groups_file, group_path):
 
 @pytest.mark.xfail(
     platform.system() == "Linux",
-    reason="Time values are improperly parsed, leading to pandas.errors.OutOfBoundsTimedelta errors",
+    reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
 )
 @pytest.mark.parametrize(
     "group,warns",
