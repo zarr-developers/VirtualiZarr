@@ -85,7 +85,6 @@ all_parsers = [
 icechunk = [
     "icechunk>=1.1.2",
 ]
-zarr = ["arro3-core", "pyarrow"]
 
 kerchunk = ["fastparquet"]
 
