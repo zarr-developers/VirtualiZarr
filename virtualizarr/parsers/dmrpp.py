@@ -208,7 +208,7 @@ class DMRParser:
                 metadata=metadata, chunkmanifest=chunkmanifest
             )
         manifest_group = ManifestGroup(arrays=manifest_dict, attributes=attrs)
-        registry = ObjectStoreRegistry()
+        registry: ObjectStoreRegistry = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
 
         return ManifestStore(registry=registry, group=manifest_group)
