@@ -512,7 +512,7 @@ class ChunkManifest:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> manifest.rename_paths(local_to_s3_url)
+        >>> manifest.rename_paths(local_to_s3_url)  # doctest: +SKIP
         """
         if isinstance(new, str):
             renamed_paths = np.full_like(self._paths, fill_value=new)

@@ -83,7 +83,7 @@ vds.vz.to_icechunk(icechunkstore)
 
 ### I already have some data in Zarr, do I have to resave it?
 
-No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`. Note: Currently only reading Zarr V3 is supported.
+No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`.
 
 ### Can I add a new parser for my custom file format?
 

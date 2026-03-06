@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-upstream:
+  test-minimum-versions:
     name: minimum-versions-build
     if: |
       always()
