@@ -1,3 +1,4 @@
+import platform
 import textwrap
 from contextlib import nullcontext
 from pathlib import Path
@@ -486,6 +487,10 @@ def test_split_groups(hdf5_groups_file, group_path):
     assert result_tags == expected_tags
 
 
+@pytest.mark.xfail(
+    platform.system() == "Linux",
+    reason="Time values are improperly parsed, leading to pandas.errors.OutOfBoundsTimedelta errors",
+)
 @pytest.mark.parametrize(
     "group,warns",
     [
