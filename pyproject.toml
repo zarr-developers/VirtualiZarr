@@ -84,7 +84,7 @@ icechunk = [
 ]
 zarr = ["arro3-core", "pyarrow"]
 
-kerchunk = ["fastparquet"]
+kerchunk = ["fastparquet", "pandas"]
 
 all_writers = [
     "virtualizarr[icechunk]",
