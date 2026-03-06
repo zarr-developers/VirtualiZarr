@@ -78,6 +78,7 @@ all_parsers = [
     "virtualizarr[fits]",
     "virtualizarr[kerchunk_parquet]",
     "virtualizarr[tiff]",
+    "virtualizarr[zarr]"
 ]
 
 # writers
