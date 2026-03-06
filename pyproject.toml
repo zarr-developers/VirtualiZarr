@@ -266,6 +266,7 @@ module = [
     "ujson",
     "zarr",
     "requests",
+    "pydap.*",
 ]
 ignore_missing_imports = true
 
