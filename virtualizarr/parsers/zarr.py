@@ -22,7 +22,6 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import (
-    parse_manifest_index,
     validate_and_normalize_path_to_uri,
 )
 
@@ -370,27 +369,21 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
 
     strategy = get_strategy(zarr_array)
+    strategy.validate(zarr_array)
     chunk_grid_shape = zarr_array._chunk_grid_shape
 
-    # scalar arrays go through the dict path instead of the pure arrow bit
     if zarr_array.shape == ():
         chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
         if not chunk_map:
             return ChunkManifest(chunk_map, shape=chunk_grid_shape)
-        paths_arr = np.empty(shape=chunk_grid_shape, dtype=np.dtypes.StringDType())
-        offsets_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
-        lengths_arr = np.zeros(shape=chunk_grid_shape, dtype=np.dtype("uint64"))
-        for key, entry in chunk_map.items():
-            idx = parse_manifest_index(key)
-            paths_arr[idx] = entry["path"]
-            offsets_arr[idx] = entry["offset"]
-            lengths_arr[idx] = entry["length"]
-        return ChunkManifest.from_arrays(
-            paths=paths_arr, offsets=offsets_arr, lengths=lengths_arr
+        entry = next(iter(chunk_map.values()))
+        return ChunkManifest._from_arrow(
+            paths=pa.array([entry["path"]], type=pa.string()),
+            offsets=pa.array([entry["offset"]], type=pa.uint64()),
+            lengths=pa.array([entry["length"]], type=pa.uint64()),
+            shape=chunk_grid_shape,
         )
 
-    # check for v3 sharding / prefix update
-    strategy.validate(zarr_array)
     prefix = strategy.get_prefix(zarr_array)
 
     result = await _build_chunk_mapping(zarr_array, path, prefix)
@@ -400,40 +393,21 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
     normalized_keys, full_paths, all_lengths = result
 
-    # Incoming: lots of LLM arrow mumbo jumbo for sparse arrays
+    total_size = zarr_array.nchunks
 
-    # compute flat positions for each listed chunk (C-order)
-    ndim = len(chunk_grid_shape)
-    if ndim == 1:
-        # 1D shortcut: we can bypass in the simple case
-        flat_positions = pc.cast(normalized_keys, pa.int64())
-        total_size = chunk_grid_shape[0]
-    else:
-        # compute C-order strides and dot with per-dimension indices
-        stride = 1
-        strides: list[int] = []
-        for s in reversed(chunk_grid_shape):
-            strides.insert(0, stride)
-            stride *= s
-        total_size = stride
+    split_keys = pc.split_pattern(normalized_keys, pattern=".")
+    coords = [
+        pc.cast(pc.list_element(split_keys, dim), pa.int64()).to_numpy()
+        for dim in range(zarr_array.ndim)
+    ]
+    flat_positions = pa.array(np.ravel_multi_index(coords, chunk_grid_shape))
 
-        flat_positions = pa.repeat(pa.scalar(0, pa.int64()), len(normalized_keys))
-        for dim, dim_stride in enumerate(strides):
-            dim_indices = pc.list_slice(
-                pc.split_pattern(normalized_keys, pattern="."), dim, dim + 1
-            ).flatten()
-            flat_positions = pc.add(
-                flat_positions,
-                pc.multiply(pc.cast(dim_indices, pa.int64()), dim_stride),
-            )
-
-    # scatter listed chunks into dense flat arrow arrays via join on flat index
-    # How will this left join scale? poorly?
+    # scatter listed chunks into a dense flat array (nulls = missing chunks)
     updates = pa.table(
         {"idx": flat_positions, "path": full_paths, "length": all_lengths}
     )
     dense = (
-        pa.table({"idx": pa.array(range(total_size), type=pa.int64())})
+        pa.table({"idx": pa.array(np.arange(total_size, dtype=np.int64))})
         .join(updates, "idx", join_type="left outer")
         .sort_by("idx")
     )

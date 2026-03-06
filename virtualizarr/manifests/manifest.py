@@ -334,7 +334,7 @@ class ChunkManifest:
         paths: "pa.StringArray",
         offsets: "pa.UInt64Array",
         lengths: "pa.UInt64Array",
-        shape: tuple[int, ...] | None = None,
+        shape: tuple[int, ...],
     ) -> "ChunkManifest":
         """
         Create a ChunkManifest from flat 1D PyArrow arrays.
@@ -351,29 +351,30 @@ class ChunkManifest:
         lengths
             Byte lengths of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
         shape
-            Shape to reshape the flat arrays into. If None, arrays are used as-is (1D).
+            Shape to reshape the flat arrays into.
         """
         import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
         import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
 
-        paths_np = (
-            pc.if_else(pc.is_null(paths), "", paths)
-            .to_numpy(zero_copy_only=False)
-            .astype(np.dtypes.StringDType())
-        )
-        offsets_np = pc.if_else(
+        arrow_paths = pc.if_else(pc.is_null(paths), "", paths)
+        arrow_offsets = pc.if_else(
             pc.is_null(offsets), pa.scalar(0, pa.uint64()), offsets
-        ).to_numpy(zero_copy_only=False)
-        lengths_np = pc.if_else(
+        )
+        arrow_lengths = pc.if_else(
             pc.is_null(lengths), pa.scalar(0, pa.uint64()), lengths
-        ).to_numpy(zero_copy_only=False)
+        )
 
-        if shape is not None:
-            paths_np = paths_np.reshape(shape)
-            offsets_np = offsets_np.reshape(shape)
-            lengths_np = lengths_np.reshape(shape)
+        np_paths = arrow_paths.to_numpy(zero_copy_only=False).astype(
+            np.dtypes.StringDType()
+        )
+        np_offsets = arrow_offsets.to_numpy(zero_copy_only=False)
+        np_lengths = arrow_lengths.to_numpy(zero_copy_only=False)
 
-        return cls.from_arrays(paths=paths_np, offsets=offsets_np, lengths=lengths_np)
+        return cls.from_arrays(
+            paths=np_paths.reshape(shape),
+            offsets=np_offsets.reshape(shape),
+            lengths=np_lengths.reshape(shape),
+        )
 
     @property
     def ndim_chunk_grid(self) -> int:

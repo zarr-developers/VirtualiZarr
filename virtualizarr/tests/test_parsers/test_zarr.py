@@ -22,6 +22,8 @@ from virtualizarr.parsers.zarr import (
 )
 from virtualizarr.tests import requires_pyarrow
 
+pytestmark = requires_pyarrow
+
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 SKIP_OLDER_ZARR_PYTHON = pytest.mark.skipif(
@@ -53,7 +55,6 @@ def zarr_versions(param_name="zarr_format", indirect=False):
     )
 
 
-@requires_pyarrow
 @zarr_versions(param_name="zarr_store", indirect=True)
 class TestOpenVirtualDatasetZarr:
     def test_loadable_variables(self, zarr_store, loadable_variables=["time", "air"]):
@@ -180,7 +181,6 @@ def test_unsupported_zarr_format():
         get_strategy(mock_array)
 
 
-@requires_pyarrow
 @zarr_versions()
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
@@ -309,7 +309,6 @@ def test_v2_metadata_with_none_fill_value(dtype):
     assert metadata.fill_value is not None
 
 
-@requires_pyarrow
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
 
@@ -330,7 +329,6 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)
 
 
-@requires_pyarrow
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
@@ -373,7 +371,6 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     assert manifest.shape_chunk_grid == (3, 3)
 
 
-@requires_pyarrow
 @zarr_versions()
 def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
@@ -409,7 +406,6 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
-@requires_pyarrow
 @zarr_versions()
 def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
@@ -470,7 +466,6 @@ def test_run_async_with_running_loop():
     assert result == 42
 
 
-@requires_pyarrow
 @zarr_versions()
 def test_zarr_parser_works_inside_running_event_loop(tmpdir, zarr_format):
     """Test that ZarrParser.__call__ works inside a running event loop (notebook scenario)."""
@@ -498,7 +493,6 @@ def test_zarr_parser_works_inside_running_event_loop(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
-@requires_pyarrow
 def test_sharded_array_raises_error(tmpdir):
     """Test that attempting to virtualize a sharded Zarr V3 array raises NotImplementedError."""
     filepath = f"{tmpdir}/test_sharded.zarr"
