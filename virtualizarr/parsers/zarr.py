@@ -122,7 +122,9 @@ async def _build_chunk_mapping(
 
     path_batches = []
     size_batches = []
-    stream = zarr_array.store.store.list_async(prefix=prefix, return_arrow=True)
+    stream = cast(ObjectStore, zarr_array.store).store.list_async(
+        prefix=prefix, return_arrow=True
+    )
     async for batch in stream:
         pa_path_col = pa.array(batch.column("path"))
         not_metadata = pc.invert(
@@ -199,7 +201,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             scalar_key = f"{prefix}0"
             return await _handle_scalar_array(zarr_array, path, scalar_key)
 
-        return await _build_chunk_mapping(zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
@@ -302,7 +304,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
         # List chunk keys under the c/ subdirectory
         prefix = f"{name}/c/" if name else "c/"
-        return await _build_chunk_mapping(zarr_array, path, prefix)
+        return await _build_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata as-is (no conversion needed)."""
@@ -315,6 +317,8 @@ class ZarrV3Strategy(ZarrVersionStrategy):
     def validate(self, zarr_array: ZarrArrayType) -> None:
         from zarr.codecs import ShardingCodec
 
+        if not isinstance(zarr_array.metadata, ArrayV3Metadata):
+            return
         if any(
             isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
         ):
@@ -407,7 +411,7 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     else:
         # compute C-order strides and dot with per-dimension indices
         stride = 1
-        strides = []
+        strides: list[int] = []
         for s in reversed(chunk_grid_shape):
             strides.insert(0, stride)
             stride *= s
