@@ -43,7 +43,7 @@ def get_executor(
     if parallel is False:
         return SerialExecutor
     if parallel is ProcessPoolExecutor:
-        # TODO Once we drop support for python <3.13, we can remove this context
+        # TODO Once we drop support for python <3.14, we can remove this context
         # dance because from 3.14 onward, POSIX defaults to "forkserver" rather
         # than "fork".
         method = mp.get_context().get_start_method()
