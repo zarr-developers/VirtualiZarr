@@ -199,6 +199,9 @@ def netcdf4_file(tmp_path: Path) -> str:
     """Create a NetCDF4 file with air temperature data."""
     filepath = tmp_path / "air.nc"
     with xr.tutorial.open_dataset("air_temperature") as ds:
+        ds["time"].encoding["_FillValue"] = None
+        ds["lat"].encoding["_FillValue"] = None
+        ds["lon"].encoding["_FillValue"] = None
         ds.to_netcdf(filepath, format="NETCDF4")
     return str(filepath)
 

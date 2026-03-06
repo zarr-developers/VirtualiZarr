@@ -1,4 +1,3 @@
-import platform
 import textwrap
 from contextlib import nullcontext
 from pathlib import Path
@@ -29,15 +28,30 @@ DMRPP_XML_STRINGS = {
     "netcdf4_file": textwrap.dedent(
         """\
         <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="air.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="air.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.0-46">
+            <Dimension name="time" size="2920"/>
             <Dimension name="lat" size="25"/>
             <Dimension name="lon" size="53"/>
-            <Dimension name="time" size="2920"/>
+            <Float32 name="time">
+                <Dim name="/time"/>
+                <Attribute name="standard_name" type="String">
+                    <Value>time</Value>
+                </Attribute>
+                <Attribute name="long_name" type="String">
+                    <Value>Time</Value>
+                </Attribute>
+                <Attribute name="units" type="String">
+                    <Value>hours since 1800-01-01</Value>
+             </Attribute>
+                <Attribute name="calendar" type="String">
+                    <Value>standard</Value>
+                </Attribute>
+                <dmrpp:chunks fillValue="9.96921e+36" byteOrder="LE">
+                    <dmrpp:chunk offset="7757599" nBytes="11680"/>
+                </dmrpp:chunks>
+            </Float32>
             <Float32 name="lat">
                 <Dim name="/lat"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
                 <Attribute name="standard_name" type="String">
                     <Value>latitude</Value>
                 </Attribute>
@@ -50,15 +64,12 @@ DMRPP_XML_STRINGS = {
                 <Attribute name="axis" type="String">
                     <Value>Y</Value>
                 </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="5179" nBytes="100"/>
+                <dmrpp:chunks fillValue="9.96921e+36" byteOrder="LE">
+                    <dmrpp:chunk offset="7750843" nBytes="100"/>
                 </dmrpp:chunks>
             </Float32>
             <Float32 name="lon">
                 <Dim name="/lon"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
                 <Attribute name="standard_name" type="String">
                     <Value>longitude</Value>
                 </Attribute>
@@ -71,29 +82,8 @@ DMRPP_XML_STRINGS = {
                 <Attribute name="axis" type="String">
                     <Value>X</Value>
                 </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="5279" nBytes="212"/>
-                </dmrpp:chunks>
-            </Float32>
-            <Float32 name="time">
-                <Dim name="/time"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <Attribute name="standard_name" type="String">
-                    <Value>time</Value>
-                </Attribute>
-                <Attribute name="long_name" type="String">
-                    <Value>Time</Value>
-                </Attribute>
-                <Attribute name="units" type="String">
-                    <Value>hours since 1800-01-01</Value>
-                </Attribute>
-                <Attribute name="calendar" type="String">
-                    <Value>standard</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="7757499" nBytes="11680"/>
+                <dmrpp:chunks fillValue="9.96921e+36" byteOrder="LE">
+                    <dmrpp:chunk offset="7752991" nBytes="212"/>
                 </dmrpp:chunks>
             </Float32>
             <Int16 name="air">
@@ -161,20 +151,17 @@ DMRPP_XML_STRINGS = {
                 <Value>http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanalysis.html</Value>
             </Attribute>
             <Attribute name="build_dmrpp_metadata" type="Container">
-                <Attribute name="created" type="String">
-                    <Value>2025-07-16T18:48:42Z</Value>
-                </Attribute>
                 <Attribute name="build_dmrpp" type="String">
-                    <Value>3.21.1-451</Value>
+                    <Value>3.21.0-46</Value>
                 </Attribute>
                 <Attribute name="bes" type="String">
-                    <Value>3.21.1-451</Value>
+                    <Value>3.21.0-46</Value>
                 </Attribute>
                 <Attribute name="libdap" type="String">
-                    <Value>libdap-3.21.1-178</Value>
+                    <Value>libdap-3.21.0-27</Value>
                 </Attribute>
                 <Attribute name="invocation" type="String">
-                    <Value>build_dmrpp -f /usr/share/hyrax/air.nc -r air.nc.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
+                    <Value>build_dmrpp -c /tmp/bes_conf_BzHu -f ///usr/share/hyrax/air.nc -r /tmp/dmr__Tm4R9h -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
                 </Attribute>
             </Attribute>
         </Dataset>
@@ -487,10 +474,10 @@ def test_split_groups(hdf5_groups_file, group_path):
     assert result_tags == expected_tags
 
 
-@pytest.mark.xfail(
-    platform.system() == "Linux",
-    reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
-)
+# @pytest.mark.xfail(
+#     platform.system() == "Linux",
+#     reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
+# )
 @pytest.mark.parametrize(
     "group,warns",
     [
