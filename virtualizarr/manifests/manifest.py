@@ -18,7 +18,7 @@ from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest
 from virtualizarr.types import ChunkKey
 
 if TYPE_CHECKING:
-    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -353,8 +353,8 @@ class ChunkManifest:
         shape
             Shape to reshape the flat arrays into. If None, arrays are used as-is (1D).
         """
-        import pyarrow as pa  # type: ignore[import-untyped]
-        import pyarrow.compute as pc  # type: ignore[import-untyped]
+        import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
+        import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
 
         paths_np = (
             pc.if_else(pc.is_null(paths), "", paths)

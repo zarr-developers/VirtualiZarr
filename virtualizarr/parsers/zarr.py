@@ -27,7 +27,7 @@ from virtualizarr.manifests.manifest import (
 )
 
 if TYPE_CHECKING:
-    import pyarrow as pa  # type: ignore[import-untyped]
+    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
     import zarr
 
 T = TypeVar("T")
@@ -117,8 +117,8 @@ async def _build_chunk_mapping(
     -------
     Tuple of (normalized_keys, full_paths, sizes) as PyArrow arrays, or None if no chunks found.
     """
-    import pyarrow as pa  # type: ignore[import-untyped]
-    import pyarrow.compute as pc  # type: ignore[import-untyped]
+    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
+    import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
 
     path_batches = []
     size_batches = []
@@ -366,8 +366,8 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
-    import pyarrow as pa  # type: ignore[import-untyped]
-    import pyarrow.compute as pc  # type: ignore[import-untyped]
+    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
+    import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
 
     strategy = get_strategy(zarr_array)
     chunk_grid_shape = zarr_array._chunk_grid_shape
