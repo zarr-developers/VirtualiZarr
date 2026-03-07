@@ -82,7 +82,9 @@ all_parsers = [
 icechunk = [
     "icechunk>=1.1.2",
 ]
-kerchunk = ["fastparquet"]
+zarr = ["arro3-core", "pyarrow"]
+
+kerchunk = ["fastparquet", "pandas"]
 
 all_writers = [
     "virtualizarr[icechunk]",
