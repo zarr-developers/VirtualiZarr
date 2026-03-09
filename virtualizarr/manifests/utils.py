@@ -104,6 +104,8 @@ def construct_chunk_pattern(
     # separated by a valid chunk key separator (e.g., a period).
     key_pattern = rf"(?:c|{integer_pattern}(?:{sep_pattern}{integer_pattern})*)$"
 
+    # If expand=True, allow key to start with "c<separator>" or "/c<separator>".
+    # In the former case, a full match is performed.
     return rf"(?:^|/)c{sep_pattern}{key_pattern}" if expand else key_pattern
 
 

@@ -24,7 +24,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.store import parse_manifest_index
-from virtualizarr.manifests.utils import create_v3_array_metadata
+from virtualizarr.manifests.utils import CHUNK_KEY_SEPARATORS, create_v3_array_metadata
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -78,6 +78,20 @@ def test_parse_manifest_index_raises(val):
         match=rf"Key {key!r} with separator {separator!r} did not match the expected pattern for nodes in the Zarr hierarchy.",
     ):
         parse_manifest_index(key, separator)
+
+
+def test_parse_manifest_index_raises_invalid_separator():
+    import re
+
+    invalid_separator = ":"
+    msg = re.escape(
+        f"chunk key separator must be one of {CHUNK_KEY_SEPARATORS}: {invalid_separator}"
+    )
+
+    with pytest.raises(ValueError, match=msg):
+        parse_manifest_index(
+            "foo", invalid_separator  # pyright: ignore[reportArgumentType]
+        )
 
 
 def _generate_manifest_store(
