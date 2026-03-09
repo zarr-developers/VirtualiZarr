@@ -876,7 +876,7 @@ class TestOpenVirtualMFDataset:
     ):
         filepath1, filepath2 = netcdf4_files_factory()
         parser = HDFParser()
-        with pytest.raises(ValueError, match="Unrecognized argument"):
+        with pytest.raises(ValueError, match="Invalid value"):
             open_virtual_mfdataset(
                 [filepath1, filepath2],
                 registry=local_registry,
@@ -891,13 +891,7 @@ class TestOpenVirtualMFDataset:
         [
             False,
             ThreadPoolExecutor,
-            pytest.param(
-                ProcessPoolExecutor,
-                marks=pytest.mark.xfail(
-                    reason="See https://github.com/zarr-developers/VirtualiZarr/pull/889",
-                    strict=True,
-                ),
-            ),
+            ProcessPoolExecutor,
             pytest.param("dask", marks=requires_dask),
             pytest.param("lithops", marks=requires_lithops),
         ],
@@ -912,10 +906,6 @@ class TestOpenVirtualMFDataset:
     def test_parallel_open(
         self, netcdf4_files_factory, parallel, preprocess, local_registry
     ):
-        if parallel == "lithops":
-            pytest.xfail(
-                "TODO - investigate intermittent test failures with lithops executor"
-            )
         filepath1, filepath2 = netcdf4_files_factory()
         parser = HDFParser()
         with (

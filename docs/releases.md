@@ -21,18 +21,32 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Raise clearer error when kerchunk references have malformed codec specifications.
   ([#864](https://github.com/zarr-developers/VirtualiZarr/pull/864)).
-- Fixed warnings caused by outdated imports from `obspec_utils` ([#863](https://github.com/zarr-developers/VirtualiZarr/pull/863)).
+- Fix warnings caused by outdated imports from `obspec_utils` ([#863](https://github.com/zarr-developers/VirtualiZarr/pull/863)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Allow `ZarrParser` to work from inside a running event loop (e.g. inside a Jupyter Notebook) ([#900](https://github.com/zarr-developers/VirtualiZarr/pull/900))
+  By [Julius Busecke](https://github.com/jbusecke).
+- Fix Lithops executor to allow use of `functools.partial`, and update
+  `get_executor` function to ensure `ProcessPoolExecutor` uses `"forkserver"`
+  mode on platforms that default to `"fork"`
+  ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
+  Daniels](https://github.com/chuckwondo).
 
 ### Documentation
 
 ### Internal changes
+
+- Skip unnecessary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.4.0 (24th January 2026)
 
 This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
 
 ### New Features
+
+- Improved `ZarrParser` performance.
+  ([#892](https://github.com/zarr-developers/VirtualiZarr/pull/892)).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
 
 - Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
   ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
@@ -44,10 +58,10 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
   By [Max Jones](https://github.com/maxrjones).
 
-    - `ObjectStoreRegistry` has moved from `virtualizarr.registry` to `obspec_utils.registry`. The old import path still works but emits a `DeprecationWarning` and will be removed in a future release.
-    - `ObstoreReader` has been removed from `virtualizarr.utils`. This should not break user's code, as it was not part of the public/documented API. See [obspec_utils](https://obspec-utils.readthedocs.io/en/latest/api/obspec/) for public file handlers.
-    - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
-    - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
+  - `ObjectStoreRegistry` has moved from `virtualizarr.registry` to `obspec_utils.registry`. The old import path still works but emits a `DeprecationWarning` and will be removed in a future release.
+  - `ObstoreReader` has been removed from `virtualizarr.utils`. This should not break user's code, as it was not part of the public/documented API. See [obspec_utils](https://obspec-utils.readthedocs.io/en/latest/api/obspec/) for public file handlers.
+  - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
+  - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
 
 ## v2.3.0 (20th January 2026)
 

@@ -1,3 +1,6 @@
+import asyncio
+from unittest.mock import Mock
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -10,7 +13,16 @@ from zarr.api.asynchronous import open_array
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
-from virtualizarr.parsers.zarr import build_chunk_manifest, get_metadata, get_strategy
+from virtualizarr.parsers.zarr import (
+    _run_async,
+    build_chunk_manifest,
+    get_metadata,
+    get_strategy,
+    join_url,
+)
+from virtualizarr.tests import requires_pyarrow
+
+pytestmark = requires_pyarrow
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
@@ -128,7 +140,6 @@ class TestOpenVirtualDatasetZarr:
 @zarr_versions()
 def test_scalar_chunk_mapping(tmpdir, zarr_format):
     """Test that scalar arrays produce correct chunk mappings for both V2 and V3."""
-    import asyncio
 
     # Create a scalar zarr array
     filepath = f"{tmpdir}/scalar.zarr"
@@ -154,7 +165,6 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
 
 def test_join_url_empty_base():
     """Test join_url with empty base."""
-    from virtualizarr.parsers.zarr import join_url
 
     result = join_url("", "some/key")
     assert result == "some/key"
@@ -162,7 +172,6 @@ def test_join_url_empty_base():
 
 def test_unsupported_zarr_format():
     """Test that unsupported zarr format raises NotImplementedError."""
-    from unittest.mock import Mock
 
     # Create a mock array with unsupported format
     mock_array = Mock()
@@ -175,9 +184,10 @@ def test_unsupported_zarr_format():
 @zarr_versions()
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
-    import asyncio
 
-    # Create an array but don't write any data
+    from obstore.store import LocalStore as ObsLocalStore
+    from zarr.storage import ObjectStore
+
     filepath = f"{tmpdir}/empty.zarr"
     zarr.create(
         shape=(10, 10),
@@ -188,19 +198,19 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     )
 
     async def get_chunk_map():
-        zarr_array = await open_array(store=filepath, mode="r")
-        strategy = get_strategy(zarr_array)
-        return await strategy.get_chunk_mapping(zarr_array, filepath)
+        obs_store = ObsLocalStore(prefix=filepath)
+        zarr_store = ObjectStore(store=obs_store)
+        zarr_array = await open_array(store=zarr_store, mode="r")
+        manifest = await build_chunk_manifest(zarr_array, filepath)
+        return manifest.dict()
 
-    chunk_map = asyncio.run(get_chunk_map())
-    # Empty arrays should return empty chunk map
-    assert chunk_map == {}
+    result = asyncio.run(get_chunk_map())
+    assert result == {}
 
 
 @SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
-    import asyncio
 
     # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
@@ -222,7 +232,6 @@ def test_v2_metadata_without_dimensions():
 @SKIP_NEWER_ZARR_PYTHON
 def test_v2_metadata_raises_import_error_on_old_zarr():
     """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
-    import asyncio
 
     # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
@@ -245,7 +254,6 @@ def test_v2_metadata_raises_import_error_on_old_zarr():
 @SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
-    import asyncio
 
     # Create a V2 array with dimension attributes
     store = zarr.storage.MemoryStore()
@@ -280,7 +288,6 @@ def test_v2_metadata_with_dimensions():
 )
 def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
-    import asyncio
 
     # Create a V2 array with None fill_value
     store = zarr.storage.MemoryStore()
@@ -304,36 +311,32 @@ def test_v2_metadata_with_none_fill_value(dtype):
 
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
-    import asyncio
 
-    # Create an array but don't write data
-    store = zarr.storage.MemoryStore()
-    zarr.create(shape=(10, 10), chunks=(5, 5), dtype="int8", store=store, zarr_format=3)
+    from obstore.store import MemoryStore as ObsMemoryStore
+    from zarr.storage import ObjectStore
+
+    obs_store = ObsMemoryStore()
+    zarr_store = ObjectStore(store=obs_store)
+    zarr.create(
+        shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3
+    )
 
     async def get_manifest():
-        zarr_array = await open_array(store=store, mode="r")
+        zarr_array = await open_array(store=zarr_store, mode="r")
         return await build_chunk_manifest(zarr_array, "test://path")
 
     manifest = asyncio.run(get_manifest())
-    # Should create manifest with proper chunk grid shape even if empty
-    assert manifest.shape_chunk_grid == (2, 2)  # 10/5 = 2 chunks per dimension
+    assert manifest.shape_chunk_grid == (2, 2)
 
 
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
-    """Test that arrays with some missing chunks (sparse arrays) are handled correctly.
-
-    This test verifies that VirtualiZarr correctly handles the case where some chunks
-    exist but others are missing. Zarr allows this for sparse data, and when chunks
-    are missing, Zarr returns the fill_value for those regions. VirtualiZarr should
-    preserve this sparsity in the manifest rather than generating entries for all
-    possible chunks based on the chunk grid.
-    """
+    """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
     import asyncio
 
-    from virtualizarr.parsers.zarr import build_chunk_manifest
+    from obstore.store import LocalStore as ObsLocalStore
+    from zarr.storage import ObjectStore
 
-    # Create a zarr array with a 3x3 chunk grid (9 possible chunks)
     filepath = f"{tmpdir}/sparse.zarr"
     arr = zarr.create(
         shape=(30, 30),
@@ -344,49 +347,38 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
         fill_value=np.nan,
     )
 
-    # Only write data to some chunks, leaving others missing (sparse)
-    # Write to chunks (0,0), (1,1), and (2,2) - a diagonal pattern
     arr[0:10, 0:10] = 1.0  # chunk 0.0
     arr[10:20, 10:20] = 2.0  # chunk 1.1
     arr[20:30, 20:30] = 3.0  # chunk 2.2
-    # Chunks (0,1), (0,2), (1,0), (1,2), (2,0), (2,1) are intentionally left unwritten
 
     async def get_manifest():
-        zarr_array = await open_array(store=filepath, mode="r")
+        obs_store = ObsLocalStore(prefix=filepath)
+        zarr_store = ObjectStore(store=obs_store)
+        zarr_array = await open_array(store=zarr_store, mode="r")
         return await build_chunk_manifest(zarr_array, filepath)
 
     manifest = asyncio.run(get_manifest())
 
-    # The manifest should only contain the 3 chunks we actually wrote
-    assert len(manifest.dict()) == 3, f"Expected 3 chunks, got {len(manifest.dict())}"
+    assert len(manifest.dict()) == 3
+    assert "0.0" in manifest.dict()
+    assert "1.1" in manifest.dict()
+    assert "2.2" in manifest.dict()
 
-    # Verify the expected chunks are present
-    assert "0.0" in manifest.dict(), "Chunk 0.0 should be present"
-    assert "1.1" in manifest.dict(), "Chunk 1.1 should be present"
-    assert "2.2" in manifest.dict(), "Chunk 2.2 should be present"
-
-    # Verify missing chunks are not in the manifest
     missing_chunks = ["0.1", "0.2", "1.0", "1.2", "2.0", "2.1"]
     for chunk_key in missing_chunks:
-        assert chunk_key not in manifest.dict(), (
-            f"Chunk {chunk_key} should not be present (it's missing/sparse)"
-        )
+        assert chunk_key not in manifest.dict()
 
-    # The chunk grid shape should still reflect the full array dimensions
-    assert manifest.shape_chunk_grid == (3, 3), "Chunk grid should be 3x3"
+    assert manifest.shape_chunk_grid == (3, 3)
 
 
 @zarr_versions()
 def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
-    import numpy as _np
-
-    from virtualizarr.parsers import ZarrParser
 
     # Create a small Dataset with chunking
     ds = xr.Dataset(
-        {"data": (("x", "y"), _np.arange(36).reshape(6, 6).astype("float32"))},
-        coords={"x": _np.arange(6), "y": _np.arange(6)},
+        {"data": (("x", "y"), np.arange(36).reshape(6, 6).astype("float32"))},
+        coords={"x": np.arange(6), "y": np.arange(6)},
     )
 
     filepath = f"{tmpdir}/roundtrip.zarr"
@@ -418,8 +410,6 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
 def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
 
-    from virtualizarr.parsers import ZarrParser
-
     # Create a small Dataset with a scalar
     ds = xr.Dataset(
         {"data": 42.0},
@@ -446,6 +436,60 @@ def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
         with xr.open_dataset(
             manifeststore, engine="zarr", consolidated=False, zarr_format=3
         ) as actual:
+            xr.testing.assert_identical(actual, expected)
+
+
+def test_run_async_without_running_loop():
+    """Test _run_async works normally when no event loop is running."""
+
+    async def coro():
+        return 42
+
+    assert _run_async(coro()) == 42
+
+
+def test_run_async_with_running_loop():
+    """Test _run_async works inside a running event loop (e.g. Jupyter notebooks).
+
+    This simulates the notebook environment where asyncio.run() would raise
+    RuntimeError because an event loop is already running.
+    """
+
+    async def coro():
+        return 42
+
+    async def outer():
+        # We're inside a running loop here, so asyncio.run() would fail.
+        return _run_async(coro())
+
+    result = asyncio.run(outer())
+    assert result == 42
+
+
+@zarr_versions()
+def test_zarr_parser_works_inside_running_event_loop(tmpdir, zarr_format):
+    """Test that ZarrParser.__call__ works inside a running event loop (notebook scenario)."""
+
+    ds = xr.Dataset(
+        {"data": (("x",), np.arange(10, dtype="float32"))},
+    )
+    filepath = f"{tmpdir}/loop_test.zarr"
+    ds.to_zarr(filepath, consolidated=False, zarr_format=zarr_format)
+
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+
+    async def run_parser_in_loop():
+        return parser(url=filepath, registry=registry)
+
+    manifest_store = asyncio.run(run_parser_in_loop())
+    with xr.open_dataset(
+        manifest_store, engine="zarr", consolidated=False, zarr_format=3
+    ) as actual:
+        with xr.open_dataset(
+            filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+        ) as expected:
             xr.testing.assert_identical(actual, expected)
 
 
