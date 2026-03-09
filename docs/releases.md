@@ -32,6 +32,9 @@
 
 ### Internal changes
 
+- Skip unneccesary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.4.0 (24th January 2026)
 
 This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
