@@ -146,18 +146,16 @@ async def _build_chunk_mapping(
 
     if len(all_paths) == 0:
         return None
-    # normalize: strip prefix, replace / with .
-    stripped = pc.utf8_replace_slice(
+    stripped_keys = pc.utf8_replace_slice(
         all_paths, start=0, stop=len(prefix), replacement=""
     )
-    normalized_keys = pc.replace_substring(stripped, pattern="/", replacement=".")
 
     # construct full paths
     full_paths = pc.binary_join_element_wise(
         pa.scalar(path.rstrip("/")), all_paths, "/"
     )
 
-    return normalized_keys, full_paths, all_sizes
+    return stripped_keys, full_paths, all_sizes
 
 
 class ZarrVersionStrategy(ABC):
@@ -178,6 +176,11 @@ class ZarrVersionStrategy(ABC):
     @abstractmethod
     def get_prefix(self, zarr_array: ZarrArrayType) -> str:
         """Get the storage prefix for chunk listing."""
+        ...
+
+    @abstractmethod
+    def get_separator(self, zarr_array: ZarrArrayType) -> str:
+        """Get the chunk key separator for the array."""
         ...
 
     @abstractmethod
@@ -265,6 +268,10 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         name = _get_array_name(zarr_array)
         return f"{name}/" if name else ""
 
+    def get_separator(self, zarr_array: ZarrArrayType) -> str:
+        # Default for v2 should be "."
+        return zarr_array.metadata.dimension_separator
+
     def validate(self, zarr_array: ZarrArrayType) -> None:
         pass  # no restrictions for V2
 
@@ -312,6 +319,10 @@ class ZarrV3Strategy(ZarrVersionStrategy):
     def get_prefix(self, zarr_array: ZarrArrayType) -> str:
         name = _get_array_name(zarr_array)
         return f"{name}/c/" if name else "c/"
+
+    def get_separator(self, zarr_array: ZarrArrayType) -> str:
+        # gets chunk separator. Default for v3 should be "/"
+        return zarr_array.metadata.chunk_key_encoding.separator
 
     def validate(self, zarr_array: ZarrArrayType) -> None:
         from zarr.codecs import ShardingCodec
@@ -391,11 +402,11 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     if result is None:
         return ChunkManifest({}, shape=chunk_grid_shape)
 
-    normalized_keys, full_paths, all_lengths = result
+    stripped_keys, full_paths, all_lengths = result
 
     total_size = zarr_array.nchunks
-
-    split_keys = pc.split_pattern(normalized_keys, pattern=".")
+    separator = strategy.get_separator(zarr_array)
+    split_keys = pc.split_pattern(stripped_keys, pattern=separator)
     coords = [
         pc.cast(pc.list_element(split_keys, dim), pa.int64()).to_numpy()
         for dim in range(zarr_array.ndim)
