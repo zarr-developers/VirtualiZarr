@@ -90,7 +90,8 @@ def test_parse_manifest_index_raises_invalid_separator():
 
     with pytest.raises(ValueError, match=msg):
         parse_manifest_index(
-            "foo", invalid_separator  # pyright: ignore[reportArgumentType]
+            "foo",
+            invalid_separator,  # pyright: ignore[reportArgumentType]
         )
 
 
