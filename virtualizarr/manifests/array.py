@@ -3,13 +3,10 @@ from typing import Any, Callable, Union
 
 import numpy as np
 import xarray as xr
-from zarr.core.chunk_grids import RegularChunkGrid
+from zarr.core.chunk_grids import ChunkGrid
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-has_rectilinear_chunk_grid_support = hasattr(
-    __import__("zarr.core.chunk_grids", fromlist=["RectilinearChunkGrid"]),
-    "RectilinearChunkGrid",
-)
+has_rectilinear_chunk_grid_support = hasattr(ChunkGrid, "is_regular")
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -86,10 +83,12 @@ class ManifestArray:
         For RegularChunkGrid, returns a tuple of ints (e.g., (30, 50)).
         For RectilinearChunkGrid, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
         """
-        if has_rectilinear_chunk_grid_support and not isinstance(
-            self._metadata.chunk_grid, RegularChunkGrid
-        ):
-            return self._metadata.chunk_grid.chunk_shapes  # type: ignore[attr-defined]
+        chunk_grid = self._metadata.chunk_grid
+        if has_rectilinear_chunk_grid_support and not chunk_grid.is_regular:
+            return tuple(
+                d.edges
+                for d in chunk_grid.dimensions  # type: ignore[union-attr]
+            )
         return self._metadata.chunks
 
     @property

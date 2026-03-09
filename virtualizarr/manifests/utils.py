@@ -298,7 +298,6 @@ def copy_and_replace_metadata(
                 "name": "rectilinear",
                 "configuration": {
                     "chunk_shapes": [list(c) for c in new_chunks],
-                    "kind": "inline",
                 },
             }
         else:

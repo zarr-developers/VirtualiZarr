@@ -90,14 +90,8 @@ def test_concat_rectilinear_tiff_datasets(tmp_path) -> None:
         assert vds2["0"].sizes == {"y": 100, "x": 50}
 
         # Verify both datasets have rectilinear (non-regular) chunk grids
-        from zarr.core.chunk_grids import RegularChunkGrid
-
-        assert not isinstance(
-            vds1["0"].variable.data.metadata.chunk_grid, RegularChunkGrid
-        )
-        assert not isinstance(
-            vds2["0"].variable.data.metadata.chunk_grid, RegularChunkGrid
-        )
+        assert not vds1["0"].variable.data.metadata.chunk_grid.is_regular
+        assert not vds2["0"].variable.data.metadata.chunk_grid.is_regular
 
         # Concatenate along a new dimension
         combined = xr.concat([vds1, vds2], dim="time")
