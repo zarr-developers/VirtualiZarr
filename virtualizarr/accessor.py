@@ -192,6 +192,7 @@ class _VirtualiZarrDatasetAccessor:
 
             return None
         elif format == "parquet":
+            import pandas as pd
             from kerchunk.df import refs_to_dataframe
 
             if isinstance(filepath, Path):
@@ -199,14 +200,19 @@ class _VirtualiZarrDatasetAccessor:
             elif isinstance(filepath, str):
                 url = filepath
 
-            # refs_to_dataframe is responsible for writing to parquet.
-            # at no point does it create a full in-memory dataframe.
-            refs_to_dataframe(
-                refs,
-                url=url,
-                record_size=record_size,
-                categorical_threshold=categorical_threshold,
-            )
+            # The zarr-parser performance update PR #892 adds pyarrow and arro3-core as deps.
+            # These break the `kerchunk` refs_to_dataframe behavior.
+            # It seems like pyarrow makes pandas default to an ArrowStringArray
+            # which fastparquet cannot zero-copy encode.
+            # TODO: remove once fastparquet or kerchunk handle ArrowStringArray.
+
+            with pd.option_context("future.infer_string", False):
+                refs_to_dataframe(
+                    refs,
+                    url=url,
+                    record_size=record_size,
+                    categorical_threshold=categorical_threshold,
+                )
             return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
@@ -249,7 +255,7 @@ class _VirtualiZarrDatasetAccessor:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> ds.vz.rename_paths(local_to_s3_url)
+        >>> ds.vz.rename_paths(local_to_s3_url)  # doctest: +SKIP
         """
 
         new_ds = self.ds.copy()

@@ -51,6 +51,8 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 
+zarr = ["arro3-core", "pyarrow"]
+
 # kerchunk-based parsers
 netcdf3 = [
     "virtualizarr[remote]",
@@ -77,13 +79,16 @@ all_parsers = [
     "virtualizarr[fits]",
     "virtualizarr[kerchunk_parquet]",
     "virtualizarr[tiff]",
+    "virtualizarr[zarr]"
 ]
 
 # writers
 icechunk = [
     "icechunk>=1.1.2",
 ]
-kerchunk = ["fastparquet"]
+
+
+kerchunk = ["fastparquet", "pandas"]
 
 all_writers = [
     "virtualizarr[icechunk]",
@@ -199,12 +204,15 @@ min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"]
 test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py311"] # test against python 3.11
-test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"] # test against python 3.14
+test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py314", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "tiff", "hdf5-lib", "minimum-versions"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py314"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py314"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py314"]
+
+[tool.pixi.dependencies]
+pytest = "*"
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]
@@ -298,6 +306,7 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
+addopts = ["--doctest-modules", "--ignore=examples"]
 # See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
 # Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
 #
