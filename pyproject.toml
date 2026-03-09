@@ -82,7 +82,9 @@ all_parsers = [
 icechunk = [
     "icechunk>=1.1.2",
 ]
-kerchunk = ["fastparquet"]
+zarr = ["arro3-core", "pyarrow"]
+
+kerchunk = ["fastparquet", "pandas"]
 
 all_writers = [
     "virtualizarr[icechunk]",
@@ -301,6 +303,7 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
+addopts = ["--doctest-modules", "--ignore=examples"]
 # See https://pytest-asyncio.readthedocs.io/en/latest/concepts.html#asyncio-event-loops
 # Explicitly set asyncio_default_fixture_loop_scope to eliminate the following warning:
 #

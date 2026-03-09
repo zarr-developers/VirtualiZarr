@@ -266,7 +266,7 @@ class ManifestArray:
         ...     filename = Path(old_local_path).name
         ...     return str(new_s3_bucket_url / filename)
         >>>
-        >>> marr.rename_paths(local_to_s3_url)
+        >>> marr.rename_paths(local_to_s3_url)  # doctest: +SKIP
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
