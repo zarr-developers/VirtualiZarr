@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -12,6 +13,7 @@ from zarr.core.metadata.v3 import (
 from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
+from virtualizarr.vendor.zarr.core.chunk_grids import _is_nested_sequence
 
 if TYPE_CHECKING:
     from .array import ManifestArray
@@ -177,7 +179,7 @@ def check_same_codecs(codecs: list[Any]) -> None:
             )
 
 
-def check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
+def check_same_chunk_shapes(chunks_list: list[Sequence]) -> None:
     """Check all the chunk shapes are the same"""
 
     first_chunks, *other_chunks_list = chunks_list
@@ -214,11 +216,17 @@ def _remove_element_at_position(t: tuple[int, ...], pos: int) -> tuple[int, ...]
 
 
 def check_no_partial_chunks_on_concat_axis(
-    shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
+    shapes: list[tuple[int, ...]], chunks: list, axis: int
 ):
-    """Check that there are no partial chunks along the concatenation axis"""
-    # loop over the arrays to be concatenated
+    """Check that there are no partial chunks along the concatenation axis.
+
+    Only applies to regular chunk grids; rectilinear grids explicitly encode
+    variable chunk sizes so partial-chunk checks are not needed.
+    """
     for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        # Rectilinear grids have sequences along each axis; skip the check
+        if _is_nested_sequence(chunk_shape):
+            continue
         if shape[axis] % chunk_shape[axis] > 0:
             raise ValueError(
                 "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
@@ -271,7 +279,7 @@ def check_compatible_arrays(
 def copy_and_replace_metadata(
     old_metadata: ArrayV3Metadata,
     new_shape: list[int] | None = None,
-    new_chunks: list[int] | None = None,
+    new_chunks: list | None = None,
     new_dimension_names: Iterable[str] | None | Literal["default"] = "default",
     new_attributes: dict | None = None,
 ) -> ArrayV3Metadata:
@@ -285,10 +293,19 @@ def copy_and_replace_metadata(
     if new_shape is not None:
         metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
     if new_chunks is not None:
-        metadata_copy["chunk_grid"] = {
-            "name": "regular",
-            "configuration": {"chunk_shape": tuple(new_chunks)},
-        }
+        if _is_nested_sequence(new_chunks):
+            metadata_copy["chunk_grid"] = {
+                "name": "rectilinear",
+                "configuration": {
+                    "chunk_shapes": [list(c) for c in new_chunks],
+                    "kind": "inline",
+                },
+            }
+        else:
+            metadata_copy["chunk_grid"] = {
+                "name": "regular",
+                "configuration": {"chunk_shape": tuple(new_chunks)},
+            }
     if new_dimension_names != "default":
         # need the option to use the literal string "default" as a sentinel value because None is a valid choice for zarr dimension_names
         metadata_copy["dimension_names"] = parse_dimension_names(new_dimension_names)
