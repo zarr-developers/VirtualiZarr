@@ -41,6 +41,10 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
 
 ### New Features
 
+- Improved `ZarrParser` performance.
+  ([#892](https://github.com/zarr-developers/VirtualiZarr/pull/892)).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
+
 - Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
   ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
   By [Max Jones](https://github.com/maxrjones).

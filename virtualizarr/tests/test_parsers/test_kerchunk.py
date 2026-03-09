@@ -164,6 +164,7 @@ def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
     This tests reading a kerchunk parquet where not all chunks are present,
     which is a common case for sparse arrays.
     """
+    import pandas as pd
     from kerchunk.df import refs_to_dataframe
 
     # Create refs with only one chunk defined (sparse array)
@@ -179,7 +180,8 @@ def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
     }
 
     ref_filepath = tmp_path / "sparse.parq"
-    refs_to_dataframe(fo=refs, url=str(ref_filepath))
+    with pd.option_context("future.infer_string", False):
+        refs_to_dataframe(fo=refs, url=str(ref_filepath))
 
     parser = KerchunkParquetParser()
     with open_virtual_dataset(
@@ -305,10 +307,14 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
                 ujson.dump(example_reference_dict, json_file)
             parser = KerchunkJSONParser(fs_root="file://")
         if reference_format == "parquet":
+            import pandas as pd
             from kerchunk.df import refs_to_dataframe
 
             ref_filepath = tmp_path / "ref.parquet"
-            refs_to_dataframe(fo=example_reference_dict, url=ref_filepath.as_posix())
+            with pd.option_context("future.infer_string", False):
+                refs_to_dataframe(
+                    fo=example_reference_dict, url=ref_filepath.as_posix()
+                )
             parser = KerchunkParquetParser(fs_root="file://")
         expected_refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
         with open_virtual_dataset(
@@ -363,10 +369,12 @@ def test_notimplemented_read_inline_refs_parquet(
 ):
     # Test that parquet references with inlined data raise NotImplementedError
     # https://github.com/zarr-developers/VirtualiZarr/issues/489
+    import pandas as pd
     from kerchunk.df import refs_to_dataframe
 
     ref_filepath = tmp_path / "ref.parquet"
-    refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
+    with pd.option_context("future.infer_string", False):
+        refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
 
     parser = KerchunkParquetParser()
     with pytest.raises(
