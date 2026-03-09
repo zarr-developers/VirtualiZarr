@@ -32,7 +32,7 @@
 
 ### Internal changes
 
-- Skip unneccesary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
+- Skip unnecessary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.4.0 (24th January 2026)
