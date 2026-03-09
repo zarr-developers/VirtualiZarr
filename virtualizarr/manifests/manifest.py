@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
 
-from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
+from virtualizarr.manifests.utils import compiled_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
 
 if TYPE_CHECKING:
@@ -32,9 +32,6 @@ VALID_URI_PREFIXES = {
     "http://",
     "https://",
 }
-
-
-_CHUNK_KEY = rf"^{construct_chunk_pattern('.')}"
 
 
 class ChunkEntry(TypedDict):
@@ -548,7 +545,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
 
     # Check if all keys have the correct form
     for key in chunk_keys:
-        if not re.match(_CHUNK_KEY, key):
+        if not re.match(compiled_chunk_pattern("."), key):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
