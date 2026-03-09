@@ -86,8 +86,6 @@ icechunk = [
     "icechunk>=1.1.2",
 ]
 
-kerchunk = ["fastparquet"]
-zarr = ["arro3-core", "pyarrow"]
 
 kerchunk = ["fastparquet", "pandas"]
 
