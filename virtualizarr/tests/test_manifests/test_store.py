@@ -72,12 +72,12 @@ def test_parse_manifest_index(
     ],
 )
 def test_parse_manifest_index_raises(val):
-    key, chunk_key_encoding = val
+    key, separator = val
     with pytest.raises(
         ValueError,
-        match=rf"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy.",
+        match=rf"Key {key!r} with separator {separator!r} did not match the expected pattern for nodes in the Zarr hierarchy.",
     ):
-        parse_manifest_index(key, chunk_key_encoding)
+        parse_manifest_index(key, separator)
 
 
 def _generate_manifest_store(
