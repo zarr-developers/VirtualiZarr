@@ -1,4 +1,6 @@
+import functools
 import re
+import typing
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
@@ -16,12 +18,16 @@ from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 if TYPE_CHECKING:
     from .array import ManifestArray
 
+ChunkKeySeparator = Literal[".", "/"]
+# Tuple of literal values specified in the Literal type above
+CHUNK_KEY_SEPARATORS = typing.get_args(ChunkKeySeparator)
+
 
 def parse_manifest_index(
-    key: str, chunk_key_encoding: Literal[".", "/"] = ".", expand_pattern: bool = False
+    key: str, separator: ChunkKeySeparator = ".", expand_pattern: bool = False
 ) -> tuple[int, ...]:
     """
-    Extracts the chunk index from a `key` (a.k.a `node`) that represents a chunk of
+    Extract the chunk index from a `key` (a.k.a `node`) that represents a chunk of
     data in a Zarr hierarchy. The returned tuple can be used to index the ndarrays
     containing paths, offsets, and lengths in ManifestArrays.
 
@@ -29,10 +35,11 @@ def parse_manifest_index(
     ----------
     key
         The key in the Zarr store to parse.
-    chunk_key_encoding
+    separator
         The chunk key separator used in the Zarr store.
     expand_pattern
-        Whether to expand the pattern matching to include /c to protect against group structures that look like chunks
+        Whether to expand the pattern matching to include /c to protect against
+        group structures that look like chunks
 
     Returns
     -------
@@ -41,7 +48,7 @@ def parse_manifest_index(
     Raises
     ------
     ValueError
-        Raised if the key does not match the expected node structure for a chunk according the
+        If the key does not match the expected node structure for a chunk according the
         [Zarr V3 specification][https://zarr-specs.readthedocs.io/en/latest/v3/chunk-key-encodings/index.html].
 
     """
@@ -50,42 +57,88 @@ def parse_manifest_index(
     if key.endswith("/c") or key == "c":
         return ()
 
-    pattern = construct_chunk_pattern(chunk_key_encoding)
-    if expand_pattern:
-        # Expand pattern to include `/c` to protect against group structures that look like chunk structures
-        pattern = rf"(?:^|/)c{chunk_key_encoding}{pattern}"
-    # Look for f"/c{chunk_key_encoding"}" followed by digits and more /digits
-    match = re.search(pattern, key)
-    if not match:
-        raise ValueError(
-            f"Key {key} with chunk_key_encoding {chunk_key_encoding} did not match the expected pattern for nodes in the Zarr hierarchy."
+    pattern = compiled_chunk_pattern(separator, expand=expand_pattern)
+
+    if not (match := re.search(pattern, key)):
+        msg = (
+            f"Key {key!r} with separator {separator!r} did not match the "
+            "expected pattern for nodes in the Zarr hierarchy."
         )
-    chunk_component = (
-        match.group().removeprefix("/").removeprefix(f"c{chunk_key_encoding}")
-    )
-    return tuple(int(ind) for ind in chunk_component.split(chunk_key_encoding))
+        raise ValueError(msg)
+
+    chunk_component = match.group().removeprefix("/").removeprefix(f"c{separator}")
+    return tuple(int(ind) for ind in chunk_component.split(separator))
 
 
-def construct_chunk_pattern(chunk_key_encoding: Literal[".", "/"]) -> str:
+def construct_chunk_pattern(
+    separator: ChunkKeySeparator, *, expand: bool = False
+) -> str:
     """
-    Produces a pattern for finding a chunk indices from key within a Zarr store using [re.match][] or [re.search][].
+    Produce a pattern for finding chunk indices from a key within a Zarr store
+    using [re.match][] or [re.search][].
 
     Parameters
     ----------
-    chunk_key_encoding
+    separator
         The chunk key separator used in the Zarr store.
 
     Returns
     -------
-    String representation of regular expression for a chunk key index
-    """
+    String representation of regular expression for a chunk key index.
 
-    integer_pattern = r"([1-9]+\d*|0)"  # matches 0 or an unsigned integer that does not begin with zero
-    separator = (
-        rf"\{chunk_key_encoding}" if chunk_key_encoding == "." else chunk_key_encoding
-    )
-    pattern = rf"(c|{integer_pattern}+({separator}{integer_pattern})*)$"  # matches the character "c" or 1 integer, optionally followed by more integers each separated by a separator (i.e. a period)
-    return pattern
+    Raises
+    ------
+    ValueError
+        If `separator` is not a valid separator as specified by the type
+        `ChunkKeySeparator`.
+    """
+    if separator not in CHUNK_KEY_SEPARATORS:
+        msg = f"chunk key separator must be one of {CHUNK_KEY_SEPARATORS}: {separator}"
+        raise ValueError(msg)
+
+    # Surround separator in square brackets to ensure it's an exact character match.
+    sep_pattern = rf"[{separator}]"
+    # Matches exactly "0" or an unsigned integer that does not begin with zero
+    integer_pattern = r"(?:[1-9]\d*|0)"
+    # Matches exactly "c" or an integer followed by zero or more integers each
+    # separated by a valid chunk key separator (e.g., a period).
+    key_pattern = rf"(?:c|{integer_pattern}(?:{sep_pattern}{integer_pattern})*)$"
+
+    # If expand=True, allow key to start with "c<separator>" or "/c<separator>".
+    # In the former case, a full match is performed.
+    return rf"(?:^|/)c{sep_pattern}{key_pattern}" if expand else key_pattern
+
+
+@functools.cache
+def compiled_chunk_pattern(
+    separator: ChunkKeySeparator, *, expand: bool = False
+) -> re.Pattern:
+    """
+    Produce a pattern for finding chunk indices from a key within a Zarr store
+    using [re.match][] or [re.search][].
+
+    Parameters
+    ----------
+    separator
+        The chunk key separator used in the Zarr store.
+
+    Returns
+    -------
+    Regular expression Pattern for a chunk key index.
+
+    Raises
+    ------
+    ValueError
+        If `separator` is not a valid separator as specified by the type
+        `ChunkKeySeparator`.
+
+    Notes
+    -----
+    This function simply calls [construct_chunk_pattern][], compiles the result,
+    caches it, and returns the cached pattern for performance.  See
+    [contruct_chunk_pattern][] for examples.
+    """
+    return re.compile(construct_chunk_pattern(separator, expand=expand))
 
 
 def create_v3_array_metadata(
