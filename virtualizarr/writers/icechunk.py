@@ -386,9 +386,8 @@ def validate_and_autodetect_region(
         mode="r+",
     )
     vds = xarray_store._validate_and_autodetect_region(vds)
-    region = xarray_store._write_region
     xarray_store.close()
-    return vds, region
+    return vds, cast(dict[str, slice], xarray_store._write_region)
 
 
 def num_chunks(
@@ -481,9 +480,14 @@ def write_virtual_variable_to_icechunk(
             append_axis=append_axis,
         )
     elif region is not None:
+        existing_array = group[name]
+        if not isinstance(existing_array, Array):
+            raise ValueError(
+                f"Expected {name!r} to be a zarr.core.Array, got {type(existing_array)}"
+            )
         check_compatible_arrays(
             ma,
-            group[name],
+            existing_array,
             append_axis=None,
             except_axes=[
                 get_axis(dims, region_dim)
@@ -491,10 +495,10 @@ def write_virtual_variable_to_icechunk(
                 if region_dim in dims
             ],
         )
-        check_compatible_encodings(var.encoding, group[name].attrs)
+        check_compatible_encodings(var.encoding, existing_array.attrs)
 
         chunk_offsets: list[int] = []
-        for dim, chunk_size in zip(dims, group[name].chunks):
+        for dim, chunk_size in zip(dims, existing_array.chunks):
             if dim not in region:
                 chunk_offsets.append(0)
                 continue
