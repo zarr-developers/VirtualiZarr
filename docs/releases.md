@@ -4,6 +4,10 @@
 
 ### New Features
 
+- Support configurable chunk separator.
+  ([#917](https://github.com/zarr-developers/VirtualiZarr/pull/917)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Breaking changes
 
 - Minimum required version of `obspec_utils` is now `0.9.0`.
@@ -115,6 +119,9 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
+
+- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
 
