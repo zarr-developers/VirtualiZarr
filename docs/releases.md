@@ -4,6 +4,10 @@
 
 ### New Features
 
+- Support configurable chunk separator.
+  ([#917](https://github.com/zarr-developers/VirtualiZarr/pull/917)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Breaking changes
 
 - Minimum required version of `obspec_utils` is now `0.9.0`.
