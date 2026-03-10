@@ -170,7 +170,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 
 VirtualiZarr allows you to write virtual references to a few formats: currently Kerchunk JSON, Kerchunk Parquet, and [Icechunk](https://icechunk.io/en/latest/).
 
-Overall **we strongly recommend using Icechunk** over the Kerchunk formats, though VirtualiZarr will continue to support writing to both.
+Overall **we strongly recommend using Icechunk** over the Kerchunk formats, though VirtualiZarr plans to support writing to both in perpetuity.
 
 This is because Icechunk provides several compelling advantages over either Kerchunk format:
 
