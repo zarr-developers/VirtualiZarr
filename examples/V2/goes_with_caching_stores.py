@@ -2,9 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "virtualizarr>=0.2.4",
+#     "virtualizarr>=2.4.0",
 #     "obstore",
-#     "obspec-utils",
+#     "obspec-utils>=0.9.0",
 #     "xarray",
 #     "numpy",
 #     "h5py",
@@ -54,10 +54,9 @@ Run this example with uv:
 
 import time
 
-from obspec_utils.cache import CachingReadableStore
-from obspec_utils.obspec import BufferedStoreReader
+from obspec_utils.readers import BufferedStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
-from obspec_utils.splitting import SplittingReadableStore
+from obspec_utils.wrappers import CachingReadableStore, SplittingReadableStore
 from obstore.store import from_url
 
 import virtualizarr as vz

@@ -74,7 +74,7 @@ from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 project_dir="/Users/user/project-dir"
 project_url=f"file://{project_dir}"
 registry = ObjectStoreRegistry({project_url: LocalStore()})
-vds = open_virtual_dataset(f"{project_url}/combined.json", , registry=registry, parser=KerchunkJSONParser())
+vds = open_virtual_dataset(f"{project_url}/combined.json", registry=registry, parser=KerchunkJSONParser())
 # or
 vds = open_virtual_dataset(f"{project_url}/combined.parquet", registry=registry, parser=KerchunkParquetParser())
 
@@ -83,7 +83,7 @@ vds.vz.to_icechunk(icechunkstore)
 
 ### I already have some data in Zarr, do I have to resave it?
 
-No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`. Note: Currently only reading Zarr V3 is supported.
+No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`.
 
 ### Can I add a new parser for my custom file format?
 

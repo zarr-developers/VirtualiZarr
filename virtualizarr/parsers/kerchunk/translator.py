@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import cast
 
@@ -213,6 +214,7 @@ def manifest_from_kerchunk_chunk_dict(
             )
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
+
         chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
     return ChunkManifest(entries=chunk_entries)
 
@@ -224,12 +226,33 @@ def chunkentry_from_kerchunk(
     """Create a single validated ChunkEntry object from whatever kerchunk contains under that chunk key."""
     from upath import UPath
 
+    if not isinstance(path_and_byte_range_info, list):
+        raise TypeError(
+            f"Malformed Kerchunk chunk reference found. Expected JSON to deserialize to a list, but got type {type(path_and_byte_range_info)}"
+        )
+
     if len(path_and_byte_range_info) == 1:
         path = path_and_byte_range_info[0]
-        offset = 0
-        length = UPath(path).stat().st_size
+
+        if isinstance(path, str):
+            # Kerchunk uses a single string path with no offset or length as shorthand to mean "point to this entire file"
+            offset = 0
+            length = UPath(path).stat().st_size
+
+        else:
+            if isinstance(path, float) and math.isnan(path):
+                # if path was a JSON NULL we should treat the chunk as missing (this is part of the Kerchunk Parquet references spec)
+                path = ""
+                offset = 0
+                length = 0
+            else:
+                raise TypeError(
+                    f"Malformed Kerchunk chunk reference found. The JSON found deserialized to a single-element list, and hence expected element to be a string, but found value {path}, of type {type(path)}"
+                )
+
     else:
         path, offset, length = path_and_byte_range_info
+
     return ChunkEntry.with_validation(  # type: ignore[attr-defined]
         path=path, offset=offset, length=length, fs_root=fs_root
     )

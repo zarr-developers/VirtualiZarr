@@ -118,6 +118,7 @@ def concatenate(
         paths=concatenated_paths,
         offsets=concatenated_offsets,
         lengths=concatenated_lengths,
+        validate_paths=False,
     )
 
     new_metadata = copy_and_replace_metadata(
@@ -183,6 +184,7 @@ def stack(
         paths=stacked_paths,
         offsets=stacked_offsets,
         lengths=stacked_lengths,
+        validate_paths=False,
     )
 
     # chunk shape has changed because a length-1 axis has been inserted
@@ -253,6 +255,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         paths=broadcasted_paths,
         offsets=broadcasted_offsets,
         lengths=broadcasted_lengths,
+        validate_paths=False,
     )
 
     new_metadata = copy_and_replace_metadata(

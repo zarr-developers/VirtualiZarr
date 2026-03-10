@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Protocol, runtime_checkable
 
-from obspec_utils.obspec import ReadableFile, ReadableStore
+from obspec_utils.protocols import ReadableFile, ReadableStore
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
