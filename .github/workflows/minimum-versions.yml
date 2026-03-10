@@ -43,7 +43,7 @@ jobs:
           pixi list --environment minimum-versions
 
       - name: Cache tutorial data
-        uses: actions/cache@5.0.3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/xarray_tutorial_data
           key: xarray-tutorial-data
