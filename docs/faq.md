@@ -58,7 +58,7 @@ You can create the virtual store once (e.g. as soon as your HPC simulation finis
 
 Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
 
-In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates, version controlled history, and faster access speeds.
+For a discussion of the pros and cons of serializing into the Icechunk format vs the Kerchunk references format, see the [this FAQ answer](#which-format-should-i-save-my-virtual-references-as).
 
 ### I have already Kerchunked my data, do I have to redo that?
 
