@@ -2,6 +2,22 @@
 
 ## Usage questions
 
+### Why write to a cloud-native format directly if I can just virtualize later?
+
+While virtual zarr stores are intended as a cloud-native bridge for archival formats, they shouldn't be used as a justification for continuing to write data into object storage using non-cloud-optimized formats (such as NetCDF, HDF5, TIFF, or GRIB).
+
+**If you can write your data directly as native Zarr (or native zarr chunks in Icechunk), you probably should!**
+
+Some reasons are:
+
+- Not all datasets can be virtualized, sometimes for subtle reasons (see [Can my specific data be virtualized?](#can-my-specific-data-be-virtualized)).
+- Writing individual files separately means there is nothing enforcing the cross-file constraints needed for later virtualization.
+- Virtualized stores are more fragile - the archival files could be moved or updated and you won't know that the reference is stale until read-time.
+- Virtualization allows arbitrary differences in metadata compared to the original files - this is mostly a useful feature but it could become out-of-sync or misleading.
+- It creates significant extra work for someone later down the line, and that person will almost certainly know less about the details of the dataset than the data provider does at write time.
+- Chunk sizes matter, and it's generally good to force data providers to think up-front about about what chunk sizes would be optimal for expected user queries.
+- For static datasets, native Zarr stores scale effortlessly to arbitrary numbers of chunks today, without having to even think about things like [manifest splitting](https://icechunk.io/en/latest/performance/#splitting-manifests).
+
 ### Can my specific data be virtualized?
 
 Depends on some details of your data.
