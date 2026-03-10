@@ -180,15 +180,15 @@ This is because Icechunk provides several compelling advantages over either Kerc
 - **Read performance** - Reading data from Icechunk is faster than reading from Kerchunk references. This is because reading from Kerchunk references is done using the fsspec python library, whereas reading data from Icechunk (virtual references or native chunks) uses the Icechunk rust library. For this and a number of other reasons, reading data from Icechunk generally provides a much higher throughput.
 - **Incremental overwriting** - VirtualiZarr's `.to_icechunk` API allows you to write to a specific region. This is more difficult to do safely when writing to Kerchunk's JSON format because it would generally require editing part of a single file.
 - **Mix "native" and virtual chunks** - Icechunk's manifests can store any mixture of virtual chunks and "native" zarr chunks. Kerchunk's formats cannot do this ("inlined" chunks are something separate).
-- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)).
-
-However a direct head-to-head comparison of the scalability of these formats has yet to be performed.
+- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)). However a direct head-to-head comparison of the scalability of these formats has yet to be performed.
 
 Conversely, the two Kerchunk formats have some advantages over Icechunk:
 
 - **Spec complexity** - Icechunk's format [specification](https://icechunk.io/en/latest/spec/) is considerably more complex than Kerchunk's format [specification](https://fsspec.github.io/kerchunk/spec.html) (as it includes more features).
 - **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses [FlatBuffers](https://github.com/google/flatbuffers), which are standardized but not human-readable.
 - **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with fewer roundtrips to object storage. However the latency incurred when writing the references will almost always be negligible compared to the time taken to parse the archival file formats in the first place.
+
+If there is another persistent format for manifests which you wish VirtualiZarr could write to, please open an issue.
 
 ## Development
 
