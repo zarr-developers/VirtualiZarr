@@ -27,6 +27,9 @@
   mode on platforms that default to `"fork"`
   ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
   Daniels](https://github.com/chuckwondo).
+- Fix `ZarrParser` not using the store-relative path when the zarr store is nested inside the object store root
+  ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
