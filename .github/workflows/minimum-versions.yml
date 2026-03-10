@@ -41,6 +41,13 @@ jobs:
         run: |
           pixi install --environment minimum-versions
           pixi list --environment minimum-versions
+
+      - name: Cache tutorial data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/xarray_tutorial_data
+          key: xarray-tutorial-data
+
       - name: Running Tests
         run: |
           pixi run -e minimum-versions run-tests-xml-cov
