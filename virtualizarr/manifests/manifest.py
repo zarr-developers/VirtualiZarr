@@ -556,10 +556,10 @@ def validate_chunk_keys(
 ) -> None:
     if not chunk_keys:
         return
-
+    pattern = compiled_chunk_pattern(separator)
     # Check if all keys have the correct form
     for key in chunk_keys:
-        if not re.match(compiled_chunk_pattern(separator), key):
+        if not re.match(pattern, key):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
