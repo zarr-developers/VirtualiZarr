@@ -43,6 +43,12 @@ jobs:
           pixi install --environment upstream
           pixi list --environment upstream
 
+      - name: Cache tutorial data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/xarray_tutorial_data
+          key: xarray-tutorial-data
+
       - name: Running Tests
         run: |
           pixi run -e upstream run-tests-xml-cov
