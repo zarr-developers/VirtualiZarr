@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Executor
+from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -26,6 +27,7 @@ from virtualizarr.manifests import ManifestArray, ManifestGroup, ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
+from virtualizarr.utils import compose
 
 if TYPE_CHECKING:
     from xarray.core.types import (
@@ -200,6 +202,7 @@ def open_virtual_dataset(
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
+        - [virtualizarr.parsers.DMRPPParser][] for virtualizing DMR++ files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
         - [virtualizarr.parsers.KerchunkParquetParser][] for re-opening Kerchunk Parquets.
         - [virtualizarr.parsers.ZarrParser][] for virtualizing Zarr stores.
@@ -350,36 +353,17 @@ def open_virtual_mfdataset(
     else:
         paths1d = paths  # type: ignore[assignment]
 
-    # TODO this refactored preprocess and executor logic should be upstreamed into xarray - see https://github.com/pydata/xarray/pull/9932
+    # TODO this refactored preprocess and executor logic should be upstreamed
+    # into xarray - see https://github.com/pydata/xarray/pull/9932
 
-    if preprocess:
-        # TODO we could reexpress these using functools.partial but then we would hit this lithops bug: https://github.com/lithops-cloud/lithops/issues/1428
+    open_vds = partial(open_virtual_dataset, registry=registry, parser=parser, **kwargs)
+    mapper = open_vds if preprocess is None else compose(preprocess, open_vds)
+    make_executor = get_executor(parallel=parallel)
 
-        def _open_and_preprocess(path: str) -> xr.Dataset:
-            ds = open_virtual_dataset(
-                url=path, registry=registry, parser=parser, **kwargs
-            )
-            return preprocess(ds)
-
-        open_func = _open_and_preprocess
-    else:
-
-        def _open(path: str) -> xr.Dataset:
-            return open_virtual_dataset(
-                url=path, registry=registry, parser=parser, **kwargs
-            )
-
-        open_func = _open
-
-    executor = get_executor(parallel=parallel)
-    with executor() as exec:
-        # wait for all the workers to finish, and send their resulting virtual datasets back to the client for concatenation there
-        virtual_datasets = list(
-            exec.map(
-                open_func,
-                paths1d,
-            )
-        )
+    with make_executor() as exec:
+        # Wait for all the workers to finish, and send their resulting virtual
+        # datasets back to the client for concatenation there.
+        virtual_datasets = list(exec.map(mapper, paths1d))
 
     # TODO add file closers
 

@@ -4,7 +4,19 @@ import copy
 import importlib
 import io
 import json
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence, Union
+from collections.abc import Callable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Iterable,
+    Mapping,
+    Optional,
+    ParamSpec,
+    Sequence,
+    TypeVar,
+    Union,
+)
 
 from zarr.abc.codec import ArrayBytesCodec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
@@ -16,6 +28,9 @@ from virtualizarr.types.kerchunk import KerchunkStoreRefs
 # taken from zarr.core.common
 JSON = str | int | float | Mapping[str, "JSON"] | Sequence["JSON"] | None
 
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+_U = TypeVar("_U")
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -153,3 +168,38 @@ def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
             normalized_result["refs"][k] = json.loads(v)  # type: ignore[index]
 
     return normalized_result
+
+
+class compose(Generic[_P, _T, _U]):
+    """Callable that is the functional composition of 2 other callables.
+
+    Adheres to the mathematical notion of function composition where
+    ``(f . g)(x) == f(g(x))`` and ``.`` represents the composition operator.
+    Alternatively, this can be written as ``compose(f, g)(x) == f(g(x))``, or,
+    if ``h = compose(f, g)``, then ``h(x) == f(g(x))``.  In other words,
+    function applications occur in right-to-left order.
+
+    If both callables can be pickled, their composition can also be pickled.
+
+    Attributes
+    ----------
+    f
+        Callable to apply to the result of applying `g`.
+    g
+        Callable to apply to argument(s) supplied when invoking this callable.
+
+    Examples
+    --------
+    >>> from operator import add
+    >>> abs(add(-40, -2))
+    42
+    >>> compose(abs, add)(-40, -2)
+    42
+    """
+
+    def __init__(self, f: Callable[[_T], _U], g: Callable[_P, _T]) -> None:
+        self._f = f
+        self._g = g
+
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _U:
+        return self._f(self._g(*args, **kwargs))
