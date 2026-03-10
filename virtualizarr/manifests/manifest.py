@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections.abc import (
     Callable,
@@ -8,12 +10,15 @@ from collections.abc import (
     ValuesView,
 )
 from pathlib import PosixPath
-from typing import Any, NewType, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
 
-from virtualizarr.manifests.utils import construct_chunk_pattern, parse_manifest_index
+from virtualizarr.manifests.utils import compiled_chunk_pattern, parse_manifest_index
 from virtualizarr.types import ChunkKey
+
+if TYPE_CHECKING:
+    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
 
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
@@ -27,9 +32,6 @@ VALID_URI_PREFIXES = {
     "http://",
     "https://",
 }
-
-
-_CHUNK_KEY = rf"^{construct_chunk_pattern('.')}"
 
 
 class ChunkEntry(TypedDict):
@@ -322,6 +324,55 @@ class ChunkManifest:
 
         return obj
 
+    @classmethod
+    def _from_arrow(
+        cls,
+        *,
+        paths: "pa.StringArray",
+        offsets: "pa.UInt64Array",
+        lengths: "pa.UInt64Array",
+        shape: tuple[int, ...],
+    ) -> "ChunkManifest":
+        """
+        Create a ChunkManifest from flat 1D PyArrow arrays.
+
+        Avoids intermediate Python dicts by converting Arrow arrays directly
+        to the numpy arrays used internally by ChunkManifest.
+
+        Parameters
+        ----------
+        paths
+            Full paths to chunks, as a PyArrow StringArray. Nulls represent missing chunks.
+        offsets
+            Byte offsets of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        lengths
+            Byte lengths of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
+        shape
+            Shape to reshape the flat arrays into.
+        """
+        import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
+        import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
+
+        arrow_paths = pc.if_else(pc.is_null(paths), "", paths)
+        arrow_offsets = pc.if_else(
+            pc.is_null(offsets), pa.scalar(0, pa.uint64()), offsets
+        )
+        arrow_lengths = pc.if_else(
+            pc.is_null(lengths), pa.scalar(0, pa.uint64()), lengths
+        )
+
+        np_paths = arrow_paths.to_numpy(zero_copy_only=False).astype(
+            np.dtypes.StringDType()
+        )
+        np_offsets = arrow_offsets.to_numpy(zero_copy_only=False)
+        np_lengths = arrow_lengths.to_numpy(zero_copy_only=False)
+
+        return cls.from_arrays(
+            paths=np_paths.reshape(shape),
+            offsets=np_offsets.reshape(shape),
+            lengths=np_lengths.reshape(shape),
+        )
+
     @property
     def ndim_chunk_grid(self) -> int:
         """
@@ -494,7 +545,7 @@ def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
 
     # Check if all keys have the correct form
     for key in chunk_keys:
-        if not re.match(_CHUNK_KEY, key):
+        if not re.match(compiled_chunk_pattern("."), key):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
