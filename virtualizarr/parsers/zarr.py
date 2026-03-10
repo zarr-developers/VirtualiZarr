@@ -383,7 +383,7 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
     strategy = get_strategy(zarr_array)
     strategy.validate(zarr_array)
-    chunk_grid_shape = zarr_array._chunk_grid_shape
+    chunk_grid_shape = zarr_array.cdata_shape
 
     if zarr_array.shape == ():
         chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
