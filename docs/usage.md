@@ -105,16 +105,17 @@ that can access your data. Available ObjectStores are described in the [obstore 
     access_key_id = "<access_key_id>"
     secret_access_key = "<secret_access_key>"
     path = "<path_to_files>"
-    file = "filename.nc"
     scheme = "s3://"
+    bucket_name = "<bucket_name>"
+    bucket = f"{scheme}{bucket_name}"
 
     # create anon s3 store
-    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, skip_signature=True)
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, skip_signature=True)
 
     # create s3 store with aws-style credentials
-    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, access_key_id = aws_access_key_id, secret_access_key=aws_secret_access_key)
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, access_key_id = access_key_id, secret_access_key=secret_access_key)
 
-    registry = ObjectStoreRegistry({f"{scheme}{path}": store})
+    registry = ObjectStoreRegistry({f"{bucket}": store})
 
     ```
 

@@ -27,6 +27,9 @@
   mode on platforms that default to `"fork"`
   ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
   Daniels](https://github.com/chuckwondo).
+- Fix `ZarrParser` not using the store-relative path when the zarr store is nested inside the object store root
+  ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
@@ -40,6 +43,10 @@
 This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
 
 ### New Features
+
+- Improved `ZarrParser` performance.
+  ([#892](https://github.com/zarr-developers/VirtualiZarr/pull/892)).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
 
 - Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
   ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
