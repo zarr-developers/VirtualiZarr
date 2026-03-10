@@ -170,7 +170,9 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 
 VirtualiZarr allows you to write virtual references to a few formats: currently Kerchunk JSON, Kerchunk Parquet, and [Icechunk](https://icechunk.io/en/latest/).
 
-Icechunk provides several compelling advantages over either Kerchunk format:
+Overall **we strongly recommend using Icechunk** over the Kerchunk formats, though VirtualiZarr will continue to support writing to both.
+
+This is because Icechunk provides several compelling advantages over either Kerchunk format:
 
 - **Ensure referenced data has not changed** - An inherent risk of the virtual references approach is someone could overwrite, update, or delete the referenced archival file between the time when the virtual references were parsed and the time that a user attempts to read the data. With Kerchunk this scenario could lead to incorrect data being returned silently. In Icechunk, the last-modified time of each file is also saved, and checked at read-time. Therefore a user will get a clear error if a file has been touched since the virtual references were created.
 - **Transactions** - Icechunk stores are updated via commits, each of which is effectively a single database-like transaction. This helps guarantee consistency of the virtual references you write, by making it impossible for someone reading the data to see a half-written state, where only some chunks or chunk references have been written.
@@ -187,8 +189,6 @@ Conversely, the two Kerchunk formats have some advantages over Icechunk:
 - **Spec complexity** - Icechunk's format [specification](https://icechunk.io/en/latest/spec/) is considerably more complex than Kerchunk's format [specification](https://fsspec.github.io/kerchunk/spec.html) (as it includes more features).
 - **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses [FlatBuffers](https://github.com/google/flatbuffers), which are standardized but not human-readable.
 - **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with fewer roundtrips to object storage. However the latency incurred when writing the references will almost always be negligible compared to the time taken to parse the archival file formats in the first place.
-
-Overall we strongly recommend using Icechunk over the Kerchunk formats, though VirtualiZarr will continue to support writing to both.
 
 ## Development
 
