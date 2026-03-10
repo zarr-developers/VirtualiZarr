@@ -185,7 +185,7 @@ However a direct head-to-head comparison of the scalability of these formats has
 Conversely, the two Kerchunk formats have some advantages over Icechunk:
 
 - **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses flatbuffers, which are standardized but not human-readable.
-- **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with a smaller number of roundtrips. However this time taken will almost always be negligible compared to the time taken to parse the archival file formats.
+- **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with fewer roundtrips to object storage. However the latency incurred when writing the references will almost always be negligible compared to the time taken to parse the archival file formats in the first place.
 
 (Note that in theory both formats could generalize to store data which does not use the Zarr data model, but in practice neither has ever been used for this purpose.)
 
