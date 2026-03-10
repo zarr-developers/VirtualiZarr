@@ -14,7 +14,11 @@ from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
 
 import numpy as np
 
-from virtualizarr.manifests.utils import compiled_chunk_pattern, parse_manifest_index
+from virtualizarr.manifests.utils import (
+    ChunkKeySeparator,
+    compiled_chunk_pattern,
+    parse_manifest_index,
+)
 from virtualizarr.types import ChunkKey
 
 if TYPE_CHECKING:
@@ -190,7 +194,12 @@ class ChunkManifest:
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
-    def __init__(self, entries: dict, shape: tuple[int, ...] | None = None) -> None:
+    def __init__(
+        self,
+        entries: dict,
+        shape: tuple[int, ...] | None = None,
+        separator: ChunkKeySeparator = ".",
+    ) -> None:
         """
         Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
 
@@ -207,15 +216,18 @@ class ChunkManifest:
                 "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
             }
             ```
+        separator
+            The chunk key separator, as specified by the array's chunk_key_encoding
+            metadata. Either "." (default/v2 encoding) or "/" (default encoding).
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
 
         # TODO do some input validation here first?
-        validate_chunk_keys(entries.keys())
+        validate_chunk_keys(entries.keys(), separator)
 
         if shape is None:
-            shape = get_chunk_grid_shape(entries.keys())
+            shape = get_chunk_grid_shape(entries.keys(), separator)
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
@@ -237,7 +249,7 @@ class ChunkManifest:
             path, offset, length = entry.values()
             entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
-            split_key = parse_manifest_index(key)
+            split_key = parse_manifest_index(key, separator)
             paths[split_key] = entry["path"]
             offsets[split_key] = entry["offset"]
             lengths[split_key] = entry["length"]
@@ -534,39 +546,45 @@ def join(inds: Iterable[Any]) -> ChunkKey:
     return cast(ChunkKey, ".".join(str(i) for i in list(inds)))
 
 
-def get_ndim_from_key(key: str) -> int:
+def get_ndim_from_key(key: str, separator: ChunkKeySeparator = ".") -> int:
     """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
-    return len(parse_manifest_index(key))
+    return len(parse_manifest_index(key, separator))
 
 
-def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
+def validate_chunk_keys(
+    chunk_keys: Iterable[ChunkKey], separator: ChunkKeySeparator = "."
+) -> None:
     if not chunk_keys:
         return
 
     # Check if all keys have the correct form
     for key in chunk_keys:
-        if not re.match(compiled_chunk_pattern("."), key):
+        if not re.match(compiled_chunk_pattern(separator), key):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
     first_key, *other_keys = list(chunk_keys)
-    ndim = get_ndim_from_key(first_key)
+    ndim = get_ndim_from_key(first_key, separator)
     for key in other_keys:
-        other_ndim = get_ndim_from_key(key)
+        other_ndim = get_ndim_from_key(key, separator)
         if other_ndim != ndim:
             raise ValueError(
                 f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
             )
 
 
-def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
+def get_chunk_grid_shape(
+    chunk_keys: Iterable[ChunkKey], separator: ChunkKeySeparator = "."
+) -> tuple[int, ...]:
     # find max chunk index along each dimension
     chunk_keys = tuple(chunk_keys)
 
     if chunk_keys == ("c",):
         # Scalar array, cannot be split
         return ()
-    zipped_indices = zip(*map(parse_manifest_index, chunk_keys))
+    zipped_indices = zip(
+        *map(lambda key: parse_manifest_index(key, separator), chunk_keys)
+    )
     chunk_grid_shape = tuple(
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )

@@ -57,7 +57,8 @@ class ManifestArray:
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
-            _chunkmanifest = ChunkManifest(entries=chunkmanifest)
+            separator = getattr(_metadata.chunk_key_encoding, "separator", ".")
+            _chunkmanifest = ChunkManifest(entries=chunkmanifest, separator=separator)
         else:
             raise TypeError(
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
