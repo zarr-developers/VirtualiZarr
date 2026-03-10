@@ -493,6 +493,34 @@ def test_zarr_parser_works_inside_running_event_loop(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
+@zarr_versions()
+def test_parser_with_nested_store_path(tmpdir, zarr_format):
+    """Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/912."""
+    parent_dir = f"{tmpdir}/bucket_root"
+    # Use path names whose characters don't overlap with the variable name "temp",
+    # to avoid triggering a separate zarr list_dir bug (zarr-developers/zarr-python#3657)
+    filepath = f"{parent_dir}/foo/bar.zarr"
+
+    ds = xr.Dataset(
+        {"temp": (("x", "y"), np.arange(12, dtype="float32").reshape(3, 4))},
+    )
+    ds.to_zarr(filepath, consolidated=False, zarr_format=zarr_format)
+
+    store = LocalStore(prefix=parent_dir)
+    registry = ObjectStoreRegistry({f"file://{parent_dir}": store})
+    parser = ZarrParser()
+
+    manifeststore = parser(url=filepath, registry=registry)
+
+    with xr.open_dataset(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)
+
+
 def test_sharded_array_raises_error(tmpdir):
     """Test that attempting to virtualize a sharded Zarr V3 array raises NotImplementedError."""
     filepath = f"{tmpdir}/test_sharded.zarr"
