@@ -69,6 +69,7 @@ Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders 
 - Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
   By [Max Jones](https://github.com/maxrjones).
 
+
 ### Documentation
 
 - Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
