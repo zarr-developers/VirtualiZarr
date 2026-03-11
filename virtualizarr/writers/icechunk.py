@@ -452,6 +452,7 @@ def write_virtual_variable_to_icechunk(
     metadata = ma.metadata
 
     dims: list[str] = cast(list[str], list(var.dims))
+    chunk_offsets: list[int]
     existing_num_chunks = 0
     if append_dim and append_dim in dims:
         # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
@@ -469,9 +470,9 @@ def write_virtual_variable_to_icechunk(
             array=group[name],
             axis=append_axis,
         )
-        chunk_offsets = tuple(
+        chunk_offsets = [
             existing_num_chunks if dim == append_dim else 0 for dim in dims
-        )
+        ]
 
         # resize the array
         resize_array(
@@ -497,7 +498,7 @@ def write_virtual_variable_to_icechunk(
         )
         check_compatible_encodings(var.encoding, existing_array.attrs)
 
-        chunk_offsets: list[int] = []
+        chunk_offsets = []
         for dim, chunk_size in zip(dims, existing_array.chunks):
             if dim not in region:
                 chunk_offsets.append(0)
@@ -511,9 +512,8 @@ def write_virtual_variable_to_icechunk(
                     + f"chunks of size {chunk_size!r}"
                 )
             chunk_offsets.append(start // chunk_size)
-        chunk_offsets = tuple(chunk_offsets)
     else:
-        chunk_offsets = tuple(0 for _ in dims)
+        chunk_offsets = [0 for _ in dims]
         # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
         filters, serializer, compressors = extract_codecs(metadata.codecs)
         arr = group.require_array(
@@ -535,7 +535,7 @@ def write_virtual_variable_to_icechunk(
         group=group,
         arr_name=name,
         manifest=ma.manifest,
-        chunk_index_offsets=chunk_offsets,
+        chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
 
