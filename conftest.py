@@ -340,6 +340,15 @@ def hdf5_empty(tmp_path: Path) -> str:
 
 
 @pytest.fixture
+def hdf5_missing_value(tmp_path: Path) -> str:
+    """Create an empty HDF5 file."""
+    filepath = tmp_path / "compact_lowlevel.h5"
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset("my_dataset", shape=(10,), dtype="int64")
+    return str(filepath)
+
+
+@pytest.fixture
 def hdf5_scalar(tmp_path: Path) -> str:
     """Create an HDF5 file with a scalar dataset."""
     filepath = tmp_path / "scalar.nc"
