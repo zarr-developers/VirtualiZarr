@@ -79,3 +79,46 @@ def minio_bucket(container):
         "file": filename,
         "client": client,
     }
+
+
+@pytest.fixture(scope="session")
+def minio_nolist_bucket(container):
+    """Create a MinIO bucket whose anonymous policy allows Get but NOT List."""
+    from minio import Minio
+
+    bucket = "nolist-bucket"
+    client = Minio(
+        "localhost:9000",
+        access_key=container["username"],
+        secret_key=container["password"],
+        secure=False,
+    )
+    client.make_bucket(bucket)
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": ["s3:GetBucketLocation"],
+                "Resource": f"arn:aws:s3:::{bucket}",
+            },
+            {
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": [
+                    "s3:GetObject",
+                ],
+                "Resource": f"arn:aws:s3:::{bucket}/*",
+            },
+        ],
+    }
+    client.set_bucket_policy(bucket, json.dumps(policy))
+    yield {
+        "port": container["port"],
+        "endpoint": container["endpoint"],
+        "username": container["username"],
+        "password": container["password"],
+        "bucket": bucket,
+        "client": client,
+    }
