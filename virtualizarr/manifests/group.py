@@ -115,6 +115,8 @@ class ManifestGroup(
         metadata_dict = self.metadata.to_dict()
         attributes = metadata_dict["attributes"]
         coord_names = attributes.pop("coordinates", [])
+        if isinstance(coord_names, str):
+            coord_names = coord_names.split() if coord_names.strip() else []
 
         virtual_vars = {
             name: marr.to_virtual_variable() for name, marr in self.arrays.items()
