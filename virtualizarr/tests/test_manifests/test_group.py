@@ -20,9 +20,7 @@ class TestToVirtualDataset:
             shape=(1, 1, 1, 2, 2), chunks=(1, 1, 1, 2, 2), dimension_names=dims_5d
         )
         time_arr = manifest_array(shape=(1,), chunks=(1,), dimension_names=["time"])
-        lat_arr = manifest_array(
-            shape=(2,), chunks=(2,), dimension_names=["latitude"]
-        )
+        lat_arr = manifest_array(shape=(2,), chunks=(2,), dimension_names=["latitude"])
 
         manifest_group = ManifestGroup(
             arrays={"t": t_arr, "u": u_arr, "time": time_arr, "latitude": lat_arr},
