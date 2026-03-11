@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 requires-python = ">=3.11"
 dynamic = ["version"]
@@ -128,6 +129,7 @@ dev = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-mypy",
+    "pytest-timeout",
     "pytest-xdist",
     "ruff",
     "s3fs",
@@ -149,7 +151,7 @@ requires = [
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
 
 # Add the editable project pip install to the default group
 [tool.pixi.pypi-dependencies]
@@ -159,13 +161,13 @@ virtualizarr = { path = ".", editable = true }
 [tool.pixi.feature.py311.dependencies]
 python = "3.11.*"
 
-# Define a feature set for Python 3.12
-[tool.pixi.feature.py312.dependencies]
-python = "3.12.*"
-
 # Define a feature set for Python 3.13
 [tool.pixi.feature.py313.dependencies]
 python = "3.13.*"
+
+# Define a feature set for Python 3.14
+[tool.pixi.feature.py314.dependencies]
+python = "3.14.*"
 
 # Define a feature set for S3 testing with MinIO
 [tool.pixi.feature.minio.pypi-dependencies]
@@ -196,23 +198,24 @@ run-mypy = { cmd = "mypy virtualizarr" }
 # is used), reduces test hangs that appear to be macOS-related.
 run-tests = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --durations=10" }
 run-tests-including-slow = { cmd = "pytest -n auto --dist loadscope --run-network-tests --run-slow-tests --verbose --durations=10" }
-run-tests-no-network = { cmd = "pytest -n auto --verbose" }
-run-tests-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
-run-tests-xml-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
-run-tests-html-cov = { cmd = "pytest -n auto --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-tests-no-network = { cmd = "pytest -n auto --dist loadscope --verbose" }
+run-tests-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
+run-tests-xml-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
+run-tests-html-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
-test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.12
-minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "tiff", "py312", "minio"]
-minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "tiff", "hdf5-lib", "minimum-versions"]
-upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "py313"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "all_parsers", "all_writers", "py313"]
-docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "py313"]
+test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
+test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","py311"] # test against python 3.11
+test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py313"] # test against python 3.13
+test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
+minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
+minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","minimum-versions", "py311"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "zarr", "py313"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "all_parsers", "all_writers", "py313"]
+docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff","zarr", "py313"]
 
 [tool.pixi.dependencies]
 pytest = "*"
@@ -320,6 +323,7 @@ addopts = ["--doctest-modules", "--ignore=examples"]
 #    explicitly in order to avoid unexpected behavior in the future. Valid fixture loop
 #    scopes are: "function", "class", "module", "package", "session"
 #
+timeout = 300
 asyncio_default_fixture_loop_scope = "session"
 markers = [
     # Although we may not use pytest.mark.flaky, some of our test modules import

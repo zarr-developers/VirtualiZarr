@@ -58,7 +58,7 @@ You can create the virtual store once (e.g. as soon as your HPC simulation finis
 
 Very much so! VirtualiZarr allows you to ingest data as virtual references and write those references into an [Icechunk](https://icechunk.io/) Store. See the [Icechunk documentation on creating virtual datasets](https://icechunk.io/icechunk-python/virtual/#creating-a-virtual-dataset-with-virtualizarr).
 
-In general once the Icechunk specification reaches a stable v1.0, we would recommend using that over Kerchunk's references format, in order to take advantage of transactional updates, version controlled history, and faster access speeds.
+For a discussion of the pros and cons of serializing into the Icechunk format vs the Kerchunk references format, see the [this FAQ answer](#which-format-should-i-save-my-virtual-references-as).
 
 ### I have already Kerchunked my data, do I have to redo that?
 
@@ -118,9 +118,15 @@ I'm glad you asked! We can think of the problem of providing virtualized zarr-li
 
 The above steps could also be performed using the `kerchunk` library alone, but because (3), (4), (5), and (6) are all performed by the `kerchunk.combine.MultiZarrToZarr` function, and no internal abstractions are exposed, kerchunk's design is much less modular, and the use cases are limited by kerchunk's API surface.
 
-## How do VirtualiZarr and Kerchunk compare?
+## How do the VirtualiZarr and Kerchunk libraries compare?
 
 You have a choice between using VirtualiZarr and Kerchunk: VirtualiZarr provides almost all the same features as Kerchunk.
+
+!!! note
+
+    "Kerchunk" is really two things: a python library and an on-disk format for storing virtual references.
+    This question compares the Kerchunk python library to the VirtualiZarr python library.
+    For a discussion of the pros and cons of serializing into the Kerchunk references format, see the [next question](#which-format-should-i-save-my-virtual-references-as).
 
 Users of Kerchunk may find the following comparison table useful, which shows which features of Kerchunk map on to which features of VirtualiZarr.
 
@@ -161,6 +167,28 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.vz.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | [Icechunk](https://icechunk.io/) store                          | ❌                                                                                                                                 | `ds.vz.to_icechunk()`, then read back via xarray (requires zarr-python v3).                                |
 
+### Which format should I save my virtual references as?
+
+VirtualiZarr allows you to write virtual references to a few formats: currently Kerchunk JSON, Kerchunk Parquet, and [Icechunk](https://icechunk.io/en/latest/).
+
+Overall **we strongly recommend using Icechunk** over the Kerchunk formats, though VirtualiZarr plans to support writing to both in perpetuity.
+
+This is because Icechunk provides several compelling advantages over either Kerchunk format:
+
+- **Ensure referenced data has not changed** - An inherent risk of the virtual references approach is someone could overwrite, update, or delete the referenced archival file between the time when the virtual references were parsed and the time that a user attempts to read the data. With Kerchunk this scenario could lead to incorrect data being returned silently. In Icechunk, the last-modified time of each file is also saved, and checked at read-time. Therefore a user will get a clear error if a file has been touched since the virtual references were created.
+- **Transactions** - Icechunk stores are updated via commits, each of which is effectively a single database-like transaction. This helps guarantee consistency of the virtual references you write, by making it impossible for someone reading the data to see a half-written state, where only some chunks or chunk references have been written.
+- **Version Control and Time Travel** - Icechunk stores a git-like history of all commits, allowing you to roll back to any previous version, or even create multiple branches and tags. See the [Icechunk docs on Version Control](https://icechunk.io/en/latest/version-control/).
+- **Read performance** - Reading data from Icechunk is faster than reading from Kerchunk references. This is because reading from Kerchunk references is done using the fsspec python library, whereas reading data from Icechunk (virtual references or native chunks) uses the Icechunk rust library. For this and a number of other reasons, reading data from Icechunk generally provides a much higher throughput.
+- **Mix "native" and virtual chunks** - Icechunk's manifests can store any mixture of virtual chunks and "native" zarr chunks. Kerchunk's formats cannot do this ("inlined" chunks are something separate).
+- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)). However a direct head-to-head comparison of the scalability of these formats has yet to be performed.
+
+Conversely, the two Kerchunk formats have some advantages over Icechunk:
+
+- **Spec complexity** - Icechunk's format [specification](https://icechunk.io/en/latest/spec/) is considerably more complex than Kerchunk's format [specification](https://fsspec.github.io/kerchunk/spec.html) (as it includes more features).
+- **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses [FlatBuffers](https://github.com/google/flatbuffers), which are standardized but not human-readable.
+- **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with fewer roundtrips to object storage. However the latency incurred when writing the references will almost always be negligible compared to the time taken to parse the archival file formats in the first place.
+
+If there is another persistent format for manifests which you wish VirtualiZarr could write to, please open an issue.
 
 ## Development
 

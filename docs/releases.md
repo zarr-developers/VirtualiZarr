@@ -7,6 +7,9 @@
 - Added `region` parameter to `to_icechunk()`.
   ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
   By [Vladislav Wohlrath](https://github.com/vladidobro).
+- Support configurable chunk separator.
+  ([#917](https://github.com/zarr-developers/VirtualiZarr/pull/917)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ### Breaking changes
 
@@ -31,6 +34,9 @@
   mode on platforms that default to `"fork"`
   ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
   Daniels](https://github.com/chuckwondo).
+- Fix `ZarrParser` not using the store-relative path when the zarr store is nested inside the object store root
+  ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
@@ -119,6 +125,9 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
+
+- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
 
