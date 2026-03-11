@@ -4,9 +4,9 @@
 
 ### Why write to a cloud-native format directly if I can just virtualize later?
 
-While virtual zarr stores are intended as a cloud-native bridge for archival formats, they shouldn't be used as a justification for continuing to write data into object storage using non-cloud-optimized formats (such as NetCDF, HDF5, TIFF, or GRIB).
+While virtual zarr stores are intended as a cloud-native bridge for archival formats, they shouldn't be used as a justification for continuing to write data into object storage using non-cloud-optimized formats (such as NetCDF, HDF5, TIFF, or GRIB) indefinitely.
 
-**If you can write your data directly as native Zarr (or native zarr chunks in Icechunk), you probably should!**
+Assuming that you have the freedom to cease supporting archival formats, then we believe that **if you can write your data directly as native Zarr (or native zarr chunks in Icechunk), you probably should!**
 
 Some reasons are:
 
