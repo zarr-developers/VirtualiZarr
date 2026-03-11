@@ -1,4 +1,3 @@
-import platform
 import textwrap
 from contextlib import nullcontext
 from xml.etree import ElementTree as ET
@@ -436,7 +435,6 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
 
 
 @pytest.mark.xfail(
-    platform.system() == "Linux",
     reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
 )
 @pytest.mark.parametrize(
