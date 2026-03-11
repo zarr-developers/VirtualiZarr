@@ -33,6 +33,8 @@ class TestToVirtualDataset:
 
         assert "t" in vds.data_vars, "'t' should be a data variable, not a coordinate"
         assert "u" in vds.data_vars, "'u' should be a data variable, not a coordinate"
+        assert "t" not in vds.coords, "'t' should not be a coordinate"
+        assert "u" not in vds.coords, "'u' should not be a coordinate"
         assert "time" in vds.coords, "'time' should be a coordinate"
         assert "latitude" in vds.coords, "'latitude' should be a coordinate"
 
