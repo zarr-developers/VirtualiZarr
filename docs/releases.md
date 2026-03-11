@@ -48,6 +48,9 @@
   By [Vladislav Wohlrath](https://github.com/vladidobro).
 - Skip unnecessary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Migrate dmrpp parser to external (pydap) library
+([#902](https://github.com/zarr-developers/VirtualiZarr/pull/902)).
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 
 ## v2.4.0 (24th January 2026)
 
