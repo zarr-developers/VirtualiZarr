@@ -121,14 +121,17 @@ class DMRParser:
             data_filepath if data_filepath is not None else self.root.attrib["name"]
         )
         self.skip_variables = skip_variables or ()
+        self._validation_issues: list[str] = []
 
     def dmrparser(self) -> _DMRPPParser:
         """Exposes the _DMRParser to external use (avoids breaking changes)"""
-        return _DMRPPParser(
+        parser = _DMRPPParser(
             root=self.root,
             data_filepath=self.data_filepath,
             skip_variables=self.skip_variables,
         )
+        self._validation_issues = parser._validation_issues
+        return parser
 
     def parse_dataset(
         self,
@@ -178,7 +181,7 @@ class DMRParser:
         manifest_dict: dict[str, ManifestArray] = {}
 
         for var in vars_dict.keys():
-            chunkmanifest = ChunkManifest(vars_dict[var].pop("chunkmanifest", None))
+            chunkmanifest = vars_dict[var].pop("chunkmanifest", None)
             meta = dict(
                 [
                     (k, v)
@@ -194,11 +197,12 @@ class DMRParser:
 
             if "inline" in meta:
                 raise NotImplementedError(
-                    "Reading inlined reference data is currently not supported."
+                    "Reading inlined reference data is currently not supported. "
                     "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
                 )
                 meta.pop("inline", None)
 
+            chunkmanifest = ChunkManifest(chunkmanifest)
             metadata = create_v3_array_metadata(**meta)
             manifest_dict[var] = ManifestArray(
                 metadata=metadata, chunkmanifest=chunkmanifest
