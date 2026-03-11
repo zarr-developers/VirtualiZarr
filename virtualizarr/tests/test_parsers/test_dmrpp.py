@@ -560,31 +560,17 @@ def test_parse_dataset_nested(hdf5_groups_file):
 # def test_parse_variable(netcdf4_file):
 #     parser = dmrparser(DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file)
 
-<<<<<<< HEAD
-    var = parser._parse_variable(parser.find_node_fqn("/air"))
-    assert var.metadata.dtype.to_native_dtype() == "int16"
-    assert var.metadata.dimension_names == ("time", "lat", "lon")
-    assert var.shape == (2920, 25, 53)
-    assert var.metadata.chunks == (2920, 25, 53)
-    # _FillValue is encoded for array dtype
-    assert var.metadata.attributes["scale_factor"] == 0.01
-    assert (
-        var.metadata.attributes["long_name"]
-        == "4xDaily Air temperature at sigma level 995"
-    )
-=======
-#     var = parser._parse_variable(parser.find_node_fqn("/air"))
-#     assert var.metadata.dtype.to_native_dtype() == "int16"
-#     assert var.metadata.dimension_names == ("time", "lat", "lon")
-#     assert var.shape == (2920, 25, 53)
-#     assert var.chunks == (2920, 25, 53)
-#     # _FillValue is encoded for array dtype
-#     assert var.metadata.attributes["scale_factor"] == 0.01
-#     assert (
-#         var.metadata.attributes["long_name"]
-#         == "4xDaily Air temperature at sigma level 995"
-#     )
->>>>>>> 2536cb0 (comment tests as these are migrated)
+    # var = parser._parse_variable(parser.find_node_fqn("/air"))
+    # assert var.metadata.dtype.to_native_dtype() == "int16"
+    # assert var.metadata.dimension_names == ("time", "lat", "lon")
+    # assert var.shape == (2920, 25, 53)
+    # assert var.metadata.chunks == (2920, 25, 53)
+    # # _FillValue is encoded for array dtype
+    # assert var.metadata.attributes["scale_factor"] == 0.01
+    # assert (
+    #     var.metadata.attributes["long_name"]
+    #     == "4xDaily Air temperature at sigma level 995"
+    # )
 
 
 # @pytest.mark.parametrize(
