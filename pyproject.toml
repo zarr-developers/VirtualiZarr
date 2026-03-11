@@ -111,6 +111,7 @@ upstream = [
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
     'virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff',
+    'pydap @ git+https://github.com/pydap/pydap.git',
 ]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
