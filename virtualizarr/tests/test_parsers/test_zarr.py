@@ -20,7 +20,7 @@ from virtualizarr.parsers.zarr import (
     get_strategy,
     join_url,
 )
-from virtualizarr.tests import requires_pyarrow
+from virtualizarr.tests import requires_minio, requires_pyarrow
 
 pytestmark = requires_pyarrow
 
@@ -545,3 +545,52 @@ def test_sharded_array_raises_error(tmpdir):
         match="Zarr V3 arrays with sharding are not yet supported",
     ):
         parser(url=filepath, registry=registry)
+
+
+@requires_minio
+@pytest.mark.xfail(
+    reason="ZarrParser does not yet support buckets without list permissions"
+)
+def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
+    """Test that ZarrParser works with a bucket that does not allow list operations."""
+    import obstore as obs
+
+    bucket = minio_nolist_bucket["bucket"]
+    endpoint = minio_nolist_bucket["endpoint"]
+    username = minio_nolist_bucket["username"]
+    password = minio_nolist_bucket["password"]
+
+    # Write a Zarr V3 store directly to the bucket using admin credentials
+    admin_store = obs.store.S3Store(
+        bucket,
+        endpoint_url=endpoint,
+        access_key_id=username,
+        secret_access_key=password,
+        virtual_hosted_style_request=False,
+        client_options={"allow_http": True},
+    )
+    zarr_store = zarr.storage.ObjectStore(store=admin_store)
+    ds = xr.Dataset(
+        {"data": (("x", "y"), np.arange(12, dtype="float32").reshape(3, 4))},
+        coords={"x": np.arange(3), "y": np.arange(4)},
+    )
+    ds.to_zarr(zarr_store, consolidated=False, zarr_format=3)
+
+    # Create an anonymous S3 store (subject to bucket policy which denies list)
+    anon_store = obs.store.S3Store(
+        bucket,
+        endpoint_url=endpoint,
+        skip_signature=True,
+        virtual_hosted_style_request=False,
+        client_options={"allow_http": True},
+    )
+
+    url = f"s3://{bucket}"
+    registry = ObjectStoreRegistry({url: anon_store})
+    parser = ZarrParser()
+    manifeststore = parser(url=url, registry=registry)
+
+    with xr.open_dataset(
+        manifeststore, engine="zarr", consolidated=False, zarr_format=3
+    ) as actual:
+        xr.testing.assert_identical(actual, ds)
