@@ -38,6 +38,7 @@
   ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+
 ### Documentation
 
 ### Internal changes
