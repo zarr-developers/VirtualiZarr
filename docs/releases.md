@@ -4,6 +4,9 @@
 
 ### New Features
 
+- Added `region` parameter to `to_icechunk()`.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
 - Support configurable chunk separator.
   ([#917](https://github.com/zarr-developers/VirtualiZarr/pull/917)).
   By [Max Jones](https://github.com/maxrjones).
@@ -39,6 +42,9 @@
 
 ### Internal changes
 
+- Inlined `virtualizarr.writers.icechunk.generate_chunk_key` in `virtualizarr.writers.icechunk.write_manifest_virtual_refs`, and deleted the original function.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
 - Skip unnecessary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
