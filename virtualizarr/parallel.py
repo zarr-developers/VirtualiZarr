@@ -113,6 +113,7 @@ class SerialExecutor(Executor):
         *iterables: Iterable[Any],
         timeout: float | None = None,
         chunksize: int = 1,
+        buffersize: int | None = None,
     ) -> Iterator[T]:
         """
         Execute a function over an iterable sequentially.
@@ -125,6 +126,10 @@ class SerialExecutor(Executor):
             Iterables to process
         timeout
             Optional timeout (ignored in serial execution)
+        chunksize
+            Ignored in serial execution
+        buffersize
+            Ignored in serial execution (added in Python 3.14)
 
         Returns
         -------
@@ -192,6 +197,7 @@ class DaskDelayedExecutor(Executor):
         *iterables: Iterable[Any],
         timeout: float | None = None,
         chunksize: int = 1,
+        buffersize: int | None = None,
     ) -> Iterator[T]:
         """
         Apply a function to an iterable using [dask.delayed][dask.delayed.delayed].
@@ -203,7 +209,11 @@ class DaskDelayedExecutor(Executor):
         *iterables
             Iterables to process
         timeout
-            Optional timeout (ignored in serial execution)
+            Optional timeout (ignored in Dask execution)
+        chunksize
+            Ignored in Dask execution
+        buffersize
+            Ignored in Dask execution (added in Python 3.14)
 
         Returns
         -------
@@ -320,6 +330,7 @@ class LithopsEagerFunctionExecutor(Executor):
         *iterables: Iterable[Any],
         timeout: float | None = None,
         chunksize: int = 1,
+        buffersize: int | None = None,
     ) -> Iterator[T]:
         """
         Apply a function to an iterable using lithops.
@@ -334,7 +345,11 @@ class LithopsEagerFunctionExecutor(Executor):
         *iterables
             Iterables to process
         timeout
-            Optional timeout (ignored in serial execution)
+            Optional timeout (ignored in Lithops execution)
+        chunksize
+            Ignored in Lithops execution
+        buffersize
+            Ignored in Lithops execution (added in Python 3.14)
 
         Returns
         -------
