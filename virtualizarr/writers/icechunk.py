@@ -309,6 +309,7 @@ def write_virtual_dataset_to_icechunk_group(
 
     # First write all the non-virtual variables
     if loadable_variables:
+        mode: Literal["a", "r+"] | None
         if append_dim is None and region is None:
             mode = "a"
         else:
