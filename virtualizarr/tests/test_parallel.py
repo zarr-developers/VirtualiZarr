@@ -62,14 +62,14 @@ def _make_executor(executor_cls):
     )
 
 
-ALL_EXECUTORS = [
+ALL_CUSTOM_EXECUTORS = [
     _make_executor(SerialExecutor),
     _make_executor(DaskDelayedExecutor),
     _make_executor(LithopsEagerFunctionExecutor),
 ]
 
 
-@pytest.mark.parametrize("executor_cls", ALL_EXECUTORS)
+@pytest.mark.parametrize("executor_cls", ALL_CUSTOM_EXECUTORS)
 class TestExecutorShutdown:
     def test_shutdown_clears_futures(self, executor_cls):
         """Internal _futures list should be empty after shutdown."""
@@ -94,7 +94,7 @@ class TestExecutorShutdown:
         assert len(executor._futures) == 0
 
 
-@pytest.mark.parametrize("executor_cls", ALL_EXECUTORS)
+@pytest.mark.parametrize("executor_cls", ALL_CUSTOM_EXECUTORS)
 class TestExecutorMemory:
     def test_repeated_executor_use_does_not_grow_memory(self, executor_cls):
         """Memory should not grow when creating and destroying executors repeatedly."""
