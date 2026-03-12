@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -956,6 +957,39 @@ class TestOpenVirtualMFDataset:
                 preprocess=preprocess,
             )
             xrt.assert_identical(combined_vds, expected_vds)
+
+    def test_file_closer_propagated_to_combined_dataset(
+        self, netcdf4_files_factory, local_registry
+    ):
+        """Closing the combined dataset should call closers from individual virtual datasets."""
+        filepath1, filepath2 = netcdf4_files_factory()
+        parser = HDFParser()
+
+        close_tracker = []
+
+        import virtualizarr.xarray as vz_xarray
+
+        original_open_virtual_dataset = vz_xarray.open_virtual_dataset
+
+        def tracking_open(*args, **kwargs):
+            vds = original_open_virtual_dataset(*args, **kwargs)
+            vds.set_close(lambda: close_tracker.append("closed"))
+            return vds
+
+        with patch.object(vz_xarray, "open_virtual_dataset", tracking_open):
+            combined_vds = open_virtual_mfdataset(
+                [filepath1, filepath2],
+                registry=local_registry,
+                parser=parser,
+                combine="nested",
+                concat_dim="time",
+            )
+
+        assert len(close_tracker) == 0, "datasets should not be closed yet"
+        combined_vds.close()
+        assert len(close_tracker) == 2, (
+            f"expected both individual dataset closers to be called, got {len(close_tracker)}"
+        )
 
 
 def test_drop_variables(netcdf4_file, local_registry):
