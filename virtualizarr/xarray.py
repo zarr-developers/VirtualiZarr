@@ -262,6 +262,7 @@ def open_virtual_mfdataset(
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
+    bypass_combine: bool = False,
     **kwargs,
 ) -> Dataset:
     """
@@ -364,6 +365,9 @@ def open_virtual_mfdataset(
         # Wait for all the workers to finish, and send their resulting virtual
         # datasets back to the client for concatenation there.
         virtual_datasets = list(exec.map(mapper, paths1d))
+
+    if bypass_combine:
+        return virtual_datasets
 
     # TODO add file closers
 
