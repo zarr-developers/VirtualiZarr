@@ -138,6 +138,9 @@ class SerialExecutor(Executor):
         """
         return map(fn, *iterables)
 
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
+
 
 class DaskDelayedExecutor(Executor):
     """
@@ -230,6 +233,9 @@ class DaskDelayedExecutor(Executor):
 
         # Compute all tasks
         return iter(dask.compute(*delayed_tasks))
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
 
 
 class LithopsEagerFunctionExecutor(Executor):
