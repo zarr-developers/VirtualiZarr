@@ -277,6 +277,24 @@ class LithopsEagerFunctionExecutor(Executor):
     def __init__(self, **kwargs) -> None:
         import lithops  # type: ignore[import-untyped]
 
+
+        # Fix for unbounded memory growth on repeated `open_virtual_mfdataset` calls 
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/926 
+        
+        # Users are encouraged to provide configs for lithops via file
+        # But just in case that someone imports this and configures it, they have to provide all
+        # details below explicitly as `config=` argument.
+        if not 'config' in kwargs:
+            _config_file = lithops.config.load_config()
+            if _config_file['lithops'].get('backend') == 'localhost':
+                # We currently only want to apply this fix for the localhost executor
+                kwargs['config'] = {
+                    "lithops":{
+                        "data_cleaner":False, #prevents atexit registration of `.lithops_client.clean` method
+                        "backend":'localhost', # if this is not provided lithops will default to aws lambda
+                        }
+                        }
+
         # Create Lithops client with optional configuration
         self.lithops_client = lithops.FunctionExecutor(**kwargs).__enter__()
 
@@ -379,18 +397,9 @@ class LithopsEagerFunctionExecutor(Executor):
         wait
             Whether to wait for pending futures.
         """
-        # Free cached results from lithops ResponseFuture objects before shutdown.
-        # lithops.FunctionExecutor.futures is never cleared internally — each map()
-        # call extends it with new ResponseFutures that cache deserialized results
-        # in _call_output. Without this, memory accumulates across repeated calls.
-        for f in self.lithops_client.futures:
-            f._call_output = None
-        self.lithops_client.futures.clear()
-        self._futures.clear()
+        if wait:
+            # ensure all futures are completed before exiting
+            self.lithops_client.wait(show_progressbar=False)
 
-        # Lithops registers self.clean as an atexit handler (executors.py __init__),
-        # which prevents the FunctionExecutor from ever being garbage collected.
-        # Unregister it so the executor can be freed after shutdown.
-        atexit.unregister(self.lithops_client.clean)
-
+        #Exit context manager entered during __init__
         self.lithops_client.__exit__(None, None, None)

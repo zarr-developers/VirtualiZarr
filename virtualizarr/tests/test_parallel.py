@@ -1,6 +1,6 @@
 import gc
 import multiprocessing as mp
-
+import tracemalloc
 import pytest
 
 from virtualizarr.parallel import (
@@ -98,7 +98,6 @@ class TestExecutorShutdown:
 class TestExecutorMemory:
     def test_repeated_executor_use_does_not_grow_memory(self, executor_cls):
         """Memory should not grow when creating and destroying executors repeatedly."""
-        import tracemalloc
 
         def _run_once():
             with executor_cls() as executor:
@@ -118,7 +117,7 @@ class TestExecutorMemory:
 
         # Now run many iterations and check peak doesn't grow
         tracemalloc.start()
-        n_iterations = 10
+        n_iterations = 20
         for _ in range(n_iterations):
             _run_once()
             gc.collect()
@@ -127,7 +126,7 @@ class TestExecutorMemory:
 
         # If memory leaks, peak will scale with n_iterations.
         # Allow 1.2x the single-run peak to account for GC timing jitter.
-        assert multi_peak < 1.2 * baseline_peak, (
+        assert multi_peak < 1.1 * baseline_peak, (
             f"{executor_cls.__name__} does not release memory: single run peak "
             f"{baseline_peak / 1024:.0f} KB, {n_iterations} runs peak "
             f"{multi_peak / 1024:.0f} KB"
