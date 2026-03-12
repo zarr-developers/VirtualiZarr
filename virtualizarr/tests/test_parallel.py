@@ -1,6 +1,5 @@
 import gc
 import multiprocessing as mp
-import weakref
 
 import pytest
 
@@ -69,6 +68,7 @@ ALL_EXECUTORS = [
     _make_executor(LithopsEagerFunctionExecutor),
 ]
 
+
 @pytest.mark.parametrize("executor_cls", ALL_EXECUTORS)
 class TestExecutorShutdown:
     def test_shutdown_clears_futures(self, executor_cls):
@@ -80,7 +80,7 @@ class TestExecutorShutdown:
             if executor_cls is LithopsEagerFunctionExecutor:
                 # grab refs before they get cleared
                 lithops_futures = list(executor.lithops_client.futures)
-                assert len(lithops_futures) ==2
+                assert len(lithops_futures) == 2
 
         assert len(executor._futures) == 0
 
