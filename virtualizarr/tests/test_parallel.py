@@ -1,4 +1,6 @@
+import gc
 import multiprocessing as mp
+import weakref
 
 import pytest
 
@@ -48,6 +50,26 @@ def test_get_executor_process_pool_mode():
     assert ctx.get_start_method() == "forkserver"
 
 
+@requires_lithops
+class TestLithopsExecutorShutdown:
+    def test_shutdown_clears_lithops_client_futures(self):
+        executor = LithopsEagerFunctionExecutor()
+        executor.submit(lambda: 42)
+
+        executor.shutdown()
+        assert len(executor.lithops_client.futures) == 0
+
+    def test_shutdown_clears_lithops_cached_results(self):
+        """Verify that shutdown clears _call_output on lithops ResponseFutures."""
+        with LithopsEagerFunctionExecutor() as executor:
+            executor.map(lambda x: x * 2, (1, 2, 3))
+            lithops_futures = list(executor.lithops_client.futures)
+            assert len(lithops_futures) > 0
+
+        # After shutdown, lithops futures list should be cleared
+        assert len(executor.lithops_client.futures) == 0
+
+
 def _make_executor(executor_cls):
     """Create a pytest param for an executor class with appropriate marks."""
     marks = {
@@ -69,45 +91,56 @@ ALL_EXECUTORS = [
 
 
 @pytest.mark.parametrize("executor_cls", ALL_EXECUTORS)
-class TestExecutorShutdown:
-    def test_shutdown_clears_futures(self, executor_cls):
+class TestExecutorMemory:
+    def test_executor_does_not_leak_after_context_manager(self, executor_cls):
+        """Executor and its futures should be GC-collectable after the with block."""
+
         with executor_cls() as executor:
-            executor.submit(lambda: 42)
-            executor.submit(lambda: 99)
-            assert len(executor._futures) == 2
+            # Use map() since lithops call_async requires a data argument
+            list(executor.map(lambda x: x * 2, range(5)))
+            ref = weakref.ref(executor)
 
-        assert len(executor._futures) == 0
+        # Drop the only local reference to the executor
+        del executor
+        gc.collect()
 
-    def test_shutdown_via_context_manager(self, executor_cls):
-        with executor_cls() as executor:
-            executor.submit(lambda: 42)
-            assert len(executor._futures) == 1
+        assert ref() is None, (
+            f"{executor_cls.__name__} was not garbage collected after shutdown"
+        )
 
-        assert len(executor._futures) == 0
+    def test_repeated_executor_use_does_not_grow_memory(self, executor_cls):
+        """Memory should not grow when creating and destroying executors repeatedly."""
+        import tracemalloc
 
-    def test_shutdown_idempotent(self, executor_cls):
-        executor = executor_cls()
-        executor.submit(lambda: 1)
-        executor.shutdown()
-        executor.shutdown()
-        assert len(executor._futures) == 0
+        def _run_once():
+            with executor_cls() as executor:
+                # Use map() to produce non-trivial results
+                return list(executor.map(lambda x: list(range(10_000)), range(5)))
 
+        # Warm up (first run may allocate caches, import modules, etc.)
+        _run_once()
+        gc.collect()
 
-@requires_lithops
-class TestLithopsExecutorShutdownSpecific:
-    def test_shutdown_clears_lithops_client_futures(self):
-        executor = LithopsEagerFunctionExecutor()
-        executor.submit(lambda: 42)
+        # Measure baseline: peak memory from a single run
+        tracemalloc.start()
+        _run_once()
+        gc.collect()
+        _, baseline_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
-        executor.shutdown()
-        assert len(executor.lithops_client.futures) == 0
+        # Now run many iterations and check peak doesn't grow
+        tracemalloc.start()
+        n_iterations = 10
+        for _ in range(n_iterations):
+            _run_once()
+            gc.collect()
+        _, multi_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
-    def test_shutdown_clears_lithops_cached_results(self):
-        """Verify that shutdown clears _call_output on lithops ResponseFutures."""
-        with LithopsEagerFunctionExecutor() as executor:
-            executor.map(lambda x: x * 2, (1, 2, 3))
-            lithops_futures = list(executor.lithops_client.futures)
-            assert len(lithops_futures) > 0
-
-        # After shutdown, lithops futures list should be cleared
-        assert len(executor.lithops_client.futures) == 0
+        # If memory leaks, peak will scale with n_iterations.
+        # Allow 1.2x the single-run peak to account for GC timing jitter.
+        assert multi_peak < 1.2 * baseline_peak, (
+            f"{executor_cls.__name__} leaked memory: single run peak "
+            f"{baseline_peak / 1024:.0f} KB, {n_iterations} runs peak "
+            f"{multi_peak / 1024:.0f} KB"
+        )

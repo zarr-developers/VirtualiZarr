@@ -1,3 +1,4 @@
+import atexit
 import inspect
 import multiprocessing as mp
 import warnings
@@ -137,9 +138,6 @@ class SerialExecutor(Executor):
         """
         return map(fn, *iterables)
 
-    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
-        self._futures.clear()
-
 
 class DaskDelayedExecutor(Executor):
     """
@@ -232,9 +230,6 @@ class DaskDelayedExecutor(Executor):
 
         # Compute all tasks
         return iter(dask.compute(*delayed_tasks))
-
-    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
-        self._futures.clear()
 
 
 class LithopsEagerFunctionExecutor(Executor):
@@ -386,4 +381,10 @@ class LithopsEagerFunctionExecutor(Executor):
             f._call_output = None
         self.lithops_client.futures.clear()
         self._futures.clear()
+
+        # Lithops registers self.clean as an atexit handler (executors.py __init__),
+        # which prevents the FunctionExecutor from ever being garbage collected.
+        # Unregister it so the executor can be freed after shutdown.
+        atexit.unregister(self.lithops_client.clean)
+
         self.lithops_client.__exit__(None, None, None)
