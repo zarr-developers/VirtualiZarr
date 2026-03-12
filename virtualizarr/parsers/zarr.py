@@ -619,16 +619,21 @@ class ZarrParser:
         virtualizarr.manifests.ManifestStore : The returned virtual store object.
         """
         uri = validate_and_normalize_path_to_uri(url, fs_root=Path.cwd().as_uri())
+
         object_store, store_relative_path = registry.resolve(uri)
         zarr_store = ObjectStore(store=object_store)  # type: ignore[type-var]
+
         # Compute the store root URI by stripping the relative path from the full URI
         rel_path = str(store_relative_path)
         store_root_uri = uri.removesuffix(rel_path).rstrip("/") if rel_path else uri
+
         # Combine the store-relative path with optional group to get the full
         # path within the object store to the zarr group
         group_path = rel_path
         if self.group:
             group_path = f"{group_path}/{self.group}" if group_path else self.group
+        
+        # Parse groups recursively from the root, concurrently
         coro = _construct_manifest_group(
             store=zarr_store,
             path=store_root_uri,
@@ -636,4 +641,5 @@ class ZarrParser:
             skip_variables=self.skip_variables,
         )
         manifest_group = _run_async(coro)
+
         return ManifestStore(registry=registry, group=manifest_group)
