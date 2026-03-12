@@ -137,6 +137,9 @@ class SerialExecutor(Executor):
         """
         return map(fn, *iterables)
 
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
+
 
 class DaskDelayedExecutor(Executor):
     """
@@ -229,6 +232,9 @@ class DaskDelayedExecutor(Executor):
 
         # Compute all tasks
         return iter(dask.compute(*delayed_tasks))
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
 
 
 class LithopsEagerFunctionExecutor(Executor):
@@ -372,4 +378,12 @@ class LithopsEagerFunctionExecutor(Executor):
         wait
             Whether to wait for pending futures.
         """
+        # Free cached results from lithops ResponseFuture objects before shutdown.
+        # lithops.FunctionExecutor.futures is never cleared internally — each map()
+        # call extends it with new ResponseFutures that cache deserialized results
+        # in _call_output. Without this, memory accumulates across repeated calls.
+        for f in self.lithops_client.futures:
+            f._call_output = None
+        self.lithops_client.futures.clear()
+        self._futures.clear()
         self.lithops_client.__exit__(None, None, None)
