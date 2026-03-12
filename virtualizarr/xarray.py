@@ -235,11 +235,6 @@ def open_virtual_dataset(
     return ds.drop_vars(list(drop_variables or ()))
 
 
-def _multi_file_closer(closers: list[Callable[[], None]]) -> None:
-    for closer in closers:
-        closer()
-
-
 def open_virtual_mfdataset(
     urls: (
         str
@@ -411,10 +406,6 @@ def open_virtual_mfdataset(
         for vds in virtual_datasets:
             vds.close()
         raise
-
-    closers = [vds._close for vds in virtual_datasets if vds._close is not None]
-    if closers:
-        combined_vds.set_close(partial(_multi_file_closer, closers))
 
     # read global attributes from the attrs_file or from the first dataset
     if attrs_file is not None:
