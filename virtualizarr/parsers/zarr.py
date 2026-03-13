@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 from abc import ABC, abstractmethod
 from collections.abc import Coroutine, Iterable
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
@@ -33,8 +34,39 @@ T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 
+# TODO put these in the enum
 ZARR_V2_METADATA_KEYS = (".zarray", ".zattrs", ".zgroup", ".zmetadata")
 ZARR_V3_METADATA_KEYS = ("zarr.json",)
+
+
+class ZarrFormat(Enum):
+    """
+    Encode all differences between on-disk Zarr formats here.
+    
+    Note that we still only need to support the zarr-python v3 API, 
+    so this enum is only concerned with differences in the native format spec between versions.
+    """
+    
+    V2 = 2
+    V3 = 3
+
+    @property
+    def scalar_chunk_key_name(self) -> str:
+        match self:
+            case ZarrFormat.V2:
+                return "0"
+            case ZarrFormat.V3:
+                return "c"
+    
+    @property
+    def possible_metadata_key_names(self) -> tuple[str]:
+        match self:
+            case ZarrFormat.V2:
+                return (".zarray", ".zattrs", ".zgroup", ".zmetadata")
+            case ZarrFormat.V3:
+                return ("zarr.json",)
+            
+    # TODO move everything else that depends on format here, instead of the strategy thing
 
 
 def join_url(base: str, key: str) -> str:
@@ -108,6 +140,8 @@ async def _build_1d_chunk_mapping(
     -------
     Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
     """
+    zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
+
     path_batches: list[np.ndarray] = []
     size_batches: list[np.ndarray] = []
     stream = cast(ObjectStore, zarr_array.store).store.list_async(
@@ -120,19 +154,16 @@ async def _build_1d_chunk_mapping(
         paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
         sizes_np = batch.column("size").to_numpy()
 
-        # filter out metadata keys
-        suffixes = (
-            ZARR_V2_METADATA_KEYS
-            if zarr_array.metadata.zarr_format == 2
-            else ZARR_V3_METADATA_KEYS
-        )
-        is_metadata = np.strings.endswith(paths_np, "/")  # directory placeholders
-        for suffix in suffixes:
+        # filter out metadata and directory keys, leaving only valid chunk keys
+        # (assumes that there are no other objects inside this directory)
+        is_metadata = np.zeros(len(paths_np), dtype=bool)
+        for suffix in zarr_format.possible_metadata_key_names:
             is_metadata |= np.strings.endswith(paths_np, suffix)
-        not_metadata = ~is_metadata
+        is_directory = np.strings.endswith(paths_np, "/")
+        chunk_keys_mask = ~(is_metadata | is_directory)
         
-        path_batches.append(paths_np[not_metadata])
-        size_batches.append(sizes_np[not_metadata])
+        path_batches.append(paths_np[chunk_keys_mask])
+        size_batches.append(sizes_np[chunk_keys_mask])
 
     if not path_batches:
         # no initialized chunks found
@@ -388,12 +419,12 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     # Handle scalar arrays
     if zarr_array.shape == ():
 
-        # TODO this key depends on the format version
-        scalar_key = f"{prefix}0"
+        # TODO simplify the construction of the enum here?
+        scalar_key = ZarrFormat(zarr_array.metadata.zarr_format).scalar_chunk_key_name
 
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
         # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
-        size = await zarr_array.store.getsize(scalar_key)
+        size = await zarr_array.store.getsize(prefix + scalar_key)
         actual_path = join_url(path, scalar_key)
 
         return ChunkManifest(
@@ -425,7 +456,6 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
 
     # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
-
     dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
     dense_lengths = np.zeros(total_size, dtype=np.uint64)
     dense_offsets = np.zeros(total_size, dtype=np.uint64)
@@ -497,6 +527,7 @@ async def _construct_manifest_group(
     }
 
     manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
+    # TODO: This is weird - why isn't this just set in the ManifestGroup constructor?
     manifest_group._metadata = GroupMetadata(
         attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
         zarr_format=3,
