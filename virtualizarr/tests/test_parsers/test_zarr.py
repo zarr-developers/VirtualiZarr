@@ -1,4 +1,5 @@
 import asyncio
+from typing import cast
 
 import numpy as np
 import obstore
@@ -14,6 +15,7 @@ from zarr.storage import ObjectStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import (
     ZarrFormat,
@@ -38,13 +40,13 @@ async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
     """Helper to open an array from a zarr store and build its chunk manifest."""
     zarr_array = await open_array(store=zarr_store, mode="r")
     fmt = ZarrFormat(zarr_array.metadata.zarr_format)
-    sep = (
+    sep: ChunkKeySeparator = (
         zarr_array.metadata.chunk_key_encoding.separator
         if fmt == ZarrFormat.V3
         else "."
     )
     return await build_chunk_manifest(
-        obs_store=zarr_array.store.store,
+        obs_store=cast(ObjectStore, zarr_array.store).store,
         array_path=zarr_array.path,
         store_base_uri=store_base_uri,
         metadata=metadata_as_v3(zarr_array.metadata),
