@@ -27,6 +27,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
+from virtualizarr.manifests.utils import ChunkKeySeparator
 
 
 T = TypeVar("T")
@@ -288,6 +289,7 @@ async def construct_manifest_array(
     # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
     # which differs from the always-V3 metadata we use internally.
     on_disk_zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
+    on_disk_separator = zarr_array.metadata.chunk_key_encoding.separator if on_disk_zarr_format == ZarrFormat.V3 else "."
 
     obs_store = cast(ObjectStore, zarr_array.store).store
     chunk_manifest = await build_chunk_manifest(
@@ -296,6 +298,7 @@ async def construct_manifest_array(
         store_base_uri=path,
         metadata=array_v3_metadata,
         on_disk_zarr_format=on_disk_zarr_format,
+        on_disk_separator=on_disk_separator,
     )
 
     return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
@@ -304,11 +307,22 @@ async def construct_manifest_array(
 def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
     """Convert V2 metadata to V3 format."""
 
-    if isinstance(metadata, ArrayV3Metadata):
-        # nothing to be done
-        return metadata
+    if isinstance(metadata, ArrayV2Metadata):
+        v3_metadata = _convert_v2_metadata(metadata)
+    else:
+        v3_metadata = metadata
 
-    # TODO replace this with an explicit version check
+    # Normalize chunk_key_encoding to DefaultChunkKeyEncoding with "." separator.
+    # The ManifestStore expects dot-separated keys (e.g. "0.0.0"), so we enforce
+    # this regardless of what the on-disk store uses.
+    v3_dict = v3_metadata.to_dict()
+    v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
+    return ArrayV3Metadata.from_dict(v3_dict)
+
+
+def _convert_v2_metadata(metadata: ArrayV2Metadata) -> ArrayV3Metadata:
+    """Convert V2 metadata to V3, handling fill_value, dimensions, and attributes."""
+
     try:
         from zarr.core.dtype import parse_dtype
         from zarr.metadata.migrate_v3 import _convert_array_metadata
@@ -318,52 +332,40 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
             f"Found Zarr version '{zarr.__version__}'"
         )
 
-    v2_metadata = metadata
-
     # V3 requires a non-None fill_value, but V2 allows it. If missing, set to the
     # dtype's default (e.g. 0 for int) before converting. We roundtrip through a dict
     # because ArrayV2Metadata is immutable.
-    if v2_metadata.fill_value is None:
-        v2_dict = v2_metadata.to_dict()
+    if metadata.fill_value is None:
+        v2_dict = metadata.to_dict()
         v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
         fill_value = v2_dtype.default_scalar()
         v2_dict["fill_value"] = v2_dtype.to_json_scalar(fill_value, zarr_format=2)
-        temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
+        metadata = ArrayV2Metadata.from_dict(v2_dict)
 
-        v3_metadata = _convert_array_metadata(temp_v2)
-    else:
-        # Normal conversion; allow other errors to propagate.
-        v3_metadata = _convert_array_metadata(v2_metadata)
+    v3_metadata = _convert_array_metadata(metadata)
 
     # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
     # to V3's dimension_names, so we do it manually.
     if v3_metadata.dimension_names is None:
         v3_dict = v3_metadata.to_dict()
         dim_names = None
-        if hasattr(v2_metadata, "attributes") and v2_metadata.attributes:
-            dim_names = v2_metadata.attributes.get("_ARRAY_DIMENSIONS")
+        if hasattr(metadata, "attributes") and metadata.attributes:
+            dim_names = metadata.attributes.get("_ARRAY_DIMENSIONS")
 
         if dim_names:
             v3_dict["dimension_names"] = dim_names
             v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
-    v3_dict = v3_metadata.to_dict()
-
     # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
     # so remove it from attributes to avoid duplication.
+    v3_dict = v3_metadata.to_dict()
     if (
         "attributes" in v3_dict
         and isinstance(v3_dict["attributes"], dict)
         and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
     ):
         del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
-
-    # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding.
-    # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
-    # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
-    # We do this so that inside the resultant ManifestStore the expected dot-separated keys are used.
-    v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
-    v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+        v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
     return v3_metadata
 
@@ -374,6 +376,7 @@ async def build_chunk_manifest(
     store_base_uri: str,
     metadata: ArrayV3Metadata,
     on_disk_zarr_format: ZarrFormat,
+    on_disk_separator: ChunkKeySeparator,
 ) -> ChunkManifest:
     """Build a ChunkManifest from chunk coordinate mappings.
 
@@ -398,7 +401,6 @@ async def build_chunk_manifest(
         s // c for s, c in zip(metadata.shape, metadata.chunk_grid.chunk_shape)
     )
     total_size = math.prod(chunk_grid_shape)
-    separator = metadata.chunk_key_encoding.separator
 
     # Handle scalar arrays
     if metadata.shape == ():
@@ -432,7 +434,7 @@ async def build_chunk_manifest(
 
     # split "0.0.0" style keys into per-dimension integer coords
     # TODO replace np.char.split with np.strings.split once it exists
-    split_keys = np.char.split(stripped_keys, sep=separator)
+    split_keys = np.char.split(stripped_keys, sep=on_disk_separator)
     coords = np.array(
         [[int(c) for c in key] for key in split_keys], dtype=np.int64
     ).T  # shape: (ndim, nchunks)
