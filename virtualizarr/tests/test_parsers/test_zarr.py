@@ -22,9 +22,9 @@ from virtualizarr.parsers.zarr import (
     join_url,
     metadata_as_v3,
 )
-from virtualizarr.tests import requires_minio
+from virtualizarr.tests import requires_arro3, requires_minio
 
-ZarrArrayType = zarr.AsyncArray | zarr.Array
+pytestmark = requires_arro3
 
 HAS_V2_MIGRATION = version.parse(zarr.__version__) >= version.parse("3.1.3")
 
