@@ -302,23 +302,22 @@ async def construct_manifest_array(
 
 
 def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
-    """Convert V2 metadata to V3 format."""
+    """Convert metadata to V3 format with normalized chunk_key_encoding."""
 
     if isinstance(metadata, ArrayV2Metadata):
-        v3_metadata = _convert_v2_metadata(metadata)
+        v3_dict = _convert_v2_to_v3_dict(metadata)
     else:
-        v3_metadata = metadata
+        v3_dict = metadata.to_dict()
 
     # Normalize chunk_key_encoding to DefaultChunkKeyEncoding with "." separator.
     # The ManifestStore expects dot-separated keys (e.g. "0.0.0"), so we enforce
     # this regardless of what the on-disk store uses.
-    v3_dict = v3_metadata.to_dict()
     v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
     return ArrayV3Metadata.from_dict(v3_dict)
 
 
-def _convert_v2_metadata(metadata: ArrayV2Metadata) -> ArrayV3Metadata:
-    """Convert V2 metadata to V3, handling fill_value, dimensions, and attributes."""
+def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
+    """Convert V2 metadata to a V3 dict, handling fill_value, dimensions, and attributes."""
 
     try:
         from zarr.core.dtype import parse_dtype
@@ -339,32 +338,20 @@ def _convert_v2_metadata(metadata: ArrayV2Metadata) -> ArrayV3Metadata:
         v2_dict["fill_value"] = v2_dtype.to_json_scalar(fill_value, zarr_format=2)
         metadata = ArrayV2Metadata.from_dict(v2_dict)
 
-    v3_metadata = _convert_array_metadata(metadata)
+    v3_dict = _convert_array_metadata(metadata).to_dict()
 
     # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
     # to V3's dimension_names, so we do it manually.
-    if v3_metadata.dimension_names is None:
-        v3_dict = v3_metadata.to_dict()
-        dim_names = None
-        if hasattr(metadata, "attributes") and metadata.attributes:
-            dim_names = metadata.attributes.get("_ARRAY_DIMENSIONS")
-
-        if dim_names:
-            v3_dict["dimension_names"] = dim_names
-            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+    dim_names = v3_dict.get("attributes", {}).get("_ARRAY_DIMENSIONS")
+    if v3_dict.get("dimension_names") is None and dim_names:
+        v3_dict["dimension_names"] = dim_names
 
     # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
     # so remove it from attributes to avoid duplication.
-    v3_dict = v3_metadata.to_dict()
-    if (
-        "attributes" in v3_dict
-        and isinstance(v3_dict["attributes"], dict)
-        and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
-    ):
+    if "_ARRAY_DIMENSIONS" in v3_dict.get("attributes", {}):
         del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
-        v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
-    return v3_metadata
+    return v3_dict
 
 
 async def build_chunk_manifest(
