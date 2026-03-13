@@ -35,6 +35,21 @@ SKIP_NEWER_ZARR_PYTHON = pytest.mark.skipif(
 )
 
 
+async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
+    """Helper to open an array from a zarr store and build its chunk manifest."""
+    zarr_array = await open_array(store=zarr_store, mode="r")
+    fmt = ZarrFormat(zarr_array.metadata.zarr_format)
+    sep = zarr_array.metadata.chunk_key_encoding.separator if fmt == ZarrFormat.V3 else "."
+    return await build_chunk_manifest(
+        obs_store=zarr_array.store.store,
+        array_path=zarr_array.path,
+        store_base_uri=store_base_uri,
+        metadata=metadata_as_v3(zarr_array.metadata),
+        on_disk_zarr_format=fmt,
+        on_disk_separator=sep,
+    )
+
+
 def zarr_versions(param_name="zarr_format", indirect=False):
     """
     Reusable parametrize decorator for Zarr V2 and V3 versions.
@@ -146,23 +161,8 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
     )
     scalar_array[()] = 42
 
-    # Open it as an async array and build the manifest
-    async def get_manifest():
-        obs_store = LocalStore(prefix=filepath)
-        zarr_store = ObjectStore(store=obs_store)
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        fmt = ZarrFormat(zarr_array.metadata.zarr_format)
-        sep = zarr_array.metadata.chunk_key_encoding.separator if fmt == ZarrFormat.V3 else "."
-        return await build_chunk_manifest(
-                obs_store=obs_store,
-                array_path=zarr_array.path,
-                store_base_uri=filepath,
-                metadata=metadata_as_v3(zarr_array.metadata),
-                on_disk_zarr_format=fmt,
-                on_disk_separator=sep,
-            )
-
-    manifest = asyncio.run(get_manifest())
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
 
     # scalar arrays have a single chunk with empty coordinate key
     chunk_dict = manifest.dict()
@@ -197,24 +197,9 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
         zarr_format=zarr_format,
     )
 
-    async def get_chunk_map():
-        obs_store = LocalStore(prefix=filepath)
-        zarr_store = ObjectStore(store=obs_store)
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        fmt = ZarrFormat(zarr_array.metadata.zarr_format)
-        sep = zarr_array.metadata.chunk_key_encoding.separator if fmt == ZarrFormat.V3 else "."
-        manifest = await build_chunk_manifest(
-                obs_store=zarr_array.store.store,
-                array_path=zarr_array.path,
-                store_base_uri=filepath,
-                metadata=metadata_as_v3(zarr_array.metadata),
-                on_disk_zarr_format=fmt,
-                on_disk_separator=sep,
-            )
-        return manifest.dict()
-
-    result = asyncio.run(get_chunk_map())
-    assert result == {}
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
+    assert manifest.dict() == {}
 
 
 @SKIP_OLDER_ZARR_PYTHON
@@ -282,24 +267,10 @@ def test_v2_metadata_with_none_fill_value(dtype):
 
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
-    obs_store = ObsMemoryStore()
-    zarr_store = ObjectStore(store=obs_store)
-    zarr.create(
-        shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3
-    )
+    zarr_store = ObjectStore(store=ObsMemoryStore())
+    zarr.create(shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3)
 
-    async def get_manifest():
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(
-                obs_store=zarr_array.store.store,
-                array_path=zarr_array.path,
-                store_base_uri="test://path",
-                metadata=metadata_as_v3(zarr_array.metadata),
-                on_disk_zarr_format=ZarrFormat.V3,
-                on_disk_separator=zarr_array.metadata.chunk_key_encoding.separator,
-            )
-
-    manifest = asyncio.run(get_manifest())
+    manifest = asyncio.run(_build_manifest(zarr_store, "test://path"))
     assert manifest.shape_chunk_grid == (2, 2)
 
 
@@ -320,22 +291,8 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     arr[10:20, 10:20] = 2.0  # chunk 1.1
     arr[20:30, 20:30] = 3.0  # chunk 2.2
 
-    async def get_manifest():
-        obs_store = LocalStore(prefix=filepath)
-        zarr_store = ObjectStore(store=obs_store)
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        fmt = ZarrFormat(zarr_array.metadata.zarr_format)
-        sep = zarr_array.metadata.chunk_key_encoding.separator if fmt == ZarrFormat.V3 else "."
-        return await build_chunk_manifest(
-                obs_store=zarr_array.store.store,
-                array_path=zarr_array.path,
-                store_base_uri=filepath,
-                metadata=metadata_as_v3(zarr_array.metadata),
-                on_disk_zarr_format=fmt,
-                on_disk_separator=sep,
-            )
-
-    manifest = asyncio.run(get_manifest())
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
 
     assert len(manifest.dict()) == 3
     assert "0.0" in manifest.dict()
