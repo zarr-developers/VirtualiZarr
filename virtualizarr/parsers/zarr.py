@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import Any, TypeVar, cast
 
 import numpy as np
-import zarr
 import obstore
+import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
+from zarr.codecs import ShardingCodec
 from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
-from zarr.codecs import ShardingCodec
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -29,7 +29,6 @@ from virtualizarr.manifests.manifest import (
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.utils import determine_chunk_grid_shape
-
 
 T = TypeVar("T")
 
@@ -56,11 +55,11 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
 class ZarrFormat(Enum):
     """
     Encode all differences between on-disk Zarr formats here.
-    
-    Note that we still only need to support the zarr-python v3 API, 
+
+    Note that we still only need to support the zarr-python v3 API,
     so this enum is only concerned with differences in the native format spec between versions.
     """
-    
+
     V2 = 2
     V3 = 3
 
@@ -79,7 +78,7 @@ class ZarrFormat(Enum):
                 return "0"
             case ZarrFormat.V3:
                 return "c"
-    
+
     @property
     def chunks_dir_prefix(self) -> str:
         match self:
@@ -215,7 +214,7 @@ class ZarrParser:
         group_path = rel_path
         if self.group:
             group_path = f"{group_path}/{self.group}" if group_path else self.group
-        
+
         # Parse groups recursively from the root, concurrently
         coro = construct_manifest_group(
             store=zarr_store,
@@ -267,9 +266,7 @@ async def construct_manifest_array(
     array_v3_metadata = metadata_as_v3(zarr_array.metadata)
 
     # This is the only restriction on what Zarr Arrays cannot be virtualized
-    if any(
-        isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs
-    ):
+    if any(isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs):
         raise NotImplementedError(
             f"Zarr V3 arrays with sharding are not yet supported, but array {path} uses the ShardingCodec."
             "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
@@ -286,7 +283,11 @@ async def construct_manifest_array(
     # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
     # which differs from the always-V3 metadata we use internally.
     on_disk_zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
-    on_disk_separator = zarr_array.metadata.chunk_key_encoding.separator if on_disk_zarr_format == ZarrFormat.V3 else "."
+    on_disk_separator = (
+        zarr_array.metadata.chunk_key_encoding.separator
+        if on_disk_zarr_format == ZarrFormat.V3
+        else "."
+    )
 
     obs_store = cast(ObjectStore, zarr_array.store).store
     chunk_manifest = await build_chunk_manifest(
@@ -381,7 +382,9 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
-    chunk_grid_shape = determine_chunk_grid_shape(metadata.shape, metadata.chunk_grid.chunk_shape)
+    chunk_grid_shape = determine_chunk_grid_shape(
+        metadata.shape, metadata.chunk_grid.chunk_shape
+    )
     total_size = math.prod(chunk_grid_shape)
 
     # Handle scalar arrays
@@ -409,8 +412,12 @@ async def build_chunk_manifest(
         )
 
     # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = join_url(array_path, on_disk_zarr_format.chunks_dir_prefix)
-    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, store_base_uri, nonscalar_chunks_prefix, on_disk_zarr_format)
+    nonscalar_chunks_prefix = join_url(
+        array_path, on_disk_zarr_format.chunks_dir_prefix
+    )
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(
+        obs_store, store_base_uri, nonscalar_chunks_prefix, on_disk_zarr_format
+    )
 
     if len(stripped_keys) == 0:
         # No initialized chunks found, so manifest is empty, and we can exit early.
@@ -440,7 +447,10 @@ async def build_chunk_manifest(
 
 
 async def build_1d_chunk_mapping(
-    obs_store: obstore.ObjectStore, store_base_uri: str, array_chunks_prefix: str, zarr_format: ZarrFormat
+    obs_store: obstore.ObjectStore,
+    store_base_uri: str,
+    array_chunks_prefix: str,
+    zarr_format: ZarrFormat,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build chunk mapping by listing the object store with obstore.
@@ -465,12 +475,11 @@ async def build_1d_chunk_mapping(
     """
     path_batches: list[np.ndarray] = []
     size_batches: list[np.ndarray] = []
-    stream = obs_store.list_async(
-        prefix=array_chunks_prefix, return_arrow=True
-    )
+    stream = obs_store.list_async(prefix=array_chunks_prefix, return_arrow=True)
     async for batch in stream:
-
-        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
+        # Immediately convert to numpy arrays - we can still do efficient manipulations, and don't need any extra arrow dependencies.
+        # Note: The .astype is only needed because .to_numpy converts to a numpy object array of python `str` objects, which is inefficient.
+        # TODO: Change this if arrow -> numpy support for variable length strings ever improves, see https://github.com/zarr-developers/VirtualiZarr/issues/922#issuecomment-4051049630
         paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
         sizes_np = batch.column("size").to_numpy()
 
@@ -481,13 +490,17 @@ async def build_1d_chunk_mapping(
             is_metadata |= np.strings.endswith(paths_np, suffix)
         is_directory = np.strings.endswith(paths_np, "/")
         chunk_keys_mask = ~(is_metadata | is_directory)
-        
+
         path_batches.append(paths_np[chunk_keys_mask])
         size_batches.append(sizes_np[chunk_keys_mask])
 
     if not path_batches:
         # no initialized chunks found
-        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
+        return (
+            np.full(0, "", dtype=np.dtypes.StringDType()),
+            np.zeros(0, dtype=np.uint64),
+            np.zeros(0, dtype=np.uint64),
+        )
 
     # join batches into one 1D array for all initialized chunks
     all_paths = np.concatenate(path_batches)

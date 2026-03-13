@@ -1,12 +1,13 @@
 import asyncio
 
 import numpy as np
+import obstore
 import pytest
 import xarray as xr
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
-import obstore
-from obstore.store import LocalStore, MemoryStore as ObsMemoryStore
+from obstore.store import LocalStore
+from obstore.store import MemoryStore as ObsMemoryStore
 from packaging import version
 from zarr.api.asynchronous import open_array
 from zarr.storage import ObjectStore
@@ -15,11 +16,11 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import (
+    ZarrFormat,
     _run_async,
     build_chunk_manifest,
-    metadata_as_v3,
     join_url,
-    ZarrFormat,
+    metadata_as_v3,
 )
 from virtualizarr.tests import requires_minio
 
@@ -37,7 +38,11 @@ async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
     """Helper to open an array from a zarr store and build its chunk manifest."""
     zarr_array = await open_array(store=zarr_store, mode="r")
     fmt = ZarrFormat(zarr_array.metadata.zarr_format)
-    sep = zarr_array.metadata.chunk_key_encoding.separator if fmt == ZarrFormat.V3 else "."
+    sep = (
+        zarr_array.metadata.chunk_key_encoding.separator
+        if fmt == ZarrFormat.V3
+        else "."
+    )
     return await build_chunk_manifest(
         obs_store=zarr_array.store.store,
         array_path=zarr_array.path,
@@ -227,7 +232,9 @@ def test_v2_metadata_raises_import_error_on_old_zarr():
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
     store = zarr.storage.MemoryStore()
-    array = zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
+    array = zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
+    )
     array.attrs["_ARRAY_DIMENSIONS"] = ["x", "y"]
 
     metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
@@ -238,8 +245,12 @@ def test_v3_metadata_separator_normalized():
     """Test that metadata_as_v3 normalizes V3 chunk_key_encoding separator to '.'."""
     store = zarr.storage.MemoryStore()
     zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store,
-        zarr_format=3, chunk_key_encoding={"name": "default", "separator": "/"},
+        shape=(5, 10),
+        chunks=(5, 5),
+        dtype="int32",
+        store=store,
+        zarr_format=3,
+        chunk_key_encoding={"name": "default", "separator": "/"},
     )
 
     metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
@@ -249,14 +260,28 @@ def test_v3_metadata_separator_normalized():
 @requires_v2_migration
 @pytest.mark.parametrize(
     "dtype",
-    ["int32", "uint8", "float64", "bool", "U10", "datetime64[s]", "timedelta64[s]", "S10", "V10"],
+    [
+        "int32",
+        "uint8",
+        "float64",
+        "bool",
+        "U10",
+        "datetime64[s]",
+        "timedelta64[s]",
+        "S10",
+        "V10",
+    ],
 )
 def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
     store = zarr.storage.MemoryStore()
     zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype=dtype, store=store,
-        zarr_format=2, fill_value=None,
+        shape=(5, 10),
+        chunks=(5, 5),
+        dtype=dtype,
+        store=store,
+        zarr_format=2,
+        fill_value=None,
     )
 
     metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
@@ -266,7 +291,9 @@ def test_v2_metadata_with_none_fill_value(dtype):
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
     zarr_store = ObjectStore(store=ObsMemoryStore())
-    zarr.create(shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3)
+    zarr.create(
+        shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3
+    )
 
     manifest = asyncio.run(_build_manifest(zarr_store, "test://path"))
     assert manifest.shape_chunk_grid == (2, 2)

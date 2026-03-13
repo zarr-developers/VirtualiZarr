@@ -21,7 +21,6 @@ from virtualizarr.manifests.utils import (
 )
 from virtualizarr.types import ChunkKey
 
-
 # doesn't guarantee that writers actually handle these
 VALID_URI_PREFIXES = {
     "s3://",

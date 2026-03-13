@@ -201,7 +201,6 @@ class _VirtualiZarrDatasetAccessor:
 
             return None
         elif format == "parquet":
-            import pandas as pd
             from kerchunk.df import refs_to_dataframe
 
             if isinstance(filepath, Path):
