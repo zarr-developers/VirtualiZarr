@@ -320,10 +320,10 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
 
     v2_metadata = metadata
 
-    # TODO: This back and forth from dicts to classes is awful
+    # V3 requires a non-None fill_value, but V2 allows it. If missing, set to the
+    # dtype's default (e.g. 0 for int) before converting. We roundtrip through a dict
+    # because ArrayV2Metadata is immutable.
     if v2_metadata.fill_value is None:
-
-        # TODO: Why does _convert_array_metadata() not do this?
         v2_dict = v2_metadata.to_dict()
         v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
         fill_value = v2_dtype.default_scalar()
