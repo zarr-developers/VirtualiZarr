@@ -234,9 +234,8 @@ def test_v2_metadata_without_dimensions():
         return metadata_as_v3(zarr_array.metadata)
 
     metadata = asyncio.run(get_meta())
-    # Should generate dimension names
-    assert metadata.dimension_names is not None
-    assert len(metadata.dimension_names) == 2
+    # No _ARRAY_DIMENSIONS attribute, so dimension names should be None
+    assert metadata.dimension_names is None
 
 
 @SKIP_NEWER_ZARR_PYTHON
