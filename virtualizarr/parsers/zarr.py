@@ -409,14 +409,18 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
     stripped_keys, full_paths, all_lengths = await _build_1d_chunk_mapping(zarr_array, path, prefix)
 
+    # TODO exit early in empty array case?
+    if len(stripped_keys) == 0:
+        raise NotImplementedError
+
     total_size = zarr_array.nchunks
     separator = strategy._get_separator(zarr_array)
 
     # split "0.0.0" style keys into per-dimension integer coords
     # TODO replace np.char.split with np.strings.split once it exists
-    split_keys_np = np.char.split(stripped_keys, sep=separator)
+    split_keys = np.char.split(stripped_keys, sep=separator)
     coords = np.array(
-        [[int(c) for c in key] for key in split_keys_np], dtype=np.int64
+        [[int(c) for c in key] for key in split_keys], dtype=np.int64
     ).T  # shape: (ndim, nchunks)
     flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
 
