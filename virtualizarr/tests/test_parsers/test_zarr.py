@@ -20,9 +20,7 @@ from virtualizarr.parsers.zarr import (
     get_strategy,
     join_url,
 )
-from virtualizarr.tests import requires_minio, requires_pyarrow
-
-pytestmark = requires_pyarrow
+from virtualizarr.tests import requires_minio
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 

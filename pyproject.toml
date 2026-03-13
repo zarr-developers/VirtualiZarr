@@ -51,7 +51,7 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 
-zarr = ["arro3-core", "pyarrow"]
+zarr = ["arro3-core"]
 
 # kerchunk-based parsers
 netcdf3 = [
