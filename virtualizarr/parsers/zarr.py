@@ -449,7 +449,7 @@ async def build_chunk_manifest(
 
 
 async def build_1d_chunk_mapping(
-    obs_store: obstore.ObjectStore, base_chunk_dir_path: str, prefix: str, zarr_format: ZarrFormat
+    obs_store: obstore.ObjectStore, store_base_uri: str, array_chunks_prefix: str, zarr_format: ZarrFormat
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build chunk mapping by listing the object store with obstore.
@@ -459,22 +459,23 @@ async def build_1d_chunk_mapping(
 
     Parameters
     ----------
-    base_chunk_dir_path
-        Base path for constructing chunk paths.
-    prefix
-        Prefix to list and strip from chunk keys.
+    obs_store
+        The obstore ObjectStore to list.
+    store_base_uri
+        The base URI of the store (e.g. "s3://bucket/store.zarr"), used to construct full chunk paths.
+    array_chunks_prefix
+        Store-relative prefix to list and strip from chunk keys (e.g. "air/c/").
+    zarr_format
+        The zarr format version.
 
     Returns
     -------
     Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
     """
-
-    # TODO: Why are the base_chunk_dir_path and prefix different things?
-
     path_batches: list[np.ndarray] = []
     size_batches: list[np.ndarray] = []
     stream = obs_store.list_async(
-        prefix=prefix, return_arrow=True
+        prefix=array_chunks_prefix, return_arrow=True
     )
     # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
     async for batch in stream:
@@ -503,11 +504,9 @@ async def build_1d_chunk_mapping(
     all_sizes = np.concatenate(size_batches)
 
     # strip the prefix to get chunk keys like "0.0.0"
-    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
+    stripped_keys = np.strings.slice(all_paths, len(array_chunks_prefix), None)
 
-    # construct full paths
-    # TODO this normalization should have already been done
-    base = base_chunk_dir_path.rstrip("/") + "/"
-    full_paths = np.strings.add(base, all_paths)
+    # construct full URIs for each chunk
+    full_paths = np.strings.add(store_base_uri + "/", all_paths)
 
     return stripped_keys, full_paths, all_sizes
