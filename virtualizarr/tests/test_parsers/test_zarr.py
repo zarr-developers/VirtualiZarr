@@ -375,8 +375,6 @@ def test_build_chunk_manifest_empty_with_shape():
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
-    import asyncio
-
     from obstore.store import LocalStore as ObsLocalStore
     from zarr.storage import ObjectStore
 
