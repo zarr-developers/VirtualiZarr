@@ -5,9 +5,10 @@ import pytest
 import xarray as xr
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import LocalStore
+from obstore.store import LocalStore, MemoryStore as ObsMemoryStore
 from packaging import version
 from zarr.api.asynchronous import open_array
+from zarr.storage import ObjectStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
@@ -147,10 +148,7 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
 
     # Open it as an async array and build the manifest
     async def get_manifest():
-        from obstore.store import LocalStore as ObsLocalStore
-        from zarr.storage import ObjectStore
-
-        obs_store = ObsLocalStore(prefix=filepath)
+        obs_store = LocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
         fmt = ZarrFormat(zarr_array.metadata.zarr_format)
@@ -190,9 +188,6 @@ def test_unsupported_zarr_format():
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
 
-    from obstore.store import LocalStore as ObsLocalStore
-    from zarr.storage import ObjectStore
-
     filepath = f"{tmpdir}/empty.zarr"
     zarr.create(
         shape=(10, 10),
@@ -203,7 +198,7 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     )
 
     async def get_chunk_map():
-        obs_store = ObsLocalStore(prefix=filepath)
+        obs_store = LocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
         fmt = ZarrFormat(zarr_array.metadata.zarr_format)
@@ -345,10 +340,6 @@ def test_v2_metadata_with_none_fill_value(dtype):
 
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
-
-    from obstore.store import MemoryStore as ObsMemoryStore
-    from zarr.storage import ObjectStore
-
     obs_store = ObsMemoryStore()
     zarr_store = ObjectStore(store=obs_store)
     zarr.create(
@@ -373,9 +364,6 @@ def test_build_chunk_manifest_empty_with_shape():
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
-    from obstore.store import LocalStore as ObsLocalStore
-    from zarr.storage import ObjectStore
-
     filepath = f"{tmpdir}/sparse.zarr"
     arr = zarr.create(
         shape=(30, 30),
@@ -391,7 +379,7 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     arr[20:30, 20:30] = 3.0  # chunk 2.2
 
     async def get_manifest():
-        obs_store = ObsLocalStore(prefix=filepath)
+        obs_store = LocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
         fmt = ZarrFormat(zarr_array.metadata.zarr_format)
