@@ -335,8 +335,8 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
         # Normal conversion; allow other errors to propagate.
         v3_metadata = _convert_array_metadata(v2_metadata)
 
-    # Set dimension names from attributes
-    # TODO: Why does _convert_array_metadata() not do this too?
+    # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
+    # to V3's dimension_names, so we do it manually.
     if v3_metadata.dimension_names is None:
         v3_dict = v3_metadata.to_dict()
         dim_names = None
