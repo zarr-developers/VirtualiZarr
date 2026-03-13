@@ -30,6 +30,9 @@ from virtualizarr.manifests.manifest import (
 from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.utils import determine_chunk_grid_shape
 
+# obstore doesn't export a public base type for stores, so we use Any for now.
+ObstoreStore = Any
+
 T = TypeVar("T")
 
 
@@ -64,7 +67,7 @@ class ZarrFormat(Enum):
     V3 = 3
 
     @property
-    def metadata_key_names(self) -> tuple[str]:
+    def metadata_key_names(self) -> tuple[str, ...]:
         match self:
             case ZarrFormat.V2:
                 return (".zarray", ".zattrs", ".zgroup", ".zmetadata")
@@ -283,7 +286,7 @@ async def construct_manifest_array(
     # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
     # which differs from the always-V3 metadata we use internally.
     on_disk_zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
-    on_disk_separator = (
+    on_disk_separator: ChunkKeySeparator = (
         zarr_array.metadata.chunk_key_encoding.separator
         if on_disk_zarr_format == ZarrFormat.V3
         else "."
@@ -343,20 +346,21 @@ def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
 
     # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
     # to V3's dimension_names, so we do it manually.
-    dim_names = v3_dict.get("attributes", {}).get("_ARRAY_DIMENSIONS")
+    attrs = cast(dict, v3_dict.get("attributes", {}))
+    dim_names = attrs.get("_ARRAY_DIMENSIONS")
     if v3_dict.get("dimension_names") is None and dim_names:
         v3_dict["dimension_names"] = dim_names
 
     # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
     # so remove it from attributes to avoid duplication.
-    if "_ARRAY_DIMENSIONS" in v3_dict.get("attributes", {}):
-        del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
+    if "_ARRAY_DIMENSIONS" in attrs:
+        del attrs["_ARRAY_DIMENSIONS"]
 
     return v3_dict
 
 
 async def build_chunk_manifest(
-    obs_store: obstore.ObjectStore,
+    obs_store: ObstoreStore,
     array_path: str,
     store_base_uri: str,
     metadata: ArrayV3Metadata,
@@ -385,7 +389,7 @@ async def build_chunk_manifest(
     """
 
     chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape, metadata.chunk_grid.chunk_shape
+        metadata.shape, cast(RegularChunkGrid, metadata.chunk_grid).chunk_shape
     )
     total_size = math.prod(chunk_grid_shape)
 
@@ -449,7 +453,7 @@ async def build_chunk_manifest(
 
 
 async def build_1d_chunk_mapping(
-    obs_store: obstore.ObjectStore,
+    obs_store: ObstoreStore,
     store_base_uri: str,
     array_chunks_prefix: str,
     zarr_format: ZarrFormat,
