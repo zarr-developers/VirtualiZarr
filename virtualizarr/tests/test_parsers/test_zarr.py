@@ -182,8 +182,6 @@ def test_join_url_empty_base():
 
 def test_unsupported_zarr_format():
     """Test that unsupported zarr format raises ValueError."""
-    from virtualizarr.parsers.zarr import ZarrFormat
-
     with pytest.raises(ValueError):
         ZarrFormat(99)
 
