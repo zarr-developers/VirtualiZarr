@@ -14,7 +14,6 @@ import obstore
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.chunk_grids import RegularChunkGrid
-from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
 from zarr.codecs import ShardingCodec
@@ -258,15 +257,7 @@ async def construct_manifest_group(
         array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
     }
 
-    manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
-    # TODO: This is weird - why isn't this just set in the ManifestGroup constructor?
-    manifest_group._metadata = GroupMetadata(
-        attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
-        zarr_format=3,
-        consolidated_metadata=None,
-    )
-
-    return manifest_group
+    return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
 async def construct_manifest_array(
