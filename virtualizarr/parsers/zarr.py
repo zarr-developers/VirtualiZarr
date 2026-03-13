@@ -55,19 +55,6 @@ def _get_array_name(zarr_array: ZarrArrayType) -> str:
     return name.lstrip("/")
 
 
-# TODO delete this entirely
-def _normalize_chunk_keys(chunk_keys: list[str], prefix: str) -> list[str]:
-    """
-    Normalize chunk keys to dot-separated coordinates.
-
-    Strips the prefix from each key and replaces '/' with '.' for coordinate notation.
-    """
-    chunk_coords = [
-        k[len(prefix) :] if prefix and k.startswith(prefix) else k for k in chunk_keys
-    ]
-    return [coord.replace("/", ".") for coord in chunk_coords]
-
-
 async def _handle_scalar_array(
     zarr_array: ZarrArrayType, path: str, scalar_key: str
 ) -> dict[str, dict[str, Any]]:
