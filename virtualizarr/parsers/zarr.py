@@ -355,9 +355,12 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     #     del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
     #     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
-    # # TODO: I don't think this should be hard-coded
-    # v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
-    # v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+    # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding.
+    # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
+    # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
+    # We do this so that inside the resultant ManifestStore the expected dot-separated keys are used.
+    v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
+    v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
     return v3_metadata
 
