@@ -354,7 +354,7 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     return v3_metadata
 
 
-async def build_chunk_manifest(zarr_array: zarr.As, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
+async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
     """Build a ChunkManifest from chunk coordinate mappings.
 
     Note: Chunk keys are discovered by listing what's actually in storage rather than
@@ -363,6 +363,8 @@ async def build_chunk_manifest(zarr_array: zarr.As, path: str, metadata: ArrayV3
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
     
+    # TODO: Eliminate the zarr_array argument from this function?
+
     zarr_format = ZarrFormat(metadata.zarr_format)
 
     chunk_grid_shape = zarr_array.cdata_shape
@@ -374,14 +376,16 @@ async def build_chunk_manifest(zarr_array: zarr.As, path: str, metadata: ArrayV3
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
         # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
         scalar_key = zarr_format.scalar_chunk_key_name
-        size = await zarr_array.store.getsize(zarr_array.path + scalar_key)
-        actual_path = join_url(path, scalar_key)
+        store_key = join_url(zarr_array.path, scalar_key)
 
+        size = await zarr_array.store.getsize(store_key)
+        
+        full_path = join_url(path, store_key)
         return ChunkManifest(
             {
-                # TODO: is this correct? Shouldn't all ChunkManifests not depend on the format they were created from?
-                "0" if scalar_key == "0" else "c": {
-                    "path": actual_path,
+                # Use the v3 convention in the ManifestArray, even though I think the constructor can handle the v2 convention too.
+                "c": {
+                    "path": full_path,
                     "offset": 0,
                     "length": size,
                 }
@@ -389,12 +393,13 @@ async def build_chunk_manifest(zarr_array: zarr.As, path: str, metadata: ArrayV3
         )
 
     # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = zarr_array.path + zarr_format.chunks_dir_prefix
-    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(zarr_array, path, nonscalar_chunks_prefix)
+    nonscalar_chunks_prefix = join_url(zarr_array.path, zarr_format.chunks_dir_prefix)
+    obs_store = cast(ObjectStore, zarr_array.store).store
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, path, nonscalar_chunks_prefix, zarr_format)
 
-    # TODO exit early in empty array case?
     if len(stripped_keys) == 0:
-        raise NotImplementedError
+        # No initialized chunks found, so manifest is empty, and we can exit early.
+        return ChunkManifest({}, shape=chunk_grid_shape)
 
     # split "0.0.0" style keys into per-dimension integer coords
     # TODO replace np.char.split with np.strings.split once it exists

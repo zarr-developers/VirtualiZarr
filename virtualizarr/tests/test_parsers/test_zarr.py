@@ -1,5 +1,4 @@
 import asyncio
-from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -16,8 +15,7 @@ from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import (
     _run_async,
     build_chunk_manifest,
-    get_metadata,
-    get_strategy,
+    metadata_as_v3,
     join_url,
 )
 from virtualizarr.tests import requires_minio
@@ -146,19 +144,18 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
     )
     scalar_array[()] = 42
 
-    # Open it as an async array to use with the strategy
-    async def get_chunk_map():
+    # Open it as an async array and build the manifest
+    async def get_manifest():
         zarr_array = await open_array(store=filepath, mode="r")
-        strategy = get_strategy(zarr_array)
-        return await strategy.get_chunk_mapping(zarr_array, filepath)
+        return await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
 
-    chunk_map = asyncio.run(get_chunk_map())
+    manifest = asyncio.run(get_manifest())
 
-    # V2 uses "0" for scalar, V3 uses "c"
-    expected_key = "0" if zarr_format == 2 else "c"
-    assert expected_key in chunk_map
-    assert chunk_map[expected_key]["offset"] == 0
-    assert chunk_map[expected_key]["length"] > 0
+    # scalar arrays have a single chunk with empty coordinate key
+    chunk_dict = manifest.dict()
+    assert "" in chunk_dict
+    assert chunk_dict[""]["offset"] == 0
+    assert chunk_dict[""]["length"] > 0
 
 
 def test_join_url_empty_base():
@@ -169,14 +166,11 @@ def test_join_url_empty_base():
 
 
 def test_unsupported_zarr_format():
-    """Test that unsupported zarr format raises NotImplementedError."""
+    """Test that unsupported zarr format raises ValueError."""
+    from virtualizarr.parsers.zarr import ZarrFormat
 
-    # Create a mock array with unsupported format
-    mock_array = Mock()
-    mock_array.metadata.zarr_format = 99  # Unsupported format
-
-    with pytest.raises(NotImplementedError, match="Zarr format 99 is not supported"):
-        get_strategy(mock_array)
+    with pytest.raises(ValueError):
+        ZarrFormat(99)
 
 
 @zarr_versions()
@@ -199,7 +193,7 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
         obs_store = ObsLocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
-        manifest = await build_chunk_manifest(zarr_array, filepath)
+        manifest = await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
         return manifest.dict()
 
     result = asyncio.run(get_chunk_map())
@@ -219,7 +213,7 @@ def test_v2_metadata_without_dimensions():
 
     async def get_meta():
         zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
+        return metadata_as_v3(zarr_array.metadata)
 
     metadata = asyncio.run(get_meta())
     # Should generate dimension names
@@ -239,7 +233,7 @@ def test_v2_metadata_raises_import_error_on_old_zarr():
 
     async def get_meta():
         zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
+        return metadata_as_v3(zarr_array.metadata)
 
     # Should raise ImportError with helpful message
     with pytest.raises(
@@ -262,7 +256,7 @@ def test_v2_metadata_with_dimensions():
 
     async def get_meta():
         zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
+        return metadata_as_v3(zarr_array.metadata)
 
     metadata = asyncio.run(get_meta())
     # Should use the provided dimension names
@@ -300,7 +294,7 @@ def test_v2_metadata_with_none_fill_value(dtype):
 
     async def get_meta():
         zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
+        return metadata_as_v3(zarr_array.metadata)
 
     metadata = asyncio.run(get_meta())
     # Should handle None fill_value gracefully
@@ -321,7 +315,7 @@ def test_build_chunk_manifest_empty_with_shape():
 
     async def get_manifest():
         zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, "test://path")
+        return await build_chunk_manifest(zarr_array, "test://path", metadata_as_v3(zarr_array.metadata))
 
     manifest = asyncio.run(get_manifest())
     assert manifest.shape_chunk_grid == (2, 2)
@@ -353,7 +347,7 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
         obs_store = ObsLocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, filepath)
+        return await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
 
     manifest = asyncio.run(get_manifest())
 
