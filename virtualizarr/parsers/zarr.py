@@ -285,12 +285,17 @@ async def construct_manifest_array(
     
     # TODO raise NotImplementedError for non-standard chunk grid objects
 
+    # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
+    # which differs from the always-V3 metadata we use internally.
+    on_disk_zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
+
     obs_store = cast(ObjectStore, zarr_array.store).store
     chunk_manifest = await build_chunk_manifest(
         obs_store=obs_store,
         array_path=zarr_array.path,
         store_base_uri=path,
         metadata=array_v3_metadata,
+        on_disk_zarr_format=on_disk_zarr_format,
     )
 
     return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
@@ -370,6 +375,7 @@ async def build_chunk_manifest(
     array_path: str,
     store_base_uri: str,
     metadata: ArrayV3Metadata,
+    on_disk_zarr_format: ZarrFormat,
 ) -> ChunkManifest:
     """Build a ChunkManifest from chunk coordinate mappings.
 
@@ -390,8 +396,6 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
-    zarr_format = ZarrFormat(metadata.zarr_format)
-
     chunk_grid_shape = tuple(
         s // c for s, c in zip(metadata.shape, metadata.chunk_grid.chunk_shape)
     )
@@ -402,7 +406,7 @@ async def build_chunk_manifest(
     if metadata.shape == ():
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
         # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
-        scalar_key = zarr_format.scalar_chunk_key_name
+        scalar_key = on_disk_zarr_format.scalar_chunk_key_name
         store_key = join_url(array_path, scalar_key)
 
         head = await obstore.head_async(obs_store, store_key)
@@ -421,8 +425,8 @@ async def build_chunk_manifest(
         )
 
     # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = join_url(array_path, zarr_format.chunks_dir_prefix)
-    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, store_base_uri, nonscalar_chunks_prefix, zarr_format)
+    nonscalar_chunks_prefix = join_url(array_path, on_disk_zarr_format.chunks_dir_prefix)
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, store_base_uri, nonscalar_chunks_prefix, on_disk_zarr_format)
 
     if len(stripped_keys) == 0:
         # No initialized chunks found, so manifest is empty, and we can exit early.

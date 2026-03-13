@@ -17,6 +17,7 @@ from virtualizarr.parsers.zarr import (
     build_chunk_manifest,
     metadata_as_v3,
     join_url,
+    ZarrFormat,
 )
 from virtualizarr.tests import requires_minio
 
@@ -157,6 +158,7 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
                 array_path=zarr_array.path,
                 store_base_uri=filepath,
                 metadata=metadata_as_v3(zarr_array.metadata),
+                on_disk_zarr_format=ZarrFormat(zarr_array.metadata.zarr_format),
             )
 
     manifest = asyncio.run(get_manifest())
@@ -208,6 +210,7 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
                 array_path=zarr_array.path,
                 store_base_uri=filepath,
                 metadata=metadata_as_v3(zarr_array.metadata),
+                on_disk_zarr_format=ZarrFormat(zarr_array.metadata.zarr_format),
             )
         return manifest.dict()
 
@@ -335,6 +338,7 @@ def test_build_chunk_manifest_empty_with_shape():
                 array_path=zarr_array.path,
                 store_base_uri="test://path",
                 metadata=metadata_as_v3(zarr_array.metadata),
+                on_disk_zarr_format=ZarrFormat(zarr_array.metadata.zarr_format),
             )
 
     manifest = asyncio.run(get_manifest())
@@ -372,6 +376,7 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
                 array_path=zarr_array.path,
                 store_base_uri=filepath,
                 metadata=metadata_as_v3(zarr_array.metadata),
+                on_disk_zarr_format=ZarrFormat(zarr_array.metadata.zarr_format),
             )
 
     manifest = asyncio.run(get_manifest())
