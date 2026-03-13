@@ -376,7 +376,9 @@ async def build_chunk_manifest(
     metadata
         V3 metadata for the array.
 
-    Note: Chunk keys are discovered by listing what's actually in storage rather than
+    Notes
+    -----
+    Chunk keys are discovered by listing what's actually in storage rather than
     generating all possible keys from the chunk grid. Zarr allows chunks to be missing
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
