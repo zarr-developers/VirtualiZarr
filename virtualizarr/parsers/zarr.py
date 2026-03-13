@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-from abc import ABC, abstractmethod
 from collections.abc import Coroutine, Iterable
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import numpy as np
 import zarr
-import obstore as obs
+import obstore
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -29,11 +27,27 @@ from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
 
-if TYPE_CHECKING:
-    import zarr
 
 T = TypeVar("T")
-ZarrArrayType = zarr.AsyncArray | zarr.Array
+
+
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine, handling the case where an event loop is already running.
+
+    In environments like Jupyter notebooks, an event loop is already running,
+    so ``asyncio.run()`` raises ``RuntimeError``. In that case we run the
+    coroutine in a separate thread with its own event loop.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop – the simple path.
+        return asyncio.run(coro)
+
+    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(asyncio.run, coro)
+        return future.result()
 
 
 class ZarrFormat(Enum):
@@ -82,225 +96,6 @@ def join_url(base: str, key: str) -> str:
         return key
     # strip trailing slash from base and leading slash from key to avoid '//' in middle
     return base.rstrip("/") + "/" + key.lstrip("/")
-
-
-def _get_array_name(zarr_array: ZarrArrayType) -> str:
-    """Extract and normalize the array name."""
-    name = getattr(zarr_array, "name", "") or ""
-    return name.lstrip("/")
-
-
-async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
-    """Build a ChunkManifest from chunk coordinate mappings.
-
-    Note: Chunk keys are discovered by listing what's actually in storage rather than
-    generating all possible keys from the chunk grid. Zarr allows chunks to be missing
-    (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
-    missing, Zarr will return the fill_value for those regions when the array is read.
-    """
-    
-    zarr_format = ZarrFormat(metadata.zarr_format)
-
-    # TODO call _get_array_name once here?
-
-    chunk_grid_shape = zarr_array.cdata_shape
-    total_size = zarr_array.nchunks
-    separator = metadata.chunk_key_encoding.separator
-
-    # Handle scalar arrays
-    if zarr_array.shape == ():
-        # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
-        # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
-        scalar_key = zarr_format.scalar_chunk_key_name
-        size = await zarr_array.store.getsize(_get_array_name(zarr_array) + scalar_key)
-        actual_path = join_url(path, scalar_key)
-
-        return ChunkManifest(
-            {
-                # TODO: is this correct? Shouldn't all ChunkManifests not depend on the format they were created from?
-                "0" if scalar_key == "0" else "c": {
-                    "path": actual_path,
-                    "offset": 0,
-                    "length": size,
-                }
-            }
-        )
-
-    # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = _get_array_name(zarr_array) + zarr_format.chunks_dir_prefix
-    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(zarr_array, path, nonscalar_chunks_prefix)
-
-    # TODO exit early in empty array case?
-    if len(stripped_keys) == 0:
-        raise NotImplementedError
-
-    # split "0.0.0" style keys into per-dimension integer coords
-    # TODO replace np.char.split with np.strings.split once it exists
-    split_keys = np.char.split(stripped_keys, sep=separator)
-    coords = np.array(
-        [[int(c) for c in key] for key in split_keys], dtype=np.int64
-    ).T  # shape: (ndim, nchunks)
-    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
-
-    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
-    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
-    dense_lengths = np.zeros(total_size, dtype=np.uint64)
-    dense_offsets = np.zeros(total_size, dtype=np.uint64)
-
-    dense_paths[flat_positions] = full_paths
-    dense_lengths[flat_positions] = all_lengths
-
-    return ChunkManifest.from_arrays(
-        paths=dense_paths.reshape(chunk_grid_shape),
-        offsets=dense_offsets.reshape(chunk_grid_shape),
-        lengths=dense_lengths.reshape(chunk_grid_shape),
-    )
-
-
-async def build_1d_chunk_mapping(
-    obs_store: obstore.ObjectStore, base_chunk_dir_path: str, prefix: str, zarr_format: ZarrFormat
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Build chunk mapping by listing the object store with obstore.
-
-    Uses obstore's list_async with Arrow output to get chunk paths and sizes
-    in a single Rust-level call, avoiding per-chunk getsize calls.
-
-    Parameters
-    ----------
-    base_chunk_dir_path
-        Base path for constructing chunk paths.
-    prefix
-        Prefix to list and strip from chunk keys.
-
-    Returns
-    -------
-    Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
-    """
-
-    # TODO: Why are the base_chunk_dir_path and prefix different things?
-
-    path_batches: list[np.ndarray] = []
-    size_batches: list[np.ndarray] = []
-    stream = obs_store.list_async(
-        prefix=prefix, return_arrow=True
-    )
-    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
-    async for batch in stream:
-
-        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
-        paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
-        sizes_np = batch.column("size").to_numpy()
-
-        # filter out metadata and directory keys, leaving only valid chunk keys
-        # (assumes that there are no other objects inside this directory)
-        is_metadata = np.zeros(len(paths_np), dtype=bool)
-        for suffix in zarr_format.metadata_key_names:
-            is_metadata |= np.strings.endswith(paths_np, suffix)
-        is_directory = np.strings.endswith(paths_np, "/")
-        chunk_keys_mask = ~(is_metadata | is_directory)
-        
-        path_batches.append(paths_np[chunk_keys_mask])
-        size_batches.append(sizes_np[chunk_keys_mask])
-
-    if not path_batches:
-        # no initialized chunks found
-        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
-
-    # join batches into one 1D array for all initialized chunks
-    all_paths = np.concatenate(path_batches)
-    all_sizes = np.concatenate(size_batches)
-
-    # strip the prefix to get chunk keys like "0.0.0"
-    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
-
-    # construct full paths
-    # TODO this normalization should have already been done
-    base = base_chunk_dir_path.rstrip("/") + "/"
-    full_paths = np.strings.add(base, all_paths)
-
-    return stripped_keys, full_paths, all_sizes
-
-
-async def _construct_manifest_array(
-    zarr_array: zarr.AsyncArray[Any], path: str
-) -> ManifestArray:
-    """Construct a ManifestArray from a zarr array."""
-    array_v3_metadata = metadata_as_v3(zarr_array.metadata)
-
-    # This is the only restriction on what Zarr Arrays cannot be virtualized
-    if any(
-        isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs
-    ):
-        raise NotImplementedError(
-            f"Zarr V3 arrays with sharding are not yet supported, but array {path} uses the ShardingCodec."
-            "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
-            "which VirtualiZarr does not currently handle. "
-            "Reading sharded arrays without proper offset handling would result in corrupted data."
-        )
-
-    # TODO: If zarr-python had some 
-    chunk_manifest = await build_chunk_manifest(zarr_array, path, array_v3_metadata)
-    return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
-
-
-async def _construct_manifest_group(
-    path: str,
-    store: zarr.storage.ObjectStore,
-    *,
-    skip_variables: str | Iterable[str] | None = None,
-    group: str | None = None,
-) -> ManifestGroup:
-    """Construct a ManifestGroup from a zarr group."""
-    zarr_group = await open_group_async(store=store, path=group, mode="r")
-
-    zarr_array_keys = [key async for key in zarr_group.array_keys()]
-    _skip_variables = [] if skip_variables is None else list(skip_variables)
-
-    zarr_arrays = await asyncio.gather(
-        *[
-            zarr_group.getitem(var)
-            for var in zarr_array_keys
-            if var not in _skip_variables
-        ]
-    )
-
-    manifest_arrays = await asyncio.gather(
-        *[_construct_manifest_array(array, path) for array in zarr_arrays]  # type: ignore[arg-type]
-    )
-
-    manifest_dict = {
-        array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
-    }
-
-    manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
-    # TODO: This is weird - why isn't this just set in the ManifestGroup constructor?
-    manifest_group._metadata = GroupMetadata(
-        attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
-        zarr_format=3,
-        consolidated_metadata=None,
-    )
-
-    return manifest_group
-
-
-def _run_async(coro: Coroutine[Any, Any, T]) -> T:
-    """Run a coroutine, handling the case where an event loop is already running.
-
-    In environments like Jupyter notebooks, an event loop is already running,
-    so ``asyncio.run()`` raises ``RuntimeError``. In that case we run the
-    coroutine in a separate thread with its own event loop.
-    """
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        # No running loop – the simple path.
-        return asyncio.run(coro)
-
-    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(asyncio.run, coro)
-        return future.result()
 
 
 class ZarrParser:
@@ -419,7 +214,7 @@ class ZarrParser:
             group_path = f"{group_path}/{self.group}" if group_path else self.group
         
         # Parse groups recursively from the root, concurrently
-        coro = _construct_manifest_group(
+        coro = construct_manifest_group(
             store=zarr_store,
             path=store_root_uri,
             group=group_path or None,
@@ -428,6 +223,69 @@ class ZarrParser:
         manifest_group = _run_async(coro)
 
         return ManifestStore(registry=registry, group=manifest_group)
+
+
+async def construct_manifest_group(
+    path: str,
+    store: zarr.storage.ObjectStore,
+    *,
+    skip_variables: str | Iterable[str] | None = None,
+    group: str | None = None,
+) -> ManifestGroup:
+    """Construct a ManifestGroup from a zarr group."""
+    zarr_group = await open_group_async(store=store, path=group, mode="r")
+
+    zarr_array_keys = [key async for key in zarr_group.array_keys()]
+    _skip_variables = [] if skip_variables is None else list(skip_variables)
+
+    zarr_arrays = await asyncio.gather(
+        *[
+            zarr_group.getitem(var)
+            for var in zarr_array_keys
+            if var not in _skip_variables
+        ]
+    )
+
+    manifest_arrays = await asyncio.gather(
+        *[construct_manifest_array(array, path) for array in zarr_arrays]  # type: ignore[arg-type]
+    )
+
+    manifest_dict = {
+        array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
+    }
+
+    manifest_group = ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
+    # TODO: This is weird - why isn't this just set in the ManifestGroup constructor?
+    manifest_group._metadata = GroupMetadata(
+        attributes=dict(zarr_group.attrs) if zarr_group.attrs is not None else {},
+        zarr_format=3,
+        consolidated_metadata=None,
+    )
+
+    return manifest_group
+
+
+async def construct_manifest_array(
+    zarr_array: zarr.AsyncArray[Any], path: str
+) -> ManifestArray:
+    """Construct a ManifestArray from a zarr array."""
+    array_v3_metadata = metadata_as_v3(zarr_array.metadata)
+
+    # This is the only restriction on what Zarr Arrays cannot be virtualized
+    if any(
+        isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs
+    ):
+        raise NotImplementedError(
+            f"Zarr V3 arrays with sharding are not yet supported, but array {path} uses the ShardingCodec."
+            "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
+            "which VirtualiZarr does not currently handle. "
+            "Reading sharded arrays without proper offset handling would result in corrupted data."
+        )
+
+    # TODO: If zarr-python had some built-in way to convert a v2 array class to a v3 array class we wouldn't need to pass separate args here
+    chunk_manifest = await build_chunk_manifest(zarr_array, path, array_v3_metadata)
+
+    return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
 
 
 def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
@@ -494,3 +352,133 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     # v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
     return v3_metadata
+
+
+async def build_chunk_manifest(zarr_array: zarr.As, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
+    """Build a ChunkManifest from chunk coordinate mappings.
+
+    Note: Chunk keys are discovered by listing what's actually in storage rather than
+    generating all possible keys from the chunk grid. Zarr allows chunks to be missing
+    (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
+    missing, Zarr will return the fill_value for those regions when the array is read.
+    """
+    
+    zarr_format = ZarrFormat(metadata.zarr_format)
+
+    chunk_grid_shape = zarr_array.cdata_shape
+    total_size = zarr_array.nchunks
+    separator = metadata.chunk_key_encoding.separator
+
+    # Handle scalar arrays
+    if zarr_array.shape == ():
+        # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
+        # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
+        scalar_key = zarr_format.scalar_chunk_key_name
+        size = await zarr_array.store.getsize(zarr_array.path + scalar_key)
+        actual_path = join_url(path, scalar_key)
+
+        return ChunkManifest(
+            {
+                # TODO: is this correct? Shouldn't all ChunkManifests not depend on the format they were created from?
+                "0" if scalar_key == "0" else "c": {
+                    "path": actual_path,
+                    "offset": 0,
+                    "length": size,
+                }
+            }
+        )
+
+    # Build 1d array of all initialized chunk paths and their lengths
+    nonscalar_chunks_prefix = zarr_array.path + zarr_format.chunks_dir_prefix
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(zarr_array, path, nonscalar_chunks_prefix)
+
+    # TODO exit early in empty array case?
+    if len(stripped_keys) == 0:
+        raise NotImplementedError
+
+    # split "0.0.0" style keys into per-dimension integer coords
+    # TODO replace np.char.split with np.strings.split once it exists
+    split_keys = np.char.split(stripped_keys, sep=separator)
+    coords = np.array(
+        [[int(c) for c in key] for key in split_keys], dtype=np.int64
+    ).T  # shape: (ndim, nchunks)
+    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
+
+    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
+    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
+    dense_lengths = np.zeros(total_size, dtype=np.uint64)
+    dense_offsets = np.zeros(total_size, dtype=np.uint64)
+
+    dense_paths[flat_positions] = full_paths
+    dense_lengths[flat_positions] = all_lengths
+
+    return ChunkManifest.from_arrays(
+        paths=dense_paths.reshape(chunk_grid_shape),
+        offsets=dense_offsets.reshape(chunk_grid_shape),
+        lengths=dense_lengths.reshape(chunk_grid_shape),
+    )
+
+
+async def build_1d_chunk_mapping(
+    obs_store: obstore.ObjectStore, base_chunk_dir_path: str, prefix: str, zarr_format: ZarrFormat
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Build chunk mapping by listing the object store with obstore.
+
+    Uses obstore's list_async with Arrow output to get chunk paths and sizes
+    in a single Rust-level call, avoiding per-chunk getsize calls.
+
+    Parameters
+    ----------
+    base_chunk_dir_path
+        Base path for constructing chunk paths.
+    prefix
+        Prefix to list and strip from chunk keys.
+
+    Returns
+    -------
+    Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
+    """
+
+    # TODO: Why are the base_chunk_dir_path and prefix different things?
+
+    path_batches: list[np.ndarray] = []
+    size_batches: list[np.ndarray] = []
+    stream = obs_store.list_async(
+        prefix=prefix, return_arrow=True
+    )
+    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
+    async for batch in stream:
+
+        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
+        paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
+        sizes_np = batch.column("size").to_numpy()
+
+        # filter out metadata and directory keys, leaving only valid chunk keys
+        # (assumes that there are no other objects inside this directory)
+        is_metadata = np.zeros(len(paths_np), dtype=bool)
+        for suffix in zarr_format.metadata_key_names:
+            is_metadata |= np.strings.endswith(paths_np, suffix)
+        is_directory = np.strings.endswith(paths_np, "/")
+        chunk_keys_mask = ~(is_metadata | is_directory)
+        
+        path_batches.append(paths_np[chunk_keys_mask])
+        size_batches.append(sizes_np[chunk_keys_mask])
+
+    if not path_batches:
+        # no initialized chunks found
+        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
+
+    # join batches into one 1D array for all initialized chunks
+    all_paths = np.concatenate(path_batches)
+    all_sizes = np.concatenate(size_batches)
+
+    # strip the prefix to get chunk keys like "0.0.0"
+    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
+
+    # construct full paths
+    # TODO this normalization should have already been done
+    base = base_chunk_dir_path.rstrip("/") + "/"
+    full_paths = np.strings.add(base, all_paths)
+
+    return stripped_keys, full_paths, all_sizes
