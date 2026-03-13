@@ -139,7 +139,7 @@ async def _build_1d_chunk_mapping(
             if zarr_array.metadata.zarr_format == 2
             else ZARR_V3_METADATA_KEYS
         )
-        is_metadata = np.zeros(len(paths_np), dtype=bool)
+        is_metadata = np.strings.endswith(paths_np, "/")  # directory placeholders
         for suffix in suffixes:
             is_metadata |= np.strings.endswith(paths_np, suffix)
         not_metadata = ~is_metadata
@@ -156,7 +156,7 @@ async def _build_1d_chunk_mapping(
     all_sizes = np.concatenate(size_batches)
 
     # strip the prefix to get chunk keys like "0.0.0"
-    stripped_keys = np.strings.slice(all_paths, start=len(prefix))
+    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
 
     # construct full paths
     base = path.rstrip("/") + "/"
