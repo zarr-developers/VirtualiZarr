@@ -29,6 +29,7 @@ from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
+from virtualizarr.utils import determine_chunk_grid_shape
 
 
 T = TypeVar("T")
@@ -402,9 +403,7 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
-    chunk_grid_shape = tuple(
-        s // c for s, c in zip(metadata.shape, metadata.chunk_grid.chunk_shape)
-    )
+    chunk_grid_shape = determine_chunk_grid_shape(metadata.shape, metadata.chunk_grid.chunk_shape)
     total_size = math.prod(chunk_grid_shape)
 
     # Handle scalar arrays
