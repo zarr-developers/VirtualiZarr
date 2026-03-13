@@ -24,14 +24,11 @@ from virtualizarr.tests import requires_minio
 
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
-SKIP_OLDER_ZARR_PYTHON = pytest.mark.skipif(
-    version.parse(zarr.__version__) < version.parse("3.1.3"),
-    reason="Zarr V2 requires zarr>=3.1.3",
-)
+HAS_V2_MIGRATION = version.parse(zarr.__version__) >= version.parse("3.1.3")
 
-SKIP_NEWER_ZARR_PYTHON = pytest.mark.skipif(
-    version.parse(zarr.__version__) >= version.parse("3.1.3"),
-    reason="Test only relevant for zarr<3.1.3",
+requires_v2_migration = pytest.mark.skipif(
+    not HAS_V2_MIGRATION,
+    reason="V2→V3 metadata migration requires zarr>=3.1.3",
 )
 
 
@@ -61,7 +58,7 @@ def zarr_versions(param_name="zarr_format", indirect=False):
     return pytest.mark.parametrize(
         param_name,
         [
-            pytest.param(2, id="Zarr V2", marks=SKIP_OLDER_ZARR_PYTHON),
+            pytest.param(2, id="Zarr V2", marks=requires_v2_migration),
             pytest.param(3, id="Zarr V3"),
         ],
         indirect=indirect,
@@ -202,7 +199,7 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     assert manifest.dict() == {}
 
 
-@SKIP_OLDER_ZARR_PYTHON
+@requires_v2_migration
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
     store = zarr.storage.MemoryStore()
@@ -212,7 +209,7 @@ def test_v2_metadata_without_dimensions():
     assert metadata.dimension_names is None
 
 
-@SKIP_NEWER_ZARR_PYTHON
+@pytest.mark.skipif(HAS_V2_MIGRATION, reason="Test only relevant for zarr<3.1.3")
 def test_v2_metadata_raises_import_error_on_old_zarr():
     """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
     store = zarr.storage.MemoryStore()
@@ -225,7 +222,7 @@ def test_v2_metadata_raises_import_error_on_old_zarr():
         metadata_as_v3(zarr.open(store, mode="r").metadata)
 
 
-@SKIP_OLDER_ZARR_PYTHON
+@requires_v2_migration
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
     store = zarr.storage.MemoryStore()
@@ -248,7 +245,7 @@ def test_v3_metadata_separator_normalized():
     assert metadata.chunk_key_encoding.separator == "."
 
 
-@SKIP_OLDER_ZARR_PYTHON
+@requires_v2_migration
 @pytest.mark.parametrize(
     "dtype",
     ["int32", "uint8", "float64", "bool", "U10", "datetime64[s]", "timedelta64[s]", "S10", "V10"],
