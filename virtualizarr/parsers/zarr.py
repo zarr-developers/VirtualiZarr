@@ -379,6 +379,11 @@ async def build_chunk_manifest(
         The base URI of the store (e.g. "s3://bucket/store.zarr").
     metadata
         V3 metadata for the array.
+    on_disk_zarr_format
+        The actual on-disk zarr format version (may differ from ``metadata.zarr_format``
+        which is always 3 after conversion).
+    on_disk_separator
+        The chunk key separator used on disk (e.g. ``"."`` or ``"/"``).
 
     Notes
     -----
