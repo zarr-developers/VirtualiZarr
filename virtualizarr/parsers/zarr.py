@@ -409,17 +409,19 @@ async def build_chunk_manifest(
     # Handle scalar arrays
     if metadata.shape == ():
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
-        # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
         scalar_key = on_disk_zarr_format.scalar_chunk_key_name
         store_key = join_url(array_path, scalar_key)
 
-        head = await obstore.head_async(obs_store, store_key)
-        size = head["size"]
+        try:
+            head = await obstore.head_async(obs_store, store_key)
+        except (FileNotFoundError, obstore.exceptions.NotFoundError):
+            # technically I think the zarr spec allows for the possibility that the scalar chunk is uninitialized
+            return ChunkManifest({})
 
+        size = head["size"]
         full_path = join_url(store_base_uri, store_key)
         return ChunkManifest(
             {
-                # Use the v3 convention in the ManifestArray, even though I think the constructor can handle the v2 convention too.
                 "c": {
                     "path": full_path,
                     "offset": 0,
@@ -488,7 +490,6 @@ async def build_1d_chunk_mapping(
     stream = obs_store.list_async(
         prefix=array_chunks_prefix, return_arrow=True
     )
-    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
     async for batch in stream:
 
         # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
