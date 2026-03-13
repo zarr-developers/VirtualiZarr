@@ -349,16 +349,14 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
 
     v3_dict = v3_metadata.to_dict()
 
-    # # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
-    # # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
-    # # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
-    # if (
-    #     "attributes" in v3_dict
-    #     and isinstance(v3_dict["attributes"], dict)
-    #     and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
-    # ):
-    #     del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
-    #     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+    # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
+    # so remove it from attributes to avoid duplication.
+    if (
+        "attributes" in v3_dict
+        and isinstance(v3_dict["attributes"], dict)
+        and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
+    ):
+        del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
 
     # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding.
     # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
