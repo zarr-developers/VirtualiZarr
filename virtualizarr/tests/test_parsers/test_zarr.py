@@ -5,6 +5,7 @@ import pytest
 import xarray as xr
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
+import obstore
 from obstore.store import LocalStore, MemoryStore as ObsMemoryStore
 from packaging import version
 from zarr.api.asynchronous import open_array
@@ -485,15 +486,13 @@ def test_sharded_array_raises_error(tmpdir):
 )
 def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
     """Test that ZarrParser works with a bucket that does not allow list operations."""
-    import obstore as obs
-
     bucket = minio_nolist_bucket["bucket"]
     endpoint = minio_nolist_bucket["endpoint"]
     username = minio_nolist_bucket["username"]
     password = minio_nolist_bucket["password"]
 
     # Write a Zarr V3 store directly to the bucket using admin credentials
-    admin_store = obs.store.S3Store(
+    admin_store = obstore.store.S3Store(
         bucket,
         endpoint_url=endpoint,
         access_key_id=username,
@@ -509,7 +508,7 @@ def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
     ds.to_zarr(zarr_store, consolidated=False, zarr_format=3)
 
     # Create an anonymous S3 store (subject to bucket policy which denies list)
-    anon_store = obs.store.S3Store(
+    anon_store = obstore.store.S3Store(
         bucket,
         endpoint_url=endpoint,
         skip_signature=True,
