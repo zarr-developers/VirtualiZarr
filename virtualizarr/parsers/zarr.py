@@ -13,6 +13,7 @@ import zarr
 import obstore
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
+from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -283,8 +284,12 @@ async def construct_manifest_array(
             "which VirtualiZarr does not currently handle. "
             "Reading sharded arrays without proper offset handling would result in corrupted data."
         )
-    
-    # TODO raise NotImplementedError for non-standard chunk grid objects
+
+    if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGrid):
+        raise NotImplementedError(
+            f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
+            f"uses {type(array_v3_metadata.chunk_grid).__name__}."
+        )
 
     # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
     # which differs from the always-V3 metadata we use internally.
