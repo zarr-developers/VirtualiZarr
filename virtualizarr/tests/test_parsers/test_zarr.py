@@ -146,8 +146,18 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
 
     # Open it as an async array and build the manifest
     async def get_manifest():
-        zarr_array = await open_array(store=filepath, mode="r")
-        return await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
+        from obstore.store import LocalStore as ObsLocalStore
+        from zarr.storage import ObjectStore
+
+        obs_store = ObsLocalStore(prefix=filepath)
+        zarr_store = ObjectStore(store=obs_store)
+        zarr_array = await open_array(store=zarr_store, mode="r")
+        return await build_chunk_manifest(
+                obs_store=obs_store,
+                array_path=zarr_array.path,
+                store_base_uri=filepath,
+                metadata=metadata_as_v3(zarr_array.metadata),
+            )
 
     manifest = asyncio.run(get_manifest())
 
@@ -193,7 +203,12 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
         obs_store = ObsLocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
-        manifest = await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
+        manifest = await build_chunk_manifest(
+                obs_store=zarr_array.store.store,
+                array_path=zarr_array.path,
+                store_base_uri=filepath,
+                metadata=metadata_as_v3(zarr_array.metadata),
+            )
         return manifest.dict()
 
     result = asyncio.run(get_chunk_map())
@@ -315,7 +330,12 @@ def test_build_chunk_manifest_empty_with_shape():
 
     async def get_manifest():
         zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, "test://path", metadata_as_v3(zarr_array.metadata))
+        return await build_chunk_manifest(
+                obs_store=zarr_array.store.store,
+                array_path=zarr_array.path,
+                store_base_uri="test://path",
+                metadata=metadata_as_v3(zarr_array.metadata),
+            )
 
     manifest = asyncio.run(get_manifest())
     assert manifest.shape_chunk_grid == (2, 2)
@@ -347,7 +367,12 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
         obs_store = ObsLocalStore(prefix=filepath)
         zarr_store = ObjectStore(store=obs_store)
         zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, filepath, metadata_as_v3(zarr_array.metadata))
+        return await build_chunk_manifest(
+                obs_store=zarr_array.store.store,
+                array_path=zarr_array.path,
+                store_base_uri=filepath,
+                metadata=metadata_as_v3(zarr_array.metadata),
+            )
 
     manifest = asyncio.run(get_manifest())
 

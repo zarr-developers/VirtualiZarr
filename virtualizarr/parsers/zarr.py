@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import math
 from collections.abc import Coroutine, Iterable
 from enum import Enum
 from pathlib import Path
@@ -281,9 +282,16 @@ async def construct_manifest_array(
             "which VirtualiZarr does not currently handle. "
             "Reading sharded arrays without proper offset handling would result in corrupted data."
         )
+    
+    # TODO raise NotImplementedError for non-standard chunk grid objects
 
-    # TODO: If zarr-python had some built-in way to convert a v2 array class to a v3 array class we wouldn't need to pass separate args here
-    chunk_manifest = await build_chunk_manifest(zarr_array, path, array_v3_metadata)
+    obs_store = cast(ObjectStore, zarr_array.store).store
+    chunk_manifest = await build_chunk_manifest(
+        obs_store=obs_store,
+        array_path=zarr_array.path,
+        store_base_uri=path,
+        metadata=array_v3_metadata,
+    )
 
     return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
 
@@ -354,33 +362,50 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     return v3_metadata
 
 
-async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
+async def build_chunk_manifest(
+    obs_store: obstore.ObjectStore,
+    array_path: str,
+    store_base_uri: str,
+    metadata: ArrayV3Metadata,
+) -> ChunkManifest:
     """Build a ChunkManifest from chunk coordinate mappings.
+
+    Parameters
+    ----------
+    obs_store
+        The obstore ObjectStore for accessing chunk data.
+    array_path
+        The array's path within the store (e.g. "air" or "group/air").
+    store_base_uri
+        The base URI of the store (e.g. "s3://bucket/store.zarr").
+    metadata
+        V3 metadata for the array.
 
     Note: Chunk keys are discovered by listing what's actually in storage rather than
     generating all possible keys from the chunk grid. Zarr allows chunks to be missing
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
-    
-    # TODO: Eliminate the zarr_array argument from this function?
 
     zarr_format = ZarrFormat(metadata.zarr_format)
 
-    chunk_grid_shape = zarr_array.cdata_shape
-    total_size = zarr_array.nchunks
+    chunk_grid_shape = tuple(
+        s // c for s, c in zip(metadata.shape, metadata.chunk_grid.chunk_shape)
+    )
+    total_size = math.prod(chunk_grid_shape)
     separator = metadata.chunk_key_encoding.separator
 
     # Handle scalar arrays
-    if zarr_array.shape == ():
+    if metadata.shape == ():
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
         # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
         scalar_key = zarr_format.scalar_chunk_key_name
-        store_key = join_url(zarr_array.path, scalar_key)
+        store_key = join_url(array_path, scalar_key)
 
-        size = await zarr_array.store.getsize(store_key)
-        
-        full_path = join_url(path, store_key)
+        head = await obstore.head_async(obs_store, store_key)
+        size = head["size"]
+
+        full_path = join_url(store_base_uri, store_key)
         return ChunkManifest(
             {
                 # Use the v3 convention in the ManifestArray, even though I think the constructor can handle the v2 convention too.
@@ -393,9 +418,8 @@ async def build_chunk_manifest(zarr_array: zarr.AsyncArray, path: str, metadata:
         )
 
     # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = join_url(zarr_array.path, zarr_format.chunks_dir_prefix)
-    obs_store = cast(ObjectStore, zarr_array.store).store
-    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, path, nonscalar_chunks_prefix, zarr_format)
+    nonscalar_chunks_prefix = join_url(array_path, zarr_format.chunks_dir_prefix)
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(obs_store, store_base_uri, nonscalar_chunks_prefix, zarr_format)
 
     if len(stripped_keys) == 0:
         # No initialized chunks found, so manifest is empty, and we can exit early.
