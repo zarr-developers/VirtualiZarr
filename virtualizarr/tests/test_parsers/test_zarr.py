@@ -220,121 +220,63 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
 @SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
-
-    # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
-    )
-    # Explicitly don't set _ARRAY_DIMENSIONS
+    zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return metadata_as_v3(zarr_array.metadata)
-
-    metadata = asyncio.run(get_meta())
-    # No _ARRAY_DIMENSIONS attribute, so dimension names should be None
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.dimension_names is None
 
 
 @SKIP_NEWER_ZARR_PYTHON
 def test_v2_metadata_raises_import_error_on_old_zarr():
     """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
-
-    # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
-    )
+    zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return metadata_as_v3(zarr_array.metadata)
-
-    # Should raise ImportError with helpful message
     with pytest.raises(
         ImportError,
         match=r"Zarr-Python>=3\.1\.3 is required for parsing Zarr V2 into Zarr V3.*Found Zarr version",
     ):
-        asyncio.run(get_meta())
+        metadata_as_v3(zarr.open(store, mode="r").metadata)
 
 
 @SKIP_OLDER_ZARR_PYTHON
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
-
-    # Create a V2 array with dimension attributes
     store = zarr.storage.MemoryStore()
-    array = zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
-    )
+    array = zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
     array.attrs["_ARRAY_DIMENSIONS"] = ["x", "y"]
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return metadata_as_v3(zarr_array.metadata)
-
-    metadata = asyncio.run(get_meta())
-    # Should use the provided dimension names
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.dimension_names == ("x", "y")
 
 
 def test_v3_metadata_separator_normalized():
     """Test that metadata_as_v3 normalizes V3 chunk_key_encoding separator to '.'."""
-
     store = zarr.storage.MemoryStore()
     zarr.create(
-        shape=(5, 10),
-        chunks=(5, 5),
-        dtype="int32",
-        store=store,
-        zarr_format=3,
-        chunk_key_encoding={"name": "default", "separator": "/"},
+        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store,
+        zarr_format=3, chunk_key_encoding={"name": "default", "separator": "/"},
     )
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return metadata_as_v3(zarr_array.metadata)
-
-    metadata = asyncio.run(get_meta())
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.chunk_key_encoding.separator == "."
 
 
 @SKIP_OLDER_ZARR_PYTHON
 @pytest.mark.parametrize(
     "dtype",
-    [
-        "int32",
-        "uint8",
-        "float64",
-        "bool",
-        "U10",
-        "datetime64[s]",
-        "timedelta64[s]",
-        "S10",
-        "V10",
-    ],
+    ["int32", "uint8", "float64", "bool", "U10", "datetime64[s]", "timedelta64[s]", "S10", "V10"],
 )
 def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
-
-    # Create a V2 array with None fill_value
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
-        shape=(5, 10),
-        chunks=(5, 5),
-        dtype=dtype,
-        store=store,
-        zarr_format=2,
-        fill_value=None,
+    zarr.create(
+        shape=(5, 10), chunks=(5, 5), dtype=dtype, store=store,
+        zarr_format=2, fill_value=None,
     )
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return metadata_as_v3(zarr_array.metadata)
-
-    metadata = asyncio.run(get_meta())
-    # Should handle None fill_value gracefully
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.fill_value is not None
 
 
