@@ -27,11 +27,14 @@ from virtualizarr.manifests.manifest import (
 )
 
 if TYPE_CHECKING:
-    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
     import zarr
 
 T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
+
+
+ZARR_V2_METADATA_KEYS = (".zarray", ".zattrs", ".zgroup", ".zmetadata")
+ZARR_V3_METADATA_KEYS = ("zarr.json",)
 
 
 def join_url(base: str, key: str) -> str:
@@ -52,6 +55,7 @@ def _get_array_name(zarr_array: ZarrArrayType) -> str:
     return name.lstrip("/")
 
 
+# TODO delete this entirely
 def _normalize_chunk_keys(chunk_keys: list[str], prefix: str) -> list[str]:
     """
     Normalize chunk keys to dot-separated coordinates.
@@ -95,9 +99,9 @@ async def _handle_scalar_array(
     }
 
 
-async def _build_chunk_mapping(
+async def _build_1d_chunk_mapping(
     zarr_array: ZarrArrayType, path: str, prefix: str
-) -> tuple["pa.Array", "pa.Array", "pa.Array"] | None:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build chunk mapping by listing the object store with obstore.
 
@@ -115,50 +119,53 @@ async def _build_chunk_mapping(
 
     Returns
     -------
-    Tuple of (normalized_keys, full_paths, sizes) as PyArrow arrays, or None if no chunks found.
+    Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
     """
-    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
-    import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
-
-    path_batches = []
-    size_batches = []
+    path_batches: list[np.ndarray] = []
+    size_batches: list[np.ndarray] = []
     stream = cast(ObjectStore, zarr_array.store).store.list_async(
         prefix=prefix, return_arrow=True
     )
+    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
     async for batch in stream:
-        pa_path_col = pa.array(batch.column("path"))
-        not_metadata = pc.invert(
-            pc.or_(
-                pc.match_substring(pa_path_col, pattern="/."),
-                pc.starts_with(pa_path_col, "."),
-            )
-        )
 
-        filtered_paths = pa_path_col.filter(not_metadata)
-        filtered_sizes = pa.array(batch.column("size")).filter(not_metadata)
-        path_batches.append(filtered_paths)
-        size_batches.append(filtered_sizes)
+        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
+        paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
+        sizes_np = batch.column("size").to_numpy()
+
+        # filter out metadata keys
+        suffixes = (
+            ZARR_V2_METADATA_KEYS
+            if zarr_array.metadata.zarr_format == 2
+            else ZARR_V3_METADATA_KEYS
+        )
+        is_metadata = np.zeros(len(paths_np), dtype=bool)
+        for suffix in suffixes:
+            is_metadata |= np.strings.endswith(paths_np, suffix)
+        not_metadata = ~is_metadata
+        
+        path_batches.append(paths_np[not_metadata])
+        size_batches.append(sizes_np[not_metadata])
 
     if not path_batches:
-        return None
+        # no initialized chunks found
+        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
 
-    all_paths = pa.concat_arrays(path_batches)
-    all_sizes = pa.concat_arrays(size_batches)
+    # join batches into one 1D array for all initialized chunks
+    all_paths = np.concatenate(path_batches)
+    all_sizes = np.concatenate(size_batches)
 
-    if len(all_paths) == 0:
-        return None
-    stripped_keys = pc.utf8_replace_slice(
-        all_paths, start=0, stop=len(prefix), replacement=""
-    )
+    # strip the prefix to get chunk keys like "0.0.0"
+    stripped_keys = np.strings.slice(all_paths, start=len(prefix))
 
     # construct full paths
-    full_paths = pc.binary_join_element_wise(
-        pa.scalar(path.rstrip("/")), all_paths, "/"
-    )
+    base = path.rstrip("/") + "/"
+    full_paths = np.strings.add(base, all_paths)
 
     return stripped_keys, full_paths, all_sizes
 
 
+# TODO get rid of this whole strategy thing - the parser can just be a sequence of functions whose internals dispatch on the version format
 class ZarrVersionStrategy(ABC):
     """Abstract base class for handling version-specific Zarr operations."""
 
@@ -202,7 +209,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             scalar_key = f"{prefix}0"
             return await _handle_scalar_array(zarr_array, path, scalar_key)
 
-        return await _build_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
+        return await _build_1d_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Convert V2 metadata to V3 format."""
@@ -276,9 +283,12 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         pass  # no restrictions for V2
 
 
+# TODO rename this strategy thing
 class ZarrV3Strategy(ZarrVersionStrategy):
     """Strategy for handling Zarr V3 arrays."""
 
+    # TODO: There's nothing really format-specific in here
+    # In fact this is not even used
     async def get_chunk_mapping(
         self, zarr_array: ZarrArrayType, path: str
     ) -> dict[str, dict[str, Any]]:
@@ -303,6 +313,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
         name = _get_array_name(zarr_array)
 
+        # TODO this logic is basically common to both formats
         # Handle scalar arrays
         if zarr_array.shape == ():
             scalar_key = f"{name}/c" if name else "c"
@@ -310,7 +321,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
 
         # List chunk keys under the c/ subdirectory
         prefix = f"{name}/c/" if name else "c/"
-        return await _build_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
+        return await _build_1d_chunk_mapping(zarr_array, path, prefix)  # type: ignore[return-value]
 
     def get_metadata(self, zarr_array: ZarrArrayType) -> ArrayV3Metadata:
         """Return V3 metadata as-is (no conversion needed)."""
@@ -330,7 +341,10 @@ class ZarrV3Strategy(ZarrVersionStrategy):
         from zarr.codecs import ShardingCodec
 
         if not isinstance(zarr_array.metadata, ArrayV3Metadata):
+            # TODO: why does this return instead of raising?
             return
+        
+        # TODO: There don't need to be any other checks for sharding aside from this
         if any(
             isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
         ):
@@ -378,58 +392,60 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
-    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
-    import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
-
     strategy = get_strategy(zarr_array)
     strategy.validate(zarr_array)
     chunk_grid_shape = zarr_array.cdata_shape
 
-    if zarr_array.shape == ():
-        chunk_map = await strategy.get_chunk_mapping(zarr_array, path)
-        if not chunk_map:
-            return ChunkManifest(chunk_map, shape=chunk_grid_shape)
-        entry = next(iter(chunk_map.values()))
-        return ChunkManifest._from_arrow(
-            paths=pa.array([entry["path"]], type=pa.string()),
-            offsets=pa.array([entry["offset"]], type=pa.uint64()),
-            lengths=pa.array([entry["length"]], type=pa.uint64()),
-            shape=chunk_grid_shape,
-        )
-
     prefix = strategy.get_prefix(zarr_array)
 
-    result = await _build_chunk_mapping(zarr_array, path, prefix)
+    # Handle scalar arrays
+    if zarr_array.shape == ():
 
-    if result is None:
-        return ChunkManifest({}, shape=chunk_grid_shape)
+        # TODO this key depends on the format version
+        scalar_key = f"{prefix}0"
 
-    stripped_keys, full_paths, all_lengths = result
+        # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
+        # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
+        size = await zarr_array.store.getsize(scalar_key)
+        actual_path = join_url(path, scalar_key)
+
+        return ChunkManifest(
+            {
+                # TODO: is this correct? Shouldn't all ChunkManifests not depend on the format they were created from?
+                "0" if scalar_key == "0" else "c": {
+                    "path": actual_path,
+                    "offset": 0,
+                    "length": size,
+                }
+            }
+        )
+
+    stripped_keys, full_paths, all_lengths = await _build_1d_chunk_mapping(zarr_array, path, prefix)
 
     total_size = zarr_array.nchunks
     separator = strategy._get_separator(zarr_array)
-    split_keys = pc.split_pattern(stripped_keys, pattern=separator)
-    coords = [
-        pc.cast(pc.list_element(split_keys, dim), pa.int64()).to_numpy()
-        for dim in range(zarr_array.ndim)
-    ]
-    flat_positions = pa.array(np.ravel_multi_index(coords, chunk_grid_shape))
 
-    # scatter listed chunks into a dense flat array (nulls = missing chunks)
-    updates = pa.table(
-        {"idx": flat_positions, "path": full_paths, "length": all_lengths}
-    )
-    dense = (
-        pa.table({"idx": pa.array(np.arange(total_size, dtype=np.int64))})
-        .join(updates, "idx", join_type="left outer")
-        .sort_by("idx")
-    )
+    # split "0.0.0" style keys into per-dimension integer coords
+    # TODO replace np.char.split with np.strings.split once it exists
+    split_keys_np = np.char.split(stripped_keys, sep=separator)
+    coords = np.array(
+        [[int(c) for c in key] for key in split_keys_np], dtype=np.int64
+    ).T  # shape: (ndim, nchunks)
+    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
 
-    return ChunkManifest._from_arrow(
-        paths=dense["path"].combine_chunks(),
-        offsets=pa.repeat(pa.scalar(0, type=pa.uint64()), total_size),
-        lengths=dense["length"].combine_chunks(),
-        shape=chunk_grid_shape,
+    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
+
+    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
+    dense_lengths = np.zeros(total_size, dtype=np.uint64)
+    dense_offsets = np.zeros(total_size, dtype=np.uint64)
+
+    dense_paths[flat_positions] = full_paths
+    dense_lengths[flat_positions] = all_lengths
+
+    return ChunkManifest.from_arrays(
+        paths=dense_paths.reshape(chunk_grid_shape),
+        offsets=dense_offsets.reshape(chunk_grid_shape),
+        lengths=dense_lengths.reshape(chunk_grid_shape),
     )
 
 
