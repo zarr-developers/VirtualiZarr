@@ -10,12 +10,14 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import zarr
+import obstore as obs
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
+from zarr.codecs import ShardingCodec
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -34,11 +36,6 @@ T = TypeVar("T")
 ZarrArrayType = zarr.AsyncArray | zarr.Array
 
 
-# TODO put these in the enum
-ZARR_V2_METADATA_KEYS = (".zarray", ".zattrs", ".zgroup", ".zmetadata")
-ZARR_V3_METADATA_KEYS = ("zarr.json",)
-
-
 class ZarrFormat(Enum):
     """
     Encode all differences between on-disk Zarr formats here.
@@ -51,6 +48,14 @@ class ZarrFormat(Enum):
     V3 = 3
 
     @property
+    def metadata_key_names(self) -> tuple[str]:
+        match self:
+            case ZarrFormat.V2:
+                return (".zarray", ".zattrs", ".zgroup", ".zmetadata")
+            case ZarrFormat.V3:
+                return ("zarr.json",)
+
+    @property
     def scalar_chunk_key_name(self) -> str:
         match self:
             case ZarrFormat.V2:
@@ -59,12 +64,12 @@ class ZarrFormat(Enum):
                 return "c"
     
     @property
-    def possible_metadata_key_names(self) -> tuple[str]:
+    def chunks_dir_prefix(self) -> str:
         match self:
             case ZarrFormat.V2:
-                return (".zarray", ".zattrs", ".zgroup", ".zmetadata")
+                return ""
             case ZarrFormat.V3:
-                return ("zarr.json",)
+                return "c/"
             
     # TODO move everything else that depends on format here, instead of the strategy thing
 
@@ -116,71 +121,6 @@ async def _handle_scalar_array(
             "length": size,
         }
     }
-
-
-async def _build_1d_chunk_mapping(
-    zarr_array: ZarrArrayType, path: str, prefix: str
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Build chunk mapping by listing the object store with obstore.
-
-    Uses obstore's list_async with Arrow output to get chunk paths and sizes
-    in a single Rust-level call, avoiding per-chunk getsize calls.
-
-    Parameters
-    ----------
-    zarr_array
-        The Zarr array.
-    path
-        Base path for constructing chunk paths.
-    prefix
-        Prefix to list and strip from chunk keys.
-
-    Returns
-    -------
-    Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
-    """
-    zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
-
-    path_batches: list[np.ndarray] = []
-    size_batches: list[np.ndarray] = []
-    stream = cast(ObjectStore, zarr_array.store).store.list_async(
-        prefix=prefix, return_arrow=True
-    )
-    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
-    async for batch in stream:
-
-        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
-        paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
-        sizes_np = batch.column("size").to_numpy()
-
-        # filter out metadata and directory keys, leaving only valid chunk keys
-        # (assumes that there are no other objects inside this directory)
-        is_metadata = np.zeros(len(paths_np), dtype=bool)
-        for suffix in zarr_format.possible_metadata_key_names:
-            is_metadata |= np.strings.endswith(paths_np, suffix)
-        is_directory = np.strings.endswith(paths_np, "/")
-        chunk_keys_mask = ~(is_metadata | is_directory)
-        
-        path_batches.append(paths_np[chunk_keys_mask])
-        size_batches.append(sizes_np[chunk_keys_mask])
-
-    if not path_batches:
-        # no initialized chunks found
-        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
-
-    # join batches into one 1D array for all initialized chunks
-    all_paths = np.concatenate(path_batches)
-    all_sizes = np.concatenate(size_batches)
-
-    # strip the prefix to get chunk keys like "0.0.0"
-    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
-
-    # construct full paths
-    base = path.rstrip("/") + "/"
-    full_paths = np.strings.add(base, all_paths)
-
-    return stripped_keys, full_paths, all_sizes
 
 
 # TODO get rid of this whole strategy thing - the parser can just be a sequence of functions whose internals dispatch on the version format
@@ -265,6 +205,7 @@ class ZarrV2Strategy(ZarrVersionStrategy):
             if dim_names:
                 v3_dict["dimension_names"] = dim_names
             else:
+                # TODO: This shouldn't happen automatically
                 array_name = zarr_array.name.lstrip("/") if zarr_array.name else "array"
                 v3_dict["dimension_names"] = [
                     f"{array_name}_dim_{i}" for i in range(len(zarr_array.shape))
@@ -283,6 +224,8 @@ class ZarrV2Strategy(ZarrVersionStrategy):
         ):
             del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
             v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+
+        # TODO: I don't think this should be hard-coded
         v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
         v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
 
@@ -362,16 +305,7 @@ class ZarrV3Strategy(ZarrVersionStrategy):
             # TODO: why does this return instead of raising?
             return
         
-        # TODO: There don't need to be any other checks for sharding aside from this
-        if any(
-            isinstance(codec, ShardingCodec) for codec in zarr_array.metadata.codecs
-        ):
-            raise NotImplementedError(
-                "Zarr V3 arrays with sharding are not yet supported. "
-                "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
-                "which VirtualiZarr does not currently handle. "
-                "Reading sharded arrays without proper offset handling would result in corrupted data."
-            )
+
 
 
 def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
@@ -402,7 +336,7 @@ def get_strategy(zarr_array: ZarrArrayType) -> ZarrVersionStrategy:
         raise NotImplementedError(f"Zarr format {zarr_format} is not supported")
 
 
-async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkManifest:
+async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str, metadata: ArrayV3Metadata) -> ChunkManifest:
     """Build a ChunkManifest from chunk coordinate mappings.
 
     Note: Chunk keys are discovered by listing what's actually in storage rather than
@@ -410,21 +344,21 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     (sparse arrays), and VirtualiZarr manifests preserve this sparsity. When chunks are
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
-    strategy = get_strategy(zarr_array)
-    strategy.validate(zarr_array)
-    chunk_grid_shape = zarr_array.cdata_shape
+    
+    zarr_format = ZarrFormat(metadata.zarr_format)
 
-    prefix = strategy.get_prefix(zarr_array)
+    # TODO call _get_array_name once here?
+
+    chunk_grid_shape = zarr_array.cdata_shape
+    total_size = zarr_array.nchunks
+    separator = metadata.chunk_key_encoding.separator
 
     # Handle scalar arrays
     if zarr_array.shape == ():
-
-        # TODO simplify the construction of the enum here?
-        scalar_key = ZarrFormat(zarr_array.metadata.zarr_format).scalar_chunk_key_name
-
         # Can only contain a single chunk, so just GET that instead of LISTing a whole directory unnecessarily
         # TODO what if the single chunk is uninitialized? Zarr technically allows that possibility doesn't it?
-        size = await zarr_array.store.getsize(prefix + scalar_key)
+        scalar_key = zarr_format.scalar_chunk_key_name
+        size = await zarr_array.store.getsize(_get_array_name(zarr_array) + scalar_key)
         actual_path = join_url(path, scalar_key)
 
         return ChunkManifest(
@@ -438,14 +372,13 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
             }
         )
 
-    stripped_keys, full_paths, all_lengths = await _build_1d_chunk_mapping(zarr_array, path, prefix)
+    # Build 1d array of all initialized chunk paths and their lengths
+    nonscalar_chunks_prefix = _get_array_name(zarr_array) + zarr_format.chunks_dir_prefix
+    stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(zarr_array, path, nonscalar_chunks_prefix)
 
     # TODO exit early in empty array case?
     if len(stripped_keys) == 0:
         raise NotImplementedError
-
-    total_size = zarr_array.nchunks
-    separator = strategy._get_separator(zarr_array)
 
     # split "0.0.0" style keys into per-dimension integer coords
     # TODO replace np.char.split with np.strings.split once it exists
@@ -470,31 +403,91 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
     )
 
 
-def get_metadata(zarr_array: ZarrArrayType) -> ArrayV3Metadata:
+async def build_1d_chunk_mapping(
+    obs_store: obstore.ObjectStore, base_chunk_dir_path: str, prefix: str, zarr_format: ZarrFormat
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Get V3 metadata for an array, converting from V2 if necessary.
+    Build chunk mapping by listing the object store with obstore.
+
+    Uses obstore's list_async with Arrow output to get chunk paths and sizes
+    in a single Rust-level call, avoiding per-chunk getsize calls.
 
     Parameters
     ----------
-    zarr_array
-        The Zarr array to get metadata for.
+    base_chunk_dir_path
+        Base path for constructing chunk paths.
+    prefix
+        Prefix to list and strip from chunk keys.
 
     Returns
     -------
-    ArrayV3Metadata
-        V3 metadata for the array.
+    Tuple of (stripped_keys, full_paths, sizes) as numpy arrays.
     """
-    strategy = get_strategy(zarr_array)
-    return strategy.get_metadata(zarr_array)
+
+    # TODO: Why are the base_chunk_dir_path and prefix different things?
+
+    path_batches: list[np.ndarray] = []
+    size_batches: list[np.ndarray] = []
+    stream = obs_store.list_async(
+        prefix=prefix, return_arrow=True
+    )
+    # TODO is there any purpose to this async for loop? Given that we just join all the results together anyway...
+    async for batch in stream:
+
+        # immediately convert to numpy arrays - we can still do efficient operations, and don't need any extra arrow dependencies.
+        paths_np = batch.column("path").to_numpy().astype(np.dtypes.StringDType())
+        sizes_np = batch.column("size").to_numpy()
+
+        # filter out metadata and directory keys, leaving only valid chunk keys
+        # (assumes that there are no other objects inside this directory)
+        is_metadata = np.zeros(len(paths_np), dtype=bool)
+        for suffix in zarr_format.metadata_key_names:
+            is_metadata |= np.strings.endswith(paths_np, suffix)
+        is_directory = np.strings.endswith(paths_np, "/")
+        chunk_keys_mask = ~(is_metadata | is_directory)
+        
+        path_batches.append(paths_np[chunk_keys_mask])
+        size_batches.append(sizes_np[chunk_keys_mask])
+
+    if not path_batches:
+        # no initialized chunks found
+        return np.full(0, "", dtype=np.dtypes.StringDType()), np.zeros(0, dtype=np.uint64), np.zeros(0, dtype=np.uint64)
+
+    # join batches into one 1D array for all initialized chunks
+    all_paths = np.concatenate(path_batches)
+    all_sizes = np.concatenate(size_batches)
+
+    # strip the prefix to get chunk keys like "0.0.0"
+    stripped_keys = np.strings.slice(all_paths, len(prefix), None)
+
+    # construct full paths
+    # TODO this normalization should have already been done
+    base = base_chunk_dir_path.rstrip("/") + "/"
+    full_paths = np.strings.add(base, all_paths)
+
+    return stripped_keys, full_paths, all_sizes
 
 
 async def _construct_manifest_array(
     zarr_array: zarr.AsyncArray[Any], path: str
 ) -> ManifestArray:
     """Construct a ManifestArray from a zarr array."""
-    array_metadata = get_metadata(zarr_array)
-    chunk_manifest = await build_chunk_manifest(zarr_array, path)
-    return ManifestArray(metadata=array_metadata, chunkmanifest=chunk_manifest)
+    array_v3_metadata = metadata_as_v3(zarr_array.metadata)
+
+    # This is the only restriction on what Zarr Arrays cannot be virtualized
+    if any(
+        isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs
+    ):
+        raise NotImplementedError(
+            f"Zarr V3 arrays with sharding are not yet supported, but array {path} uses the ShardingCodec."
+            "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
+            "which VirtualiZarr does not currently handle. "
+            "Reading sharded arrays without proper offset handling would result in corrupted data."
+        )
+
+    # TODO: If zarr-python had some 
+    chunk_manifest = await build_chunk_manifest(zarr_array, path, array_v3_metadata)
+    return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
 
 
 async def _construct_manifest_group(
@@ -681,3 +674,69 @@ class ZarrParser:
         manifest_group = _run_async(coro)
 
         return ManifestStore(registry=registry, group=manifest_group)
+
+
+def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
+    """Convert V2 metadata to V3 format."""
+
+    if isinstance(metadata, ArrayV3Metadata):
+        # nothing to be done
+        return metadata
+
+    # TODO replace this with an explicit version check
+    try:
+        from zarr.core.dtype import parse_dtype
+        from zarr.metadata.migrate_v3 import _convert_array_metadata
+    except (ImportError, AttributeError):
+        raise ImportError(
+            f"Zarr-Python>=3.1.3 is required for parsing Zarr V2 into Zarr V3. "
+            f"Found Zarr version '{zarr.__version__}'"
+        )
+
+    v2_metadata = metadata
+
+    # TODO: This back and forth from dicts to classes is awful
+    if v2_metadata.fill_value is None:
+
+        # TODO: Why does _convert_array_metadata() not do this?
+        v2_dict = v2_metadata.to_dict()
+        v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
+        fill_value = v2_dtype.default_scalar()
+        v2_dict["fill_value"] = v2_dtype.to_json_scalar(fill_value, zarr_format=2)
+        temp_v2 = ArrayV2Metadata.from_dict(v2_dict)
+
+        v3_metadata = _convert_array_metadata(temp_v2)
+    else:
+        # Normal conversion; allow other errors to propagate.
+        v3_metadata = _convert_array_metadata(v2_metadata)
+
+    # Set dimension names from attributes
+    # TODO: Why does _convert_array_metadata() not do this too?
+    if v3_metadata.dimension_names is None:
+        v3_dict = v3_metadata.to_dict()
+        dim_names = None
+        if hasattr(v2_metadata, "attributes") and v2_metadata.attributes:
+            dim_names = v2_metadata.attributes.get("_ARRAY_DIMENSIONS")
+
+        if dim_names:
+            v3_dict["dimension_names"] = dim_names
+            v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+
+    v3_dict = v3_metadata.to_dict()
+
+    # # Replace V2ChunkKeyEncoding with V3 DefaultChunkKeyEncoding
+    # # The automatic conversion preserves V2's encoding, causing zarr to use V2-style
+    # # paths (array/0) instead of V3-style (array/c/0). This ensures V3 semantics.
+    # if (
+    #     "attributes" in v3_dict
+    #     and isinstance(v3_dict["attributes"], dict)
+    #     and "_ARRAY_DIMENSIONS" in v3_dict["attributes"]
+    # ):
+    #     del v3_dict["attributes"]["_ARRAY_DIMENSIONS"]
+    #     v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+
+    # # TODO: I don't think this should be hard-coded
+    # v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
+    # v3_metadata = ArrayV3Metadata.from_dict(v3_dict)
+
+    return v3_metadata
