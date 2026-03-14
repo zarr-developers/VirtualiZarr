@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
+from zarr.core.chunk_grids import _is_rectilinear_chunks
 
 from virtualizarr.utils import determine_chunk_grid_shape
-from virtualizarr.vendor.zarr.core.chunk_grids import _is_nested_sequence
 
 from .manifest import ChunkManifest
 from .utils import (
@@ -192,7 +192,7 @@ def stack(
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
     # For rectilinear grids, each element is a sequence; insert a single-element tuple
-    if _is_nested_sequence(old_chunks):
+    if _is_rectilinear_chunks(old_chunks):
         new_chunks.insert(axis, (1,))
     else:
         new_chunks.insert(axis, 1)

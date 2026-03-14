@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
 
 import numpy as np
 from zarr import Array
+from zarr.core.chunk_grids import _is_rectilinear_chunks
 from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
 from zarr.core.metadata.v3 import (
     ArrayV3Metadata,
@@ -15,7 +16,6 @@ from zarr.core.metadata.v3 import (
 from zarr.dtype import parse_data_type
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
-from virtualizarr.vendor.zarr.core.chunk_grids import _is_nested_sequence
 
 if TYPE_CHECKING:
     from .array import ManifestArray
@@ -278,7 +278,7 @@ def check_no_partial_chunks_on_concat_axis(
     """
     for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
         # Rectilinear grids have sequences along each axis; skip the check
-        if _is_nested_sequence(chunk_shape):
+        if _is_rectilinear_chunks(chunk_shape):
             continue
         if shape[axis] % chunk_shape[axis] > 0:
             raise ValueError(
@@ -346,10 +346,11 @@ def copy_and_replace_metadata(
     if new_shape is not None:
         metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
     if new_chunks is not None:
-        if _is_nested_sequence(new_chunks):
+        if _is_rectilinear_chunks(new_chunks):
             metadata_copy["chunk_grid"] = {
                 "name": "rectilinear",
                 "configuration": {
+                    "kind": "inline",
                     "chunk_shapes": [list(c) for c in new_chunks],
                 },
             }

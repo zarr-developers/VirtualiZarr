@@ -80,15 +80,12 @@ class ManifestArray:
         """
         Individual chunk size by number of elements.
 
-        For RegularChunkGrid, returns a tuple of ints (e.g., (30, 50)).
-        For RectilinearChunkGrid, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
+        For regular grids, returns a tuple of ints (e.g., (30, 50)).
+        For rectilinear grids, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
         """
         chunk_grid = self._metadata.chunk_grid
         if has_rectilinear_chunk_grid_support and not chunk_grid.is_regular:
-            return tuple(
-                d.edges
-                for d in chunk_grid.dimensions  # type: ignore[union-attr]
-            )
+            return chunk_grid.chunk_sizes
         return self._metadata.chunks
 
     @property
