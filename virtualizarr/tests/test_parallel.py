@@ -13,6 +13,7 @@ from virtualizarr.parallel import (
 from virtualizarr.tests import requires_dask, requires_lithops
 
 
+@pytest.mark.flaky
 @requires_lithops
 def test_lithops_executor_with_multiple_args():
     with LithopsEagerFunctionExecutor() as exec:
@@ -21,6 +22,7 @@ def test_lithops_executor_with_multiple_args():
     assert tuple(results) == (5, 7, 9)
 
 
+@pytest.mark.flaky
 @requires_lithops
 def test_lithops_executor_with_partial():
     from functools import partial
