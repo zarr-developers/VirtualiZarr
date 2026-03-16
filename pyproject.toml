@@ -163,6 +163,10 @@ python = "3.11.*"
 
 # Define a feature set for Python 3.13
 [tool.pixi.feature.py313.dependencies]
+python = "3.12.*"
+
+# Define a feature set for Python 3.13
+[tool.pixi.feature.py313.dependencies]
 python = "3.13.*"
 
 # Define a feature set for Python 3.14
@@ -209,6 +213,7 @@ min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
 test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.13
 test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
