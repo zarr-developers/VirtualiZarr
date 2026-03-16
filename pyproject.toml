@@ -202,6 +202,7 @@ run-tests-no-network = { cmd = "pytest -n auto --dist loadscope --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
 run-tests-html-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-flaky-tests = { cmd = "pytest -m flaky --run-flaky --run-network-tests --verbose" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
@@ -326,11 +327,7 @@ addopts = ["--doctest-modules", "--ignore=examples"]
 timeout = 300
 asyncio_default_fixture_loop_scope = "session"
 markers = [
-    # Although we may not use pytest.mark.flaky, some of our test modules import
-    # from xarray.tests, and xarray.tests.__init__.py references pytest.mark.flaky.
-    # Therefore, without the "flaky" marker below, during test execution, we see
-    # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
-    "flaky: flaky tests",
+    "flaky: flaky tests (skipped by default, run with '--run-flaky')",
     "network: marks test requiring internet (select with '--run-network-tests')",
     "slow: marks test as slow (select with '--run-slow-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
