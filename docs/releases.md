@@ -52,6 +52,8 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Completely rewrote the `ZarrParser` to use numpy string arrays for efficiency ([#927](https://github.com/zarr-developers/VirtualiZarr/pull/927)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Testing across all supported python versions ([#927](https://github.com/zarr-developers/VirtualiZarr/pull/932)).
+  By [Julius Busecke](https://github.com/jbusecke)
 
 ## v2.4.0 (24th January 2026)
 
