@@ -41,6 +41,7 @@ remote = [
     "requests",
     "aiohttp",
     "s3fs",
+    "pydap>=3.5.9",
 ]
 
 # non-kerchunk-based parsers
@@ -110,6 +111,7 @@ upstream = [
     'kerchunk @ git+https://github.com/fsspec/kerchunk',
     'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
     'virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff',
+    'pydap @ git+https://github.com/pydap/pydap.git',
 ]
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
@@ -256,6 +258,7 @@ module = [
     "ujson",
     "zarr",
     "requests",
+    "pydap.*",
 ]
 ignore_missing_imports = true
 
