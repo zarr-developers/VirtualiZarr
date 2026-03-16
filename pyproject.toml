@@ -22,7 +22,7 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.03.0",
+    "xarray>=2025.06.0",  # first version compatible with zarr 3.1.x fill value dtype handling
     "numpy>=2.1.0",  # first version with Python 3.13 wheels
     "universal-pathlib",
     "numcodecs>=0.15.1",
