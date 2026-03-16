@@ -1,40 +1,58 @@
 import asyncio
-from unittest.mock import Mock
+from typing import cast
 
 import numpy as np
+import obstore
 import pytest
 import xarray as xr
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
+from obstore.store import MemoryStore as ObsMemoryStore
 from packaging import version
 from zarr.api.asynchronous import open_array
+from zarr.storage import ObjectStore
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
+from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.parsers import ZarrParser
 from virtualizarr.parsers.zarr import (
+    ZarrFormat,
     _run_async,
     build_chunk_manifest,
-    get_metadata,
-    get_strategy,
     join_url,
+    metadata_as_v3,
 )
-from virtualizarr.tests import requires_minio, requires_pyarrow
+from virtualizarr.tests import requires_arro3, requires_minio
 
-pytestmark = requires_pyarrow
+pytestmark = requires_arro3
 
-ZarrArrayType = zarr.AsyncArray | zarr.Array
+HAS_V2_MIGRATION = version.parse(zarr.__version__) >= version.parse("3.1.3")
 
-SKIP_OLDER_ZARR_PYTHON = pytest.mark.skipif(
-    version.parse(zarr.__version__) < version.parse("3.1.3"),
-    reason="Zarr V2 requires zarr>=3.1.3",
+requires_v2_migration = pytest.mark.skipif(
+    not HAS_V2_MIGRATION,
+    reason="V2→V3 metadata migration requires zarr>=3.1.3",
 )
 
-SKIP_NEWER_ZARR_PYTHON = pytest.mark.skipif(
-    version.parse(zarr.__version__) >= version.parse("3.1.3"),
-    reason="Test only relevant for zarr<3.1.3",
-)
+
+async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
+    """Helper to open an array from a zarr store and build its chunk manifest."""
+    zarr_array = await open_array(store=zarr_store, mode="r")
+    fmt = ZarrFormat(zarr_array.metadata.zarr_format)
+    sep: ChunkKeySeparator = (
+        zarr_array.metadata.chunk_key_encoding.separator
+        if fmt == ZarrFormat.V3
+        else "."
+    )
+    return await build_chunk_manifest(
+        obs_store=cast(ObjectStore, zarr_array.store).store,
+        array_path=zarr_array.path,
+        store_base_uri=store_base_uri,
+        metadata=metadata_as_v3(zarr_array.metadata),
+        on_disk_zarr_format=fmt,
+        on_disk_separator=sep,
+    )
 
 
 def zarr_versions(param_name="zarr_format", indirect=False):
@@ -48,7 +66,7 @@ def zarr_versions(param_name="zarr_format", indirect=False):
     return pytest.mark.parametrize(
         param_name,
         [
-            pytest.param(2, id="Zarr V2", marks=SKIP_OLDER_ZARR_PYTHON),
+            pytest.param(2, id="Zarr V2", marks=requires_v2_migration),
             pytest.param(3, id="Zarr V3"),
         ],
         indirect=indirect,
@@ -148,19 +166,14 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
     )
     scalar_array[()] = 42
 
-    # Open it as an async array to use with the strategy
-    async def get_chunk_map():
-        zarr_array = await open_array(store=filepath, mode="r")
-        strategy = get_strategy(zarr_array)
-        return await strategy.get_chunk_mapping(zarr_array, filepath)
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
 
-    chunk_map = asyncio.run(get_chunk_map())
-
-    # V2 uses "0" for scalar, V3 uses "c"
-    expected_key = "0" if zarr_format == 2 else "c"
-    assert expected_key in chunk_map
-    assert chunk_map[expected_key]["offset"] == 0
-    assert chunk_map[expected_key]["length"] > 0
+    # scalar arrays have a single chunk with empty coordinate key
+    chunk_dict = manifest.dict()
+    assert "" in chunk_dict
+    assert chunk_dict[""]["offset"] == 0
+    assert chunk_dict[""]["length"] > 0
 
 
 def test_join_url_empty_base():
@@ -171,22 +184,14 @@ def test_join_url_empty_base():
 
 
 def test_unsupported_zarr_format():
-    """Test that unsupported zarr format raises NotImplementedError."""
-
-    # Create a mock array with unsupported format
-    mock_array = Mock()
-    mock_array.metadata.zarr_format = 99  # Unsupported format
-
-    with pytest.raises(NotImplementedError, match="Zarr format 99 is not supported"):
-        get_strategy(mock_array)
+    """Test that unsupported zarr format raises ValueError."""
+    with pytest.raises(ValueError):
+        ZarrFormat(99)
 
 
 @zarr_versions()
 def test_empty_array_chunk_mapping(tmpdir, zarr_format):
     """Test chunk mapping for arrays with no chunks written yet."""
-
-    from obstore.store import LocalStore as ObsLocalStore
-    from zarr.storage import ObjectStore
 
     filepath = f"{tmpdir}/empty.zarr"
     zarr.create(
@@ -197,81 +202,64 @@ def test_empty_array_chunk_mapping(tmpdir, zarr_format):
         zarr_format=zarr_format,
     )
 
-    async def get_chunk_map():
-        obs_store = ObsLocalStore(prefix=filepath)
-        zarr_store = ObjectStore(store=obs_store)
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        manifest = await build_chunk_manifest(zarr_array, filepath)
-        return manifest.dict()
-
-    result = asyncio.run(get_chunk_map())
-    assert result == {}
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
+    assert manifest.dict() == {}
 
 
-@SKIP_OLDER_ZARR_PYTHON
+@requires_v2_migration
 def test_v2_metadata_without_dimensions():
     """Test V2 metadata conversion when array has no _ARRAY_DIMENSIONS attribute."""
-
-    # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
-    )
-    # Explicitly don't set _ARRAY_DIMENSIONS
+    zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
-
-    metadata = asyncio.run(get_meta())
-    # Should generate dimension names
-    assert metadata.dimension_names is not None
-    assert len(metadata.dimension_names) == 2
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
+    assert metadata.dimension_names is None
 
 
-@SKIP_NEWER_ZARR_PYTHON
+@pytest.mark.skipif(HAS_V2_MIGRATION, reason="Test only relevant for zarr<3.1.3")
 def test_v2_metadata_raises_import_error_on_old_zarr():
     """Test that V2 metadata conversion raises ImportError with zarr<3.1.3."""
-
-    # Create a V2 array without dimension attributes
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
-        shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
-    )
+    zarr.create(shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2)
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
-
-    # Should raise ImportError with helpful message
     with pytest.raises(
         ImportError,
         match=r"Zarr-Python>=3\.1\.3 is required for parsing Zarr V2 into Zarr V3.*Found Zarr version",
     ):
-        asyncio.run(get_meta())
+        metadata_as_v3(zarr.open(store, mode="r").metadata)
 
 
-@SKIP_OLDER_ZARR_PYTHON
+@requires_v2_migration
 def test_v2_metadata_with_dimensions():
     """Test V2 metadata conversion when array has _ARRAY_DIMENSIONS attribute."""
-
-    # Create a V2 array with dimension attributes
     store = zarr.storage.MemoryStore()
     array = zarr.create(
         shape=(5, 10), chunks=(5, 5), dtype="int32", store=store, zarr_format=2
     )
     array.attrs["_ARRAY_DIMENSIONS"] = ["x", "y"]
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
-
-    metadata = asyncio.run(get_meta())
-    # Should use the provided dimension names
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.dimension_names == ("x", "y")
 
 
-@SKIP_OLDER_ZARR_PYTHON
+def test_v3_metadata_separator_normalized():
+    """Test that metadata_as_v3 normalizes V3 chunk_key_encoding separator to '.'."""
+    store = zarr.storage.MemoryStore()
+    zarr.create(
+        shape=(5, 10),
+        chunks=(5, 5),
+        dtype="int32",
+        store=store,
+        zarr_format=3,
+        chunk_key_encoding={"name": "default", "separator": "/"},
+    )
+
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
+    assert metadata.chunk_key_encoding.separator == "."
+
+
+@requires_v2_migration
 @pytest.mark.parametrize(
     "dtype",
     [
@@ -288,10 +276,8 @@ def test_v2_metadata_with_dimensions():
 )
 def test_v2_metadata_with_none_fill_value(dtype):
     """Test V2 metadata conversion when fill_value is None."""
-
-    # Create a V2 array with None fill_value
     store = zarr.storage.MemoryStore()
-    _ = zarr.create(
+    zarr.create(
         shape=(5, 10),
         chunks=(5, 5),
         dtype=dtype,
@@ -300,43 +286,24 @@ def test_v2_metadata_with_none_fill_value(dtype):
         fill_value=None,
     )
 
-    async def get_meta():
-        zarr_array = await open_array(store=store, mode="r")
-        return get_metadata(zarr_array)
-
-    metadata = asyncio.run(get_meta())
-    # Should handle None fill_value gracefully
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
     assert metadata.fill_value is not None
 
 
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
-
-    from obstore.store import MemoryStore as ObsMemoryStore
-    from zarr.storage import ObjectStore
-
-    obs_store = ObsMemoryStore()
-    zarr_store = ObjectStore(store=obs_store)
+    zarr_store = ObjectStore(store=ObsMemoryStore())
     zarr.create(
         shape=(10, 10), chunks=(5, 5), dtype="int8", store=zarr_store, zarr_format=3
     )
 
-    async def get_manifest():
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, "test://path")
-
-    manifest = asyncio.run(get_manifest())
+    manifest = asyncio.run(_build_manifest(zarr_store, "test://path"))
     assert manifest.shape_chunk_grid == (2, 2)
 
 
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
-    import asyncio
-
-    from obstore.store import LocalStore as ObsLocalStore
-    from zarr.storage import ObjectStore
-
     filepath = f"{tmpdir}/sparse.zarr"
     arr = zarr.create(
         shape=(30, 30),
@@ -351,13 +318,8 @@ def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     arr[10:20, 10:20] = 2.0  # chunk 1.1
     arr[20:30, 20:30] = 3.0  # chunk 2.2
 
-    async def get_manifest():
-        obs_store = ObsLocalStore(prefix=filepath)
-        zarr_store = ObjectStore(store=obs_store)
-        zarr_array = await open_array(store=zarr_store, mode="r")
-        return await build_chunk_manifest(zarr_array, filepath)
-
-    manifest = asyncio.run(get_manifest())
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
 
     assert len(manifest.dict()) == 3
     assert "0.0" in manifest.dict()
@@ -553,15 +515,13 @@ def test_sharded_array_raises_error(tmpdir):
 )
 def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
     """Test that ZarrParser works with a bucket that does not allow list operations."""
-    import obstore as obs
-
     bucket = minio_nolist_bucket["bucket"]
     endpoint = minio_nolist_bucket["endpoint"]
     username = minio_nolist_bucket["username"]
     password = minio_nolist_bucket["password"]
 
     # Write a Zarr V3 store directly to the bucket using admin credentials
-    admin_store = obs.store.S3Store(
+    admin_store = obstore.store.S3Store(
         bucket,
         endpoint_url=endpoint,
         access_key_id=username,
@@ -577,7 +537,7 @@ def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
     ds.to_zarr(zarr_store, consolidated=False, zarr_format=3)
 
     # Create an anonymous S3 store (subject to bucket policy which denies list)
-    anon_store = obs.store.S3Store(
+    anon_store = obstore.store.S3Store(
         bucket,
         endpoint_url=endpoint,
         skip_signature=True,

@@ -201,7 +201,6 @@ class _VirtualiZarrDatasetAccessor:
 
             return None
         elif format == "parquet":
-            import pandas as pd
             from kerchunk.df import refs_to_dataframe
 
             if isinstance(filepath, Path):
@@ -209,19 +208,12 @@ class _VirtualiZarrDatasetAccessor:
             elif isinstance(filepath, str):
                 url = filepath
 
-            # The zarr-parser performance update PR #892 adds pyarrow and arro3-core as deps.
-            # These break the `kerchunk` refs_to_dataframe behavior.
-            # It seems like pyarrow makes pandas default to an ArrowStringArray
-            # which fastparquet cannot zero-copy encode.
-            # TODO: remove once fastparquet or kerchunk handle ArrowStringArray.
-
-            with pd.option_context("future.infer_string", False):
-                refs_to_dataframe(
-                    refs,
-                    url=url,
-                    record_size=record_size,
-                    categorical_threshold=categorical_threshold,
-                )
+            refs_to_dataframe(
+                refs,
+                url=url,
+                record_size=record_size,
+                categorical_threshold=categorical_threshold,
+            )
             return None
         else:
             raise ValueError(f"Unrecognized output format: {format}")
