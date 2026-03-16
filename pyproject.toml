@@ -133,7 +133,7 @@ dev = [
     "pytest-xdist",
     "ruff",
     "s3fs",
-    "lithops",
+    "lithops>3.6.4",
     "dask",
 ]
 
