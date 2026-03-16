@@ -161,8 +161,8 @@ virtualizarr = { path = ".", editable = true }
 [tool.pixi.feature.py311.dependencies]
 python = "3.11.*"
 
-# Define a feature set for Python 3.13
-[tool.pixi.feature.py313.dependencies]
+# Define a feature set for Python 3.12
+[tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
 # Define a feature set for Python 3.13
