@@ -40,6 +40,11 @@ def pytest_addoption(parser):
         action="store_true",
         help="runs tests requiring docker and minio",
     )
+    parser.addoption(
+        "--run-flaky",
+        action="store_true",
+        help="runs flaky tests",
+    )
 
 
 def pytest_runtest_setup(item):
@@ -52,6 +57,8 @@ def pytest_runtest_setup(item):
         pytest.skip("set --run-minio-tests to run tests requiring docker and minio")
     if "slow" in item.keywords and not item.config.getoption("--run-slow-tests"):
         pytest.skip("set --run-slow-tests to run slow tests")
+    if "flaky" in item.keywords and not item.config.getoption("--run-flaky"):
+        pytest.skip("set --run-flaky to run flaky tests")
 
 
 def _xarray_subset():

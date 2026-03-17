@@ -518,7 +518,8 @@ async def build_1d_chunk_mapping(
     all_sizes = np.concatenate(size_batches)
 
     # strip the prefix to get chunk keys like "0.0.0"
-    stripped_keys = np.strings.slice(all_paths, len(array_chunks_prefix), None)
+    # TODO: replace with np.strings.slice once minimum numpy is 2.3.0
+    stripped_keys = np.strings.replace(all_paths, array_chunks_prefix, "", 1)
 
     # construct full URIs for each chunk
     full_paths = np.strings.add(store_base_uri + "/", all_paths)

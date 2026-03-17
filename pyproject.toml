@@ -22,8 +22,8 @@ classifiers = [
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "xarray>=2025.03.0",
-    "numpy>=2.0.0",
+    "xarray>=2025.06.0",  # first version compatible with zarr 3.1.x fill value dtype handling
+    "numpy>=2.1.0",  # first version with Python 3.13 wheels
     "universal-pathlib",
     "numcodecs>=0.15.1",
     "ujson",
@@ -161,6 +161,10 @@ virtualizarr = { path = ".", editable = true }
 [tool.pixi.feature.py311.dependencies]
 python = "3.11.*"
 
+# Define a feature set for Python 3.12
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
 # Define a feature set for Python 3.13
 [tool.pixi.feature.py313.dependencies]
 python = "3.13.*"
@@ -185,7 +189,7 @@ rust = "*"
 
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"
-numpy = "==2.0.0"
+numpy = "==2.1.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
 obstore = "==0.7.0"
@@ -202,6 +206,7 @@ run-tests-no-network = { cmd = "pytest -n auto --dist loadscope --verbose" }
 run-tests-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov=term-missing" }
 run-tests-xml-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=xml" }
 run-tests-html-cov = { cmd = "pytest -n auto --dist loadscope --run-network-tests --verbose --cov=virtualizarr --cov-report=html" }
+run-flaky-tests = { cmd = "pytest -m flaky --run-flaky --run-network-tests --verbose" }
 
 # Define which features and groups to include in different pixi (similar to conda) environments)
 [tool.pixi.environments]
@@ -209,6 +214,7 @@ min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
 test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","py311"] # test against python 3.11
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.13
 test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
@@ -326,11 +332,7 @@ addopts = ["--doctest-modules", "--ignore=examples"]
 timeout = 300
 asyncio_default_fixture_loop_scope = "session"
 markers = [
-    # Although we may not use pytest.mark.flaky, some of our test modules import
-    # from xarray.tests, and xarray.tests.__init__.py references pytest.mark.flaky.
-    # Therefore, without the "flaky" marker below, during test execution, we see
-    # this warning: "PytestUnknownMarkWarning: Unknown pytest.mark.flaky"
-    "flaky: flaky tests",
+    "flaky: flaky tests (skipped by default, run with '--run-flaky')",
     "network: marks test requiring internet (select with '--run-network-tests')",
     "slow: marks test as slow (select with '--run-slow-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",

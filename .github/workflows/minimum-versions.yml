@@ -7,7 +7,7 @@ on:
     - 'docs/**'
   pull_request:
     branches: [ "main" ]
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize]
     paths-ignore:
     - 'docs/**'
   schedule:
@@ -20,12 +20,6 @@ concurrency:
 jobs:
   test-minimum-versions:
     name: minimum-versions-build
-    if: |
-      always()
-      && (
-          (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-          || contains( github.event.pull_request.labels.*.name, 'test-upstream')
-      )
     runs-on: ubuntu-latest
     defaults:
       run:
