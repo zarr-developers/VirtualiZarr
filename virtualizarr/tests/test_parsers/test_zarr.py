@@ -243,6 +243,17 @@ def test_v2_metadata_with_dimensions():
     assert metadata.dimension_names == ("x", "y")
 
 
+@requires_v2_migration
+def test_v2_metadata_with_scalar_dimensions():
+    """Test V2 metadata conversion for scalar array with _ARRAY_DIMENSIONS=[]."""
+    store = zarr.storage.MemoryStore()
+    array = zarr.create(shape=(), chunks=(), dtype="int64", store=store, zarr_format=2)
+    array.attrs["_ARRAY_DIMENSIONS"] = []
+
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
+    assert metadata.dimension_names == ()
+
+
 def test_v3_metadata_separator_normalized():
     """Test that metadata_as_v3 normalizes V3 chunk_key_encoding separator to '.'."""
     store = zarr.storage.MemoryStore()
