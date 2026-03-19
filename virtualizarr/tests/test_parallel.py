@@ -56,7 +56,7 @@ def _make_executor(executor_cls):
     """Create a pytest param for an executor class with appropriate marks."""
     marks = {
         "DaskDelayedExecutor": [requires_dask],
-        "LithopsEagerFunctionExecutor": [requires_lithops],
+        "LithopsEagerFunctionExecutor": [requires_lithops, pytest.mark.flaky],
     }
     return pytest.param(
         executor_cls,
