@@ -97,6 +97,6 @@ class TestExecutorShutdown:
 
 @requires_lithops
 def test_lithops_executor_data_cleaner_disabled():
-    """data_cleaner must be False to prevent atexit registration of lithops' clean method."""
+    """Data_cleaner must be False to prevent atexit registration of lithops' clean method."""
     with LithopsEagerFunctionExecutor() as executor:
         assert executor.lithops_client.data_cleaner is False
