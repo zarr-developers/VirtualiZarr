@@ -399,5 +399,12 @@ class LithopsEagerFunctionExecutor(Executor):
             # ensure all futures are completed before exiting
             self.lithops_client.wait(show_progressbar=False)
 
+        self._futures.clear()
+
+        # Free output memory and clear lithops internal futures list
+        for f in self.lithops_client.futures:
+            f._call_output = None
+        self.lithops_client.futures.clear()
+
         # Exit context manager entered during __init__
         self.lithops_client.__exit__(None, None, None)
