@@ -348,7 +348,7 @@ def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
     # to V3's dimension_names, so we do it manually.
     attrs = cast(dict, v3_dict.get("attributes", {}))
     dim_names = attrs.get("_ARRAY_DIMENSIONS")
-    if v3_dict.get("dimension_names") is None and dim_names:
+    if v3_dict.get("dimension_names") is None and dim_names is not None:
         v3_dict["dimension_names"] = dim_names
 
     # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
