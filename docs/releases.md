@@ -42,6 +42,8 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix `ZarrParser` not correctly parsing scalar variables from v2 native zarr stores ([#936](https://github.com/zarr-developers/VirtualiZarr/pull/936)).
   By [Julius Buseceke](https://github.com/jbusecke)
+- Add `.shutdown()` method to custom executors (dask, lithops) preventing unbounded memory increase in the case of lithops ([#925](https://github.com/zarr-developers/VirtualiZarr/pull/925)).
+  By [Julius Buseceke](https://github.com/jbusecke)
 
 ### Documentation
 
