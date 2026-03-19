@@ -1,5 +1,6 @@
 import gc
 import multiprocessing as mp
+import time
 import tracemalloc
 
 import pytest
@@ -97,6 +98,13 @@ class TestExecutorShutdown:
         assert len(executor._futures) == 0
 
 
+@requires_lithops
+def test_lithops_executor_data_cleaner_disabled():
+    """data_cleaner must be False to prevent atexit registration of lithops' clean method."""
+    with LithopsEagerFunctionExecutor() as executor:
+        assert executor.lithops_client.data_cleaner is False
+
+
 @pytest.mark.parametrize("executor_cls", ALL_CUSTOM_EXECUTORS)
 class TestExecutorMemory:
     def test_repeated_executor_use_does_not_grow_memory(self, executor_cls):
@@ -124,6 +132,7 @@ class TestExecutorMemory:
         for _ in range(n_iterations):
             _run_once()
             gc.collect()
+            time.sleep(0.5)  # allow background threads to exit and be GC'd
         _, multi_peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
