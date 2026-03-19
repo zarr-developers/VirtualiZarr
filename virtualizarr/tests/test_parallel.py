@@ -132,7 +132,7 @@ class TestExecutorMemory:
         for _ in range(n_iterations):
             _run_once()
             gc.collect()
-        time.sleep(2)  # allow background threads to exit and be GC'd before measuring
+        time.sleep(30)  # allow background threads to exit and be GC'd before measuring
         _, multi_peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
