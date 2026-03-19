@@ -1,7 +1,4 @@
-import gc
 import multiprocessing as mp
-import time
-import tracemalloc
 
 import pytest
 
