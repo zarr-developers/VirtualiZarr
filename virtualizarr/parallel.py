@@ -137,6 +137,9 @@ class SerialExecutor(Executor):
         """
         return map(fn, *iterables)
 
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
+
 
 class DaskDelayedExecutor(Executor):
     """
@@ -230,6 +233,9 @@ class DaskDelayedExecutor(Executor):
         # Compute all tasks
         return iter(dask.compute(*delayed_tasks))
 
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self._futures.clear()
+
 
 class LithopsEagerFunctionExecutor(Executor):
     """
@@ -269,6 +275,23 @@ class LithopsEagerFunctionExecutor(Executor):
 
     def __init__(self, **kwargs) -> None:
         import lithops  # type: ignore[import-untyped]
+
+        # Fix for unbounded memory growth on repeated `open_virtual_mfdataset` calls
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/926
+
+        # Users are encouraged to provide configs for lithops via file
+        # But just in case that someone imports this and configures it, they have to provide all
+        # details below explicitly as `config=` argument.
+        if "config" not in kwargs:
+            _config_file = lithops.config.load_config()
+            if _config_file["lithops"].get("backend") == "localhost":
+                # We currently only want to apply this fix for the localhost executor
+                kwargs["config"] = {
+                    "lithops": {
+                        "data_cleaner": False,  # prevents atexit registration of `.lithops_client.clean` method
+                        "backend": "localhost",  # if this is not provided lithops will default to aws lambda
+                    }
+                }
 
         # Create Lithops client with optional configuration
         self.lithops_client = lithops.FunctionExecutor(**kwargs).__enter__()
@@ -372,4 +395,16 @@ class LithopsEagerFunctionExecutor(Executor):
         wait
             Whether to wait for pending futures.
         """
+        if wait:
+            # ensure all futures are completed before exiting
+            self.lithops_client.wait(show_progressbar=False)
+
+        self._futures.clear()
+
+        # Free output memory and clear lithops internal futures list
+        for f in self.lithops_client.futures:
+            f._call_output = None
+        self.lithops_client.futures.clear()
+
+        # Exit context manager entered during __init__
         self.lithops_client.__exit__(None, None, None)
