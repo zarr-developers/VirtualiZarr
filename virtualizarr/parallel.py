@@ -399,6 +399,7 @@ class LithopsEagerFunctionExecutor(Executor):
             # ensure all futures are completed before exiting
             self.lithops_client.wait(show_progressbar=False)
 
+        # Python <= 3.13 requires manual clearing of the futures, python 3.14 clears futures during wait
         self._futures.clear()
 
         # Free output memory and clear lithops internal futures list
