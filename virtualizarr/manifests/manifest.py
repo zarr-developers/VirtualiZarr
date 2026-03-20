@@ -48,7 +48,7 @@ class ChunkEntry(TypedDict):
         path: str,
         offset: int,
         length: int,
-        data: bytes | None = None,
+        inlined_data: bytes | None = None,
         fs_root: str | None = None,
     ) -> "ChunkEntry":
         """
@@ -59,13 +59,15 @@ class ChunkEntry(TypedDict):
         fs_root
             The root of the filesystem on which these references were generated.
             Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
-        data
+        inlined_data
             Raw bytes for inlined (in-memory) chunks. When present, path/offset/length are ignored.
         """
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
-        if data is not None:
-            return ChunkEntry(path="", offset=0, length=len(data), data=data)
+        if inlined_data is not None:
+            return ChunkEntry(
+                path="", offset=0, length=len(inlined_data), data=inlined_data
+            )
         if path != "":
             path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)

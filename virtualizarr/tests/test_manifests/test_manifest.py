@@ -508,7 +508,7 @@ class TestInlinedChunks:
 
     def test_chunk_entry_with_validation_inlined(self):
         entry = ChunkEntry.with_validation(
-            path="", offset=0, length=0, data=b"\x01\x02\x03"
+            path="", offset=0, length=0, inlined_data=b"\x01\x02\x03"
         )
         assert entry["data"] == b"\x01\x02\x03"
         assert entry["path"] == ""
