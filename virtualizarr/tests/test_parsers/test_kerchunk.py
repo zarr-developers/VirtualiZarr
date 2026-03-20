@@ -339,7 +339,7 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
 @requires_kerchunk
 def test_read_inline_refs(netcdf4_inlined_ref, local_registry):
-    # Inlined data in kerchunk references should be read as native chunks
+    # Inlined data in kerchunk references should be read as inlined chunks
     # https://github.com/zarr-developers/VirtualiZarr/issues/489
 
     parser = KerchunkJSONParser()
@@ -355,7 +355,7 @@ def test_read_inline_refs(netcdf4_inlined_ref, local_registry):
 @requires_kerchunk
 @pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
 def test_read_inline_refs_parquet(tmp_path, netcdf4_inlined_ref, local_registry):
-    # Inlined data in parquet kerchunk references should be read as native chunks
+    # Inlined data in parquet kerchunk references should be read as inlined chunks
     # https://github.com/zarr-developers/VirtualiZarr/issues/489
     import pandas as pd
     from kerchunk.df import refs_to_dataframe
@@ -435,7 +435,7 @@ def test_inlined_kerchunk_to_icechunk_roundtrip(
     )
     session = repo.writable_session("main")
 
-    # Write to icechunk (virtual refs + native chunks)
+    # Write to icechunk (virtual refs + inlined chunks)
     vds.vz.to_icechunk(session.store, validate_containers=False)
     session.commit("inlined kerchunk roundtrip")
 

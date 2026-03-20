@@ -7,7 +7,7 @@ Kerchunk reference files can contain two kinds of chunk references:
 
 Inlined references are common for small variables like coordinate arrays, dimension labels, and scalar metadata. Kerchunk inlines data below a configurable `inline_threshold`.
 
-VirtualiZarr can read both kinds of references. Inlined data is stored as **native chunks** directly in the [ChunkManifest][virtualizarr.manifests.ChunkManifest], so it travels with the manifest through concatenation, serialization, and pickling without needing access to any external file.
+VirtualiZarr can read both kinds of references. Inlined data is stored as **inlined chunks** directly in the [ChunkManifest][virtualizarr.manifests.ChunkManifest], so it travels with the manifest through concatenation, serialization, and pickling without needing access to any external file.
 
 ## Roundtrip example
 
@@ -85,7 +85,7 @@ for key, value in refs["refs"].items():
 ### 3. Load the kerchunk JSON back
 
 Use the `KerchunkJSONParser` to read the reference file. Inlined data is decoded
-from base64 and stored as native chunks in the manifest.
+from base64 and stored as inlined chunks in the manifest.
 
 ```python
 from virtualizarr.parsers import KerchunkJSONParser
@@ -113,12 +113,12 @@ The two datasets are identical: coordinate values, data values, attributes, and 
 
 ## How it works
 
-When the kerchunk parser encounters a base64-encoded inlined reference, it decodes the bytes and stores them as a **native chunk** on the `ChunkManifest`. Native chunks are held in a sparse dictionary keyed by chunk grid index:
+When the kerchunk parser encounters a base64-encoded inlined reference, it decodes the bytes and stores them as a **inlined chunk** on the `ChunkManifest`. Native chunks are held in a sparse dictionary keyed by chunk grid index:
 
 ```python
-# After parsing, the manifest for 'time' has one native chunk:
+# After parsing, the manifest for 'time' has one inlined chunk:
 time_manifest = manifest_store._group.arrays["time"].manifest
-print(time_manifest._native)
+print(time_manifest._inlined)
 # {(0,): b'\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00...'}
 ```
 

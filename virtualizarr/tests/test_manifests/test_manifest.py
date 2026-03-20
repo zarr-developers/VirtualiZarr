@@ -316,10 +316,10 @@ class TestRenamePaths:
             manifest.rename_paths("./foo.nc")
 
 
-class TestNativeChunks:
-    """Tests for native (in-memory) chunk support in ChunkManifest."""
+class TestInlinedChunks:
+    """Tests for inlined (in-memory) chunk support in ChunkManifest."""
 
-    def test_create_manifest_with_native_chunks(self):
+    def test_create_manifest_with_inlined_chunks(self):
         chunks = {
             "0.0": {
                 "path": "",
@@ -329,11 +329,11 @@ class TestNativeChunks:
             },
         }
         manifest = ChunkManifest(entries=chunks)
-        assert len(manifest._native) == 1
-        assert (0, 0) in manifest._native
-        assert manifest._native[(0, 0)] == b"\x00\x01\x02\x03"
+        assert len(manifest._inlined) == 1
+        assert (0, 0) in manifest._inlined
+        assert manifest._inlined[(0, 0)] == b"\x00\x01\x02\x03"
 
-    def test_mixed_virtual_and_native(self):
+    def test_mixed_virtual_and_inlined(self):
         chunks = {
             "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.1": {
@@ -344,11 +344,11 @@ class TestNativeChunks:
             },
         }
         manifest = ChunkManifest(entries=chunks)
-        assert len(manifest._native) == 1
+        assert len(manifest._inlined) == 1
         assert manifest._paths[(0, 0)] == "s3://bucket/foo.nc"
         assert manifest._paths[(0, 1)] == ""
 
-    def test_dict_includes_native_data(self):
+    def test_dict_includes_inlined_data(self):
         chunks = {
             "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "0.1": {
@@ -368,7 +368,7 @@ class TestNativeChunks:
         }
         assert d["0.1"]["data"] == b"\x00\x01\x02\x03"
 
-    def test_getitem_native_chunk(self):
+    def test_getitem_inlined_chunk(self):
         chunks = {
             "0.0": {
                 "path": "",
@@ -383,7 +383,7 @@ class TestNativeChunks:
         assert entry["data"] == b"\x00\x01\x02\x03"
         assert entry["path"] == ""
 
-    def test_nbytes_includes_native_data(self):
+    def test_nbytes_includes_inlined_data(self):
         chunks = {
             "0.0": {
                 "path": "",
@@ -393,10 +393,10 @@ class TestNativeChunks:
             },
         }
         manifest = ChunkManifest(entries=chunks)
-        # nbytes should include both the numpy arrays and the native data
+        # nbytes should include both the numpy arrays and the inlined data
         assert manifest.nbytes > 4
 
-    def test_equals_with_native(self):
+    def test_equals_with_inlined(self):
         chunks = {
             "0": {
                 "path": "",
@@ -409,7 +409,7 @@ class TestNativeChunks:
         m2 = ChunkManifest(entries=chunks)
         assert m1 == m2
 
-    def test_not_equals_different_native_data(self):
+    def test_not_equals_different_inlined_data(self):
         m1 = ChunkManifest(
             entries={
                 "0": {
@@ -432,31 +432,31 @@ class TestNativeChunks:
         )
         assert m1 != m2
 
-    def test_from_arrays_with_native(self):
+    def test_from_arrays_with_inlined(self):
         paths = np.asarray(["s3://bucket/foo.nc", ""], dtype=np.dtypes.StringDType)
         offsets = np.asarray([100, 0], dtype=np.uint64)
         lengths = np.asarray([100, 4], dtype=np.uint64)
-        native = {(1,): b"\x00\x01\x02\x03"}
+        inlined = {(1,): b"\x00\x01\x02\x03"}
         manifest = ChunkManifest.from_arrays(
             paths=paths,
             offsets=offsets,
             lengths=lengths,
             validate_paths=False,
-            native=native,
+            inlined=inlined,
         )
-        assert manifest._native == native
+        assert manifest._inlined == inlined
         entry = manifest["1"]
         assert "data" in entry
         assert entry["data"] == b"\x00\x01\x02\x03"
 
-    def test_virtual_only_has_empty_native(self):
+    def test_virtual_only_has_empty_inlined(self):
         chunks = {
             "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
-        assert manifest._native == {}
+        assert manifest._inlined == {}
 
-    def test_repr_with_native(self):
+    def test_repr_with_inlined(self):
         chunks = {
             "0": {
                 "path": "",
@@ -466,16 +466,16 @@ class TestNativeChunks:
             },
         }
         manifest = ChunkManifest(entries=chunks)
-        assert "native_chunks=1" in repr(manifest)
+        assert "inlined_chunks=1" in repr(manifest)
 
-    def test_repr_without_native(self):
+    def test_repr_without_inlined(self):
         chunks = {
             "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
         }
         manifest = ChunkManifest(entries=chunks)
-        assert "native_chunks" not in repr(manifest)
+        assert "inlined_chunks" not in repr(manifest)
 
-    def test_rename_paths_preserves_native(self):
+    def test_rename_paths_preserves_inlined(self):
         chunks = {
             "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
             "1": {
@@ -487,7 +487,7 @@ class TestNativeChunks:
         }
         manifest = ChunkManifest(entries=chunks)
         renamed = manifest.rename_paths("s3://bucket/bar.nc")
-        assert renamed._native == {(1,): b"\x01\x02\x03"}
+        assert renamed._inlined == {(1,): b"\x01\x02\x03"}
         assert renamed.dict()["0"]["path"] == "s3://bucket/bar.nc"
 
     def test_pickle_roundtrip(self):
@@ -504,9 +504,9 @@ class TestNativeChunks:
         pickled = pickle.dumps(manifest)
         restored = pickle.loads(pickled)
         assert manifest == restored
-        assert restored._native == {(0, 1): b"\x00\x01\x02\x03"}
+        assert restored._inlined == {(0, 1): b"\x00\x01\x02\x03"}
 
-    def test_chunk_entry_with_validation_native(self):
+    def test_chunk_entry_with_validation_inlined(self):
         entry = ChunkEntry.with_validation(
             path="", offset=0, length=0, data=b"\x01\x02\x03"
         )

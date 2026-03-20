@@ -208,7 +208,7 @@ def manifest_from_kerchunk_chunk_dict(
     chunk_entries: dict[ChunkKey, ChunkEntry] = {}
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
-            # Inlined data: decode base64 and store as native chunk
+            # Inlined data: decode base64 and store as inlined chunk
             import base64
 
             raw = v.encode() if isinstance(v, str) else v

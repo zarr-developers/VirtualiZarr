@@ -601,12 +601,12 @@ def write_manifest_virtual_refs(
         validate_containers=False,  # we already validated these before setting any refs
     )
 
-    # Write native (in-memory) chunks as real data to the icechunk store
-    if manifest._native:
+    # Write inlined (in-memory) chunks as real data to the icechunk store
+    if manifest._inlined:
         from zarr.core.buffer import default_buffer_prototype
         from zarr.core.sync import sync as zarr_sync
 
-        for idx, data in manifest._native.items():
+        for idx, data in manifest._inlined.items():
             shifted_idx = tuple(
                 index + offset for index, offset in zip(idx, chunk_index_offsets)
             )
