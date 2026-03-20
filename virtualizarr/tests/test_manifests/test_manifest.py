@@ -133,7 +133,7 @@ class TestCreateManifest:
         chunks = {
             "0.0.0": {"path": "s3://bucket/foo.nc"},
         }
-        with pytest.raises(ValueError, match="must be of the form"):
+        with pytest.raises(ValueError, match="must be a dict with keys"):
             ChunkManifest(entries=chunks)
 
     def test_invalid_chunk_keys(self):

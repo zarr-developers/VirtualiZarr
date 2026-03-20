@@ -263,13 +263,14 @@ class ChunkManifest:
 
         inlined: dict[tuple[int, ...], bytes] = {}
 
+        _required_keys = {"path", "offset", "length"}
+
         # populate the arrays
         for key, entry in entries.items():
-            if not isinstance(entry, dict) or len(entry) not in (3, 4):
+            if not isinstance(entry, dict) or not _required_keys <= entry.keys():
                 msg = (
-                    "Each chunk entry must be of the form dict(path=<str>, offset=<int>, length=<int>) "
-                    "or dict(path=<str>, offset=<int>, length=<int>, data=<bytes>), "
-                    f"but got {entry}"
+                    "Each chunk entry must be a dict with keys 'path', 'offset', 'length' "
+                    f"(and optionally 'data'), but got {entry}"
                 )
                 raise ValueError(msg)
 
@@ -282,9 +283,10 @@ class ChunkManifest:
                 offsets[split_key] = 0
                 lengths[split_key] = len(entry["data"])
             else:
-                path, offset, length = entry.values()
                 entry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
-                    path=path, offset=offset, length=length
+                    path=entry["path"],
+                    offset=entry["offset"],
+                    length=entry["length"],
                 )
                 paths[split_key] = entry["path"]
                 offsets[split_key] = entry["offset"]
