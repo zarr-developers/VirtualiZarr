@@ -506,6 +506,23 @@ class TestInlinedChunks:
         assert manifest == restored
         assert restored._inlined == {(0, 1): b"\x00\x01\x02\x03"}
 
+    def test_scalar_inlined_chunk(self):
+        """Scalar arrays use key 'c' which maps to empty tuple ()."""
+        chunks = {
+            "c": {
+                "path": "",
+                "offset": 0,
+                "length": 8,
+                "data": b"\x00" * 8,
+            },
+        }
+        manifest = ChunkManifest(entries=chunks, shape=())
+        assert () in manifest._inlined
+        assert manifest._inlined[()] == b"\x00" * 8
+        entry = manifest["c"]
+        assert "data" in entry
+        assert entry["data"] == b"\x00" * 8
+
     def test_chunk_entry_with_validation_inlined(self):
         entry = ChunkEntry.with_validation(
             path="", offset=0, length=0, inlined_data=b"\x01\x02\x03"
