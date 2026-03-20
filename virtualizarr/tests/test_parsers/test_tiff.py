@@ -6,7 +6,13 @@ from obstore.store import LocalStore, S3Store
 from xarray import Dataset, DataTree
 
 from virtualizarr import open_virtual_dataset, open_virtual_datatree
-from virtualizarr.manifests.array import has_rectilinear_chunk_grid_support
+
+try:
+    from zarr.core.metadata.v3 import RectilinearChunkGrid  # noqa: F401
+
+    has_rectilinear_chunk_grid_support = True
+except ImportError:
+    has_rectilinear_chunk_grid_support = False
 from virtualizarr.tests import requires_network, requires_tiff, requires_tifffile
 
 virtual_tiff = pytest.importorskip("virtual_tiff")
@@ -89,9 +95,13 @@ def test_concat_rectilinear_tiff_datasets(tmp_path) -> None:
         assert vds1["0"].sizes == {"y": 100, "x": 50}
         assert vds2["0"].sizes == {"y": 100, "x": 50}
 
-        # Verify both datasets have rectilinear (non-regular) chunk grids
-        assert not vds1["0"].variable.data.metadata.chunk_grid.is_regular
-        assert not vds2["0"].variable.data.metadata.chunk_grid.is_regular
+        # Verify both datasets have rectilinear chunk grids
+        assert isinstance(
+            vds1["0"].variable.data.metadata.chunk_grid, RectilinearChunkGrid
+        )
+        assert isinstance(
+            vds2["0"].variable.data.metadata.chunk_grid, RectilinearChunkGrid
+        )
 
         # Concatenate along a new dimension
         combined = xr.concat([vds1, vds2], dim="time")

@@ -3,10 +3,14 @@ from typing import Any, Callable, Union
 
 import numpy as np
 import xarray as xr
-from zarr.core.chunk_grids import ChunkGrid
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
-has_rectilinear_chunk_grid_support = hasattr(ChunkGrid, "is_regular")
+try:
+    from zarr.core.metadata.v3 import RectilinearChunkGrid, RegularChunkGrid
+
+    _has_chunk_grid_dtos = True
+except ImportError:
+    _has_chunk_grid_dtos = False
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -81,11 +85,15 @@ class ManifestArray:
         Individual chunk size by number of elements.
 
         For regular grids, returns a tuple of ints (e.g., (30, 50)).
-        For rectilinear grids, returns a tuple of tuples (e.g., ((30, 30, 30, 10), (50,))).
+        For rectilinear grids, returns a tuple of tuples (e.g., ((10, 20, 30), (50, 50))).
         """
-        chunk_grid = self._metadata.chunk_grid
-        if has_rectilinear_chunk_grid_support and not chunk_grid.is_regular:
-            return chunk_grid.chunk_sizes
+        if _has_chunk_grid_dtos:
+            chunk_grid = self._metadata.chunk_grid
+            if isinstance(chunk_grid, RectilinearChunkGrid):
+                return chunk_grid.chunk_shapes
+            elif isinstance(chunk_grid, RegularChunkGrid):
+                return chunk_grid.chunk_shape
+            raise TypeError(f"Unknown chunk grid type: {type(chunk_grid)}")
         return self._metadata.chunks
 
     @property
