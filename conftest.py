@@ -9,7 +9,6 @@ from typing import Any, Callable, Iterable, Mapping, Optional
 import h5py  # type: ignore[import]
 import numpy as np
 import pytest
-import ujson
 import xarray as xr
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
@@ -313,16 +312,11 @@ def netcdf4_virtual_dataset(netcdf4_file):
 
 
 @pytest.fixture
-def netcdf4_inlined_ref(tmp_path, netcdf4_file):
-    """Create an inlined reference file from a NetCDF4 file, returning a file URL."""
+def netcdf4_inlined_ref(netcdf4_file):
+    """Create an inlined reference from a NetCDF4 file."""
     from kerchunk.hdf import SingleHdf5ToZarr
 
-    ref_filepath = tmp_path / "ref.json"
-    refs = SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
-    with open(ref_filepath, "w") as json_file:
-        ujson.dump(refs, json_file)
-
-    return f"file://{ref_filepath}"
+    return SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
 
 
 # HDF5 file fixtures
