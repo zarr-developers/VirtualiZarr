@@ -164,8 +164,24 @@ class ManifestStore(Store):
         )
         chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
 
+        # Check for inlined (in-memory) chunks first
+        if chunk_indexes in manifest._inlined:
+            inlined_data = manifest._inlined[chunk_indexes]
+            if byte_range is not None:
+                inlined_byte_range = _transform_byte_range(
+                    byte_range,
+                    chunk_start=0,
+                    chunk_end_exclusive=len(inlined_data),
+                )
+                inlined_data = inlined_data[
+                    inlined_byte_range.start : inlined_byte_range.end
+                ]
+            return prototype.buffer.from_bytes(inlined_data)
+
+        from virtualizarr.manifests.manifest import MISSING_CHUNK_PATH
+
         path = manifest._paths[chunk_indexes]
-        if path == "":
+        if path == MISSING_CHUNK_PATH:
             return None
         offset = manifest._offsets[chunk_indexes]
         length = manifest._lengths[chunk_indexes]

@@ -114,11 +114,23 @@ def concatenate(
         [arr.manifest._lengths for arr in arrays],
         axis=axis,
     )
+
+    # merge inlined chunk dicts with index shifting along the concat axis
+    concatenated_inlined: dict[tuple[int, ...], bytes] = {}
+    grid_offset = 0
+    for arr in arrays:
+        for key, data in arr.manifest._inlined.items():
+            shifted = list(key)
+            shifted[axis] += grid_offset
+            concatenated_inlined[tuple(shifted)] = data
+        grid_offset += arr.manifest._paths.shape[axis]
+
     concatenated_manifest = ChunkManifest.from_arrays(
         paths=concatenated_paths,
         offsets=concatenated_offsets,
         lengths=concatenated_lengths,
         validate_paths=False,
+        inlined=concatenated_inlined if concatenated_inlined else None,
     )
 
     new_metadata = copy_and_replace_metadata(
@@ -180,11 +192,21 @@ def stack(
         [arr.manifest._lengths for arr in arrays],
         axis=axis,
     )
+
+    # merge inlined chunk dicts, inserting the new stacked axis
+    stacked_inlined: dict[tuple[int, ...], bytes] = {}
+    for i, arr in enumerate(arrays):
+        for key, data in arr.manifest._inlined.items():
+            shifted = list(key)
+            shifted.insert(axis, i)
+            stacked_inlined[tuple(shifted)] = data
+
     stacked_manifest = ChunkManifest.from_arrays(
         paths=stacked_paths,
         offsets=stacked_offsets,
         lengths=stacked_lengths,
         validate_paths=False,
+        inlined=stacked_inlined if stacked_inlined else None,
     )
 
     # chunk shape has changed because a length-1 axis has been inserted
@@ -251,11 +273,20 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         x.manifest._lengths,
         shape=new_chunk_grid_shape,
     )
+    # broadcast inlined chunks by prepending singleton dimensions to their keys
+    broadcasted_inlined: dict[tuple[int, ...], bytes] = {}
+    if x.manifest._inlined:
+        n_prepended = len(new_shape) - x.ndim
+        for key, data in x.manifest._inlined.items():
+            new_key = (0,) * n_prepended + key
+            broadcasted_inlined[new_key] = data
+
     broadcasted_manifest = ChunkManifest.from_arrays(
         paths=broadcasted_paths,
         offsets=broadcasted_offsets,
         lengths=broadcasted_lengths,
         validate_paths=False,
+        inlined=broadcasted_inlined if broadcasted_inlined else None,
     )
 
     new_metadata = copy_and_replace_metadata(
