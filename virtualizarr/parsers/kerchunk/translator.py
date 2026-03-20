@@ -208,14 +208,21 @@ def manifest_from_kerchunk_chunk_dict(
     chunk_entries: dict[ChunkKey, ChunkEntry] = {}
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
-            raise NotImplementedError(
-                "Reading inlined reference data is currently not supported."
-                "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
+            # Inlined data: decode base64 and store as native chunk
+            import base64
+
+            raw = v.encode() if isinstance(v, str) else v
+            if raw.startswith(b"base64:"):
+                data = base64.b64decode(raw[len(b"base64:") :])
+            else:
+                data = raw
+            chunk_entries[k] = ChunkEntry(
+                path="", offset=0, length=len(data), data=data
             )
         elif not isinstance(v, (tuple, list)):
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
-
-        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
+        else:
+            chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
     return ChunkManifest(entries=chunk_entries)
 
 

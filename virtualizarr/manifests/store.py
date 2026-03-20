@@ -164,6 +164,20 @@ class ManifestStore(Store):
         )
         chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
 
+        # Check for native (in-memory) chunks first
+        if chunk_indexes in manifest._native:
+            native_data = manifest._native[chunk_indexes]
+            if byte_range is not None:
+                native_byte_range = _transform_byte_range(
+                    byte_range,
+                    chunk_start=0,
+                    chunk_end_exclusive=len(native_data),
+                )
+                native_data = native_data[
+                    native_byte_range.start : native_byte_range.end
+                ]
+            return prototype.buffer.from_bytes(native_data)
+
         path = manifest._paths[chunk_indexes]
         if path == "":
             return None

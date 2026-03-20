@@ -600,3 +600,17 @@ def write_manifest_virtual_refs(
         chunks=virtual_chunk_spec_list,
         validate_containers=False,  # we already validated these before setting any refs
     )
+
+    # Write native (in-memory) chunks as real data to the icechunk store
+    if manifest._native:
+        from zarr.core.buffer import default_buffer_prototype
+        from zarr.core.sync import sync as zarr_sync
+
+        for idx, data in manifest._native.items():
+            shifted_idx = tuple(
+                index + offset for index, offset in zip(idx, chunk_index_offsets)
+            )
+            chunk_key = "/".join(str(i) for i in shifted_idx)
+            full_key = f"{key_prefix}/c/{chunk_key}"
+            buf = default_buffer_prototype().buffer.from_bytes(data)
+            zarr_sync(store.set(full_key, buf))

@@ -338,55 +338,43 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
 
 @requires_kerchunk
-def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_registry):
-    # For now, we raise a NotImplementedError if we read existing references that have inlined data
-    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
-
-    ref_filepath = tmp_path / "ref.json"
-
-    import ujson
-
-    with open(ref_filepath, "w") as json_file:
-        ujson.dump(netcdf4_inlined_ref, json_file)
+def test_read_inline_refs(netcdf4_inlined_ref, local_registry):
+    # Inlined data in kerchunk references should be read as native chunks
+    # https://github.com/zarr-developers/VirtualiZarr/issues/489
 
     parser = KerchunkJSONParser()
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
-        with open_virtual_dataset(
-            url=ref_filepath.as_posix(),
-            registry=local_registry,
-            parser=parser,
-        ) as _:
-            pass
+    with open_virtual_dataset(
+        url=netcdf4_inlined_ref,
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        # Should successfully open without error
+        assert len(vds.variables) > 0
 
 
 @requires_kerchunk
 @pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
-def test_notimplemented_read_inline_refs_parquet(
-    tmp_path, netcdf4_inlined_ref, local_registry
-):
-    # Test that parquet references with inlined data raise NotImplementedError
+def test_read_inline_refs_parquet(tmp_path, netcdf4_inlined_ref, local_registry):
+    # Inlined data in parquet kerchunk references should be read as native chunks
     # https://github.com/zarr-developers/VirtualiZarr/issues/489
     import pandas as pd
     from kerchunk.df import refs_to_dataframe
 
     ref_filepath = tmp_path / "ref.parquet"
+    # refs_to_dataframe accepts a file path — strip the file:// prefix
     with pd.option_context("future.infer_string", False):
-        refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
+        refs_to_dataframe(
+            fo=netcdf4_inlined_ref.removeprefix("file://"),
+            url=ref_filepath.as_posix(),
+        )
 
     parser = KerchunkParquetParser()
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
-        with open_virtual_dataset(
-            url=ref_filepath.as_posix(),
-            registry=local_registry,
-            parser=parser,
-        ) as _:
-            pass
+    with open_virtual_dataset(
+        url=ref_filepath.as_posix(),
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        assert len(vds.variables) > 0
 
 
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
@@ -402,16 +390,9 @@ def test_skip_variables(refs_file_factory, skip_variables, local_registry):
 
 
 @requires_kerchunk
-def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_registry):
-    refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")
-    ref_filepath = tmp_path / "ref.json"
-    with open(ref_filepath.as_posix(), "w") as json_file:
-        ujson.dump(refs, json_file)
-
+def test_load_manifest(tmp_path, netcdf4_file, netcdf4_inlined_ref, local_registry):
     parser = KerchunkJSONParser()
-    manifest_store = parser(
-        url=f"file://{ref_filepath.as_posix()}", registry=local_registry
-    )
+    manifest_store = parser(url=netcdf4_inlined_ref, registry=local_registry)
     with (
         xr.open_dataset(
             netcdf4_file,
@@ -424,6 +405,49 @@ def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_re
         ).load() as manifest_ds,
     ):
         xrt.assert_identical(ds, manifest_ds)
+
+
+@requires_kerchunk
+def test_inlined_kerchunk_to_icechunk_roundtrip(
+    netcdf4_file, netcdf4_inlined_ref, local_registry
+):
+    """Test that inlined kerchunk refs can be written to icechunk and loaded back identically."""
+    icechunk = pytest.importorskip("icechunk")
+    from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
+
+    # Parse the inlined kerchunk refs
+    parser = KerchunkJSONParser()
+    manifest_store = parser(url=netcdf4_inlined_ref, registry=local_registry)
+    vds = manifest_store.to_virtual_dataset()
+
+    # Set up icechunk repo with in-memory storage
+    storage = icechunk.Storage.new_in_memory()
+    config = icechunk.RepositoryConfig.default()
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+    )
+    config.set_virtual_chunk_container(container)
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+    session = repo.writable_session("main")
+
+    # Write to icechunk (virtual refs + native chunks)
+    vds.vz.to_icechunk(session.store, validate_containers=False)
+    session.commit("inlined kerchunk roundtrip")
+
+    # Read back from icechunk and compare to direct NetCDF load
+    readonly_session = repo.readonly_session("main")
+    with (
+        xr.open_dataset(netcdf4_file) as direct_ds,
+        xr.open_zarr(
+            store=readonly_session.store, zarr_format=3, consolidated=False
+        ).load() as icechunk_ds,
+    ):
+        xrt.assert_identical(direct_ds, icechunk_ds)
 
 
 def test_parse_dict_via_memorystore(array_v3_metadata):

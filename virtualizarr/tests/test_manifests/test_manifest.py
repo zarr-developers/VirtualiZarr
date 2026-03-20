@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import pytest
 
@@ -312,3 +314,202 @@ class TestRenamePaths:
         with pytest.raises(ValueError):
             # list is an invalid arg type
             manifest.rename_paths("./foo.nc")
+
+
+class TestNativeChunks:
+    """Tests for native (in-memory) chunk support in ChunkManifest."""
+
+    def test_create_manifest_with_native_chunks(self):
+        chunks = {
+            "0.0": {
+                "path": "",
+                "offset": 0,
+                "length": 4,
+                "data": b"\x00\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert len(manifest._native) == 1
+        assert (0, 0) in manifest._native
+        assert manifest._native[(0, 0)] == b"\x00\x01\x02\x03"
+
+    def test_mixed_virtual_and_native(self):
+        chunks = {
+            "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.1": {
+                "path": "",
+                "offset": 0,
+                "length": 3,
+                "data": b"\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert len(manifest._native) == 1
+        assert manifest._paths[(0, 0)] == "s3://bucket/foo.nc"
+        assert manifest._paths[(0, 1)] == ""
+
+    def test_dict_includes_native_data(self):
+        chunks = {
+            "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.1": {
+                "path": "",
+                "offset": 0,
+                "length": 4,
+                "data": b"\x00\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        d = manifest.dict()
+        assert len(d) == 2
+        assert d["0.0"] == {
+            "path": "s3://bucket/foo.nc",
+            "offset": 100,
+            "length": 100,
+        }
+        assert d["0.1"]["data"] == b"\x00\x01\x02\x03"
+
+    def test_getitem_native_chunk(self):
+        chunks = {
+            "0.0": {
+                "path": "",
+                "offset": 0,
+                "length": 4,
+                "data": b"\x00\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        entry = manifest["0.0"]
+        assert "data" in entry
+        assert entry["data"] == b"\x00\x01\x02\x03"
+        assert entry["path"] == ""
+
+    def test_nbytes_includes_native_data(self):
+        chunks = {
+            "0.0": {
+                "path": "",
+                "offset": 0,
+                "length": 4,
+                "data": b"\x00\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        # nbytes should include both the numpy arrays and the native data
+        assert manifest.nbytes > 4
+
+    def test_equals_with_native(self):
+        chunks = {
+            "0": {
+                "path": "",
+                "offset": 0,
+                "length": 3,
+                "data": b"\x01\x02\x03",
+            },
+        }
+        m1 = ChunkManifest(entries=chunks)
+        m2 = ChunkManifest(entries=chunks)
+        assert m1 == m2
+
+    def test_not_equals_different_native_data(self):
+        m1 = ChunkManifest(
+            entries={
+                "0": {
+                    "path": "",
+                    "offset": 0,
+                    "length": 3,
+                    "data": b"\x01\x02\x03",
+                },
+            }
+        )
+        m2 = ChunkManifest(
+            entries={
+                "0": {
+                    "path": "",
+                    "offset": 0,
+                    "length": 3,
+                    "data": b"\x04\x05\x06",
+                },
+            }
+        )
+        assert m1 != m2
+
+    def test_from_arrays_with_native(self):
+        paths = np.asarray(["s3://bucket/foo.nc", ""], dtype=np.dtypes.StringDType)
+        offsets = np.asarray([100, 0], dtype=np.uint64)
+        lengths = np.asarray([100, 4], dtype=np.uint64)
+        native = {(1,): b"\x00\x01\x02\x03"}
+        manifest = ChunkManifest.from_arrays(
+            paths=paths,
+            offsets=offsets,
+            lengths=lengths,
+            validate_paths=False,
+            native=native,
+        )
+        assert manifest._native == native
+        entry = manifest["1"]
+        assert "data" in entry
+        assert entry["data"] == b"\x00\x01\x02\x03"
+
+    def test_virtual_only_has_empty_native(self):
+        chunks = {
+            "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert manifest._native == {}
+
+    def test_repr_with_native(self):
+        chunks = {
+            "0": {
+                "path": "",
+                "offset": 0,
+                "length": 3,
+                "data": b"\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert "native_chunks=1" in repr(manifest)
+
+    def test_repr_without_native(self):
+        chunks = {
+            "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks)
+        assert "native_chunks" not in repr(manifest)
+
+    def test_rename_paths_preserves_native(self):
+        chunks = {
+            "0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "1": {
+                "path": "",
+                "offset": 0,
+                "length": 3,
+                "data": b"\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        renamed = manifest.rename_paths("s3://bucket/bar.nc")
+        assert renamed._native == {(1,): b"\x01\x02\x03"}
+        assert renamed.dict()["0"]["path"] == "s3://bucket/bar.nc"
+
+    def test_pickle_roundtrip(self):
+        chunks = {
+            "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+            "0.1": {
+                "path": "",
+                "offset": 0,
+                "length": 4,
+                "data": b"\x00\x01\x02\x03",
+            },
+        }
+        manifest = ChunkManifest(entries=chunks)
+        pickled = pickle.dumps(manifest)
+        restored = pickle.loads(pickled)
+        assert manifest == restored
+        assert restored._native == {(0, 1): b"\x00\x01\x02\x03"}
+
+    def test_chunk_entry_with_validation_native(self):
+        entry = ChunkEntry.with_validation(
+            path="", offset=0, length=0, data=b"\x01\x02\x03"
+        )
+        assert entry["data"] == b"\x01\x02\x03"
+        assert entry["path"] == ""
+        assert entry["length"] == 3

@@ -116,14 +116,19 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
     if isinstance(var.data, ManifestArray):
         marr = var.data
 
-        arr_refs: dict[str, str | list[str | int]] = {
-            str(chunk_key): [
-                remove_file_uri_prefix(entry["path"]),
-                entry["offset"],
-                entry["length"],
-            ]
-            for chunk_key, entry in marr.manifest.dict().items()
-        }
+        arr_refs: dict[str, str | list[str | int]] = {}
+        for chunk_key, entry in marr.manifest.dict().items():
+            if "data" in entry:
+                inlined_data = (b"base64:" + base64.b64encode(entry["data"])).decode(
+                    "utf-8"
+                )
+                arr_refs[str(chunk_key)] = inlined_data
+            else:
+                arr_refs[str(chunk_key)] = [
+                    remove_file_uri_prefix(entry["path"]),
+                    entry["offset"],
+                    entry["length"],
+                ]
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
         zattrs = {**var.attrs, **var.encoding}
     else:
