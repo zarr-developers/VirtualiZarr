@@ -19,10 +19,10 @@ nav:
     - "installation.md"
   - How-to guides:
     - "usage.md"
-    - "inlined_references.md"
     - "examples.md"
   - Explanation:
     - "data_structures.md"
+    - "inlined_references.md"
     - "custom_parsers.md"
     - "scaling.md"
     - "faq.md"
