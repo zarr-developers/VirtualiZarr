@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Union, cast
+from typing import TYPE_CHECKING, Callable, Union
 
 import numpy as np
 
@@ -97,28 +97,8 @@ def concatenate(
     new_shape[axis] = new_length_along_concat_axis
 
     # do concatenation of entries in manifest
-    concatenated_paths = (
-        cast(  # `np.concatenate` is type hinted as if the output could have Any dtype
-            np.ndarray[Any, np.dtypes.StringDType],
-            np.concatenate(
-                [arr.manifest._paths for arr in arrays],
-                axis=axis,
-            ),
-        )
-    )
-    concatenated_offsets = np.concatenate(
-        [arr.manifest._offsets for arr in arrays],
-        axis=axis,
-    )
-    concatenated_lengths = np.concatenate(
-        [arr.manifest._lengths for arr in arrays],
-        axis=axis,
-    )
-    concatenated_manifest = ChunkManifest.from_arrays(
-        paths=concatenated_paths,
-        offsets=concatenated_offsets,
-        lengths=concatenated_lengths,
-        validate_paths=False,
+    concatenated_manifest = ChunkManifest.concat(
+        [arr.manifest for arr in arrays], axis=axis
     )
 
     new_metadata = copy_and_replace_metadata(
@@ -165,27 +145,7 @@ def stack(
     new_shape.insert(axis, length_along_new_stacked_axis)
 
     # do stacking of entries in manifest
-    stacked_paths = cast(  # `np.stack` apparently is type hinted as if the output could have Any dtype
-        np.ndarray[Any, np.dtypes.StringDType],
-        np.stack(
-            [arr.manifest._paths for arr in arrays],
-            axis=axis,
-        ),
-    )
-    stacked_offsets = np.stack(
-        [arr.manifest._offsets for arr in arrays],
-        axis=axis,
-    )
-    stacked_lengths = np.stack(
-        [arr.manifest._lengths for arr in arrays],
-        axis=axis,
-    )
-    stacked_manifest = ChunkManifest.from_arrays(
-        paths=stacked_paths,
-        offsets=stacked_offsets,
-        lengths=stacked_lengths,
-        validate_paths=False,
-    )
+    stacked_manifest = ChunkManifest.stack([arr.manifest for arr in arrays], axis=axis)
 
     # chunk shape has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
@@ -235,28 +195,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
 
     # do broadcasting of entries in manifest
-    broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
-        np.ndarray[Any, np.dtypes.StringDType],
-        np.broadcast_to(
-            x.manifest._paths,
-            shape=new_chunk_grid_shape,
-        ),
-    )
-
-    broadcasted_offsets = np.broadcast_to(
-        x.manifest._offsets,
-        shape=new_chunk_grid_shape,
-    )
-    broadcasted_lengths = np.broadcast_to(
-        x.manifest._lengths,
-        shape=new_chunk_grid_shape,
-    )
-    broadcasted_manifest = ChunkManifest.from_arrays(
-        paths=broadcasted_paths,
-        offsets=broadcasted_offsets,
-        lengths=broadcasted_lengths,
-        validate_paths=False,
-    )
+    broadcasted_manifest = x.manifest.broadcast(shape=new_chunk_grid_shape)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=x.metadata,

@@ -2,7 +2,6 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
 
-import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
@@ -272,9 +271,8 @@ def validate_virtual_chunk_containers(
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
-        for ref in marr.manifest._paths.flat:
-            if ref:
-                validate_single_ref(ref, supported_prefixes)
+        for ref in marr.manifest.iter_nonempty_paths():
+            validate_single_ref(ref, supported_prefixes)
 
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
@@ -562,16 +560,6 @@ def write_manifest_virtual_refs(
     # but Icechunk need to expose a suitable API first
     # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
 
-    it = np.nditer(
-        [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
-        flags=[
-            "refs_ok",
-            "multi_index",
-            "c_index",
-        ],
-        op_flags=[["readonly"]] * 3,  # type: ignore
-    )
-
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
         # so we need to add a buffer, so that if you immediately read data back from this icechunk store,
@@ -583,16 +571,14 @@ def write_manifest_virtual_refs(
     virtual_chunk_spec_list = [
         VirtualChunkSpec(
             index=[
-                index + offset
-                for index, offset in zip(it.multi_index, chunk_index_offsets)
+                index + offset for index, offset in zip(grid_index, chunk_index_offsets)
             ],
-            location=path.item(),
-            offset=offset.item(),
-            length=length.item(),
+            location=entry["path"],
+            offset=entry["offset"],
+            length=entry["length"],
             last_updated_at_checksum=last_updated_at,
         )
-        for path, offset, length in it
-        if path
+        for grid_index, entry in manifest.iter_refs()
     ]
 
     store.set_virtual_refs(

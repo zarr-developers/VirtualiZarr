@@ -194,13 +194,7 @@ class ManifestArray:
                 )
 
                 # do chunk-wise comparison
-                equal_chunk_paths = self.manifest._paths == other.manifest._paths
-                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
-                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
-
-                equal_chunks = (
-                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
-                )
+                equal_chunks = self.manifest.elementwise_eq(other.manifest)
 
                 if not equal_chunks.all():
                     # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
