@@ -10,6 +10,7 @@ from zarr import Array, Group
 
 from virtualizarr.codecs import get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH, MISSING_CHUNK_PATH
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -273,7 +274,7 @@ def validate_virtual_chunk_containers(
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
         for ref in marr.manifest._paths.flat:
-            if ref:
+            if ref and ref not in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH):
                 validate_single_ref(ref, supported_prefixes)
 
 
@@ -592,7 +593,7 @@ def write_manifest_virtual_refs(
             last_updated_at_checksum=last_updated_at,
         )
         for path, offset, length in it
-        if path
+        if path and path.item() not in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH)
     ]
 
     store.set_virtual_refs(

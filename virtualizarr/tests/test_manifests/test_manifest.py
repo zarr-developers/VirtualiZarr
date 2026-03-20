@@ -346,7 +346,7 @@ class TestInlinedChunks:
         manifest = ChunkManifest(entries=chunks)
         assert len(manifest._inlined) == 1
         assert manifest._paths[(0, 0)] == "s3://bucket/foo.nc"
-        assert manifest._paths[(0, 1)] == ""
+        assert manifest._paths[(0, 1)] == "__inlined__"
 
     def test_dict_includes_inlined_data(self):
         chunks = {
@@ -381,7 +381,7 @@ class TestInlinedChunks:
         entry = manifest["0.0"]
         assert "data" in entry
         assert entry["data"] == b"\x00\x01\x02\x03"
-        assert entry["path"] == ""
+        assert entry["path"] == "__inlined__"
 
     def test_nbytes_includes_inlined_data(self):
         chunks = {
@@ -511,5 +511,5 @@ class TestInlinedChunks:
             path="", offset=0, length=0, inlined_data=b"\x01\x02\x03"
         )
         assert entry["data"] == b"\x01\x02\x03"
-        assert entry["path"] == ""
+        assert entry["path"] == "__inlined__"
         assert entry["length"] == 3

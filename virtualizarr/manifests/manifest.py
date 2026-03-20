@@ -34,6 +34,11 @@ VALID_URI_PREFIXES = {
     "https://",
 }
 
+# Sentinel path values used in the paths array to distinguish chunk states.
+# Missing chunks have no data anywhere; inlined chunks have data in _inlined dict.
+MISSING_CHUNK_PATH = ""
+INLINED_CHUNK_PATH = "__inlined__"
+
 
 class ChunkEntry(TypedDict):
     path: str
@@ -66,9 +71,12 @@ class ChunkEntry(TypedDict):
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
         if inlined_data is not None:
             return ChunkEntry(
-                path="", offset=0, length=len(inlined_data), data=inlined_data
+                path=INLINED_CHUNK_PATH,
+                offset=0,
+                length=len(inlined_data),
+                data=inlined_data,
             )
-        if path != "":
+        if path != MISSING_CHUNK_PATH:
             path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
@@ -86,8 +94,8 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
         The root of the filesystem on which these references were generated.
         Required if any (likely kerchunk-generated) paths are relative in order to turn them into absolute paths (which virtualizarr requires).
     """
-    if path == "":
-        # (empty paths are allowed through as they represent missing chunks)
+    if path in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH):
+        # sentinel values are allowed through (missing chunks and inlined chunks)
         return path
     elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
         return path  # path is already in URI form
@@ -245,7 +253,7 @@ class ChunkManifest:
         if shape is None:
             shape = get_chunk_grid_shape(entries.keys(), separator)
 
-        # Initializing to empty implies that entries with path='' are treated as missing chunks
+        # Initializing to empty implies that entries with path=MISSING_CHUNK_PATH are treated as missing chunks
         paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
             np.ndarray[Any, np.dtypes.StringDType],
             np.empty(shape=shape, dtype=np.dtypes.StringDType()),
@@ -270,7 +278,7 @@ class ChunkManifest:
             if "data" in entry:
                 # Inlined chunk: store bytes in the sparse dict
                 inlined[split_key] = entry["data"]
-                paths[split_key] = ""
+                paths[split_key] = INLINED_CHUNK_PATH
                 offsets[split_key] = 0
                 lengths[split_key] = len(entry["data"])
             else:
@@ -316,7 +324,7 @@ class ChunkManifest:
             Set to False to skip validation for performance reasons.
         inlined
             Dictionary mapping chunk grid indices to raw bytes for inlined (in-memory) chunks.
-            Paths at these indices should be empty strings.
+            Paths at these indices should be ``INLINED_CHUNK_PATH``.
         """
 
         # check types
@@ -417,7 +425,9 @@ class ChunkManifest:
         indices = parse_manifest_index(key)
         if indices in self._inlined:
             data = self._inlined[indices]
-            return ChunkEntry(path="", offset=0, length=len(data), data=data)
+            return ChunkEntry(
+                path=INLINED_CHUNK_PATH, offset=0, length=len(data), data=data
+            )
         path = self._paths[indices]
         offset = self._offsets[indices]
         length = self._lengths[indices]
@@ -456,8 +466,8 @@ class ChunkManifest:
         }
         ```
 
-        Entries whose path is an empty string will be interpreted as missing chunks and omitted from the dictionary,
-        unless they are inlined chunks (which have their data stored in memory).
+        Entries whose path is ``MISSING_CHUNK_PATH`` will be interpreted as missing chunks and omitted from the dictionary.
+        Entries whose path is ``INLINED_CHUNK_PATH`` have their data stored in memory and are included.
         """
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
@@ -472,12 +482,12 @@ class ChunkManifest:
             idx = tuple(int(i) for i in inds)
             if idx in self._inlined:
                 d[join(inds)] = ChunkEntry(
-                    path="",
+                    path=INLINED_CHUNK_PATH,
                     offset=0,
                     length=len(self._inlined[idx]),
                     data=self._inlined[idx],
                 )
-            elif path.item() != "":
+            elif path.item() != MISSING_CHUNK_PATH:
                 d[join(inds)] = dict(
                     path=path.item(), offset=offset.item(), length=length.item()
                 )

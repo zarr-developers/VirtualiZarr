@@ -113,7 +113,7 @@ The two datasets are identical: coordinate values, data values, attributes, and 
 
 ## How it works
 
-When the kerchunk parser encounters a base64-encoded inlined reference, it decodes the bytes and stores them as a **inlined chunk** on the `ChunkManifest`. Native chunks are held in a sparse dictionary keyed by chunk grid index:
+When the kerchunk parser encounters a base64-encoded inlined reference, it decodes the bytes and stores them as an **inlined chunk** on the `ChunkManifest`. Inlined chunks are held in a sparse dictionary keyed by chunk grid index:
 
 ```python
 # After parsing, the manifest for 'time' has one inlined chunk:
@@ -122,7 +122,7 @@ print(time_manifest._inlined)
 # {(0,): b'\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00...'}
 ```
 
-Native chunks participate in all manifest operations:
+Inlined chunks participate in all manifest operations:
 
 - **Concatenation and stacking**: indices are shifted to their new positions
 - **Serialization**: included when writing back to kerchunk (re-encoded as base64) or Icechunk (written as real data)

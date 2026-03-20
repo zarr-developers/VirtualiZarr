@@ -178,8 +178,10 @@ class ManifestStore(Store):
                 ]
             return prototype.buffer.from_bytes(inlined_data)
 
+        from virtualizarr.manifests.manifest import MISSING_CHUNK_PATH
+
         path = manifest._paths[chunk_indexes]
-        if path == "":
+        if path == MISSING_CHUNK_PATH:
             return None
         offset = manifest._offsets[chunk_indexes]
         length = manifest._lengths[chunk_indexes]
