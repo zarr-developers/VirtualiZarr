@@ -19,7 +19,6 @@ from xarray.core.variable import Variable
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.utils import ceildiv
 
 
 # Pytest configuration
@@ -126,10 +125,9 @@ def _generate_chunk_entries(
     dict
         Mapping of chunk keys to entry dictionaries
     """
-    chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
-        for axis_length, chunk_length in zip(shape, chunks)
-    )
+    from zarr.experimental import ChunkGrid
+
+    chunk_grid_shape = ChunkGrid.from_regular(shape, chunks).shape
 
     if chunk_grid_shape == ():
         return {"0": entry_generator((0,), (0,), itemsize)}

@@ -14,6 +14,7 @@ from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.experimental import ChunkGrid
 from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
@@ -383,7 +384,7 @@ async def build_chunk_manifest(zarr_array: ZarrArrayType, path: str) -> ChunkMan
 
     strategy = get_strategy(zarr_array)
     strategy.validate(zarr_array)
-    chunk_grid_shape = zarr_array._chunk_grid_shape
+    chunk_grid_shape = ChunkGrid.from_metadata(zarr_array.metadata).shape
 
     if zarr_array.shape == ():
         chunk_map = await strategy.get_chunk_mapping(zarr_array, path)

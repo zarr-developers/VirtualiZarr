@@ -1,9 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
-from zarr.core.chunk_grids import _is_rectilinear_chunks
-
-from virtualizarr.utils import determine_chunk_grid_shape
+from zarr.experimental import ChunkGrid
 
 from .manifest import ChunkManifest
 from .utils import (
@@ -192,7 +190,7 @@ def stack(
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
     # For rectilinear grids, each element is a sequence; insert a single-element tuple
-    if _is_rectilinear_chunks(old_chunks):
+    if not first_arr.chunk_grid.is_regular:
         new_chunks.insert(axis, (1,))
     else:
         new_chunks.insert(axis, 1)
@@ -237,8 +235,12 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         old_chunk_shape, ndim=len(new_shape)
     )
 
-    # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=x.metadata,
+        new_shape=list(new_shape),
+        new_chunks=list(new_chunk_shape),
+    )
+    new_chunk_grid_shape = ChunkGrid.from_metadata(new_metadata).shape
 
     # do broadcasting of entries in manifest
     broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
@@ -262,12 +264,6 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
         offsets=broadcasted_offsets,
         lengths=broadcasted_lengths,
         validate_paths=False,
-    )
-
-    new_metadata = copy_and_replace_metadata(
-        old_metadata=x.metadata,
-        new_shape=list(new_shape),
-        new_chunks=list(new_chunk_shape),
     )
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
