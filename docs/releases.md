@@ -73,6 +73,8 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Testing across all supported python versions ([#932](https://github.com/zarr-developers/VirtualiZarr/pull/932)).
   By [Julius Busecke](https://github.com/jbusecke)
+- Compile regular expressions for improved performance ([#909](https://github.com/zarr-developers/VirtualiZarr/pull/909)).
+  By [Chuck Daniels](https://github.com/chuckwondo).
 
 ## v2.4.0 (24th January 2026)
 
