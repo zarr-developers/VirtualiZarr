@@ -11,6 +11,7 @@ from collections.abc import (
 )
 from pathlib import PosixPath
 from typing import Any, NewType, TypedDict, cast
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -21,18 +22,10 @@ from virtualizarr.manifests.utils import (
 )
 from virtualizarr.types import ChunkKey
 
-# doesn't guarantee that writers actually handle these
-VALID_URI_PREFIXES = {
-    "s3://",
-    "gs://",
-    "azure://",
-    "r2://",
-    "cos://",
-    "minio://",
-    "file:///",
-    "http://",
-    "https://",
-}
+
+def _is_uri(path: str) -> bool:
+    """Check if a path is a URI by looking for a scheme."""
+    return bool(urlparse(path).scheme)
 
 
 class ChunkEntry(TypedDict):
@@ -76,7 +69,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     if path == "":
         # (empty paths are allowed through as they represent missing chunks)
         return path
-    elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
+    elif _is_uri(path):
         return path  # path is already in URI form
     else:
         # must be a posix filesystem path (absolute or relative)

@@ -54,6 +54,20 @@ class TestPathValidation:
             length=100,
         )
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "az://container/path/to/file.nc",
+            "abfs://container/path/to/file.nc",
+            "abfss://container/path/to/file.nc",
+            "gcs://bucket/path/to/file.nc",
+        ],
+    )
+    def test_allow_object_store_urls(self, url):
+        """Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/771"""
+        chunkentry = ChunkEntry.with_validation(path=url, offset=100, length=100)
+        assert chunkentry["path"] == url
+
 
 class TestConvertingRelativePathsUsingFSRoot:
     def test_fs_root_must_be_absolute(self):
