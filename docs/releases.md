@@ -55,6 +55,12 @@
 
 - Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- FAQ answer on "why still write native zarr?" ([#918](https://github.com/zarr-developers/VirtualiZarr/pull/918)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Updated FAQ regarding virtualizing existing Zarr V2 data ([#893](https://github.com/zarr-developers/VirtualiZarr/pull/893)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- R2 docs ([#937](https://github.com/zarr-developers/VirtualiZarr/pull/937)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
 
