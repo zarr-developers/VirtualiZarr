@@ -54,7 +54,7 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Completely rewrote the `ZarrParser` to use numpy string arrays for efficiency ([#927](https://github.com/zarr-developers/VirtualiZarr/pull/927)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Testing across all supported python versions ([#927](https://github.com/zarr-developers/VirtualiZarr/pull/932)).
+- Testing across all supported python versions ([#932](https://github.com/zarr-developers/VirtualiZarr/pull/932)).
   By [Julius Busecke](https://github.com/jbusecke)
 
 ## v2.4.0 (24th January 2026)
@@ -112,7 +112,7 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   ([#790](https://github.com/zarr-developers/VirtualiZarr/pull/790)).
   By [Ilan Gold](https://github.com/ilan-gold)
 - `ZarrParser` now handles Zarr V2 and V3 array parsing.
-  ([#565](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
+  ([#822](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
   By [Neil Schroeder](https://github.com/neilSchroeder)
 - Add Virtual TIFF as an optional dependency for TIFF parsing.
   ([#810](https://github.com/zarr-developers/VirtualiZarr/pull/810))
@@ -130,9 +130,6 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   By [Max Jones](https://github.com/maxrjones)
 
 ### Documentation
-
-- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
-  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
 
