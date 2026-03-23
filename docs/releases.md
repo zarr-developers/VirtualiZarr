@@ -41,7 +41,15 @@
   ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix `ZarrParser` not correctly parsing scalar variables from v2 native zarr stores ([#936](https://github.com/zarr-developers/VirtualiZarr/pull/936)).
-  By [Julius Buseceke](https://github.com/jbusecke)
+  By [Julius Busecke](https://github.com/jbusecke)
+- Fix dmrpp error handling ([#880](https://github.com/zarr-developers/VirtualiZarr/pull/880)).
+  By [Luis López](https://github.com/betolink).
+- Fix error when running with Zarr-Python 3.1.0 ([#868](https://github.com/zarr-developers/VirtualiZarr/pull/868)).
+  By [Rajat Shinde](https://github.com/omshinde).
+- Fix coordinate name issue ([#924](https://github.com/zarr-developers/VirtualiZarr/pull/924)).
+  By [UserNobody14](https://github.com/UserNobody14).
+- Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ### Documentation
 
