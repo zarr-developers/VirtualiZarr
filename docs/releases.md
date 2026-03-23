@@ -97,6 +97,13 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
   - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
 
+### Documentation
+
+- Added example of virtualizing GOES using caching and request splitting ([#855](https://github.com/zarr-developers/VirtualiZarr/pull/855)).
+  By [Max Jones](https://github.com/maxrjones).
+- Updated kerchunk comparison in FAQ ([#856](https://github.com/zarr-developers/VirtualiZarr/pull/856)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.3.0 (20th January 2026)
 
 ### New Features
