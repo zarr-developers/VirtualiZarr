@@ -154,6 +154,12 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
 - Return None for Zarr V2/consolidated metadata requests.
   ([#827](https://github.com/zarr-developers/VirtualiZarr/pull/827)).
   By [Max Jones](https://github.com/maxrjones)
+- Raise informative error on Zarr V2 parsing with Zarr-Python<3.1.3
+  ([#829](https://github.com/zarr-developers/VirtualiZarr/pull/829)).
+  By [Max Jones](https://github.com/maxrjones).
+- Revert "Remove unnecessary dtype conversion in icechunk writer"
+  ([#805](https://github.com/zarr-developers/VirtualiZarr/pull/805)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
