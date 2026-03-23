@@ -1,6 +1,8 @@
 # Release notes
 
-## vX.Y.Z+1 (unreleased)
+## v2.5.0 (23rd March 2026)
+
+Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders of magnitude better performance, more FAQ docs, and various bugfixes.
 
 ### New Features
 
