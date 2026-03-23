@@ -45,6 +45,9 @@
 
 ### Documentation
 
+- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 - Inlined `virtualizarr.writers.icechunk.generate_chunk_key` in `virtualizarr.writers.icechunk.write_manifest_virtual_refs`, and deleted the original function.
