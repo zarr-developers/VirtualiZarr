@@ -428,6 +428,47 @@ class ChunkManifest:
         lengths_equal = (self._lengths == other._lengths).all()
         return paths_equal and offsets_equal and lengths_equal
 
+    def get_entry(self, indices: tuple[int, ...]) -> ChunkEntry | None:
+        """Look up a chunk entry by grid indices. Returns None for missing chunks (empty path)."""
+        path = self._paths[indices]
+        if path == "":
+            return None
+        offset = self._offsets[indices]
+        length = self._lengths[indices]
+        return ChunkEntry(path=path, offset=offset, length=length)
+
+    def elementwise_eq(self, other: "ChunkManifest") -> np.ndarray:
+        """Return boolean array where True means that chunk entry matches."""
+        return (
+            (self._paths == other._paths)
+            & (self._offsets == other._offsets)
+            & (self._lengths == other._lengths)
+        )
+
+    def iter_nonempty_paths(self) -> Iterator[str]:
+        """Yield all non-empty paths in the manifest."""
+        for path in self._paths.flat:
+            if path:
+                yield path
+
+    def iter_refs(self) -> Iterator[tuple[tuple[int, ...], ChunkEntry]]:
+        """Yield (grid_indices, chunk_entry) for every non-missing chunk."""
+        coord_vectors = np.mgrid[
+            tuple(slice(None, length) for length in self.shape_chunk_grid)
+        ]
+        for *inds, path, offset, length in np.nditer(
+            [*coord_vectors, self._paths, self._offsets, self._lengths],
+            flags=("refs_ok",),
+        ):
+            if path.item() != "":
+                idx = tuple(int(i) for i in inds)
+                yield (
+                    idx,
+                    ChunkEntry(
+                        path=path.item(), offset=offset.item(), length=length.item()
+                    ),
+                )
+
     def rename_paths(
         self,
         new: str | Callable[[str], str],

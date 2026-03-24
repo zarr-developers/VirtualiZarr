@@ -164,11 +164,12 @@ class ManifestStore(Store):
         )
         chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
 
-        path = manifest._paths[chunk_indexes]
-        if path == "":
+        entry = manifest.get_entry(chunk_indexes)
+        if entry is None:
             return None
-        offset = manifest._offsets[chunk_indexes]
-        length = manifest._lengths[chunk_indexes]
+        path = entry["path"]
+        offset = entry["offset"]
+        length = entry["length"]
         # Get the configured object store instance that matches the path
         store, path_after_prefix = self._registry.resolve(path)
         if not store:
