@@ -498,17 +498,16 @@ def test_sharded_array_roundtrip(tmpdir):
     """Test that a sharded Zarr V3 array can be virtualized and read back correctly."""
     filepath = f"{tmpdir}/test_sharded.zarr"
 
-    # Create a Zarr V3 group with a sharded array containing real data
-    root = zarr.open_group(store=filepath, mode="w", zarr_format=3)
-    data = np.arange(100 * 100, dtype="float32").reshape(100, 100)
-    arr = root.create_array(
-        name="data",
-        shape=(100, 100),
-        chunks=(10, 10),
-        shards=(50, 50),
-        dtype="float32",
+    # Create a small sharded dataset via xarray
+    ds = xr.Dataset(
+        {"data": (("x", "y"), np.arange(12 * 12, dtype="float32").reshape(12, 12))},
     )
-    arr[:] = data
+    ds.to_zarr(
+        filepath,
+        encoding={"data": {"chunks": (3, 3), "shards": (6, 6)}},
+        consolidated=False,
+        zarr_format=3,
+    )
 
     # Parse with VirtualiZarr
     store = LocalStore(prefix=filepath)
