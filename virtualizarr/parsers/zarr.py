@@ -13,7 +13,6 @@ import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.codecs import ShardingCodec
 from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
