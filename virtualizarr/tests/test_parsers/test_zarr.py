@@ -494,30 +494,36 @@ def test_parser_with_nested_store_path(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
-def test_sharded_array_raises_error(tmpdir):
-    """Test that attempting to virtualize a sharded Zarr V3 array raises NotImplementedError."""
+def test_sharded_array_roundtrip(tmpdir):
+    """Test that a sharded Zarr V3 array can be virtualized and read back correctly."""
     filepath = f"{tmpdir}/test_sharded.zarr"
 
-    # Create a Zarr V3 group with a sharded array
+    # Create a Zarr V3 group with a sharded array containing real data
     root = zarr.open_group(store=filepath, mode="w", zarr_format=3)
-    root.create_array(
+    data = np.arange(100 * 100, dtype="float32").reshape(100, 100)
+    arr = root.create_array(
         name="data",
         shape=(100, 100),
         chunks=(10, 10),
-        shards=(50, 50),  # This adds sharding
+        shards=(50, 50),
         dtype="float32",
     )
+    arr[:] = data
 
-    # Attempt to open with VirtualiZarr should raise NotImplementedError
+    # Parse with VirtualiZarr
     store = LocalStore(prefix=filepath)
     registry = ObjectStoreRegistry({f"file://{filepath}": store})
     parser = ZarrParser()
+    manifeststore = parser(url=filepath, registry=registry)
 
-    with pytest.raises(
-        NotImplementedError,
-        match="Zarr V3 arrays with sharding are not yet supported",
-    ):
-        parser(url=filepath, registry=registry)
+    # Read back via ManifestStore and compare to original
+    with xr.open_dataset(
+        filepath, engine="zarr", consolidated=False, zarr_format=3
+    ) as expected:
+        with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)
 
 
 @requires_minio
