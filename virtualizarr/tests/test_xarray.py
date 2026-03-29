@@ -572,33 +572,23 @@ class TestDetermineCoords:
 
 @requires_network
 class TestReadRemote:
-    @slow_test
-    @pytest.mark.parametrize(
-        "indexes",
-        [
-            None,
-            pytest.param({}, marks=pytest.mark.xfail(reason="not implemented")),
-        ],
-        ids=["None index", "empty dict index"],
-    )
-    def test_anon_read_s3(self, indexes):
+    def test_anon_read_s3(self):
         """Parameterized tests for empty vs supplied indexes and filetypes."""
         # TODO: Switch away from this s3 url after minIO is implemented.
-        filepath = "s3://carbonplan-share/virtualizarr/local.nc"
-        object_store = obstore_s3(url=filepath, region="us-west-2")
+        filepath = "s3://noaa-cdr-precip-gpcp-daily-pds/data/2025/gpcp_v01r03_daily_d20250430_c20250718.nc"
+        object_store = obstore_s3(url=filepath, region="us-east-1")
         registry = ObjectStoreRegistry()
         registry.register(filepath, object_store)
         parser = HDFParser()
         with open_virtual_dataset(
             url=filepath,
             registry=registry,
-            indexes=indexes,
             parser=parser,
         ) as vds:
-            assert vds.dims == {"time": 2920, "lat": 25, "lon": 53}
+            assert vds.dims == {"latitude": 180, "nv": 2, "longitude": 360, "time": 1}
 
-            assert isinstance(vds["air"].data, ManifestArray)
-            for name in ["time", "lat", "lon"]:
+            assert isinstance(vds["precip"].data, ManifestArray)
+            for name in ["time", "latitude", "longitude"]:
                 assert isinstance(vds[name].data, np.ndarray)
 
     @slow_test
