@@ -518,7 +518,7 @@ def write_virtual_variable_to_icechunk(
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
-            chunks=metadata.chunks,
+            chunks=metadata.chunk_grid.chunk_shape,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
             compressors=compressors,
@@ -580,6 +580,14 @@ def write_manifest_virtual_refs(
         )
         for grid_index, entry in manifest.iter_refs()
     ]
+
+    print(f"  write_manifest_virtual_refs: arr_name={arr_name}, num_specs={len(virtual_chunk_spec_list)}")
+    if arr_name == "embeddings":
+        target = [0, 0, 48, 97]
+        match = [s for s in virtual_chunk_spec_list if s.index == target]
+        print(f"  chunk [0,0,48,97]: found={len(match)}")
+        if match:
+            print(f"  location={match[0].location!r}, offset={match[0].offset}, length={match[0].length}")
 
     store.set_virtual_refs(
         array_path=key_prefix,
