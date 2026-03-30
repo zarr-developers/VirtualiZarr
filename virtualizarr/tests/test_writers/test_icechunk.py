@@ -1004,7 +1004,11 @@ def test_write_empty_chunk(
 
 
 def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
-    """Test that a sharded Zarr V3 array preserves shard and chunk shapes through icechunk."""
+    """
+    Test that a sharded Zarr V3 array preserves shard and chunk shapes through icechunk.
+    
+    Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/951.
+    """
     from obstore.store import LocalStore
     from obspec_utils.registry import ObjectStoreRegistry
 
