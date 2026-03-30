@@ -10,28 +10,22 @@ from collections.abc import (
     ValuesView,
 )
 from pathlib import PosixPath
-from typing import TYPE_CHECKING, Any, NewType, TypedDict, cast
+from typing import Any, NewType, TypedDict, cast
+from urllib.parse import urlparse
 
 import numpy as np
 
-from virtualizarr.manifests.utils import compiled_chunk_pattern, parse_manifest_index
+from virtualizarr.manifests.utils import (
+    ChunkKeySeparator,
+    compiled_chunk_pattern,
+    parse_manifest_index,
+)
 from virtualizarr.types import ChunkKey
 
-if TYPE_CHECKING:
-    import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
 
-# doesn't guarantee that writers actually handle these
-VALID_URI_PREFIXES = {
-    "s3://",
-    "gs://",
-    "azure://",
-    "r2://",
-    "cos://",
-    "minio://",
-    "file:///",
-    "http://",
-    "https://",
-}
+def _is_uri(path: str) -> bool:
+    """Check if a path is a URI by looking for a scheme."""
+    return bool(urlparse(path).scheme)
 
 
 class ChunkEntry(TypedDict):
@@ -75,7 +69,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     if path == "":
         # (empty paths are allowed through as they represent missing chunks)
         return path
-    elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
+    elif _is_uri(path):
         return path  # path is already in URI form
     else:
         # must be a posix filesystem path (absolute or relative)
@@ -190,7 +184,12 @@ class ChunkManifest:
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
 
-    def __init__(self, entries: dict, shape: tuple[int, ...] | None = None) -> None:
+    def __init__(
+        self,
+        entries: dict,
+        shape: tuple[int, ...] | None = None,
+        separator: ChunkKeySeparator = ".",
+    ) -> None:
         """
         Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
 
@@ -207,15 +206,18 @@ class ChunkManifest:
                 "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
             }
             ```
+        separator
+            The chunk key separator, as specified by the array's chunk_key_encoding
+            metadata. Either "." (default/v2 encoding) or "/" (default encoding).
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
 
         # TODO do some input validation here first?
-        validate_chunk_keys(entries.keys())
+        validate_chunk_keys(entries.keys(), separator)
 
         if shape is None:
-            shape = get_chunk_grid_shape(entries.keys())
+            shape = get_chunk_grid_shape(entries.keys(), separator)
 
         # Initializing to empty implies that entries with path='' are treated as missing chunks
         paths = cast(  # `np.empty` apparently is type hinted as if the output could have Any dtype
@@ -237,7 +239,7 @@ class ChunkManifest:
             path, offset, length = entry.values()
             entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
-            split_key = parse_manifest_index(key)
+            split_key = parse_manifest_index(key, separator)
             paths[split_key] = entry["path"]
             offsets[split_key] = entry["offset"]
             lengths[split_key] = entry["length"]
@@ -323,55 +325,6 @@ class ChunkManifest:
         obj._lengths = lengths
 
         return obj
-
-    @classmethod
-    def _from_arrow(
-        cls,
-        *,
-        paths: "pa.StringArray",
-        offsets: "pa.UInt64Array",
-        lengths: "pa.UInt64Array",
-        shape: tuple[int, ...],
-    ) -> "ChunkManifest":
-        """
-        Create a ChunkManifest from flat 1D PyArrow arrays.
-
-        Avoids intermediate Python dicts by converting Arrow arrays directly
-        to the numpy arrays used internally by ChunkManifest.
-
-        Parameters
-        ----------
-        paths
-            Full paths to chunks, as a PyArrow StringArray. Nulls represent missing chunks.
-        offsets
-            Byte offsets of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
-        lengths
-            Byte lengths of chunks, as a PyArrow UInt64Array. Nulls represent missing chunks.
-        shape
-            Shape to reshape the flat arrays into.
-        """
-        import pyarrow as pa  # type: ignore[import-untyped,import-not-found]
-        import pyarrow.compute as pc  # type: ignore[import-untyped,import-not-found]
-
-        arrow_paths = pc.if_else(pc.is_null(paths), "", paths)
-        arrow_offsets = pc.if_else(
-            pc.is_null(offsets), pa.scalar(0, pa.uint64()), offsets
-        )
-        arrow_lengths = pc.if_else(
-            pc.is_null(lengths), pa.scalar(0, pa.uint64()), lengths
-        )
-
-        np_paths = arrow_paths.to_numpy(zero_copy_only=False).astype(
-            np.dtypes.StringDType()
-        )
-        np_offsets = arrow_offsets.to_numpy(zero_copy_only=False)
-        np_lengths = arrow_lengths.to_numpy(zero_copy_only=False)
-
-        return cls.from_arrays(
-            paths=np_paths.reshape(shape),
-            offsets=np_offsets.reshape(shape),
-            lengths=np_lengths.reshape(shape),
-        )
 
     @property
     def ndim_chunk_grid(self) -> int:
@@ -475,6 +428,47 @@ class ChunkManifest:
         lengths_equal = (self._lengths == other._lengths).all()
         return paths_equal and offsets_equal and lengths_equal
 
+    def get_entry(self, indices: tuple[int, ...]) -> ChunkEntry | None:
+        """Look up a chunk entry by grid indices. Returns None for missing chunks (empty path)."""
+        path = self._paths[indices]
+        if path == "":
+            return None
+        offset = self._offsets[indices]
+        length = self._lengths[indices]
+        return ChunkEntry(path=path, offset=offset, length=length)
+
+    def elementwise_eq(self, other: "ChunkManifest") -> np.ndarray:
+        """Return boolean array where True means that chunk entry matches."""
+        return (
+            (self._paths == other._paths)
+            & (self._offsets == other._offsets)
+            & (self._lengths == other._lengths)
+        )
+
+    def iter_nonempty_paths(self) -> Iterator[str]:
+        """Yield all non-empty paths in the manifest."""
+        for path in self._paths.flat:
+            if path:
+                yield path
+
+    def iter_refs(self) -> Iterator[tuple[tuple[int, ...], ChunkEntry]]:
+        """Yield (grid_indices, chunk_entry) for every non-missing chunk."""
+        coord_vectors = np.mgrid[
+            tuple(slice(None, length) for length in self.shape_chunk_grid)
+        ]
+        for *inds, path, offset, length in np.nditer(
+            [*coord_vectors, self._paths, self._offsets, self._lengths],
+            flags=("refs_ok",),
+        ):
+            if path.item() != "":
+                idx = tuple(int(i) for i in inds)
+                yield (
+                    idx,
+                    ChunkEntry(
+                        path=path.item(), offset=offset.item(), length=length.item()
+                    ),
+                )
+
     def rename_paths(
         self,
         new: str | Callable[[str], str],
@@ -534,39 +528,45 @@ def join(inds: Iterable[Any]) -> ChunkKey:
     return cast(ChunkKey, ".".join(str(i) for i in list(inds)))
 
 
-def get_ndim_from_key(key: str) -> int:
+def get_ndim_from_key(key: str, separator: ChunkKeySeparator = ".") -> int:
     """Get number of dimensions implied by key, e.g. '4.5.6' -> 3"""
-    return len(parse_manifest_index(key))
+    return len(parse_manifest_index(key, separator))
 
 
-def validate_chunk_keys(chunk_keys: Iterable[ChunkKey]):
+def validate_chunk_keys(
+    chunk_keys: Iterable[ChunkKey], separator: ChunkKeySeparator = "."
+) -> None:
     if not chunk_keys:
         return
-
+    pattern = compiled_chunk_pattern(separator)
     # Check if all keys have the correct form
     for key in chunk_keys:
-        if not re.match(compiled_chunk_pattern("."), key):
+        if not re.match(pattern, key):
             raise ValueError(f"Invalid format for chunk key: '{key}'")
 
     # Check if all keys have the same number of dimensions
     first_key, *other_keys = list(chunk_keys)
-    ndim = get_ndim_from_key(first_key)
+    ndim = get_ndim_from_key(first_key, separator)
     for key in other_keys:
-        other_ndim = get_ndim_from_key(key)
+        other_ndim = get_ndim_from_key(key, separator)
         if other_ndim != ndim:
             raise ValueError(
                 f"Inconsistent number of dimensions between chunk key {key} and {first_key}: {other_ndim} vs {ndim}"
             )
 
 
-def get_chunk_grid_shape(chunk_keys: Iterable[ChunkKey]) -> tuple[int, ...]:
+def get_chunk_grid_shape(
+    chunk_keys: Iterable[ChunkKey], separator: ChunkKeySeparator = "."
+) -> tuple[int, ...]:
     # find max chunk index along each dimension
     chunk_keys = tuple(chunk_keys)
 
     if chunk_keys == ("c",):
         # Scalar array, cannot be split
         return ()
-    zipped_indices = zip(*map(parse_manifest_index, chunk_keys))
+    zipped_indices = zip(
+        *map(lambda key: parse_manifest_index(key, separator), chunk_keys)
+    )
     chunk_grid_shape = tuple(
         max(indices_along_one_dim) + 1 for indices_along_one_dim in zipped_indices
     )

@@ -184,7 +184,7 @@ def manifestarray_from_kerchunk_refs(
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
 
-        shape = ChunkGrid.from_metadata(metadata).shape
+        shape = ChunkGrid.from_metadata(metadata).grid_shape
         manifest = ChunkManifest(entries={}, shape=shape)
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     else:
