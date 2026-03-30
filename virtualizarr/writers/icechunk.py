@@ -581,14 +581,6 @@ def write_manifest_virtual_refs(
         for grid_index, entry in manifest.iter_refs()
     ]
 
-    print(f"  write_manifest_virtual_refs: arr_name={arr_name}, num_specs={len(virtual_chunk_spec_list)}")
-    if arr_name == "embeddings":
-        target = [0, 0, 48, 97]
-        match = [s for s in virtual_chunk_spec_list if s.index == target]
-        print(f"  chunk [0,0,48,97]: found={len(match)}")
-        if match:
-            print(f"  location={match[0].location!r}, offset={match[0].offset}, length={match[0].length}")
-
     store.set_virtual_refs(
         array_path=key_prefix,
         chunks=virtual_chunk_spec_list,
