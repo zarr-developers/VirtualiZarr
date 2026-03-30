@@ -9,10 +9,9 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
-from zarr.core.metadata import ArrayV3Metadata
-
-from obstore.store import LocalStore
 from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
+from zarr.core.metadata import ArrayV3Metadata
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -1011,7 +1010,7 @@ def test_write_empty_chunk(
 def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
     """
     Test that a sharded Zarr V3 array preserves shard and chunk shapes through icechunk.
-    
+
     Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/951.
     """
     filepath = str(tmp_path / "test_sharded.zarr")
