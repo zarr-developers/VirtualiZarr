@@ -11,7 +11,12 @@ import xarray.testing as xrt
 import zarr
 from zarr.core.metadata import ArrayV3Metadata
 
+from obstore.store import LocalStore
+from obspec_utils.registry import ObjectStoreRegistry
+
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.parsers.zarr import ZarrParser
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
@@ -1009,12 +1014,6 @@ def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
     
     Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/951.
     """
-    from obstore.store import LocalStore
-    from obspec_utils.registry import ObjectStoreRegistry
-
-    from virtualizarr import open_virtual_dataset
-    from virtualizarr.parsers.zarr import ZarrParser
-
     filepath = str(tmp_path / "test_sharded.zarr")
 
     # Create a sharded zarr store
