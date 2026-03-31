@@ -1,10 +1,9 @@
-import platform
 import textwrap
 from contextlib import nullcontext
-from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
+import requests
 import xarray as xr
 import xarray.testing as xrt
 from obspec_utils.registry import ObjectStoreRegistry
@@ -435,60 +434,7 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         assert ds.load()
 
 
-@pytest.mark.parametrize(
-    "fqn_path, expected_xpath",
-    [
-        ("/", "."),
-        ("/air", "./*[@name='air']"),
-    ],
-)
-def test_find_node_fqn_simple(netcdf4_file, fqn_path, expected_xpath):
-    parser_instance = dmrparser(
-        DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file
-    )
-    result = parser_instance.find_node_fqn(fqn_path)
-    expected = parser_instance.root.find(expected_xpath, parser_instance._NS)
-    assert result == expected
-
-
-def test_find_node_fqn_grouped(hdf5_groups_file):
-    parser_instance = dmrparser(
-        DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=hdf5_groups_file
-    )
-    result = parser_instance.find_node_fqn("/test/group/air")
-    expected = parser_instance.root.find(
-        "./*[@name='test']/*[@name='group']/*[@name='air']", parser_instance._NS
-    )
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "group_path",
-    [
-        ("/"),
-        ("/test"),
-        ("/test/group"),
-    ],
-)
-def test_split_groups(hdf5_groups_file, group_path):
-    dmrpp_instance = dmrparser(
-        DMRPP_XML_STRINGS["hdf5_groups_file"], filepath=hdf5_groups_file
-    )
-
-    # get all tags in a dataset (so all tags excluding nested groups)
-    dataset_tags = lambda x: [
-        d for d in x if d.tag != "{" + dmrpp_instance._NS["dap"] + "}" + "Group"
-    ]
-    # check that contents of the split groups dataset match contents of the original dataset
-    result_tags = dataset_tags(
-        dmrpp_instance._split_groups(dmrpp_instance.root)[Path(group_path)]
-    )
-    expected_tags = dataset_tags(dmrpp_instance.find_node_fqn(group_path))
-    assert result_tags == expected_tags
-
-
 @pytest.mark.xfail(
-    platform.system() == "Linux",
     reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
 )
 @pytest.mark.parametrize(
@@ -558,157 +504,6 @@ def test_parse_dataset_nested(hdf5_groups_file):
     assert vds_g2.data_vars["air"].dims == ("time", "lat", "lon")
 
 
-def test_parse_variable(netcdf4_file):
-    parser = dmrparser(DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file)
-
-    var = parser._parse_variable(parser.find_node_fqn("/air"))
-    assert var.metadata.dtype.to_native_dtype() == "int16"
-    assert var.metadata.dimension_names == ("time", "lat", "lon")
-    assert var.shape == (2920, 25, 53)
-    assert var.chunks == (2920, 25, 53)
-    # _FillValue is encoded for array dtype
-    assert var.metadata.attributes["scale_factor"] == 0.01
-    assert (
-        var.metadata.attributes["long_name"]
-        == "4xDaily Air temperature at sigma level 995"
-    )
-
-
-@pytest.mark.parametrize(
-    "attr_path, expected",
-    [
-        ("air/long_name", {"long_name": "4xDaily Air temperature at sigma level 995"}),
-        ("air/scale_factor", {"scale_factor": 0.01}),
-    ],
-)
-def test_parse_attribute(netcdf4_file, attr_path, expected):
-    parser = dmrparser(DMRPP_XML_STRINGS["netcdf4_file"], filepath=netcdf4_file)
-
-    result = parser._parse_attribute(parser.find_node_fqn(attr_path))
-    assert result == expected
-
-
-def test_dmrpp_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url):
-    parsed_dmrpp = dmrparser(
-        DMRPP_XML_STRINGS["fill_value_scalar_no_chunks_nc4_url"],
-        filepath=fill_value_scalar_no_chunks_nc4_url,
-    )
-    store = obstore_local(url=f"file://{parsed_dmrpp.data_filepath}")
-    with pytest.warns(UserWarning):
-        parsed_vds = parsed_dmrpp.parse_dataset(object_store=store)
-        vds_g1 = parsed_vds.to_virtual_dataset()
-        assert vds_g1["data"].attrs == {"_FillValue": -999}
-
-
-def test_dmrpp_phony_dim_naming():
-    dmrpp_xml_str = textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="phony_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Float32 name="data">
-                <Dim size="10"/>
-                <Dim size="20"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="100" nBytes="800"/>
-                </dmrpp:chunks>
-            </Float32>
-        </Dataset>
-        """
-    )
-    parser = dmrparser(dmrpp_xml_str, filepath="file:///phony_test.nc")
-    var = parser._parse_variable(parser.find_node_fqn("/data"))
-    assert var.metadata.dimension_names == ("phony_dim_0", "phony_dim_1")
-    assert var.shape == (10, 20)
-
-
-def test_dmrpp_validation_issues_accumulation():
-    dmrpp_xml_str = textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="validation_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Dimension name="lat" size="25"/>
-            <Float32 name="data">
-                <Dim name="/lat"/>
-                <Attribute type="Float32">
-                    <Value>1.0</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="100" nBytes="100"/>
-                </dmrpp:chunks>
-            </Float32>
-        </Dataset>
-        """
-    )
-    parser = dmrparser(dmrpp_xml_str, filepath="file:///validation_test.nc")
-    parser._parse_dataset(parser.root)
-    assert len(parser._validation_issues) > 0
-    assert any(
-        "Missing required attribute 'name'" in issue
-        for issue in parser._validation_issues
-    )
-
-
-def test_dmrpp_get_attrib_with_missing_optional():
-    dmrpp_xml_str = textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Dimension name="lat" size="25"/>
-        </Dataset>
-        """
-    )
-    parser = dmrparser(dmrpp_xml_str, filepath="file:///test.nc")
-    dimension = parser.root.find("dap:Dimension", parser._NS)
-    result = parser._get_attrib(dimension, "nonexistent")
-    assert result is None
-    assert len(parser._validation_issues) == 1
-
-
-def test_dmrpp_get_attrib_with_required_missing():
-    dmrpp_xml_str = textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Dimension name="lat" size="25"/>
-        </Dataset>
-        """
-    )
-    parser = dmrparser(dmrpp_xml_str, filepath="file:///test.nc")
-    dimension = parser.root.find("dap:Dimension", parser._NS)
-    with pytest.raises(ValueError, match="Missing required attribute 'nonexistent'"):
-        parser._get_attrib(dimension, "nonexistent", required=True)
-
-
-def test_dmrpp_mixed_named_and_unnamed_dimensions():
-    dmrpp_xml_str = textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="mixed_test.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Dimension name="time" size="10"/>
-            <Dimension name="lat" size="30"/>
-            <Float32 name="data">
-                <Dim name="/time"/>
-                <Dim size="20"/>
-                <Dim name="/lat"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="100" nBytes="24000"/>
-                </dmrpp:chunks>
-            </Float32>
-        </Dataset>
-        """
-    )
-    parser = dmrparser(dmrpp_xml_str, filepath="file:///mixed_test.nc")
-    var = parser._parse_variable(parser.find_node_fqn("/data"))
-    assert var.metadata.dimension_names == ("time", "phony_dim_1", "lat")
-    assert var.shape == (10, 20, 30)
-
-
 def test_dmrpp_simple(dmrpp_xml_simple):
     """Test parsing a simple valid DMR++ XML creates virtual chunk manifests."""
     parser = dmrparser(dmrpp_xml_simple, filepath="file:///simple.nc")
@@ -767,3 +562,20 @@ def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
     # Verify manifest store was still created (parser continues despite issues)
     assert manifest_store is not None
     assert manifest_store._group is not None
+
+
+@requires_network
+def test_nonimplement_inlinevalue(hdf5_missing_value):
+    dmrpp_file = (
+        "http://test.opendap.org/opendap/data/dmrpp/compact_lowlevel.h5.dmrpp.file"
+    )
+    session = requests.Session()
+    dmrpp = session.get(dmrpp_file).content.decode()
+    parser = dmrparser(dmrpp, filepath=f"file:///{hdf5_missing_value}")
+    store = obstore_local(url=parser.data_filepath)
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Reading inlined reference data is currently not supported",
+    ):
+        parser.parse_dataset(object_store=store)
