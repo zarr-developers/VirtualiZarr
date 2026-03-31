@@ -16,6 +16,10 @@
 
 ### Internal changes
 
+- Migrates bulk of `dmrpp parser` to `Pydap`.
+  ([#902](https://github.com/zarr-developers/VirtualiZarr/pull/902)).
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez).
+
 ## v2.5.0 (23rd March 2026)
 
 Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders of magnitude better performance, more FAQ docs, and various bugfixes.
