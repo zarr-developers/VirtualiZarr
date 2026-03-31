@@ -518,7 +518,7 @@ def write_virtual_variable_to_icechunk(
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
-            chunks=metadata.chunks,
+            chunks=metadata.chunk_grid.chunk_shape,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
             compressors=compressors,
