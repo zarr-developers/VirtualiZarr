@@ -14,10 +14,10 @@ import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.core.metadata.v3 import RegularChunkGrid
 from zarr.experimental import ChunkGrid
 from zarr.storage import ObjectStore
 
