@@ -135,6 +135,7 @@ dev = [
     "s3fs",
     "lithops",
     "dask",
+    "tifffile>=2026.2.16,<2027"
 ]
 
 [project.urls]
@@ -187,6 +188,11 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+[tool.pixi.feature.rectilinear.pypi-dependencies]
+zarr = { git = "https://github.com/maxrjones/zarr-python.git", branch = "poc/unified-chunk-grid" }
+xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "poc/unified-zarr-chunk-grid" }
+virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "poc/unified-chunk-grid" }
+
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"
 numpy = "==2.1.0"
@@ -214,12 +220,13 @@ min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
 test-py311 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","py311"] # test against python 3.11
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.13
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.12
 test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","minimum-versions", "py311"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "zarr", "py313"]
+rectilinear = ["dev", "test", "tiff", "hdf5-lib", "rectilinear", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff","zarr", "py313"]
 
