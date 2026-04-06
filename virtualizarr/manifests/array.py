@@ -280,7 +280,14 @@ class ManifestArray:
 
         # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
         # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
-        dims = self.metadata.dimension_names or ()
+        if self.metadata.dimension_names is not None:                                                                                                                                                             
+            dims = self.metadata.dimension_names
+        elif self.ndim == 0:                                                                                                                                                                                      
+            dims = ()             
+        else:
+            raise ValueError(
+                f"Cannot create virtual variable from {self.ndim}-dimensional array without dimension names."
+            )
         attrs = self.metadata.attributes
         stripped_metadata = utils.copy_and_replace_metadata(
             self.metadata, new_dimension_names=None, new_attributes={}
