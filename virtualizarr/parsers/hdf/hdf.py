@@ -366,7 +366,7 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
 
 def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
     import h5py
-    
+
     dimension_names = []
     non_coordinate_dimension_variables = []
     for name, obj in group.items():
