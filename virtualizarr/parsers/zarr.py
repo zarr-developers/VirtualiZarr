@@ -303,9 +303,9 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     else:
         v3_dict = metadata.to_dict()
 
-    # For V3 scalar arrays, dimension_names is null per spec but xarray requires an
-    # iterable. Normalize to [] so it round-trips as () after from_dict, matching
-    # what the V2 path produces via _ARRAY_DIMENSIONS: [].
+    # For V3 scalar arrays, dimension_names is null, which causes a `TypeError`:
+    # `TypeError: 'NoneType' object is not iterable`
+    # This normalizes it to match Zarr V2 scalar behavior.
     if v3_dict.get("dimension_names") is None and v3_dict.get("shape") == ():
         v3_dict["dimension_names"] = []
 
