@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Callable, Union
+from typing import Any, Callable, Union, cast
 
 import numpy as np
 import xarray as xr
@@ -12,6 +12,7 @@ from virtualizarr.manifests.array_api import (
 )
 from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.manifests.utils import ChunkKeySeparator
 
 
 class ManifestArray:
@@ -57,7 +58,11 @@ class ManifestArray:
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
-            _chunkmanifest = ChunkManifest(entries=chunkmanifest)
+            separator = cast(
+                ChunkKeySeparator,
+                getattr(_metadata.chunk_key_encoding, "separator", "."),
+            )
+            _chunkmanifest = ChunkManifest(entries=chunkmanifest, separator=separator)
         else:
             raise TypeError(
                 f"chunkmanifest arg must be of type ChunkManifest or dict, but got type {type(chunkmanifest)}"
@@ -189,13 +194,7 @@ class ManifestArray:
                 )
 
                 # do chunk-wise comparison
-                equal_chunk_paths = self.manifest._paths == other.manifest._paths
-                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
-                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
-
-                equal_chunks = (
-                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
-                )
+                equal_chunks = self.manifest.elementwise_eq(other.manifest)
 
                 if not equal_chunks.all():
                     # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False

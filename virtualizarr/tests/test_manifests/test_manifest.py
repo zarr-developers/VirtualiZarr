@@ -54,6 +54,20 @@ class TestPathValidation:
             length=100,
         )
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "az://container/path/to/file.nc",
+            "abfs://container/path/to/file.nc",
+            "abfss://container/path/to/file.nc",
+            "gcs://bucket/path/to/file.nc",
+        ],
+    )
+    def test_allow_object_store_urls(self, url):
+        """Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/771"""
+        chunkentry = ChunkEntry.with_validation(path=url, offset=100, length=100)
+        assert chunkentry["path"] == url
+
 
 class TestConvertingRelativePathsUsingFSRoot:
     def test_fs_root_must_be_absolute(self):
@@ -146,6 +160,26 @@ class TestCreateManifest:
             "0": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
         }
         with pytest.raises(ValueError, match="Inconsistent number of dimensions"):
+            ChunkManifest(entries=chunks)
+
+    def test_slash_separator(self):
+        """Chunk keys using '/' separator should be accepted when separator='/'."""
+        chunks = {
+            "0/0": {"path": "/foo.nc", "offset": 100, "length": 100},
+            "0/1": {"path": "/foo.nc", "offset": 200, "length": 100},
+            "1/0": {"path": "/foo.nc", "offset": 300, "length": 100},
+            "1/1": {"path": "/foo.nc", "offset": 400, "length": 100},
+        }
+        manifest = ChunkManifest(entries=chunks, separator="/")
+        assert manifest.shape_chunk_grid == (2, 2)
+        assert manifest.ndim_chunk_grid == 2
+
+    def test_slash_separator_rejected_without_separator_param(self):
+        """Chunk keys using '/' should fail validation when separator is '.' (the default)."""
+        chunks = {
+            "0/0": {"path": "/foo.nc", "offset": 100, "length": 100},
+        }
+        with pytest.raises(ValueError, match="Invalid format for chunk key"):
             ChunkManifest(entries=chunks)
 
     def test_remove_chunks_with_empty_paths(self):

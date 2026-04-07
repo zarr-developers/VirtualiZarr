@@ -1,8 +1,36 @@
 # Release notes
 
-## vX.Y.Z+1 (unreleased)
+## v2.5.1 (unreleased)
 
 ### New Features
+
+- Support for sharded Zarr V3 arrays in `ZarrParser`.
+  ([#946](https://github.com/zarr-developers/VirtualiZarr/pull/946)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+## v2.5.0 (23rd March 2026)
+
+Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders of magnitude better performance, more FAQ docs, and various bugfixes.
+
+### New Features
+
+- Added `region` parameter to `to_icechunk()`.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
+- Support configurable chunk separator.
+  ([#917](https://github.com/zarr-developers/VirtualiZarr/pull/917)).
+  By [Max Jones](https://github.com/maxrjones).
+- Improved `ZarrParser` performance enormously by using obstore to list chunks in a directory instead of getting all their sizes individually.
+  ([#892](https://github.com/zarr-developers/VirtualiZarr/pull/892)).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
 
 ### Breaking changes
 
@@ -30,23 +58,50 @@
   mode on platforms that default to `"fork"`
   ([#899](https://github.com/zarr-developers/VirtualiZarr/pull/899)). By [Chuck
   Daniels](https://github.com/chuckwondo).
+- Fix `ZarrParser` not using the store-relative path when the zarr store is nested inside the object store root
+  ([#913](https://github.com/zarr-developers/VirtualiZarr/pull/913)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ZarrParser` not correctly parsing scalar variables from v2 native zarr stores ([#936](https://github.com/zarr-developers/VirtualiZarr/pull/936)).
+  By [Julius Busecke](https://github.com/jbusecke)
+- Fix dmrpp error handling ([#880](https://github.com/zarr-developers/VirtualiZarr/pull/880)).
+  By [Luis López](https://github.com/betolink).
+- Fix error when running with Zarr-Python 3.1.0 ([#868](https://github.com/zarr-developers/VirtualiZarr/pull/868)).
+  By [Rajat Shinde](https://github.com/omshinde).
+- Fix coordinate name issue ([#924](https://github.com/zarr-developers/VirtualiZarr/pull/924)).
+  By [UserNobody14](https://github.com/UserNobody14).
+- Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ### Documentation
 
+- Added FAQ answer comparing the Kerchunk and Icechunk serialization formats. ([#818](https://github.com/zarr-developers/VirtualiZarr/pull/818)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- FAQ answer on "why still write native zarr?" ([#918](https://github.com/zarr-developers/VirtualiZarr/pull/918)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Updated FAQ regarding virtualizing existing Zarr V2 data ([#893](https://github.com/zarr-developers/VirtualiZarr/pull/893)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- R2 docs ([#937](https://github.com/zarr-developers/VirtualiZarr/pull/937)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
+- Inlined `virtualizarr.writers.icechunk.generate_chunk_key` in `virtualizarr.writers.icechunk.write_manifest_virtual_refs`, and deleted the original function.
+  ([#873](https://github.com/zarr-developers/VirtualiZarr/pull/873)).
+  By [Vladislav Wohlrath](https://github.com/vladidobro).
 - Skip unnecessary re-validation of already-validated paths during manifest concatenation([#910](https://github.com/zarr-developers/VirtualiZarr/pull/910)).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Completely rewrote the `ZarrParser` to use numpy string arrays for efficiency ([#927](https://github.com/zarr-developers/VirtualiZarr/pull/927)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Testing across all supported python versions ([#932](https://github.com/zarr-developers/VirtualiZarr/pull/932)).
+  By [Julius Busecke](https://github.com/jbusecke)
+- Compile regular expressions for improved performance ([#909](https://github.com/zarr-developers/VirtualiZarr/pull/909)).
+  By [Chuck Daniels](https://github.com/chuckwondo).
 
 ## v2.4.0 (24th January 2026)
 
 This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils`, and provides a way to customize how files are read, which can easily allow `open_virtual_dataset` to run over ~5x faster.
 
 ### New Features
-
-- Improved `ZarrParser` performance.
-  ([#892](https://github.com/zarr-developers/VirtualiZarr/pull/892)).
-  By [Raphael Hagen](https://github.com/norlandrhagen).
 
 - Added `reader_factory` parameter to `HDFParser` to allow customizing how files are read
   ([#844](https://github.com/zarr-developers/VirtualiZarr/pull/844)).
@@ -62,6 +117,13 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   - `ObstoreReader` has been removed from `virtualizarr.utils`. This should not break user's code, as it was not part of the public/documented API. See [obspec_utils](https://obspec-utils.readthedocs.io/en/latest/api/obspec/) for public file handlers.
   - Added `obspec_utils>=0.7.0` as a required dependency. This package provides the `ObjectStoreRegistry` that was previously part of VirtualiZarr.
   - Minimum required version of `obstore` is now `0.7.0` (previously `0.5.1`). This was the first release to implement obspec protocols.
+
+### Documentation
+
+- Added example of virtualizing GOES using caching and request splitting ([#855](https://github.com/zarr-developers/VirtualiZarr/pull/855)).
+  By [Max Jones](https://github.com/maxrjones).
+- Updated kerchunk comparison in FAQ ([#856](https://github.com/zarr-developers/VirtualiZarr/pull/856)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.3.0 (20th January 2026)
 
@@ -97,7 +159,7 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
   ([#790](https://github.com/zarr-developers/VirtualiZarr/pull/790)).
   By [Ilan Gold](https://github.com/ilan-gold)
 - `ZarrParser` now handles Zarr V2 and V3 array parsing.
-  ([#565](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
+  ([#822](https://github.com/zarr-developers/VirtualiZarr/pull/822)).
   By [Neil Schroeder](https://github.com/neilSchroeder)
 - Add Virtual TIFF as an optional dependency for TIFF parsing.
   ([#810](https://github.com/zarr-developers/VirtualiZarr/pull/810))
@@ -113,6 +175,12 @@ This release moves the `ObjectStoreRegistry` to a separate package `obspec_utils
 - Return None for Zarr V2/consolidated metadata requests.
   ([#827](https://github.com/zarr-developers/VirtualiZarr/pull/827)).
   By [Max Jones](https://github.com/maxrjones)
+- Raise informative error on Zarr V2 parsing with Zarr-Python<3.1.3
+  ([#829](https://github.com/zarr-developers/VirtualiZarr/pull/829)).
+  By [Max Jones](https://github.com/maxrjones).
+- Revert "Remove unnecessary dtype conversion in icechunk writer"
+  ([#805](https://github.com/zarr-developers/VirtualiZarr/pull/805)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 

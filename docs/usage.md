@@ -59,7 +59,6 @@ that can access your data. Available ObjectStores are described in the [obstore 
     from obspec_utils.registry import ObjectStoreRegistry
     from obstore.store import from_url
 
-
     from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
     from virtualizarr.parsers import HDFParser
 
@@ -68,6 +67,35 @@ that can access your data. Available ObjectStores are described in the [obstore 
     url = f"{bucket}/{path}"
     store = from_url(bucket)
     registry = ObjectStoreRegistry({bucket: store})
+
+    ```
+
+=== "R2"
+
+    ```python
+
+    import xarray as xr
+    from obstore.store import S3Store
+    from obspec_utils.registry import ObjectStoreRegistry
+
+    from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+    from virtualizarr.parsers import HDFParser
+
+    endpoint = "https://f0b62eebfbdde1133378bfe3958325f6.r2.cloudflarestorage.com"
+    access_key_id = "<access_key_id>"
+    secret_access_key = "<secret_access_key>"
+    path = "<path_to_files>"
+    scheme = "s3://"
+    bucket_name = "<bucket_name>"
+    bucket = f"{scheme}{bucket_name}"
+
+    # create anon s3 store
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, skip_signature=True)
+
+    # create s3 store with aws-style credentials
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, access_key_id=access_key_id, secret_access_key=secret_access_key)
+
+    registry = ObjectStoreRegistry({f"{bucket}": store})
 
     ```
 
@@ -105,16 +133,17 @@ that can access your data. Available ObjectStores are described in the [obstore 
     access_key_id = "<access_key_id>"
     secret_access_key = "<secret_access_key>"
     path = "<path_to_files>"
-    file = "filename.nc"
     scheme = "s3://"
+    bucket_name = "<bucket_name>"
+    bucket = f"{scheme}{bucket_name}"
 
     # create anon s3 store
-    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, skip_signature=True)
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, skip_signature=True)
 
     # create s3 store with aws-style credentials
-    store = S3Store.from_url(f"{scheme}{path}", endpoint=endpoint, access_key_id = aws_access_key_id, secret_access_key=aws_secret_access_key)
+    store = S3Store.from_url(f"{bucket}", endpoint=endpoint, access_key_id = access_key_id, secret_access_key=secret_access_key)
 
-    registry = ObjectStoreRegistry({f"{scheme}{path}": store})
+    registry = ObjectStoreRegistry({f"{bucket}": store})
 
     ```
 
