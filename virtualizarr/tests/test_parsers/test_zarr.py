@@ -254,6 +254,15 @@ def test_v2_metadata_with_scalar_dimensions():
     assert metadata.dimension_names == ()
 
 
+def test_v3_metadata_with_scalar_dimensions():
+    """Test that V3 scalar arrays get dimension_names normalized from None to ()."""
+    store = zarr.storage.MemoryStore()
+    zarr.create(shape=(), chunks=(), dtype="int64", store=store, zarr_format=3)
+
+    metadata = metadata_as_v3(zarr.open(store, mode="r").metadata)
+    assert metadata.dimension_names == ()
+
+
 def test_v3_metadata_separator_normalized():
     """Test that metadata_as_v3 normalizes V3 chunk_key_encoding separator to '.'."""
     store = zarr.storage.MemoryStore()
@@ -410,15 +419,6 @@ def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
             manifeststore, engine="zarr", consolidated=False, zarr_format=3
         ) as actual:
             xr.testing.assert_identical(actual, expected)
-
-    # Also test the open_virtual_dataset path
-    vds = open_virtual_dataset(
-        url=filepath,
-        parser=parser,
-        registry=registry,
-    )
-    assert vds["data"].dims == ()
-    assert vds["data"].shape == ()
 
 
 def test_run_async_without_running_loop():

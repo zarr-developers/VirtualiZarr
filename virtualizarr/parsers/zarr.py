@@ -303,6 +303,12 @@ def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metada
     else:
         v3_dict = metadata.to_dict()
 
+    # For V3 scalar arrays, dimension_names is null per spec but xarray requires an
+    # iterable. Normalize to [] so it round-trips as () after from_dict, matching
+    # what the V2 path produces via _ARRAY_DIMENSIONS: [].
+    if v3_dict.get("dimension_names") is None and v3_dict.get("shape") == ():
+        v3_dict["dimension_names"] = []
+
     # Normalize chunk_key_encoding to DefaultChunkKeyEncoding with "." separator.
     # The ManifestStore expects dot-separated keys (e.g. "0.0.0"), so we enforce
     # this regardless of what the on-disk store uses.
