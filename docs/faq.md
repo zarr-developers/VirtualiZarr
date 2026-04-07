@@ -16,6 +16,7 @@ Some reasons are:
 - Virtualization allows arbitrary differences in metadata compared to the original files - this is mostly a useful feature but it could become out-of-sync or misleading.
 - It creates significant extra work for someone later down the line, and that person will almost certainly know less about the details of the dataset than the data provider does at write time.
 - Chunk sizes matter, and it's generally good to force data providers to think up-front about about what chunk sizes would be optimal for expected user queries.
+- Some other types of optimizations (particularly sharding) are not supported for virtual stores.
 - For static datasets, native Zarr stores scale effortlessly to arbitrary numbers of chunks today, without having to even think about things like [manifest splitting](https://icechunk.io/en/latest/performance/#splitting-manifests).
 
 ### Can my specific data be virtualized?

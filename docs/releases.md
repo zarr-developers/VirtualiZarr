@@ -4,10 +4,6 @@
 
 ### New Features
 
-- Support for sharded Zarr V3 arrays in `ZarrParser`.
-  ([#946](https://github.com/zarr-developers/VirtualiZarr/pull/946)).
-  By [Tom Nicholas](https://github.com/TomNicholas).
-
 ### Breaking changes
 
 ### Bug fixes
