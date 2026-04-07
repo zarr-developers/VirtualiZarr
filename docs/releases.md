@@ -11,6 +11,9 @@
 ### Breaking changes
 
 ### Bug fixes
+- Fixes Zarr V3 Scalar Bug.
+  ([#956](https://github.com/zarr-developers/VirtualiZarr/pull/956)).
+  By [Raphael Hagen](https://github.com/norlandrhagen)
 
 ### Documentation
 
