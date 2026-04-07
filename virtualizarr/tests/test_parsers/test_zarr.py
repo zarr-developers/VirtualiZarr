@@ -411,6 +411,15 @@ def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
         ) as actual:
             xr.testing.assert_identical(actual, expected)
 
+    # Also test the open_virtual_dataset path
+    vds = open_virtual_dataset(
+        url=filepath,
+        parser=parser,
+        registry=registry,
+    )
+    assert vds["data"].dims == ()
+    assert vds["data"].shape == ()
+
 
 def test_run_async_without_running_loop():
     """Test _run_async works normally when no event loop is running."""
