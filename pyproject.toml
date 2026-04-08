@@ -189,7 +189,7 @@ h5netcdf = ">=1.5.0,<2"
 rust = "*"
 
 [tool.pixi.feature.rectilinear.pypi-dependencies]
-zarr = { git = "https://github.com/maxrjones/zarr-python.git", branch = "poc/unified-chunk-grid" }
+zarr = { git = "https://github.com/zarr-developers/zarr-python.git", branch = "main" }
 xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "poc/unified-zarr-chunk-grid" }
 virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "poc/unified-chunk-grid" }
 
