@@ -6,9 +6,11 @@ import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 try:
-    from zarr.core.metadata.v3 import RegularChunkGridMetadata
+    from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
 except ImportError:
-    from zarr.core.metadata.v3 import RegularChunkGrid as RegularChunkGridMetadata
+    from zarr.core.metadata.v3 import (
+        RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
+    )
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (

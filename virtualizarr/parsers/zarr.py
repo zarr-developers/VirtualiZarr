@@ -15,9 +15,11 @@ from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 
 try:
-    from zarr.core.metadata.v3 import RegularChunkGridMetadata
+    from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
 except ImportError:
-    from zarr.core.chunk_grids import RegularChunkGrid as RegularChunkGridMetadata
+    from zarr.core.chunk_grids import (
+        RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
+    )
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
 
