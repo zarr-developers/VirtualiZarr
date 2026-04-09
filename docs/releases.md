@@ -12,6 +12,10 @@
 
 ### Bug fixes
 
+- Fix icechunk writer using inner chunk shape instead of shard shape for sharded arrays.
+  ([#952](https://github.com/zarr-developers/VirtualiZarr/pull/952)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes

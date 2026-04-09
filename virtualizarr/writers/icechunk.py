@@ -7,7 +7,7 @@ from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
@@ -443,9 +443,6 @@ def write_virtual_variable_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from zarr import Array
-
-    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
@@ -513,12 +510,12 @@ def write_virtual_variable_to_icechunk(
             chunk_offsets.append(start // chunk_size)
     else:
         chunk_offsets = [0 for _ in dims]
-        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
-        filters, serializer, compressors = extract_codecs(metadata.codecs)
+        filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
             chunks=metadata.chunks,
+            shards=metadata.shards,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
             compressors=compressors,

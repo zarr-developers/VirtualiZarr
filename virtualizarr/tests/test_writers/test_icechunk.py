@@ -9,9 +9,13 @@ import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
+from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 from zarr.core.metadata import ArrayV3Metadata
 
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.parsers.zarr import ZarrParser
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
@@ -1001,3 +1005,48 @@ def test_write_empty_chunk(
     expected_values = np.full(shape=(5,), fill_value=10, dtype=np.dtype("int32"))
     expected = xr.Variable(data=expected_values, dims=["x"])
     xrt.assert_identical(roundtrip["a"].variable, expected)
+
+
+def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
+    """
+    Test that a sharded Zarr V3 array preserves shard and chunk shapes through icechunk.
+
+    Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/951.
+    """
+    filepath = str(tmp_path / "test_sharded.zarr")
+
+    # Create a sharded zarr store
+    data = np.arange(12 * 12, dtype="float32").reshape(12, 12)
+    ds = xr.Dataset({"data": (("x", "y"), data)})
+    ds.to_zarr(
+        filepath,
+        encoding={"data": {"chunks": (3, 3), "shards": (6, 6)}},
+        consolidated=False,
+        zarr_format=3,
+    )
+
+    # Verify original shapes
+    original_arr = zarr.open_array(filepath + "/data", mode="r")
+    assert original_arr.shards == (6, 6)
+    assert original_arr.chunks == (3, 3)
+
+    # Virtualize with ZarrParser
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+    vds = open_virtual_dataset(url=filepath, registry=registry, parser=parser)
+
+    # Write to icechunk
+    session = icechunk_repo.writable_session("main")
+    vds.vz.to_icechunk(session.store, validate_containers=False)
+    session.commit("test")
+
+    # Read back from icechunk and verify shapes are preserved
+    ro_session = icechunk_repo.readonly_session("main")
+    ic_arr = zarr.open_array(ro_session.store, path="data", mode="r")
+    assert ic_arr.shards == (6, 6), f"Expected shard shape (6,6), got {ic_arr.shards}"
+    assert ic_arr.chunks == (3, 3), f"Expected chunk shape (3,3), got {ic_arr.chunks}"
+
+    # Verify data values match
+    ic_ds = xr.open_zarr(ro_session.store, zarr_format=3, consolidated=False)
+    npt.assert_array_equal(ic_ds["data"].values, data)
