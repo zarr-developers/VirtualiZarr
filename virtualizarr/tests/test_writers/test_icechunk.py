@@ -846,7 +846,9 @@ class TestRegion:
             ) as ds,
         ):
             actual = ds["foo"] != 0
-            expected = ds["y"].isin(my_vds["y"]).broadcast_like(actual).transpose(*actual.dims)
+            expected = (
+                ds["y"].isin(my_vds["y"]).broadcast_like(actual).transpose(*actual.dims)
+            )
             xrt.assert_allclose(expected, actual)
 
     def test_write_region_auto_without_dimension(
