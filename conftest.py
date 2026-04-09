@@ -356,7 +356,7 @@ def simple_netcdf4(tmp_path: Path) -> str:
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4)
     var = Variable(data=arr, dims=["x", "y"])
     ds = xr.Dataset({"foo": var})
-    ds.to_netcdf(filepath)
+    ds.to_netcdf(filepath, engine="netcdf4")
     return str(filepath)
 
 

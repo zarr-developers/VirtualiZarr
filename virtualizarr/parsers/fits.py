@@ -31,7 +31,7 @@ class FITSParser:
 
         self.group = group
         self.skip_variables = skip_variables
-        self.reader_options = reader_options
+        self.reader_options = reader_options or {}
 
     def __call__(
         self,
