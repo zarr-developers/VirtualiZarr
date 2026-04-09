@@ -7,7 +7,7 @@ from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import get_codecs, extract_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
@@ -443,7 +443,6 @@ def write_virtual_variable_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
