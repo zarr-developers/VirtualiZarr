@@ -13,7 +13,6 @@ import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.codecs import ShardingCodec
 from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
@@ -268,15 +267,6 @@ async def construct_manifest_array(
     """Construct a ManifestArray from a zarr array."""
     array_v3_metadata = metadata_as_v3(zarr_array.metadata)
 
-    # This is the only restriction on what Zarr Arrays cannot be virtualized
-    if any(isinstance(codec, ShardingCodec) for codec in array_v3_metadata.codecs):
-        raise NotImplementedError(
-            f"Zarr V3 arrays with sharding are not yet supported, but array {path} uses the ShardingCodec."
-            "Sharding stores multiple chunks in a single storage object with non-zero offsets, "
-            "which VirtualiZarr does not currently handle. "
-            "Reading sharded arrays without proper offset handling would result in corrupted data."
-        )
-
     if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGrid):
         raise NotImplementedError(
             f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
@@ -393,6 +383,9 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
+    # For sharded arrays, chunk_grid.chunk_shape is the shard shape (not the inner
+    # chunk shape, which lives inside the ShardingCodec config). So this grid describes
+    # the number of shard files on disk, which is exactly what we want for the manifest.
     chunk_grid_shape = determine_chunk_grid_shape(
         metadata.shape, cast(RegularChunkGrid, metadata.chunk_grid).chunk_shape
     )
