@@ -845,11 +845,9 @@ class TestRegion:
                 zarr_format=3,
             ) as ds,
         ):
-            is_written = ds["y"].isin(my_vds["y"]).broadcast_like(ds)
-            xrt.assert_allclose(
-                is_written,
-                ds["foo"] != 0,
-            )
+            actual = ds["foo"] != 0
+            expected = ds["y"].isin(my_vds["y"]).broadcast_like(actual).transpose(*actual.dims)
+            xrt.assert_allclose(expected, actual)
 
     def test_write_region_auto_without_dimension(
         self,
