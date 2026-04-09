@@ -976,3 +976,33 @@ def test_concat_zero_dimensional_var(manifest_array):
     vds2 = xr.Dataset({"a": marr})
     result = xr.concat([vds1, vds2], dim="time", coords="minimal", compat="override")
     assert result["a"].sizes == {"time": 2}
+
+
+def test_to_xarray_scalar_no_dimension_names(array_v3_metadata):
+    metadata = array_v3_metadata(
+        shape=(),
+        chunks=(),
+        dimension_names=None,
+    )
+    manifest = ChunkManifest(
+        entries={"c": {"path": "/foo.nc", "offset": 0, "length": 8}}
+    )
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+    vv = marr.to_virtual_variable()
+    assert vv.dims == ()
+
+
+def test_to_xarray_nonscalar_no_dimension_names(array_v3_metadata):
+    metadata = array_v3_metadata(
+        shape=(5,),
+        chunks=(5,),
+        dimension_names=None,
+    )
+    manifest = ChunkManifest(
+        entries={"0": {"path": "/foo.nc", "offset": 0, "length": 40}}
+    )
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+    with pytest.raises(ValueError, match="without dimension names"):
+        marr.to_virtual_variable()

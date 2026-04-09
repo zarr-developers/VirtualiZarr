@@ -1,12 +1,8 @@
 # Release notes
 
-## v2.5.1 (unreleased)
+## v2.5.2 (unreleased)
 
 ### New Features
-
-- Support for sharded Zarr V3 arrays in `ZarrParser`.
-  ([#946](https://github.com/zarr-developers/VirtualiZarr/pull/946)).
-  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
@@ -15,6 +11,51 @@
 ### Documentation
 
 ### Internal changes
+
+## v2.5.1 (9th April 2026)
+
+Adds support for sharded Zarr V3 arrays, and includes several other bug fixes.
+
+### New Features
+
+- Support for sharded Zarr V3 arrays in `ZarrParser` and icechunk writer.
+  ([#946](https://github.com/zarr-developers/VirtualiZarr/pull/946),
+  [#952](https://github.com/zarr-developers/VirtualiZarr/pull/952)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+### Bug fixes
+- Fix handling of scalar Zarr V3 arrays with `None` `dimension_names`.
+  ([#897](https://github.com/zarr-developers/VirtualiZarr/pull/897)).
+  By [Lars Buntemeyer](https://github.com/larsbuntemeyer).
+- Fix allowing Azure URLs.
+  ([#943](https://github.com/zarr-developers/VirtualiZarr/pull/943)).
+  By [Max Jones](https://github.com/maxrjones).
+- Add h5py import for dimension variable handling.
+  ([#955](https://github.com/zarr-developers/VirtualiZarr/pull/955)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix mypy error in `FITSParser` for optional `reader_options`.
+  ([#959](https://github.com/zarr-developers/VirtualiZarr/pull/959)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Fix note markdown in developer docs.
+  ([#948](https://github.com/zarr-developers/VirtualiZarr/pull/948)).
+  By [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
+
+### Internal changes
+
+- Add iteration helpers to `ChunkManifest`.
+  ([#939](https://github.com/zarr-developers/VirtualiZarr/pull/939)).
+  By [Max Jones](https://github.com/maxrjones).
+- Fix `simple_netcdf4` test fixture to explicitly use netcdf4 engine.
+  ([#958](https://github.com/zarr-developers/VirtualiZarr/pull/958)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix flaky region test dimension ordering.
+  ([#960](https://github.com/zarr-developers/VirtualiZarr/pull/960)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.5.0 (23rd March 2026)
 
