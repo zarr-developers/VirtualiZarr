@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.5.2 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.5.1 (9th April 2026)
 
 Adds support for sharded Zarr V3 arrays, and includes several other bug fixes.
