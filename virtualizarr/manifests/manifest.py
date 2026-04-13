@@ -239,7 +239,7 @@ class ChunkManifest:
             path, offset, length = entry.values()
             entry = ChunkEntry.with_validation(path=path, offset=offset, length=length)  # type: ignore[attr-defined]
 
-            split_key = parse_manifest_index(key, separator)
+            split_key = () if shape == () else parse_manifest_index(key, separator)
             paths[split_key] = entry["path"]
             offsets[split_key] = entry["offset"]
             lengths[split_key] = entry["length"]

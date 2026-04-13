@@ -199,6 +199,23 @@ def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
         assert "1.0" not in manifest
 
 
+def test_scalar_variable_manifest_shape(refs_file_factory, local_registry):
+    """Scalar variables from kerchunk refs should produce a manifest with shape (), not (1,)."""
+    zarray = '{"chunks":[],"compressor":null,"dtype":"<i4","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}'
+    zattrs = '{"_ARRAY_DIMENSIONS":[]}'
+    refs_file = refs_file_factory(
+        zarray=zarray,
+        zattrs=zattrs,
+        chunks={"a/0": ["/test1.nc", 100, 4]},
+    )
+    parser = KerchunkJSONParser()
+    with open_virtual_dataset(
+        url=refs_file, registry=local_registry, parser=parser
+    ) as vds:
+        assert vds["a"].shape == ()
+        assert vds["a"].data.manifest.shape_chunk_grid == ()
+
+
 def test_handle_relative_paths(refs_file_factory, local_registry):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
