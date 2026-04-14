@@ -3,7 +3,14 @@ from typing import Any, Callable, Union, cast
 
 import numpy as np
 import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
+from zarr.core.metadata.v3 import ArrayV3Metadata
+
+try:
+    from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
+except ImportError:
+    from zarr.core.metadata.v3 import (
+        RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
+    )
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -50,7 +57,7 @@ class ManifestArray:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
 
-        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
+        if not isinstance(_metadata.chunk_grid, RegularChunkGridMetadata):
             raise NotImplementedError(
                 f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
             )
