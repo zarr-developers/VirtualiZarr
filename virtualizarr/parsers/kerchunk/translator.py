@@ -178,7 +178,13 @@ def manifestarray_from_kerchunk_refs(
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     if chunk_dict:
-        manifest = manifest_from_kerchunk_chunk_dict(chunk_dict, fs_root=fs_root)
+        chunk_grid_shape = determine_chunk_grid_shape(
+            metadata.shape,
+            metadata.chunks,
+        )
+        manifest = manifest_from_kerchunk_chunk_dict(
+            chunk_dict, fs_root=fs_root, shape=chunk_grid_shape
+        )
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     elif len(metadata.shape) != 0:
         # empty variables don't have physical chunks, but zarray shows that the variable
@@ -199,6 +205,7 @@ def manifestarray_from_kerchunk_refs(
 def manifest_from_kerchunk_chunk_dict(
     kerchunk_chunk_dict: dict[ChunkKey, str | tuple[str] | tuple[str, int, int]],
     fs_root: str | None = None,
+    shape: tuple[int, ...] | None = None,
 ) -> ChunkManifest:
     """Create a single ChunkManifest from the mapping of keys to chunk information stored inside kerchunk array refs."""
 
@@ -213,7 +220,7 @@ def manifest_from_kerchunk_chunk_dict(
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
 
         chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
-    return ChunkManifest(entries=chunk_entries)
+    return ChunkManifest(entries=chunk_entries, shape=shape)
 
 
 def chunkentry_from_kerchunk(
