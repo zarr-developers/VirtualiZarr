@@ -6,6 +6,10 @@
 
 ### Breaking changes
 
+- Dropped support for Python 3.11. Python 3.12+ is now required, matching icechunk 2.x.
+  ({pr}`968`).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Bug fixes
 
 ### Documentation
