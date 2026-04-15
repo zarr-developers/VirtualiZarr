@@ -468,6 +468,95 @@ print(snapshot_id)
 
 See the [Icechunk documentation](https://icechunk.io/en/latest/virtual/) for more details.
 
+#### Writing to a region of an Icechunk Store
+
+Region writing allows you to write virtual references into a specific slice of an already-initialized store.
+This is useful for parallel or out-of-order writes, where each worker fills in its own time slice independently.
+
+
+```python
+session = repo.writable_session("main")
+vds1.vz.to_icechunk(session.store, region="auto")
+snapshot_id = session.commit("Wrote region")
+print(snapshot_id)
+```
+
+You can also specify regions explicitly using slices:
+
+```python
+session = repo.writable_session("main")
+n = len(vds1.time)
+vds1.vz.to_icechunk(session.store, region={"time": slice(0, n)})
+snapshot_id = session.commit("Wrote explicit region")
+print(snapshot_id)
+```
+
+##### Initializing blank datasets
+
+If using region writing for writing a new dataset, you should initialize your dataset first.
+You can do this by using reference file to initialize the shape and attributes of the dataset,
+while filling with empty references, as shown with the example below.
+
+```python
+import pandas as pd
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import HDFParser
+from zarr.core.metadata import ArrayV3Metadata
+from virtualizarr.manifests import ChunkManifest, ManifestArray
+
+# Use an existing virtual dataset as the reference template
+reference_vds = open_virtual_dataset(
+    url=f"{bucket}/{path}",
+    parser=parser,
+    registry=registry,
+)
+
+# Build a blank scaffold that matches the final coordinate space
+full_time = pd.date_range(
+    start="2015-01-01",
+    end="2026-01-01",
+    freq="1d",
+)
+target_shape = (len(full_time), 600, 1440)
+
+blank_ds = xr.Dataset(
+    coords={
+        "time": full_time,
+        "lat": reference_vds["lat"],
+        "lon": reference_vds["lon"],
+    },
+    attrs=reference_vds.attrs,
+)
+
+for var_name in reference_vds.data_vars:
+    donor_arr = reference_vds[var_name].data
+
+    # get the index of the time coord, and update the shape
+    # of the manifest chunk grid for the blank dataset
+    time_axis = ds[var_name].dims.index("time")
+    chunk_grid_shape = tuple(
+        len(full_time) if i == time_axis else s
+        for i, s in enumerate(donor_arr.manifest.shape_chunk_grid)
+    )
+    empty_manifest = ChunkManifest({}, shape=chunk_grid_shape)
+
+    # update the shape in the array metadata
+    meta_dict = donor_arr.metadata.to_dict()
+    meta_dict["shape"] = target_shape
+    new_metadata = ArrayV3Metadata.from_dict(meta_dict)
+
+    blank_ds[var_name] = xr.Variable(
+        dims=reference_vds[var_name].dims,
+        data=ManifestArray(chunkmanifest=empty_manifest, metadata=new_metadata),
+        attrs=reference_vds[var_name].attrs,
+    )
+
+# Initialize the store: this writes all array metadata and coordinates, but no data refs
+session = repo.writable_session("main")
+blank_ds.vz.to_icechunk(session.store)
+session.commit("Initialized empty store")
+```
+
 ### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for serializing virtual datasets as a JSON file or Parquet directory.
