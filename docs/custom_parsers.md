@@ -216,6 +216,74 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
 
     Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
 
+## Fill values
+
+There are two distinct "fill value" concepts that parsers may interact with:
+
+1. Value for uninitialized chunks - (e.g., **Zarr `fill_value`**) — the default value returned for uninitialized or missing chunks. This is set via the `fill_value` parameter when creating `ArrayV3Metadata`.
+2. Sentinel value - (e.g., **CF `_FillValue`** )) — a sentinel value that CF-aware readers like xarray use to mask individual data points as missing within chunks that _do_ contain data.
+
+These serve different purposes and are stored in different places. Many source formats interact with these distinct concepts. For example, HDF5 has a storage-level `fillvalue` (returned for unallocated chunks) and a CF `_FillValue` attribute (used for masking). Parsers should preserve this separation faithfully: the source format's storage fill value maps to the zarr `fill_value`, and the CF `_FillValue` attribute is carried through as a zarr attribute.
+
+### Format-specific fill value attributes
+
+Source formats may carry additional attributes that serve a similar role to `_FillValue`. Parsers should understand their semantics to avoid conflicts or data loss.
+
+#### CF conventions: `missing_value`
+
+The `missing_value` attribute is an older CF convention attribute with the same meaning as `_FillValue`: a sentinel value indicating missing data points. Xarray treats the two equivalently, decoding both to NaN (for floats) or masked values. If _both_ `_FillValue` and `missing_value` are present as attributes on the same array and their values differ, xarray will raise an error. Parsers should therefore ensure consistency: either emit only one of the two, or ensure they carry the same value (with the same encoding).
+
+#### GeoTIFF/GDAL: `gdal_no_data`
+
+The `gdal_no_data` attribute comes from GeoTIFF's `GDAL_NODATA` tag (tag 42113). This is specific to the TIFF/GeoTIFF ecosystem and is _not_ part of the CF conventions. Xarray does not recognize or decode this attribute, so it is carried through as an opaque attribute. Parsers for TIFF-based formats should decide how to handle this value:
+
+- If the source data uses `gdal_no_data` as a true missing-data sentinel, the parser may want to also emit a properly encoded `_FillValue` so that xarray can mask the data automatically.
+- Avoid emitting conflicting values between `gdal_no_data`, `_FillValue`, and `missing_value` unless the distinction is intentional.
+
+Note that [rioxarray](https://corteva.github.io/rioxarray/) also does _not_ look at `gdal_no_data` by name. Its nodata resolution checks `_FillValue`, `missing_value`, `fill_value`, `nodata`, and rasterio's `DatasetReader.nodata` (which reads the GDAL_NODATA tag via GDAL). When data is accessed through a virtual Zarr store rather than rasterio, the rasterio path is unavailable, so `gdal_no_data` alone is not sufficient for either xarray or rioxarray to detect missing data.
+
+#### HDF5: storage-level `fillvalue`
+
+HDF5 datasets have a storage-level fill value (`dataset.fillvalue`) that is returned for unallocated chunks. This is distinct from the CF `_FillValue` attribute, which is application-level metadata for masking. The HDF parser maps `dataset.fillvalue` to the Zarr `fill_value` and carries the CF `_FillValue` attribute through separately (with proper encoding). Parsers for HDF5-derived formats should preserve this separation.
+
+#### OPeNDAP/DMR++: `fillValue`
+
+DMR++ files may include a `fillValue` attribute on chunk definitions, representing the server-side fill for unallocated chunks. This maps to the Zarr `fill_value`. Any CF `_FillValue` attribute present in the DMR++ variable metadata is carried through as an encoded attribute, the same as for HDF5.
+
+#### FITS: `BLANK` keyword
+
+FITS files use the `BLANK` keyword in the header to indicate undefined integer pixel values. For floating-point data, IEEE NaN is used by convention instead. FITS also has `BZERO` and `BSCALE` for linear scaling, which interact with `BLANK` (the blank value is applied _before_ scaling). Parsers for FITS data should map `BLANK` to either the Zarr `fill_value` or a `_FillValue` attribute depending on whether it represents uninitialized storage or a data-level sentinel.
+
+#### NetCDF-3: default fill values
+
+NetCDF-3 defines [default fill values per data type](https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html) (e.g., `9.9692e+36` for float, `–32767` for short) that are used when no explicit `_FillValue` attribute is set. If a variable was written with `nofill` mode, no fill value applies. Parsers should check whether a `_FillValue` attribute is explicitly present; if not, they may need to apply the NetCDF-3 default for the variable's type.
+
+### Encoding the `_FillValue` attribute
+
+In order to be currently parsed by Xarray, the `_FillValue` attribute must be encoded in a way that xarray's `FillValueCoder.decode()` expects. You could use `FillValueCoder.encode()` to accomplish this. The internal parsers use a custom function ([`encode_cf_fill_value`][virtualizarr.parsers.utils.encode_cf_fill_value]) in order to accept `_FillValue` data types not yet supported by Xarray and to make Xarray an optional dependency.
+
+The zarr `fill_value` in `ArrayV3Metadata` does **not** need this encoding — zarr handles its own serialization.
+
+#### Supported dtypes
+
+Xarray's `FillValueCoder` currently supports the following dtype kinds:
+
+| dtype kind | Encoding | Decoding |
+|------------|----------|----------|
+| `f` (float) | base64-encoded little-endian double | base64 → `float` |
+| `iu` (integer) | Python `int` | `int` |
+| `b` (boolean) | Python `bool` | `bool` |
+| `U` (unicode string) | Python `str` | `str` |
+| `S` (byte string) | base64-encoded | base64 → `bytes` |
+| `string` (Zarr V3) | — | `str` |
+| `bytes` (Zarr V3) | — | base64 → `bytes` |
+
+Any other dtype (complex, structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`. VirtualiZarr's [`encode_cf_fill_value`][virtualizarr.parsers.utils.encode_cf_fill_value] extends this with best-effort support for complex (encoded as `[real, imag]` list) and structured dtypes (passthrough), but xarray's decoder cannot currently round-trip these — they will fail on read.
+
+!!! warning
+
+    The `_FillValue` attribute must be the **encoded** form, not a raw scalar. A common mistake is to emit `_FillValue` as a plain numeric value or string (e.g., `"-9999"` for a float32 array). For float dtypes, xarray expects a base64-encoded 8-byte little-endian double; passing a numeric string instead will cause a `struct.error` at decode time. This is especially likely when parsing formats that store metadata as text (e.g., GDAL metadata XML in GeoTIFF), where type information from the original source format has been lost.
+
 ## Data model differences between Zarr and Xarray
 
 Whilst the [`ManifestStore`][virtualizarr.manifests.ManifestStore] class enforces nothing other than the minimum required to conform to the Zarr model, if you want to convert your [`ManifestStore`][virtualizarr.manifests.ManifestStore] to a virtual xarray dataset using [`ManifestStore.to_virtual_dataset`][virtualizarr.manifests.ManifestStore.to_virtual_dataset], there are a couple of additional requirements, set by Xarray's data model.
