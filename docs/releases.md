@@ -12,6 +12,11 @@
 
 ### Internal changes
 
+- Use `set_virtual_refs_arr` for ~3x faster virtual ref writing to icechunk.
+  Requires icechunk >= 2.0.2.
+  ([#967](https://github.com/zarr-developers/VirtualiZarr/pull/967)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.5.1 (9th April 2026)
 
 Adds support for sharded Zarr V3 arrays, and includes several other bug fixes.
