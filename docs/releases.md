@@ -17,7 +17,7 @@
 ### Internal changes
 
 - Use `set_virtual_refs_arr` for ~3x faster virtual ref writing to icechunk.
-  Requires icechunk >= 2.0.2.
+  Requires icechunk >= 2.0.3.
   ([#967](https://github.com/zarr-developers/VirtualiZarr/pull/967)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
