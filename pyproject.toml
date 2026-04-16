@@ -83,7 +83,7 @@ all_parsers = [
 
 # writers
 icechunk = [
-    "icechunk>=2.0.2",
+    "icechunk>=2.0.3",
 ]
 
 
@@ -188,7 +188,7 @@ numpy = "==2.1.0"
 numcodecs = "==0.15.1"
 zarr = "==3.1.0"
 obstore = "==0.7.0"
-icechunk = "==2.0.2"
+icechunk = "==2.0.3"
 
 # Define commands to run within the test environments
 [tool.pixi.feature.test.tasks]

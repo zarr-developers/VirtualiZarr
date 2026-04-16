@@ -560,14 +560,14 @@ def write_manifest_virtual_refs(
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
     # Pass manifest arrays directly to Rust, avoiding per-chunk Python object creation.
-    # Requires icechunk with set_virtual_refs_arr (earth-mover/icechunk#2049).
+    # Empty paths represent missing chunks and are skipped on the Rust side.
     store.set_virtual_refs_arr(
         array_path=key_prefix,
         chunk_grid_shape=manifest.shape_chunk_grid,
         locations=manifest._paths.flatten().tolist(),
         offsets=manifest._offsets.flatten(),
         lengths=manifest._lengths.flatten(),
-        validate_containers=False,  # we already validated these before setting any refs
+        validate_containers=False,
         arr_offset=list(chunk_index_offsets) if any(chunk_index_offsets) else None,
         checksum=last_updated_at,
     )
