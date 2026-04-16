@@ -1,23 +1,31 @@
 # Release notes
 
-## v2.5.2 (unreleased)
+## v2.6.0 (16th April 2026)
+
+Now requires icechunk 2.x, enabling a ~3x performance improvement for writing virtual references. Also drops support for Python 3.11.
 
 ### New Features
 
 ### Breaking changes
 
+- Now requires icechunk >= 2.0.3.
+  ([#967](https://github.com/zarr-developers/VirtualiZarr/pull/967)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Dropped support for Python 3.11. Python 3.12+ is now required, matching icechunk 2.x.
-  ({pr}`968`).
+  ([#969](https://github.com/zarr-developers/VirtualiZarr/pull/969)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
+
+- Fix scalar variable manifests getting shape `(1,)` instead of `()` from kerchunk references.
+  ([#965](https://github.com/zarr-developers/VirtualiZarr/pull/965)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
 ### Internal changes
 
 - Use `set_virtual_refs_arr` for ~3x faster virtual ref writing to icechunk.
-  Requires icechunk >= 2.0.3.
   ([#967](https://github.com/zarr-developers/VirtualiZarr/pull/967)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
