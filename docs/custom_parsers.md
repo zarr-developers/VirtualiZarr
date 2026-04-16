@@ -186,7 +186,7 @@ memory_store.put("refs.json", ujson.dumps(refs).encode())
 
 registry = ObjectStoreRegistry({"memory://": memory_store})
 parser = KerchunkJSONParser()
-manifeststore = parser("file:///Users/user/my-project/refs.json", registry)
+manifeststore = parser("memory://refs.json", registry)
 ```
 
 Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
@@ -260,17 +260,18 @@ NetCDF-3 defines [default fill values per data type](https://www.unidata.ucar.ed
 
 ### Encoding the `_FillValue` attribute
 
-In order to be currently parsed by Xarray, the `_FillValue` attribute must be encoded in a way that xarray's `FillValueCoder.decode()` expects. You could use `FillValueCoder.encode()` to accomplish this. The internal parsers use a custom function ([`encode_cf_fill_value`][virtualizarr.parsers.utils.encode_cf_fill_value]) in order to accept `_FillValue` data types not yet supported by Xarray and to make Xarray an optional dependency.
+In order to be correctly parsed by xarray, the `_FillValue` attribute must be encoded in a way that xarray's `FillValueCoder.decode()` expects. You could use `FillValueCoder.encode()` directly to accomplish this. The internal parsers use a convenience function ([`encode_cf_fill_value`][virtualizarr.parsers.utils.encode_cf_fill_value]) which handles extracting scalar values from numpy arrays before delegating to `FillValueCoder.encode()`.
 
 The zarr `fill_value` in `ArrayV3Metadata` does **not** need this encoding — zarr handles its own serialization.
 
 #### Supported dtypes
 
-Xarray's `FillValueCoder` currently supports the following dtype kinds:
+Xarray's `FillValueCoder` (as of xarray >= 2025.06.0) supports the following dtype kinds:
 
 | dtype kind | Encoding | Decoding |
 |------------|----------|----------|
 | `f` (float) | base64-encoded little-endian double | base64 → `float` |
+| `c` (complex) | 2-element list of base64-encoded doubles | list → `complex` |
 | `iu` (integer) | Python `int` | `int` |
 | `b` (boolean) | Python `bool` | `bool` |
 | `U` (unicode string) | Python `str` | `str` |
@@ -278,7 +279,7 @@ Xarray's `FillValueCoder` currently supports the following dtype kinds:
 | `string` (Zarr V3) | — | `str` |
 | `bytes` (Zarr V3) | — | base64 → `bytes` |
 
-Any other dtype (complex, structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`. VirtualiZarr's [`encode_cf_fill_value`][virtualizarr.parsers.utils.encode_cf_fill_value] extends this with best-effort support for complex (encoded as `[real, imag]` list) and structured dtypes (passthrough), but xarray's decoder cannot currently round-trip these — they will fail on read.
+Any other dtype (structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`.
 
 !!! warning
 
@@ -317,7 +318,7 @@ manifest_store = parser(url=f"{project_url}/netcdf-file.nc", registry=registry)
 
 with (
     xr.open_dataset(manifest_store, engine="zarr", zarr_format=3, consolidated=False) as actual,
-    xr.open_dataset(manifest_store, backend="h5netcdf") as expected,
+    xr.open_dataset(f"{project_directory}/netcdf-file.nc", engine="h5netcdf") as expected,
 ):
     xrt.assert_identical(actual, expected)
 ```
