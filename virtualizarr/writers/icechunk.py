@@ -568,6 +568,6 @@ def write_manifest_virtual_refs(
         offsets=manifest._offsets.flatten(),
         lengths=manifest._lengths.flatten(),
         validate_containers=False,
-        arr_offset=list(chunk_index_offsets) if any(chunk_index_offsets) else None,
+        arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
         checksum=last_updated_at,
     )
