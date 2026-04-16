@@ -1,5 +1,17 @@
 # Release notes
 
+## v2.6.1 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.6.0 (16th April 2026)
 
 Now requires icechunk 2.x, enabling a ~3x performance improvement for writing virtual references. Also drops support for Python 3.11.
