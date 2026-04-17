@@ -44,6 +44,7 @@ def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
     group: str,
+    squeeze: bool = False,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -62,7 +63,7 @@ def _construct_manifest_array(
     ManifestArray
     """
     chunks = dataset.chunks or dataset.shape
-    keep_indices = _squeeze_indices(chunks)
+    keep_indices = _squeeze_indices(chunks) if squeeze else list(range(len(chunks)))
     keep_chunks = tuple(chunks[i] for i in keep_indices)
     keep_shape = tuple(dataset.shape[i] for i in keep_indices)
     codecs = codecs_from_dataset(dataset)
@@ -97,7 +98,7 @@ def _construct_manifest_array(
         dimension_names=keep_dims,
         attributes=attrs,
     )
-    manifest = _dataset_chunk_manifest(filepath, dataset)
+    manifest = _dataset_chunk_manifest(filepath, dataset, squeeze=squeeze)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
 
@@ -107,6 +108,7 @@ def _construct_manifest_group(
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
+    squeeze: bool = False,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
@@ -126,7 +128,9 @@ def _construct_manifest_group(
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
         group_name = str(g.name)  # NOTE: this will always include leading "/"
         arrays = {
-            key: _construct_manifest_array(filepath, dataset, group_name)
+            key: _construct_manifest_array(
+                filepath, dataset, group_name, squeeze=squeeze
+            )
             for key in g.keys()
             if key not in drop_variables
             if isinstance(dataset := g[key], h5py.Dataset)
@@ -136,6 +140,7 @@ def _construct_manifest_group(
                 filepath,
                 reader,
                 group=str(Path(group) / key) if group is not None else key,
+                squeeze=squeeze,
             )
             for key in g.keys()
             if key not in drop_variables
@@ -152,6 +157,7 @@ class HDFParser:
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
+        squeeze: bool = False,
     ):
         """
         Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
@@ -169,10 +175,13 @@ class HDFParser:
             Must return an object implementing the
             [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
             Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+        squeeze
+            If `True`, remove dimensions of size 1 from arrays (default: `False`).
         """
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
+        self.squeeze = squeeze
 
     def __call__(
         self,
@@ -202,6 +211,7 @@ class HDFParser:
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
+            squeeze=self.squeeze,
         )
         # Convert to a manifest store
         return ManifestStore(registry=registry, group=manifest_group)
@@ -210,6 +220,7 @@ class HDFParser:
 def _dataset_chunk_manifest(
     filepath: str,
     dataset: H5Dataset,
+    squeeze: bool = False,
 ) -> ChunkManifest:
     """
     Generate ChunkManifest for HDF5 dataset.
@@ -227,7 +238,12 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
-    keep_indices = _squeeze_indices(dataset.chunks or dataset.shape)
+    chunks_or_shape = dataset.chunks or dataset.shape
+    keep_indices = (
+        _squeeze_indices(chunks_or_shape)
+        if squeeze
+        else list(range(len(chunks_or_shape)))
+    )
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)

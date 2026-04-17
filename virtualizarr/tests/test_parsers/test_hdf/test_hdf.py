@@ -43,11 +43,21 @@ class TestDatasetChunkManifest:
 
     def test_singleton_dimensions_squeezed(self, singleton_padded_dimension_hdf5_file):
         manifest_store = manifest_store_from_hdf_url(
-            singleton_padded_dimension_hdf5_file
+            singleton_padded_dimension_hdf5_file, squeeze=True
         )
         assert manifest_store._group.arrays["data"].shape == (10, 5)
         assert manifest_store._group.arrays["row_coord"].shape == (10,)
         assert manifest_store._group.arrays["col_coord"].shape == (5,)
+
+    def test_singleton_dimensions_not_squeezed(
+        self, singleton_padded_dimension_hdf5_file
+    ):
+        manifest_store = manifest_store_from_hdf_url(
+            singleton_padded_dimension_hdf5_file,
+        )
+        assert manifest_store._group.arrays["data"].shape == (10, 5)
+        assert manifest_store._group.arrays["row_coord"].shape == (10, 1)
+        assert manifest_store._group.arrays["col_coord"].shape == (1, 5)
 
 
 @requires_hdf5plugin
