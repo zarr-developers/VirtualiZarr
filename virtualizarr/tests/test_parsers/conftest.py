@@ -479,6 +479,21 @@ def big_endian_dtype_hdf5_file(tmpdir):
     return filepath
 
 
+@pytest.fixture
+def singleton_padded_dimension_hdf5_file(tmp_path: Path) -> str:
+    """HDF5 file mimicking MATLAB layout: a 2D array (N, M) plus coordinate
+    arrays shaped (N, 1) and (1, M)."""
+    N, M = 10, 5
+    filepath = str(tmp_path / "singleton_dimension_layout.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=np.random.random((N, M)))
+        f.create_dataset(name="row_coord", data=np.random.random((N, 1)))
+        f.create_dataset(name="col_coord", data=np.random.random((1, M)))
+
+    return f"file://{filepath}"
+
+
 @pytest.fixture()
 def dmrpp_xml_simple():
     """Return a minimal valid DMR++ XML string for testing."""
