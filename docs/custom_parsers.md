@@ -186,7 +186,7 @@ memory_store.put("refs.json", ujson.dumps(refs).encode())
 
 registry = ObjectStoreRegistry({"memory://": memory_store})
 parser = KerchunkJSONParser()
-manifeststore = parser("file:///Users/user/my-project/refs.json", registry)
+manifeststore = parser("memory://refs.json", registry)
 ```
 
 Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
@@ -215,6 +215,201 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
     3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
 
     Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
+
+## Fill values
+
+There are two distinct "fill value" concepts that parsers may interact with:
+
+1. Value for uninitialized chunks - (e.g., **Zarr `fill_value`**) — the default value returned for uninitialized or missing chunks. This is set via the `fill_value` parameter when creating `ArrayV3Metadata`.
+2. Sentinel value - (e.g., **CF `_FillValue`** )) — a sentinel value that CF-aware readers like xarray use to mask individual data points as missing within chunks that _do_ contain data.
+
+These serve different purposes and are stored in different places. Many source formats interact with these distinct concepts. For example, HDF5 has a storage-level `fillvalue` (returned for unallocated chunks) and a CF `_FillValue` attribute (used for masking). Parsers should preserve this separation faithfully: the source format's storage fill value maps to the zarr `fill_value`, and the CF `_FillValue` attribute is carried through as a zarr attribute.
+
+!!! note
+
+    When the source format uses [packed data](#packing-and-scaling) (`scale_factor`/`add_offset`), the `_FillValue` must be in the packed (encoded) domain. See [Fill values in packed data](#fill-values-in-packed-data) for details.
+
+### Format-specific fill value attributes
+
+Source formats may carry additional attributes that serve a similar role to `_FillValue`. Parsers should understand their semantics to avoid conflicts or data loss.
+
+#### CF conventions: `missing_value`
+
+The `missing_value` attribute is an older CF convention attribute with the same meaning as `_FillValue`: a sentinel value indicating missing data points. Xarray treats the two equivalently, decoding both to NaN (for floats) or masked values. If _both_ `_FillValue` and `missing_value` are present as attributes on the same array and their values differ, xarray will raise an error. Parsers should therefore ensure consistency: either emit only one of the two, or ensure they carry the same value (with the same encoding).
+
+#### GeoTIFF/GDAL: `gdal_no_data`
+
+The `gdal_no_data` attribute comes from GeoTIFF's `GDAL_NODATA` tag (tag 42113). This is specific to the TIFF/GeoTIFF ecosystem and is _not_ part of the CF conventions. Xarray does not recognize or decode this attribute, so it is carried through as an opaque attribute. Parsers for TIFF-based formats should decide how to handle this value:
+
+- If the source data uses `gdal_no_data` as a true missing-data sentinel, the parser may want to also emit a properly encoded `_FillValue` so that xarray can mask the data automatically.
+- Avoid emitting conflicting values between `gdal_no_data`, `_FillValue`, and `missing_value` unless the distinction is intentional.
+
+Note that [rioxarray](https://corteva.github.io/rioxarray/) also does _not_ look at `gdal_no_data` by name. Its nodata resolution checks `_FillValue`, `missing_value`, `fill_value`, `nodata`, and rasterio's `DatasetReader.nodata` (which reads the GDAL_NODATA tag via GDAL). When data is accessed through a virtual Zarr store rather than rasterio, the rasterio path is unavailable, so `gdal_no_data` alone is not sufficient for either xarray or rioxarray to detect missing data.
+
+#### HDF5: storage-level `fillvalue`
+
+HDF5 datasets have a storage-level fill value (`dataset.fillvalue`) that is returned for unallocated chunks. This is distinct from the CF `_FillValue` attribute, which is application-level metadata for masking. The HDF parser maps `dataset.fillvalue` to the Zarr `fill_value` and carries the CF `_FillValue` attribute through separately (with proper encoding). Parsers for HDF5-derived formats should preserve this separation.
+
+#### OPeNDAP/DMR++: `fillValue`
+
+DMR++ files may include a `fillValue` attribute on chunk definitions, representing the server-side fill for unallocated chunks. This maps to the Zarr `fill_value`. Any CF `_FillValue` attribute present in the DMR++ variable metadata is carried through as an encoded attribute, the same as for HDF5.
+
+#### FITS: `BLANK` keyword
+
+FITS files use the `BLANK` keyword in the header to indicate undefined integer pixel values. For floating-point data, IEEE NaN is used by convention instead. FITS also has `BZERO` and `BSCALE` for linear scaling, which interact with `BLANK` (the blank value is applied _before_ scaling). Parsers for FITS data should map `BLANK` to either the Zarr `fill_value` or a `_FillValue` attribute depending on whether it represents uninitialized storage or a data-level sentinel.
+
+#### NetCDF-3: default fill values
+
+NetCDF-3 defines [default fill values per data type](https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html) (e.g., `9.9692e+36` for float, `–32767` for short) that are used when no explicit `_FillValue` attribute is set. If a variable was written with `nofill` mode, no fill value applies. Parsers should check whether a `_FillValue` attribute is explicitly present; if not, they may need to apply the NetCDF-3 default for the variable's type.
+
+#### GRIB/GRIB2: bitmap-based missing data
+
+GRIB and GRIB2 files use a fundamentally different missing data model from the attribute-based approach of NetCDF/HDF5. Instead of a sentinel fill value, GRIB uses a **bitmap section** (Section 6 in GRIB2) where each bit indicates whether the corresponding data point is present or missing. The data section only contains values for present points, so missing points have no storage representation at all.
+
+VirtualiZarr does not yet include a GRIB parser, but custom parser authors targeting GRIB data should be aware that:
+
+- There is no direct equivalent of `_FillValue` in the GRIB data model. The bitmap _is_ the missing data indicator.
+- When mapping GRIB to Zarr, the parser must choose a fill value to represent bitmap-masked points in the output array, and emit a corresponding `_FillValue` attribute so that xarray can mask the data.
+- GRIB2 also supports ["complex packing"](https://codes.ecmwf.int/grib/format/grib2/templates/5/) and ["second-order packing"](https://codes.ecmwf.int/grib/format/grib1/packing/2/) where the decompression algorithm itself must account for the bitmap. This means the codec pipeline must be bitmap-aware, not just the fill value.
+
+### Encoding the `_FillValue` attribute
+
+In order to be correctly parsed by xarray, the `_FillValue` attribute must be encoded in a way that xarray's `FillValueCoder.decode()` expects. You could use `FillValueCoder.encode()` directly to accomplish this. The internal parsers use a convenience function (`virtualizarr.parsers.utils.encode_cf_fill_value`) which handles extracting scalar values from numpy arrays before delegating to `FillValueCoder.encode()`.
+
+The zarr `fill_value` in `ArrayV3Metadata` does **not** need this encoding — zarr handles its own serialization.
+
+#### Supported dtypes
+
+Xarray's `FillValueCoder` (as of xarray >= 2025.06.0) supports the following dtype kinds:
+
+| dtype kind | Encoding | Decoding |
+|------------|----------|----------|
+| `f` (float) | base64-encoded little-endian double | base64 → `float` |
+| `c` (complex) | 2-element list of base64-encoded doubles | list → `complex` |
+| `iu` (integer) | Python `int` | `int` |
+| `b` (boolean) | Python `bool` | `bool` |
+| `U` (unicode string) | Python `str` | `str` |
+| `S` (byte string) | base64-encoded | base64 → `bytes` |
+| `string` (Zarr V3) | — | `str` |
+| `bytes` (Zarr V3) | — | base64 → `bytes` |
+
+Any other dtype (structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`.
+
+!!! warning
+
+    The `_FillValue` attribute must be the **encoded** form, not a raw scalar. A common mistake is to emit `_FillValue` as a plain numeric value or string (e.g., `"-9999"` for a float32 array). For float dtypes, xarray expects a base64-encoded 8-byte little-endian double; passing a numeric string instead will cause a `struct.error` at decode time. This is especially likely when parsing formats that store metadata as text (e.g., GDAL metadata XML in GeoTIFF), where type information from the original source format has been lost.
+
+### `valid_range`, `valid_min`, `valid_max`
+
+The CF conventions define `valid_range`, `valid_min`, and `valid_max` attributes for specifying the range of physically meaningful values. Values outside this range are considered missing.
+
+!!! warning
+
+    **Xarray does not process these attributes.** Unlike the netcdf4 Python library (which masks out-of-range values when `auto_maskandscale` is enabled), xarray passes `valid_range`, `valid_min`, and `valid_max` through as opaque attributes without applying any masking.
+
+    If your source format relies on these attributes for missing data detection, your parser should either:
+
+    - Convert out-of-range values to a `_FillValue` sentinel during parsing, or
+    - Document that downstream consumers must handle range-based masking themselves.
+
+## Packing and scaling
+
+Many source formats store data in a "packed" form using integer types for storage efficiency, with metadata that defines the transformation to physical values. Parsers need to decide how to represent this packing in the Zarr data model: as attributes that xarray decodes at read time, or as codecs in the Zarr codec pipeline.
+
+### Packing as attributes
+
+The recommended approach for custom parsers is to emit `scale_factor` and `add_offset` as zarr array attributes, and store the data in its packed dtype (e.g., `int16`). Xarray's CF decoding will apply the transformation `decoded = encoded * scale_factor + add_offset` at read time. This is how VirtualiZarr's built-in parsers currently work.
+
+#### Fill values in packed data
+
+When packing is represented as attributes, xarray applies `CFMaskCoder` (fill value masking) _before_ `CFScaleOffsetCoder` (scaling). This decode order means:
+
+- The `_FillValue` attribute must be in the **packed (encoded) domain**, not the decoded domain. For example, if the packed data is `int16` with `scale_factor=0.01` and the intended missing value is `-9999.0` in physical units, the `_FillValue` should be the packed integer representation (e.g., `-999900`), not the float `-9999.0`.
+- Parsers should emit `_FillValue`, `scale_factor`, and `add_offset` as separate attributes and let xarray handle the decode order. Do not pre-apply the scaling transformation to the fill value.
+
+!!! warning
+
+    If your source format stores the fill value in the _decoded_ (physical) domain, you must reverse the packing transformation before emitting `_FillValue`. The reverse transformation is: `encoded_fill = (decoded_fill - add_offset) / scale_factor`.
+
+#### `_Unsigned`
+
+Some NetCDF4 files use signed integer types (e.g., `int16`) to store unsigned data (e.g., `uint16`), with a `_Unsigned = "true"` attribute to signal the intended interpretation. xarray's `CFMaskCoder` handles this conversion before applying fill value masking.
+
+Parsers should be aware that:
+
+- If `_Unsigned = "true"` is present, the fill value must be interpreted in the _unsigned_ domain. For example, a `_FillValue` of `-1` stored as `int16` corresponds to `65535` when reinterpreted as `uint16`.
+- The `_Unsigned` attribute should be passed through as a regular attribute. xarray will handle the type reinterpretation during decoding.
+- This attribute is most common in NetCDF4 files created by tools that predate native unsigned integer support in NetCDF4.
+
+### Packing as codecs
+
+!!! note
+
+    The `scale_offset` and `cast_value` codecs are [specified](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset) in the Zarr V3 extension registry but are not yet available in a released version of zarr-python. They are implemented on the [`feat/scale-offset-cast-value`](https://github.com/zarr-developers/zarr-python/tree/feat/scale-offset-cast-value) branch. Additionally, `cast_value` requires the optional [`cast-value-rs`](https://github.com/zarr-developers/cast-value-rs) package. Until these are merged and released, custom parsers should use the [attributes approach](#packing-as-attributes).
+
+Instead of relying on xarray's CF decoding, packing can be encoded directly into the zarr codec pipeline using the Zarr V3 [`scale_offset`](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset) and [`cast_value`](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value) codecs:
+
+- **`scale_offset`**: An array-to-array codec that applies `out = (in - offset) * scale` during encoding and `out = (in / scale) + offset` during decoding. This codec operates within a single data type — it does not change the dtype.
+- **`cast_value`**: An array-to-array codec that converts values between numeric types, with configurable rounding (`"nearest-even"`, `"towards-zero"`, `"towards-positive"`, `"towards-negative"`, `"nearest-away"`) and out-of-range handling (`"clamp"`, `"wrap"`, or error). It also supports a `scalar_map` for explicit scalar mappings (e.g., mapping `NaN` to `0` during a float-to-integer cast).
+
+When using the codec approach, `scale_factor` and `add_offset` are removed from the attributes (since the transformation is now encoded in the codec chain), and the array's declared `data_type` is the _decoded_ (physical) type.
+
+For example, a `float32` array packed into `uint8` with `offset=1000` and `scale=0.1`:
+
+```json
+{
+    "data_type": "float32",
+    "codecs": [
+        {
+            "name": "scale_offset",
+            "configuration": {
+                "offset": 1000,
+                "scale": 0.1
+            }
+        },
+        {
+            "name": "cast_value",
+            "configuration": {
+                "data_type": "uint8",
+                "out_of_range": "wrap"
+            }
+        },
+        "bytes"
+    ]
+}
+```
+
+#### Fill values with packing codecs
+
+When packing is expressed as codecs rather than attributes, the fill value semantics change:
+
+- The zarr `fill_value` is specified in the array's declared data type (the _decoded_ domain, e.g., `float32`), and both `scale_offset` and `cast_value` transform the fill value as it propagates through the codec chain. This ensures that fill-value-aware codecs downstream (such as `sharding_indexed`) see the correctly transformed fill value.
+- There is no `_FillValue` _attribute_ needed for uninitialized chunks — the zarr `fill_value` and the codec chain together handle that, and xarray will not apply `CFMaskCoder` because there is no `_FillValue` attribute to trigger it.
+- If the source data uses a fill/sentinel value for masking _within_ chunks (distinct from the storage fill), the parser must still emit a `_FillValue` attribute for that purpose. In this case, the `_FillValue` should be in the **decoded** domain (since the codec chain handles the type transformation), and `cast_value`'s `scalar_map` can be used to preserve the fill value through the cast. For example, mapping `NaN` to `0` on encode and `0` back to `NaN` on decode:
+
+    ```json
+    {
+        "name": "cast_value",
+        "configuration": {
+            "data_type": "uint8",
+            "rounding": "nearest-even",
+            "scalar_map": {
+                "encode": [["NaN", 0]],
+                "decode": [[0, "NaN"]]
+            }
+        }
+    }
+    ```
+
+#### Relationship to `numcodecs.fixedscaleoffset`
+
+The `scale_offset` + `cast_value` pair supersedes the legacy `numcodecs.fixedscaleoffset` codec, which combined scaling, offset, rounding, and type casting into a single monolithic operation. The new codecs address several problems with the legacy approach:
+
+- **Fill value awareness**: `FixedScaleOffset` applies `(x - offset) * scale` to _every_ element indiscriminately, including fill/sentinel values. For integer fill values like `-9999`, this silently produces a different value, corrupting the sentinel. With the separated codecs, `cast_value`'s `scalar_map` provides explicit control over how sentinels are mapped across type boundaries, and each codec independently transforms the fill value through the chain.
+- **Overflow handling**: `FixedScaleOffset` wraps silently on integer overflow with no error or warning. The `cast_value` codec makes this behavior explicit and configurable via the `out_of_range` field.
+- **Rounding control**: `FixedScaleOffset` always rounds to the nearest integer using `numpy.around`. The `cast_value` codec supports five rounding modes.
+
+The Zarr extensions registry [documents the conversion procedure](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset#conversion-to-scale_offset) between the two representations. Custom parsers should prefer emitting the new codec pair when encoding packing as codecs.
 
 ## Data model differences between Zarr and Xarray
 
@@ -249,7 +444,7 @@ manifest_store = parser(url=f"{project_url}/netcdf-file.nc", registry=registry)
 
 with (
     xr.open_dataset(manifest_store, engine="zarr", zarr_format=3, consolidated=False) as actual,
-    xr.open_dataset(manifest_store, backend="h5netcdf") as expected,
+    xr.open_dataset(f"{project_directory}/netcdf-file.nc", engine="h5netcdf") as expected,
 ):
     xrt.assert_identical(actual, expected)
 ```
