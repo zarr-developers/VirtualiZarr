@@ -35,6 +35,11 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+def _squeeze_indices(chunks: tuple) -> list[int]:
+    """Return indices of dimensions where chunk size is not 1."""
+    return [i for i, s in enumerate(chunks) if s != 1]
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -57,6 +62,9 @@ def _construct_manifest_array(
     ManifestArray
     """
     chunks = dataset.chunks or dataset.shape
+    keep_indices = _squeeze_indices(chunks)
+    keep_chunks = tuple(chunks[i] for i in keep_indices)
+    keep_shape = tuple(dataset.shape[i] for i in keep_indices)
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
@@ -79,13 +87,14 @@ def _construct_manifest_array(
 
     fill_value = dataset.fillvalue.item()
     dims = tuple(_dataset_dims(dataset, group=group))
+    keep_dims = tuple(dims[i] for i in keep_indices)
     metadata = create_v3_array_metadata(
-        shape=dataset.shape,
+        shape=keep_shape,
         data_type=dtype,
-        chunk_shape=chunks,
+        chunk_shape=keep_chunks,
         fill_value=fill_value,
         codecs=codec_configs,
-        dimension_names=dims,
+        dimension_names=keep_dims,
         attributes=attrs,
     )
     manifest = _dataset_chunk_manifest(filepath, dataset)
@@ -218,6 +227,7 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
+    keep_indices = _squeeze_indices(dataset.chunks or dataset.shape)
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
@@ -228,7 +238,7 @@ def _dataset_chunk_manifest(
                 lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
             )
         else:
-            key_list = [0] * (len(dataset.shape) or 1)
+            key_list = [0] * (len(keep_indices) or 1)
             key = ".".join(map(str, key_list))
 
             chunk_entry: ChunkEntry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
@@ -264,6 +274,14 @@ def _dataset_chunk_manifest(
             else:
                 for index in range(num_chunks):
                     add_chunk_info(dsid.get_chunk_info(index))
+
+            squeeze_axes = tuple(
+                i for i in range(len(dataset.chunks)) if i not in set(keep_indices)
+            )
+            if squeeze_axes:
+                paths = np.squeeze(paths, axis=squeeze_axes)
+                offsets = np.squeeze(offsets, axis=squeeze_axes)
+                lengths = np.squeeze(lengths, axis=squeeze_axes)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
