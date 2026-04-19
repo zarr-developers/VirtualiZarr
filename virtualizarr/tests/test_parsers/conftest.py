@@ -481,12 +481,11 @@ def big_endian_dtype_hdf5_file(tmpdir):
 
 @pytest.fixture(
     params=[
-        # {"N": 50, "M": 100, "chunked": True, "chunks": (5, 25)},
-        # {"N": 50, "M": 100, "chunked": False, "chunks": None},
+        {"N": 50, "M": 100, "chunked": True, "chunks": (5, 25)},
+        {"N": 50, "M": 100, "chunked": False, "chunks": None},
         {"N": 1, "M": 100, "chunked": True, "chunks": (1, 25)},
     ],
-    # ids=["chunked", "not_chunked", "singleton_chunked"],
-    ids=["singleton_chunked"],
+    ids=["chunked", "not_chunked", "singleton_chunked"],
 )
 def singleton_padded_dimension_hdf5_file(tmp_path: Path, request) -> tuple:
     """HDF5 file mimicking MATLAB layout: a 2D array (N, M) plus coordinate

@@ -290,6 +290,7 @@ def _dataset_chunk_manifest(
             else:
                 for index in range(num_chunks):
                     add_chunk_info(dsid.get_chunk_info(index))
+
             # we squeeze here rather than in get_key
             squeeze_axes = tuple(
                 i for i in range(len(dataset.chunks)) if i not in set(keep_indices)
