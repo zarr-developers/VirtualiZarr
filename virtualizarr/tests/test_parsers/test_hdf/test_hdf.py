@@ -42,22 +42,30 @@ class TestDatasetChunkManifest:
         assert manifest_store._group.arrays["var2"].manifest.shape_chunk_grid == (2, 8)
 
     def test_singleton_dimensions_squeezed(self, singleton_padded_dimension_hdf5_file):
-        manifest_store = manifest_store_from_hdf_url(
-            singleton_padded_dimension_hdf5_file, squeeze=True
+        url, N, M, chunked, chunks = singleton_padded_dimension_hdf5_file
+        manifest_store = manifest_store_from_hdf_url(url, squeeze=True)
+        expected_data_shape = (M,) if N == 1 else (N, M)
+        assert manifest_store._group.arrays["data"].shape == expected_data_shape
+        if chunked:
+            expected_chunks = tuple(c for c, n in zip(chunks, (N, M)) if n != 1)
+        else:
+            expected_chunks = expected_data_shape
+        assert manifest_store._group.arrays["data"].chunks == expected_chunks
+        assert manifest_store._group.arrays["row_coord"].shape == (
+            () if N == 1 else (N,)
         )
-        assert manifest_store._group.arrays["data"].shape == (10, 5)
-        assert manifest_store._group.arrays["row_coord"].shape == (10,)
-        assert manifest_store._group.arrays["col_coord"].shape == (5,)
+        assert manifest_store._group.arrays["col_coord"].shape == (M,)
 
     def test_singleton_dimensions_not_squeezed(
         self, singleton_padded_dimension_hdf5_file
     ):
-        manifest_store = manifest_store_from_hdf_url(
-            singleton_padded_dimension_hdf5_file,
-        )
-        assert manifest_store._group.arrays["data"].shape == (10, 5)
-        assert manifest_store._group.arrays["row_coord"].shape == (10, 1)
-        assert manifest_store._group.arrays["col_coord"].shape == (1, 5)
+        url, N, M, chunked, chunks = singleton_padded_dimension_hdf5_file
+        manifest_store = manifest_store_from_hdf_url(url)
+        assert manifest_store._group.arrays["data"].shape == (N, M)
+        expected_chunks = chunks if chunked else (N, M)
+        assert manifest_store._group.arrays["data"].chunks == expected_chunks
+        assert manifest_store._group.arrays["row_coord"].shape == (N, 1)
+        assert manifest_store._group.arrays["col_coord"].shape == (1, M)
 
 
 @requires_hdf5plugin
