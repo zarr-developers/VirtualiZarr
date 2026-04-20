@@ -66,7 +66,7 @@ A chunk manifest has a chunk grid shape, which represents the number of chunks a
 This shape is inferred automatically from the entries, however you can also pass an explicit `shape` argument.
 This is required when `entries` is empty (no chunks yet), and it can also be used to declare a larger chunk grid than the keys alone imply (for example, a sparse or partially-filled grid):
 
-# empty manifest with a known grid shape
+#### From an empty manifest with a known grid shape
 
 ```python exec="on" session="chunk-manifest" source="material-block"
 from virtualizarr.manifests import ChunkManifest
