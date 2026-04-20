@@ -134,7 +134,7 @@ def _generate_chunk_entries(
     """
     from zarr.experimental import ChunkGrid
 
-    chunk_grid_shape = ChunkGrid.from_regular(shape, chunks).grid_shape
+    chunk_grid_shape = ChunkGrid.from_sizes(shape, chunks).grid_shape
 
     if chunk_grid_shape == ():
         return {"0": entry_generator((0,), (0,), itemsize)}

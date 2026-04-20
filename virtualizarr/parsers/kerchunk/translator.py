@@ -178,10 +178,7 @@ def manifestarray_from_kerchunk_refs(
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     if chunk_dict:
-        chunk_grid_shape = determine_chunk_grid_shape(
-            metadata.shape,
-            metadata.chunks,
-        )
+        chunk_grid_shape = ChunkGrid.from_metadata(metadata).grid_shape
         manifest = manifest_from_kerchunk_chunk_dict(
             chunk_dict, fs_root=fs_root, shape=chunk_grid_shape
         )
