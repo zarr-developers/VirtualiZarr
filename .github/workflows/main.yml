@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        environment: [test-py311, test-py312, test-py313, test-py314, min-deps, minio]
+        environment: [test-py312, test-py313, test-py314, min-deps, minio]
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.9.3
@@ -71,11 +71,11 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.9.3
         with:
           pixi-version: v0.59.0
-          environments: test-py311
+          environments: test-py312
 
       - name: Running Flaky Tests
         run: |
-          pixi run -e test-py311 run-flaky-tests
+          pixi run -e test-py312 run-flaky-tests
 
   check-docs:
     name: check-docs
