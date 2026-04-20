@@ -42,7 +42,7 @@ The [virtualizarr.manifests.ChunkManifest][] class is virtualizarr's internal in
 
 ### Constructing a `ChunkManifest`
 
-There are two ways to construct a `ChunkManifest` directly.
+There are multiple ways to construct a `ChunkManifest` directly.
 
 #### From a dictionary
 
