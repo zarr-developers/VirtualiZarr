@@ -178,13 +178,12 @@ class ManifestStore(Store):
                 ]
             return prototype.buffer.from_bytes(inlined_data)
 
-        from virtualizarr.manifests.manifest import MISSING_CHUNK_PATH
-
-        path = manifest._paths[chunk_indexes]
-        if path == MISSING_CHUNK_PATH:
+        entry = manifest.get_entry(chunk_indexes)
+        if entry is None:
             return None
-        offset = manifest._offsets[chunk_indexes]
-        length = manifest._lengths[chunk_indexes]
+        path = entry["path"]
+        offset = entry["offset"]
+        length = entry["length"]
         # Get the configured object store instance that matches the path
         store, path_after_prefix = self._registry.resolve(path)
         if not store:

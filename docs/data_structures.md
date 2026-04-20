@@ -40,6 +40,60 @@ In this case we can see that the `"air"` variable contains only one chunk, the b
 
 The [virtualizarr.manifests.ChunkManifest][] class is virtualizarr's internal in-memory representation of this manifest.
 
+### Constructing a `ChunkManifest`
+
+There are multiple ways to construct a `ChunkManifest` directly.
+
+#### From a dictionary
+
+Pass a dict of chunk keys to byte-range entries to `ChunkManifest`:
+
+```python exec="on" session="chunk-manifest" source="material-block"
+from virtualizarr.manifests import ChunkManifest
+
+manifest = ChunkManifest(
+    entries={
+        "0.0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        "0.0.1": {"path": "s3://bucket/foo.nc", "offset": 200, "length": 100},
+        "0.1.0": {"path": "s3://bucket/foo.nc", "offset": 300, "length": 100},
+        "0.1.1": {"path": "s3://bucket/foo.nc", "offset": 400, "length": 100},
+    }
+)
+```
+
+A chunk manifest has a chunk grid shape, which represents the number of chunks along each dimension. In the example above the chunk grid has shape `(1, 2, 2)`: 1 chunk along the first dimension and 2 chunks along each of the other two.
+
+This shape is inferred automatically from the entries, however you can also pass an explicit `shape` argument.
+This is required when `entries` is empty (no chunks yet), and it can also be used to declare a larger chunk grid than the keys alone imply (for example, a sparse or partially-filled grid):
+
+#### From an empty manifest with a known grid shape
+
+```python exec="on" session="chunk-manifest" source="material-block"
+from virtualizarr.manifests import ChunkManifest
+
+manifest = ChunkManifest(entries={}, shape=(4, 8))
+```
+
+!!! note
+    `shape` here is the **chunk grid shape** — the number of chunks in each dimension — not the shape of the underlying data array.
+    For example, an array of shape `(1000, 50, 100)` stored as a single chunk has a manifest with chunk grid shape `(1, 1, 1)`.
+
+#### From numpy arrays
+
+For large manifests, constructing the dictionary first can be memory-intensive.
+`ChunkManifest.from_arrays` lets you build a manifest directly from numpy arrays, which is the same internal representation used by the class:
+
+```python exec="on" session="chunk-manifest" source="material-block"
+import numpy as np
+from virtualizarr.manifests import ChunkManifest
+
+paths   = np.asarray(["s3://bucket/foo.nc", "s3://bucket/bar.nc"], dtype=np.dtypes.StringDType())
+offsets = np.asarray([100, 200], dtype=np.uint64)
+lengths = np.asarray([100, 100], dtype=np.uint64)
+
+manifest = ChunkManifest.from_arrays(paths=paths, offsets=offsets, lengths=lengths)
+```
+
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.

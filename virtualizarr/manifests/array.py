@@ -194,13 +194,7 @@ class ManifestArray:
                 )
 
                 # do chunk-wise comparison
-                equal_chunk_paths = self.manifest._paths == other.manifest._paths
-                equal_chunk_offsets = self.manifest._offsets == other.manifest._offsets
-                equal_chunk_lengths = self.manifest._lengths == other.manifest._lengths
-
-                equal_chunks = (
-                    equal_chunk_paths & equal_chunk_offsets & equal_chunk_lengths
-                )
+                equal_chunks = self.manifest.elementwise_eq(other.manifest)
 
                 if not equal_chunks.all():
                     # TODO expand chunk-wise comparison into an element-wise result instead of just returning all False
@@ -285,7 +279,14 @@ class ManifestArray:
 
         # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
         # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
-        dims = self.metadata.dimension_names
+        if self.metadata.dimension_names is not None:
+            dims = self.metadata.dimension_names
+        elif self.ndim == 0:
+            dims = ()
+        else:
+            raise ValueError(
+                f"Cannot create virtual variable from {self.ndim}-dimensional array without dimension names."
+            )
         attrs = self.metadata.attributes
         stripped_metadata = utils.copy_and_replace_metadata(
             self.metadata, new_dimension_names=None, new_attributes={}

@@ -47,7 +47,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     manifest = ChunkManifest(entries=chunks_dict)
     metadata = create_v3_array_metadata(
         shape=(2, 4),
-        chunk_shape=(2, 4),
+        chunk_shape=(2, 2),
         data_type=np.dtype("float32"),
     )
     marr = ManifestArray(

@@ -97,40 +97,8 @@ def concatenate(
     new_shape[axis] = new_length_along_concat_axis
 
     # do concatenation of entries in manifest
-    concatenated_paths = (
-        cast(  # `np.concatenate` is type hinted as if the output could have Any dtype
-            np.ndarray[Any, np.dtypes.StringDType],
-            np.concatenate(
-                [arr.manifest._paths for arr in arrays],
-                axis=axis,
-            ),
-        )
-    )
-    concatenated_offsets = np.concatenate(
-        [arr.manifest._offsets for arr in arrays],
-        axis=axis,
-    )
-    concatenated_lengths = np.concatenate(
-        [arr.manifest._lengths for arr in arrays],
-        axis=axis,
-    )
-
-    # merge inlined chunk dicts with index shifting along the concat axis
-    concatenated_inlined: dict[tuple[int, ...], bytes] = {}
-    grid_offset = 0
-    for arr in arrays:
-        for key, data in arr.manifest._inlined.items():
-            shifted = list(key)
-            shifted[axis] += grid_offset
-            concatenated_inlined[tuple(shifted)] = data
-        grid_offset += arr.manifest._paths.shape[axis]
-
-    concatenated_manifest = ChunkManifest.from_arrays(
-        paths=concatenated_paths,
-        offsets=concatenated_offsets,
-        lengths=concatenated_lengths,
-        validate_paths=False,
-        inlined=concatenated_inlined if concatenated_inlined else None,
+    concatenated_manifest = _concat_manifests(
+        [arr.manifest for arr in arrays], axis=axis
     )
 
     new_metadata = copy_and_replace_metadata(
@@ -177,37 +145,7 @@ def stack(
     new_shape.insert(axis, length_along_new_stacked_axis)
 
     # do stacking of entries in manifest
-    stacked_paths = cast(  # `np.stack` apparently is type hinted as if the output could have Any dtype
-        np.ndarray[Any, np.dtypes.StringDType],
-        np.stack(
-            [arr.manifest._paths for arr in arrays],
-            axis=axis,
-        ),
-    )
-    stacked_offsets = np.stack(
-        [arr.manifest._offsets for arr in arrays],
-        axis=axis,
-    )
-    stacked_lengths = np.stack(
-        [arr.manifest._lengths for arr in arrays],
-        axis=axis,
-    )
-
-    # merge inlined chunk dicts, inserting the new stacked axis
-    stacked_inlined: dict[tuple[int, ...], bytes] = {}
-    for i, arr in enumerate(arrays):
-        for key, data in arr.manifest._inlined.items():
-            shifted = list(key)
-            shifted.insert(axis, i)
-            stacked_inlined[tuple(shifted)] = data
-
-    stacked_manifest = ChunkManifest.from_arrays(
-        paths=stacked_paths,
-        offsets=stacked_offsets,
-        lengths=stacked_lengths,
-        validate_paths=False,
-        inlined=stacked_inlined if stacked_inlined else None,
-    )
+    stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
     # chunk shape has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
@@ -257,37 +195,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
 
     # do broadcasting of entries in manifest
-    broadcasted_paths = cast(  # `np.broadcast_to` apparently is type hinted as if the output could have Any dtype
-        np.ndarray[Any, np.dtypes.StringDType],
-        np.broadcast_to(
-            x.manifest._paths,
-            shape=new_chunk_grid_shape,
-        ),
-    )
-
-    broadcasted_offsets = np.broadcast_to(
-        x.manifest._offsets,
-        shape=new_chunk_grid_shape,
-    )
-    broadcasted_lengths = np.broadcast_to(
-        x.manifest._lengths,
-        shape=new_chunk_grid_shape,
-    )
-    # broadcast inlined chunks by prepending singleton dimensions to their keys
-    broadcasted_inlined: dict[tuple[int, ...], bytes] = {}
-    if x.manifest._inlined:
-        n_prepended = len(new_shape) - x.ndim
-        for key, data in x.manifest._inlined.items():
-            new_key = (0,) * n_prepended + key
-            broadcasted_inlined[new_key] = data
-
-    broadcasted_manifest = ChunkManifest.from_arrays(
-        paths=broadcasted_paths,
-        offsets=broadcasted_offsets,
-        lengths=broadcasted_lengths,
-        validate_paths=False,
-        inlined=broadcasted_inlined if broadcasted_inlined else None,
-    )
+    broadcasted_manifest = _broadcast_manifest(x.manifest, shape=new_chunk_grid_shape)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=x.metadata,
@@ -296,6 +204,88 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     )
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
+
+
+def _concat_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifest:
+    """Concatenate manifests along an existing axis."""
+    concatenated_paths = cast(
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.concatenate([m._paths for m in manifests], axis=axis),
+    )
+    concatenated_offsets = np.concatenate([m._offsets for m in manifests], axis=axis)
+    concatenated_lengths = np.concatenate([m._lengths for m in manifests], axis=axis)
+
+    # merge inlined chunk dicts with index shifting along the concat axis
+    concatenated_inlined: dict[tuple[int, ...], bytes] = {}
+    grid_offset = 0
+    for m in manifests:
+        for key, data in m._inlined.items():
+            shifted = list(key)
+            shifted[axis] += grid_offset
+            concatenated_inlined[tuple(shifted)] = data
+        grid_offset += m._paths.shape[axis]
+
+    return ChunkManifest.from_arrays(
+        paths=concatenated_paths,
+        offsets=concatenated_offsets,
+        lengths=concatenated_lengths,
+        validate_paths=False,
+        inlined=concatenated_inlined if concatenated_inlined else None,
+    )
+
+
+def _stack_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifest:
+    """Stack manifests along a new axis."""
+    stacked_paths = cast(
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.stack([m._paths for m in manifests], axis=axis),
+    )
+    stacked_offsets = np.stack([m._offsets for m in manifests], axis=axis)
+    stacked_lengths = np.stack([m._lengths for m in manifests], axis=axis)
+
+    # merge inlined chunk dicts, inserting the new stacked axis
+    stacked_inlined: dict[tuple[int, ...], bytes] = {}
+    for i, m in enumerate(manifests):
+        for key, data in m._inlined.items():
+            shifted = list(key)
+            shifted.insert(axis, i)
+            stacked_inlined[tuple(shifted)] = data
+
+    return ChunkManifest.from_arrays(
+        paths=stacked_paths,
+        offsets=stacked_offsets,
+        lengths=stacked_lengths,
+        validate_paths=False,
+        inlined=stacked_inlined if stacked_inlined else None,
+    )
+
+
+def _broadcast_manifest(
+    manifest: ChunkManifest, shape: tuple[int, ...]
+) -> ChunkManifest:
+    """Broadcast manifest to a new chunk grid shape."""
+    broadcasted_paths = cast(
+        np.ndarray[Any, np.dtypes.StringDType],
+        np.broadcast_to(manifest._paths, shape=shape),
+    )
+    broadcasted_offsets = np.broadcast_to(manifest._offsets, shape=shape)
+    broadcasted_lengths = np.broadcast_to(manifest._lengths, shape=shape)
+
+    # broadcast inlined chunks by prepending singleton dimensions to their keys
+    broadcasted_inlined: dict[tuple[int, ...], bytes] = {}
+    if manifest._inlined:
+        n_prepended = len(shape) - manifest._paths.ndim
+        for key, data in manifest._inlined.items():
+            new_key = (0,) * n_prepended + key
+            broadcasted_inlined[new_key] = data
+
+    return ChunkManifest.from_arrays(
+        paths=broadcasted_paths,
+        offsets=broadcasted_offsets,
+        lengths=broadcasted_lengths,
+        validate_paths=False,
+        inlined=broadcasted_inlined if broadcasted_inlined else None,
+    )
 
 
 def _prepend_singleton_dimensions(shape: tuple[int, ...], ndim: int) -> tuple[int, ...]:

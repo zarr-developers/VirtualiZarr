@@ -8,9 +8,9 @@ from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 
-from virtualizarr.codecs import get_codecs
+from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH, MISSING_CHUNK_PATH
+from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -273,9 +273,8 @@ def validate_virtual_chunk_containers(
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
-        for ref in marr.manifest._paths.flat:
-            if ref and ref not in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH):
-                validate_single_ref(ref, supported_prefixes)
+        for ref in marr.manifest.iter_nonempty_paths():
+            validate_single_ref(ref, supported_prefixes)
 
 
 def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
@@ -446,9 +445,6 @@ def write_virtual_variable_to_icechunk(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
-    from zarr import Array
-
-    from virtualizarr.codecs import extract_codecs
 
     ma = cast(ManifestArray, var.data)
     metadata = ma.metadata
@@ -516,12 +512,12 @@ def write_virtual_variable_to_icechunk(
             chunk_offsets.append(start // chunk_size)
     else:
         chunk_offsets = [0 for _ in dims]
-        # TODO: Should codecs be an argument to zarr's AsyncrGroup.create_array?
-        filters, serializer, compressors = extract_codecs(metadata.codecs)
+        filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
             chunks=metadata.chunks,
+            shards=metadata.shards,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
             compressors=compressors,
@@ -551,27 +547,11 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
-    from icechunk import VirtualChunkSpec
 
     if group.name == "/":
         key_prefix = arr_name
     else:
         key_prefix = f"{group.name}/{arr_name}"
-
-    # loop over every reference in the ChunkManifest for that array
-    # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
-    # but Icechunk need to expose a suitable API first
-    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
-
-    it = np.nditer(
-        [manifest._paths, manifest._offsets, manifest._lengths],  # type: ignore[arg-type]
-        flags=[
-            "refs_ok",
-            "multi_index",
-            "c_index",
-        ],
-        op_flags=[["readonly"]] * 3,  # type: ignore
-    )
 
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
@@ -581,23 +561,19 @@ def write_manifest_virtual_refs(
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
-    virtual_chunk_spec_list = [
-        VirtualChunkSpec(
-            index=[
-                index + offset
-                for index, offset in zip(it.multi_index, chunk_index_offsets)
-            ],
-            location=path.item(),
-            offset=offset.item(),
-            length=length.item(),
-            last_updated_at_checksum=last_updated_at,
-        )
-        for path, offset, length in it
-        if path and path.item() not in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH)
-    ]
-
-    store.set_virtual_refs(
+    # Pass manifest arrays directly to Rust, avoiding per-chunk Python object creation.
+    # Empty paths represent missing chunks and are skipped on the Rust side.
+    # Inlined chunks are also treated as missing here — they are stored separately, not as virtual refs.
+    paths_flat = manifest._paths.flatten()
+    if manifest._inlined:
+        paths_flat = np.where(paths_flat == INLINED_CHUNK_PATH, "", paths_flat)
+    store.set_virtual_refs_arr(
         array_path=key_prefix,
-        chunks=virtual_chunk_spec_list,
-        validate_containers=False,  # we already validated these before setting any refs
+        chunk_grid_shape=manifest.shape_chunk_grid,
+        locations=paths_flat.tolist(),
+        offsets=manifest._offsets.flatten(),
+        lengths=manifest._lengths.flatten(),
+        validate_containers=False,
+        arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
+        checksum=last_updated_at,
     )

@@ -11,6 +11,7 @@ from collections.abc import (
 )
 from pathlib import PosixPath
 from typing import Any, NewType, NotRequired, TypedDict, cast
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -21,18 +22,11 @@ from virtualizarr.manifests.utils import (
 )
 from virtualizarr.types import ChunkKey
 
-# doesn't guarantee that writers actually handle these
-VALID_URI_PREFIXES = {
-    "s3://",
-    "gs://",
-    "azure://",
-    "r2://",
-    "cos://",
-    "minio://",
-    "file:///",
-    "http://",
-    "https://",
-}
+
+def _is_uri(path: str) -> bool:
+    """Check if a path is a URI by looking for a scheme."""
+    return bool(urlparse(path).scheme)
+
 
 # Sentinel path values used in the paths array to distinguish chunk states.
 # Missing chunks have no data anywhere; inlined chunks have data in _inlined dict.
@@ -97,7 +91,7 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
     if path in (MISSING_CHUNK_PATH, INLINED_CHUNK_PATH):
         # sentinel values are allowed through (missing chunks and inlined chunks)
         return path
-    elif any(path.startswith(prefix) for prefix in VALID_URI_PREFIXES):
+    elif _is_uri(path):
         return path  # path is already in URI form
     else:
         # must be a posix filesystem path (absolute or relative)
@@ -274,7 +268,7 @@ class ChunkManifest:
                 )
                 raise ValueError(msg)
 
-            split_key = parse_manifest_index(key, separator)
+            split_key = () if shape == () else parse_manifest_index(key, separator)
 
             if "data" in entry:
                 # Inlined chunk: store bytes in the sparse dict
@@ -506,6 +500,47 @@ class ChunkManifest:
         lengths_equal = (self._lengths == other._lengths).all()
         inlined_equal = self._inlined == other._inlined
         return paths_equal and offsets_equal and lengths_equal and inlined_equal
+
+    def get_entry(self, indices: tuple[int, ...]) -> ChunkEntry | None:
+        """Look up a chunk entry by grid indices. Returns None for missing chunks (empty path)."""
+        path = self._paths[indices]
+        if path == "":
+            return None
+        offset = self._offsets[indices]
+        length = self._lengths[indices]
+        return ChunkEntry(path=path, offset=offset, length=length)
+
+    def elementwise_eq(self, other: "ChunkManifest") -> np.ndarray:
+        """Return boolean array where True means that chunk entry matches."""
+        return (
+            (self._paths == other._paths)
+            & (self._offsets == other._offsets)
+            & (self._lengths == other._lengths)
+        )
+
+    def iter_nonempty_paths(self) -> Iterator[str]:
+        """Yield all real (non-missing, non-inlined) paths in the manifest."""
+        for path in self._paths.flat:
+            if path and path != INLINED_CHUNK_PATH:
+                yield path
+
+    def iter_refs(self) -> Iterator[tuple[tuple[int, ...], ChunkEntry]]:
+        """Yield (grid_indices, chunk_entry) for every non-missing chunk."""
+        coord_vectors = np.mgrid[
+            tuple(slice(None, length) for length in self.shape_chunk_grid)
+        ]
+        for *inds, path, offset, length in np.nditer(
+            [*coord_vectors, self._paths, self._offsets, self._lengths],
+            flags=("refs_ok",),
+        ):
+            if path.item() != "":
+                idx = tuple(int(i) for i in inds)
+                yield (
+                    idx,
+                    ChunkEntry(
+                        path=path.item(), offset=offset.item(), length=length.item()
+                    ),
+                )
 
     def rename_paths(
         self,
