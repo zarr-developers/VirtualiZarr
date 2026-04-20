@@ -48,6 +48,7 @@ There are two ways to construct a `ChunkManifest` directly.
 
 Pass a dict of chunk keys to byte-range entries to `ChunkManifest`:
 
+```python exec="on" session="chunk-manifest" source="material-block"
 from virtualizarr import ChunkManifest
 
 manifest = ChunkManifest(
@@ -66,6 +67,8 @@ This shape is inferred automatically from the entries, however you can also pass
 This is required when `entries` is empty (no chunks yet), and it can also be used to declare a larger chunk grid than the keys alone imply (for example, a sparse or partially-filled grid):
 
 # empty manifest with a known grid shape
+
+```python exec="on" session="chunk-manifest" source="material-block"
 manifest = ChunkManifest(entries={}, shape=(4, 8))
 ```
 
@@ -78,6 +81,7 @@ manifest = ChunkManifest(entries={}, shape=(4, 8))
 For large manifests, constructing the dictionary first can be memory-intensive.
 `ChunkManifest.from_arrays` lets you build a manifest directly from numpy arrays, which is the same internal representation used by the class:
 
+```python exec="on" session="chunk-manifest" source="material-block"
 import numpy as np
 from virtualizarr import ChunkManifest
 
