@@ -49,7 +49,7 @@ There are two ways to construct a `ChunkManifest` directly.
 Pass a dict of chunk keys to byte-range entries to `ChunkManifest`:
 
 ```python exec="on" session="chunk-manifest" source="material-block"
-from virtualizarr import ChunkManifest
+from virtualizarr.manifests import ChunkManifest
 
 manifest = ChunkManifest(
     entries={
@@ -69,6 +69,8 @@ This is required when `entries` is empty (no chunks yet), and it can also be use
 # empty manifest with a known grid shape
 
 ```python exec="on" session="chunk-manifest" source="material-block"
+from virtualizarr.manifests import ChunkManifest
+
 manifest = ChunkManifest(entries={}, shape=(4, 8))
 ```
 
@@ -83,7 +85,7 @@ For large manifests, constructing the dictionary first can be memory-intensive.
 
 ```python exec="on" session="chunk-manifest" source="material-block"
 import numpy as np
-from virtualizarr import ChunkManifest
+from virtualizarr.manifests import ChunkManifest
 
 paths   = np.asarray(["s3://bucket/foo.nc", "s3://bucket/bar.nc"], dtype=np.dtypes.StringDType())
 offsets = np.asarray([100, 200], dtype=np.uint64)
