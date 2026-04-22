@@ -3,7 +3,8 @@ from typing import Any, Callable, Union, cast
 
 import numpy as np
 import xarray as xr
-from zarr.core.metadata.v3 import ArrayV3Metadata, RegularChunkGrid
+from zarr.core.metadata.v3 import ArrayV3Metadata
+from zarr.experimental import ChunkGrid
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -50,11 +51,6 @@ class ManifestArray:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
 
-        if not isinstance(_metadata.chunk_grid, RegularChunkGrid):
-            raise NotImplementedError(
-                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
-            )
-
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
@@ -83,11 +79,22 @@ class ManifestArray:
         return self._metadata
 
     @property
-    def chunks(self) -> tuple[int, ...]:
+    def chunk_grid(self) -> ChunkGrid:
+        """Behavioral chunk grid bound to this array's shape."""
+        return ChunkGrid.from_metadata(self._metadata)
+
+    @property
+    def chunks(self) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
         """
         Individual chunk size by number of elements.
+
+        For regular grids, returns a tuple of ints (e.g., (30, 50)).
+        For rectilinear grids, returns a tuple of tuples (e.g., ((10, 20, 30), (50, 50))).
         """
-        return self._metadata.chunks
+        grid = self.chunk_grid
+        if grid.is_regular:
+            return grid.chunk_shape
+        return grid.chunk_sizes
 
     @property
     def dtype(self) -> np.dtype:
