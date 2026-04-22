@@ -290,6 +290,25 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
         }
 
 
+def test_relative_path_to_absolute_cloud_url(refs_file_factory, local_registry):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/975
+    refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
+    parser = KerchunkJSONParser(fs_root="s3://some_bucket/")
+    with open_virtual_dataset(
+        url=refs_file,
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.manifest.dict() == {
+            "0.0": {
+                "path": "s3://some_bucket/test1.nc",
+                "offset": 6144,
+                "length": 48,
+            }
+        }
+
+
 @requires_kerchunk
 @pytest.mark.parametrize(
     "reference_format",
