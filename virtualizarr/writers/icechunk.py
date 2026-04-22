@@ -566,11 +566,13 @@ def write_manifest_virtual_refs(
     # Inlined chunks are also treated as missing here — they are stored separately, not as virtual refs.
     paths_flat = manifest._paths.flatten()
     if manifest._inlined:
-        paths_flat = np.where(paths_flat == INLINED_CHUNK_PATH, "", paths_flat)
+        locations = np.where(paths_flat == INLINED_CHUNK_PATH, "", paths_flat).tolist()
+    else:
+        locations = paths_flat.tolist()
     store.set_virtual_refs_arr(
         array_path=key_prefix,
         chunk_grid_shape=manifest.shape_chunk_grid,
-        locations=paths_flat.tolist(),
+        locations=locations,
         offsets=manifest._offsets.flatten(),
         lengths=manifest._lengths.flatten(),
         validate_containers=False,
