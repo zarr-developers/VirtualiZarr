@@ -82,44 +82,28 @@ def validate_and_normalize_path_to_uri(path: str, fs_root: str | None = None) ->
                 raise ValueError(
                     f"paths in the manifest must be absolute posix paths or URIs, but got {path}, and fs_root was not specified"
                 )
-            else:
-                _path = convert_relative_path_to_absolute(_path, fs_root)
+            return convert_relative_path_to_absolute(_path, fs_root)
 
         return _path.as_uri()
 
 
-def posixpath_maybe_from_uri(path: str) -> PosixPath:
-    """
-    Handles file URIs like cloudpathlib.AnyPath does, i.e.
+def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> str:
+    # normalize file:// URIs to plain posix paths
+    if fs_root.startswith("file:///"):
+        fs_root = fs_root.removeprefix("file://")
 
-    In[1]: pathlib.PosixPath('file:///dir/file.nc')
-    Out[1]: pathlib.PosixPath('file:/dir/file.nc')
+    # remote URI root (s3://, gs://, https://, ...) — just concat
+    if _is_uri(fs_root):
+        return fs_root.rstrip("/") + "/" + str(path)
 
-    In [2]: cloudpathlib.AnyPath('file:///dir/file.nc')
-    Out[2]: pathlib.PosixPath('/dir/file.nc')
-
-    In [3]: posixpath_maybe_from_uri('file:///dir/file.nc')
-    Out[3]: pathlib.PosixPath('/dir/file.nc')
-
-    This is needed otherwise pathlib thinks the URI is a relative path.
-    """
-    if path.startswith("file:///"):
-        # TODO in python 3.13 we could probably use Path.from_uri() instead
-        return PosixPath(path.removeprefix("file://"))
-    else:
-        return PosixPath(path)
-
-
-def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> PosixPath:
-    _fs_root = posixpath_maybe_from_uri(fs_root)
-
+    # local posix root
+    _fs_root = PosixPath(fs_root)
     if not _fs_root.is_absolute() or _fs_root.suffix:
-        # TODO handle http url roots and bucket prefix roots? (ideally through cloudpathlib)
         raise ValueError(
-            f"fs_root must be an absolute path to a filesystem directory, but got {fs_root}"
+            f"fs_root must be an absolute filesystem directory path or URI "
+            f"(e.g. /data, file:///data, s3://bucket/), but got {fs_root}"
         )
-
-    return (_fs_root / path).resolve()
+    return (_fs_root / path).resolve().as_uri()
 
 
 def validate_byte_range(*, offset: Any, length: Any) -> None:

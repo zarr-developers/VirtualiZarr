@@ -240,7 +240,7 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
 
     parser = KerchunkJSONParser(fs_root="some_directory/")
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+        ValueError, match="fs_root must be an absolute filesystem directory path or URI"
     ):
         with open_virtual_dataset(
             url=refs_file,
@@ -251,7 +251,7 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
 
     parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+        ValueError, match="fs_root must be an absolute filesystem directory path or URI"
     ):
         with open_virtual_dataset(
             url=refs_file,
