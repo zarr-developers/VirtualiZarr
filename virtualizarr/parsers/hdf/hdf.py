@@ -56,7 +56,10 @@ def _construct_manifest_array(
     -------
     ManifestArray
     """
-    chunks = dataset.chunks or dataset.shape
+    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
+    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
+    # https://github.com/zarr-developers/zarr-python/issues/3711.
+    chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype

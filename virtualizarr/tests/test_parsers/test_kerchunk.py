@@ -199,6 +199,23 @@ def test_kerchunk_parquet_sparse_array(tmp_path, local_registry):
         assert "1.0" not in manifest
 
 
+def test_scalar_variable_manifest_shape(refs_file_factory, local_registry):
+    """Scalar variables from kerchunk refs should produce a manifest with shape (), not (1,)."""
+    zarray = '{"chunks":[],"compressor":null,"dtype":"<i4","fill_value":null,"filters":null,"order":"C","shape":[],"zarr_format":2}'
+    zattrs = '{"_ARRAY_DIMENSIONS":[]}'
+    refs_file = refs_file_factory(
+        zarray=zarray,
+        zattrs=zattrs,
+        chunks={"a/0": ["/test1.nc", 100, 4]},
+    )
+    parser = KerchunkJSONParser()
+    with open_virtual_dataset(
+        url=refs_file, registry=local_registry, parser=parser
+    ) as vds:
+        assert vds["a"].shape == ()
+        assert vds["a"].data.manifest.shape_chunk_grid == ()
+
+
 def test_handle_relative_paths(refs_file_factory, local_registry):
     # deliberately use relative path here, see https://github.com/zarr-developers/VirtualiZarr/pull/243#issuecomment-2492341326
     refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
@@ -223,7 +240,7 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
 
     parser = KerchunkJSONParser(fs_root="some_directory/")
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+        ValueError, match="fs_root must be an absolute filesystem directory path or URI"
     ):
         with open_virtual_dataset(
             url=refs_file,
@@ -234,7 +251,7 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
 
     parser = KerchunkJSONParser(fs_root="/some_directory/file.nc")
     with pytest.raises(
-        ValueError, match="fs_root must be an absolute path to a filesystem directory"
+        ValueError, match="fs_root must be an absolute filesystem directory path or URI"
     ):
         with open_virtual_dataset(
             url=refs_file,
@@ -267,6 +284,25 @@ def test_handle_relative_paths(refs_file_factory, local_registry):
         assert vda.data.manifest.dict() == {
             "0.0": {
                 "path": "file:///some_directory/test1.nc",
+                "offset": 6144,
+                "length": 48,
+            }
+        }
+
+
+def test_relative_path_to_absolute_cloud_url(refs_file_factory, local_registry):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/975
+    refs_file = refs_file_factory(chunks={"a/0.0": ["test1.nc", 6144, 48]})
+    parser = KerchunkJSONParser(fs_root="s3://some_bucket/")
+    with open_virtual_dataset(
+        url=refs_file,
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        vda = vds["a"]
+        assert vda.data.manifest.dict() == {
+            "0.0": {
+                "path": "s3://some_bucket/test1.nc",
                 "offset": 6144,
                 "length": 48,
             }

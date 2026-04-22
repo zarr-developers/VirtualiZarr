@@ -545,17 +545,11 @@ def write_manifest_virtual_refs(
     last_updated_at: Optional[datetime] = None,
 ) -> None:
     """Write all the virtual references for one array manifest at once."""
-    from icechunk import VirtualChunkSpec
 
     if group.name == "/":
         key_prefix = arr_name
     else:
         key_prefix = f"{group.name}/{arr_name}"
-
-    # loop over every reference in the ChunkManifest for that array
-    # TODO inefficient: this should be replaced with something that sets all (new) references for the array at once
-    # but Icechunk need to expose a suitable API first
-    # See https://github.com/earth-mover/icechunk/issues/401 for performance benchmark
 
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
@@ -565,21 +559,15 @@ def write_manifest_virtual_refs(
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
-    virtual_chunk_spec_list = [
-        VirtualChunkSpec(
-            index=[
-                index + offset for index, offset in zip(grid_index, chunk_index_offsets)
-            ],
-            location=entry["path"],
-            offset=entry["offset"],
-            length=entry["length"],
-            last_updated_at_checksum=last_updated_at,
-        )
-        for grid_index, entry in manifest.iter_refs()
-    ]
-
-    store.set_virtual_refs(
+    # Pass manifest arrays directly to Rust, avoiding per-chunk Python object creation.
+    # Empty paths represent missing chunks and are skipped on the Rust side.
+    store.set_virtual_refs_arr(
         array_path=key_prefix,
-        chunks=virtual_chunk_spec_list,
-        validate_containers=False,  # we already validated these before setting any refs
+        chunk_grid_shape=manifest.shape_chunk_grid,
+        locations=manifest._paths.flatten().tolist(),
+        offsets=manifest._offsets.flatten(),
+        lengths=manifest._lengths.flatten(),
+        validate_containers=False,
+        arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
+        checksum=last_updated_at,
     )
