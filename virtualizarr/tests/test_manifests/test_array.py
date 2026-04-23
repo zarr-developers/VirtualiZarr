@@ -954,3 +954,18 @@ def test_to_xarray(array_v3_metadata):
     assert vv.data.metadata.dimension_names is None
     assert vv.attrs == {"ham": "sandwich"}
     assert vv.data.metadata.attributes == {}
+
+
+def test_to_virtual_variable_preserves_inlined(array_v3_metadata):
+    metadata = array_v3_metadata(
+        shape=(2,), chunks=(1,), dimension_names=["x"]
+    )
+    manifest = ChunkManifest(
+        entries={
+            "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+            "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+        }
+    )
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    vv = marr.to_virtual_variable()
+    assert vv.data.manifest._inlined == {(0,): b"aaaa", (1,): b"bbbb"}
