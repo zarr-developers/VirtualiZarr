@@ -208,6 +208,39 @@ def s3_store(minio_bucket):
 
 
 @pytest.fixture()
+def local_store_with_inlined(tmpdir):
+    """ManifestStore with one array holding three virtual chunks + one inlined chunk at 0.0."""
+    store = obs.store.LocalStore()
+    filepath = f"{tmpdir}/data.tmp"
+    prefix = "file://"
+    obs.put(
+        store,
+        filepath,
+        b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x10\x11\x12",
+    )
+    chunk_dict = {
+        "0.0": {"path": "", "offset": 0, "length": 4, "data": b"\xaa\xbb\xcc\xdd"},
+        "0.1": {"path": f"{prefix}/{filepath}", "offset": 0, "length": 4},
+        "1.0": {"path": f"{prefix}/{filepath}", "offset": 4, "length": 4},
+        "1.1": {"path": f"{prefix}/{filepath}", "offset": 8, "length": 4},
+    }
+    manifest = ChunkManifest(entries=chunk_dict)
+    codecs = [{"configuration": {"endian": "little"}, "name": "bytes"}]
+    metadata = create_v3_array_metadata(
+        shape=(4, 4),
+        chunk_shape=(2, 2),
+        data_type=np.dtype("int32"),
+        codecs=codecs,
+        chunk_key_encoding={"name": "default", "separator": "."},
+        fill_value=0,
+    )
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    group = ManifestGroup(arrays={"foo": marr})
+    registry = ObjectStoreRegistry({prefix: store})
+    return ManifestStore(registry=registry, group=group)
+
+
+@pytest.fixture()
 def empty_memory_store():
     import obstore as obs
 
@@ -355,6 +388,50 @@ class TestManifestStore:
         observed = await _collect_aiterator(store.list_dir("foo/"))
         assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
         observed = await _collect_aiterator(store.list_dir("subgroup/foo/"))
+        assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
+
+    @pytest.mark.asyncio
+    async def test_get_inlined_chunk(self, local_store_with_inlined):
+        observed = await local_store_with_inlined.get(
+            "foo/c.0.0", prototype=default_buffer_prototype()
+        )
+        assert observed.to_bytes() == b"\xaa\xbb\xcc\xdd"
+
+    @pytest.mark.asyncio
+    async def test_get_inlined_chunk_byte_ranges(self, local_store_with_inlined):
+        observed = await local_store_with_inlined.get(
+            "foo/c.0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=RangeByteRequest(start=1, end=3),
+        )
+        assert observed.to_bytes() == b"\xbb\xcc"
+        observed = await local_store_with_inlined.get(
+            "foo/c.0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=OffsetByteRequest(offset=1),
+        )
+        assert observed.to_bytes() == b"\xbb\xcc\xdd"
+        observed = await local_store_with_inlined.get(
+            "foo/c.0.0",
+            prototype=default_buffer_prototype(),
+            byte_range=SuffixByteRequest(suffix=2),
+        )
+        assert observed.to_bytes() == b"\xcc\xdd"
+
+    @pytest.mark.asyncio
+    async def test_get_mixed_inlined_and_virtual(self, local_store_with_inlined):
+        inlined = await local_store_with_inlined.get(
+            "foo/c.0.0", prototype=default_buffer_prototype()
+        )
+        assert inlined.to_bytes() == b"\xaa\xbb\xcc\xdd"
+        virtual = await local_store_with_inlined.get(
+            "foo/c.0.1", prototype=default_buffer_prototype()
+        )
+        assert virtual.to_bytes() == b"\x01\x02\x03\x04"
+
+    @pytest.mark.asyncio
+    async def test_list_dir_includes_inlined_chunks(self, local_store_with_inlined):
+        observed = await _collect_aiterator(local_store_with_inlined.list_dir("foo/"))
         assert observed == ("zarr.json", "c.0.0", "c.0.1", "c.1.0", "c.1.1")
 
     @pytest.mark.asyncio
