@@ -512,11 +512,17 @@ class ChunkManifest:
 
     def elementwise_eq(self, other: "ChunkManifest") -> np.ndarray:
         """Return boolean array where True means that chunk entry matches."""
-        return (
+        equal = (
             (self._paths == other._paths)
             & (self._offsets == other._offsets)
             & (self._lengths == other._lengths)
         )
+        # For inlined chunks, paths/offsets/lengths can agree while bytes differ.
+        # Force False at any position where the two manifests disagree on inlined data.
+        for chunk_key in set(self._inlined) | set(other._inlined):
+            if self._inlined.get(chunk_key) != other._inlined.get(chunk_key):
+                equal[chunk_key] = False
+        return equal
 
     def iter_nonempty_paths(self) -> Iterator[str]:
         """Yield all real (non-missing, non-inlined) paths in the manifest."""
