@@ -115,8 +115,12 @@ class TestEquals:
     def test_equal_inlined_data(self, array_v3_metadata):
         metadata = array_v3_metadata(shape=(1,), chunks=(1,))
         chunks = {"0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"}}
-        marr1 = ManifestArray(metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks))
-        marr2 = ManifestArray(metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks))
+        marr1 = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks)
+        )
+        marr2 = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks)
+        )
         assert (marr1 == marr2).all()
 
     def test_not_equal_different_inlined_data(self, array_v3_metadata):
@@ -957,9 +961,7 @@ def test_to_xarray(array_v3_metadata):
 
 
 def test_to_virtual_variable_preserves_inlined(array_v3_metadata):
-    metadata = array_v3_metadata(
-        shape=(2,), chunks=(1,), dimension_names=["x"]
-    )
+    metadata = array_v3_metadata(shape=(2,), chunks=(1,), dimension_names=["x"])
     manifest = ChunkManifest(
         entries={
             "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
