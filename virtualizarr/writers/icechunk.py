@@ -2,7 +2,6 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
 
-import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
@@ -10,7 +9,6 @@ from zarr import Array, Group
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -563,16 +561,10 @@ def write_manifest_virtual_refs(
 
     # Pass manifest arrays directly to Rust, avoiding per-chunk Python object creation.
     # Empty paths represent missing chunks and are skipped on the Rust side.
-    # Inlined chunks are also treated as missing here — they are stored separately, not as virtual refs.
-    paths_flat = manifest._paths.flatten()
-    if manifest._inlined:
-        locations = np.where(paths_flat == INLINED_CHUNK_PATH, "", paths_flat).tolist()
-    else:
-        locations = paths_flat.tolist()
     store.set_virtual_refs_arr(
         array_path=key_prefix,
         chunk_grid_shape=manifest.shape_chunk_grid,
-        locations=locations,
+        locations=manifest._paths.flatten().tolist(),
         offsets=manifest._offsets.flatten(),
         lengths=manifest._lengths.flatten(),
         validate_containers=False,
