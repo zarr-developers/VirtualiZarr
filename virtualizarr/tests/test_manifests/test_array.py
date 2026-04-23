@@ -274,6 +274,96 @@ class TestBroadcast:
         assert expanded.manifest.dict() == {}
 
 
+class TestBroadcastInlined:
+    def test_broadcast_existing_axis(self, array_v3_metadata):
+        # inlined chunks should be replicated to every position along an expanded axis
+        metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "0.1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 1): b"bbbb",
+            (2, 1): b"bbbb",
+        }
+
+    def test_broadcast_new_axis(self, array_v3_metadata):
+        # prepending a size-1 axis should rewrite inlined keys without replicating bytes
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(1, 2))
+        assert expanded.shape == (1, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (0, 1): b"bbbb",
+        }
+
+    def test_broadcast_prepended_and_expanded(self, array_v3_metadata):
+        # prepend a new axis AND expand it; inlined bytes should be replicated along the new axis
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 1): b"bbbb",
+            (2, 1): b"bbbb",
+        }
+
+    def test_broadcast_mixed_inlined_and_virtual(self, array_v3_metadata):
+        # inlined and virtual chunks in the same manifest both replicate along the expanded axis
+        metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+        }
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "1.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "2.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            "1.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            "2.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+        }
+
+
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
 class TestConcat:
