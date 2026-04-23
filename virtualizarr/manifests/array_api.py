@@ -1,3 +1,4 @@
+import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
@@ -271,13 +272,21 @@ def _broadcast_manifest(
     broadcasted_offsets = np.broadcast_to(manifest._offsets, shape=shape)
     broadcasted_lengths = np.broadcast_to(manifest._lengths, shape=shape)
 
-    # broadcast inlined chunks by prepending singleton dimensions to their keys
+    # broadcast inlined chunks: prepend singleton dims to each key, then replicate
+    # the entry across every target position along any axis that was size 1 in the
+    # source (matching np.broadcast_to semantics for the paths/offsets/lengths arrays).
     broadcasted_inlined: dict[tuple[int, ...], bytes] = {}
     if manifest._inlined:
         n_prepended = len(shape) - manifest._paths.ndim
+        source_shape_padded = (1,) * n_prepended + manifest._paths.shape
         for key, data in manifest._inlined.items():
-            new_key = (0,) * n_prepended + key
-            broadcasted_inlined[new_key] = data
+            padded_key = (0,) * n_prepended + key
+            axis_ranges = [
+                range(shape[i]) if source_shape_padded[i] == 1 else (padded_key[i],)
+                for i in range(len(shape))
+            ]
+            for target_key in itertools.product(*axis_ranges):
+                broadcasted_inlined[target_key] = data
 
     return ChunkManifest.from_arrays(
         paths=broadcasted_paths,
