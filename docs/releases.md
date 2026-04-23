@@ -8,6 +8,9 @@
 
 ### Bug fixes
 
+- Fix `HDFParser` failing on HDF5 datasets with a zero-length dimension under `zarr-python >= 3.2.0`, which forbids zero-length chunk dimensions. Chunk dimensions are now clamped to a minimum of 1 when falling back from dataset shape.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
