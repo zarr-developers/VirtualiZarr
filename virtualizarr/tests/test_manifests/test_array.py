@@ -337,6 +337,23 @@ class TestBroadcastInlined:
             (2, 1): b"bbbb",
         }
 
+    def test_broadcast_preserves_bytes_identity(self, array_v3_metadata):
+        # replicated inlined entries should share the same bytes object, not copies
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        payload = b"x" * 16
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 16, "data": payload}}
+            ),
+        )
+
+        expanded = np.broadcast_to(marr, shape=(4,))
+        assert expanded.manifest._inlined[(0,)] is payload
+        assert expanded.manifest._inlined[(1,)] is payload
+        assert expanded.manifest._inlined[(2,)] is payload
+        assert expanded.manifest._inlined[(3,)] is payload
+
     def test_broadcast_mixed_inlined_and_virtual(self, array_v3_metadata):
         # inlined and virtual chunks in the same manifest both replicate along the expanded axis
         metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
