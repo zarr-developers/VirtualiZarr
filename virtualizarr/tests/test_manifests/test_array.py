@@ -112,6 +112,30 @@ class TestEquals:
     @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self): ...
 
+    def test_equal_inlined_data(self, array_v3_metadata):
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        chunks = {"0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"}}
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks))
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks))
+        assert (marr1 == marr2).all()
+
+    def test_not_equal_different_inlined_data(self, array_v3_metadata):
+        # same paths/offsets/lengths, but different inlined bytes → not equal
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"}}
+            ),
+        )
+        assert not (marr1 == marr2).all()
+
     def test_equals_nan_fill_value(self, array_v3_metadata):
         # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/501
         chunks_dict = {
