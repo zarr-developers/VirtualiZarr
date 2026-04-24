@@ -62,10 +62,20 @@ def _construct_manifest_array(
     -------
     ManifestArray
     """
-    chunks = dataset.chunks or dataset.shape
+    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
+    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
+    # https://github.com/zarr-developers/zarr-python/issues/3711.
+    # this uses dataset.chunks if present or dataset.shape if chunks are not present
+    # if using dataset.shape, it enforces that each dimension is at least size one
+    chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
+    # this says we only want to keep indices of dimensions where the size is greater than 1,
+    # which only somewhat overrides the logic above since we will remove any dimensions that are of size 1
+    # taken together it means we remove any dimension that is of size 1 or less
+    # and any chunk dimension that is of size 1 or less
     keep_indices = _squeeze_indices(chunks) if squeeze else list(range(len(chunks)))
     keep_chunks = tuple(chunks[i] for i in keep_indices)
     keep_shape = tuple(dataset.shape[i] for i in keep_indices)
+
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
