@@ -68,10 +68,8 @@ def _construct_manifest_array(
     # this uses dataset.chunks if present or dataset.shape if chunks are not present
     # if using dataset.shape, it enforces that each dimension is at least size one
     chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
-    # this says we only want to keep indices of dimensions where the size is greater than 1,
-    # which only somewhat overrides the logic above since we will remove any dimensions that are of size 1
-    # taken together it means we remove any dimension that is of size 1 or less
-    # and any chunk dimension that is of size 1 or less
+    # keep only dimensions where chunk size != 1; after clamping above, no dim can be < 1,
+    # so this effectively drops any dim that was zero-length in the original dataset.
     keep_indices = _squeeze_indices(chunks) if squeeze else list(range(len(chunks)))
     keep_chunks = tuple(chunks[i] for i in keep_indices)
     keep_shape = tuple(dataset.shape[i] for i in keep_indices)
