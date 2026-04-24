@@ -2,10 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.parsers import KerchunkJSONParser
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json
 
@@ -186,11 +189,6 @@ class TestAccessor:
     def test_write_inlined_chunks_roundtrip(self, tmp_path, array_v3_metadata):
         # Write a manifest containing inlined chunks to JSON, then re-parse it
         # with KerchunkJSONParser; the inlined bytes should survive the round trip.
-        from obspec_utils.registry import ObjectStoreRegistry
-        from obstore.store import LocalStore
-
-        from virtualizarr.parsers import KerchunkJSONParser
-
         inlined = b"\x01\x02\x03\x04\x05\x06\x07\x08"
         manifest = ChunkManifest(
             entries={
