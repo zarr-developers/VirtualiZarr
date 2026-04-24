@@ -241,11 +241,15 @@ class ChunkManifest:
 
         inlined: dict[tuple[int, ...], bytes] = {}
 
-        _required_keys = {"path", "offset", "length"}
+        _virtual_keys = {"path", "offset", "length"}
+        _inlined_keys = {"path", "offset", "length", "data"}
 
         # populate the arrays
         for key, entry in entries.items():
-            if not isinstance(entry, dict) or not _required_keys <= entry.keys():
+            if not isinstance(entry, dict) or set(entry) not in (
+                _virtual_keys,
+                _inlined_keys,
+            ):
                 msg = (
                     "Each chunk entry must be a dict with keys 'path', 'offset', 'length' "
                     f"(and optionally 'data'), but got {entry}"

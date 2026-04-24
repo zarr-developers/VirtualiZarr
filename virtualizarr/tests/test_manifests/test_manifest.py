@@ -150,6 +150,18 @@ class TestCreateManifest:
         with pytest.raises(ValueError, match="must be a dict with keys"):
             ChunkManifest(entries=chunks)
 
+    def test_invalid_chunk_entry_extra_keys(self):
+        chunks = {
+            "0.0.0": {
+                "path": "s3://bucket/foo.nc",
+                "offset": 0,
+                "length": 4,
+                "garbage": "x",
+            },
+        }
+        with pytest.raises(ValueError, match="must be a dict with keys"):
+            ChunkManifest(entries=chunks)
+
     def test_invalid_chunk_keys(self):
         chunks = {
             "0.0.": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
