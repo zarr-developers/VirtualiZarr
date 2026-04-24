@@ -454,6 +454,51 @@ def test_parse_inline_refs_parquet(tmp_path, local_registry):
     }
 
 
+@pytest.mark.asyncio
+async def test_read_inline_and_virtual_refs_end_to_end():
+    # Parse a refs dict containing one inlined chunk and one virtual chunk,
+    # then round-trip both through ManifestStore.get: the inlined chunk must
+    # come back from memory and the virtual chunk must be fetched from the
+    # target file via the object store registry.
+    from zarr.core.buffer import default_buffer_prototype
+
+    inlined_bytes = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+    virtual_bytes = b"\xaa\xbb\xcc\xdd\xee\xff\x11\x22"
+
+    refs = {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            "a/.zarray": (
+                '{"chunks":[1,4],"compressor":null,"dtype":"<i4",'
+                '"fill_value":null,"filters":null,"order":"C",'
+                '"shape":[2,4],"zarr_format":2}'
+            ),
+            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            "a/0.0": "base64:AQIDBAUGBwg=",
+            "a/1.0": ["memory:///test.nc", 0, len(virtual_bytes)],
+        },
+    }
+
+    memory_store = obstore.store.MemoryStore()
+    memory_store.put("refs.json", ujson.dumps(refs).encode())
+    memory_store.put("test.nc", virtual_bytes)
+
+    registry = ObjectStoreRegistry({"memory://": memory_store})
+    parser = KerchunkJSONParser()
+    manifeststore = parser("memory:///refs.json", registry=registry)
+
+    inlined_result = await manifeststore.get(
+        "a/c/0/0", prototype=default_buffer_prototype()
+    )
+    assert inlined_result.to_bytes() == inlined_bytes
+
+    virtual_result = await manifeststore.get(
+        "a/c/1/0", prototype=default_buffer_prototype()
+    )
+    assert virtual_result.to_bytes() == virtual_bytes
+
+
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
 def test_skip_variables(refs_file_factory, skip_variables, local_registry):
     refs_file = refs_file_factory()
