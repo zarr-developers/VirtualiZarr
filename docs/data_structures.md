@@ -94,6 +94,18 @@ lengths = np.asarray([100, 100], dtype=np.uint64)
 manifest = ChunkManifest.from_arrays(paths=paths, offsets=offsets, lengths=lengths)
 ```
 
+### Chunk states
+
+Every position in a `ChunkManifest` is in one of three states, distinguished by the value of `path` in its entry:
+
+| State    | `path`                                | Meaning                                                                                      |
+|----------|---------------------------------------|----------------------------------------------------------------------------------------------|
+| Virtual  | a real URI (e.g., `"s3://bucket/foo.nc"`) | Chunk lives at the given byte range in an external file.                                  |
+| Missing  | `""` (`MISSING_CHUNK_PATH`)           | Chunk is absent. Reads return the array's `fill_value`.                                      |
+| Inlined  | `"__inlined__"` (`INLINED_CHUNK_PATH`)| Raw bytes for the chunk are stored in memory in the manifest's `_inlined` dict (see below).  |
+
+Parser authors are free to mix all three states within a single manifest.
+
 ### Inlined chunks
 
 So far every chunk in the manifest has pointed to a byte range in some external file.
@@ -103,7 +115,7 @@ Inlined chunks are useful for small variables — coordinate arrays, dimension l
 
 Inlined chunks are produced by [parsers](custom_parsers.md), not by end users; there is no way to request them via `loadable_variables`. If you are writing a custom parser for a format that stores small inlined references (e.g., Kerchunk JSON), you can emit them using the constructors below.
 
-Internally, inlined chunks live in a sparse dictionary `_inlined: dict[tuple[int, ...], bytes]` on the `ChunkManifest`, keyed by chunk grid index. In the paths array, inlined chunks are marked with a sentinel value (`INLINED_CHUNK_PATH`) to distinguish them from missing chunks (which use an empty string).
+Internally, inlined chunks live in a sparse dictionary `_inlined: dict[tuple[int, ...], bytes]` on the `ChunkManifest`, keyed by chunk grid index. The corresponding entry in the paths array is set to the `INLINED_CHUNK_PATH` sentinel.
 
 To create a manifest with inlined chunks, pass entries with a `data` key:
 
