@@ -6,14 +6,13 @@ import math
 from collections.abc import Coroutine, Iterable
 from enum import Enum
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
-from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
 
@@ -28,6 +27,20 @@ from virtualizarr.manifests.manifest import (
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.utils import determine_chunk_grid_shape
+
+# Type-check against the min-deps name (RegularChunkGrid) while keeping a
+# runtime try/except so both zarr-python <=3.1.6 and >3.1.6 work. Version
+# sniffing is unreliable under hatch-vcs when installed from a git source
+# without fetched tags.
+if TYPE_CHECKING:
+    from zarr.core.metadata.v3 import RegularChunkGrid as RegularChunkGridMetadata
+else:
+    try:
+        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
+    except ImportError:
+        from zarr.core.metadata.v3 import (
+            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
+        )
 
 # obstore doesn't export a public base type for stores, so we use Any for now.
 ObstoreStore = Any
@@ -267,7 +280,7 @@ async def construct_manifest_array(
     """Construct a ManifestArray from a zarr array."""
     array_v3_metadata = metadata_as_v3(zarr_array.metadata)
 
-    if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGrid):
+    if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGridMetadata):
         raise NotImplementedError(
             f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
             f"uses {type(array_v3_metadata.chunk_grid).__name__}."
@@ -387,7 +400,7 @@ async def build_chunk_manifest(
     # chunk shape, which lives inside the ShardingCodec config). So this grid describes
     # the number of shard files on disk, which is exactly what we want for the manifest.
     chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape, cast(RegularChunkGrid, metadata.chunk_grid).chunk_shape
+        metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
     )
     total_size = math.prod(chunk_grid_shape)
 
