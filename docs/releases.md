@@ -4,6 +4,10 @@
 
 ### New Features
 
+- `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
+  ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Breaking changes
 
 ### Bug fixes
