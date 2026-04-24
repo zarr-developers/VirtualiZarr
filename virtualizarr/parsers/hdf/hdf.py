@@ -35,9 +35,9 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
-def _squeeze_indices(chunks: tuple) -> list[int]:
-    """Return indices of dimensions where chunk size is not 1."""
-    return [i for i, s in enumerate(chunks) if s != 1]
+def _squeeze_indices(shape: tuple) -> list[int]:
+    """Return indices of dimensions where shape is greater than 1."""
+    return [i for i, s in enumerate(shape) if s > 1]
 
 
 def _construct_manifest_array(
@@ -65,12 +65,13 @@ def _construct_manifest_array(
     # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
     # chunk dimensions (enforced by zarr-python >= 3.2.0). See
     # https://github.com/zarr-developers/zarr-python/issues/3711.
-    # this uses dataset.chunks if present or dataset.shape if chunks are not present
-    # if using dataset.shape, it enforces that each dimension is at least size one
     chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
-    # keep only dimensions where chunk size != 1; after clamping above, no dim can be < 1,
-    # so this effectively drops any dim that was zero-length in the original dataset.
-    keep_indices = _squeeze_indices(chunks) if squeeze else list(range(len(chunks)))
+    # When squeeze=True, we keep only dimensions of size > 1.
+    # So squeeze=True on its own drops any dim that was length 0 (or less) in the original dataset and the clamp is technically redundant.
+    # But when squeeze=False, the clamp is necessary to prevent having zero-length chunk dimensions.
+    keep_indices = (
+        _squeeze_indices(dataset.shape) if squeeze else list(range(len(dataset.shape)))
+    )
     keep_chunks = tuple(chunks[i] for i in keep_indices)
     keep_shape = tuple(dataset.shape[i] for i in keep_indices)
 
@@ -246,11 +247,8 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
-    chunks_or_shape = dataset.chunks or dataset.shape
     keep_indices = (
-        _squeeze_indices(chunks_or_shape)
-        if squeeze
-        else list(range(len(chunks_or_shape)))
+        _squeeze_indices(dataset.shape) if squeeze else list(range(len(dataset.shape)))
     )
     if dataset.chunks is None:
         if dsid.get_offset() is None:
