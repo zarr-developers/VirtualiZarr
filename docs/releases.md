@@ -7,6 +7,9 @@
 - `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
   ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
   By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+- `KerchunkJSONParser` and `KerchunkParquetParser` now parse inline chunk data (both raw-string and `base64:`-prefixed forms) into inlined `ChunkManifest` entries, instead of raising `NotImplementedError`. Fixes the read side of [#489](https://github.com/zarr-developers/VirtualiZarr/issues/489); writer support for inlined chunks will follow in a separate PR.
+  ([#979](https://github.com/zarr-developers/VirtualiZarr/pull/979)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
