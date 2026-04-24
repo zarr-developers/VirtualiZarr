@@ -374,55 +374,84 @@ def test_open_virtual_dataset_existing_kerchunk_refs(
 
 
 @requires_kerchunk
-def test_notimplemented_read_inline_refs(tmp_path, netcdf4_inlined_ref, local_registry):
-    # For now, we raise a NotImplementedError if we read existing references that have inlined data
-    # https://github.com/zarr-developers/VirtualiZarr/pull/251#pullrequestreview-2361916932
+def _refs_with_one_inlined_one_virtual(inline_repr: str) -> dict:
+    """Kerchunk refs describing a (2, 4) int32 array with two (1, 4) chunks:
+    position (0, 0) is inlined (carrying ``inline_repr``), position (1, 0) is virtual."""
+    return {
+        "version": 1,
+        "refs": {
+            ".zgroup": '{"zarr_format":2}',
+            "a/.zarray": (
+                '{"chunks":[1,4],"compressor":null,"dtype":"<i4",'
+                '"fill_value":null,"filters":null,"order":"C",'
+                '"shape":[2,4],"zarr_format":2}'
+            ),
+            "a/.zattrs": '{"_ARRAY_DIMENSIONS":["x","y"]}',
+            "a/0.0": inline_repr,
+            "a/1.0": ["/test.nc", 6144, 16],
+        },
+    }
 
-    ref_filepath = tmp_path / "ref.json"
 
-    import ujson
+@pytest.mark.parametrize(
+    "inline_repr, expected_bytes",
+    [
+        ("base64:AQIDBAUGBwg=", b"\x01\x02\x03\x04\x05\x06\x07\x08"),
+        ("hello, w!", b"hello, w!"),
+    ],
+    ids=["base64", "raw_string"],
+)
+def test_parse_inline_refs_json(inline_repr, expected_bytes):
+    refs = _refs_with_one_inlined_one_virtual(inline_repr)
 
-    with open(ref_filepath, "w") as json_file:
-        ujson.dump(netcdf4_inlined_ref, json_file)
-
+    memory_store = obstore.store.MemoryStore()
+    memory_store.put("refs.json", ujson.dumps(refs).encode())
+    registry = ObjectStoreRegistry({"memory://": memory_store})
     parser = KerchunkJSONParser()
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
-        with open_virtual_dataset(
-            url=ref_filepath.as_posix(),
-            registry=local_registry,
-            parser=parser,
-        ) as _:
-            pass
+    manifeststore = parser("memory:///refs.json", registry=registry)
+
+    marr = manifeststore._group._members["a"]
+    assert marr.manifest._inlined == {(0, 0): expected_bytes}
+    assert marr.manifest.dict() == {
+        "0.0": {
+            "path": "__inlined__",
+            "offset": 0,
+            "length": len(expected_bytes),
+            "data": expected_bytes,
+        },
+        "1.0": {"path": "file:///test.nc", "offset": 6144, "length": 16},
+    }
 
 
 @requires_kerchunk
 @pytest.mark.skipif(not has_fastparquet, reason="fastparquet not installed")
-def test_notimplemented_read_inline_refs_parquet(
-    tmp_path, netcdf4_inlined_ref, local_registry
-):
-    # Test that parquet references with inlined data raise NotImplementedError
-    # https://github.com/zarr-developers/VirtualiZarr/issues/489
+def test_parse_inline_refs_parquet(tmp_path, local_registry):
     import pandas as pd
     from kerchunk.df import refs_to_dataframe
 
+    expected_bytes = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+    refs = _refs_with_one_inlined_one_virtual(
+        "base64:" + "AQIDBAUGBwg="
+    )
+
     ref_filepath = tmp_path / "ref.parquet"
     with pd.option_context("future.infer_string", False):
-        refs_to_dataframe(fo=netcdf4_inlined_ref, url=ref_filepath.as_posix())
+        refs_to_dataframe(fo=refs, url=ref_filepath.as_posix())
 
     parser = KerchunkParquetParser()
-    with pytest.raises(
-        NotImplementedError,
-        match="Reading inlined reference data is currently not supported",
-    ):
-        with open_virtual_dataset(
-            url=ref_filepath.as_posix(),
-            registry=local_registry,
-            parser=parser,
-        ) as _:
-            pass
+    manifeststore = parser(ref_filepath.as_posix(), registry=local_registry)
+
+    marr = manifeststore._group._members["a"]
+    assert marr.manifest._inlined == {(0, 0): expected_bytes}
+    assert marr.manifest.dict() == {
+        "0.0": {
+            "path": "__inlined__",
+            "offset": 0,
+            "length": len(expected_bytes),
+            "data": expected_bytes,
+        },
+        "1.0": {"path": "file:///test.nc", "offset": 6144, "length": 16},
+    }
 
 
 @pytest.mark.parametrize("skip_variables", ["a", ["a"]])
