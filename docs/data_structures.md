@@ -94,6 +94,58 @@ lengths = np.asarray([100, 100], dtype=np.uint64)
 manifest = ChunkManifest.from_arrays(paths=paths, offsets=offsets, lengths=lengths)
 ```
 
+### Chunk states
+
+Every position in a `ChunkManifest` is in one of three states, distinguished by the value of `path` in its entry:
+
+| State    | `path`                                | Meaning                                                                                      |
+|----------|---------------------------------------|----------------------------------------------------------------------------------------------|
+| Virtual  | a real URI (e.g., `"s3://bucket/foo.nc"`) | Chunk lives at the given byte range in an external file.                                  |
+| Missing  | `""` (`MISSING_CHUNK_PATH`)           | Chunk is absent. Reads return the array's `fill_value`.                                      |
+| Inlined  | `"__inlined__"` (`INLINED_CHUNK_PATH`)| Raw bytes for the chunk are stored in memory in the manifest's `_inlined` dict (see below).  |
+
+Parser authors are free to mix all three states within a single manifest.
+
+### Inlined chunks
+
+So far every chunk in the manifest has pointed to a byte range in some external file.
+A `ChunkManifest` can also hold **inlined chunks**: the raw chunk bytes are carried directly inside the manifest itself, rather than referenced from an external file.
+
+Inlined chunks are useful for small variables — coordinate arrays, dimension labels, scalar metadata — where the overhead of a remote read exceeds the cost of just carrying the bytes along.
+
+Inlined chunks are produced by [parsers](custom_parsers.md), not by end users; there is no way to request them via `loadable_variables`. If you are writing a custom parser for a format that stores small inlined references (e.g., Kerchunk JSON), you can emit them using the constructors below.
+
+Internally, inlined chunks live in a sparse dictionary `_inlined: dict[tuple[int, ...], bytes]` on the `ChunkManifest`, keyed by chunk grid index. The corresponding entry in the paths array is set to the `INLINED_CHUNK_PATH` sentinel.
+
+To create a manifest with inlined chunks, pass entries with a `data` key:
+
+```python
+from virtualizarr.manifests import ChunkManifest
+
+manifest = ChunkManifest(
+    entries={
+        "0.0": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 100},
+        "0.1": {"path": "", "offset": 0, "length": 4, "data": b"\x00\x01\x02\x03"},
+    }
+)
+```
+
+Or via `from_arrays` with the `inlined` parameter:
+
+```python
+import numpy as np
+from virtualizarr.manifests import ChunkManifest
+
+manifest = ChunkManifest.from_arrays(
+    paths=np.asarray(["s3://bucket/foo.nc", ""], dtype=np.dtypes.StringDType()),
+    offsets=np.asarray([100, 0], dtype=np.uint64),
+    lengths=np.asarray([100, 4], dtype=np.uint64),
+    inlined={(1,): b"\x00\x01\x02\x03"},
+)
+```
+
+Inlined chunks participate in all manifest operations: concatenation and stacking shift their indices, broadcasting prepends singleton dimensions to their keys, equality compares the inlined bytes, pickling carries the data along (for Dask/multiprocessing), `ManifestStore` reads return them directly from memory, and `nbytes` includes their size.
+
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.
