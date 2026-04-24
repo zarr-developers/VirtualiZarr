@@ -4,7 +4,7 @@
 
 ### New Features
 
-- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through `to_kerchunk(format="json")` and `KerchunkJSONParser` without losing data.
+- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 - `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.

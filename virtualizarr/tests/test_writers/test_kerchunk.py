@@ -8,7 +8,7 @@ from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
-from virtualizarr.parsers import KerchunkJSONParser
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json
 
@@ -213,6 +213,42 @@ class TestAccessor:
 
         registry = ObjectStoreRegistry({"file://": LocalStore()})
         manifeststore = KerchunkJSONParser()(f"file://{filepath}", registry=registry)
+        roundtripped = manifeststore._group._members["a"]
+        assert roundtripped.manifest._inlined == {(0, 0): inlined}
+        assert roundtripped.manifest.dict()["0.1"] == {
+            "path": "file:///foo.nc",
+            "offset": 100,
+            "length": 8,
+        }
+
+    @requires_kerchunk
+    @requires_fastparquet
+    def test_write_inlined_chunks_roundtrip_parquet(self, tmp_path, array_v3_metadata):
+        # As above but via the parquet serialization.
+        inlined = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 8, "data": inlined},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 8},
+            }
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(1, 2),
+                data_type=np.dtype("<i4"),
+                chunks=(1, 1),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        filepath = tmp_path / "refs"
+        ds.vz.to_kerchunk(filepath, format="parquet")
+
+        registry = ObjectStoreRegistry({"file://": LocalStore()})
+        manifeststore = KerchunkParquetParser()(str(filepath), registry=registry)
         roundtripped = manifeststore._group._members["a"]
         assert roundtripped.manifest._inlined == {(0, 0): inlined}
         assert roundtripped.manifest.dict()["0.1"] == {
