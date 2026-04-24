@@ -430,9 +430,7 @@ def test_parse_inline_refs_parquet(tmp_path, local_registry):
     from kerchunk.df import refs_to_dataframe
 
     expected_bytes = b"\x01\x02\x03\x04\x05\x06\x07\x08"
-    refs = _refs_with_one_inlined_one_virtual(
-        "base64:" + "AQIDBAUGBwg="
-    )
+    refs = _refs_with_one_inlined_one_virtual("base64:" + "AQIDBAUGBwg=")
 
     ref_filepath = tmp_path / "ref.parquet"
     with pd.option_context("future.infer_string", False):
