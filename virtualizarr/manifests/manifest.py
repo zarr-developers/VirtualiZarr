@@ -116,7 +116,7 @@ def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> str:
 
     # remote URI root (s3://, gs://, https://, ...) — just concat
     if _is_uri(fs_root):
-        return fs_root.rstrip("/") + "/" + str(path)
+        return fs_root.removesuffix("/") + "/" + str(path)
 
     # local posix root
     _fs_root = PosixPath(fs_root)
