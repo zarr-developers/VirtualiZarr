@@ -479,6 +479,47 @@ def big_endian_dtype_hdf5_file(tmpdir):
     return filepath
 
 
+@pytest.fixture(
+    params=[
+        {"N": 50, "M": 100, "chunked": True, "chunks": (5, 25)},
+        {"N": 50, "M": 100, "chunked": False, "chunks": None},
+        {"N": 1, "M": 100, "chunked": True, "chunks": (1, 25)},
+    ],
+    ids=["chunked", "not_chunked", "singleton_chunked"],
+)
+def singleton_padded_dimension_hdf5_file(tmp_path: Path, request) -> tuple:
+    """HDF5 file mimicking MATLAB layout: a 2D array (N, M) plus coordinate
+    arrays shaped (N, 1) and (1, M)."""
+    N = request.param["N"]
+    M = request.param["M"]
+    chunked = request.param["chunked"]
+    chunks = request.param["chunks"]
+    filepath = str(tmp_path / "singleton_dimension_layout.nc")
+
+    dataset_args = {
+        "data": {
+            "name": "data",
+            "data": np.random.random((N, M)),
+        },
+        "row_coord": {
+            "name": "row_coord",
+            "data": np.random.random((N, 1)),
+        },
+        "col_coord": {
+            "name": "col_coord",
+            "data": np.random.random((1, M)),
+        },
+    }
+    if chunks is not None:
+        dataset_args["data"]["chunks"] = chunks
+
+    with h5py.File(filepath, "w") as f:
+        for v in dataset_args.values():
+            f.create_dataset(**v)
+
+    return f"file://{filepath}", N, M, chunked, chunks
+
+
 @pytest.fixture()
 def dmrpp_xml_simple():
     """Return a minimal valid DMR++ XML string for testing."""
