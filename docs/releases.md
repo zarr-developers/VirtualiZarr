@@ -6,6 +6,8 @@
 
 - The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
   By [Tom Nicholas](https://github.com/TomNicholas).
+- The icechunk writer now handles `ChunkManifest` entries containing inlined chunk data. For arrays with no inlined chunks the existing fast bulk `set_virtual_refs_arr` path is unchanged; otherwise inlined positions are sent to icechunk as empty (missing) virtual refs and the inlined bytes are written separately as managed chunks. A virtual dataset with inlined chunks can now be `to_icechunk`'d and re-opened via `xr.open_zarr` without data loss.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 - `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
   ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).

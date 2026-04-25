@@ -5,13 +5,16 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import numpy as np
 import numpy.testing as npt
+import obstore as obs
 import pytest
 import xarray as xr
 import xarray.testing as xrt
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
+from zarr.codecs import BytesCodec
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.dtype import parse_data_type
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -168,6 +171,61 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", synthetic_vd
     assert isinstance(observed, zarr.Array)
 
     npt.assert_equal(observed, arr)
+
+
+def test_set_inlined_and_virtual_refs(
+    icechunk_filestore: "IcechunkStore",
+    icechunk_repo: "Repository",
+    tmp_path: Path,
+):
+    # ManifestArray with shape (2, 2), chunks (1, 2): position (0, .) is inlined
+    # with values [1, 2]; position (1, .) is virtual with values [3, 4] read from
+    # a file in the tmp dir (covered by the icechunk_repo virtual chunk container).
+    inlined_arr = np.array([[1, 2]], dtype="<i4")
+    virtual_arr = np.array([[3, 4]], dtype="<i4")
+    inlined_bytes = inlined_arr.tobytes()
+    virtual_bytes = virtual_arr.tobytes()
+
+    filepath = str(tmp_path / "data_chunk")
+    obs.put(obs.store.LocalStore(), filepath, virtual_bytes)
+
+    manifest = ChunkManifest(
+        entries={
+            "0.0": {
+                "path": "",
+                "offset": 0,
+                "length": len(inlined_bytes),
+                "data": inlined_bytes,
+            },
+            "1.0": {
+                "path": filepath,
+                "offset": 0,
+                "length": len(virtual_bytes),
+            },
+        }
+    )
+    metadata = ArrayV3Metadata(
+        shape=(2, 2),
+        data_type=parse_data_type(np.dtype("<i4"), zarr_format=3),
+        chunk_grid={"name": "regular", "configuration": {"chunk_shape": (1, 2)}},
+        chunk_key_encoding={"name": "default"},
+        fill_value=0,
+        codecs=[BytesCodec()],
+        attributes={},
+        dimension_names=("y", "x"),
+        storage_transformers=None,
+    )
+    ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+    vds = xr.Dataset({"foo": xr.Variable(data=ma, dims=["y", "x"])})
+
+    vds.vz.to_icechunk(icechunk_filestore)
+    icechunk_filestore.session.commit("test")
+
+    icechunk_readonly_session = icechunk_repo.readonly_session("main")
+    with xr.open_zarr(
+        store=icechunk_readonly_session.store, zarr_format=3, consolidated=False
+    ) as ds:
+        np.testing.assert_equal(ds["foo"].data, np.array([[1, 2], [3, 4]], dtype="<i4"))
 
 
 def test_write_big_endian_value(icechunk_repo: "Repository", big_endian_synthetic_vds):
