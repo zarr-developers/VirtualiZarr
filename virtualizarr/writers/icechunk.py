@@ -1,14 +1,20 @@
+import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
 
+import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
+from zarr.core.buffer import default_buffer_prototype
+from zarr.core.chunk_key_encodings import ChunkKeyEncoding
+from zarr.core.sync import sync
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
     check_same_chunk_shapes,
@@ -526,25 +532,32 @@ def write_virtual_variable_to_icechunk(
 
         update_attributes(arr, var.attrs, encoding=var.encoding)
 
-    write_manifest_virtual_refs(
+    write_manifest_to_icechunk(
         store=store,
         group=group,
         arr_name=name,
         manifest=ma.manifest,
+        chunk_key_encoding=ma.metadata.chunk_key_encoding,
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
 
 
-def write_manifest_virtual_refs(
+def write_manifest_to_icechunk(
     store: "IcechunkStore",
     group: "Group",
     arr_name: str,
     manifest: ChunkManifest,
+    chunk_key_encoding: ChunkKeyEncoding,
     chunk_index_offsets: tuple[int, ...],
     last_updated_at: Optional[datetime] = None,
 ) -> None:
-    """Write all the virtual references for one array manifest at once."""
+    """
+    Write all the chunks (virtual and/or inlined) for one array manifest at once.
+
+    Virtual chunks are written as virtual chunks, and inlined chunks are written as native
+    (which Icechunk may then choose to inline in its manifests).
+    """
 
     if group.name == "/":
         key_prefix = arr_name
@@ -559,15 +572,67 @@ def write_manifest_virtual_refs(
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
 
-    # Pass manifest arrays directly to Rust, avoiding per-chunk Python object creation.
-    # Empty paths represent missing chunks and are skipped on the Rust side.
-    store.set_virtual_refs_arr(
-        array_path=key_prefix,
-        chunk_grid_shape=manifest.shape_chunk_grid,
-        locations=manifest._paths.flatten().tolist(),
-        offsets=manifest._offsets.flatten(),
-        lengths=manifest._lengths.flatten(),
-        validate_containers=False,
-        arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
-        checksum=last_updated_at,
-    )
+    paths_flat = manifest._paths.flatten()
+
+    if manifest._inlined:
+        # Write inlined chunks first, then erase them from the paths array so the
+        # virtual-refs write below doesn't see the INLINED_CHUNK_PATH sentinel
+        # (which Icechunk's `.set_virtual_refs_arr` would reject as a malformed URL).
+        # Use of zarr's `sync` here is to avoid a serial high-latency loop over chunks.
+        # Would prefer if zarr-python had a public API for setting many chunks at once concurrently.
+        sync(
+            write_inlined_chunks_as_native(
+                store=store,
+                key_prefix=key_prefix,
+                chunk_key_encoding=chunk_key_encoding,
+                inlined=manifest._inlined,
+                chunk_index_offsets=chunk_index_offsets,
+            )
+        )
+        virtual_paths = np.where(paths_flat == INLINED_CHUNK_PATH, "", paths_flat)
+    else:
+        virtual_paths = paths_flat
+
+    # Cheap numpy-level check so we can skip the .tolist() allocation and the
+    # Python->Rust call entirely when no position holds a real virtual ref
+    # (e.g. an all-inlined or all-missing manifest).
+    if (virtual_paths != "").any():
+        # Pass flat per-chunk arrays (or a list) to Rust in one call, avoiding Python-side
+        # per-chunk dict construction. Empty paths are skipped on the Rust side.
+        store.set_virtual_refs_arr(
+            array_path=key_prefix,
+            chunk_grid_shape=manifest.shape_chunk_grid,
+            locations=virtual_paths.tolist(),
+            offsets=manifest._offsets.flatten(),
+            lengths=manifest._lengths.flatten(),
+            validate_containers=False,
+            arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
+            checksum=last_updated_at,
+        )
+
+
+async def write_inlined_chunks_as_native(
+    store: "IcechunkStore",
+    key_prefix: str,
+    chunk_key_encoding: ChunkKeyEncoding,
+    inlined: Mapping[tuple[int, ...], bytes],
+    chunk_index_offsets: tuple[int, ...],
+) -> None:
+    """Write each inlined chunk as a native chunk at its zarr chunk key."""
+    prototype = default_buffer_prototype()
+    has_offset = any(chunk_index_offsets)
+    coros = []
+    for chunk_idx, data in inlined.items():
+        shifted_idx = (
+            tuple(c + o for c, o in zip(chunk_idx, chunk_index_offsets))
+            if has_offset
+            else chunk_idx
+        )
+        encoded_chunk_key = chunk_key_encoding.encode_chunk_key(shifted_idx)
+        coros.append(
+            store.set(
+                f"{key_prefix}/{encoded_chunk_key}",
+                prototype.buffer.from_bytes(data),
+            )
+        )
+    await asyncio.gather(*coros)

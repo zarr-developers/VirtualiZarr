@@ -144,7 +144,7 @@ manifest = ChunkManifest.from_arrays(
 )
 ```
 
-Inlined chunks participate in all manifest operations: concatenation and stacking shift their indices, broadcasting prepends singleton dimensions to their keys, equality compares the inlined bytes, pickling carries the data along (for Dask/multiprocessing), `ManifestStore` reads return them directly from memory, and `nbytes` includes their size.
+Inlined chunks participate in all manifest operations: concatenation and stacking shift their indices, broadcasting both prepends singleton dimensions to their keys and replicates the bytes (by reference) across every position of an expanded axis, equality compares the inlined bytes, pickling carries the data along (for Dask/multiprocessing), `ManifestStore` reads return them directly from memory, and `nbytes` includes their size.
 
 ## `ManifestArray` class
 
