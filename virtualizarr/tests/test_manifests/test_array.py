@@ -112,6 +112,34 @@ class TestEquals:
     @pytest.mark.skip(reason="Not Implemented")
     def test_partly_equals(self): ...
 
+    def test_equal_inlined_data(self, array_v3_metadata):
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        chunks = {"0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"}}
+        marr1 = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks)
+        )
+        marr2 = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=chunks)
+        )
+        assert (marr1 == marr2).all()
+
+    def test_not_equal_different_inlined_data(self, array_v3_metadata):
+        # same paths/offsets/lengths, but different inlined bytes → not equal
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"}}
+            ),
+        )
+        assert not (marr1 == marr2).all()
+
     def test_equals_nan_fill_value(self, array_v3_metadata):
         # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/501
         chunks_dict = {
@@ -274,6 +302,113 @@ class TestBroadcast:
         assert expanded.manifest.dict() == {}
 
 
+class TestBroadcastInlined:
+    def test_broadcast_existing_axis(self, array_v3_metadata):
+        # inlined chunks should be replicated to every position along an expanded axis
+        metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "0.1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 1): b"bbbb",
+            (2, 1): b"bbbb",
+        }
+
+    def test_broadcast_new_axis(self, array_v3_metadata):
+        # prepending a size-1 axis should rewrite inlined keys without replicating bytes
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(1, 2))
+        assert expanded.shape == (1, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (0, 1): b"bbbb",
+        }
+
+    def test_broadcast_prepended_and_expanded(self, array_v3_metadata):
+        # prepend a new axis AND expand it; inlined bytes should be replicated along the new axis
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.shape == (3, 2)
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 1): b"bbbb",
+            (2, 1): b"bbbb",
+        }
+
+    def test_broadcast_preserves_bytes_identity(self, array_v3_metadata):
+        # replicated inlined entries should share the same bytes object, not copies
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        payload = b"x" * 16
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 16, "data": payload}}
+            ),
+        )
+
+        expanded = np.broadcast_to(marr, shape=(4,))
+        assert expanded.manifest._inlined[(0,)] is payload
+        assert expanded.manifest._inlined[(1,)] is payload
+        assert expanded.manifest._inlined[(2,)] is payload
+        assert expanded.manifest._inlined[(3,)] is payload
+
+    def test_broadcast_mixed_inlined_and_virtual(self, array_v3_metadata):
+        # inlined and virtual chunks in the same manifest both replicate along the expanded axis
+        metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        expanded = np.broadcast_to(marr, shape=(3, 2))
+        assert expanded.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"aaaa",
+            (2, 0): b"aaaa",
+        }
+        assert expanded.manifest.dict() == {
+            "0.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "1.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "2.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            "1.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+            "2.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+        }
+
+
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
 class TestConcat:
@@ -331,6 +466,86 @@ class TestConcat:
         assert codec_dict["name"] == "numcodecs.zlib"
         assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
+
+
+class TestConcatInlined:
+    def test_concat_two_inlined_along_axis_0(self, array_v3_metadata):
+        metadata = array_v3_metadata(shape=(1, 2), chunks=(1, 1))
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                    "0.1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+                }
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0": {"path": "", "offset": 0, "length": 4, "data": b"cccc"},
+                    "0.1": {"path": "", "offset": 0, "length": 4, "data": b"dddd"},
+                }
+            ),
+        )
+
+        result = np.concatenate([marr1, marr2], axis=0)
+        assert result.shape == (2, 2)
+        assert result.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 0): b"cccc",
+            (1, 1): b"dddd",
+        }
+
+    def test_concat_mixed_inlined_and_virtual(self, array_v3_metadata):
+        # one array inlined, the other virtual — concat along axis 1
+        metadata = array_v3_metadata(shape=(1, 1), chunks=(1, 1))
+        marr_inlined = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                }
+            ),
+        )
+        marr_virtual = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0": {"path": "/foo.nc", "offset": 100, "length": 4},
+                }
+            ),
+        )
+
+        result = np.concatenate([marr_inlined, marr_virtual], axis=1)
+        assert result.shape == (1, 2)
+        # inlined entry stays at column 0; virtual shifted to column 1
+        assert result.manifest._inlined == {(0, 0): b"aaaa"}
+        assert result.manifest.dict() == {
+            "0.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 4},
+        }
+
+    def test_concat_all_virtual_leaves_inlined_empty(self, array_v3_metadata):
+        # regression: concat of two virtual-only arrays must not populate _inlined
+        metadata = array_v3_metadata(shape=(1, 1), chunks=(1, 1))
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/a.nc", "offset": 0, "length": 4}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/b.nc", "offset": 0, "length": 4}}
+            ),
+        )
+
+        result = np.concatenate([marr1, marr2], axis=0)
+        assert result.manifest._inlined == {}
 
 
 class TestStack:
@@ -401,6 +616,94 @@ class TestStack:
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
         assert result.metadata.fill_value == metadata.fill_value
+
+
+class TestStackInlined:
+    def test_stack_two_inlined_along_new_axis(self, array_v3_metadata):
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                    "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+                }
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0": {"path": "", "offset": 0, "length": 4, "data": b"cccc"},
+                    "1": {"path": "", "offset": 0, "length": 4, "data": b"dddd"},
+                }
+            ),
+        )
+
+        result = np.stack([marr1, marr2], axis=0)
+        assert result.shape == (2, 2)
+        assert result.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (0, 1): b"bbbb",
+            (1, 0): b"cccc",
+            (1, 1): b"dddd",
+        }
+
+    def test_stack_mixed_inlined_and_virtual_axis_1(self, array_v3_metadata):
+        # insert the new stack axis at position 1
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        marr_inlined = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+                    "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+                }
+            ),
+        )
+        marr_virtual = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0": {"path": "/foo.nc", "offset": 0, "length": 4},
+                    "1": {"path": "/foo.nc", "offset": 4, "length": 4},
+                }
+            ),
+        )
+
+        result = np.stack([marr_inlined, marr_virtual], axis=1)
+        assert result.shape == (2, 2)
+        assert result.manifest._inlined == {
+            (0, 0): b"aaaa",
+            (1, 0): b"bbbb",
+        }
+        assert result.manifest.dict() == {
+            "0.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"aaaa"},
+            "1.0": {"path": "__inlined__", "offset": 0, "length": 4, "data": b"bbbb"},
+            "0.1": {"path": "file:///foo.nc", "offset": 0, "length": 4},
+            "1.1": {"path": "file:///foo.nc", "offset": 4, "length": 4},
+        }
+
+    def test_stack_preserves_bytes_identity(self, array_v3_metadata):
+        # bytes objects should be shared by reference, not copied
+        metadata = array_v3_metadata(shape=(1,), chunks=(1,))
+        payload = b"x" * 16
+        marr1 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 16, "data": payload}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "", "offset": 0, "length": 16, "data": payload}}
+            ),
+        )
+
+        result = np.stack([marr1, marr2], axis=0)
+        assert result.manifest._inlined[(0, 0)] is payload
+        assert result.manifest._inlined[(1, 0)] is payload
 
 
 def test_refuse_combine(array_v3_metadata):
@@ -655,3 +958,16 @@ def test_to_xarray(array_v3_metadata):
     assert vv.data.metadata.dimension_names is None
     assert vv.attrs == {"ham": "sandwich"}
     assert vv.data.metadata.attributes == {}
+
+
+def test_to_virtual_variable_preserves_inlined(array_v3_metadata):
+    metadata = array_v3_metadata(shape=(2,), chunks=(1,), dimension_names=["x"])
+    manifest = ChunkManifest(
+        entries={
+            "0": {"path": "", "offset": 0, "length": 4, "data": b"aaaa"},
+            "1": {"path": "", "offset": 0, "length": 4, "data": b"bbbb"},
+        }
+    )
+    marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+    vv = marr.to_virtual_variable()
+    assert vv.data.manifest._inlined == {(0,): b"aaaa", (1,): b"bbbb"}
