@@ -280,7 +280,7 @@ The zarr `fill_value` in `ArrayV3Metadata` does **not** need this encoding — z
 
 #### Supported dtypes
 
-Xarray's `FillValueCoder` (as of xarray >= 2025.06.0) supports the following dtype kinds:
+Xarray's `FillValueCoder` (as of xarray >= 2026.4.0) supports the following dtype kinds:
 
 | dtype kind | Encoding | Decoding |
 |------------|----------|----------|
@@ -294,6 +294,10 @@ Xarray's `FillValueCoder` (as of xarray >= 2025.06.0) supports the following dty
 | `bytes` (Zarr V3) | — | base64 → `bytes` |
 
 Any other dtype (structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`.
+
+!!! note
+
+    Complex dtype support was added to xarray's `FillValueCoder` in 2026.4.0 and is not yet covered by the in-progress `_FillValue` Zarr convention. Emitting a complex `_FillValue` is xarray-specific and may not be portable to other readers that follow the convention strictly.
 
 !!! warning
 
