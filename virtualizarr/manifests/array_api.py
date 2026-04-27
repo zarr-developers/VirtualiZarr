@@ -1,3 +1,4 @@
+import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
@@ -225,11 +226,23 @@ def _concat_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifes
     )
     concatenated_offsets = np.concatenate([m._offsets for m in manifests], axis=axis)
     concatenated_lengths = np.concatenate([m._lengths for m in manifests], axis=axis)
+
+    # merge inlined chunk dicts with index shifting along the concat axis
+    concatenated_inlined: dict[tuple[int, ...], bytes] = {}
+    grid_offset = 0
+    for m in manifests:
+        for key, data in m._inlined.items():
+            shifted = list(key)
+            shifted[axis] += grid_offset
+            concatenated_inlined[tuple(shifted)] = data
+        grid_offset += m._paths.shape[axis]
+
     return ChunkManifest.from_arrays(
         paths=concatenated_paths,
         offsets=concatenated_offsets,
         lengths=concatenated_lengths,
         validate_paths=False,
+        inlined=concatenated_inlined if concatenated_inlined else None,
     )
 
 
@@ -241,11 +254,21 @@ def _stack_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifest
     )
     stacked_offsets = np.stack([m._offsets for m in manifests], axis=axis)
     stacked_lengths = np.stack([m._lengths for m in manifests], axis=axis)
+
+    # merge inlined chunk dicts, inserting the new stacked axis
+    stacked_inlined: dict[tuple[int, ...], bytes] = {}
+    for i, m in enumerate(manifests):
+        for key, data in m._inlined.items():
+            shifted = list(key)
+            shifted.insert(axis, i)
+            stacked_inlined[tuple(shifted)] = data
+
     return ChunkManifest.from_arrays(
         paths=stacked_paths,
         offsets=stacked_offsets,
         lengths=stacked_lengths,
         validate_paths=False,
+        inlined=stacked_inlined if stacked_inlined else None,
     )
 
 
@@ -259,11 +282,29 @@ def _broadcast_manifest(
     )
     broadcasted_offsets = np.broadcast_to(manifest._offsets, shape=shape)
     broadcasted_lengths = np.broadcast_to(manifest._lengths, shape=shape)
+
+    # broadcast inlined chunks: prepend singleton dims to each key, then replicate
+    # the entry across every target position along any axis that was size 1 in the
+    # source (matching np.broadcast_to semantics for the paths/offsets/lengths arrays).
+    broadcasted_inlined: dict[tuple[int, ...], bytes] = {}
+    if manifest._inlined:
+        n_prepended = len(shape) - manifest._paths.ndim
+        source_shape_padded = (1,) * n_prepended + manifest._paths.shape
+        for key, data in manifest._inlined.items():
+            padded_key = (0,) * n_prepended + key
+            axis_ranges = [
+                range(shape[i]) if source_shape_padded[i] == 1 else (padded_key[i],)
+                for i in range(len(shape))
+            ]
+            for target_key in itertools.product(*axis_ranges):
+                broadcasted_inlined[target_key] = data
+
     return ChunkManifest.from_arrays(
         paths=broadcasted_paths,
         offsets=broadcasted_offsets,
         lengths=broadcasted_lengths,
         validate_paths=False,
+        inlined=broadcasted_inlined if broadcasted_inlined else None,
     )
 
 

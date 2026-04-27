@@ -2,10 +2,13 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json
 
@@ -149,6 +152,110 @@ class TestAccessor:
         assert kerchunk_refs_as_json(loaded_refs) == kerchunk_refs_as_json(
             expected_ds_refs
         )
+
+    def test_write_inlined_chunks_to_dict(self, array_v3_metadata):
+        # ManifestArray with mixed inlined+virtual chunks should serialize the
+        # inlined positions as `base64:<b64>` strings and the virtual ones as
+        # `[path, offset, length]` triples.
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {
+                    "path": "",
+                    "offset": 0,
+                    "length": 8,
+                    "data": b"\x01\x02\x03\x04\x05\x06\x07\x08",
+                },
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 8},
+            }
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(1, 2),
+                data_type=np.dtype("<i4"),
+                chunks=(1, 1),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        result = ds.vz.to_kerchunk(format="dict")
+        refs = result["refs"]
+        assert refs["a/0.0"] == "base64:AQIDBAUGBwg="
+        assert refs["a/0.1"] == ["/foo.nc", 100, 8]
+
+    @requires_kerchunk
+    def test_write_inlined_chunks_roundtrip(self, tmp_path, array_v3_metadata):
+        # Write a manifest containing inlined chunks to JSON, then re-parse it
+        # with KerchunkJSONParser; the inlined bytes should survive the round trip.
+        inlined = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 8, "data": inlined},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 8},
+            }
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(1, 2),
+                data_type=np.dtype("<i4"),
+                chunks=(1, 1),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        filepath = tmp_path / "refs.json"
+        ds.vz.to_kerchunk(filepath, format="json")
+
+        registry = ObjectStoreRegistry({"file://": LocalStore()})
+        manifeststore = KerchunkJSONParser()(f"file://{filepath}", registry=registry)
+        roundtripped = manifeststore._group._members["a"]
+        assert roundtripped.manifest._inlined == {(0, 0): inlined}
+        assert roundtripped.manifest.dict()["0.1"] == {
+            "path": "file:///foo.nc",
+            "offset": 100,
+            "length": 8,
+        }
+
+    @requires_kerchunk
+    @requires_fastparquet
+    def test_write_inlined_chunks_roundtrip_parquet(self, tmp_path, array_v3_metadata):
+        # As above but via the parquet serialization.
+        inlined = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 8, "data": inlined},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 8},
+            }
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(1, 2),
+                data_type=np.dtype("<i4"),
+                chunks=(1, 1),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        filepath = tmp_path / "refs"
+        ds.vz.to_kerchunk(filepath, format="parquet")
+
+        registry = ObjectStoreRegistry({"file://": LocalStore()})
+        manifeststore = KerchunkParquetParser()(str(filepath), registry=registry)
+        roundtripped = manifeststore._group._members["a"]
+        assert roundtripped.manifest._inlined == {(0, 0): inlined}
+        assert roundtripped.manifest.dict()["0.1"] == {
+            "path": "file:///foo.nc",
+            "offset": 100,
+            "length": 8,
+        }
 
     @requires_fastparquet
     def test_accessor_to_kerchunk_parquet(self, tmp_path, array_v3_metadata):

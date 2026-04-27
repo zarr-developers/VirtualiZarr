@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import math
 from collections.abc import Iterable
 from typing import cast
@@ -209,14 +210,20 @@ def manifest_from_kerchunk_chunk_dict(
     chunk_entries: dict[ChunkKey, ChunkEntry] = {}
     for k, v in kerchunk_chunk_dict.items():
         if isinstance(v, (str, bytes)):
-            raise NotImplementedError(
-                "Reading inlined reference data is currently not supported."
-                "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
+            # Kerchunk inline form: a raw string (interpreted as bytes) or, when
+            # prefixed with "base64:", a base64-encoded payload.
+            raw = v.encode() if isinstance(v, str) else v
+            if raw.startswith(b"base64:"):
+                data = base64.b64decode(raw[len(b"base64:") :])
+            else:
+                data = raw
+            chunk_entries[k] = ChunkEntry(
+                path="", offset=0, length=len(data), data=data
             )
-        elif not isinstance(v, (tuple, list)):
+        elif isinstance(v, (tuple, list)):
+            chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
+        else:
             raise TypeError(f"Unexpected type {type(v)} for chunk value: {v}")
-
-        chunk_entries[k] = chunkentry_from_kerchunk(v, fs_root=fs_root)
     return ChunkManifest(entries=chunk_entries, shape=shape)
 
 
