@@ -9,6 +9,7 @@ import numpy as np
 import ujson
 from zarr.core.common import JSON
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.experimental import ChunkGrid
 
 from virtualizarr.codecs import (
     zarr_codec_config_to_v3,
@@ -24,7 +25,6 @@ from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
     KerchunkStoreRefs,
 )
-from virtualizarr.utils import determine_chunk_grid_shape
 
 
 def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
@@ -179,10 +179,7 @@ def manifestarray_from_kerchunk_refs(
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
     if chunk_dict:
-        chunk_grid_shape = determine_chunk_grid_shape(
-            metadata.shape,
-            metadata.chunks,
-        )
+        chunk_grid_shape = ChunkGrid.from_metadata(metadata).grid_shape
         manifest = manifest_from_kerchunk_chunk_dict(
             chunk_dict, fs_root=fs_root, shape=chunk_grid_shape
         )
@@ -191,10 +188,7 @@ def manifestarray_from_kerchunk_refs(
         # empty variables don't have physical chunks, but zarray shows that the variable
         # is at least 1D
 
-        shape = determine_chunk_grid_shape(
-            metadata.shape,
-            metadata.chunks,
-        )
+        shape = ChunkGrid.from_metadata(metadata).grid_shape
         manifest = ChunkManifest(entries={}, shape=shape)
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     else:

@@ -2,8 +2,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
-
-from virtualizarr.utils import determine_chunk_grid_shape
+from zarr.experimental import ChunkGrid
 
 from .manifest import ChunkManifest
 from .utils import (
@@ -102,8 +101,17 @@ def concatenate(
         [arr.manifest for arr in arrays], axis=axis
     )
 
+    # For rectilinear grids, concatenate chunk edges along the concat axis
+    new_chunks = None
+    if not first_arr.chunk_grid.is_regular:
+        new_chunks = list(first_arr.chunks)
+        concat_edges: tuple[int, ...] = ()
+        for arr in arrays:
+            concat_edges = concat_edges + arr.chunks[axis]  # type: ignore[index]
+        new_chunks[axis] = concat_edges
+
     new_metadata = copy_and_replace_metadata(
-        old_metadata=first_arr.metadata, new_shape=new_shape
+        old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
     )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
@@ -151,7 +159,11 @@ def stack(
     # chunk shape has changed because a length-1 axis has been inserted
     old_chunks = first_arr.chunks
     new_chunks = list(old_chunks)
-    new_chunks.insert(axis, 1)
+    # For rectilinear grids, each element is a sequence; insert a single-element tuple
+    if not first_arr.chunk_grid.is_regular:
+        new_chunks.insert(axis, (1,))
+    else:
+        new_chunks.insert(axis, 1)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
@@ -187,22 +199,21 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    old_chunk_shape = x.chunks
+    # broadcast_to only applies to regular chunk grids
+    old_chunk_shape: tuple[int, ...] = x.chunks  # type: ignore[assignment]
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )
-
-    # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
-
-    # do broadcasting of entries in manifest
-    broadcasted_manifest = _broadcast_manifest(x.manifest, shape=new_chunk_grid_shape)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=x.metadata,
         new_shape=list(new_shape),
         new_chunks=list(new_chunk_shape),
     )
+    new_chunk_grid_shape = ChunkGrid.from_metadata(new_metadata).grid_shape
+
+    # do broadcasting of entries in manifest
+    broadcasted_manifest = _broadcast_manifest(x.manifest, shape=new_chunk_grid_shape)
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 

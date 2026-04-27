@@ -6,7 +6,7 @@ import math
 from collections.abc import Coroutine, Iterable
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import numpy as np
 import obstore
@@ -14,6 +14,8 @@ import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.core.metadata.v3 import RegularChunkGridMetadata
+from zarr.experimental import ChunkGrid
 from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
@@ -26,21 +28,6 @@ from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
-from virtualizarr.utils import determine_chunk_grid_shape
-
-# Type-check against the min-deps name (RegularChunkGrid) while keeping a
-# runtime try/except so both zarr-python <=3.1.6 and >3.1.6 work. Version
-# sniffing is unreliable under hatch-vcs when installed from a git source
-# without fetched tags.
-if TYPE_CHECKING:
-    from zarr.core.metadata.v3 import RegularChunkGrid as RegularChunkGridMetadata
-else:
-    try:
-        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
-    except ImportError:
-        from zarr.core.metadata.v3 import (
-            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
-        )
 
 # obstore doesn't export a public base type for stores, so we use Any for now.
 ObstoreStore = Any
@@ -282,7 +269,7 @@ async def construct_manifest_array(
 
     if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGridMetadata):
         raise NotImplementedError(
-            f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
+            f"Only RegularChunkGridMetadata is supported, but array {zarr_array.path} "
             f"uses {type(array_v3_metadata.chunk_grid).__name__}."
         )
 
@@ -396,12 +383,9 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
-    # For sharded arrays, chunk_grid.chunk_shape is the shard shape (not the inner
-    # chunk shape, which lives inside the ShardingCodec config). So this grid describes
-    # the number of shard files on disk, which is exactly what we want for the manifest.
-    chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
-    )
+    # For sharded arrays, grid_shape reflects the number of shard files on disk,
+    # which is exactly what we want for the manifest.
+    chunk_grid_shape = ChunkGrid.from_metadata(metadata).grid_shape
     total_size = math.prod(chunk_grid_shape)
 
     # Handle scalar arrays
