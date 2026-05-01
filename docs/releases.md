@@ -1,31 +1,52 @@
 # Release notes
 
-## v2.6.1 (unreleased)
+## v2.6.1 (1st May 2026)
+
+Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
 
 ### New Features
-
-- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
-  By [Tom Nicholas](https://github.com/TomNicholas).
-- The icechunk writer now handles `ChunkManifest` entries containing inlined chunk data. For arrays with no inlined chunks the existing fast bulk `set_virtual_refs_arr` path is unchanged; otherwise inlined positions are sent to icechunk as empty (missing) virtual refs and the inlined bytes are written separately as managed chunks. A virtual dataset with inlined chunks can now be `to_icechunk`'d and re-opened via `xr.open_zarr` without data loss.
-  By [Tom Nicholas](https://github.com/TomNicholas).
 
 - `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
   ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
   By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
-- `KerchunkJSONParser` and `KerchunkParquetParser` now parse inline chunk data (both raw-string and `base64:`-prefixed forms) into inlined `ChunkManifest` entries, instead of raising `NotImplementedError`. Fixes the read side of [#489](https://github.com/zarr-developers/VirtualiZarr/issues/489); writer support for inlined chunks will follow in a separate PR.
+- `KerchunkJSONParser` and `KerchunkParquetParser` now parse inline chunk data (both raw-string and `base64:`-prefixed forms) into inlined `ChunkManifest` entries, instead of raising `NotImplementedError`. Fixes the read side of [#489](https://github.com/zarr-developers/VirtualiZarr/issues/489).
   ([#979](https://github.com/zarr-developers/VirtualiZarr/pull/979)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
+  ([#980](https://github.com/zarr-developers/VirtualiZarr/pull/980)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- The icechunk writer now handles `ChunkManifest` entries containing inlined chunk data. For arrays with no inlined chunks the existing fast bulk `set_virtual_refs_arr` path is unchanged; otherwise inlined positions are sent to icechunk as empty (missing) virtual refs and the inlined bytes are written separately as managed chunks. A virtual dataset with inlined chunks can now be `to_icechunk`'d and re-opened via `xr.open_zarr` without data loss.
+  ([#981](https://github.com/zarr-developers/VirtualiZarr/pull/981)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
 ### Bug fixes
 
+- Fix `KerchunkParser` rejecting cloud URI roots (e.g. `s3://bucket`) in `fs_root`.
+  ([#976](https://github.com/zarr-developers/VirtualiZarr/pull/976)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix `HDFParser` failing on HDF5 datasets with a zero-length dimension under `zarr-python >= 3.2.0`, which forbids zero-length chunk dimensions. Chunk dimensions are now clamped to a minimum of 1 when falling back from dataset shape.
+  ([#977](https://github.com/zarr-developers/VirtualiZarr/pull/977)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `KerchunkParser` mangling scheme-only `fs_root` values like `s3://` into `s3:/key` when joining paths.
+  ([#984](https://github.com/zarr-developers/VirtualiZarr/pull/984)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
+- Expand `ChunkManifest` documentation with detail on construction and the `shape` argument.
+  ([#961](https://github.com/zarr-developers/VirtualiZarr/pull/961)).
+  By [Tyler Anderson](https://github.com/tylanderson).
+
 ### Internal changes
+
+- Add compatibility with Zarr-Python 3.2.0.
+  ([#957](https://github.com/zarr-developers/VirtualiZarr/pull/957)).
+  By [Max Jones](https://github.com/maxrjones).
+- Update typing for internal changes in Zarr-Python 3.2.0.
+  ([#985](https://github.com/zarr-developers/VirtualiZarr/pull/985)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ## v2.6.0 (16th April 2026)
 
