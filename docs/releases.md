@@ -19,8 +19,6 @@ Adds end-to-end support for inlined chunk references in `ChunkManifest` (read vi
   ([#981](https://github.com/zarr-developers/VirtualiZarr/pull/981)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
-### Breaking changes
-
 ### Bug fixes
 
 - Fix `KerchunkParser` rejecting cloud URI roots (e.g. `s3://bucket`) in `fs_root`.
