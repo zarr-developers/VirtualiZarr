@@ -1,6 +1,6 @@
 # Release notes
 
-## v2.6.1 (1st May 2026)
+## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
 
