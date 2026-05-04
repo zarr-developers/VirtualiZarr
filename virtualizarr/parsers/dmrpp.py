@@ -1,3 +1,4 @@
+import base64
 import io
 import warnings
 from pathlib import Path
@@ -15,7 +16,6 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import ChunkEntry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 
@@ -198,13 +198,23 @@ class DMRParser:
                 meta["attributes"]["_FillValue"] = encoded_cf_fill_value
 
             if "inline" in meta:
-                # chunkmanifest is empty - extract inline data from dict
+                # extract data already decoded into array/string
                 data = meta.pop("inline", None)
-                shape = meta.pop("shape", None)
-                chunk_entry = ChunkEntry(
-                    path="__inlined__", offset=0, length=len(data), data=data
-                )
-                chunkmanifest = ChunkManifest(entries=chunk_entry, shape=shape)
+                bdata = base64.b64encode(data)
+                # chunk_entry = ChunkEntry(
+                #     path="", offset=0, length=len(bdata), data=bdata
+                # )
+                # chunkmanifest = ChunkManifest(entries=chunk_entry)
+
+                chunks = {
+                    "0.0": {
+                        "path": "__inline__",
+                        "offset": 0,
+                        "length": len(bdata),
+                        "data": bdata,
+                    },
+                }
+                chunkmanifest = ChunkManifest(entries=chunks)
             else:
                 chunkmanifest = ChunkManifest(chunkmanifest)
 
