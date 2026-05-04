@@ -125,7 +125,7 @@ dev = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
-    "pydap>=3.5.9"
+    "pydap>=3.5.9",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
