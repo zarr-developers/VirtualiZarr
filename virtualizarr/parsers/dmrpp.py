@@ -15,6 +15,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.manifest import ChunkEntry
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.utils import encode_cf_fill_value
 
@@ -182,6 +183,7 @@ class DMRParser:
 
         for var in vars_dict.keys():
             chunkmanifest = vars_dict[var].pop("chunkmanifest", None)
+            # remove opendap-related metadata
             meta = dict(
                 [
                     (k, v)
@@ -196,17 +198,21 @@ class DMRParser:
                 meta["attributes"]["_FillValue"] = encoded_cf_fill_value
 
             if "inline" in meta:
-                raise NotImplementedError(
-                    "Reading inlined reference data is currently not supported. "
-                    "See https://github.com/zarr-developers/VirtualiZarr/issues/489",
+                # chunkmanifest is empty - extract inline data from dict
+                data = meta.pop("inline", None)
+                shape = meta.pop("shape", None)
+                chunk_entry = ChunkEntry(
+                    path="__inlined__", offset=0, length=len(data), data=data
                 )
-                meta.pop("inline", None)
+                chunkmanifest = ChunkManifest(entries=chunk_entry, shape=shape)
+            else:
+                chunkmanifest = ChunkManifest(chunkmanifest)
 
-            chunkmanifest = ChunkManifest(chunkmanifest)
             metadata = create_v3_array_metadata(**meta)
             manifest_dict[var] = ManifestArray(
                 metadata=metadata, chunkmanifest=chunkmanifest
             )
+
         manifest_group = ManifestGroup(arrays=manifest_dict, attributes=attrs)
         registry: ObjectStoreRegistry = ObjectStoreRegistry()
         registry.register(self.data_filepath, object_store)
