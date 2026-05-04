@@ -35,6 +35,22 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+def _get_fill_value(dataset: H5Dataset):
+    """
+    Extract the fill value from an h5py dataset, handling string/bytes dtypes
+    that don't return numpy scalars from dataset.fillvalue.
+    """
+    raw = dataset.fillvalue
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        return raw
+    elif isinstance(raw, np.generic):
+        return raw.item()
+    else:
+        return raw
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -64,6 +80,11 @@ def _construct_manifest_array(
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
 
+    # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
+    # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
+    if dtype.kind == "O":
+        dtype = np.dtypes.StringDType()
+
     # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
     # cfcodec = cfcodec_from_dataset(dataset)
     # if cfcodec:
@@ -74,13 +95,13 @@ def _construct_manifest_array(
     # else:
     # dtype = dataset.dtype
 
-    if "_FillValue" in attrs:
+    if "_FillValue" in attrs and dtype.kind not in ("S", "U", "O", "T"):
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
     codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
 
-    fill_value = dataset.fillvalue.item()
+    fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
     metadata = create_v3_array_metadata(
         shape=dataset.shape,
