@@ -96,6 +96,32 @@ class TestIntegration:
             with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
                 xrt.assert_equal(ds, roundtrip)
 
+    def test_singleton_dim_roundtrip(
+        self, tmp_path, singleton_padded_dimension_hdf5_file, local_registry
+    ):
+        import numpy as np
+
+        parser = HDFParser(squeeze=True)
+        filepath, *_ = singleton_padded_dimension_hdf5_file
+        with (
+            xr.open_dataset(
+                filepath, engine="h5netcdf", backend_kwargs={"phony_dims": "sort"}
+            ).squeeze(drop=True) as ds,
+            open_virtual_dataset(
+                url=filepath,
+                registry=local_registry,
+                parser=parser,
+            ) as vds,
+        ):
+            kerchunk_file = str(tmp_path / "kerchunk.json")
+            vds.vz.to_kerchunk(kerchunk_file, format="json")
+            with xr.open_dataset(kerchunk_file, engine="kerchunk") as roundtrip:
+                for var_name in ds.data_vars:
+                    assert ds[var_name].shape == roundtrip[var_name].shape
+                    np.testing.assert_array_equal(
+                        ds[var_name].values, roundtrip[var_name].values
+                    )
+
     @requires_icechunk
     def test_cf_fill_value_roundtrip(
         self, tmp_path, cf_fill_value_hdf5_file, local_registry
