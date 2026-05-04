@@ -597,11 +597,13 @@ def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
     assert manifest_store._group is not None
 
 
-@pytest.mark.xfail(
-    reason="inline reference is failing locally",
-)
 @requires_network
 def test_inlinevalue():
+    """
+    Test that inline values can be parsed into manifest
+    """
+    expected_bytes = b"AAAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAUAAAAAAAAABgAAAAAAAAAHAAAAAAAAAAgAAAAAAAAACQAAAAAAAAA="
+
     dmrpp_file = (
         "http://test.opendap.org/opendap/data/dmrpp/compact_lowlevel.h5.dmrpp.file"
     )
@@ -609,4 +611,7 @@ def test_inlinevalue():
     dmrpp = session.get(dmrpp_file).content.decode()
     parser = dmrparser(dmrpp, filepath="file:///")
     store = obstore_local(url=parser.data_filepath)
-    parser.parse_dataset(object_store=store)
+    ms = parser.parse_dataset(object_store=store)
+    vds = ms.to_virtual_dataset()
+    assert "my_dataset" in vds
+    assert ms._group["my_dataset"]._manifest._inlined == {(0, 0): expected_bytes}
