@@ -14,12 +14,8 @@ from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.utils import ChunkKeySeparator
 
-# Type-check against the min-deps name (RegularChunkGrid) while keeping a
-# runtime try/except so both zarr-python <=3.1.6 and >3.1.6 work. Version
-# sniffing is unreliable under hatch-vcs when installed from a git source
-# without fetched tags.
 if TYPE_CHECKING:
-    from zarr.core.metadata.v3 import RegularChunkGrid as RegularChunkGridMetadata
+    from zarr.core.metadata.v3 import RegularChunkGridMetadata
 else:
     try:
         from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
