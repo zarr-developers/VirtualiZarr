@@ -35,10 +35,16 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+def _squeeze_indices(shape: tuple) -> list[int]:
+    """Return indices of dimensions where shape is greater than 1."""
+    return [i for i, s in enumerate(shape) if s > 1]
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
     group: str,
+    squeeze: bool = False,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -60,6 +66,15 @@ def _construct_manifest_array(
     # chunk dimensions (enforced by zarr-python >= 3.2.0). See
     # https://github.com/zarr-developers/zarr-python/issues/3711.
     chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
+    # When squeeze=True, we keep only dimensions of size > 1.
+    # So squeeze=True on its own drops any dim that was length 0 (or less) in the original dataset and the clamp is technically redundant.
+    # But when squeeze=False, the clamp is necessary to prevent having zero-length chunk dimensions.
+    keep_indices = (
+        _squeeze_indices(dataset.shape) if squeeze else list(range(len(dataset.shape)))
+    )
+    keep_chunks = tuple(chunks[i] for i in keep_indices)
+    keep_shape = tuple(dataset.shape[i] for i in keep_indices)
+
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
@@ -82,16 +97,17 @@ def _construct_manifest_array(
 
     fill_value = dataset.fillvalue.item()
     dims = tuple(_dataset_dims(dataset, group=group))
+    keep_dims = tuple(dims[i] for i in keep_indices)
     metadata = create_v3_array_metadata(
-        shape=dataset.shape,
+        shape=keep_shape,
         data_type=dtype,
-        chunk_shape=chunks,
+        chunk_shape=keep_chunks,
         fill_value=fill_value,
         codecs=codec_configs,
-        dimension_names=dims,
+        dimension_names=keep_dims,
         attributes=attrs,
     )
-    manifest = _dataset_chunk_manifest(filepath, dataset)
+    manifest = _dataset_chunk_manifest(filepath, dataset, squeeze=squeeze)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
 
@@ -101,6 +117,7 @@ def _construct_manifest_group(
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
+    squeeze: bool = False,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
@@ -120,7 +137,9 @@ def _construct_manifest_group(
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
         group_name = str(g.name)  # NOTE: this will always include leading "/"
         arrays = {
-            key: _construct_manifest_array(filepath, dataset, group_name)
+            key: _construct_manifest_array(
+                filepath, dataset, group_name, squeeze=squeeze
+            )
             for key in g.keys()
             if key not in drop_variables
             if isinstance(dataset := g[key], h5py.Dataset)
@@ -130,6 +149,7 @@ def _construct_manifest_group(
                 filepath,
                 reader,
                 group=str(Path(group) / key) if group is not None else key,
+                squeeze=squeeze,
             )
             for key in g.keys()
             if key not in drop_variables
@@ -146,6 +166,7 @@ class HDFParser:
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
+        squeeze: bool = False,
     ):
         """
         Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
@@ -163,10 +184,13 @@ class HDFParser:
             Must return an object implementing the
             [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
             Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+        squeeze
+            If `True`, remove dimensions of size 1 from arrays (default: `False`).
         """
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
+        self.squeeze = squeeze
 
     def __call__(
         self,
@@ -196,6 +220,7 @@ class HDFParser:
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
+            squeeze=self.squeeze,
         )
         # Convert to a manifest store
         return ManifestStore(registry=registry, group=manifest_group)
@@ -204,6 +229,7 @@ class HDFParser:
 def _dataset_chunk_manifest(
     filepath: str,
     dataset: H5Dataset,
+    squeeze: bool = False,
 ) -> ChunkManifest:
     """
     Generate ChunkManifest for HDF5 dataset.
@@ -221,6 +247,9 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
+    keep_indices = (
+        _squeeze_indices(dataset.shape) if squeeze else list(range(len(dataset.shape)))
+    )
     if dataset.chunks is None:
         if dsid.get_offset() is None:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
@@ -231,7 +260,7 @@ def _dataset_chunk_manifest(
                 lengths=np.array(dsid.get_storage_size(), dtype=np.uint64),
             )
         else:
-            key_list = [0] * (len(dataset.shape) or 1)
+            key_list = [0] * (len(keep_indices) or 1)
             key = ".".join(map(str, key_list))
 
             chunk_entry: ChunkEntry = ChunkEntry.with_validation(  # type: ignore[attr-defined]
@@ -267,6 +296,15 @@ def _dataset_chunk_manifest(
             else:
                 for index in range(num_chunks):
                     add_chunk_info(dsid.get_chunk_info(index))
+
+            # we squeeze here rather than in get_key
+            squeeze_axes = tuple(
+                i for i in range(len(dataset.chunks)) if i not in set(keep_indices)
+            )
+            if squeeze_axes:
+                paths = np.squeeze(paths, axis=squeeze_axes)
+                offsets = np.squeeze(offsets, axis=squeeze_axes)
+                lengths = np.squeeze(lengths, axis=squeeze_axes)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
