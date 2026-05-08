@@ -405,6 +405,40 @@ When packing is expressed as codecs rather than attributes, the fill value seman
     }
     ```
 
+#### Handling NaN values during casts
+
+The example above relies on `cast_value`'s `scalar_map` to route `NaN` through an integer encoding, which is necessary because of the [rules `cast_value` defines for non-finite values](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value#numpy-compatibility):
+
+- When both endpoints support IEEE 754 (e.g., `float32` ↔ `float64`), `NaN` and `±Infinity` are propagated through the cast unchanged unless `scalar_map` overrides them.
+- When the output dtype does not support NaN or transfinite values (any integer or boolean type), the codec raises an error if the input contains `NaN` or `±Infinity`, unless `scalar_map` provides an explicit mapping for those values. There is no silent coercion.
+
+This means a parser packing floating-point data into an integer type must decide up front how non-finite inputs should be encoded — emitting a `cast_value` configuration that crosses the IEEE-754 boundary without a `scalar_map` will fail at encode time as soon as a `NaN` appears in the data.
+
+There are two common patterns:
+
+1. **Round-trip-faithful sentinel mapping (preferred).** If `NaN` represents missing data in the source, map `NaN` to a reserved integer on `encode` _and_ back to `NaN` on `decode`, as in the example above. Pair this with a matching `_FillValue` attribute in the **decoded** domain so that xarray and other CF-aware readers also mask the value.
+2. **NumPy-compatible cast.** If the source data was written by tooling that relied on NumPy's default float-to-integer cast (where `NaN`, `+Infinity`, and `-Infinity` are silently coerced to `0` and finite out-of-range values wrap), reproduce that behavior explicitly using the [NumPy compatibility recipe](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value#numpy-compatibility) from the spec:
+
+    ```json
+    {
+        "name": "cast_value",
+        "configuration": {
+            "data_type": "uint8",
+            "rounding": "towards-zero",
+            "out_of_range": "wrap",
+            "scalar_map": {
+                "encode": [
+                    ["NaN", 0],
+                    ["+Infinity", 0],
+                    ["-Infinity", 0]
+                ]
+            }
+        }
+    }
+    ```
+
+    This recipe deliberately omits a `decode` mapping: once `NaN` is written as `0`, it cannot be recovered on read, and any genuine `0` values in the source will round-trip as `0` rather than `NaN`. Use it only when faithfully reproducing legacy NumPy semantics is the explicit goal; for real missing-data sentinels, prefer the bidirectional pattern in (1).
+
 #### Relationship to `numcodecs.fixedscaleoffset`
 
 The `scale_offset` + `cast_value` pair supersedes the legacy `numcodecs.fixedscaleoffset` codec, which combined scaling, offset, rounding, and type casting into a single monolithic operation. The new codecs address several problems with the legacy approach:
