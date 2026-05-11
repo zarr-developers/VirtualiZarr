@@ -40,6 +40,7 @@ CI throttling:
 
 from __future__ import annotations
 
+import string
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -235,18 +236,42 @@ def test_equivalence_helper_passes_on_simple_file(tmp_path):
     _assert_h5netcdf_virtualizarr_identical(url.removeprefix("file://"))
 
 
+# A small enum-label map reused for all enum-dtype samples; concrete values
+# don't matter for the property test, only that the dtype carries enum
+# metadata h5py preserves.
+_ENUM_LABELS = {"NONE": 0, "LOW": 1, "MED": 2, "HIGH": 3}
+
+
 def _h5py_compatible_dtype_strategy() -> st.SearchStrategy[np.dtype]:
     """Sample one of the dtypes h5py can store in a dataset.
 
     Extends `base_numeric_dtype_strategy()` (bool/int*/uint*/float*/complex*)
-    with HDF5-specific kinds: fixed-bytes `S*` and vlen utf-8
-    (`h5py.string_dtype()`, kind `O`). Both currently expose downstream
-    breakages — that's intentional: the suite *highlights* breakages
-    rather than hides them.
+    with HDF5-specific kinds:
 
-    Structured/compound dtypes are excluded — they can't be parametrised
-    by a single `np.dtype` and are covered by curated cases in
-    `TestCompoundDtype`.
+    - fixed-length bytes (`|S*`, numpy kind `S`)
+    - vlen utf-8 string (`h5py.string_dtype()`, numpy kind `O`)
+    - vlen ASCII string (`h5py.string_dtype(encoding="ascii")`, kind `O`)
+    - vlen array of a numeric base (`h5py.vlen_dtype(base)`, kind `O`,
+      each element is its own variable-length numpy array)
+    - enum (`h5py.enum_dtype({...}, basetype=...)`, integer kind with
+      label metadata that doesn't survive the JSON metadata round-trip)
+
+    All currently expose at least one form of downstream breakage —
+    that's intentional: the suite *highlights* breakages rather than
+    hides them. The new attribution categories distinguish parser-side
+    failures from upstream / downstream-shared ones.
+
+    Excluded:
+
+    - Structured/compound dtypes — can't be parametrised by a single
+      `np.dtype`; covered by curated `TestCompoundDtype` cases.
+    - Object/region reference dtypes (`h5py.ref_dtype`,
+      `h5py.regionref_dtype`) — require a multi-dataset graph
+      (referrer + referent), not suitable for the single-dataset
+      writer template. Worth a separate curated module if real bugs
+      surface.
+    - Opaque dtype (`np.dtype(("V", n))`) — rare; not worth the
+      strategy weight today.
     """
     return st.one_of(
         base_numeric_dtype_strategy(),
@@ -255,7 +280,12 @@ def _h5py_compatible_dtype_strategy() -> st.SearchStrategy[np.dtype]:
                 np.dtype("S1"),
                 np.dtype("S5"),
                 np.dtype("S20"),
-                h5py.string_dtype(),  # vlen utf-8 (kind 'O' under the hood)
+                h5py.string_dtype(),  # vlen utf-8 (kind 'O')
+                h5py.string_dtype(encoding="ascii"),  # vlen ASCII (kind 'O')
+                h5py.vlen_dtype(np.dtype("i4")),  # vlen array of int32
+                h5py.vlen_dtype(np.dtype("f8")),  # vlen array of float64
+                h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i1")),
+                h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i4")),
             ]
         ),
     )
@@ -265,10 +295,29 @@ def _value_in_dtype_strategy(dtype: np.dtype) -> st.SearchStrategy[Any]:
     """Return a strategy producing a value compatible with `dtype`.
 
     Delegates to `base_value_in_dtype_strategy` for the universally-supported
-    kinds and adds the HDF-specific vlen-string branch (kind `O`).
+    kinds and adds HDF-specific branches:
+
+    - vlen utf-8 string: any unicode text
+    - vlen ASCII string: only ASCII codepoints (h5py rejects non-ASCII
+      bytes when the dtype declares ASCII encoding)
+    - enum: an integer from the enum's label set (h5py would accept any
+      int of the base dtype, but values outside the label set don't
+      round-trip semantically; we constrain for realism)
     """
-    if dtype.kind == "O":  # h5py.string_dtype() — vlen utf-8
+    str_info = h5py.check_string_dtype(dtype)
+    if str_info is not None:
+        if str_info.encoding == "ascii":
+            return st.text(
+                alphabet=string.ascii_letters + string.digits + " ",
+                min_size=0,
+                max_size=20,
+            )
         return st.text(min_size=0, max_size=20)
+    # Enum dtypes look numeric (kind 'i'/'u') with metadata; if metadata
+    # carries an enum label-map, constrain values to those labels.
+    enum_map = h5py.check_enum_dtype(dtype)
+    if enum_map is not None:
+        return st.sampled_from(sorted(set(enum_map.values())))
     return _base_value_in_dtype_strategy(dtype)
 
 
@@ -277,17 +326,64 @@ def _data_in_dtype_strategy(
 ) -> st.SearchStrategy[np.ndarray]:
     """Generate a numpy array of the given dtype and shape.
 
-    Branches on dtype because `hypothesis.extra.numpy.arrays` doesn't
-    handle h5py's vlen-string dtype well — we have to build a flat list
-    and reshape.
+    Branches per HDF5-specific dtype because `hypothesis.extra.numpy.arrays`
+    doesn't handle h5py's vlen / enum dtypes.
+
+    - vlen string (utf-8 or ASCII): build a flat list of strings and
+      reshape into the requested shape.
+    - vlen array: each element is its own length-varying numpy array
+      of the vlen base type.
+    - enum: integer storage with values drawn from the label set, then
+      reshape.
+    - everything else: delegate to the shared numeric data strategy.
     """
-    if dtype.kind == "O":
+    str_info = h5py.check_string_dtype(dtype)
+    if str_info is not None:
         n = int(np.prod(shape)) if len(shape) else 1
-        return st.lists(
-            st.text(min_size=0, max_size=20),
-            min_size=n,
-            max_size=n,
-        ).map(lambda xs: np.array(xs, dtype=h5py.string_dtype()).reshape(shape))
+        if str_info.encoding == "ascii":
+            text_strategy = st.text(
+                alphabet=string.ascii_letters + string.digits + " ",
+                min_size=0,
+                max_size=20,
+            )
+        else:
+            text_strategy = st.text(min_size=0, max_size=20)
+        return st.lists(text_strategy, min_size=n, max_size=n).map(
+            lambda xs: np.array(xs, dtype=dtype).reshape(shape)
+        )
+
+    vlen_base = h5py.check_vlen_dtype(dtype)
+    if vlen_base is not None:
+        # Each element of the outer array is itself a length-varying
+        # numpy array of `vlen_base`. Build flat then reshape.
+        n = int(np.prod(shape)) if len(shape) else 1
+
+        @st.composite
+        def _vlen_array_data(draw):
+            lengths = draw(
+                st.lists(
+                    st.integers(min_value=0, max_value=4),
+                    min_size=n,
+                    max_size=n,
+                )
+            )
+            arr = np.empty(n, dtype=dtype)
+            for i, length in enumerate(lengths):
+                arr[i] = draw(npst.arrays(dtype=vlen_base, shape=(length,)))
+            return arr.reshape(shape)
+
+        return _vlen_array_data()
+
+    enum_map = h5py.check_enum_dtype(dtype)
+    if enum_map is not None:
+        # Storage is the integer base; constrain values to the label set
+        # so the data is semantically meaningful for an enum.
+        labels = sorted(set(enum_map.values()))
+        n = int(np.prod(shape)) if len(shape) else 1
+        return st.lists(st.sampled_from(labels), min_size=n, max_size=n).map(
+            lambda xs: np.array(xs, dtype=dtype).reshape(shape)
+        )
+
     return _base_data_in_dtype_strategy(dtype, shape)
 
 
@@ -304,6 +400,13 @@ def _basic_dataset_strategy(draw) -> _DatasetSpec:
         else None
     )
     data = draw(_data_in_dtype_strategy(dtype, shape))
+
+    # Vlen-array dtypes don't have a meaningful array-level fill value
+    # (h5py's default is an empty inner array). Skip the fill-value
+    # sweep for them; data-shape coverage alone is the signal here.
+    if h5py.check_vlen_dtype(dtype) is not None:
+        return _DatasetSpec(dtype=dtype, data=data, chunks=chunks)
+
     fill_in_dtype = draw(_value_in_dtype_strategy(dtype))
     dataset_fillvalue = draw(st.sampled_from([_UNSET, fill_in_dtype]))
     fill_value_attr = draw(st.sampled_from([_UNSET, fill_in_dtype]))
@@ -385,6 +488,50 @@ _BASIC_EXAMPLES = [
         data=np.array([b"a", b"b"], dtype="S5"),
         fill_value_attr=b"x",
     ),
+    # ASCII vlen string with an explicit ASCII sentinel
+    _DatasetSpec(
+        dtype=h5py.string_dtype(encoding="ascii"),
+        data=np.array(["alpha", "beta"], dtype=h5py.string_dtype(encoding="ascii")),
+        fill_value_attr="MISSING",
+    ),
+    # int8-backed enum with fill = one of the labels (LOW=1)
+    _DatasetSpec(
+        dtype=h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i1")),
+        data=np.array(
+            [0, 1, 2, 3], dtype=h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i1"))
+        ),
+        fill_value_attr=np.int8(1),
+    ),
+    # int32-backed enum with no fill
+    _DatasetSpec(
+        dtype=h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i4")),
+        data=np.array(
+            [0, 2], dtype=h5py.enum_dtype(_ENUM_LABELS, basetype=np.dtype("i4"))
+        ),
+    ),
+    # vlen array of int32, no fill (vlen-array dtypes don't have one)
+    _DatasetSpec(
+        dtype=h5py.vlen_dtype(np.dtype("i4")),
+        data=np.array(
+            [
+                np.array([1, 2, 3], dtype="i4"),
+                np.array([], dtype="i4"),
+                np.array([4], dtype="i4"),
+            ],
+            dtype=h5py.vlen_dtype(np.dtype("i4")),
+        ),
+    ),
+    # vlen array of float64, no fill
+    _DatasetSpec(
+        dtype=h5py.vlen_dtype(np.dtype("f8")),
+        data=np.array(
+            [
+                np.array([1.0, 2.5], dtype="f8"),
+                np.array([np.nan], dtype="f8"),
+            ],
+            dtype=h5py.vlen_dtype(np.dtype("f8")),
+        ),
+    ),
 ]
 
 
@@ -397,6 +544,11 @@ _BASIC_EXAMPLE_IDS = [
     "vlen-no-fill",
     "S10-empty-fill",
     "S5-sentinel-fill",
+    "ascii-vlen-sentinel-fill",
+    "enum-i1-with-fill",
+    "enum-i4-no-fill",
+    "vlen-array-i4",
+    "vlen-array-f8",
 ]
 
 
