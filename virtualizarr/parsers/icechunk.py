@@ -201,9 +201,7 @@ async def _construct_manifest_array(
         path_col = np.array(b_paths, dtype=np.dtypes.StringDType())
         is_native = b_kinds == _KIND_NATIVE
         if is_native.any():
-            path_col[is_native] = np.strings.add(
-                prefix_with_slash, path_col[is_native]
-            )
+            path_col[is_native] = np.strings.add(prefix_with_slash, path_col[is_native])
         is_inline = b_kinds == _KIND_INLINE
         if is_inline.any():
             path_col[is_inline] = INLINED_CHUNK_PATH

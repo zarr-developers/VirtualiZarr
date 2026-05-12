@@ -25,9 +25,7 @@ def mixed_icechunk_repo() -> icechunk.Repository:
     store = session.store
 
     group = zarr.group(store=store, overwrite=True)
-    arr = group.create_array(
-        "a", shape=(4,), chunks=(1,), dtype="i4", compressors=None
-    )
+    arr = group.create_array("a", shape=(4,), chunks=(1,), dtype="i4", compressors=None)
     # inline at slot 0
     arr[0] = 7
     # virtual at slot 2
@@ -43,7 +41,9 @@ def mixed_icechunk_repo() -> icechunk.Repository:
     return repo
 
 
-def test_parser_returns_manifest_store(mixed_icechunk_repo: icechunk.Repository) -> None:
+def test_parser_returns_manifest_store(
+    mixed_icechunk_repo: icechunk.Repository,
+) -> None:
     session = mixed_icechunk_repo.readonly_session(branch="main")
     parser = IcechunkParser(native_chunks_prefix="s3://bucket/repo/chunks")
     ms = parser(session.store, registry=ObjectStoreRegistry({}))
