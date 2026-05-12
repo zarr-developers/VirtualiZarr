@@ -1,6 +1,7 @@
 from virtualizarr.parsers.dmrpp import DMRPPParser
 from virtualizarr.parsers.fits import FITSParser
 from virtualizarr.parsers.hdf import HDFParser
+from virtualizarr.parsers.icechunk import IcechunkParser
 from virtualizarr.parsers.kerchunk.json import KerchunkJSONParser
 from virtualizarr.parsers.kerchunk.parquet import KerchunkParquetParser
 from virtualizarr.parsers.netcdf3 import NetCDF3Parser
@@ -10,6 +11,7 @@ __all__ = [
     "DMRPPParser",
     "FITSParser",
     "HDFParser",
+    "IcechunkParser",
     "NetCDF3Parser",
     "KerchunkJSONParser",
     "KerchunkParquetParser",
