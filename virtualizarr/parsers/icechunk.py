@@ -1,22 +1,25 @@
-"""Parser for converting an icechunk Session into a VirtualiZarr ManifestStore.
+"""Parser for converting an icechunk repository into a VirtualiZarr ManifestStore.
 
-Unlike the other parsers, this one operates on a live icechunk store rather
-than parsing an archival file from object storage. It walks zarr groups via
-the standard zarr-python API to enumerate arrays + their metadata, then for
-each array consumes :meth:`icechunk.IcechunkStore.array_chunk_iterator` —
-a columnar async generator of chunk references — and scatters the batches
-into the dense numpy arrays that VirtualiZarr's
-:meth:`ChunkManifest.from_arrays` expects.
+Provides two entry points:
 
-The mapping is:
+- :meth:`IcechunkParser.__call__(url, registry)` — protocol-conformant. Resolves
+  the URL against the registry to find an obstore, translates that obstore into
+  an :class:`icechunk.Storage`, opens the repo + a readonly session, and parses.
+  Use this when going through :func:`virtualizarr.open_virtual_dataset`.
+
+- :meth:`IcechunkParser.parse_session(session, registry)` — escape hatch. Skip
+  the URL/Storage round trip and parse an already-open
+  :class:`icechunk.Session` directly. Use this when you already have an open
+  Session in hand (the common case if you're working with your icechunk repo
+  in the same process).
+
+The mapping is the same regardless of entry point:
 
 - IC virtual ref (any ``s3://`` / ``gs://`` / ``vcc://`` location, already
   resolved by icechunk) → VZ virtual ref with the resolved URL as path.
 - IC native (managed) chunk → VZ virtual ref with path
-  ``f"{native_chunks_prefix}/{chunk_id}"``. The prefix is supplied at
-  parser construction time.
-- IC inline chunk → VZ inline chunk (bytes carried in
-  ``ChunkManifest._inlined``, path replaced by VZ's sentinel).
+  ``f"{native_chunks_prefix}/{chunk_id}"``.
+- IC inline chunk → VZ inline chunk.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 from collections.abc import Coroutine, Iterable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -45,7 +49,6 @@ if TYPE_CHECKING:
     from obspec_utils.registry import ObjectStoreRegistry
 
 
-# Default batch size for the iterator; can be overridden at parser construction.
 _DEFAULT_BATCH_SIZE: int = 100_000
 
 T = TypeVar("T")
@@ -64,45 +67,85 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
 
 
 class IcechunkParser:
-    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from an icechunk session.
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from an icechunk repository.
+
+    There are two entry points:
+
+    - ``__call__(url, registry)`` matches VirtualiZarr's
+      [`Parser`][virtualizarr.parsers.typing.Parser] protocol, so this class
+      works with [open_virtual_dataset][virtualizarr.open_virtual_dataset].
+      It uses the registry's obstore to identify the icechunk Storage config,
+      opens its own ``Repository`` and a readonly ``Session``, and parses.
+    - ``parse_session(session, registry)`` is the escape hatch — pass an
+      already-open ``icechunk.Session`` and skip the URL/Storage round trip.
+      Useful when you already have a session in hand.
 
     Parameters
     ----------
     native_chunks_prefix
-        URL prefix to root icechunk's native (managed) chunk paths at.
-        Native chunks are rendered as ``f"{native_chunks_prefix}/{chunk_id}"``.
+        URL prefix to render icechunk's native (managed) chunk paths under.
+        Native chunks become ``f"{native_chunks_prefix}/{chunk_id}"``.
         For an S3-backed repo at ``s3://my-bucket/my-repo``, this would be
         ``"s3://my-bucket/my-repo/chunks"``. A single trailing slash is tolerated.
-        Virtual chunks ignore this — their URL is whatever icechunk has on file
-        (with ``vcc://`` references already resolved).
+    branch
+        Branch name to open in ``__call__`` (default ``"main"``). Ignored by
+        ``parse_session`` because the session is already pinned.
+    tag
+        Tag to open in ``__call__``. Mutually exclusive with ``branch`` /
+        ``snapshot_id``.
+    snapshot_id
+        Snapshot id to open in ``__call__``. Mutually exclusive with
+        ``branch`` / ``tag``.
     group
         Optional sub-group path within the icechunk store to use as the root.
     skip_variables
         Names of arrays in the group to exclude.
     batch_size
-        Iterator batch size in chunks. Default 100,000.
+        Per-batch chunk count for the underlying iterator. Default 100,000.
 
     Examples
     --------
     >>> import icechunk
     >>> from obspec_utils.registry import ObjectStoreRegistry
+    >>> from virtualizarr import open_virtual_dataset
     >>> from virtualizarr.parsers import IcechunkParser
     >>>
-    >>> repo = icechunk.Repository.open(storage=...)  # doctest: +SKIP
-    >>> session = repo.readonly_session(branch="main")  # doctest: +SKIP
+    >>> # Protocol-conformant path:
     >>> parser = IcechunkParser(  # doctest: +SKIP
     ...     native_chunks_prefix="s3://my-bucket/my-repo/chunks",
     ... )
-    >>> manifest_store = parser(session.store, registry=ObjectStoreRegistry({}))  # doctest: +SKIP
+    >>> vds = open_virtual_dataset(  # doctest: +SKIP
+    ...     url="s3://my-bucket/my-repo", registry=registry, parser=parser
+    ... )
+    >>>
+    >>> # Escape hatch — already have a Session:
+    >>> repo = icechunk.Repository.open(storage=...)  # doctest: +SKIP
+    >>> session = repo.readonly_session(branch="dev")  # doctest: +SKIP
+    >>> ms = parser.parse_session(session, registry=registry)  # doctest: +SKIP
     """
 
     def __init__(
         self,
         native_chunks_prefix: str,
+        *,
+        branch: str | None = None,
+        tag: str | None = None,
+        snapshot_id: str | None = None,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
         batch_size: int = _DEFAULT_BATCH_SIZE,
     ):
+        n_version_specs = sum(v is not None for v in (branch, tag, snapshot_id))
+        if n_version_specs > 1:
+            raise ValueError(
+                "At most one of `branch`, `tag`, `snapshot_id` may be given; "
+                f"got branch={branch!r}, tag={tag!r}, snapshot_id={snapshot_id!r}."
+            )
+        # Default to the 'main' branch when nothing is specified.
+        self.branch = branch if n_version_specs else "main"
+        self.tag = tag
+        self.snapshot_id = snapshot_id
+
         self.native_chunks_prefix = native_chunks_prefix.rstrip("/")
         self.group = group
         self.skip_variables = skip_variables
@@ -110,12 +153,39 @@ class IcechunkParser:
 
     def __call__(
         self,
-        store: "icechunk.IcechunkStore",
+        url: str,
         registry: "ObjectStoreRegistry",
     ) -> ManifestStore:
-        """Parse an icechunk store and return a VZ ManifestStore."""
+        """Protocol-conformant entry point: open the icechunk repo from a URL.
+
+        Resolves ``url`` against ``registry`` to find an obstore, translates
+        that obstore into an :class:`icechunk.Storage` (currently supports
+        S3, local filesystem, and HTTP backends), opens the repository at
+        the configured branch/tag/snapshot, and parses.
+        """
+        import icechunk
+
+        obstore, relative = registry.resolve(url)
+        ic_storage = _obstore_to_icechunk_storage(obstore, relative_prefix=str(relative))
+        repo = icechunk.Repository.open(storage=ic_storage)
+        session = repo.readonly_session(
+            branch=self.branch, tag=self.tag, snapshot_id=self.snapshot_id
+        )
+        return self.parse_session(session, registry)
+
+    def parse_session(
+        self,
+        session: "icechunk.Session",
+        registry: "ObjectStoreRegistry",
+    ) -> ManifestStore:
+        """Escape hatch: parse an already-open icechunk Session directly.
+
+        Bypasses the URL/Storage translation in ``__call__``. The session's
+        snapshot is used as-is — the parser's ``branch``/``tag``/``snapshot_id``
+        constructor args do not apply on this path.
+        """
         coro = _construct_manifest_group(
-            store=store,
+            store=session.store,
             group=self.group,
             native_chunks_prefix=self.native_chunks_prefix,
             skip_variables=self.skip_variables,
@@ -123,6 +193,63 @@ class IcechunkParser:
         )
         manifest_group = _run_async(coro)
         return ManifestStore(registry=registry, group=manifest_group)
+
+
+def _obstore_to_icechunk_storage(
+    store: Any,
+    *,
+    relative_prefix: str,
+) -> "icechunk.Storage":
+    """Build an :class:`icechunk.Storage` from a configured obstore object.
+
+    Handles the common cases (S3, local filesystem, HTTP). Raises a clear
+    error for any backend we haven't mapped yet.
+    """
+    import icechunk
+    import obstore.store as obs
+
+    full_prefix = _join_prefix(getattr(store, "prefix", None), relative_prefix)
+
+    if isinstance(store, obs.S3Store):
+        cfg = store.config or {}
+        return icechunk.s3_storage(
+            bucket=cfg["bucket"],
+            prefix=full_prefix or None,
+            region=cfg.get("region"),
+            endpoint_url=cfg.get("endpoint"),
+            access_key_id=cfg.get("access_key_id"),
+            secret_access_key=cfg.get("secret_access_key"),
+            session_token=cfg.get("session_token"),
+            anonymous=cfg.get("skip_signature", False) or None,
+            allow_http=cfg.get("allow_http", False),
+        )
+    if isinstance(store, obs.LocalStore):
+        root = Path(store.prefix or "")
+        return icechunk.local_filesystem_storage(str(root / relative_prefix))
+    if isinstance(store, obs.HTTPStore):
+        base = store.url.rstrip("/")
+        url = f"{base}/{relative_prefix}" if relative_prefix else base
+        return icechunk.http_storage(url)
+
+    raise NotImplementedError(
+        f"IcechunkParser doesn't yet know how to translate "
+        f"{type(store).__name__} into an icechunk.Storage. "
+        f"Either pre-open the icechunk Session yourself and use "
+        f"IcechunkParser.parse_session(session, registry), or open an issue."
+    )
+
+
+def _join_prefix(store_prefix: Any, relative: str) -> str:
+    """Combine the store's configured prefix with the URL-relative path.
+
+    ``store_prefix`` may be ``None``, a string, or a path-like (obstore's
+    ``LocalStore.prefix`` is a ``PosixPath``), so we coerce to ``str`` first.
+    """
+    left = str(store_prefix or "").strip("/")
+    right = relative.strip("/")
+    if left and right:
+        return f"{left}/{right}"
+    return left or right
 
 
 async def _construct_manifest_group(
@@ -161,8 +288,8 @@ async def _construct_manifest_array(
     batch_size: int,
 ) -> ManifestArray:
     """Assemble one array's ChunkManifest by scattering iterator batches."""
-    # Import ChunkType lazily so importing this module doesn't require icechunk
-    # at install time (matches the TYPE_CHECKING-only icechunk import above).
+    # Import ChunkType lazily so importing this module doesn't require
+    # icechunk at install time (matches the TYPE_CHECKING-only import above).
     from icechunk import ChunkType
 
     metadata = metadata_as_v3(zarr_array.metadata)
@@ -170,8 +297,6 @@ async def _construct_manifest_array(
         metadata.shape, metadata.chunk_grid.chunk_shape
     )
 
-    # Allocate dense buffers sized to the chunk grid. Scalar arrays
-    # (grid_shape == ()) get a single-slot buffer that we reshape to () at the end.
     total = int(np.prod(grid_shape)) if grid_shape else 1
     paths = np.full(total, "", dtype=np.dtypes.StringDType())
     offsets = np.zeros(total, dtype=np.uint64)
@@ -186,17 +311,11 @@ async def _construct_manifest_array(
         if n == 0:
             continue
 
-        # Flat row-major index for each chunk in the batch.
         if grid_shape:
             flat_idx = np.ravel_multi_index(b_coords.T, grid_shape)
         else:
-            # Scalar array: only one possible chunk slot.
             flat_idx = np.zeros(n, dtype=np.intp)
 
-        # Build the per-batch paths column with the right values:
-        # - virtual: URL as-is
-        # - native:  prepend prefix to chunk_id
-        # - inline:  VZ sentinel
         path_col = np.array(b_paths, dtype=np.dtypes.StringDType())
         is_native = b_kinds == ChunkType.native
         if is_native.any():
@@ -205,12 +324,10 @@ async def _construct_manifest_array(
         if is_inline.any():
             path_col[is_inline] = INLINED_CHUNK_PATH
 
-        # Scatter into the dense buffers.
         paths[flat_idx] = path_col
         offsets[flat_idx] = b_offsets
         lengths[flat_idx] = b_lengths
 
-        # Inline bytes are keyed by absolute chunk coordinate, not flat index.
         for batch_i, data in b_inlined.items():
             coord = tuple(int(x) for x in b_coords[batch_i])
             inlined[coord] = data
