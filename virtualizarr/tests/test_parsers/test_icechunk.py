@@ -19,7 +19,7 @@ from virtualizarr.parsers.typing import Parser
 
 def test_parser_satisfies_parser_protocol() -> None:
     """IcechunkParser must be a runtime-checkable Parser so it works with open_virtual_dataset."""
-    assert isinstance(IcechunkParser(native_chunks_prefix="s3://x/y"), Parser)
+    assert isinstance(IcechunkParser(), Parser)
 
 
 # ----------------------------------------------------------------------
@@ -78,8 +78,12 @@ def test_parse_session_array_metadata_and_manifest(
     mixed_icechunk_repo: icechunk.Repository,
 ) -> None:
     session = mixed_icechunk_repo.readonly_session(branch="main")
-    parser = IcechunkParser(native_chunks_prefix="s3://bucket/repo/chunks")
-    ms = parser.parse_session(session, registry=ObjectStoreRegistry({}))
+    parser = IcechunkParser()
+    ms = parser.parse_session(
+        session,
+        registry=ObjectStoreRegistry({}),
+        native_chunks_prefix="s3://bucket/repo/chunks",
+    )
 
     ma = ms._group.arrays["a"]
     assert isinstance(ma, ManifestArray)
@@ -128,8 +132,10 @@ def test_parse_session_native_chunks_prefix_applied(prefix: str) -> None:
     session.commit("c")
 
     session = repo.readonly_session(branch="main")
-    parser = IcechunkParser(native_chunks_prefix=prefix)
-    ms = parser.parse_session(session, registry=ObjectStoreRegistry({}))
+    parser = IcechunkParser()
+    ms = parser.parse_session(
+        session, registry=ObjectStoreRegistry({}), native_chunks_prefix=prefix
+    )
     cm = ms._group.arrays["v"]._manifest
 
     expected_prefix = "s3://mybucket/myrepo/chunks/"
@@ -143,12 +149,24 @@ def test_parse_session_native_chunks_prefix_applied(prefix: str) -> None:
 
 def test_parse_session_skip_variables(mixed_icechunk_repo: icechunk.Repository) -> None:
     session = mixed_icechunk_repo.readonly_session(branch="main")
-    parser = IcechunkParser(
+    parser = IcechunkParser(skip_variables=["a"])
+    ms = parser.parse_session(
+        session,
+        registry=ObjectStoreRegistry({}),
         native_chunks_prefix="s3://bucket/repo/chunks",
-        skip_variables=["a"],
     )
-    ms = parser.parse_session(session, registry=ObjectStoreRegistry({}))
     assert "a" not in ms._group.arrays
+
+
+def test_parse_session_requires_native_chunks_prefix(
+    mixed_icechunk_repo: icechunk.Repository,
+) -> None:
+    """parse_session's native_chunks_prefix is a required kwarg."""
+    session = mixed_icechunk_repo.readonly_session(branch="main")
+    parser = IcechunkParser()
+    with pytest.raises(TypeError):
+        # Missing the required native_chunks_prefix kwarg.
+        parser.parse_session(session, registry=ObjectStoreRegistry({}))  # type: ignore[call-arg]
 
 
 # ----------------------------------------------------------------------
@@ -213,11 +231,3 @@ def test_call_defaults_native_chunks_prefix_to_url_chunks(
     assert cm._paths[0].startswith(f"{url}/chunks/")
 
 
-def test_parse_session_requires_explicit_native_chunks_prefix(
-    mixed_icechunk_repo: icechunk.Repository,
-) -> None:
-    """parse_session can't infer the prefix — the user must supply it."""
-    session = mixed_icechunk_repo.readonly_session(branch="main")
-    parser = IcechunkParser()  # no prefix
-    with pytest.raises(ValueError, match="native_chunks_prefix"):
-        parser.parse_session(session, registry=ObjectStoreRegistry({}))

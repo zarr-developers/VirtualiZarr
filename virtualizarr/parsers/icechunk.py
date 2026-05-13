@@ -82,16 +82,6 @@ class IcechunkParser:
 
     Parameters
     ----------
-    native_chunks_prefix
-        URL prefix to render icechunk's native (managed) chunk paths under.
-        Native chunks become ``f"{native_chunks_prefix}/{chunk_id}"``.
-
-        Optional. When ``__call__(url, ...)`` is used and ``native_chunks_prefix``
-        is ``None``, it defaults to ``f"{url}/chunks"`` (which is where icechunk's
-        format-constant ``CHUNKS_FILE_PATH`` puts native chunks for a repo at
-        that URL). When :meth:`parse_session` is used, this must be supplied
-        explicitly — the parser has no URL to derive a default from.
-        A single trailing slash is tolerated.
     branch
         Branch name to open in ``__call__`` (default ``"main"``). Ignored by
         ``parse_session`` because the session is already pinned.
@@ -111,27 +101,30 @@ class IcechunkParser:
     Examples
     --------
     >>> import icechunk
-    >>> from obspec_utils.registry import ObjectStoreRegistry
     >>> from virtualizarr import open_virtual_dataset
     >>> from virtualizarr.parsers import IcechunkParser
     >>>
-    >>> # Protocol-conformant path:
-    >>> parser = IcechunkParser(  # doctest: +SKIP
-    ...     native_chunks_prefix="s3://my-bucket/my-repo/chunks",
-    ... )
+    >>> # Protocol-conformant path — native chunks rendered as
+    >>> # ``f"{url}/chunks/{id}"`` automatically.
     >>> vds = open_virtual_dataset(  # doctest: +SKIP
-    ...     url="s3://my-bucket/my-repo", registry=registry, parser=parser
+    ...     url="s3://my-bucket/my-repo",
+    ...     registry=registry,
+    ...     parser=IcechunkParser(),
     ... )
     >>>
-    >>> # Escape hatch — already have a Session:
+    >>> # Escape hatch — already have a Session. Native-chunks prefix must be
+    >>> # supplied here since there's no URL.
     >>> repo = icechunk.Repository.open(storage=...)  # doctest: +SKIP
     >>> session = repo.readonly_session(branch="dev")  # doctest: +SKIP
-    >>> ms = parser.parse_session(session, registry=registry)  # doctest: +SKIP
+    >>> ms = IcechunkParser().parse_session(  # doctest: +SKIP
+    ...     session,
+    ...     registry=registry,
+    ...     native_chunks_prefix="s3://my-bucket/my-repo/chunks",
+    ... )
     """
 
     def __init__(
         self,
-        native_chunks_prefix: str | None = None,
         *,
         branch: str | None = None,
         tag: str | None = None,
@@ -150,11 +143,6 @@ class IcechunkParser:
         self.tag = tag
         self.snapshot_id = snapshot_id
 
-        self.native_chunks_prefix = (
-            native_chunks_prefix.rstrip("/")
-            if native_chunks_prefix is not None
-            else None
-        )
         self.group = group
         self.skip_variables = skip_variables
         self.batch_size = batch_size
@@ -169,11 +157,9 @@ class IcechunkParser:
         Resolves ``url`` against ``registry`` to find an obstore, translates
         that obstore into an :class:`icechunk.Storage` (currently supports
         S3, local filesystem, and HTTP backends), opens the repository at
-        the configured branch/tag/snapshot, and parses.
-
-        If no ``native_chunks_prefix`` was given at construction, it defaults
-        to ``f"{url}/chunks"`` — icechunk's format-constant chunks directory
-        for the repo at that URL.
+        the configured branch/tag/snapshot, and parses. Native chunk paths
+        are rendered as ``f"{url}/chunks/{chunk_id}"`` — icechunk's
+        format-constant chunks directory for the repo at that URL.
         """
         import icechunk
 
@@ -185,13 +171,14 @@ class IcechunkParser:
         session = repo.readonly_session(
             branch=self.branch, tag=self.tag, snapshot_id=self.snapshot_id
         )
-        prefix = self.native_chunks_prefix or f"{url.rstrip('/')}/chunks"
-        return self._parse(session, registry, prefix)
+        return self._parse(session, registry, f"{url.rstrip('/')}/chunks")
 
     def parse_session(
         self,
         session: "icechunk.Session",
         registry: "ObjectStoreRegistry",
+        *,
+        native_chunks_prefix: str,
     ) -> ManifestStore:
         """Escape hatch: parse an already-open icechunk Session directly.
 
@@ -199,16 +186,20 @@ class IcechunkParser:
         snapshot is used as-is — the parser's ``branch``/``tag``/``snapshot_id``
         constructor args do not apply on this path.
 
-        ``native_chunks_prefix`` must have been set at construction; without
-        a URL, the parser can't derive a default.
+        Parameters
+        ----------
+        session
+            The open icechunk session to parse.
+        registry
+            ObjectStoreRegistry the resulting ManifestStore will use to read
+            chunk data.
+        native_chunks_prefix
+            URL prefix to render icechunk's native (managed) chunk paths under.
+            Native chunks become ``f"{native_chunks_prefix}/{chunk_id}"``.
+            Required here — there's no URL for the parser to derive a default
+            from. A single trailing slash is tolerated.
         """
-        if self.native_chunks_prefix is None:
-            raise ValueError(
-                "IcechunkParser.parse_session requires native_chunks_prefix "
-                "to be set at construction (no URL to derive a default from). "
-                "Pass e.g. native_chunks_prefix='s3://my-bucket/my-repo/chunks'."
-            )
-        return self._parse(session, registry, self.native_chunks_prefix)
+        return self._parse(session, registry, native_chunks_prefix.rstrip("/"))
 
     def _parse(
         self,
