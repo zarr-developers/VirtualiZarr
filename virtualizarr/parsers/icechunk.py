@@ -45,11 +45,6 @@ if TYPE_CHECKING:
     from obspec_utils.registry import ObjectStoreRegistry
 
 
-# Mirrors the constants in icechunk-python/src/store.rs.
-_KIND_VIRTUAL: int = 1
-_KIND_NATIVE: int = 2
-_KIND_INLINE: int = 3
-
 # Default batch size for the iterator; can be overridden at parser construction.
 _DEFAULT_BATCH_SIZE: int = 100_000
 
@@ -166,6 +161,10 @@ async def _construct_manifest_array(
     batch_size: int,
 ) -> ManifestArray:
     """Assemble one array's ChunkManifest by scattering iterator batches."""
+    # Import ChunkType lazily so importing this module doesn't require icechunk
+    # at install time (matches the TYPE_CHECKING-only icechunk import above).
+    from icechunk import ChunkType
+
     metadata = metadata_as_v3(zarr_array.metadata)
     grid_shape = determine_chunk_grid_shape(
         metadata.shape, metadata.chunk_grid.chunk_shape
@@ -199,10 +198,10 @@ async def _construct_manifest_array(
         # - native:  prepend prefix to chunk_id
         # - inline:  VZ sentinel
         path_col = np.array(b_paths, dtype=np.dtypes.StringDType())
-        is_native = b_kinds == _KIND_NATIVE
+        is_native = b_kinds == ChunkType.native
         if is_native.any():
             path_col[is_native] = np.strings.add(prefix_with_slash, path_col[is_native])
-        is_inline = b_kinds == _KIND_INLINE
+        is_inline = b_kinds == ChunkType.inline
         if is_inline.any():
             path_col[is_inline] = INLINED_CHUNK_PATH
 
