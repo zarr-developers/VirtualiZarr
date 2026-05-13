@@ -8,7 +8,7 @@ from obspec_utils.registry import ObjectStoreRegistry
 icechunk = pytest.importorskip("icechunk")
 zarr = pytest.importorskip("zarr")
 
-from virtualizarr.manifests import ManifestArray, ManifestStore
+from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.parsers import IcechunkParser
 
@@ -39,15 +39,6 @@ def mixed_icechunk_repo() -> icechunk.Repository:
     # slots 1 and 3 left missing
     session.commit("init")
     return repo
-
-
-def test_parser_returns_manifest_store(
-    mixed_icechunk_repo: icechunk.Repository,
-) -> None:
-    session = mixed_icechunk_repo.readonly_session(branch="main")
-    parser = IcechunkParser(native_chunks_prefix="s3://bucket/repo/chunks")
-    ms = parser(session.store, registry=ObjectStoreRegistry({}))
-    assert isinstance(ms, ManifestStore)
 
 
 def test_parser_array_metadata_and_manifest(
@@ -81,8 +72,19 @@ def test_parser_array_metadata_and_manifest(
         assert int(cm._lengths[i]) == 0
 
 
-def test_parser_native_chunks_prefix_applied() -> None:
-    """Native chunks must come back with the user-supplied URL prefix."""
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "s3://mybucket/myrepo/chunks",
+        "s3://mybucket/myrepo/chunks/",  # trailing slash must be tolerated
+    ],
+)
+def test_parser_native_chunks_prefix_applied(prefix: str) -> None:
+    """Native chunks come back with the user-supplied URL prefix.
+
+    Also asserts no `//` after the scheme, so a trailing slash on the prefix
+    doesn't double up.
+    """
     config = icechunk.RepositoryConfig.default()
     config.inline_chunk_threshold_bytes = 0  # force every write to be native
     repo = icechunk.Repository.create(
@@ -97,39 +99,19 @@ def test_parser_native_chunks_prefix_applied() -> None:
     session.commit("c")
 
     session = repo.readonly_session(branch="main")
-    parser = IcechunkParser(native_chunks_prefix="s3://mybucket/myrepo/chunks")
+    parser = IcechunkParser(native_chunks_prefix=prefix)
     ms = parser(session.store, registry=ObjectStoreRegistry({}))
     cm = ms._group.arrays["v"]._manifest
 
+    expected_prefix = "s3://mybucket/myrepo/chunks/"
     for i in (0, 1):
-        assert cm._paths[i].startswith("s3://mybucket/myrepo/chunks/")
-        # bare chunk_id sits between the prefix and end — non-empty, no further slashes
-        suffix = cm._paths[i].removeprefix("s3://mybucket/myrepo/chunks/")
-        assert suffix
-        assert "/" not in suffix
+        assert cm._paths[i].startswith(expected_prefix)
+        # bare chunk_id sits between prefix and end — non-empty, no slashes
+        suffix = cm._paths[i].removeprefix(expected_prefix)
+        assert suffix and "/" not in suffix
+        # no '//' anywhere after the scheme
+        assert "//" not in cm._paths[i].removeprefix("s3://")
         assert int(cm._lengths[i]) == 4
-
-
-def test_parser_native_chunks_prefix_trailing_slash_tolerated() -> None:
-    """A trailing slash on the prefix shouldn't produce '//' in chunk URLs."""
-    config = icechunk.RepositoryConfig.default()
-    config.inline_chunk_threshold_bytes = 0
-    repo = icechunk.Repository.create(
-        storage=icechunk.in_memory_storage(),
-        config=config,
-    )
-    session = repo.writable_session("main")
-    group = zarr.group(store=session.store, overwrite=True)
-    arr = group.create_array("v", shape=(1,), chunks=(1,), dtype="i4", compressors=None)
-    arr[0] = 1
-    session.commit("c")
-
-    session = repo.readonly_session(branch="main")
-    parser = IcechunkParser(native_chunks_prefix="s3://mybucket/myrepo/chunks/")
-    ms = parser(session.store, registry=ObjectStoreRegistry({}))
-    cm = ms._group.arrays["v"]._manifest
-
-    assert "//" not in cm._paths[0].removeprefix("s3://")
 
 
 def test_parser_skip_variables(mixed_icechunk_repo: icechunk.Repository) -> None:
