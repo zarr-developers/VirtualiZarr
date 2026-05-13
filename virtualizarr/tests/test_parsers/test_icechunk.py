@@ -229,5 +229,3 @@ def test_call_defaults_native_chunks_prefix_to_url_chunks(
     ms = parser(url=url, registry=registry)
     cm = ms._group.arrays["native"]._manifest
     assert cm._paths[0].startswith(f"{url}/chunks/")
-
-
