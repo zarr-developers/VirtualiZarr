@@ -166,7 +166,9 @@ class IcechunkParser:
         import icechunk
 
         obstore, relative = registry.resolve(url)
-        ic_storage = _obstore_to_icechunk_storage(obstore, relative_prefix=str(relative))
+        ic_storage = _obstore_to_icechunk_storage(
+            obstore, relative_prefix=str(relative)
+        )
         repo = icechunk.Repository.open(storage=ic_storage)
         session = repo.readonly_session(
             branch=self.branch, tag=self.tag, snapshot_id=self.snapshot_id
