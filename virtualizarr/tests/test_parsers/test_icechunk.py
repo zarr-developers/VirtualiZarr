@@ -161,19 +161,63 @@ def test_call_via_url_opens_repo_and_parses(
 ) -> None:
     """The Protocol-conformant path: __call__(url, registry) opens icechunk itself."""
     repo_path, _ = local_icechunk_repo
-    parser_root = repo_path.parent  # parent dir holds the obstore prefix
+    parser_root = repo_path.parent
     repo_name = repo_path.name
 
     registry = ObjectStoreRegistry(
         {f"file://{parser_root}/": obstore_store.LocalStore(prefix=str(parser_root))}
     )
 
-    parser = IcechunkParser(native_chunks_prefix="ignored-for-this-test")
+    # native_chunks_prefix not given — should default to f"{url}/chunks".
+    parser = IcechunkParser()
     ms = parser(url=f"file://{parser_root}/{repo_name}", registry=registry)
 
     assert isinstance(ms, ManifestStore)
     cm = ms._group.arrays["a"]._manifest
     assert cm.shape_chunk_grid == (2,)
-    # slot 0 was inline
     assert cm._paths[0] == INLINED_CHUNK_PATH
     assert (0,) in cm._inlined
+
+
+def test_call_defaults_native_chunks_prefix_to_url_chunks(
+    local_icechunk_repo: tuple[Path, icechunk.Repository],
+) -> None:
+    """Native chunks rendered with `{url}/chunks/{id}` when the prefix is implicit."""
+    repo_path, repo = local_icechunk_repo
+    # Write an extra array with native chunks so we can inspect the prefix.
+    config = icechunk.RepositoryConfig.default()
+    config.inline_chunk_threshold_bytes = 0
+    # Reopen the same on-disk repo with a config that forces native chunks.
+    repo = icechunk.Repository.open(
+        storage=icechunk.local_filesystem_storage(str(repo_path)),
+        config=config,
+    )
+    session = repo.writable_session("main")
+    group = zarr.group(store=session.store)
+    arr = group.create_array(
+        "native", shape=(1,), chunks=(1,), dtype="i4", compressors=None
+    )
+    arr[0] = 1
+    session.commit("add native chunk")
+
+    parser_root = repo_path.parent
+    repo_name = repo_path.name
+    registry = ObjectStoreRegistry(
+        {f"file://{parser_root}/": obstore_store.LocalStore(prefix=str(parser_root))}
+    )
+
+    parser = IcechunkParser()
+    url = f"file://{parser_root}/{repo_name}"
+    ms = parser(url=url, registry=registry)
+    cm = ms._group.arrays["native"]._manifest
+    assert cm._paths[0].startswith(f"{url}/chunks/")
+
+
+def test_parse_session_requires_explicit_native_chunks_prefix(
+    mixed_icechunk_repo: icechunk.Repository,
+) -> None:
+    """parse_session can't infer the prefix — the user must supply it."""
+    session = mixed_icechunk_repo.readonly_session(branch="main")
+    parser = IcechunkParser()  # no prefix
+    with pytest.raises(ValueError, match="native_chunks_prefix"):
+        parser.parse_session(session, registry=ObjectStoreRegistry({}))

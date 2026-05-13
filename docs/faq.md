@@ -115,13 +115,14 @@ There are two entry points. The protocol-conformant one matches every other pars
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import IcechunkParser
 
-parser = IcechunkParser(native_chunks_prefix="s3://my-bucket/my-repo/chunks")
 vds = open_virtual_dataset(
     url="s3://my-bucket/my-repo",
     registry=registry,
-    parser=parser,
+    parser=IcechunkParser(),
 )
 ```
+
+The `native_chunks_prefix` defaults to ``f"{url}/chunks"`` for this path — pass it explicitly only if you've moved the chunks elsewhere.
 
 If you already have an open icechunk Session in hand (the common case if you're using icechunk in the same process), use the `parse_session` escape hatch to skip re-opening the repo:
 
@@ -134,6 +135,8 @@ session = repo.readonly_session(branch="main")
 parser = IcechunkParser(native_chunks_prefix="s3://my-bucket/my-repo/chunks")
 manifest_store = parser.parse_session(session, registry=registry)
 ```
+
+On this path `native_chunks_prefix` is required — there's no URL to derive a default from.
 
 ### Can I add a new parser for my custom file format?
 
@@ -188,7 +191,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=VirtualTIFF())`, via [virtual_tiff](https://github.com/virtual-zarr/virtual-tiff)                                                              |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                       |
 | From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
-| From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser(...).parse_session(session, registry)` if you already have an open icechunk session |
+| From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser(native_chunks_prefix=...).parse_session(session, registry)` if you already have an open icechunk session |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., parser=FITSParser())`, via `kerchunk.fits.process_file`                                                                                      |
 | From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |

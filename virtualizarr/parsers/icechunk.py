@@ -85,8 +85,13 @@ class IcechunkParser:
     native_chunks_prefix
         URL prefix to render icechunk's native (managed) chunk paths under.
         Native chunks become ``f"{native_chunks_prefix}/{chunk_id}"``.
-        For an S3-backed repo at ``s3://my-bucket/my-repo``, this would be
-        ``"s3://my-bucket/my-repo/chunks"``. A single trailing slash is tolerated.
+
+        Optional. When ``__call__(url, ...)`` is used and ``native_chunks_prefix``
+        is ``None``, it defaults to ``f"{url}/chunks"`` (which is where icechunk's
+        format-constant ``CHUNKS_FILE_PATH`` puts native chunks for a repo at
+        that URL). When :meth:`parse_session` is used, this must be supplied
+        explicitly — the parser has no URL to derive a default from.
+        A single trailing slash is tolerated.
     branch
         Branch name to open in ``__call__`` (default ``"main"``). Ignored by
         ``parse_session`` because the session is already pinned.
@@ -126,7 +131,7 @@ class IcechunkParser:
 
     def __init__(
         self,
-        native_chunks_prefix: str,
+        native_chunks_prefix: str | None = None,
         *,
         branch: str | None = None,
         tag: str | None = None,
@@ -141,12 +146,15 @@ class IcechunkParser:
                 "At most one of `branch`, `tag`, `snapshot_id` may be given; "
                 f"got branch={branch!r}, tag={tag!r}, snapshot_id={snapshot_id!r}."
             )
-        # Default to the 'main' branch when nothing is specified.
         self.branch = branch if n_version_specs else "main"
         self.tag = tag
         self.snapshot_id = snapshot_id
 
-        self.native_chunks_prefix = native_chunks_prefix.rstrip("/")
+        self.native_chunks_prefix = (
+            native_chunks_prefix.rstrip("/")
+            if native_chunks_prefix is not None
+            else None
+        )
         self.group = group
         self.skip_variables = skip_variables
         self.batch_size = batch_size
@@ -162,6 +170,10 @@ class IcechunkParser:
         that obstore into an :class:`icechunk.Storage` (currently supports
         S3, local filesystem, and HTTP backends), opens the repository at
         the configured branch/tag/snapshot, and parses.
+
+        If no ``native_chunks_prefix`` was given at construction, it defaults
+        to ``f"{url}/chunks"`` — icechunk's format-constant chunks directory
+        for the repo at that URL.
         """
         import icechunk
 
@@ -173,7 +185,8 @@ class IcechunkParser:
         session = repo.readonly_session(
             branch=self.branch, tag=self.tag, snapshot_id=self.snapshot_id
         )
-        return self.parse_session(session, registry)
+        prefix = self.native_chunks_prefix or f"{url.rstrip('/')}/chunks"
+        return self._parse(session, registry, prefix)
 
     def parse_session(
         self,
@@ -185,11 +198,28 @@ class IcechunkParser:
         Bypasses the URL/Storage translation in ``__call__``. The session's
         snapshot is used as-is — the parser's ``branch``/``tag``/``snapshot_id``
         constructor args do not apply on this path.
+
+        ``native_chunks_prefix`` must have been set at construction; without
+        a URL, the parser can't derive a default.
         """
+        if self.native_chunks_prefix is None:
+            raise ValueError(
+                "IcechunkParser.parse_session requires native_chunks_prefix "
+                "to be set at construction (no URL to derive a default from). "
+                "Pass e.g. native_chunks_prefix='s3://my-bucket/my-repo/chunks'."
+            )
+        return self._parse(session, registry, self.native_chunks_prefix)
+
+    def _parse(
+        self,
+        session: "icechunk.Session",
+        registry: "ObjectStoreRegistry",
+        native_chunks_prefix: str,
+    ) -> ManifestStore:
         coro = _construct_manifest_group(
             store=session.store,
             group=self.group,
-            native_chunks_prefix=self.native_chunks_prefix,
+            native_chunks_prefix=native_chunks_prefix,
             skip_variables=self.skip_variables,
             batch_size=self.batch_size,
         )
