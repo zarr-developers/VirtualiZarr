@@ -40,7 +40,10 @@ def _get_fill_value(dataset: H5Dataset):
     Extract the fill value from an h5py dataset, handling string/bytes dtypes
     that don't return numpy scalars from dataset.fillvalue.
     """
-    raw = dataset.fillvalue
+    try:
+        raw = dataset.fillvalue
+    except AttributeError:
+        return np.ma.default_fill_value(dataset.dtype)
     if isinstance(raw, bytes):
         return raw.decode("utf-8", errors="replace")
     elif isinstance(raw, str):
