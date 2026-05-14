@@ -40,7 +40,14 @@ def mixed_icechunk_repo() -> icechunk.Repository:
     store = session.store
 
     group = zarr.group(store=store, overwrite=True)
-    arr = group.create_array("a", shape=(4,), chunks=(1,), dtype="i4", compressors=None)
+    arr = group.create_array(
+        "a",
+        shape=(4,),
+        chunks=(1,),
+        dtype="i4",
+        compressors=None,
+        dimension_names=("x",),
+    )
     arr[0] = 7  # inline
     store.set_virtual_ref(
         "a/c/2",
@@ -167,6 +174,34 @@ def test_parse_session_requires_native_chunks_prefix(
     with pytest.raises(TypeError):
         # Missing the required native_chunks_prefix kwarg.
         parser.parse_session(session, registry=ObjectStoreRegistry({}))  # type: ignore[call-arg]
+
+
+def test_round_trip_to_icechunk_writes_valid_chunk_keys(
+    mixed_icechunk_repo: icechunk.Repository,
+) -> None:
+    """Read an icechunk repo with IcechunkParser, then write the resulting
+    virtual dataset back to a fresh icechunk repo via ``vds.vz.to_icechunk``.
+
+    Regression test for a real-world failure: ``mixed_icechunk_repo`` has an
+    inline chunk on ``/a``, and on writeback the icechunk store rejects the
+    dot-separated chunk key the writer constructs from the manifest's
+    metadata. Existing tests don't surface this because ZarrParser never
+    produces inline chunks; IcechunkParser is the first parser that does.
+    """
+    session = mixed_icechunk_repo.readonly_session(branch="main")
+    parser = IcechunkParser()
+    ms = parser.parse_session(
+        session,
+        registry=ObjectStoreRegistry({}),
+        native_chunks_prefix="s3://bucket/repo/chunks",
+    )
+    vds = ms.to_virtual_dataset()
+
+    dst_repo = icechunk.Repository.create(storage=icechunk.in_memory_storage())
+    dst_session = dst_repo.writable_session("main")
+    # Must not raise: IcechunkError("invalid zarr key format `...c.0`").
+    vds.vz.to_icechunk(dst_session.store, validate_containers=False)
+    dst_session.commit("round-trip")
 
 
 # ----------------------------------------------------------------------
