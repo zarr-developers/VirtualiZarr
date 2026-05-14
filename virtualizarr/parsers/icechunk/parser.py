@@ -2,7 +2,7 @@
 
 The user-facing class is :class:`IcechunkParser`. The obstore →
 :class:`icechunk.Storage` translation it uses on the URL path lives in the
-sibling :mod:`._obstore_storage` module.
+sibling :mod:`.obstore_utils` module.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
-from virtualizarr.parsers.icechunk._obstore_storage import obstore_to_icechunk_storage
+from virtualizarr.parsers.icechunk.obstore_utils import obstore_to_icechunk_storage
 from virtualizarr.parsers.zarr import metadata_as_v3
 from virtualizarr.utils import determine_chunk_grid_shape
 

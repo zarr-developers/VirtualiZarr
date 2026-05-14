@@ -5,7 +5,7 @@ This package splits the parser into two pieces:
 - :mod:`virtualizarr.parsers.icechunk.parser` contains the user-facing
   :class:`IcechunkParser` class and the async helpers that walk an icechunk
   store + assemble manifest arrays.
-- :mod:`virtualizarr.parsers.icechunk._obstore_storage` contains the
+- :mod:`virtualizarr.parsers.icechunk.obstore_utils` contains the
   obstore-object → :class:`icechunk.Storage` translation used by
   :meth:`IcechunkParser.__call__` to open the repo from a URL.
 

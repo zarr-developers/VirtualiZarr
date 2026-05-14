@@ -31,7 +31,7 @@ def test_obstore_s3_bool_config_translated_correctly() -> None:
 
     See https://github.com/zarr-developers/VirtualiZarr/pull/991 (tylanderson).
     """
-    from virtualizarr.parsers.icechunk._obstore_storage import (
+    from virtualizarr.parsers.icechunk.obstore_utils import (
         obstore_to_icechunk_storage,
     )
 
@@ -197,7 +197,7 @@ def test_parse_session_skip_variables(mixed_icechunk_repo: icechunk.Repository) 
 def test_parse_session_requires_native_chunks_prefix(
     mixed_icechunk_repo: icechunk.Repository,
 ) -> None:
-    """parse_session's native_chunks_prefix is a required kwarg."""
+    """Verify parse_session's native_chunks_prefix is a required kwarg."""
     session = mixed_icechunk_repo.readonly_session(branch="main")
     parser = IcechunkParser()
     with pytest.raises(TypeError):
