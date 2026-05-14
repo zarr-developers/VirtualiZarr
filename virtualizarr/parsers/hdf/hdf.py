@@ -42,7 +42,7 @@ def _get_fill_value(dataset: H5Dataset):
     """
     try:
         raw = dataset.fillvalue
-    except AttributeError:
+    except RuntimeError:
         return np.ma.default_fill_value(dataset.dtype)
     if isinstance(raw, bytes):
         return raw.decode("utf-8", errors="replace")
