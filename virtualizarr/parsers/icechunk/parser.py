@@ -37,6 +37,36 @@ _DEFAULT_BATCH_SIZE: int = 100_000
 T = TypeVar("T")
 
 
+def _require_icechunk_with_array_chunk_iterator() -> None:
+    """Check the installed icechunk has the API IcechunkParser needs.
+
+    ``IcechunkStore.array_chunk_iterator`` was added in icechunk 2.0.5. We
+    don't bump VirtualiZarr's ``[icechunk]`` extra to ``>=2.0.5`` because
+    most users want only the writer (``to_icechunk``), which works against
+    older icechunk versions — paying the parser's higher floor would force
+    them to upgrade for no benefit. Instead we feature-detect here and fail
+    fast with a clear message when someone constructs the parser against an
+    older icechunk.
+    """
+    try:
+        from icechunk import IcechunkStore
+    except ImportError as e:
+        raise ImportError(
+            "IcechunkParser requires icechunk. Install with "
+            "`pip install icechunk>=2.0.5` (or "
+            "`pip install virtualizarr[icechunk]` then upgrade icechunk)."
+        ) from e
+    if not hasattr(IcechunkStore, "array_chunk_iterator"):
+        import icechunk
+
+        raise ImportError(
+            f"IcechunkParser requires icechunk>=2.0.5 (for the new "
+            f"IcechunkStore.array_chunk_iterator API), but found "
+            f"icechunk=={icechunk.__version__}. Upgrade with "
+            f"`pip install --upgrade icechunk`."
+        )
+
+
 def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync code, even when a loop is already running."""
     try:
@@ -116,6 +146,8 @@ class IcechunkParser:
         skip_variables: Iterable[str] | None = None,
         batch_size: int = _DEFAULT_BATCH_SIZE,
     ):
+        _require_icechunk_with_array_chunk_iterator()
+
         n_version_specs = sum(v is not None for v in (branch, tag, snapshot_id))
         if n_version_specs > 1:
             raise ValueError(
