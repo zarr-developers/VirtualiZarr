@@ -1,5 +1,25 @@
 # Release notes
 
+## v2.6.2 (unreleased)
+
+### New Features
+
+- New `IcechunkParser` — opens an existing icechunk repository and converts it into a VirtualiZarr `ManifestStore` without copying data. Maps icechunk virtual refs straight through, renders native (managed) chunks as VZ virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Two entry points: the protocol-conformant `IcechunkParser()(url, registry)` for use with `open_virtual_dataset`, and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5` for the `IcechunkStore.array_chunk_iterator` API; VirtualiZarr's `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade, but `IcechunkParser` checks at construction and raises a clear error against older icechunk.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+### Bug fixes
+
+- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer was building chunk keys via the manifest metadata's `chunk_key_encoding` (which the ManifestStore convention pins to `"."`), so it produced `c.0.0.0`-form keys that icechunk's zarr `Key::parse` rejects. The writer now always emits the `c/0/0/0`-form icechunk requires, regardless of the manifest's stored separator. Mainly surfaces with `IcechunkParser` since icechunk inlines small chunks aggressively; existing parsers don't produce inlined chunks and aren't affected.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+### Internal changes
+
 ## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
