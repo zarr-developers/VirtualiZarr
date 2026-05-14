@@ -22,6 +22,35 @@ def test_parser_satisfies_parser_protocol() -> None:
     assert isinstance(IcechunkParser(), Parser)
 
 
+def test_obstore_s3_bool_config_translated_correctly() -> None:
+    """Regression test: obstore stringifies bool config (e.g. ``True`` becomes
+    ``"true"``), so the obstore -> icechunk Storage translation must parse,
+    not pass through. Otherwise ``s3_storage(anonymous="true", ...)`` blows
+    up because the icechunk arg expects ``bool | None``. ``allow_http`` lives
+    in ``store.client_options``, not ``store.config`` — also covered here.
+
+    See https://github.com/zarr-developers/VirtualiZarr/pull/991 (tylanderson).
+    """
+    from virtualizarr.parsers.icechunk._obstore_storage import (
+        obstore_to_icechunk_storage,
+    )
+
+    store = obstore_store.S3Store(
+        bucket="mybucket",
+        config={"skip_signature": True},
+        client_options={"allow_http": True},
+    )
+    # Confirm the preconditions that motivated this test: obstore stringifies
+    # bools, and allow_http lives on client_options not config.
+    assert store.config["skip_signature"] == "true"
+    assert store.client_options["allow_http"] == "true"
+
+    # Translation must produce a valid icechunk.Storage — if either bool
+    # leaked through as a string, s3_storage would raise a TypeError here.
+    storage = obstore_to_icechunk_storage(store, relative_prefix="repo")
+    assert isinstance(storage, icechunk.Storage)
+
+
 # ----------------------------------------------------------------------
 # Fixtures: in-memory repo (used by parse_session path) and on-disk repo
 # (used by the protocol-conformant __call__ path).

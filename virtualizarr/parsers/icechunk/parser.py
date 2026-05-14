@@ -1,25 +1,8 @@
-"""Parser for converting an icechunk repository into a VirtualiZarr ManifestStore.
+"""IcechunkParser: walks an icechunk repository and builds a VZ ManifestStore.
 
-Provides two entry points:
-
-- :meth:`IcechunkParser.__call__(url, registry)` — protocol-conformant. Resolves
-  the URL against the registry to find an obstore, translates that obstore into
-  an :class:`icechunk.Storage`, opens the repo + a readonly session, and parses.
-  Use this when going through :func:`virtualizarr.open_virtual_dataset`.
-
-- :meth:`IcechunkParser.parse_session(session, registry)` — escape hatch. Skip
-  the URL/Storage round trip and parse an already-open
-  :class:`icechunk.Session` directly. Use this when you already have an open
-  Session in hand (the common case if you're working with your icechunk repo
-  in the same process).
-
-The mapping is the same regardless of entry point:
-
-- IC virtual ref (any ``s3://`` / ``gs://`` / ``vcc://`` location, already
-  resolved by icechunk) → VZ virtual ref with the resolved URL as path.
-- IC native (managed) chunk → VZ virtual ref with path
-  ``f"{native_chunks_prefix}/{chunk_id}"``.
-- IC inline chunk → VZ inline chunk.
+The user-facing class is :class:`IcechunkParser`. The obstore →
+:class:`icechunk.Storage` translation it uses on the URL path lives in the
+sibling :mod:`._obstore_storage` module.
 """
 
 from __future__ import annotations
@@ -27,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 from collections.abc import Coroutine, Iterable
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -40,6 +22,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
+from virtualizarr.parsers.icechunk._obstore_storage import obstore_to_icechunk_storage
 from virtualizarr.parsers.zarr import metadata_as_v3
 from virtualizarr.utils import determine_chunk_grid_shape
 
@@ -164,7 +147,7 @@ class IcechunkParser:
         import icechunk
 
         obstore, relative = registry.resolve(url)
-        ic_storage = _obstore_to_icechunk_storage(
+        ic_storage = obstore_to_icechunk_storage(
             obstore, relative_prefix=str(relative)
         )
         repo = icechunk.Repository.open(storage=ic_storage)
@@ -216,63 +199,6 @@ class IcechunkParser:
         )
         manifest_group = _run_async(coro)
         return ManifestStore(registry=registry, group=manifest_group)
-
-
-def _obstore_to_icechunk_storage(
-    store: Any,
-    *,
-    relative_prefix: str,
-) -> "icechunk.Storage":
-    """Build an :class:`icechunk.Storage` from a configured obstore object.
-
-    Handles the common cases (S3, local filesystem, HTTP). Raises a clear
-    error for any backend we haven't mapped yet.
-    """
-    import icechunk
-    import obstore.store as obs
-
-    full_prefix = _join_prefix(getattr(store, "prefix", None), relative_prefix)
-
-    if isinstance(store, obs.S3Store):
-        cfg = store.config or {}
-        return icechunk.s3_storage(
-            bucket=cfg["bucket"],
-            prefix=full_prefix or None,
-            region=cfg.get("region"),
-            endpoint_url=cfg.get("endpoint"),
-            access_key_id=cfg.get("access_key_id"),
-            secret_access_key=cfg.get("secret_access_key"),
-            session_token=cfg.get("session_token"),
-            anonymous=cfg.get("skip_signature", False) or None,
-            allow_http=cfg.get("allow_http", False),
-        )
-    if isinstance(store, obs.LocalStore):
-        root = Path(store.prefix or "")
-        return icechunk.local_filesystem_storage(str(root / relative_prefix))
-    if isinstance(store, obs.HTTPStore):
-        base = store.url.rstrip("/")
-        url = f"{base}/{relative_prefix}" if relative_prefix else base
-        return icechunk.http_storage(url)
-
-    raise NotImplementedError(
-        f"IcechunkParser doesn't yet know how to translate "
-        f"{type(store).__name__} into an icechunk.Storage. "
-        f"Either pre-open the icechunk Session yourself and use "
-        f"IcechunkParser.parse_session(session, registry), or open an issue."
-    )
-
-
-def _join_prefix(store_prefix: Any, relative: str) -> str:
-    """Combine the store's configured prefix with the URL-relative path.
-
-    ``store_prefix`` may be ``None``, a string, or a path-like (obstore's
-    ``LocalStore.prefix`` is a ``PosixPath``), so we coerce to ``str`` first.
-    """
-    left = str(store_prefix or "").strip("/")
-    right = relative.strip("/")
-    if left and right:
-        return f"{left}/{right}"
-    return left or right
 
 
 async def _construct_manifest_group(
