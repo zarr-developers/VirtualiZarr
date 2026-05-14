@@ -152,7 +152,11 @@ class IcechunkParser:
         session = repo.readonly_session(
             branch=self.branch, tag=self.tag, snapshot_id=self.snapshot_id
         )
-        return self._parse(session, registry, f"{url.rstrip('/')}/chunks")
+        return self.parse_session(
+            session,
+            registry,
+            native_chunks_prefix=f"{url.rstrip('/')}/chunks",
+        )
 
     def parse_session(
         self,
@@ -180,18 +184,10 @@ class IcechunkParser:
             Required here — there's no URL for the parser to derive a default
             from. A single trailing slash is tolerated.
         """
-        return self._parse(session, registry, native_chunks_prefix.rstrip("/"))
-
-    def _parse(
-        self,
-        session: "icechunk.Session",
-        registry: "ObjectStoreRegistry",
-        native_chunks_prefix: str,
-    ) -> ManifestStore:
         coro = _construct_manifest_group(
             store=session.store,
             group=self.group,
-            native_chunks_prefix=native_chunks_prefix,
+            native_chunks_prefix=native_chunks_prefix.rstrip("/"),
             skip_variables=self.skip_variables,
             batch_size=self.batch_size,
         )
