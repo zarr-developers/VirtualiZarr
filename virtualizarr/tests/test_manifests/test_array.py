@@ -7,6 +7,7 @@ from conftest import (
     ZLIB_CODEC,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.indexing import SubChunkIndexingError
 
 
 class TestInit:
@@ -843,88 +844,35 @@ class TestIndexing:
         [
             # obvious no-ops
             ((2,), (1,), slice(0, 2), (2,), (1,)),
-            # reduces shape
-            pytest.param(
-                (1,),
-                (1,),
-                0,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            # requires chunk-aligned selection
-            pytest.param(
-                (2,),
-                (1,),
-                0,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                1,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (0, ...),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (..., 0),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                slice(0, 1),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (..., slice(0, 1)),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (slice(0, 1), ...),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
+            # integer indexing drops the indexed axis (numpy / array-API semantics).
+            # Only legal when chunk_size == 1 along that axis: otherwise picking a
+            # single element would require splitting a chunk.
+            ((1,), (1,), 0, (), ()),
+            ((2,), (1,), 0, (), ()),
+            ((2,), (1,), 1, (), ()),
+            ((2,), (1,), (0, ...), (), ()),
+            ((2,), (1,), (..., 0), (), ()),
+            # multi-axis integer indexing drops every indexed axis
+            ((2, 2), (1, 1), (0, 0), (), ()),
+            ((3, 3), (1, 1), (1, 2), (), ()),
+            # chunk-aligned slicing preserves the axis
+            ((2,), (1,), slice(0, 1), (1,), (1,)),
+            ((2,), (1,), (..., slice(0, 1)), (1,), (1,)),
+            ((2,), (1,), (slice(0, 1), ...), (1,), (1,)),
+            # multi-chunk slices and slices over multi-chunk axes
+            ((8,), (2,), slice(0, 4), (4,), (2,)),
+            ((8,), (2,), slice(2, 6), (4,), (2,)),
+            ((8,), (2,), slice(6, 8), (2,), (2,)),
+            # multi-dim slicing
+            ((4, 4), (2, 2), (slice(0, 2), slice(0, 2)), (2, 2), (2, 2)),
+            ((4, 4), (2, 2), (slice(2, 4), slice(0, 4)), (2, 4), (2, 2)),
+            # mixed integer + slice indexing — the integer-indexed axis drops, the
+            # slice-indexed axis stays.
+            ((2, 4), (1, 2), (0, slice(0, 2)), (2,), (2,)),
+            ((4, 4), (1, 2), (2, slice(0, 4)), (4,), (2,)),
+            # partial final chunk along an axis
+            ((5,), (2,), slice(0, 4), (4,), (2,)),
+            ((5,), (2,), slice(2, 5), (3,), (2,)),
         ],
     )
     def test_chunk_selection_cases(
@@ -934,6 +882,265 @@ class TestIndexing:
         indexed = marr[indexer]
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
+
+    def test_integer_indexing_subsets_manifest_to_one_chunk(self, array_v3_metadata):
+        # Make sure dropping the axis also drops the manifest's chunk-grid axis and
+        # keeps just the referenced chunk's bytes.
+        metadata = array_v3_metadata(shape=(4, 2), chunks=(1, 2))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 16},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 16},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 16},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 16},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr[2, ...]
+
+        assert result.shape == (2,)
+        assert result.chunks == (2,)
+        assert result.manifest.shape_chunk_grid == (1,)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 200, "length": 16},
+        }
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer",
+        [
+            # int on a multi-element chunk — only chunk_size == 1 permits int indexing
+            ((4,), (2,), 0),
+            ((4,), (2,), 1),
+            ((4,), (2,), 2),
+            ((4,), (2,), 3),
+            # slice start misaligned
+            ((4,), (2,), slice(1, 3)),
+            # slice stop misaligned (and stop != axis_length)
+            ((4,), (2,), slice(0, 3)),
+            ((4,), (2,), slice(0, 1)),
+            # step != 1
+            ((4,), (2,), slice(0, 4, 2)),
+            # only one axis misaligned in a multi-dim selection
+            ((4, 4), (2, 2), (slice(0, 4), slice(0, 1))),
+            # int on a chunk_size > 1 axis even when other axes are fine
+            ((4, 4), (2, 2), (0, slice(0, 4))),
+        ],
+    )
+    def test_misaligned_with_chunks(self, manifest_array, in_shape, in_chunks, indexer):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[indexer]
+
+
+class TestSubChunkSlicingUncompressed:
+    # For an uncompressed array, sub-chunk slicing along the axis with the largest byte
+    # stride in storage can be expressed purely as a byte-offset/length adjustment into
+    # the same source file. Issue #86. Scope: slice fully contained within one source
+    # chunk along that axis. The eligible-axis is axis 0 for the plain BytesCodec case
+    # (C-order) or axis ``order[0]`` when a TransposeCodec is prepended.
+
+    BYTES_CODEC = {"name": "bytes", "configuration": {"endian": "little"}}
+    ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
+    # Reversed transpose makes the LAST logical axis the largest-stride axis in storage,
+    # so this is the F-order equivalent of [BytesCodec].
+    F_ORDER_2D_CODECS = [
+        {"name": "transpose", "configuration": {"order": [1, 0]}},
+        BYTES_CODEC,
+    ]
+
+    def _uncompressed_marr(
+        self,
+        array_v3_metadata,
+        shape,
+        chunks,
+        codecs=None,
+    ):
+        # one 8-byte float per element, single source file, sequential chunk offsets
+        itemsize = 8
+        bytes_per_chunk = int(np.prod(chunks)) * itemsize
+        metadata = array_v3_metadata(
+            shape=shape,
+            chunks=chunks,
+            data_type=np.dtype("float64"),
+            codecs=codecs or [self.BYTES_CODEC],
+        )
+        chunk_grid_shape = tuple(-(-s // c) for s, c in zip(shape, chunks))
+        entries: dict[str, dict] = {}
+        for idx in np.ndindex(*chunk_grid_shape):
+            key = ".".join(str(i) for i in idx)
+            entries[key] = {
+                "path": "/foo.nc",
+                "offset": 1000
+                + int(np.ravel_multi_index(idx, chunk_grid_shape)) * bytes_per_chunk,
+                "length": bytes_per_chunk,
+            }
+        return ManifestArray(metadata=metadata, chunkmanifest=ChunkManifest(entries))
+
+    @pytest.mark.parametrize(
+        "shape, chunks, indexer, expected_shape, expected_chunks, expected_entries",
+        [
+            # chunk size = 32 bytes, axis-0 stride = 8 bytes
+            (
+                (8,),
+                (4,),
+                np.s_[1:3],
+                (2,),
+                (2,),
+                {"0": {"offset": 1000 + 8, "length": 16}},
+            ),
+            (
+                (8,),
+                (4,),
+                np.s_[5:7],
+                (2,),
+                (2,),
+                {"0": {"offset": 1000 + 32 + 8, "length": 16}},
+            ),
+            # chunk size = 128 bytes, axis-0 stride = 32 bytes
+            (
+                (8, 4),
+                (4, 4),
+                np.s_[1:3, :],
+                (2, 4),
+                (2, 4),
+                {"0.0": {"offset": 1000 + 32, "length": 64}},
+            ),
+            # chunk size = 96 bytes, axis-0 stride = 24 bytes
+            (
+                (8, 6),
+                (4, 3),
+                np.s_[1:3, :],
+                (2, 6),
+                (2, 3),
+                {
+                    "0.0": {"offset": 1000 + 24, "length": 48},
+                    "0.1": {"offset": 1000 + 96 + 24, "length": 48},
+                },
+            ),
+        ],
+    )
+    def test_axis_0_slice_within_single_chunk(
+        self,
+        array_v3_metadata,
+        shape,
+        chunks,
+        indexer,
+        expected_shape,
+        expected_chunks,
+        expected_entries,
+    ):
+        marr = self._uncompressed_marr(array_v3_metadata, shape=shape, chunks=chunks)
+
+        sliced = marr[indexer]
+
+        assert sliced.shape == expected_shape
+        assert sliced.chunks == expected_chunks
+        expected = {
+            k: {"path": "file:///foo.nc", **v} for k, v in expected_entries.items()
+        }
+        assert sliced.manifest.dict() == expected
+
+    @pytest.mark.parametrize(
+        "indexer, reason",
+        [
+            # Slice spans >1 source chunk along axis 0.
+            (np.s_[1:5, :], "slice crossing chunk boundary"),
+            # Integer indexing into a multi-row chunk: still chunk-aligned-only
+            # (not part of the chosen scope for #86).
+            (np.s_[1, :], "integer indexing into a multi-row chunk"),
+            # Sub-chunk along axis 1 — bytes are interleaved, can't byte-adjust.
+            (np.s_[:, 1:3], "sub-chunk slice on non-axis-0"),
+        ],
+    )
+    def test_uncompressed_out_of_scope_cases_raise(
+        self, array_v3_metadata, indexer, reason
+    ):
+        marr = self._uncompressed_marr(array_v3_metadata, shape=(8, 6), chunks=(4, 3))
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[indexer]
+
+    def test_sub_chunk_slice_on_compressed_array_raises(self, array_v3_metadata):
+        # Compressed array — even axis-0 sub-chunk slicing requires decoding bytes.
+        marr = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=(8, 4),
+            chunks=(4, 4),
+            codecs=[self.BYTES_CODEC, self.ZLIB_CODEC],
+        )
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[1:3, :]
+
+    # F-order tests — TransposeCodec(order=(1, 0)) before BytesCodec means the
+    # largest-stride axis in storage is logical axis 1 (the LAST axis), so sub-chunk
+    # slicing applies there instead of axis 0.
+
+    @pytest.mark.parametrize(
+        "shape, chunks, indexer, expected_shape, expected_chunks, expected_entries",
+        [
+            # chunk size = 128 bytes, axis-1 stride = 32 bytes
+            (
+                (8, 4),
+                (4, 4),
+                np.s_[:, 1:3],
+                (8, 2),
+                (4, 2),
+                {
+                    "0.0": {"offset": 1000 + 32, "length": 64},
+                    "1.0": {"offset": 1128 + 32, "length": 64},
+                },
+            ),
+            # chunk size = 96 bytes, axis-1 stride = 24 bytes
+            (
+                (6, 8),
+                (3, 4),
+                np.s_[:, 5:7],
+                (6, 2),
+                (3, 2),
+                {
+                    "0.0": {"offset": 1000 + 96 + 24, "length": 48},
+                    "1.0": {"offset": 1000 + 96 + 96 + 96 + 24, "length": 48},
+                },
+            ),
+        ],
+    )
+    def test_f_order_sub_chunk_on_last_axis(
+        self,
+        array_v3_metadata,
+        shape,
+        chunks,
+        indexer,
+        expected_shape,
+        expected_chunks,
+        expected_entries,
+    ):
+        marr = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=shape,
+            chunks=chunks,
+            codecs=self.F_ORDER_2D_CODECS,
+        )
+
+        sliced = marr[indexer]
+
+        assert sliced.shape == expected_shape
+        assert sliced.chunks == expected_chunks
+        expected = {
+            k: {"path": "file:///foo.nc", **v} for k, v in expected_entries.items()
+        }
+        assert sliced.manifest.dict() == expected
+
+    def test_f_order_sub_chunk_on_axis_0_raises(self, array_v3_metadata):
+        # In F-order, axis 0 is the fastest-changing-in-memory axis, so slicing it
+        # gives interleaved (non-contiguous) bytes. Out of scope.
+        marr = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=(8, 4),
+            chunks=(4, 4),
+            codecs=self.F_ORDER_2D_CODECS,
+        )
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[1:3, :]
 
 
 def test_to_xarray(array_v3_metadata):

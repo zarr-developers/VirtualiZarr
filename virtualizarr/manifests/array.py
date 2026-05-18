@@ -155,8 +155,6 @@ class ManifestArray:
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
 
-    # Everything beyond here is basically just to make this array class wrappable by xarray #
-
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
         if ufunc == np.isnan:
@@ -227,16 +225,43 @@ class ManifestArray:
         /,
     ) -> "ManifestArray":
         """
-        Perform numpy-style indexing on this ManifestArray.
+        Index into this ManifestArray, returning a new ManifestArray view over a subset of chunks.
 
-        Only supports limited indexing, because in general you cannot slice inside of a compressed chunk.
-        Mainly required because Xarray uses this instead of expand dims (by passing Nones) and often will index with a no-op.
+        Supports only chunk-aligned selections. A ManifestArray only stores references to where
+        each chunk's bytes live, never their decoded values, so any indexer that would split into
+        the interior of a chunk would require loading the underlying data — which defeats the
+        point of a virtual array. Selections that would do so raise ``SubChunkIndexingError``
+        (a ``ValueError`` subclass); this is a permanent constraint, not a missing feature.
 
-        Could potentially support indexing with slices aligned along chunk boundaries, but currently does not.
+        Supported indexers (and tuples thereof):
+
+        - ``Ellipsis`` and ``None`` — no-ops and new-axis insertion.
+        - ``slice`` with ``step == 1`` whose start and stop land on chunk boundaries
+          (``stop == axis_length`` is also allowed, so a partial final chunk can be selected).
+          Slice indexers preserve the axis.
+        - ``int`` — drops the indexed axis, following numpy / array-API semantics. Only legal
+          when ``chunk_size == 1`` along that axis; otherwise picking a single element would
+          require splitting a chunk.
+        - Slice along the largest-stride storage axis of an **uncompressed** array that fits
+          entirely within one source chunk — handled by rewriting the chunk reference's byte
+          offset/length rather than splitting bytes. Useful for picking a single timestep from
+          a multi-row chunk on a parser like the netCDF3 one. The eligible-axis is axis 0 for
+          a plain ``[BytesCodec]`` array (C-order) or axis ``order[0]`` of a prepended
+          ``[TransposeCodec(order=...), BytesCodec]`` (e.g. the last axis for F-order).
+
+        Anything else — fancy indexing with arrays, misaligned slices, ``step != 1`` —
+        raises ``SubChunkIndexingError`` or ``NotImplementedError``.
 
         Parameters
         ----------
         key
+            A basic indexer or tuple of basic indexers, one per array axis (with ``Ellipsis``
+            and ``None`` allowed as per the array API).
+
+        Returns
+        -------
+        ManifestArray
+            A new array whose ``ChunkManifest`` references only the selected chunks.
         """
         return index(self, key)
 

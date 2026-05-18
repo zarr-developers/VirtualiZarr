@@ -80,6 +80,20 @@ def local_registry():
     return ObjectStoreRegistry({"file://": LocalStore()})
 
 
+@pytest.fixture
+def netcdf3_file(tmp_path: Path):
+    """Factory for writing a temporary netCDF3 file with a caller-supplied Dataset."""
+
+    def _make(ds: xr.Dataset | None = None, name: str = "file.nc") -> Path:
+        if ds is None:
+            ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
+        filepath = tmp_path / name
+        ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+        return filepath
+
+    return _make
+
+
 @pytest.fixture(params=["int8", "uint8", "float32"])
 def zarr_array_fill_value(request):
     store = zarr.storage.MemoryStore()
