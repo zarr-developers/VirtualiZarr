@@ -240,3 +240,20 @@ def test_netcdf_over_https():
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
         np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
+
+
+def test_fillvalue_runtime_error():
+    from virtualizarr.parsers.hdf.hdf import _get_fill_value
+
+    dtype = np.dtype("float32")
+
+    class _RuntimeErrorDataset:
+        @property
+        def fillvalue(self):
+            raise RuntimeError("Unable to get fill value")
+
+    dataset = _RuntimeErrorDataset()
+    dataset.dtype = dtype  # type: ignore[attr-defined]
+
+    result = _get_fill_value(dataset)
+    assert result == np.ma.default_fill_value(dtype)

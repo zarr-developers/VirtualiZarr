@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased
+
+### Bug Fixes
+
+HDFParser now includes a `_get_fill_value` function which wraps `dataset.fillvalue` in a try/except AttributeError.
+
 ## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
