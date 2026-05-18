@@ -190,25 +190,19 @@ def apply_selection(
         if axis == sub_chunk_axis and _is_sub_chunk_slice(
             indexer_1d, axis_length, chunk_size
         ):
-            # Sub-chunk slicing on an uncompressed array along its largest-stride axis:
-            # slice fits within one source chunk, expressed as a byte-offset adjustment.
             assert isinstance(indexer_1d, slice)  # narrowed by the helper above
-            start, stop, _ = indexer_1d.indices(axis_length)
-            chunk_index = start // chunk_size
-            chunk_grid_selector = slice(chunk_index, chunk_index + 1, 1)
-            new_axis_length = stop - start
+            chunk_grid_selector, new_axis_length, sub_chunk_byte_adjust = (
+                _compute_sub_chunk_axis_selection(
+                    indexer_1d,
+                    axis_length=axis_length,
+                    chunk_size=chunk_size,
+                    other_axis_chunks=tuple(
+                        c for i, c in enumerate(marr.chunks) if i != axis
+                    ),
+                    itemsize=marr.dtype.itemsize,
+                )
+            )
             new_chunks_for_axis = new_axis_length
-            # bytes per index step along this axis within one chunk =
-            # product of all chunk sizes for the other axes (regardless of their order in
-            # storage — multiplication is commutative) times itemsize.
-            stride_bytes = (
-                int(np.prod([c for i, c in enumerate(marr.chunks) if i != axis]))
-                * marr.dtype.itemsize
-            )
-            sub_chunk_byte_adjust = (
-                (start - chunk_index * chunk_size) * stride_bytes,
-                new_axis_length * stride_bytes,
-            )
         else:
             chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
                 indexer_1d, axis_length=axis_length, chunk_size=chunk_size
@@ -217,7 +211,7 @@ def apply_selection(
 
         chunk_grid_selectors.append(chunk_grid_selector)
         # int indexers drop the axis from the output array; slices preserve it (including the
-        # sub-chunk path above, which uses a length-1 chunk-grid slice selector).
+        # sub-chunk path, which uses a length-1 chunk-grid slice selector).
         if not isinstance(indexer_1d, int):
             new_shape.append(new_axis_length)
             new_chunks.append(new_chunks_for_axis)
@@ -301,6 +295,38 @@ def _compute_chunk_aligned_selection_1d(
     # slice indexer: ceil-divide stop so a partial final chunk is included when stop == axis_length
     chunk_stop = -(-stop // chunk_size)
     return slice(chunk_start, chunk_stop, 1), stop - start
+
+
+def _compute_sub_chunk_axis_selection(
+    indexer_1d: slice,
+    axis_length: int,
+    chunk_size: int,
+    other_axis_chunks: tuple[int, ...],
+    itemsize: int,
+) -> tuple[slice, int, tuple[int, int]]:
+    """
+    Translate a sub-chunk slice along the eligible (largest-stride) storage axis into a
+    chunk-grid selector, an output axis length, and a uniform byte adjustment
+    ``(offset_delta, new_chunk_byte_length)`` applied to every surviving chunk reference.
+
+    Callers must have already confirmed that this slice is sub-chunk-eligible via
+    ``_is_sub_chunk_slice`` and that the array is uncompressed via
+    ``_uncompressed_sub_chunk_axis``.
+    """
+    start, stop, _ = indexer_1d.indices(axis_length)
+    chunk_index = start // chunk_size
+    new_axis_length = stop - start
+    # Bytes per index step along this axis within one chunk is the product of every
+    # *other* axis's chunk size, times itemsize. Order doesn't matter since the product
+    # is commutative.
+    stride_bytes = int(np.prod(other_axis_chunks)) * itemsize
+    inner_offset_bytes = (start - chunk_index * chunk_size) * stride_bytes
+    sub_chunk_byte_adjust = (inner_offset_bytes, new_axis_length * stride_bytes)
+    return (
+        slice(chunk_index, chunk_index + 1, 1),
+        new_axis_length,
+        sub_chunk_byte_adjust,
+    )
 
 
 def _subset_manifest(
