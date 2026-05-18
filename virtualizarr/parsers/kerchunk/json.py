@@ -8,26 +8,24 @@ from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk
 
 
 class KerchunkJSONParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a Kerchunk JSON references file.
+
+    Parameters
+    ----------
+    group
+        The group within the Kerchunk JSON to be used as the Zarr root group for the ManifestStore.
+    fs_root
+        The qualifier to be used for Kerchunk chunk references containing relative paths.
+    skip_variables
+        Variables in the Kerchunk JSON that will be ignored when creating the ManifestStore.
+    """
+
     def __init__(
         self,
         group: str | None = None,
         fs_root: str | None = None,
         skip_variables: Iterable[str] | None = None,
     ):
-        """
-        Instantiate a parser with parser-specific parameters that can be used in the
-        `__call__` method.
-
-        Parameters
-        ----------
-        group
-            The group within the Kerchunk JSON to be used as the Zarr root group for the ManifestStore.
-        fs_root
-            The qualifier to be used for Kerchunk chunk references containing relative paths.
-        skip_variables
-            Variables in the Kerchunk JSON that will be ignored when creating the ManifestStore.
-        """
-
         self.group = group
         self.fs_root = fs_root
         self.skip_variables = skip_variables
