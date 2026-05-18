@@ -1,5 +1,5 @@
 from types import EllipsisType
-from typing import TYPE_CHECKING, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
 
@@ -162,6 +162,7 @@ def apply_selection(
     assert len(indexer_without_newaxes) == marr.ndim
 
     # validate types and reject anything we can never support per-axis
+    narrowed_indexers: list[int | slice] = []
     for indexer_1d in indexer_without_newaxes:
         if isinstance(indexer_1d, np.ndarray):
             raise NotImplementedError(
@@ -169,13 +170,14 @@ def apply_selection(
             )
         if not isinstance(indexer_1d, (int, slice)):
             raise TypeError(f"Invalid indexer type: {indexer_1d}")
+        narrowed_indexers.append(indexer_1d)
 
     new_shape: list[int] = []
     new_chunks: list[int] = []
     chunk_grid_selectors: list[int | slice] = []
     kept_axes: list[int] = []
     for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
-        zip(marr.shape, marr.chunks, indexer_without_newaxes, strict=True)
+        zip(marr.shape, marr.chunks, narrowed_indexers, strict=True)
     ):
         chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
             indexer_1d, axis_length=axis_length, chunk_size=chunk_size
@@ -198,7 +200,9 @@ def apply_selection(
 
     new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
     old_dimension_names = marr.metadata.dimension_names
-    new_dimension_names: tuple[str | None, ...] | None | str
+    # zarr's dimension_names is tuple[str | None, ...] but copy_and_replace_metadata's
+    # type hint says Iterable[str]; the runtime handles None entries fine, so cast through.
+    new_dimension_names: Any
     if old_dimension_names is None:
         new_dimension_names = "default"  # sentinel: leave as None
     else:
@@ -271,14 +275,22 @@ def _subset_manifest(
     """
     # When every axis is int-indexed, numpy returns a 0D scalar (Python str for StringDType,
     # numpy scalar for the numeric arrays). Wrap back into a 0D ndarray so from_arrays accepts it.
-    new_paths = np.asarray(
-        manifest._paths[chunk_grid_selectors], dtype=manifest._paths.dtype
+    # np.asarray's return type erases the dtype param, so cast back to keep from_arrays happy.
+    new_paths = cast(
+        "np.ndarray[Any, np.dtypes.StringDType]",
+        np.asarray(manifest._paths[chunk_grid_selectors], dtype=manifest._paths.dtype),
     )
-    new_offsets = np.asarray(
-        manifest._offsets[chunk_grid_selectors], dtype=manifest._offsets.dtype
+    new_offsets = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.asarray(
+            manifest._offsets[chunk_grid_selectors], dtype=manifest._offsets.dtype
+        ),
     )
-    new_lengths = np.asarray(
-        manifest._lengths[chunk_grid_selectors], dtype=manifest._lengths.dtype
+    new_lengths = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.asarray(
+            manifest._lengths[chunk_grid_selectors], dtype=manifest._lengths.dtype
+        ),
     )
 
     if manifest._inlined:
