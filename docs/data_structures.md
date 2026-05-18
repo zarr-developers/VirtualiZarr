@@ -244,8 +244,9 @@ NotImplementedError: ManifestArrays can't be converted into numpy arrays or pand
 The whole point is to manipulate references to the data without actually loading any data.
 
 !!! note
-    You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array.
-    We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
+    You can index into a `ManifestArray` as long as the selection aligns with chunk boundaries — slicing through the interior of a chunk would require loading the chunk's bytes, which a virtual array deliberately cannot do.
+    Chunk-aligned integer and slice indexing is supported, including mixed integer + slice indexers; integer indexers drop the indexed axis as in numpy. Misaligned selections raise `SubChunkIndexingError`.
+    Arbitrary fancy indexing (e.g. with a boolean mask or integer array) is not supported, since it would generally require loading data.
 
 ## Zarr Groups
 
