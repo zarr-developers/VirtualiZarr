@@ -1,5 +1,18 @@
 # Release notes
 
+## Unreleased
+
+### New Features
+
+- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including integer indexing on length-1 chunked axes, multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (an `IndexError` subclass) — this is a permanent constraint of a virtual array, not a missing feature. Previously slice misalignment silently no-op'd while integer indexing unconditionally raised `NotImplementedError`. Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
 ## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.

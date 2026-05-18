@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, TypeAlias, cast
 import numpy as np
 
 from virtualizarr.manifests.array_api import expand_dims
+from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.manifests.utils import copy_and_replace_metadata
 
 # indexer with only basic selectors, no new axes or ellipsis
 T_BasicIndexer_1d: TypeAlias = int | slice | np.ndarray
@@ -12,6 +14,18 @@ T_SimpleIndexer_1d: TypeAlias = T_BasicIndexer_1d | None
 # general valid indexer representing any possible user input
 T_Indexer_1d: TypeAlias = T_SimpleIndexer_1d | EllipsisType
 T_Indexer: TypeAlias = T_Indexer_1d | tuple[T_Indexer_1d, ...]
+
+
+class SubChunkIndexingError(IndexError):
+    """
+    Raised when an indexer would split individual chunks of a ManifestArray.
+
+    This is not a NotImplementedError: a ManifestArray only knows where each
+    chunk's bytes live, never their values, so any selection that crosses into
+    the interior of a compressed chunk would require loading the data — which
+    defeats the point of a virtual array. This is a permanent constraint, not
+    a missing feature.
+    """
 
 
 if TYPE_CHECKING:
@@ -138,56 +152,124 @@ def apply_indexer(
 def apply_selection(
     marr: "ManifestArray", indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...]
 ) -> "ManifestArray":
-    """Applies indexes to subset along each dimension."""
+    """
+    Apply chunk-aligned subsetting along each dimension.
+
+    Slices and integer indexers are only supported if they align with chunk boundaries, since
+    splitting individual chunks would require loading their bytes. See GitHub issue #51.
+    """
+    from virtualizarr.manifests.array import ManifestArray
 
     # at this point there should be no ellipsis, no Nones, and one 1D indexer for each axis.
     assert len(indexer_without_newaxes) == marr.ndim
 
-    output_arr = marr
-    for axis, (length, indexer_1d) in enumerate(
-        zip(marr.shape, indexer_without_newaxes)
-    ):
-        output_arr = apply_selection_1d(output_arr, indexer_1d, length)
-
-    return output_arr
-
-
-def apply_selection_1d(
-    marr: "ManifestArray", indexer_1d: T_BasicIndexer_1d, length: int
-) -> "ManifestArray":
-    """
-    Actually index the ManifestArray along 1 dimension.
-
-    Notice that none of these options actually do any indexing right now!
-    """
-
-    if isinstance(indexer_1d, slice):
-        if slice_is_no_op(indexer_1d, axis_length=length):
-            pass
-        else:
-            NotImplementedError(
-                f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
+    # validate types and reject anything we can never support per-axis
+    for indexer_1d in indexer_without_newaxes:
+        if isinstance(indexer_1d, np.ndarray):
+            raise NotImplementedError(
+                f"Unsupported indexer. So-called 'fancy indexing' via numpy arrays is not supported, but received {indexer_1d}"
             )
-    elif isinstance(indexer_1d, int):
-        # TODO cover possibility of indexing into a length-1 dimension (which just removes that dimension)?
-        raise NotImplementedError(
-            f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
+        if not isinstance(indexer_1d, (int, slice)):
+            raise TypeError(f"Invalid indexer type: {indexer_1d}")
+
+    new_shape: list[int] = []
+    chunk_grid_slices: list[slice] = []
+    for axis_length, chunk_size, indexer_1d in zip(
+        marr.shape, marr.chunks, indexer_without_newaxes, strict=True
+    ):
+        chunk_grid_slice, new_axis_length = _compute_chunk_aligned_selection_1d(
+            indexer_1d, axis_length=axis_length, chunk_size=chunk_size
         )
-    elif isinstance(indexer_1d, np.ndarray):
-        raise NotImplementedError(
-            f"Unsupported indexer. So-called 'fancy indexing' via numpy arrays is not supported, but received {indexer_1d}"
+        chunk_grid_slices.append(chunk_grid_slice)
+        new_shape.append(new_axis_length)
+
+    chunk_grid_slices_tuple = tuple(chunk_grid_slices)
+
+    # short-circuit if every axis selects the whole chunk grid (a no-op)
+    if all(
+        cgs == slice(0, dim, 1)
+        for cgs, dim in zip(chunk_grid_slices_tuple, marr.manifest.shape_chunk_grid)
+    ):
+        return marr
+
+    new_manifest = _subset_manifest(marr.manifest, chunk_grid_slices_tuple)
+    new_metadata = copy_and_replace_metadata(marr.metadata, new_shape=new_shape)
+    return ManifestArray(metadata=new_metadata, chunkmanifest=new_manifest)
+
+
+def _compute_chunk_aligned_selection_1d(
+    indexer_1d: int | slice, axis_length: int, chunk_size: int
+) -> tuple[slice, int]:
+    """
+    Translate a 1D array-space indexer (int or slice) into a chunk-grid slice plus the new axis length.
+
+    Raises SubChunkIndexingError if the selection would require splitting individual chunks.
+    """
+    if isinstance(indexer_1d, int):
+        # Integer indexing is treated as a length-1 slice; we don't drop dimensions because that
+        # would require loading the underlying data for the array-API conformance reasons that
+        # ManifestArray operates on chunk references rather than values.
+        i = indexer_1d
+        if i < 0:
+            i += axis_length
+        if not (0 <= i < axis_length):
+            raise IndexError(
+                f"index {indexer_1d} is out of bounds for axis with size {axis_length}"
+            )
+        start, stop, step = i, i + 1, 1
+    else:
+        start, stop, step = indexer_1d.indices(axis_length)
+
+    if step != 1:
+        raise SubChunkIndexingError(
+            f"step != 1 is not supported for chunk-aligned indexing, got step={step}"
         )
+
+    if start % chunk_size != 0:
+        raise SubChunkIndexingError(
+            f"Cannot index ManifestArray axis of length {axis_length} and chunk length "
+            f"{chunk_size} with {indexer_1d!r}: slice would split individual chunks, "
+            "which a ManifestArray cannot do without loading the underlying data."
+        )
+
+    # The final chunk may legitimately be partial, so allow stop == axis_length even if
+    # axis_length % chunk_size != 0; otherwise stop must land on a chunk boundary.
+    if stop != axis_length and stop % chunk_size != 0:
+        raise SubChunkIndexingError(
+            f"Cannot index ManifestArray axis of length {axis_length} and chunk length "
+            f"{chunk_size} with {indexer_1d!r}: slice would split individual chunks, "
+            "which a ManifestArray cannot do without loading the underlying data."
+        )
+
+    chunk_start = start // chunk_size
+    # ceil-divide so that a partial final chunk is included when stop == axis_length
+    chunk_stop = -(-stop // chunk_size)
+    return slice(chunk_start, chunk_stop, 1), stop - start
+
+
+def _subset_manifest(
+    manifest: ChunkManifest, chunk_grid_slices: tuple[slice, ...]
+) -> ChunkManifest:
+    """Subset a ChunkManifest by slicing its underlying chunk-grid arrays."""
+    new_paths = manifest._paths[chunk_grid_slices]
+    new_offsets = manifest._offsets[chunk_grid_slices]
+    new_lengths = manifest._lengths[chunk_grid_slices]
+
+    if manifest._inlined:
+        starts = tuple(s.start for s in chunk_grid_slices)
+        stops = tuple(s.stop for s in chunk_grid_slices)
+        new_inlined = {
+            tuple(idx - start for idx, start in zip(coords, starts)): data
+            for coords, data in manifest._inlined.items()
+            if all(start <= idx < stop for idx, start, stop in zip(coords, starts, stops))
+        }
     else:
-        # should never get here
-        raise TypeError(f"Invalid indexer type: {indexer_1d}")
+        new_inlined = {}
 
-    return marr
-
-
-def slice_is_no_op(slice_indexer_1d: slice, axis_length: int) -> bool:
-    if slice_indexer_1d == slice(None):
-        return True
-    elif slice_indexer_1d == slice(0, axis_length, 1):
-        return True
-    else:
-        return False
+    return ChunkManifest.from_arrays(
+        paths=new_paths,
+        offsets=new_offsets,
+        lengths=new_lengths,
+        inlined=new_inlined,
+        validate_paths=False,
+    )
