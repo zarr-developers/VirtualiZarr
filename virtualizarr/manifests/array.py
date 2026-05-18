@@ -242,6 +242,10 @@ class ManifestArray:
         - ``int`` — drops the indexed axis, following numpy / array-API semantics. Only legal
           when ``chunk_size == 1`` along that axis; otherwise picking a single element would
           require splitting a chunk.
+        - Slice along axis 0 of an **uncompressed** array (only the v3 ``BytesCodec``, no other
+          codecs) that fits entirely within one source chunk — handled by rewriting the chunk
+          reference's byte offset/length rather than splitting bytes. Useful for picking a
+          single timestep from a multi-row chunk on a parser like the netCDF3 one.
 
         Anything else — fancy indexing with arrays, misaligned slices, ``step != 1`` —
         raises ``SubChunkIndexingError`` or ``NotImplementedError``.

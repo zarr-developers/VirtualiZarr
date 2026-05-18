@@ -2,6 +2,8 @@ from types import EllipsisType
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
+from zarr.codecs import BytesCodec
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
 from virtualizarr.manifests.manifest import ChunkManifest
@@ -172,21 +174,51 @@ def apply_selection(
             raise TypeError(f"Invalid indexer type: {indexer_1d}")
         narrowed_indexers.append(indexer_1d)
 
+    uncompressed = _is_uncompressed_bytes_only(marr.metadata)
+
     new_shape: list[int] = []
     new_chunks: list[int] = []
     chunk_grid_selectors: list[int | slice] = []
     kept_axes: list[int] = []
+    # At most one sub-chunk axis (axis 0). The byte adjustment is uniform across every
+    # surviving chunk, since chunks share layout.
+    sub_chunk_byte_adjust: tuple[int, int] | None = None
     for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
         zip(marr.shape, marr.chunks, narrowed_indexers, strict=True)
     ):
-        chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
-            indexer_1d, axis_length=axis_length, chunk_size=chunk_size
-        )
+        chunk_grid_selector: int | slice
+        if (
+            axis == 0
+            and uncompressed
+            and _is_axis_0_sub_chunk_slice(indexer_1d, axis_length, chunk_size)
+        ):
+            # Sub-chunk axis-0 slicing on an uncompressed array: contained in a single
+            # source chunk, expressed as an integer byte-offset adjustment.
+            assert isinstance(indexer_1d, slice)  # narrowed by the helper above
+            start, stop, _ = indexer_1d.indices(axis_length)
+            chunk_index = start // chunk_size
+            chunk_grid_selector = slice(chunk_index, chunk_index + 1, 1)
+            new_axis_length = stop - start
+            new_chunks_for_axis = new_axis_length
+            stride_bytes = (
+                int(np.prod(marr.chunks[1:])) * marr.dtype.itemsize
+            )  # bytes per row along axis 0 within one chunk
+            sub_chunk_byte_adjust = (
+                (start - chunk_index * chunk_size) * stride_bytes,
+                new_axis_length * stride_bytes,
+            )
+        else:
+            chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
+                indexer_1d, axis_length=axis_length, chunk_size=chunk_size
+            )
+            new_chunks_for_axis = chunk_size
+
         chunk_grid_selectors.append(chunk_grid_selector)
-        # int selectors drop the axis from the output array
+        # int indexers drop the axis from the output array; slices preserve it (including the
+        # sub-chunk path above, which uses a length-1 chunk-grid slice selector).
         if not isinstance(indexer_1d, int):
             new_shape.append(new_axis_length)
-            new_chunks.append(chunk_size)
+            new_chunks.append(new_chunks_for_axis)
             kept_axes.append(axis)
 
     chunk_grid_selectors_tuple = tuple(chunk_grid_selectors)
@@ -199,6 +231,8 @@ def apply_selection(
         return marr
 
     new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
+    if sub_chunk_byte_adjust is not None:
+        new_manifest = _shift_manifest_byte_ranges(new_manifest, *sub_chunk_byte_adjust)
     old_dimension_names = marr.metadata.dimension_names
     # zarr's dimension_names is tuple[str | None, ...] but copy_and_replace_metadata's
     # type hint says Iterable[str]; the runtime handles None entries fine, so cast through.
@@ -321,5 +355,71 @@ def _subset_manifest(
         offsets=new_offsets,
         lengths=new_lengths,
         inlined=new_inlined,
+        validate_paths=False,
+    )
+
+
+def _is_uncompressed_bytes_only(metadata: ArrayV3Metadata) -> bool:
+    """
+    True iff ``metadata.codecs`` is exactly one ``BytesCodec`` and nothing else.
+
+    BytesCodec only encodes endianness; with no other codecs, the chunk bytes on disk are
+    the raw little/big-endian element values in C-order. That lets us treat sub-chunk slices
+    along axis 0 as a byte-offset adjustment into the same chunk file. Any array-array codec
+    (value transform) or bytes-bytes codec (compressor / checksum) requires decoding the
+    whole chunk and is therefore not eligible.
+    """
+    codecs = metadata.codecs
+    return len(codecs) == 1 and isinstance(codecs[0], BytesCodec)
+
+
+def _is_axis_0_sub_chunk_slice(
+    indexer_1d: int | slice, axis_length: int, chunk_size: int
+) -> bool:
+    """
+    True iff this is a slice that should take the axis-0 sub-chunk path: step == 1,
+    non-empty, fits entirely within one source chunk along axis 0, and is NOT already
+    chunk-aligned (chunk-aligned slices go through the simpler aligned path).
+    """
+    if not isinstance(indexer_1d, slice):
+        return False
+    start, stop, step = indexer_1d.indices(axis_length)
+    if step != 1 or start >= stop:
+        return False
+    # chunk-aligned slices are handled by _compute_chunk_aligned_selection_1d
+    aligned = start % chunk_size == 0 and (
+        stop == axis_length or stop % chunk_size == 0
+    )
+    if aligned:
+        return False
+    # contained in a single source chunk?
+    return start // chunk_size == (stop - 1) // chunk_size
+
+
+def _shift_manifest_byte_ranges(
+    manifest: ChunkManifest, offset_delta: int, new_length: int
+) -> ChunkManifest:
+    """
+    Return a new ``ChunkManifest`` whose virtual chunk references point to a uniform
+    sub-range of each original chunk: ``offset += offset_delta`` and ``length = new_length``.
+
+    Used by the uncompressed-axis-0 sub-chunk path, where every surviving chunk shares the
+    same byte layout and therefore the same byte adjustment.
+    """
+    new_offsets = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        manifest._offsets + np.uint64(offset_delta),
+    )
+    new_lengths = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.full_like(manifest._lengths, np.uint64(new_length)),
+    )
+    # paths and any inlined-chunk dict carry through unchanged: inlined chunks aren't
+    # involved here (this path is only taken for uncompressed virtual references).
+    return ChunkManifest.from_arrays(
+        paths=manifest._paths,
+        offsets=new_offsets,
+        lengths=new_lengths,
+        inlined=dict(manifest._inlined),
         validate_paths=False,
     )
