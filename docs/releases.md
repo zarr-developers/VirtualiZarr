@@ -9,7 +9,9 @@
 
 ### Bug fixes
 
-- HDFParser now includes a `_get_fill_value` function which wraps `dataset.fillvalue` in a try/except AttributeError.
+- HDFParser now correctly parses datasets with either no fill value or a string dtype fill value.
+  ([#988](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
+  By [Sean Harkins](https://github.com/sharkinsspatial) and [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
 
 ### Documentation
 
