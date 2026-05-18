@@ -16,15 +16,9 @@ T_Indexer_1d: TypeAlias = T_SimpleIndexer_1d | EllipsisType
 T_Indexer: TypeAlias = T_Indexer_1d | tuple[T_Indexer_1d, ...]
 
 
-class SubChunkIndexingError(IndexError):
+class SubChunkIndexingError(ValueError):
     """
-    Raised when an indexer would split individual chunks of a ManifestArray.
-
-    This is not a NotImplementedError: a ManifestArray only knows where each
-    chunk's bytes live, never their values, so any selection that crosses into
-    the interior of a compressed chunk would require loading the data — which
-    defeats the point of a virtual array. This is a permanent constraint, not
-    a missing feature.
+    Raised when an indexer would split individual chunks of a compressed ManifestArray.
     """
 
 
