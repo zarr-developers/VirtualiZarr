@@ -895,9 +895,7 @@ class TestIndexing:
             ((4, 4), (2, 2), (slice(0, 4), slice(0, 1))),
         ],
     )
-    def test_misaligned_with_chunks(
-        self, manifest_array, in_shape, in_chunks, indexer
-    ):
+    def test_misaligned_with_chunks(self, manifest_array, in_shape, in_chunks, indexer):
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
         with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[indexer]

@@ -251,7 +251,9 @@ def _subset_manifest(
         new_inlined = {
             tuple(idx - start for idx, start in zip(coords, starts)): data
             for coords, data in manifest._inlined.items()
-            if all(start <= idx < stop for idx, start, stop in zip(coords, starts, stops))
+            if all(
+                start <= idx < stop for idx, start, stop in zip(coords, starts, stops)
+            )
         }
     else:
         new_inlined = {}

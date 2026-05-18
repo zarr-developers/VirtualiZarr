@@ -225,13 +225,35 @@ class ManifestArray:
         /,
     ) -> "ManifestArray":
         """
-        Perform numpy-style indexing on this ManifestArray.
+        Index into this ManifestArray, returning a new ManifestArray view over a subset of chunks.
 
-        Only supports limited types of indexing, because in general you cannot slice inside of a compressed chunk.
-        
+        Supports only chunk-aligned selections. A ManifestArray only stores references to where
+        each chunk's bytes live, never their decoded values, so any indexer that would split into
+        the interior of a chunk would require loading the underlying data — which defeats the
+        point of a virtual array. Selections that would do so raise ``SubChunkIndexingError``
+        (a ``ValueError`` subclass); this is a permanent constraint, not a missing feature.
+
+        Supported indexers (and tuples thereof):
+
+        - ``Ellipsis`` and ``None`` — no-ops and new-axis insertion.
+        - ``slice`` with ``step == 1`` whose start and stop land on chunk boundaries
+          (``stop == axis_length`` is also allowed, so a partial final chunk can be selected).
+        - ``int`` — treated as a length-1 slice; does not drop the axis, since dropping a
+          dimension is only meaningful when values are available.
+
+        Anything else — fancy indexing with arrays, misaligned slices, ``step != 1`` —
+        raises ``SubChunkIndexingError`` or ``NotImplementedError``.
+
         Parameters
         ----------
         key
+            A basic indexer or tuple of basic indexers, one per array axis (with ``Ellipsis``
+            and ``None`` allowed as per the array API).
+
+        Returns
+        -------
+        ManifestArray
+            A new array whose ``ChunkManifest`` references only the selected chunks.
         """
         return index(self, key)
 
