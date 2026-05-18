@@ -18,6 +18,7 @@ from virtualizarr import (
     open_virtual_mfdataset,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.indexing import SubChunkIndexingError
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_dask,
@@ -1006,3 +1007,81 @@ def test_to_xarray_nonscalar_no_dimension_names(array_v3_metadata):
 
     with pytest.raises(ValueError, match="without dimension names"):
         marr.to_virtual_variable()
+
+
+class TestIsel:
+    # Verifies the workflow documented in docs/scaling.md under
+    # "Splitting a single large virtual dataset across commits": slicing a virtual
+    # xarray.Dataset with .isel along a chunk-aligned axis subsets the underlying
+    # ChunkManifest without touching the data, and misaligned splits raise.
+
+    def _virtual_dataset(self, array_v3_metadata):
+        # shape=(8, 4), chunks=(2, 4): 4 chunks along "time", 1 chunk along "x"
+        metadata = array_v3_metadata(
+            shape=(8, 4), chunks=(2, 4), dimension_names=["time", "x"]
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 64},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 64},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 64},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 64},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        return xr.Dataset({"foo": (["time", "x"], marr)})
+
+    def test_isel_along_chunk_boundary(self, array_v3_metadata):
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        sliced = vds.isel(time=slice(2, 6))
+
+        assert sliced.sizes == {"time": 4, "x": 4}
+        assert isinstance(sliced["foo"].data, ManifestArray)
+        assert sliced["foo"].data.shape == (4, 4)
+        assert sliced["foo"].data.chunks == (2, 4)
+        # only the two middle chunks should remain, re-indexed from 0
+        assert sliced["foo"].data.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
+            "1.0": {"path": "file:///a.nc", "offset": 200, "length": 64},
+        }
+
+    def test_isel_single_chunk_via_length_1_slice(self, array_v3_metadata):
+        # Selecting a single chunk requires a length-1 slice rather than an int:
+        # ManifestArray intentionally preserves the axis (since dropping it would
+        # require knowing values, not just references), and xarray's int-indexing
+        # path expects the axis to be dropped — so a literal `isel(time=2)` fails.
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        sliced = vds.isel(time=slice(2, 4))
+
+        assert sliced.sizes == {"time": 2, "x": 4}
+        assert isinstance(sliced["foo"].data, ManifestArray)
+        # slice(2, 4) on chunks=(2, 4) picks chunk index 1 (the second chunk)
+        assert sliced["foo"].data.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
+        }
+
+    def test_isel_misaligned_raises(self, array_v3_metadata):
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            vds.isel(time=slice(1, 5))
+
+    def test_isel_iterative_append_simulation(self, array_v3_metadata):
+        # Simulate the scaling.md recipe: walk a chunk-aligned step across "time"
+        # and confirm each slice yields a valid ManifestArray with the expected refs.
+        vds = self._virtual_dataset(array_v3_metadata)
+        step = 4  # two chunks of size 2 per slice
+
+        seen_refs = []
+        for start in range(0, vds.sizes["time"], step):
+            slice_vds = vds.isel(time=slice(start, start + step))
+            assert isinstance(slice_vds["foo"].data, ManifestArray)
+            seen_refs.extend(
+                entry["offset"]
+                for entry in slice_vds["foo"].data.manifest.dict().values()
+            )
+
+        # every original chunk should have been visited exactly once
+        assert sorted(seen_refs) == [0, 100, 200, 300]
