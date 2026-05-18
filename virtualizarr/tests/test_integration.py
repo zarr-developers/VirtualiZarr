@@ -24,10 +24,10 @@ from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
     has_kerchunk,
+    requires_icechunk,
     requires_kerchunk,
     requires_network,
     requires_scipy,
-    requires_zarr_python,
     slow_test,
 )
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
@@ -180,7 +180,6 @@ def roundtrip_as_in_memory_icechunk(
     )
 
 
-@requires_zarr_python
 @pytest.mark.parametrize(
     "roundtrip_func",
     [
@@ -555,17 +554,16 @@ def test_roundtrip_dataset_with_multiple_compressors():
 
 
 @requires_scipy
-@requires_zarr_python
-@pytest.mark.skipif(not has_icechunk, reason="icechunk not available")
-def test_subchunk_slice_netcdf3_through_icechunk_roundtrip(tmp_path, local_registry):
+@requires_icechunk
+def test_subchunk_slice_netcdf3_through_icechunk_roundtrip(
+    netcdf3_file, local_registry
+):
     # End-to-end check of the uncompressed sub-chunk slicing path: parse a netCDF3
     # file (whose variables become single multi-row chunks), .isel within a chunk,
     # write to icechunk, read back, and confirm bytes match a direct netCDF3 read +
     # slice on the same file.
     data = np.arange(32, dtype=np.float64).reshape(8, 4)
-    ds = xr.Dataset({"foo": (["time", "x"], data)})
-    nc_path = tmp_path / "data.nc"
-    ds.to_netcdf(nc_path, format="NETCDF3_CLASSIC")
+    nc_path = netcdf3_file(xr.Dataset({"foo": (["time", "x"], data)}))
     nc_url = f"file://{nc_path}"
 
     with open_virtual_dataset(

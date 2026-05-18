@@ -367,16 +367,6 @@ def root_coordinates_hdf5_file(tmp_path: Path, np_uncompressed_int16) -> str:
 
 
 @pytest.fixture
-def netcdf3_file(tmp_path: Path) -> Path:
-    ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
-
-    filepath = tmp_path / "file.nc"
-    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
-
-    return filepath
-
-
-@pytest.fixture
 def non_coord_dim(tmpdir):
     filepath = f"{tmpdir}/non_coord_dim.nc"
     ds = create_test_data(dim_sizes=(20, 80, 10))
