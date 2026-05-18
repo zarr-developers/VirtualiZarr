@@ -155,8 +155,6 @@ class ManifestArray:
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
 
-    # Everything beyond here is basically just to make this array class wrappable by xarray #
-
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> Any:
         """We have to define this in order to convince xarray that this class is a duckarray, even though we will never support ufuncs."""
         if ufunc == np.isnan:
@@ -229,11 +227,8 @@ class ManifestArray:
         """
         Perform numpy-style indexing on this ManifestArray.
 
-        Only supports limited indexing, because in general you cannot slice inside of a compressed chunk.
-        Mainly required because Xarray uses this instead of expand dims (by passing Nones) and often will index with a no-op.
-
-        Could potentially support indexing with slices aligned along chunk boundaries, but currently does not.
-
+        Only supports limited types of indexing, because in general you cannot slice inside of a compressed chunk.
+        
         Parameters
         ----------
         key
