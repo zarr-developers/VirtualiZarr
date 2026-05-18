@@ -238,8 +238,10 @@ class ManifestArray:
         - ``Ellipsis`` and ``None`` — no-ops and new-axis insertion.
         - ``slice`` with ``step == 1`` whose start and stop land on chunk boundaries
           (``stop == axis_length`` is also allowed, so a partial final chunk can be selected).
-        - ``int`` — treated as a length-1 slice; does not drop the axis, since dropping a
-          dimension is only meaningful when values are available.
+          Slice indexers preserve the axis.
+        - ``int`` — drops the indexed axis, following numpy / array-API semantics. Only legal
+          when ``chunk_size == 1`` along that axis; otherwise picking a single element would
+          require splitting a chunk.
 
         Anything else — fancy indexing with arrays, misaligned slices, ``step != 1`` —
         raises ``SubChunkIndexingError`` or ``NotImplementedError``.

@@ -151,6 +151,10 @@ def apply_selection(
 
     Slices and integer indexers are only supported if they align with chunk boundaries, since
     splitting individual chunks would require loading their bytes. See GitHub issue #51.
+
+    Integer indexers drop the indexed axis (numpy / array-API semantics); slice indexers
+    preserve it. Integer indexing is only legal when ``chunk_size == 1`` along that axis,
+    since picking a single element of a larger chunk would require splitting it.
     """
     from virtualizarr.manifests.array import ManifestArray
 
@@ -167,42 +171,58 @@ def apply_selection(
             raise TypeError(f"Invalid indexer type: {indexer_1d}")
 
     new_shape: list[int] = []
-    chunk_grid_slices: list[slice] = []
-    for axis_length, chunk_size, indexer_1d in zip(
-        marr.shape, marr.chunks, indexer_without_newaxes, strict=True
+    new_chunks: list[int] = []
+    chunk_grid_selectors: list[int | slice] = []
+    kept_axes: list[int] = []
+    for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
+        zip(marr.shape, marr.chunks, indexer_without_newaxes, strict=True)
     ):
-        chunk_grid_slice, new_axis_length = _compute_chunk_aligned_selection_1d(
+        chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
             indexer_1d, axis_length=axis_length, chunk_size=chunk_size
         )
-        chunk_grid_slices.append(chunk_grid_slice)
-        new_shape.append(new_axis_length)
+        chunk_grid_selectors.append(chunk_grid_selector)
+        # int selectors drop the axis from the output array
+        if not isinstance(indexer_1d, int):
+            new_shape.append(new_axis_length)
+            new_chunks.append(chunk_size)
+            kept_axes.append(axis)
 
-    chunk_grid_slices_tuple = tuple(chunk_grid_slices)
+    chunk_grid_selectors_tuple = tuple(chunk_grid_selectors)
 
-    # short-circuit if every axis selects the whole chunk grid (a no-op)
+    # short-circuit if every axis selects the whole chunk grid via a slice (a no-op)
     if all(
-        cgs == slice(0, dim, 1)
-        for cgs, dim in zip(chunk_grid_slices_tuple, marr.manifest.shape_chunk_grid)
+        isinstance(cgs, slice) and cgs == slice(0, dim, 1)
+        for cgs, dim in zip(chunk_grid_selectors_tuple, marr.manifest.shape_chunk_grid)
     ):
         return marr
 
-    new_manifest = _subset_manifest(marr.manifest, chunk_grid_slices_tuple)
-    new_metadata = copy_and_replace_metadata(marr.metadata, new_shape=new_shape)
+    new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
+    old_dimension_names = marr.metadata.dimension_names
+    new_dimension_names: tuple[str | None, ...] | None | str
+    if old_dimension_names is None:
+        new_dimension_names = "default"  # sentinel: leave as None
+    else:
+        new_dimension_names = tuple(old_dimension_names[a] for a in kept_axes)
+    new_metadata = copy_and_replace_metadata(
+        marr.metadata,
+        new_shape=new_shape,
+        new_chunks=new_chunks,
+        new_dimension_names=new_dimension_names,
+    )
     return ManifestArray(metadata=new_metadata, chunkmanifest=new_manifest)
 
 
 def _compute_chunk_aligned_selection_1d(
     indexer_1d: int | slice, axis_length: int, chunk_size: int
-) -> tuple[slice, int]:
+) -> tuple[int | slice, int]:
     """
-    Translate a 1D array-space indexer (int or slice) into a chunk-grid slice plus the new axis length.
+    Translate a 1D array-space indexer (int or slice) into a chunk-grid selector plus the
+    new axis length. The selector is an ``int`` for int indexers (so the chunk-grid axis
+    is dropped) and a ``slice`` for slice indexers (so the chunk-grid axis is preserved).
 
     Raises SubChunkIndexingError if the selection would require splitting individual chunks.
     """
     if isinstance(indexer_1d, int):
-        # Integer indexing is treated as a length-1 slice; we don't drop dimensions because that
-        # would require loading the underlying data for the array-API conformance reasons that
-        # ManifestArray operates on chunk references rather than values.
         i = indexer_1d
         if i < 0:
             # Allow negative indexing - this makes it wrap around
@@ -231,30 +251,56 @@ def _compute_chunk_aligned_selection_1d(
         )
 
     chunk_start = start // chunk_size
-    # ceil-divide so that a partial final chunk is included when stop == axis_length
+
+    if isinstance(indexer_1d, int):
+        # int indexer drops the array axis, so the chunk-grid axis is dropped too via an int selector
+        return chunk_start, 1
+
+    # slice indexer: ceil-divide stop so a partial final chunk is included when stop == axis_length
     chunk_stop = -(-stop // chunk_size)
     return slice(chunk_start, chunk_stop, 1), stop - start
 
 
 def _subset_manifest(
-    manifest: ChunkManifest, chunk_grid_slices: tuple[slice, ...]
+    manifest: ChunkManifest, chunk_grid_selectors: tuple[int | slice, ...]
 ) -> ChunkManifest:
-    """Subset a ChunkManifest by slicing its underlying chunk-grid arrays."""
-    new_paths = manifest._paths[chunk_grid_slices]
-    new_offsets = manifest._offsets[chunk_grid_slices]
-    new_lengths = manifest._lengths[chunk_grid_slices]
+    """
+    Subset a ChunkManifest by indexing its underlying chunk-grid arrays. Each entry of
+    ``chunk_grid_selectors`` is either an int (which drops the corresponding chunk-grid axis)
+    or a slice (which keeps it).
+    """
+    # When every axis is int-indexed, numpy returns a 0D scalar (Python str for StringDType,
+    # numpy scalar for the numeric arrays). Wrap back into a 0D ndarray so from_arrays accepts it.
+    new_paths = np.asarray(
+        manifest._paths[chunk_grid_selectors], dtype=manifest._paths.dtype
+    )
+    new_offsets = np.asarray(
+        manifest._offsets[chunk_grid_selectors], dtype=manifest._offsets.dtype
+    )
+    new_lengths = np.asarray(
+        manifest._lengths[chunk_grid_selectors], dtype=manifest._lengths.dtype
+    )
 
     if manifest._inlined:
-        starts = tuple(s.start for s in chunk_grid_slices)
-        stops = tuple(s.stop for s in chunk_grid_slices)
-        # Keep only the inlined chunks that fall within the new domain, and reindex them if necessary
-        new_inlined = {
-            tuple(idx - start for idx, start in zip(coords, starts)): data
-            for coords, data in manifest._inlined.items()
-            if all(
-                start <= idx < stop for idx, start, stop in zip(coords, starts, stops)
-            )
-        }
+        # For each old chunk-grid key, keep it only if int-indexed axes match exactly and
+        # slice-indexed axes fall inside the slice. Re-map the surviving key by omitting
+        # int-indexed positions and offsetting slice-indexed positions by the slice start.
+        new_inlined: dict[tuple[int, ...], bytes] = {}
+        for coords, data in manifest._inlined.items():
+            new_coord: list[int] = []
+            keep = True
+            for coord, sel in zip(coords, chunk_grid_selectors):
+                if isinstance(sel, int):
+                    if coord != sel:
+                        keep = False
+                        break
+                else:
+                    if not (sel.start <= coord < sel.stop):
+                        keep = False
+                        break
+                    new_coord.append(coord - sel.start)
+            if keep:
+                new_inlined[tuple(new_coord)] = data
     else:
         new_inlined = {}
 

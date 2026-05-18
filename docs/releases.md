@@ -4,7 +4,7 @@
 
 ### New Features
 
-- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including integer indexing on length-1 chunked axes, multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass) — this is a permanent constraint of a virtual array, not a missing feature. Previously slice misalignment silently no-op'd while integer indexing unconditionally raised `NotImplementedError`. Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass) — a permanent constraint of a virtual array, not a missing feature. Previously slice misalignment silently no-op'd while integer indexing unconditionally raised `NotImplementedError`. Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes

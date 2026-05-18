@@ -844,14 +844,18 @@ class TestIndexing:
         [
             # obvious no-ops
             ((2,), (1,), slice(0, 2), (2,), (1,)),
-            # length-1 axis: integer indexing
-            ((1,), (1,), 0, (1,), (1,)),
-            # chunk-aligned integer indexing (treated as length-1 slice; does not drop the axis)
-            ((2,), (1,), 0, (1,), (1,)),
-            ((2,), (1,), 1, (1,), (1,)),
-            ((2,), (1,), (0, ...), (1,), (1,)),
-            ((2,), (1,), (..., 0), (1,), (1,)),
-            # chunk-aligned slicing
+            # integer indexing drops the indexed axis (numpy / array-API semantics).
+            # Only legal when chunk_size == 1 along that axis: otherwise picking a
+            # single element would require splitting a chunk.
+            ((1,), (1,), 0, (), ()),
+            ((2,), (1,), 0, (), ()),
+            ((2,), (1,), 1, (), ()),
+            ((2,), (1,), (0, ...), (), ()),
+            ((2,), (1,), (..., 0), (), ()),
+            # multi-axis integer indexing drops every indexed axis
+            ((2, 2), (1, 1), (0, 0), (), ()),
+            ((3, 3), (1, 1), (1, 2), (), ()),
+            # chunk-aligned slicing preserves the axis
             ((2,), (1,), slice(0, 1), (1,), (1,)),
             ((2,), (1,), (..., slice(0, 1)), (1,), (1,)),
             ((2,), (1,), (slice(0, 1), ...), (1,), (1,)),
@@ -862,9 +866,10 @@ class TestIndexing:
             # multi-dim slicing
             ((4, 4), (2, 2), (slice(0, 2), slice(0, 2)), (2, 2), (2, 2)),
             ((4, 4), (2, 2), (slice(2, 4), slice(0, 4)), (2, 4), (2, 2)),
-            # mixed integer + slice indexing
-            ((2, 4), (1, 2), (0, slice(0, 2)), (1, 2), (1, 2)),
-            ((4, 4), (1, 2), (2, slice(0, 4)), (1, 4), (1, 2)),
+            # mixed integer + slice indexing — the integer-indexed axis drops, the
+            # slice-indexed axis stays.
+            ((2, 4), (1, 2), (0, slice(0, 2)), (2,), (2,)),
+            ((4, 4), (1, 2), (2, slice(0, 4)), (4,), (2,)),
             # partial final chunk along an axis
             ((5,), (2,), slice(0, 4), (4,), (2,)),
             ((5,), (2,), slice(2, 5), (3,), (2,)),
@@ -878,11 +883,36 @@ class TestIndexing:
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
 
+    def test_integer_indexing_subsets_manifest_to_one_chunk(self, array_v3_metadata):
+        # Make sure dropping the axis also drops the manifest's chunk-grid axis and
+        # keeps just the referenced chunk's bytes.
+        metadata = array_v3_metadata(shape=(4, 2), chunks=(1, 2))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 16},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 16},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 16},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 16},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr[2, ...]
+
+        assert result.shape == (2,)
+        assert result.chunks == (2,)
+        assert result.manifest.shape_chunk_grid == (1,)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 200, "length": 16},
+        }
+
     @pytest.mark.parametrize(
         "in_shape, in_chunks, indexer",
         [
-            # int that doesn't land on a chunk boundary
+            # int on a multi-element chunk — only chunk_size == 1 permits int indexing
+            ((4,), (2,), 0),
             ((4,), (2,), 1),
+            ((4,), (2,), 2),
             ((4,), (2,), 3),
             # slice start misaligned
             ((4,), (2,), slice(1, 3)),
@@ -893,6 +923,8 @@ class TestIndexing:
             ((4,), (2,), slice(0, 4, 2)),
             # only one axis misaligned in a multi-dim selection
             ((4, 4), (2, 2), (slice(0, 4), slice(0, 1))),
+            # int on a chunk_size > 1 axis even when other axes are fine
+            ((4, 4), (2, 2), (0, slice(0, 4))),
         ],
     )
     def test_misaligned_with_chunks(self, manifest_array, in_shape, in_chunks, indexer):
