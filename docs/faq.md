@@ -101,6 +101,49 @@ vds.vz.to_icechunk(icechunkstore)
 
 No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`.
 
+### I already have some data in Icechunk — can I virtualize it without rewriting?
+
+Yes — use the [`IcechunkParser`][virtualizarr.parsers.IcechunkParser]. It walks an existing icechunk repository and returns a VirtualiZarr [`ManifestStore`][virtualizarr.manifests.ManifestStore] in which:
+
+- icechunk virtual refs become VZ virtual refs (URLs preserved),
+- icechunk native (managed) chunks become VZ virtual refs whose paths are `{native_chunks_prefix}/{chunk_id}`,
+- icechunk inline chunks stay inline.
+
+There are two entry points. The protocol-conformant one matches every other parser and works through [`open_virtual_dataset`][virtualizarr.open_virtual_dataset]:
+
+```python
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import IcechunkParser
+
+vds = open_virtual_dataset(
+    url="s3://my-bucket/my-repo",
+    registry=registry,
+    parser=IcechunkParser(),
+)
+```
+
+Native chunk paths are rendered as `f"{url}/chunks/{chunk_id}"` — icechunk's format-constant chunks directory for the repo at that URL.
+
+If you already have an open icechunk Session in hand (the common case if you're using icechunk in the same process), use the `parse_session` escape hatch to skip re-opening the repo:
+
+```python
+import icechunk
+
+repo = icechunk.Repository.open(storage=...)
+session = repo.readonly_session(branch="main")
+
+manifest_store = IcechunkParser().parse_session(
+    session,
+    registry=registry,
+    native_chunks_prefix="s3://my-bucket/my-repo/chunks",
+)
+```
+
+`native_chunks_prefix` is required here — without a URL the parser can't derive a default.
+
+!!! note
+    `IcechunkParser` requires `icechunk >= 2.0.5` (it uses the `IcechunkStore.array_chunk_iterator` API added in that release). The `to_icechunk` writer still works against `icechunk >= 2.0.3`, so VirtualiZarr's `[icechunk]` extra is not bumped — only parser users need to upgrade. `IcechunkParser()` raises `ImportError` with an upgrade hint if it detects an older icechunk at construction time.
+
 ### Can I add a new parser for my custom file format?
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
@@ -154,6 +197,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=VirtualTIFF())`, via [virtual_tiff](https://github.com/virtual-zarr/virtual-tiff)                                                              |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                       |
 | From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
+| From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser().parse_session(session, registry, native_chunks_prefix=...)` if you already have an open icechunk session |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., parser=FITSParser())`, via `kerchunk.fits.process_file`                                                                                      |
 | From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |

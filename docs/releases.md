@@ -1,10 +1,15 @@
 # Release notes
 
-## Unreleased
+## v2.6.2 (unreleased)
 
 ### New Features
 
+- New `IcechunkParser` — opens an existing icechunk repository and converts it into a VirtualiZarr `ManifestStore` without copying data. Maps icechunk virtual refs straight through, renders native (managed) chunks as VZ virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Two entry points: the protocol-conformant `IcechunkParser()(url, registry)` for use with `open_virtual_dataset`, and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5` for the `IcechunkStore.array_chunk_iterator` API; VirtualiZarr's `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade, but `IcechunkParser` checks at construction and raises a clear error against older icechunk.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass) — a permanent constraint of a virtual array, not a missing feature. Previously slice misalignment silently no-op'd while integer indexing unconditionally raised `NotImplementedError`. Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` (e.g. F-order with `order=(N-1, ..., 0)`, where the axis is `order[0]` — typically the last axis). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk; multi-chunk-spanning sub-chunk slices, `step != 1`, and sub-chunk indexing on other axes still raise `SubChunkIndexingError`. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
@@ -12,10 +17,16 @@
 - HDFParser now correctly parses datasets with either no fill value or a string dtype fill value.
   ([#988](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
   By [Sean Harkins](https://github.com/sharkinsspatial) and [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
+- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer was building chunk keys via the manifest metadata's `chunk_key_encoding` (which the ManifestStore convention pins to `"."`), so it produced `c.0.0.0`-form keys that icechunk's zarr `Key::parse` rejects. The writer now always emits the `c/0/0/0`-form icechunk requires, regardless of the manifest's stored separator. Mainly surfaces with `IcechunkParser` since icechunk inlines small chunks aggressively; existing parsers don't produce inlined chunks and aren't affected.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
 ### Internal changes
+
+- Mark `test_read_netcdf3` as also requiring `kerchunk`. It already had `@requires_scipy`, but `NetCDF3Parser` lazily imports `kerchunk.netCDF3`, so the test raised `ModuleNotFoundError` in any environment with scipy but not kerchunk (e.g. pixi `min-deps` once a transitive dep started pulling in scipy).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.6.1 (3rd May 2026)
 
