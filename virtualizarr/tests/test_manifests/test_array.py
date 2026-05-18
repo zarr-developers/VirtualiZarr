@@ -899,9 +899,7 @@ class TestIndexing:
         self, manifest_array, in_shape, in_chunks, indexer
     ):
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
-        with pytest.raises(
-            SubChunkIndexingError, match="split individual chunks|step != 1"
-        ):
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[indexer]
 
 

@@ -205,6 +205,7 @@ def _compute_chunk_aligned_selection_1d(
         # ManifestArray operates on chunk references rather than values.
         i = indexer_1d
         if i < 0:
+            # Allow negative indexing - this makes it wrap around
             i += axis_length
         if not (0 <= i < axis_length):
             raise IndexError(
@@ -214,21 +215,15 @@ def _compute_chunk_aligned_selection_1d(
     else:
         start, stop, step = indexer_1d.indices(axis_length)
 
-    if step != 1:
-        raise SubChunkIndexingError(
-            f"step != 1 is not supported for chunk-aligned indexing, got step={step}"
-        )
-
-    if start % chunk_size != 0:
-        raise SubChunkIndexingError(
-            f"Cannot index ManifestArray axis of length {axis_length} and chunk length "
-            f"{chunk_size} with {indexer_1d!r}: slice would split individual chunks, "
-            "which a ManifestArray cannot do without loading the underlying data."
-        )
-
     # The final chunk may legitimately be partial, so allow stop == axis_length even if
-    # axis_length % chunk_size != 0; otherwise stop must land on a chunk boundary.
-    if stop != axis_length and stop % chunk_size != 0:
+    # axis_length % chunk_size != 0; otherwise both endpoints must land on chunk boundaries.
+    # TODO step != 1 we can actually support for uncompressed arrays along the first axis,
+    # see https://github.com/zarr-developers/VirtualiZarr/issues/86
+    if (
+        step != 1
+        or start % chunk_size != 0
+        or (stop != axis_length and stop % chunk_size != 0)
+    ):
         raise SubChunkIndexingError(
             f"Cannot index ManifestArray axis of length {axis_length} and chunk length "
             f"{chunk_size} with {indexer_1d!r}: slice would split individual chunks, "
@@ -252,6 +247,7 @@ def _subset_manifest(
     if manifest._inlined:
         starts = tuple(s.start for s in chunk_grid_slices)
         stops = tuple(s.stop for s in chunk_grid_slices)
+        # Keep only the inlined chunks that fall within the new domain, and reindex them if necessary
         new_inlined = {
             tuple(idx - start for idx, start in zip(coords, starts)): data
             for coords, data in manifest._inlined.items()
