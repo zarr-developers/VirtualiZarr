@@ -32,7 +32,7 @@ install the regular `upstream` env and then pip-overlay the dev versions on top:
 
 ```bash
 pixi install --environment upstream
-pixi run -e upstream pip install --upgrade --no-deps -r ci/upstream-overrides.txt
+pixi run -e upstream install-upstream-overrides
 pixi run --environment upstream run-tests
 ```
 

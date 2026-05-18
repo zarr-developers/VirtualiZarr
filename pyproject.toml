@@ -180,6 +180,9 @@ rust = "*"
 [tool.pixi.feature.upstream-overlay.dependencies]
 pip = "*"
 
+[tool.pixi.feature.upstream-overlay.tasks]
+install-upstream-overrides = { cmd = "pip install --upgrade --no-deps -r ci/upstream-overrides.txt" }
+
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"
 numpy = "==2.1.0"

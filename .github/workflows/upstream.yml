@@ -45,7 +45,7 @@ jobs:
       - name: Overlay dev versions of upstream libraries
         # See ci/upstream-overrides.txt for why these aren't in pyproject.toml.
         run: |
-          pixi run -e upstream pip install --upgrade --no-deps -r ci/upstream-overrides.txt
+          pixi run -e upstream install-upstream-overrides
 
       - name: List installed libraries
         run: |
