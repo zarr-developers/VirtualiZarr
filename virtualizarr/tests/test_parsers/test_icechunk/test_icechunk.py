@@ -15,16 +15,22 @@ sibling test file, ``test_icechunk_obstore_utils.py``.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from obspec_utils.registry import ObjectStoreRegistry
 
-# IcechunkParser needs IcechunkStore.array_chunk_iterator, added in 2.0.5.
-# Older icechunk is still supported by the writer, so the [icechunk] extra
-# pins >=2.0.3 and the parser feature-detects at construction time — skip
-# this whole module rather than fail in envs (e.g. pixi minimum-versions)
-# that pin icechunk to the writer's floor.
-icechunk = pytest.importorskip("icechunk", minversion="2.0.5")
+if TYPE_CHECKING:
+    # Use the real module at type-check time so annotations like
+    # `icechunk.Repository` resolve.
+    import icechunk
+else:
+    # IcechunkParser needs IcechunkStore.array_chunk_iterator, added in 2.0.5.
+    # Older icechunk is still supported by the writer, so the [icechunk] extra
+    # pins >=2.0.3 and the parser feature-detects at construction time — skip
+    # this whole module rather than fail in envs (e.g. pixi minimum-versions)
+    # that pin icechunk to the writer's floor.
+    icechunk = pytest.importorskip("icechunk", minversion="2.0.5")
 zarr = pytest.importorskip("zarr")
 obstore_store = pytest.importorskip("obstore.store")
 

@@ -113,7 +113,7 @@ class IcechunkParser:
 
     Examples
     --------
-    >>> import icechunk
+    >>> import icechunk  # doctest: +SKIP
     >>> from virtualizarr import open_virtual_dataset
     >>> from virtualizarr.parsers import IcechunkParser
     >>>
@@ -245,10 +245,12 @@ async def _construct_manifest_group(
         *[zarr_group.getitem(k) for k in array_keys if k not in skip]
     )
 
+    # zarr_group.getitem() returns AsyncArray | AsyncGroup; we filtered to
+    # array_keys above, so every element is an AsyncArray in practice.
     manifest_arrays = await asyncio.gather(
         *[
-            _construct_manifest_array(arr, store, native_chunks_prefix, batch_size)
-            for arr in zarr_arrays  # type: ignore[union-attr]
+            _construct_manifest_array(arr, store, native_chunks_prefix, batch_size)  # type: ignore[arg-type]
+            for arr in zarr_arrays
         ]
     )
 
@@ -268,8 +270,11 @@ async def _construct_manifest_array(
     from icechunk import ChunkType
 
     metadata = metadata_as_v3(zarr_array.metadata)
+    # icechunk arrays use regular (uniform) chunk grids in practice; the union
+    # member without chunk_shape (RectilinearChunkGridMetadata) doesn't apply.
     grid_shape = determine_chunk_grid_shape(
-        metadata.shape, metadata.chunk_grid.chunk_shape
+        metadata.shape,
+        metadata.chunk_grid.chunk_shape,  # type: ignore[union-attr]
     )
 
     total = int(np.prod(grid_shape)) if grid_shape else 1
@@ -286,8 +291,11 @@ async def _construct_manifest_array(
         if n == 0:
             continue
 
+        flat_idx: np.ndarray
         if grid_shape:
-            flat_idx = np.ravel_multi_index(b_coords.T, grid_shape)
+            # np.ravel_multi_index's stubs pick the scalar overload here; the
+            # array form is what we actually get from a (n_dims, n) input.
+            flat_idx = np.asarray(np.ravel_multi_index(b_coords.T, grid_shape))
         else:
             flat_idx = np.zeros(n, dtype=np.intp)
 
