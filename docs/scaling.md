@@ -308,6 +308,37 @@ for i, batch in enumerate(file_batches):
 
 Notice this workflow could also be used for appending data only as it becomes available, e.g. by replacing the for loop with a cron job.
 
+### Splitting a single large virtual dataset across commits
+
+A single Icechunk commit cannot include more than 50 million chunk references at once.
+If a single source — typically a massive Zarr store opened via [`ZarrParser`][virtualizarr.parsers.ZarrParser] — produces a virtual dataset whose arrays together exceed that, you can't write it in one transaction even after all the references are already in memory.
+
+In that case you can slice the virtual dataset along an axis where the slicing falls on chunk boundaries (often `time`), and commit each slice with `append_dim`. Chunk-aligned slicing on a `ManifestArray` (and therefore on the variables of a virtual `xarray.Dataset`) only subsets the manifest, so this is cheap — no chunks are loaded.
+
+```python
+import icechunk as ic
+
+# Parse the giant Zarr store once, producing a virtual dataset that exceeds
+# 50M refs in total but whose `time` axis is chunked.
+vds = vz.open_virtual_dataset(<zarr_store>, parser=ZarrParser(), registry=registry)
+
+chunk_size_time = vds.chunksizes["time"]  # must align the splits to chunk boundaries
+step = chunk_size_time * N  # pick N so that each slice has < 50M refs
+
+repo = ic.Repository.open(<repo_url>)
+
+for i, start in enumerate(range(0, vds.sizes["time"], step)):
+    session = repo.writable_session("main")
+    slice_vds = vds.isel(time=slice(start, start + step))
+    append_dim = "time" if i > 0 else None
+    slice_vds.vz.to_icechunk(session.store, append_dim=append_dim)
+    session.commit(f"wrote virtual references for time slice {i}")
+```
+
+If the slice boundaries don't align with chunk edges along that axis, the indexing call raises `SubChunkIndexingError`.
+
+(Remember you can also subset the Dataset to specific variables and commit those separately too if necessary.)
+
 ### Retries
 
 Sometimes an [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] call might fail for a transient reason, such as a failed HTTP response from a server.
