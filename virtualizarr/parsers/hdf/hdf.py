@@ -85,8 +85,19 @@ def _construct_manifest_array(
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
     # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
-    if dtype.kind == "O":
+    # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
+    # region references) that would silently be coerced to StringDType and
+    # produce garbage downstream — those aren't supported yet, so fail loudly.
+    if h5py.check_string_dtype(dtype) is not None:
         dtype = np.dtypes.StringDType()
+    elif dtype.kind == "O":
+        raise NotImplementedError(
+            f"HDF5 object dtype {dtype!r} is not a variable-length string and "
+            f"is not yet supported by HDFParser. h5py exposes vlen arrays "
+            f"(`h5py.vlen_dtype`) and object/region references "
+            f"(`h5py.ref_dtype`, `h5py.regionref_dtype`) as numpy object dtype; "
+            f"please open an issue if your file needs one of these."
+        )
 
     # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
     # cfcodec = cfcodec_from_dataset(dataset)
