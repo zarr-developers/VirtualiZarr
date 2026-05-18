@@ -201,6 +201,7 @@ def open_virtual_dataset(
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
+        - [virtualizarr.parsers.IcechunkParser][] for virtualizing existing icechunk repos.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
         - [virtualizarr.parsers.DMRPPParser][] for virtualizing DMR++ files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
