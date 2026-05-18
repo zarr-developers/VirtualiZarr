@@ -96,20 +96,13 @@ all_writers = [
 
 # Dependency sets under dependencies-groups are NOT available via PyPI
 [dependency-groups]
-upstream = [
-    'xarray @ git+https://github.com/pydata/xarray',
-    'universal_pathlib @ git+https://github.com/fsspec/universal_pathlib',
-    'numcodecs @ git+https://github.com/zarr-developers/numcodecs',
-    'ujson @ git+https://github.com/ultrajson/ultrajson',
-    'zarr @ git+https://github.com/zarr-developers/zarr-python',
-    'obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils',
-    # optional dependencies
-    'astropy @ git+https://github.com/astropy/astropy',
-    's3fs @ git+https://github.com/fsspec/s3fs',
-    'kerchunk @ git+https://github.com/fsspec/kerchunk',
-    'icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python',
-    'virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff',
-]
+# Dev versions of upstream libraries are NOT defined here as a dependency-group.
+# Including git+https sources in a pixi-managed pyproject.toml forces every
+# `pixi install` (including the docs and minimum-versions envs) to perform a
+# fresh wheel build of each git source as part of the workspace-wide lockfile
+# solve, which is unreliable on memory-constrained CI runners. The upstream
+# canary job instead pip-overlays dev versions from ci/upstream-overrides.txt
+# on top of the regular `upstream` pixi env. See issue #995.
 docs = [
     "mkdocs-material[imaging]>=9.6.14",
     "mkdocs>=1.6.1",
@@ -182,6 +175,14 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+# `pip` is needed by the Upstream CI job to overlay dev versions from
+# ci/upstream-overrides.txt on top of the pixi-resolved env. See issue #995.
+[tool.pixi.feature.upstream-overlay.dependencies]
+pip = "*"
+
+[tool.pixi.feature.upstream-overlay.tasks]
+install-upstream-overrides = { cmd = "pip install --upgrade --no-deps -r ci/upstream-overrides.txt" }
+
 [tool.pixi.feature.minimum-versions.dependencies]
 xarray = "==2025.6.0"
 numpy = "==2.1.0"
@@ -213,7 +214,7 @@ test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "ke
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr","minimum-versions", "py312"]
-upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "upstream", "icechunk-dev", "zarr", "py313"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff","zarr", "py313"]
 

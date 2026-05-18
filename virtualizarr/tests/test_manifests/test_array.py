@@ -7,6 +7,7 @@ from conftest import (
     ZLIB_CODEC,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.indexing import SubChunkIndexingError
 
 
 class TestInit:
@@ -843,88 +844,35 @@ class TestIndexing:
         [
             # obvious no-ops
             ((2,), (1,), slice(0, 2), (2,), (1,)),
-            # reduces shape
-            pytest.param(
-                (1,),
-                (1,),
-                0,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            # requires chunk-aligned selection
-            pytest.param(
-                (2,),
-                (1,),
-                0,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                1,
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (0, ...),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (..., 0),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                slice(0, 1),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (..., slice(0, 1)),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
-            pytest.param(
-                (2,),
-                (1,),
-                (slice(0, 1), ...),
-                (1,),
-                (1,),
-                marks=pytest.mark.xfail(
-                    reason="Chunk-aligned indexing not yet implemented"
-                ),
-            ),
+            # integer indexing drops the indexed axis (numpy / array-API semantics).
+            # Only legal when chunk_size == 1 along that axis: otherwise picking a
+            # single element would require splitting a chunk.
+            ((1,), (1,), 0, (), ()),
+            ((2,), (1,), 0, (), ()),
+            ((2,), (1,), 1, (), ()),
+            ((2,), (1,), (0, ...), (), ()),
+            ((2,), (1,), (..., 0), (), ()),
+            # multi-axis integer indexing drops every indexed axis
+            ((2, 2), (1, 1), (0, 0), (), ()),
+            ((3, 3), (1, 1), (1, 2), (), ()),
+            # chunk-aligned slicing preserves the axis
+            ((2,), (1,), slice(0, 1), (1,), (1,)),
+            ((2,), (1,), (..., slice(0, 1)), (1,), (1,)),
+            ((2,), (1,), (slice(0, 1), ...), (1,), (1,)),
+            # multi-chunk slices and slices over multi-chunk axes
+            ((8,), (2,), slice(0, 4), (4,), (2,)),
+            ((8,), (2,), slice(2, 6), (4,), (2,)),
+            ((8,), (2,), slice(6, 8), (2,), (2,)),
+            # multi-dim slicing
+            ((4, 4), (2, 2), (slice(0, 2), slice(0, 2)), (2, 2), (2, 2)),
+            ((4, 4), (2, 2), (slice(2, 4), slice(0, 4)), (2, 4), (2, 2)),
+            # mixed integer + slice indexing — the integer-indexed axis drops, the
+            # slice-indexed axis stays.
+            ((2, 4), (1, 2), (0, slice(0, 2)), (2,), (2,)),
+            ((4, 4), (1, 2), (2, slice(0, 4)), (4,), (2,)),
+            # partial final chunk along an axis
+            ((5,), (2,), slice(0, 4), (4,), (2,)),
+            ((5,), (2,), slice(2, 5), (3,), (2,)),
         ],
     )
     def test_chunk_selection_cases(
@@ -934,6 +882,55 @@ class TestIndexing:
         indexed = marr[indexer]
         assert indexed.shape == out_shape
         assert indexed.chunks == out_chunks
+
+    def test_integer_indexing_subsets_manifest_to_one_chunk(self, array_v3_metadata):
+        # Make sure dropping the axis also drops the manifest's chunk-grid axis and
+        # keeps just the referenced chunk's bytes.
+        metadata = array_v3_metadata(shape=(4, 2), chunks=(1, 2))
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 16},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 16},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 16},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 16},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr[2, ...]
+
+        assert result.shape == (2,)
+        assert result.chunks == (2,)
+        assert result.manifest.shape_chunk_grid == (1,)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 200, "length": 16},
+        }
+
+    @pytest.mark.parametrize(
+        "in_shape, in_chunks, indexer",
+        [
+            # int on a multi-element chunk — only chunk_size == 1 permits int indexing
+            ((4,), (2,), 0),
+            ((4,), (2,), 1),
+            ((4,), (2,), 2),
+            ((4,), (2,), 3),
+            # slice start misaligned
+            ((4,), (2,), slice(1, 3)),
+            # slice stop misaligned (and stop != axis_length)
+            ((4,), (2,), slice(0, 3)),
+            ((4,), (2,), slice(0, 1)),
+            # step != 1
+            ((4,), (2,), slice(0, 4, 2)),
+            # only one axis misaligned in a multi-dim selection
+            ((4, 4), (2, 2), (slice(0, 4), slice(0, 1))),
+            # int on a chunk_size > 1 axis even when other axes are fine
+            ((4, 4), (2, 2), (0, slice(0, 4))),
+        ],
+    )
+    def test_misaligned_with_chunks(self, manifest_array, in_shape, in_chunks, indexer):
+        marr = manifest_array(shape=in_shape, chunks=in_chunks)
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[indexer]
 
 
 def test_to_xarray(array_v3_metadata):
