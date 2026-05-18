@@ -12,8 +12,6 @@
 - Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` (e.g. F-order with `order=(N-1, ..., 0)`, where the axis is `order[0]` — typically the last axis). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk; multi-chunk-spanning sub-chunk slices, `step != 1`, and sub-chunk indexing on other axes still raise `SubChunkIndexingError`. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
-### Breaking changes
-
 ### Bug fixes
 
 - Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer was building chunk keys via the manifest metadata's `chunk_key_encoding` (which the ManifestStore convention pins to `"."`), so it produced `c.0.0.0`-form keys that icechunk's zarr `Key::parse` rejects. The writer now always emits the `c/0/0/0`-form icechunk requires, regardless of the manifest's stored separator. Mainly surfaces with `IcechunkParser` since icechunk inlines small chunks aggressively; existing parsers don't produce inlined chunks and aren't affected.

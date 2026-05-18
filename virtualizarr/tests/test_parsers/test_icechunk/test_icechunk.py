@@ -19,7 +19,12 @@ from pathlib import Path
 import pytest
 from obspec_utils.registry import ObjectStoreRegistry
 
-icechunk = pytest.importorskip("icechunk")
+# IcechunkParser needs IcechunkStore.array_chunk_iterator, added in 2.0.5.
+# Older icechunk is still supported by the writer, so the [icechunk] extra
+# pins >=2.0.3 and the parser feature-detects at construction time — skip
+# this whole module rather than fail in envs (e.g. pixi minimum-versions)
+# that pin icechunk to the writer's floor.
+icechunk = pytest.importorskip("icechunk", minversion="2.0.5")
 zarr = pytest.importorskip("zarr")
 obstore_store = pytest.importorskip("obstore.store")
 

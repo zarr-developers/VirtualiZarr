@@ -141,6 +141,9 @@ manifest_store = IcechunkParser().parse_session(
 
 `native_chunks_prefix` is required here — without a URL the parser can't derive a default.
 
+!!! note
+    `IcechunkParser` requires `icechunk >= 2.0.5` (it uses the `IcechunkStore.array_chunk_iterator` API added in that release). The `to_icechunk` writer still works against `icechunk >= 2.0.3`, so VirtualiZarr's `[icechunk]` extra is not bumped — only parser users need to upgrade. `IcechunkParser()` raises `ImportError` with an upgrade hint if it detects an older icechunk at construction time.
+
 ### Can I add a new parser for my custom file format?
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
