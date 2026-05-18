@@ -8,26 +8,24 @@ from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk
 
 
 class NetCDF3Parser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a NetCDF3 file.
+
+    Parameters
+    ----------
+    group
+        The group within the file to be used as the Zarr root group for the ManifestStore.
+    skip_variables
+        Variables in the file that will be ignored when creating the ManifestStore.
+    reader_options
+        Configuration options used internally for the kerchunk's fsspec backend.
+    """
+
     def __init__(
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
         reader_options: dict | None = None,
     ):
-        """
-        Instantiate a parser with parser-specific parameters that can be used in the
-        `__call__` method.
-
-        Parameters
-        ----------
-        group
-            The group within the file to be used as the Zarr root group for the ManifestStore.
-        skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore.
-        reader_options
-            Configuration options used internally for the kerchunk's fsspec backend.
-        """
-
         self.group = group
         self.skip_variables = skip_variables
         self.reader_options = reader_options or {}
@@ -38,7 +36,7 @@ class NetCDF3Parser:
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given NetCDF3 file to product a VirtualiZarr ManifestStore.
+        Parse the metadata and byte offsets from a given NetCDF3 file to produce a VirtualiZarr ManifestStore.
 
         Parameters
         ----------
