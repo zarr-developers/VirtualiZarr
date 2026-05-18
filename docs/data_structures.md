@@ -246,7 +246,7 @@ The whole point is to manipulate references to the data without actually loading
 !!! note
     You can index into a `ManifestArray` as long as the selection aligns with chunk boundaries — slicing through the interior of a chunk would require loading the chunk's bytes, which a virtual array deliberately cannot do.
     Chunk-aligned integer and slice indexing is supported, including mixed integer + slice indexers; integer indexers drop the indexed axis as in numpy. Misaligned selections raise `SubChunkIndexingError`.
-    As a special case, an **uncompressed** array (only a `BytesCodec`, no other codecs) supports slicing _within_ a single source chunk along axis 0 — the result is a new chunk reference with a bumped byte offset and a smaller length, no data loaded. This is useful for picking out a row from a multi-row chunk produced by a parser like the netCDF3 one.
+    As a special case, an **uncompressed** array supports slicing _within_ a single source chunk along its largest-stride storage axis — the result is a new chunk reference with a bumped byte offset and a smaller length, no data loaded. This works for `[BytesCodec]` arrays (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` arrays (the axis is `order[0]` — e.g. the last axis for F-order). Useful for picking out a row from a multi-row chunk produced by a parser like the netCDF3 one.
     Arbitrary fancy indexing (e.g. with a boolean mask or integer array) is not supported, since it would generally require loading data.
 
 ## Zarr Groups

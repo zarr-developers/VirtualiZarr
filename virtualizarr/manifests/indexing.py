@@ -2,7 +2,7 @@ from types import EllipsisType
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 import numpy as np
-from zarr.codecs import BytesCodec
+from zarr.codecs import BytesCodec, TransposeCodec
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
@@ -174,35 +174,37 @@ def apply_selection(
             raise TypeError(f"Invalid indexer type: {indexer_1d}")
         narrowed_indexers.append(indexer_1d)
 
-    uncompressed = _is_uncompressed_bytes_only(marr.metadata)
+    sub_chunk_axis = _uncompressed_sub_chunk_axis(marr.metadata)
 
     new_shape: list[int] = []
     new_chunks: list[int] = []
     chunk_grid_selectors: list[int | slice] = []
     kept_axes: list[int] = []
-    # At most one sub-chunk axis (axis 0). The byte adjustment is uniform across every
-    # surviving chunk, since chunks share layout.
+    # At most one sub-chunk axis (whichever axis has the largest byte stride in storage).
+    # The byte adjustment is uniform across every surviving chunk, since chunks share layout.
     sub_chunk_byte_adjust: tuple[int, int] | None = None
     for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
         zip(marr.shape, marr.chunks, narrowed_indexers, strict=True)
     ):
         chunk_grid_selector: int | slice
-        if (
-            axis == 0
-            and uncompressed
-            and _is_axis_0_sub_chunk_slice(indexer_1d, axis_length, chunk_size)
+        if axis == sub_chunk_axis and _is_sub_chunk_slice(
+            indexer_1d, axis_length, chunk_size
         ):
-            # Sub-chunk axis-0 slicing on an uncompressed array: contained in a single
-            # source chunk, expressed as an integer byte-offset adjustment.
+            # Sub-chunk slicing on an uncompressed array along its largest-stride axis:
+            # slice fits within one source chunk, expressed as a byte-offset adjustment.
             assert isinstance(indexer_1d, slice)  # narrowed by the helper above
             start, stop, _ = indexer_1d.indices(axis_length)
             chunk_index = start // chunk_size
             chunk_grid_selector = slice(chunk_index, chunk_index + 1, 1)
             new_axis_length = stop - start
             new_chunks_for_axis = new_axis_length
+            # bytes per index step along this axis within one chunk =
+            # product of all chunk sizes for the other axes (regardless of their order in
+            # storage — multiplication is commutative) times itemsize.
             stride_bytes = (
-                int(np.prod(marr.chunks[1:])) * marr.dtype.itemsize
-            )  # bytes per row along axis 0 within one chunk
+                int(np.prod([c for i, c in enumerate(marr.chunks) if i != axis]))
+                * marr.dtype.itemsize
+            )
             sub_chunk_byte_adjust = (
                 (start - chunk_index * chunk_size) * stride_bytes,
                 new_axis_length * stride_bytes,
@@ -223,8 +225,10 @@ def apply_selection(
 
     chunk_grid_selectors_tuple = tuple(chunk_grid_selectors)
 
-    # short-circuit if every axis selects the whole chunk grid via a slice (a no-op)
-    if all(
+    # short-circuit if every axis selects the whole chunk grid via a slice (a no-op).
+    # A pending sub-chunk byte adjustment is real work even if its single source chunk
+    # happens to span the whole chunk grid along that axis, so don't short-circuit then.
+    if sub_chunk_byte_adjust is None and all(
         isinstance(cgs, slice) and cgs == slice(0, dim, 1)
         for cgs, dim in zip(chunk_grid_selectors_tuple, marr.manifest.shape_chunk_grid)
     ):
@@ -359,27 +363,41 @@ def _subset_manifest(
     )
 
 
-def _is_uncompressed_bytes_only(metadata: ArrayV3Metadata) -> bool:
+def _uncompressed_sub_chunk_axis(metadata: ArrayV3Metadata) -> int | None:
     """
-    True iff ``metadata.codecs`` is exactly one ``BytesCodec`` and nothing else.
+    Return the axis along which sub-chunk slicing is implementable for this array, or
+    ``None`` if the codec stack disqualifies it.
 
-    BytesCodec only encodes endianness; with no other codecs, the chunk bytes on disk are
-    the raw little/big-endian element values in C-order. That lets us treat sub-chunk slices
-    along axis 0 as a byte-offset adjustment into the same chunk file. Any array-array codec
-    (value transform) or bytes-bytes codec (compressor / checksum) requires decoding the
-    whole chunk and is therefore not eligible.
+    Sub-chunk slicing rewrites an existing chunk reference's byte offset and length,
+    so it only works when chunk bytes are raw element values in a fixed memory order —
+    i.e., no compression, no value transforms, no checksums. The eligible codec stacks
+    are:
+
+    - ``[BytesCodec]`` — C-order layout; the axis with the largest byte stride is axis 0.
+    - ``[TransposeCodec(order=perm), BytesCodec]`` — stored layout is the logical array
+      permuted by ``perm``; the axis with the largest byte stride in storage is logical
+      axis ``perm[0]``. For the F-order case ``perm = (n-1, n-2, ..., 0)`` this picks out
+      the last axis.
     """
     codecs = metadata.codecs
-    return len(codecs) == 1 and isinstance(codecs[0], BytesCodec)
+    if len(codecs) == 1 and isinstance(codecs[0], BytesCodec):
+        return 0
+    if (
+        len(codecs) == 2
+        and isinstance(codecs[0], TransposeCodec)
+        and isinstance(codecs[1], BytesCodec)
+    ):
+        return int(codecs[0].order[0])
+    return None
 
 
-def _is_axis_0_sub_chunk_slice(
+def _is_sub_chunk_slice(
     indexer_1d: int | slice, axis_length: int, chunk_size: int
 ) -> bool:
     """
-    True iff this is a slice that should take the axis-0 sub-chunk path: step == 1,
-    non-empty, fits entirely within one source chunk along axis 0, and is NOT already
-    chunk-aligned (chunk-aligned slices go through the simpler aligned path).
+    True iff this is a slice that should take the sub-chunk path: step == 1, non-empty,
+    fits entirely within one source chunk, and is NOT already chunk-aligned (chunk-aligned
+    slices go through the simpler aligned path).
     """
     if not isinstance(indexer_1d, slice):
         return False
