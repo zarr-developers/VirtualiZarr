@@ -1,5 +1,5 @@
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard, cast
 
 import numpy as np
 from zarr.codecs import BytesCodec, TransposeCodec
@@ -190,7 +190,6 @@ def apply_selection(
         if axis == sub_chunk_axis and _is_sub_chunk_slice(
             indexer_1d, axis_length, chunk_size
         ):
-            assert isinstance(indexer_1d, slice)  # narrowed by the helper above
             chunk_grid_selector, new_axis_length, sub_chunk_byte_adjust = (
                 _compute_sub_chunk_axis_selection(
                     indexer_1d,
@@ -419,11 +418,14 @@ def _uncompressed_sub_chunk_axis(metadata: ArrayV3Metadata) -> int | None:
 
 def _is_sub_chunk_slice(
     indexer_1d: int | slice, axis_length: int, chunk_size: int
-) -> bool:
+) -> TypeGuard[slice]:
     """
     True iff this is a slice that should take the sub-chunk path: step == 1, non-empty,
     fits entirely within one source chunk, and is NOT already chunk-aligned (chunk-aligned
     slices go through the simpler aligned path).
+
+    Typed as ``TypeGuard[slice]`` so callers can pass the narrowed indexer straight into
+    helpers that take a ``slice``.
     """
     if not isinstance(indexer_1d, slice):
         return False
