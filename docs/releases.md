@@ -15,6 +15,9 @@
 
 ### Internal changes
 
+- Mark `test_read_netcdf3` as also requiring `kerchunk`. It already had `@requires_scipy`, but `NetCDF3Parser` lazily imports `kerchunk.netCDF3`, so the test raised `ModuleNotFoundError` in any environment with scipy but not kerchunk (e.g. pixi `min-deps` once a transitive dep started pulling in scipy).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
