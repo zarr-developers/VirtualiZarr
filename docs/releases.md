@@ -1,28 +1,43 @@
 # Release notes
 
-## v2.6.2 (unreleased)
+## v2.6.2 (18th May 2026)
+
+Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
 
 ### New Features
 
-- New `IcechunkParser` — opens an existing icechunk repository and converts it into a VirtualiZarr `ManifestStore` without copying data. Maps icechunk virtual refs straight through, renders native (managed) chunks as VZ virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Two entry points: the protocol-conformant `IcechunkParser()(url, registry)` for use with `open_virtual_dataset`, and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5` for the `IcechunkStore.array_chunk_iterator` API; VirtualiZarr's `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade, but `IcechunkParser` checks at construction and raises a clear error against older icechunk.
+- New `IcechunkParser` — opens an existing icechunk repository and converts it into a `ManifestStore` without copying data. Maps icechunk virtual refs straight through, exposes native (managed) chunks as VirtualiZarr virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Provides both the protocol-conformant `IcechunkParser()(url, registry)` entry point and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5`; the `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade.
   ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass) — a permanent constraint of a virtual array, not a missing feature. Previously slice misalignment silently no-op'd while integer indexing unconditionally raised `NotImplementedError`. Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass). Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+  ([#994](https://github.com/zarr-developers/VirtualiZarr/pull/994)).
   By [Tom Nicholas](https://github.com/TomNicholas).
-- Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` (e.g. F-order with `order=(N-1, ..., 0)`, where the axis is `order[0]` — typically the last axis). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk; multi-chunk-spanning sub-chunk slices, `step != 1`, and sub-chunk indexing on other axes still raise `SubChunkIndexingError`. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
+- Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order) and `[TransposeCodec(...), BytesCodec]` (e.g. F-order). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
+  ([#996](https://github.com/zarr-developers/VirtualiZarr/pull/996)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
 
-- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer was building chunk keys via the manifest metadata's `chunk_key_encoding` (which the ManifestStore convention pins to `"."`), so it produced `c.0.0.0`-form keys that icechunk's zarr `Key::parse` rejects. The writer now always emits the `c/0/0/0`-form icechunk requires, regardless of the manifest's stored separator. Mainly surfaces with `IcechunkParser` since icechunk inlines small chunks aggressively; existing parsers don't produce inlined chunks and aren't affected.
+- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer now always emits `c/0/0/0`-form chunk keys regardless of the manifest's stored chunk-key separator. Mainly surfaces with `IcechunkParser` (icechunk inlines small chunks aggressively); existing parsers don't produce inlined chunks and aren't affected.
   ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
+- Add guidance on fill values and scale/offset to the custom parser docs.
+  ([#974](https://github.com/zarr-developers/VirtualiZarr/pull/974)).
+  By [Max Jones](https://github.com/maxrjones).
+- Align all parser docstrings with `IcechunkParser` — promote per-parser docstrings to the class level so the rendered API reference is consistent across parsers.
+  ([#999](https://github.com/zarr-developers/VirtualiZarr/pull/999)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
-- Mark `test_read_netcdf3` as also requiring `kerchunk`. It already had `@requires_scipy`, but `NetCDF3Parser` lazily imports `kerchunk.netCDF3`, so the test raised `ModuleNotFoundError` in any environment with scipy but not kerchunk (e.g. pixi `min-deps` once a transitive dep started pulling in scipy).
+- Mark `test_read_netcdf3` as also requiring `kerchunk`, since `NetCDF3Parser` lazily imports `kerchunk.netCDF3` and the test would otherwise raise `ModuleNotFoundError` in environments with scipy but not kerchunk.
+  ([#998](https://github.com/zarr-developers/VirtualiZarr/pull/998)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Move dev-version git sources out of the pixi workspace (`pyproject.toml`'s `upstream` dependency group) into `ci/upstream-overrides.txt`, applied as a pip overlay in the Upstream CI job. Stops every pixi solve (docs, minimum-versions, etc.) from having to build wheels for those packages, which was causing intermittent SIGSEGV / `ETXTBSY` failures on memory-constrained CI runners. Closes [#995](https://github.com/zarr-developers/VirtualiZarr/issues/995).
+  ([#997](https://github.com/zarr-developers/VirtualiZarr/pull/997)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.6.1 (3rd May 2026)
