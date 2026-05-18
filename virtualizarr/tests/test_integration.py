@@ -18,7 +18,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.parsers import HDFParser, ZarrParser
+from virtualizarr.parsers import HDFParser, NetCDF3Parser, ZarrParser
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.tests import (
     has_fastparquet,
@@ -26,6 +26,7 @@ from virtualizarr.tests import (
     has_kerchunk,
     requires_kerchunk,
     requires_network,
+    requires_scipy,
     requires_zarr_python,
     slow_test,
 )
@@ -551,3 +552,50 @@ def test_roundtrip_dataset_with_multiple_compressors():
         ) as observed,
     ):
         xr.testing.assert_allclose(expected, observed)
+
+
+@requires_scipy
+@requires_zarr_python
+@pytest.mark.skipif(not has_icechunk, reason="icechunk not available")
+def test_subchunk_slice_netcdf3_through_icechunk_roundtrip(tmp_path, local_registry):
+    # End-to-end check of the uncompressed sub-chunk slicing path: parse a netCDF3
+    # file (whose variables become single multi-row chunks), .isel within a chunk,
+    # write to icechunk, read back, and confirm bytes match a direct netCDF3 read +
+    # slice on the same file.
+    data = np.arange(32, dtype=np.float64).reshape(8, 4)
+    ds = xr.Dataset({"foo": (["time", "x"], data)})
+    nc_path = tmp_path / "data.nc"
+    ds.to_netcdf(nc_path, format="NETCDF3_CLASSIC")
+    nc_url = f"file://{nc_path}"
+
+    with open_virtual_dataset(
+        url=nc_url, parser=NetCDF3Parser(), registry=local_registry
+    ) as vds:
+        # netCDF3 puts all rows in one source chunk; this slice is sub-chunk on axis 0.
+        sliced_vds = vds.isel(time=slice(1, 3))
+
+        storage = icechunk.Storage.new_in_memory()
+        config = icechunk.RepositoryConfig.default()
+        container = icechunk.VirtualChunkContainer(
+            url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+            store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+        )
+        config.set_virtual_chunk_container(container)
+        repo = icechunk.Repository.create(
+            storage=storage,
+            config=config,
+            authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+        )
+        session = repo.writable_session("main")
+        sliced_vds.vz.to_icechunk(session.store)
+        session.commit("sub-chunk slice")
+
+    read_session = repo.readonly_session("main")
+    with (
+        xr.open_zarr(
+            read_session.store, zarr_format=3, consolidated=False
+        ) as roundtripped,
+        xr.open_dataset(nc_path) as direct,
+    ):
+        expected = direct.isel(time=slice(1, 3))
+        xrt.assert_identical(roundtripped.load(), expected.load())
