@@ -176,29 +176,28 @@ def _construct_manifest_group(
 
 
 class HDFParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from an HDF5/NetCDF4 file.
+
+    Parameters
+    ----------
+    group
+        Name of the group within the HDF5 file to virtualize.
+    drop_variables
+        Variables in the file that will be ignored when creating the ManifestStore
+        (default: `None`, do not ignore any variables).
+    reader_factory
+        A callable that creates a file-like reader from a store and path.
+        Must return an object implementing the
+        [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
+        Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+    """
+
     def __init__(
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
     ):
-        """
-        Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
-        `__call__` method.
-
-        Parameters
-        ----------
-        group
-            Name of the group within the HDF5 file to virtualize.
-        drop_variables
-            Variables in the file that will be ignored when creating the ManifestStore
-            (default: `None`, do not ignore any variables).
-        reader_factory
-            A callable that creates a file-like reader from a store and path.
-            Must return an object implementing the
-            [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
-            Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
-        """
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory

@@ -112,39 +112,22 @@ def join_url(base: str, key: str) -> str:
 
 
 class ZarrParser:
-    """
-    Parser for creating virtual references to existing Zarr stores.
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from an existing Zarr store.
 
-    The ZarrParser creates lightweight virtual references to chunks in existing
-    Zarr stores without copying data. It supports both Zarr V2 and V3 formats,
-    automatically converting V2 metadata to V3 format.
+    Creates lightweight virtual references to chunks in an existing Zarr store
+    without copying data. Supports both Zarr V2 and V3 formats, automatically
+    converting V2 metadata to V3.
 
     Parameters
     ----------
-    group : str, optional
-        Path to a specific group within the Zarr store to use as the root.
-        Uses forward slashes for nested groups (e.g., "model/output").
-        Default is None, which uses the store's root group.
-    skip_variables : iterable of str, optional
-        Names of variables (arrays) to exclude when creating the virtual store.
-        Useful for filtering out auxiliary data or large variables that aren't
-        needed. Default is None, which includes all variables.
-
-    Attributes
-    ----------
-    group : str or None
-        The group path to use as root.
-    skip_variables : iterable of str or None
-        Variables to exclude from virtualization.
-
-    Methods
-    -------
-    __call__(url, registry)
-        Create a virtual representation of a Zarr store.
-
-    See Also
-    --------
-    virtualizarr.open_virtual_dataset : High-level function for opening virtual datasets.
+    group
+        Path to a specific group within the Zarr store to be used as the Zarr
+        root group for the ManifestStore. Uses forward slashes for nested
+        groups (e.g., "model/output"). Default is None, which uses the store's
+        root group.
+    skip_variables
+        Variables in the Zarr store that will be ignored when creating the
+        ManifestStore. Default is None, which includes all variables.
     """
 
     def __init__(
@@ -152,18 +135,6 @@ class ZarrParser:
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
     ):
-        """
-        Instantiate a parser with parser-specific parameters that can be used in the `__call__` method.
-
-        Parameters
-        ----------
-        group : str | None, optional (default: None)
-            The group within the original Zarr store to be used as the root group for
-            the ManifestStore (default: the Zarr store's root group).
-        skip_variables : Iterable[str] | None, optional (default: None)
-            Variables in the Zarr store that will be ignored when creating the
-            `ManifestStore` (default: None, do not ignore any variables).
-        """
         self.group = group
         self.skip_variables = skip_variables
 
