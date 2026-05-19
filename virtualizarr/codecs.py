@@ -106,7 +106,7 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        if isinstance(dtype, np.dtypes.StringDType) or dtype.kind == "O":
+        if isinstance(dtype, np.dtypes.StringDType):
             arraybytes_codec = VLenUTF8Codec()
         elif dtype.byteorder == ">":
             arraybytes_codec = BytesCodec(endian="big")
