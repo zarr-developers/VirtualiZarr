@@ -1,3 +1,4 @@
+import dataclasses
 import warnings
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
@@ -13,6 +14,7 @@ from virtualizarr.manifests.array_api import (
 from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.utils import ChunkKeySeparator
+from virtualizarr.utils import determine_chunk_grid_shape
 
 if TYPE_CHECKING:
     from zarr.core.metadata.v3 import RegularChunkGridMetadata
@@ -304,6 +306,32 @@ class ManifestArray:
         """
         renamed_manifest = self.manifest.rename_paths(new)
         return ManifestArray(metadata=self.metadata, chunkmanifest=renamed_manifest)
+
+    def with_fill_value_only(self, fill_value: Any) -> "ManifestArray":
+        """
+        Return a new ManifestArray with the same schema (shape, chunks, codecs,
+        dimension names, attributes) as this one, but with an empty chunk
+        manifest and the given ``fill_value``.
+
+        Reads from any chunk in the result return ``fill_value`` (see the Zarr V3
+        spec for missing-chunk semantics). This is useful as a typed placeholder
+        for a variable that is absent from one source but present in others — e.g.
+        concatenating with real data along a new axis without materializing chunks.
+
+        Parameters
+        ----------
+        fill_value
+            The scalar value to store on the metadata; every read from the
+            resulting array returns this value.
+        """
+        # dataclasses.replace bypasses the to_dict/from_dict roundtrip used in
+        # copy_and_replace_metadata, which can't accept raw NaN scalars (to_dict
+        # serializes NaN to the JSON string "NaN")
+        new_metadata = dataclasses.replace(self.metadata, fill_value=fill_value)
+        empty_manifest = ChunkManifest(
+            entries={}, shape=determine_chunk_grid_shape(self.shape, self.chunks)
+        )
+        return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
 
     def to_virtual_variable(self) -> xr.Variable:
         """

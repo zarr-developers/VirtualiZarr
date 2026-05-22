@@ -707,6 +707,86 @@ class TestStackInlined:
         assert result.manifest._inlined[(1, 0)] is payload
 
 
+class TestWithFillValueOnly:
+    def test_returns_manifest_array_with_empty_manifest(self, array_v3_metadata):
+        # with_fill_value_only produces a ManifestArray with the same schema
+        # (shape, chunks, codecs) but an empty manifest — reads from any chunk
+        # will return fill_value
+        shape = (5, 2, 20)
+        chunks = (5, 1, 10)
+        codecs = [ARRAYBYTES_CODEC, ZLIB_CODEC]
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, data_type=np.dtype("float32"), codecs=codecs
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0.0": {"path": "/foo.nc", "offset": 0, "length": 100},
+                    "0.1.1": {"path": "/foo.nc", "offset": 100, "length": 100},
+                },
+            ),
+        )
+
+        result = marr.with_fill_value_only(np.float32("nan"))
+
+        assert isinstance(result, ManifestArray)
+        assert result.shape == shape
+        assert result.chunks == chunks
+        assert result.dtype == np.dtype("float32")
+        # manifest carries no entries — every chunk read will return fill_value
+        assert result.manifest.dict() == {}
+        # fill_value reflects the requested value
+        assert np.isnan(result.metadata.fill_value)
+        # metadata identical to input except for fill_value
+        input_md = marr.metadata.to_dict()
+        result_md = result.metadata.to_dict()
+        input_md.pop("fill_value")
+        result_md.pop("fill_value")
+        assert result_md == input_md
+
+    def test_non_nan_fill_value(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(4, 4), chunks=(2, 2), data_type=np.dtype("int32")
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.nc", "offset": 0, "length": 16}}
+            ),
+        )
+
+        result = marr.with_fill_value_only(7)
+
+        assert isinstance(result, ManifestArray)
+        assert result.metadata.fill_value == 7
+        assert result.manifest.dict() == {}
+
+    def test_preserves_existing_fill_value_when_passed(self, array_v3_metadata):
+        # the canonical "missing variable of known schema" use case: the
+        # placeholder should reuse the array's existing fill_value so its
+        # metadata is byte-identical to the source's
+        metadata = array_v3_metadata(
+            shape=(4, 4),
+            chunks=(2, 2),
+            data_type=np.dtype("float32"),
+            fill_value=np.float32("nan"),
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.nc", "offset": 0, "length": 16}}
+            ),
+        )
+
+        result = marr.with_fill_value_only(marr.metadata.fill_value)
+
+        # NaN != NaN breaks dataclass __eq__, so compare the serialized dicts
+        # where NaN becomes the JSON string "NaN"
+        assert result.metadata.to_dict() == marr.metadata.to_dict()
+        assert result.manifest.dict() == {}
+
+
 def test_refuse_combine(array_v3_metadata):
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
     chunks = (5, 1, 10)
