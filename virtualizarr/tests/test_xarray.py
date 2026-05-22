@@ -540,6 +540,16 @@ class TestOpenVirtualDatasetAttrs:
                 "axis": "Y",
             }
 
+    def test_source_url_stored_in_encoding(self, netcdf4_file, local_registry):
+        # mirrors xarray.open_dataset behaviour of populating ds.encoding["source"]
+        parser = HDFParser()
+        with open_virtual_dataset(
+            url=netcdf4_file,
+            registry=local_registry,
+            parser=parser,
+        ) as vds:
+            assert vds.encoding["source"] == Path(netcdf4_file).as_uri()
+
 
 class TestDetermineCoords:
     def test_infer_one_dimensional_coords(self, netcdf4_file, local_registry):

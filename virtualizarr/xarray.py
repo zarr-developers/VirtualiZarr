@@ -166,10 +166,16 @@ def open_virtual_datatree(
         registry=registry,
     )
 
-    return manifest_store.to_virtual_datatree(
+    vdt = manifest_store.to_virtual_datatree(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
     )
+
+    # mirror xarray.open_datatree behaviour by recording the source url
+    if "source" not in vdt.encoding:
+        vdt.encoding["source"] = filepath
+
+    return vdt
 
 
 def open_virtual_dataset(
@@ -233,7 +239,13 @@ def open_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
     )
-    return ds.drop_vars(list(drop_variables or ()))
+    ds = ds.drop_vars(list(drop_variables or ()))
+
+    # mirror xarray.open_dataset behaviour by recording the source url
+    if "source" not in ds.encoding:
+        ds.encoding["source"] = filepath
+
+    return ds
 
 
 def open_virtual_mfdataset(

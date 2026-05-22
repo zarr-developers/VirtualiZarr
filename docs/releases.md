@@ -6,6 +6,8 @@
 
 - `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
   By [Tom Nicholas](https://github.com/TomNicholas).
+- `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.6.2 (18th May 2026)
 
