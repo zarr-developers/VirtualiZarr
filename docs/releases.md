@@ -1,5 +1,12 @@
 # Release notes
 
+## Unreleased
+
+### New Features
+
+- `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.2 (18th May 2026)
 
 Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
