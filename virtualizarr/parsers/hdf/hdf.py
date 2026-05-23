@@ -35,6 +35,25 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+def _get_fill_value(dataset: H5Dataset):
+    """
+    Extract the fill value from an h5py dataset, handling string/bytes dtypes
+    that don't return numpy scalars from dataset.fillvalue.
+    """
+    try:
+        raw = dataset.fillvalue
+    except RuntimeError:
+        return np.ma.default_fill_value(dataset.dtype)
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8", errors="replace")
+    elif isinstance(raw, str):
+        return raw
+    elif isinstance(raw, np.generic):
+        return raw.item()
+    else:
+        return raw
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -64,6 +83,22 @@ def _construct_manifest_array(
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
 
+    # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
+    # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
+    # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
+    # region references) that would silently be coerced to StringDType and
+    # produce garbage downstream — those aren't supported yet, so fail loudly.
+    if h5py.check_string_dtype(dtype) is not None:
+        dtype = np.dtypes.StringDType()
+    elif dtype.kind == "O":
+        raise NotImplementedError(
+            f"HDF5 object dtype {dtype!r} is not a variable-length string and "
+            f"is not yet supported by HDFParser. h5py exposes vlen arrays "
+            f"(`h5py.vlen_dtype`) and object/region references "
+            f"(`h5py.ref_dtype`, `h5py.regionref_dtype`) as numpy object dtype; "
+            f"please open an issue if your file needs one of these."
+        )
+
     # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
     # cfcodec = cfcodec_from_dataset(dataset)
     # if cfcodec:
@@ -74,13 +109,13 @@ def _construct_manifest_array(
     # else:
     # dtype = dataset.dtype
 
-    if "_FillValue" in attrs:
+    if "_FillValue" in attrs and dtype.kind not in ("S", "U", "O", "T"):
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
     codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
 
-    fill_value = dataset.fillvalue.item()
+    fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
     metadata = create_v3_array_metadata(
         shape=dataset.shape,
