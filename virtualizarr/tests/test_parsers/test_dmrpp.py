@@ -601,9 +601,7 @@ def test_dmrpp_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url)
         # ManifestArray rather than on the Variable's arbitrary attrs (see
         # ManifestArray.to_virtual_variable).
         assert vds_g1["data"].attrs == {}
-        assert vds_g1["data"].variable.data.metadata.attributes == {
-            "_FillValue": -999
-        }
+        assert vds_g1["data"].variable.data.metadata.attributes == {"_FillValue": -999}
 
 
 def test_dmrpp_phony_dim_naming():

@@ -374,9 +374,7 @@ class ManifestArray:
         split_metadata = utils.copy_and_replace_metadata(
             self.metadata, new_dimension_names=None, new_attributes=cf_attrs
         )
-        split_marr = ManifestArray(
-            chunkmanifest=self.manifest, metadata=split_metadata
-        )
+        split_marr = ManifestArray(chunkmanifest=self.manifest, metadata=split_metadata)
 
         return xr.Variable(
             data=split_marr,

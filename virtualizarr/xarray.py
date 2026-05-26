@@ -58,9 +58,7 @@ def extract_cf_encoding_attrs(var: xr.Variable) -> dict[str, object]:
             f"ManifestArray, got {type(var.data).__name__}"
         )
     return {
-        k: v
-        for k, v in var.data.metadata.attributes.items()
-        if k in CF_ENCODING_ATTRS
+        k: v for k, v in var.data.metadata.attributes.items() if k in CF_ENCODING_ATTRS
     }
 
 
