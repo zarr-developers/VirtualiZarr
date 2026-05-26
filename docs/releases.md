@@ -12,7 +12,7 @@
 ### Bug fixes
 
 - Detect mismatched CF decoding attributes (`scale_factor`, `add_offset`, `_FillValue`, `missing_value`) when concatenating virtual datasets. Previously, `xr.concat` on two virtual datasets whose source files were CF-packed with different scale/offset values silently kept only the first array's attrs, so the surviving values were applied to every chunk after `decode_cf` — corrupting decoded values for everything sourced from non-first files. CF decoding attrs now live on the inner `ManifestArray.metadata.attributes` (where `np.concatenate` dispatch can inspect them) rather than on the wrapping `xr.Variable.attrs`, and `check_combinable_zarr_arrays` raises `ValueError` on any mismatch. Round-trip through the icechunk and kerchunk writers is unchanged. Closes [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
-  ([#XXXX](https://github.com/zarr-developers/VirtualiZarr/pull/XXXX)).
+  ([#1005](https://github.com/zarr-developers/VirtualiZarr/pull/1005)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.6.2 (18th May 2026)
