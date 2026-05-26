@@ -228,3 +228,94 @@ def test_netcdf_over_https():
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
         np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
+
+
+def _write_packed_hdf5(
+    path, *, x_start, x_len, scale_factor, add_offset, fill_value=-9999
+):
+    """Write a small CF-packed int16 HDF5 file with the given scale/offset attrs."""
+    with h5py.File(path, "w") as f:
+        data = np.arange(x_start, x_start + x_len, dtype="int16").reshape(x_len, 1)
+        d = f.create_dataset("foo", data=data, chunks=(x_len, 1))
+        d.attrs["scale_factor"] = np.float64(scale_factor)
+        d.attrs["add_offset"] = np.float64(add_offset)
+        d.attrs["_FillValue"] = np.int16(fill_value)
+        x = f.create_dataset(
+            "x", data=np.arange(x_start, x_start + x_len, dtype="int32")
+        )
+        x.make_scale("x")
+        d.dims[0].attach_scale(x)
+        y = f.create_dataset("y", data=np.arange(1, dtype="int32"))
+        y.make_scale("y")
+        d.dims[1].attach_scale(y)
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestConcatMismatchedCFEncoding:
+    """
+    Concatenating virtual datasets whose source files were CF-packed with
+    different scale_factor / add_offset / _FillValue must not silently keep
+    only the first file's attrs — doing so corrupts decoded values for every
+    chunk that did not come from the first file.
+    """
+
+    def test_concat_mismatched_scale_factor_raises(self, tmp_path, local_registry):
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.01, add_offset=0.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            with pytest.raises(ValueError, match="scale_factor"):
+                xr.concat([vds1, vds2], dim="x")
+
+    def test_concat_mismatched_add_offset_raises(self, tmp_path, local_registry):
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.1, add_offset=100.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            with pytest.raises(ValueError, match="add_offset"):
+                xr.concat([vds1, vds2], dim="x")
+
+    def test_concat_matching_cf_encoding_succeeds(self, tmp_path, local_registry):
+        # positive control: identical CF encoding must still concatenate cleanly,
+        # and the decoding attrs must survive on the concatenated ManifestArray
+        # so that the next writer can materialize them in the destination store.
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.1, add_offset=0.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            combined = xr.concat([vds1, vds2], dim="x")
+            assert combined["foo"].shape == (8, 1)
+            combined_attrs = combined["foo"].variable.data.metadata.attributes
+            assert combined_attrs["scale_factor"] == 0.1
+            assert combined_attrs["add_offset"] == 0.0

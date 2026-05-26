@@ -219,6 +219,46 @@ def check_compatible_encodings(encoding1, encoding2):
                 )
 
 
+# CF-convention attributes that control how packed chunk values are decoded.
+# These live on `ManifestArray.metadata.attributes` rather than on the
+# wrapping `xr.Variable.attrs`, so that mismatched values across concat
+# inputs can be detected by `check_combinable_zarr_arrays` before the
+# silent "first array wins" inheritance corrupts decoded values.
+# Kept in sync with `virtualizarr.writers.icechunk.ENCODING_KEYS`.
+CF_ENCODING_ATTRS = frozenset(
+    {"_FillValue", "missing_value", "scale_factor", "add_offset"}
+)
+
+
+def check_same_cf_encoding_attrs(
+    attrs_list: list[dict[str, Any]],
+) -> None:
+    """Check that CF decoding-relevant attributes agree across all arrays."""
+    first_attrs, *other_attrs_list = attrs_list
+    for other_attrs in other_attrs_list:
+        for key in CF_ENCODING_ATTRS:
+            in_first = key in first_attrs
+            in_other = key in other_attrs
+            if in_first != in_other:
+                present, missing = (
+                    ("first", "other") if in_first else ("other", "first")
+                )
+                raise ValueError(
+                    f"Cannot concatenate arrays with inconsistent CF encoding: "
+                    f"attribute {key!r} is present on the {present} array but "
+                    f"missing on the {missing} array. Mixing chunks with and "
+                    f"without {key} would silently corrupt decoded values."
+                )
+            if in_first and first_attrs[key] != other_attrs[key]:
+                raise ValueError(
+                    f"Cannot concatenate arrays with inconsistent CF encoding "
+                    f"attribute {key!r}: {first_attrs[key]!r} vs "
+                    f"{other_attrs[key]!r}. Applying one value's decoding to "
+                    f"chunks packed with the other would silently corrupt "
+                    f"decoded values."
+                )
+
+
 def check_same_codecs(codecs: list[Any]) -> None:
     first_codec, *other_codecs = codecs
     for codec in other_codecs:
@@ -325,6 +365,8 @@ def check_combinable_zarr_arrays(
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
     """
+    arrays = list(arrays)
+
     check_same_dtypes([arr.dtype for arr in arrays])
 
     # Can't combine different codecs in one manifest
@@ -333,6 +375,10 @@ def check_combinable_zarr_arrays(
 
     # Would require variable-length chunks ZEP
     check_same_chunk_shapes([arr.chunks for arr in arrays])
+
+    # Mismatched CF decoding attrs across inputs would silently corrupt values
+    # once the concatenated array is decoded by xarray.
+    check_same_cf_encoding_attrs([dict(arr.metadata.attributes) for arr in arrays])
 
 
 def check_compatible_arrays(

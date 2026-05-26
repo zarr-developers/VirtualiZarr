@@ -338,10 +338,19 @@ class ManifestArray:
         Create a "virtual" xarray.Variable containing the contents of one zarr array.
 
         The returned variable will be "virtual", i.e. it will wrap a single ManifestArray object.
+
+        Attributes are split by role:
+
+        - CF decoding attributes (`scale_factor`, `add_offset`, `_FillValue`,
+          `missing_value`) stay on the inner ManifestArray. This is the
+          canonical home: a value mismatch across concat inputs would
+          silently corrupt decoded chunks, so it must be detectable at the
+          ManifestArray layer where np.concatenate dispatches.
+        - All other attributes are treated as arbitrary metadata and move
+          onto the wrapping `xr.Variable`, matching xarray's data model
+          for attrs.
         """
 
-        # The xarray data model stores dimension names and arbitrary extra metadata outside of the wrapped array class,
-        # so to avoid that information being duplicated we strip it from the ManifestArray before wrapping it.
         if self.metadata.dimension_names is not None:
             dims = self.metadata.dimension_names
         elif self.ndim == 0:
@@ -350,16 +359,25 @@ class ManifestArray:
             raise ValueError(
                 f"Cannot create virtual variable from {self.ndim}-dimensional array without dimension names."
             )
-        attrs = self.metadata.attributes
-        stripped_metadata = utils.copy_and_replace_metadata(
-            self.metadata, new_dimension_names=None, new_attributes={}
+
+        cf_attrs = {
+            k: v
+            for k, v in self.metadata.attributes.items()
+            if k in utils.CF_ENCODING_ATTRS
+        }
+        var_attrs = {
+            k: v
+            for k, v in self.metadata.attributes.items()
+            if k not in utils.CF_ENCODING_ATTRS
+        }
+
+        split_metadata = utils.copy_and_replace_metadata(
+            self.metadata, new_dimension_names=None, new_attributes=cf_attrs
         )
-        stripped_marr = ManifestArray(
-            chunkmanifest=self.manifest, metadata=stripped_metadata
-        )
+        split_marr = ManifestArray(chunkmanifest=self.manifest, metadata=split_metadata)
 
         return xr.Variable(
-            data=stripped_marr,
+            data=split_marr,
             dims=dims,
-            attrs=attrs,
+            attrs=var_attrs,
         )

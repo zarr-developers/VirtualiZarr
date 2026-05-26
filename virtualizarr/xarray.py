@@ -25,6 +25,7 @@ from xarray.structure.combine import _infer_concat_order_from_positions, _nested
 
 from virtualizarr.manifests import ManifestArray, ManifestGroup, ManifestStore
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
+from virtualizarr.manifests.utils import CF_ENCODING_ATTRS
 from virtualizarr.parallel import get_executor
 from virtualizarr.parsers.typing import Parser
 from virtualizarr.utils import compose
@@ -35,6 +36,30 @@ if TYPE_CHECKING:
         CompatOptions,
         JoinOptions,
     )
+
+
+def extract_cf_encoding_attrs(var: xr.Variable) -> dict[str, object]:
+    """
+    Return the CF decoding attributes hidden on the inner `ManifestArray` of
+    a virtual xarray Variable.
+
+    [ManifestArray.to_virtual_variable][virtualizarr.manifests.ManifestArray.to_virtual_variable]
+    splits attributes by role: the CF decoding attrs in
+    [CF_ENCODING_ATTRS][virtualizarr.manifests.utils.CF_ENCODING_ATTRS]
+    stay on the inner `ManifestArray.metadata.attributes` so concat can
+    detect mismatches, while arbitrary attrs sit on `xr.Variable.attrs`.
+    Writers materializing the destination store call this to pull the CF
+    attrs back out so they can write them alongside the variable's other
+    attrs.
+    """
+    if not isinstance(var.data, ManifestArray):
+        raise TypeError(
+            "extract_cf_encoding_attrs requires a variable wrapping a "
+            f"ManifestArray, got {type(var.data).__name__}"
+        )
+    return {
+        k: v for k, v in var.data.metadata.attributes.items() if k in CF_ENCODING_ATTRS
+    }
 
 
 def open_virtual_datatree(
