@@ -24,6 +24,7 @@ from virtualizarr.manifests.utils import (
     check_same_shapes_except_axes,
     check_same_shapes_except_on_concat_axis,
 )
+from virtualizarr.xarray import extract_cf_encoding_attrs
 
 if TYPE_CHECKING:
     from icechunk import (
@@ -530,7 +531,11 @@ def write_virtual_variable_to_icechunk(
             fill_value=metadata.fill_value,
         )
 
-        update_attributes(arr, var.attrs, encoding=var.encoding)
+        update_attributes(
+            arr,
+            {**extract_cf_encoding_attrs(var), **var.attrs},
+            encoding=var.encoding,
+        )
 
     write_manifest_to_icechunk(
         store=store,

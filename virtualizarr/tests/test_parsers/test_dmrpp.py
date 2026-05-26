@@ -597,7 +597,13 @@ def test_dmrpp_empty_scalar_warns_container(fill_value_scalar_no_chunks_nc4_url)
     with pytest.warns(UserWarning):
         parsed_vds = parsed_dmrpp.parse_dataset(object_store=store)
         vds_g1 = parsed_vds.to_virtual_dataset()
-        assert vds_g1["data"].attrs == {"_FillValue": -999}
+        # _FillValue is a CF decoding attribute, which lives on the inner
+        # ManifestArray rather than on the Variable's arbitrary attrs (see
+        # ManifestArray.to_virtual_variable).
+        assert vds_g1["data"].attrs == {}
+        assert vds_g1["data"].variable.data.metadata.attributes == {
+            "_FillValue": -999
+        }
 
 
 def test_dmrpp_phony_dim_naming():

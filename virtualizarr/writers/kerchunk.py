@@ -17,6 +17,7 @@ from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.utils import convert_v3_to_v2_metadata
+from virtualizarr.xarray import extract_cf_encoding_attrs
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -130,7 +131,7 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
                     entry["length"],
                 ]
         array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
-        zattrs = {**var.attrs, **var.encoding}
+        zattrs = {**extract_cf_encoding_attrs(var), **var.attrs, **var.encoding}
     else:
         var = encode_zarr_variable(var)
         try:

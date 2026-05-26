@@ -297,7 +297,9 @@ class TestConcatMismatchedCFEncoding:
                 xr.concat([vds1, vds2], dim="x")
 
     def test_concat_matching_cf_encoding_succeeds(self, tmp_path, local_registry):
-        # positive control: identical CF encoding must still concatenate cleanly
+        # positive control: identical CF encoding must still concatenate cleanly,
+        # and the decoding attrs must survive on the concatenated ManifestArray
+        # so that the next writer can materialize them in the destination store.
         p1 = tmp_path / "a.nc"
         p2 = tmp_path / "b.nc"
         _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
@@ -314,5 +316,6 @@ class TestConcatMismatchedCFEncoding:
         ):
             combined = xr.concat([vds1, vds2], dim="x")
             assert combined["foo"].shape == (8, 1)
-            assert combined["foo"].attrs["scale_factor"] == 0.1
-            assert combined["foo"].attrs["add_offset"] == 0.0
+            combined_attrs = combined["foo"].variable.data.metadata.attributes
+            assert combined_attrs["scale_factor"] == 0.1
+            assert combined_attrs["add_offset"] == 0.0
