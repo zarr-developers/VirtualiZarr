@@ -9,6 +9,12 @@
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Bug fixes
+
+- Detect mismatched CF decoding attributes (`scale_factor`, `add_offset`, `_FillValue`, `missing_value`) when concatenating virtual datasets. Previously, `xr.concat` on two virtual datasets whose source files were CF-packed with different scale/offset values silently kept only the first array's attrs, so the surviving values were applied to every chunk after `decode_cf` — corrupting decoded values for everything sourced from non-first files. CF decoding attrs now live on the inner `ManifestArray.metadata.attributes` (where `np.concatenate` dispatch can inspect them) rather than on the wrapping `xr.Variable.attrs`, and `check_combinable_zarr_arrays` raises `ValueError` on any mismatch. Round-trip through the icechunk and kerchunk writers is unchanged. Closes [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+  ([#XXXX](https://github.com/zarr-developers/VirtualiZarr/pull/XXXX)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.2 (18th May 2026)
 
 Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
