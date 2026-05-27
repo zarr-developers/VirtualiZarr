@@ -290,6 +290,9 @@ If you're not familiar with any of these functions we recommend you skim through
 !!! important
     Currently the virtual approach requires the same chunking and encoding across datasets. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
 
+!!! warning
+    CF encoding attributes (such as `scale_factor` and `add_offset`) must also be consistent across files. Unlike the chunking/codec/dtype requirements above, a mismatch here will _not_ raise an error — xarray's default attribute-merging behaviour can silently drop conflicting values, leaving you with a combined dataset that is decoded incorrectly on read. See [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) and the [FAQ](faq.md#can-my-specific-data-be-virtualized) for details.
+
 ### Manual concatenation ordering
 
 The simplest case of concatenation is when you have a set of files and you know the order in which they should be concatenated, _without looking inside the files_.
