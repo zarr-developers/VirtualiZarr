@@ -9,7 +9,7 @@ from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group
 from zarr.core.buffer import default_buffer_prototype
-from zarr.core.chunk_key_encodings import ChunkKeyEncoding
+from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.sync import sync
 
 from virtualizarr.codecs import extract_codecs, get_codecs
@@ -537,7 +537,6 @@ def write_virtual_variable_to_icechunk(
         group=group,
         arr_name=name,
         manifest=ma.manifest,
-        chunk_key_encoding=ma.metadata.chunk_key_encoding,
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
@@ -548,7 +547,6 @@ def write_manifest_to_icechunk(
     group: "Group",
     arr_name: str,
     manifest: ChunkManifest,
-    chunk_key_encoding: ChunkKeyEncoding,
     chunk_index_offsets: tuple[int, ...],
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -584,7 +582,6 @@ def write_manifest_to_icechunk(
             write_inlined_chunks_as_native(
                 store=store,
                 key_prefix=key_prefix,
-                chunk_key_encoding=chunk_key_encoding,
                 inlined=manifest._inlined,
                 chunk_index_offsets=chunk_index_offsets,
             )
@@ -614,11 +611,17 @@ def write_manifest_to_icechunk(
 async def write_inlined_chunks_as_native(
     store: "IcechunkStore",
     key_prefix: str,
-    chunk_key_encoding: ChunkKeyEncoding,
     inlined: Mapping[tuple[int, ...], bytes],
     chunk_index_offsets: tuple[int, ...],
 ) -> None:
-    """Write each inlined chunk as a native chunk at its zarr chunk key."""
+    """Write each inlined chunk as a native chunk at its zarr chunk key.
+
+    Icechunk's ``Key::parse`` only accepts the standard zarr v3 ``/``-separated
+    ``c/i0/i1/...`` chunk-key form; the manifest's stored chunk_key_encoding
+    uses ``.`` (the ManifestStore's internal convention), so we encode with a
+    slash-separated encoding here regardless.
+    """
+    encoding = DefaultChunkKeyEncoding(separator="/")
     prototype = default_buffer_prototype()
     has_offset = any(chunk_index_offsets)
     coros = []
@@ -628,7 +631,7 @@ async def write_inlined_chunks_as_native(
             if has_offset
             else chunk_idx
         )
-        encoded_chunk_key = chunk_key_encoding.encode_chunk_key(shifted_idx)
+        encoded_chunk_key = encoding.encode_chunk_key(shifted_idx)
         coros.append(
             store.set(
                 f"{key_prefix}/{encoded_chunk_key}",

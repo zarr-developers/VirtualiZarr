@@ -23,9 +23,17 @@ You can also run tests in other environments:
 
 ```bash
 pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
-pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
 # List which versions are installed in the `min-deps` environment
 pixi list --environment min-deps
+```
+
+To test against unreleased dev versions of upstream libraries (xarray, zarr, numcodecs, etc.),
+install the regular `upstream` env and then pip-overlay the dev versions on top:
+
+```bash
+pixi install --environment upstream
+pixi run -e upstream install-upstream-overrides
+pixi run --environment upstream run-tests
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test

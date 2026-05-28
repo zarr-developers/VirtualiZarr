@@ -32,6 +32,7 @@ When virtualizing multi-file datasets, it is sometimes the case that it is possi
 - **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
 - **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
 - **Homogeneous data types** - The zarr data model assumes that every chunk of data in a single array decodes to the same data type (i.e. dtype). For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent data types your data cannot be virtualized. This is arguably inherent to the concept of what an array is.
+- **Homogeneous CF encoding** - Many tools (including Xarray) apply an additional decoding step upon opening which interprets the values of specific [CF-conventions](https://cfconventions.org/)-compliant attribute fields such as `scale_factor` and `add_offset`. This decoding is applied per-variable, but Xarray/VirtualiZarr's default attribute concatenation behaviour is to merge all attributes by overwriting. This means that concatenating two virtual datasets created from netCDF files with different values of `scale_factor` and `add_offset` can create a result which is silently decoded incorrectly by Xarray! We know this is a major footgun, and have plans to resolve it via pushing these extra encoding steps down to also become Zarr codecs (see [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) for more details).
 - **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
 
 If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
@@ -101,6 +102,49 @@ vds.vz.to_icechunk(icechunkstore)
 
 No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`.
 
+### I already have some data in Icechunk — can I virtualize it without rewriting?
+
+Yes — use the [`IcechunkParser`][virtualizarr.parsers.IcechunkParser]. It walks an existing icechunk repository and returns a VirtualiZarr [`ManifestStore`][virtualizarr.manifests.ManifestStore] in which:
+
+- icechunk virtual refs become VZ virtual refs (URLs preserved),
+- icechunk native (managed) chunks become VZ virtual refs whose paths are `{native_chunks_prefix}/{chunk_id}`,
+- icechunk inline chunks stay inline.
+
+There are two entry points. The protocol-conformant one matches every other parser and works through [`open_virtual_dataset`][virtualizarr.open_virtual_dataset]:
+
+```python
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import IcechunkParser
+
+vds = open_virtual_dataset(
+    url="s3://my-bucket/my-repo",
+    registry=registry,
+    parser=IcechunkParser(),
+)
+```
+
+Native chunk paths are rendered as `f"{url}/chunks/{chunk_id}"` — icechunk's format-constant chunks directory for the repo at that URL.
+
+If you already have an open icechunk Session in hand (the common case if you're using icechunk in the same process), use the `parse_session` escape hatch to skip re-opening the repo:
+
+```python
+import icechunk
+
+repo = icechunk.Repository.open(storage=...)
+session = repo.readonly_session(branch="main")
+
+manifest_store = IcechunkParser().parse_session(
+    session,
+    registry=registry,
+    native_chunks_prefix="s3://my-bucket/my-repo/chunks",
+)
+```
+
+`native_chunks_prefix` is required here — without a URL the parser can't derive a default.
+
+!!! note
+    `IcechunkParser` requires `icechunk >= 2.0.5` (it uses the `IcechunkStore.array_chunk_iterator` API added in that release). The `to_icechunk` writer still works against `icechunk >= 2.0.3`, so VirtualiZarr's `[icechunk]` extra is not bumped — only parser users need to upgrade. `IcechunkParser()` raises `ImportError` with an upgrade hint if it detects an older icechunk at construction time.
+
 ### Can I add a new parser for my custom file format?
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
@@ -154,6 +198,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=VirtualTIFF())`, via [virtual_tiff](https://github.com/virtual-zarr/virtual-tiff)                                                              |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                       |
 | From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
+| From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser().parse_session(session, registry, native_chunks_prefix=...)` if you already have an open icechunk session |
 | From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., parser=FITSParser())`, via `kerchunk.fits.process_file`                                                                                      |
 | From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |
@@ -174,7 +219,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Renaming dimensions              | ❌                                                                                                                                  | `xarray.Dataset.rename_dims`                                                                                                                          |
 | Renaming manifest file paths | `kerchunk.utils.rename_target`                                                                                                                                  | `vds.vz.rename_paths`                                                                                                                          |
 | Splitting uncompressed data into chunks | `kerchunk.utils.subchunk`                                                                                                                                  | `xarray.Dataset.chunk` (❌ Not yet implemented - see [PR #199](https://github.com/zarr-developers/VirtualiZarr/pull/199))
-| Selecting specific chunks | ❌                                                                                                                                  | `xarray.Dataset.isel` (❌ Not yet implemented - see [issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51))                                                                                                                          |
+| Selecting specific chunks | ❌                                                                                                                                  | `xarray.Dataset.isel` (✅ chunk-aligned selections only)                                                                                                                          |
 **Parallelization**                                                      |                                                                                                                                     |                                                                                                                                                  |
 | Parallelized generation of references                                    | Wrapping kerchunk's opener inside `dask.delayed`                                                                                    | Wrapping `open_virtual_dataset` inside `dask.delayed`
 | Parallelized combining of references (tree-reduce)                       | `kerchunk.combine.auto_dask`                                                                                                        | Wrapping `ManifestArray` objects within `dask.array.Array` objects inside `xarray.Dataset` to use dask's `concatenate` (⚠️ Untested, but also unnecessary)                         |

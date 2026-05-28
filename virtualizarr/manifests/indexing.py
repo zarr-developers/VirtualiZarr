@@ -1,9 +1,13 @@
 from types import EllipsisType
-from typing import TYPE_CHECKING, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard, cast
 
 import numpy as np
+from zarr.codecs import BytesCodec, TransposeCodec
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
+from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.manifests.utils import copy_and_replace_metadata
 
 # indexer with only basic selectors, no new axes or ellipsis
 T_BasicIndexer_1d: TypeAlias = int | slice | np.ndarray
@@ -12,6 +16,12 @@ T_SimpleIndexer_1d: TypeAlias = T_BasicIndexer_1d | None
 # general valid indexer representing any possible user input
 T_Indexer_1d: TypeAlias = T_SimpleIndexer_1d | EllipsisType
 T_Indexer: TypeAlias = T_Indexer_1d | tuple[T_Indexer_1d, ...]
+
+
+class SubChunkIndexingError(ValueError):
+    """
+    Raised when an indexer would split individual chunks of a compressed ManifestArray.
+    """
 
 
 if TYPE_CHECKING:
@@ -138,56 +148,324 @@ def apply_indexer(
 def apply_selection(
     marr: "ManifestArray", indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...]
 ) -> "ManifestArray":
-    """Applies indexes to subset along each dimension."""
+    """
+    Apply chunk-aligned subsetting along each dimension.
+
+    Slices and integer indexers are only supported if they align with chunk boundaries, since
+    splitting individual chunks would require loading their bytes. See GitHub issue #51.
+
+    Integer indexers drop the indexed axis (numpy / array-API semantics); slice indexers
+    preserve it. Integer indexing is only legal when ``chunk_size == 1`` along that axis,
+    since picking a single element of a larger chunk would require splitting it.
+    """
+    from virtualizarr.manifests.array import ManifestArray
 
     # at this point there should be no ellipsis, no Nones, and one 1D indexer for each axis.
     assert len(indexer_without_newaxes) == marr.ndim
 
-    output_arr = marr
-    for axis, (length, indexer_1d) in enumerate(
-        zip(marr.shape, indexer_without_newaxes)
-    ):
-        output_arr = apply_selection_1d(output_arr, indexer_1d, length)
-
-    return output_arr
-
-
-def apply_selection_1d(
-    marr: "ManifestArray", indexer_1d: T_BasicIndexer_1d, length: int
-) -> "ManifestArray":
-    """
-    Actually index the ManifestArray along 1 dimension.
-
-    Notice that none of these options actually do any indexing right now!
-    """
-
-    if isinstance(indexer_1d, slice):
-        if slice_is_no_op(indexer_1d, axis_length=length):
-            pass
-        else:
-            NotImplementedError(
-                f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
+    # validate types and reject anything we can never support per-axis
+    narrowed_indexers: list[int | slice] = []
+    for indexer_1d in indexer_without_newaxes:
+        if isinstance(indexer_1d, np.ndarray):
+            raise NotImplementedError(
+                f"Unsupported indexer. So-called 'fancy indexing' via numpy arrays is not supported, but received {indexer_1d}"
             )
-    elif isinstance(indexer_1d, int):
-        # TODO cover possibility of indexing into a length-1 dimension (which just removes that dimension)?
-        raise NotImplementedError(
-            f"Unsupported indexer. Indexing within a ManifestArray using ints or slices is not yet supported (see GitHub issue #51), but received {indexer_1d}"
-        )
-    elif isinstance(indexer_1d, np.ndarray):
-        raise NotImplementedError(
-            f"Unsupported indexer. So-called 'fancy indexing' via numpy arrays is not supported, but received {indexer_1d}"
-        )
+        if not isinstance(indexer_1d, (int, slice)):
+            raise TypeError(f"Invalid indexer type: {indexer_1d}")
+        narrowed_indexers.append(indexer_1d)
+
+    sub_chunk_axis = _uncompressed_sub_chunk_axis(marr.metadata)
+
+    new_shape: list[int] = []
+    new_chunks: list[int] = []
+    chunk_grid_selectors: list[int | slice] = []
+    kept_axes: list[int] = []
+    # At most one sub-chunk axis (whichever axis has the largest byte stride in storage).
+    # The byte adjustment is uniform across every surviving chunk, since chunks share layout.
+    sub_chunk_byte_adjust: tuple[int, int] | None = None
+    for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
+        zip(marr.shape, marr.chunks, narrowed_indexers, strict=True)
+    ):
+        chunk_grid_selector: int | slice
+        if axis == sub_chunk_axis and _is_sub_chunk_slice(
+            indexer_1d, axis_length, chunk_size
+        ):
+            chunk_grid_selector, new_axis_length, sub_chunk_byte_adjust = (
+                _compute_sub_chunk_axis_selection(
+                    indexer_1d,
+                    axis_length=axis_length,
+                    chunk_size=chunk_size,
+                    other_axis_chunks=tuple(
+                        c for i, c in enumerate(marr.chunks) if i != axis
+                    ),
+                    itemsize=marr.dtype.itemsize,
+                )
+            )
+            new_chunks_for_axis = new_axis_length
+        else:
+            chunk_grid_selector, new_axis_length = _compute_chunk_aligned_selection_1d(
+                indexer_1d, axis_length=axis_length, chunk_size=chunk_size
+            )
+            new_chunks_for_axis = chunk_size
+
+        chunk_grid_selectors.append(chunk_grid_selector)
+        # int indexers drop the axis from the output array; slices preserve it (including the
+        # sub-chunk path, which uses a length-1 chunk-grid slice selector).
+        if not isinstance(indexer_1d, int):
+            new_shape.append(new_axis_length)
+            new_chunks.append(new_chunks_for_axis)
+            kept_axes.append(axis)
+
+    chunk_grid_selectors_tuple = tuple(chunk_grid_selectors)
+
+    # short-circuit if every axis selects the whole chunk grid via a slice (a no-op).
+    # A pending sub-chunk byte adjustment is real work even if its single source chunk
+    # happens to span the whole chunk grid along that axis, so don't short-circuit then.
+    if sub_chunk_byte_adjust is None and all(
+        isinstance(cgs, slice) and cgs == slice(0, dim, 1)
+        for cgs, dim in zip(chunk_grid_selectors_tuple, marr.manifest.shape_chunk_grid)
+    ):
+        return marr
+
+    new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
+    if sub_chunk_byte_adjust is not None:
+        new_manifest = _shift_manifest_byte_ranges(new_manifest, *sub_chunk_byte_adjust)
+    old_dimension_names = marr.metadata.dimension_names
+    # zarr's dimension_names is tuple[str | None, ...] but copy_and_replace_metadata's
+    # type hint says Iterable[str]; the runtime handles None entries fine, so cast through.
+    new_dimension_names: Any
+    if old_dimension_names is None:
+        new_dimension_names = "default"  # sentinel: leave as None
     else:
-        # should never get here
-        raise TypeError(f"Invalid indexer type: {indexer_1d}")
+        new_dimension_names = tuple(old_dimension_names[a] for a in kept_axes)
+    new_metadata = copy_and_replace_metadata(
+        marr.metadata,
+        new_shape=new_shape,
+        new_chunks=new_chunks,
+        new_dimension_names=new_dimension_names,
+    )
+    return ManifestArray(metadata=new_metadata, chunkmanifest=new_manifest)
 
-    return marr
 
+def _compute_chunk_aligned_selection_1d(
+    indexer_1d: int | slice, axis_length: int, chunk_size: int
+) -> tuple[int | slice, int]:
+    """
+    Translate a 1D array-space indexer (int or slice) into a chunk-grid selector plus the
+    new axis length. The selector is an ``int`` for int indexers (so the chunk-grid axis
+    is dropped) and a ``slice`` for slice indexers (so the chunk-grid axis is preserved).
 
-def slice_is_no_op(slice_indexer_1d: slice, axis_length: int) -> bool:
-    if slice_indexer_1d == slice(None):
-        return True
-    elif slice_indexer_1d == slice(0, axis_length, 1):
-        return True
+    Raises SubChunkIndexingError if the selection would require splitting individual chunks.
+    """
+    if isinstance(indexer_1d, int):
+        i = indexer_1d
+        if i < 0:
+            # Allow negative indexing - this makes it wrap around
+            i += axis_length
+        if not (0 <= i < axis_length):
+            raise IndexError(
+                f"index {indexer_1d} is out of bounds for axis with size {axis_length}"
+            )
+        start, stop, step = i, i + 1, 1
     else:
+        start, stop, step = indexer_1d.indices(axis_length)
+
+    # The final chunk may legitimately be partial, so allow stop == axis_length even if
+    # axis_length % chunk_size != 0; otherwise both endpoints must land on chunk boundaries.
+    # TODO step != 1 we can actually support for uncompressed arrays along the first axis,
+    # see https://github.com/zarr-developers/VirtualiZarr/issues/86
+    if (
+        step != 1
+        or start % chunk_size != 0
+        or (stop != axis_length and stop % chunk_size != 0)
+    ):
+        raise SubChunkIndexingError(
+            f"Cannot index ManifestArray axis of length {axis_length} and chunk length "
+            f"{chunk_size} with {indexer_1d!r}: slice would split individual chunks, "
+            "which a ManifestArray cannot do without loading the underlying data."
+        )
+
+    chunk_start = start // chunk_size
+
+    if isinstance(indexer_1d, int):
+        # int indexer drops the array axis, so the chunk-grid axis is dropped too via an int selector
+        return chunk_start, 1
+
+    # slice indexer: ceil-divide stop so a partial final chunk is included when stop == axis_length
+    chunk_stop = -(-stop // chunk_size)
+    return slice(chunk_start, chunk_stop, 1), stop - start
+
+
+def _compute_sub_chunk_axis_selection(
+    indexer_1d: slice,
+    axis_length: int,
+    chunk_size: int,
+    other_axis_chunks: tuple[int, ...],
+    itemsize: int,
+) -> tuple[slice, int, tuple[int, int]]:
+    """
+    Translate a sub-chunk slice along the eligible (largest-stride) storage axis into a
+    chunk-grid selector, an output axis length, and a uniform byte adjustment
+    ``(offset_delta, new_chunk_byte_length)`` applied to every surviving chunk reference.
+
+    Callers must have already confirmed that this slice is sub-chunk-eligible via
+    ``_is_sub_chunk_slice`` and that the array is uncompressed via
+    ``_uncompressed_sub_chunk_axis``.
+    """
+    start, stop, _ = indexer_1d.indices(axis_length)
+    chunk_index = start // chunk_size
+    new_axis_length = stop - start
+    # Bytes per index step along this axis within one chunk is the product of every
+    # *other* axis's chunk size, times itemsize. Order doesn't matter since the product
+    # is commutative.
+    stride_bytes = int(np.prod(other_axis_chunks)) * itemsize
+    inner_offset_bytes = (start - chunk_index * chunk_size) * stride_bytes
+    sub_chunk_byte_adjust = (inner_offset_bytes, new_axis_length * stride_bytes)
+    return (
+        slice(chunk_index, chunk_index + 1, 1),
+        new_axis_length,
+        sub_chunk_byte_adjust,
+    )
+
+
+def _subset_manifest(
+    manifest: ChunkManifest, chunk_grid_selectors: tuple[int | slice, ...]
+) -> ChunkManifest:
+    """
+    Subset a ChunkManifest by indexing its underlying chunk-grid arrays. Each entry of
+    ``chunk_grid_selectors`` is either an int (which drops the corresponding chunk-grid axis)
+    or a slice (which keeps it).
+    """
+    # When every axis is int-indexed, numpy returns a 0D scalar (Python str for StringDType,
+    # numpy scalar for the numeric arrays). Wrap back into a 0D ndarray so from_arrays accepts it.
+    # np.asarray's return type erases the dtype param, so cast back to keep from_arrays happy.
+    new_paths = cast(
+        "np.ndarray[Any, np.dtypes.StringDType]",
+        np.asarray(manifest._paths[chunk_grid_selectors], dtype=manifest._paths.dtype),
+    )
+    new_offsets = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.asarray(
+            manifest._offsets[chunk_grid_selectors], dtype=manifest._offsets.dtype
+        ),
+    )
+    new_lengths = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.asarray(
+            manifest._lengths[chunk_grid_selectors], dtype=manifest._lengths.dtype
+        ),
+    )
+
+    if manifest._inlined:
+        # For each old chunk-grid key, keep it only if int-indexed axes match exactly and
+        # slice-indexed axes fall inside the slice. Re-map the surviving key by omitting
+        # int-indexed positions and offsetting slice-indexed positions by the slice start.
+        new_inlined: dict[tuple[int, ...], bytes] = {}
+        for coords, data in manifest._inlined.items():
+            new_coord: list[int] = []
+            keep = True
+            for coord, sel in zip(coords, chunk_grid_selectors):
+                if isinstance(sel, int):
+                    if coord != sel:
+                        keep = False
+                        break
+                else:
+                    if not (sel.start <= coord < sel.stop):
+                        keep = False
+                        break
+                    new_coord.append(coord - sel.start)
+            if keep:
+                new_inlined[tuple(new_coord)] = data
+    else:
+        new_inlined = {}
+
+    return ChunkManifest.from_arrays(
+        paths=new_paths,
+        offsets=new_offsets,
+        lengths=new_lengths,
+        inlined=new_inlined,
+        validate_paths=False,
+    )
+
+
+def _uncompressed_sub_chunk_axis(metadata: ArrayV3Metadata) -> int | None:
+    """
+    Return the axis along which sub-chunk slicing is implementable for this array, or
+    ``None`` if the codec stack disqualifies it.
+
+    Sub-chunk slicing rewrites an existing chunk reference's byte offset and length,
+    so it only works when chunk bytes are raw element values in a fixed memory order —
+    i.e., no compression, no value transforms, no checksums. The eligible codec stacks
+    are:
+
+    - ``[BytesCodec]`` — C-order layout; the axis with the largest byte stride is axis 0.
+    - ``[TransposeCodec(order=perm), BytesCodec]`` — stored layout is the logical array
+      permuted by ``perm``; the axis with the largest byte stride in storage is logical
+      axis ``perm[0]``. For the F-order case ``perm = (n-1, n-2, ..., 0)`` this picks out
+      the last axis.
+    """
+    codecs = metadata.codecs
+    if len(codecs) == 1 and isinstance(codecs[0], BytesCodec):
+        return 0
+    if (
+        len(codecs) == 2
+        and isinstance(codecs[0], TransposeCodec)
+        and isinstance(codecs[1], BytesCodec)
+    ):
+        return int(codecs[0].order[0])
+    return None
+
+
+def _is_sub_chunk_slice(
+    indexer_1d: int | slice, axis_length: int, chunk_size: int
+) -> TypeGuard[slice]:
+    """
+    True iff this is a slice that should take the sub-chunk path: step == 1, non-empty,
+    fits entirely within one source chunk, and is NOT already chunk-aligned (chunk-aligned
+    slices go through the simpler aligned path).
+
+    Typed as ``TypeGuard[slice]`` so callers can pass the narrowed indexer straight into
+    helpers that take a ``slice``.
+    """
+    if not isinstance(indexer_1d, slice):
         return False
+    start, stop, step = indexer_1d.indices(axis_length)
+    if step != 1 or start >= stop:
+        return False
+    # chunk-aligned slices are handled by _compute_chunk_aligned_selection_1d
+    aligned = start % chunk_size == 0 and (
+        stop == axis_length or stop % chunk_size == 0
+    )
+    if aligned:
+        return False
+    # contained in a single source chunk?
+    return start // chunk_size == (stop - 1) // chunk_size
+
+
+def _shift_manifest_byte_ranges(
+    manifest: ChunkManifest, offset_delta: int, new_length: int
+) -> ChunkManifest:
+    """
+    Return a new ``ChunkManifest`` whose virtual chunk references point to a uniform
+    sub-range of each original chunk: ``offset += offset_delta`` and ``length = new_length``.
+
+    Used by the uncompressed-axis-0 sub-chunk path, where every surviving chunk shares the
+    same byte layout and therefore the same byte adjustment.
+    """
+    new_offsets = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        manifest._offsets + np.uint64(offset_delta),
+    )
+    new_lengths = cast(
+        "np.ndarray[Any, np.dtype[np.uint64]]",
+        np.full_like(manifest._lengths, np.uint64(new_length)),
+    )
+    # paths and any inlined-chunk dict carry through unchanged: inlined chunks aren't
+    # involved here (this path is only taken for uncompressed virtual references).
+    return ChunkManifest.from_arrays(
+        paths=manifest._paths,
+        offsets=new_offsets,
+        lengths=new_lengths,
+        inlined=dict(manifest._inlined),
+        validate_paths=False,
+    )

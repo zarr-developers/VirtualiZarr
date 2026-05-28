@@ -316,6 +316,8 @@ def full_like(
     Returns a numpy array instead of a ManifestArray.
 
     Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
+    For creating a ManifestArray placeholder backed entirely by a fill_value, use
+    :meth:`ManifestArray.fill_value_placeholder` instead.
     """
     return np.full(
         shape=x.shape,

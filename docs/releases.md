@@ -1,5 +1,60 @@
 # Release notes
 
+## Unreleased
+
+### New Features
+
+- `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+  ([#1006](https://github.com/zarr-developers/VirtualiZarr/pull/1006)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+## v2.6.2 (18th May 2026)
+
+Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
+
+### New Features
+
+- New `IcechunkParser` — opens an existing icechunk repository and converts it into a `ManifestStore` without copying data. Maps icechunk virtual refs straight through, exposes native (managed) chunks as VirtualiZarr virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Provides both the protocol-conformant `IcechunkParser()(url, registry)` entry point and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5`; the `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass). Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+  ([#994](https://github.com/zarr-developers/VirtualiZarr/pull/994)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order) and `[TransposeCodec(...), BytesCodec]` (e.g. F-order). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
+  ([#996](https://github.com/zarr-developers/VirtualiZarr/pull/996)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer now always emits `c/0/0/0`-form chunk keys regardless of the manifest's stored chunk-key separator. Mainly surfaces with `IcechunkParser` (icechunk inlines small chunks aggressively); existing parsers don't produce inlined chunks and aren't affected.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Add guidance on fill values and scale/offset to the custom parser docs.
+  ([#974](https://github.com/zarr-developers/VirtualiZarr/pull/974)).
+  By [Max Jones](https://github.com/maxrjones).
+- Align all parser docstrings with `IcechunkParser` — promote per-parser docstrings to the class level so the rendered API reference is consistent across parsers.
+  ([#999](https://github.com/zarr-developers/VirtualiZarr/pull/999)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- Mark `test_read_netcdf3` as also requiring `kerchunk`, since `NetCDF3Parser` lazily imports `kerchunk.netCDF3` and the test would otherwise raise `ModuleNotFoundError` in environments with scipy but not kerchunk.
+  ([#998](https://github.com/zarr-developers/VirtualiZarr/pull/998)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Move dev-version git sources out of the pixi workspace (`pyproject.toml`'s `upstream` dependency group) into `ci/upstream-overrides.txt`, applied as a pip overlay in the Upstream CI job. Stops every pixi solve (docs, minimum-versions, etc.) from having to build wheels for those packages, which was causing intermittent SIGSEGV / `ETXTBSY` failures on memory-constrained CI runners. Closes [#995](https://github.com/zarr-developers/VirtualiZarr/issues/995).
+  ([#997](https://github.com/zarr-developers/VirtualiZarr/pull/997)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.1 (3rd May 2026)
 
 Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.

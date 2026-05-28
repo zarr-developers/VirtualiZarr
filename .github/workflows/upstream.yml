@@ -38,9 +38,17 @@ jobs:
           pixi-version: v0.59.0
           environments: upstream
 
-      - name: List installed libraries
+      - name: Install pixi upstream environment
         run: |
           pixi install --environment upstream
+
+      - name: Overlay dev versions of upstream libraries
+        # See ci/upstream-overrides.txt for why these aren't in pyproject.toml.
+        run: |
+          pixi run -e upstream install-upstream-overrides
+
+      - name: List installed libraries
+        run: |
           pixi list --environment upstream
 
       - name: Cache tutorial data

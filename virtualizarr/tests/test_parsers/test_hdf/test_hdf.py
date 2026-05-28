@@ -215,7 +215,8 @@ def test_subgroup_variable_names(
         assert list(vds.dims) == ["dim_0"]
 
 
-# @requires_network
+@pytest.mark.network
+@pytest.mark.flaky
 def test_netcdf_over_https():
     url = "https://www.earthbyte.org/webdav/gmt_mirror/gmt/data/cache/topo_32.nc"
     store = from_url(url)
