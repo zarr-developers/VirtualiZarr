@@ -40,6 +40,7 @@ remote = [
     "requests",
     "aiohttp",
     "s3fs",
+    "pydap>=3.5.9",
 ]
 
 # non-kerchunk-based parsers
@@ -117,6 +118,7 @@ dev = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
+    "pydap>=3.5.9",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
@@ -257,6 +259,7 @@ module = [
     "ujson",
     "zarr",
     "requests",
+    "pydap.*",
 ]
 ignore_missing_imports = true
 
