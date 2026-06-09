@@ -40,7 +40,6 @@ remote = [
     "requests",
     "aiohttp",
     "s3fs",
-    "pydap>=3.5.9",
 ]
 
 # non-kerchunk-based parsers
@@ -50,6 +49,9 @@ hdf = [
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
 ]
+
+# dmrpp
+dmrpp = ["pydap>=3.5.10"]
 
 zarr = ["arro3-core"]
 
@@ -84,7 +86,8 @@ all_parsers = [
     "virtualizarr[kerchunk_parquet]",
     "virtualizarr[tiff]",
     "virtualizarr[grib]",
-    "virtualizarr[zarr]"
+    "virtualizarr[zarr]",
+    "virtualizarr[dmrpp]",
 ]
 
 # writers
@@ -125,7 +128,6 @@ dev = [
     "pandas-stubs",
     "pooch",
     "pre-commit",
-    "pydap>=3.5.9",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
