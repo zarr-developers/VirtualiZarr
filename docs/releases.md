@@ -4,6 +4,8 @@
 
 ### New Features
 
+- GRIB1/GRIB2 files can now be read as virtual datasets via the `GribberishParser` from the [gribberish](https://github.com/mpiannucci/gribberish) library (`>=1.0.0`), installable with `pip install "virtualizarr[grib]"`. Each GRIB message becomes one chunk, decoded on read through gribberish's registered zarr codec. Like the TIFF parser, the parser itself lives in the third-party package; VirtualiZarr just adds the optional dependency, docs, and tests.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
   By [Tom Nicholas](https://github.com/TomNicholas).
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
