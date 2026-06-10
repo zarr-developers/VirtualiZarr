@@ -21,7 +21,7 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.parsers.hdf.filters import codecs_from_dataset
+from virtualizarr.parsers.hdf.filters import cf_codecs_from_dataset, codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
@@ -64,23 +64,28 @@ def _construct_manifest_array(
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
 
-    # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
-    # cfcodec = cfcodec_from_dataset(dataset)
-    # if cfcodec:
-    # codecs.insert(0, cfcodec["codec"])
-    # dtype = cfcodec["target_dtype"]
-    # attrs.pop("scale_factor", None)
-    # attrs.pop("add_offset", None)
-    # else:
-    # dtype = dataset.dtype
+    codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
+    fill_value = dataset.fillvalue.item()
+
+    # Express CF scale/offset packing as zarr codecs rather than attributes, so
+    # arrays packed with different parameters get different codec pipelines and
+    # cannot be silently concatenated. The scale_offset/cast_value codecs run on
+    # the decoded float array, so they go before the file's byte-level filters.
+    # See https://github.com/zarr-developers/VirtualiZarr/issues/1004.
+    cfcodecs = cf_codecs_from_dataset(dataset)
+    if cfcodecs is not None:
+        codec_configs = cfcodecs["codecs"] + codec_configs
+        dtype = cfcodecs["target_dtype"]
+        # The array is now logically float (decoded), so the fill value — stored
+        # in the packed integer domain — must be decoded to match, mirroring the
+        # ScaleOffset codec's decode of `packed / scale + offset`.
+        fill_value = fill_value / cfcodecs["scale"] + cfcodecs["offset"]
+        attrs.pop("scale_factor", None)
+        attrs.pop("add_offset", None)
 
     if "_FillValue" in attrs:
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
-
-    codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
-
-    fill_value = dataset.fillvalue.item()
     dims = tuple(_dataset_dims(dataset, group=group))
     metadata = create_v3_array_metadata(
         shape=dataset.shape,

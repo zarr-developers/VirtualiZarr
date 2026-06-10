@@ -10,8 +10,10 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
+    requires_icechunk,
     requires_imagecodecs,
 )
+from virtualizarr.tests.test_integration import roundtrip_as_in_memory_icechunk
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
 
@@ -228,3 +230,111 @@ def test_netcdf_over_https():
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
         np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
+
+
+def _write_packed_hdf5(
+    path, *, x_start, x_len, scale_factor, add_offset, fill_value=-9999
+):
+    """Write a small CF-packed int16 HDF5 file with the given scale/offset attrs."""
+    with h5py.File(path, "w") as f:
+        data = np.arange(x_start, x_start + x_len, dtype="int16").reshape(x_len, 1)
+        d = f.create_dataset("foo", data=data, chunks=(x_len, 1))
+        d.attrs["scale_factor"] = np.float64(scale_factor)
+        d.attrs["add_offset"] = np.float64(add_offset)
+        d.attrs["_FillValue"] = np.int16(fill_value)
+        x = f.create_dataset(
+            "x", data=np.arange(x_start, x_start + x_len, dtype="int32")
+        )
+        x.make_scale("x")
+        d.dims[0].attach_scale(x)
+        y = f.create_dataset("y", data=np.arange(1, dtype="int32"))
+        y.make_scale("y")
+        d.dims[1].attach_scale(y)
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestConcatMismatchedCFEncoding:
+    """
+    The HDF parser expresses CF scale_factor / add_offset packing as zarr
+    `scale_offset` + `cast_value` codecs rather than as attributes. Files packed
+    with different parameters therefore get different codec pipelines, so the
+    existing `check_same_codecs` refuses to concatenate them instead of silently
+    keeping only the first file's parameters and corrupting decoded values for
+    every chunk that did not come from the first file (see
+    https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+    """
+
+    def test_concat_mismatched_scale_factor_raises(self, tmp_path, local_registry):
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.01, add_offset=0.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            # the codec mismatch surfaces as different ScaleOffset codecs:
+            # scale = 1 / scale_factor, so 0.1 -> 10.0 and 0.01 -> 100.0
+            with pytest.raises(NotImplementedError, match="ScaleOffset") as excinfo:
+                xr.concat([vds1, vds2], dim="x")
+            assert "scale=10.0" in str(excinfo.value)
+            assert "scale=100.0" in str(excinfo.value)
+
+    def test_concat_mismatched_add_offset_raises(self, tmp_path, local_registry):
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.1, add_offset=100.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            # add_offset maps directly onto the ScaleOffset codec's offset
+            with pytest.raises(NotImplementedError, match="ScaleOffset") as excinfo:
+                xr.concat([vds1, vds2], dim="x")
+            assert "offset=100.0" in str(excinfo.value)
+
+    @requires_icechunk
+    def test_concat_matching_cf_encoding_roundtrips(self, tmp_path, local_registry):
+        # positive control: identical CF encoding must concatenate cleanly, and a
+        # write -> reopen -> decode round-trip must yield the correct unpacked
+        # values for chunks sourced from *both* files (packed = arange,
+        # decoded = packed * 0.1).
+        p1 = tmp_path / "a.nc"
+        p2 = tmp_path / "b.nc"
+        _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
+        _write_packed_hdf5(p2, x_start=4, x_len=4, scale_factor=0.1, add_offset=0.0)
+
+        parser = HDFParser()
+        with (
+            open_virtual_dataset(
+                url=f"file://{p1}", parser=parser, registry=local_registry
+            ) as vds1,
+            open_virtual_dataset(
+                url=f"file://{p2}", parser=parser, registry=local_registry
+            ) as vds2,
+        ):
+            combined = xr.concat([vds1, vds2], dim="x")
+            assert combined["foo"].shape == (8, 1)
+            # scale/offset live on the codec pipeline, not as attributes
+            assert (
+                "scale_factor" not in combined["foo"].variable.data.metadata.attributes
+            )
+            assert "add_offset" not in combined["foo"].variable.data.metadata.attributes
+
+            roundtrip = roundtrip_as_in_memory_icechunk(combined, tmp_path)
+            expected = (np.arange(0, 8) * 0.1).reshape(8, 1)
+            np.testing.assert_allclose(roundtrip["foo"].values, expected)

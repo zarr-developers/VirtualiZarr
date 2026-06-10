@@ -48,6 +48,9 @@ hdf = [
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",
+    # CF scale/offset packing is expressed via the zarr `scale_offset` +
+    # `cast_value` codecs; the latter needs its Rust backend at parse time.
+    "cast-value-rs",
 ]
 
 zarr = ["arro3-core"]

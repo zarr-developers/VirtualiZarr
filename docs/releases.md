@@ -9,6 +9,11 @@
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Bug fixes
+
+- The HDF parser now expresses CF `scale_factor`/`add_offset` packing as the zarr `scale_offset` + `cast_value` codecs (stripping those attributes) instead of leaving them as attributes. Files packed with different parameters therefore get different codec pipelines, so `check_same_codecs` refuses to concatenate them rather than silently keeping only the first file's parameters and corrupting decoded values for chunks sourced from other files. No concatenation code was changed. The kerchunk (zarr v2) writer reconstructs the equivalent `scale_factor`/`add_offset` attributes on write. Note that codec-based decoding (`packed / scale`) agrees with xarray's `decode_cf` (`packed * scale_factor`) only to within ~1 ULP. Closes [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 - Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
