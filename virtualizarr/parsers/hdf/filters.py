@@ -8,6 +8,7 @@ import numpy as np
 from numcodecs.abc import Codec
 from numcodecs.fixedscaleoffset import FixedScaleOffset
 from xarray.coding.variables import _choose_float_dtype
+from zarr.codecs import CastValue, ScaleOffset
 
 from virtualizarr.utils import soft_import
 
@@ -66,6 +67,13 @@ class ZlibProperties:
 class CFCodec(TypedDict):
     target_dtype: np.dtype
     codec: Codec
+
+
+class CFCodecs(TypedDict):
+    target_dtype: np.dtype
+    codecs: list[dict]
+    scale: float
+    offset: float
 
 
 def _filter_to_codec(
@@ -168,6 +176,69 @@ def cfcodec_from_dataset(dataset: Dataset) -> Codec | None:
         return cfcodec
     else:
         return None
+
+
+def cf_codecs_from_dataset(dataset: Dataset) -> CFCodecs | None:
+    """
+    Express an h5py dataset's CF scale/offset packing as zarr v3 codecs.
+
+    CF-packed data is stored as integers and decoded as
+    ``unpacked = packed * scale_factor + add_offset``. We represent that with
+    two zarr v3 codecs applied to the (decoded) float array:
+
+    - ``scale_offset`` does the arithmetic. Its decode is ``x / scale + offset``,
+      so ``scale = 1 / scale_factor`` and ``offset = add_offset``.
+    - ``cast_value`` casts between the decoded float dtype and the stored
+      integer dtype.
+
+    Returning these as codecs (rather than leaving ``scale_factor`` /
+    ``add_offset`` as attributes) means two arrays packed with different
+    parameters get different codec pipelines, so ``check_same_codecs`` refuses
+    to concatenate them instead of silently corrupting decoded values
+    (see https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+
+    Parameters
+    ----------
+    dataset
+       An h5py dataset.
+
+    Returns
+    -------
+    CFCodecs or None
+        ``None`` when the dataset has no scale/offset packing.
+    """
+    attributes = {attr: dataset.attrs[attr] for attr in dataset.attrs}
+    mapping = {}
+    if "scale_factor" in attributes:
+        try:
+            scale_factor = attributes["scale_factor"][0]
+        except IndexError:
+            scale_factor = attributes["scale_factor"]
+        mapping["scale_factor"] = float(1 / scale_factor)
+    else:
+        mapping["scale_factor"] = 1
+    if "add_offset" in attributes:
+        try:
+            offset = attributes["add_offset"][0]
+        except IndexError:
+            offset = attributes["add_offset"]
+        mapping["add_offset"] = float(offset)
+    else:
+        mapping["add_offset"] = 0
+    if mapping["scale_factor"] == 1 and mapping["add_offset"] == 0:
+        return None
+
+    target_dtype = np.dtype(_choose_float_dtype(dtype=dataset.dtype, mapping=mapping))
+    scale_offset = ScaleOffset(
+        scale=mapping["scale_factor"], offset=mapping["add_offset"]
+    )
+    cast_value = CastValue(data_type=dataset.dtype.name)
+    return CFCodecs(
+        target_dtype=target_dtype,
+        codecs=[scale_offset.to_dict(), cast_value.to_dict()],
+        scale=mapping["scale_factor"],
+        offset=mapping["add_offset"],
+    )
 
 
 def codecs_from_dataset(dataset: Dataset) -> List[Codec]:

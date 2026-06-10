@@ -1,6 +1,6 @@
 import base64
 import json
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import ujson
@@ -9,12 +9,15 @@ from xarray import Dataset, Variable
 from xarray.backends.zarr import encode_zarr_variable
 from xarray.coding.times import CFDatetimeCoder
 from xarray.conventions import encode_dataset_coordinates
+from zarr.codecs import CastValue, ScaleOffset
 from zarr.core.common import JSON
 from zarr.core.metadata.v2 import ArrayV2Metadata
+from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.dtype import parse_data_type
 
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.manifest import join
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.types.kerchunk import KerchunkArrRefs, KerchunkStoreRefs
 from virtualizarr.utils import convert_v3_to_v2_metadata
 
@@ -106,6 +109,55 @@ def remove_file_uri_prefix(path: str):
         return path
 
 
+def _revert_cf_codecs_to_attrs(
+    metadata: ArrayV3Metadata,
+) -> tuple[ArrayV3Metadata, dict[str, Any]]:
+    """
+    Undo CF scale/offset codec packing for the zarr-v2-based kerchunk format.
+
+    The HDF parser expresses CF scale_factor/add_offset as the zarr v3
+    ``scale_offset`` + ``cast_value`` codecs, which numcodecs — and therefore
+    kerchunk — cannot represent. Revert that here: drop the two codecs, restore
+    the stored integer dtype and fill value, and hand scale_factor / add_offset
+    back as attributes so xarray's ``decode_cf`` reapplies them on read (the
+    long-standing v2 behaviour). Returns the input unchanged when no CF codecs
+    are present.
+    """
+    scale_offset = next(
+        (c for c in metadata.codecs if isinstance(c, ScaleOffset)), None
+    )
+    cast_value = next((c for c in metadata.codecs if isinstance(c, CastValue)), None)
+    if scale_offset is None or cast_value is None:
+        return metadata, {}
+
+    scale, offset = scale_offset.scale, scale_offset.offset
+    storage_dtype = cast_value.dtype.to_native_dtype()
+
+    cf_attrs: dict[str, Any] = {"scale_factor": 1.0 / scale}
+    if offset != 0:
+        cf_attrs["add_offset"] = offset
+
+    # re-pack the decoded float fill value into the stored integer domain,
+    # mirroring the ScaleOffset codec's encode of `(x - offset) * scale`
+    packed_fill = int(round((float(metadata.fill_value) - offset) * scale))
+
+    remaining_codecs = [
+        codec
+        for codec in metadata.to_dict()["codecs"]
+        if codec.get("name") not in ("scale_offset", "cast_value", "bytes")
+    ]
+    reverted = create_v3_array_metadata(
+        shape=metadata.shape,
+        data_type=storage_dtype,
+        chunk_shape=metadata.chunks,
+        fill_value=packed_fill,
+        codecs=remaining_codecs,
+        attributes=dict(metadata.attributes),
+        dimension_names=metadata.dimension_names,
+    )
+    return reverted, cf_attrs
+
+
 def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRefs:
     """
     Create a dictionary containing kerchunk-style array references from a single xarray.Variable (which wraps either a ManifestArray or a numpy array).
@@ -129,8 +181,9 @@ def variable_to_kerchunk_arr_refs(var: Variable, var_name: str) -> KerchunkArrRe
                     entry["offset"],
                     entry["length"],
                 ]
-        array_v2_metadata = convert_v3_to_v2_metadata(marr.metadata)
-        zattrs = {**var.attrs, **var.encoding}
+        reverted_metadata, cf_attrs = _revert_cf_codecs_to_attrs(marr.metadata)
+        array_v2_metadata = convert_v3_to_v2_metadata(reverted_metadata)
+        zattrs = {**cf_attrs, **var.attrs, **var.encoding}
     else:
         var = encode_zarr_variable(var)
         try:

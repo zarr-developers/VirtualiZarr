@@ -10,8 +10,10 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
+    requires_icechunk,
     requires_imagecodecs,
 )
+from virtualizarr.tests.test_integration import roundtrip_as_in_memory_icechunk
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
 
@@ -254,10 +256,13 @@ def _write_packed_hdf5(
 @requires_imagecodecs
 class TestConcatMismatchedCFEncoding:
     """
-    Concatenating virtual datasets whose source files were CF-packed with
-    different scale_factor / add_offset / _FillValue must not silently keep
-    only the first file's attrs — doing so corrupts decoded values for every
-    chunk that did not come from the first file.
+    The HDF parser expresses CF scale_factor / add_offset packing as zarr
+    `scale_offset` + `cast_value` codecs rather than as attributes. Files packed
+    with different parameters therefore get different codec pipelines, so the
+    existing `check_same_codecs` refuses to concatenate them instead of silently
+    keeping only the first file's parameters and corrupting decoded values for
+    every chunk that did not come from the first file (see
+    https://github.com/zarr-developers/VirtualiZarr/issues/1004).
     """
 
     def test_concat_mismatched_scale_factor_raises(self, tmp_path, local_registry):
@@ -275,8 +280,12 @@ class TestConcatMismatchedCFEncoding:
                 url=f"file://{p2}", parser=parser, registry=local_registry
             ) as vds2,
         ):
-            with pytest.raises(ValueError, match="scale_factor"):
+            # the codec mismatch surfaces as different ScaleOffset codecs:
+            # scale = 1 / scale_factor, so 0.1 -> 10.0 and 0.01 -> 100.0
+            with pytest.raises(NotImplementedError, match="ScaleOffset") as excinfo:
                 xr.concat([vds1, vds2], dim="x")
+            assert "scale=10.0" in str(excinfo.value)
+            assert "scale=100.0" in str(excinfo.value)
 
     def test_concat_mismatched_add_offset_raises(self, tmp_path, local_registry):
         p1 = tmp_path / "a.nc"
@@ -293,13 +302,17 @@ class TestConcatMismatchedCFEncoding:
                 url=f"file://{p2}", parser=parser, registry=local_registry
             ) as vds2,
         ):
-            with pytest.raises(ValueError, match="add_offset"):
+            # add_offset maps directly onto the ScaleOffset codec's offset
+            with pytest.raises(NotImplementedError, match="ScaleOffset") as excinfo:
                 xr.concat([vds1, vds2], dim="x")
+            assert "offset=100.0" in str(excinfo.value)
 
-    def test_concat_matching_cf_encoding_succeeds(self, tmp_path, local_registry):
-        # positive control: identical CF encoding must still concatenate cleanly,
-        # and the decoding attrs must survive on the concatenated ManifestArray
-        # so that the next writer can materialize them in the destination store.
+    @requires_icechunk
+    def test_concat_matching_cf_encoding_roundtrips(self, tmp_path, local_registry):
+        # positive control: identical CF encoding must concatenate cleanly, and a
+        # write -> reopen -> decode round-trip must yield the correct unpacked
+        # values for chunks sourced from *both* files (packed = arange,
+        # decoded = packed * 0.1).
         p1 = tmp_path / "a.nc"
         p2 = tmp_path / "b.nc"
         _write_packed_hdf5(p1, x_start=0, x_len=4, scale_factor=0.1, add_offset=0.0)
@@ -316,6 +329,12 @@ class TestConcatMismatchedCFEncoding:
         ):
             combined = xr.concat([vds1, vds2], dim="x")
             assert combined["foo"].shape == (8, 1)
-            combined_attrs = combined["foo"].variable.data.metadata.attributes
-            assert combined_attrs["scale_factor"] == 0.1
-            assert combined_attrs["add_offset"] == 0.0
+            # scale/offset live on the codec pipeline, not as attributes
+            assert (
+                "scale_factor" not in combined["foo"].variable.data.metadata.attributes
+            )
+            assert "add_offset" not in combined["foo"].variable.data.metadata.attributes
+
+            roundtrip = roundtrip_as_in_memory_icechunk(combined, tmp_path)
+            expected = (np.arange(0, 8) * 0.1).reshape(8, 1)
+            np.testing.assert_allclose(roundtrip["foo"].values, expected)

@@ -820,7 +820,15 @@ class TestLoadVirtualDataset:
 
             for name, var in ds.variables.items():
                 if name in actual_loadable_variables:
-                    xrt.assert_identical(vds.variables[name], ds.variables[name])
+                    if "scale_factor" in var.encoding or "add_offset" in var.encoding:
+                        # CF scale/offset packing is now decoded by the zarr
+                        # scale_offset codec (packed / scale) rather than by
+                        # xarray's decode_cf (packed * scale_factor). The two
+                        # agree to within ~1 ULP but are not bit-identical, so
+                        # the decoded values are compared with assert_allclose.
+                        xrt.assert_allclose(vds.variables[name], ds.variables[name])
+                    else:
+                        xrt.assert_identical(vds.variables[name], ds.variables[name])
 
     def test_group_kwarg_not_a_group(self, hdf5_groups_file, local_registry):
         parser = HDFParser(group="doesnt_exist")
@@ -846,7 +854,15 @@ class TestLoadVirtualDataset:
         ):
             for name in full_ds.variables:
                 if name in vars_to_load:
-                    xrt.assert_identical(vds.variables[name], full_ds.variables[name])
+                    ref = full_ds.variables[name]
+                    if "scale_factor" in ref.encoding or "add_offset" in ref.encoding:
+                        # CF scale/offset packing is decoded by the zarr
+                        # scale_offset codec (packed / scale) rather than by
+                        # xarray's decode_cf (packed * scale_factor); these agree
+                        # to within ~1 ULP but are not bit-identical.
+                        xrt.assert_allclose(vds.variables[name], ref)
+                    else:
+                        xrt.assert_identical(vds.variables[name], ref)
 
     def test_open_dataset_with_empty(self, hdf5_empty, local_registry):
         parser = HDFParser()
