@@ -53,11 +53,12 @@ def test_grib_only_variables() -> None:
 @requires_grib
 def test_grib_chunk_decodes_via_codec() -> None:
     """Each GRIB message is one chunk; reading it back resolves the byte
-    reference through the gribberish zarr codec and decodes the message."""
+    reference through the gribberish zarr codec and decodes the message.
+    This fixture stores a 0..15 ramp, so we can assert the exact values to
+    catch a codec that returns garbage rather than just something finite."""
     registry, url = _registry_and_url()
     store = GribberishParser()(url, registry)
     arr = zarr.open_array(store, path="stl1", mode="r")
 
     chunk = np.asarray(arr[0])  # (time0) -> (latitude, longitude)
-    assert chunk.shape == (4, 4)
-    assert np.isfinite(chunk).all()
+    np.testing.assert_array_equal(chunk, np.arange(16, dtype=chunk.dtype).reshape(4, 4))
