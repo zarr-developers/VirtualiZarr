@@ -273,9 +273,14 @@ line-length = 88
 indent-width = 4
 target-version = "py310"
 
+# force-exclude so the patterns below are honoured even when pre-commit
+# passes excluded files explicitly on the command line.
+force-exclude = true
 exclude = [
     "docs",
-    ".eggs"
+    ".eggs",
+    # Notebook ported verbatim from a blog post; not held to repo lint rules.
+    "examples/V2/goes-16-ingest.ipynb",
 ]
 
 [tool.ruff.lint]
