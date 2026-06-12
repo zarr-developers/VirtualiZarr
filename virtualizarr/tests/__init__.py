@@ -44,3 +44,5 @@ has_tiff, requires_tiff = _importorskip("virtual_tiff")
 has_arro3, requires_arro3 = _importorskip("arro3.core")
 # The GribberishParser is new in gribberish 1.0.0.
 has_grib, requires_grib = _importorskip("gribberish", minversion="1.0.0")
+# The DMRPPParser is new in pydap 3.5.10
+has_pydap, requires_pydap = _importorskip("pydap")
