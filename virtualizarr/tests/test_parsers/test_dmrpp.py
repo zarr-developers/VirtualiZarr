@@ -1,19 +1,17 @@
-import textwrap
-from contextlib import nullcontext
 from xml.etree import ElementTree as ET
 
 import pytest
 import requests
 import xarray as xr
-import xarray.testing as xrt
 from obspec_utils.registry import ObjectStoreRegistry
-from packaging import version
 
 from virtualizarr.parsers import DMRPPParser, HDFParser
-from virtualizarr.parsers.dmrpp import DMRParser
-from virtualizarr.tests import requires_network, slow_test
+from virtualizarr.tests import requires_network, requires_pydap, slow_test
 from virtualizarr.tests.utils import obstore_local, obstore_s3
 from virtualizarr.xarray import open_virtual_dataset
+
+pytest.importorskip("pydap")
+from pydap.virtualizarr.parser import DMRParser  # noqa: E402
 
 urls = [
     (
@@ -23,364 +21,8 @@ urls = [
     # TODO: later add MUR, SWOT, TEMPO and others by using kerchunk JSON to read refs (rather than reading the whole netcdf file)
 ]
 
-# This DMRPP was created following the instructions from https://opendap.github.io/DMRpp-wiki/DMRpp.html#sec-build-them on the files produced by conftest.py with the key matching the fixture name.
-DMRPP_XML_STRINGS = {
-    "netcdf4_file": textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="air.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Dimension name="lat" size="25"/>
-            <Dimension name="lon" size="53"/>
-            <Dimension name="time" size="2920"/>
-            <Float32 name="lat">
-                <Dim name="/lat"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <Attribute name="standard_name" type="String">
-                    <Value>latitude</Value>
-                </Attribute>
-                <Attribute name="long_name" type="String">
-                    <Value>Latitude</Value>
-                </Attribute>
-                <Attribute name="units" type="String">
-                    <Value>degrees_north</Value>
-                </Attribute>
-                <Attribute name="axis" type="String">
-                    <Value>Y</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="5179" nBytes="100"/>
-                </dmrpp:chunks>
-            </Float32>
-            <Float32 name="lon">
-                <Dim name="/lon"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <Attribute name="standard_name" type="String">
-                    <Value>longitude</Value>
-                </Attribute>
-                <Attribute name="long_name" type="String">
-                    <Value>Longitude</Value>
-                </Attribute>
-                <Attribute name="units" type="String">
-                    <Value>degrees_east</Value>
-                </Attribute>
-                <Attribute name="axis" type="String">
-                    <Value>X</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="5279" nBytes="212"/>
-                </dmrpp:chunks>
-            </Float32>
-            <Float32 name="time">
-                <Dim name="/time"/>
-                <Attribute name="_FillValue" type="Float32">
-                    <Value>NaN</Value>
-                </Attribute>
-                <Attribute name="standard_name" type="String">
-                    <Value>time</Value>
-                </Attribute>
-                <Attribute name="long_name" type="String">
-                    <Value>Time</Value>
-                </Attribute>
-                <Attribute name="units" type="String">
-                    <Value>hours since 1800-01-01</Value>
-                </Attribute>
-                <Attribute name="calendar" type="String">
-                    <Value>standard</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                    <dmrpp:chunk offset="7757499" nBytes="11680"/>
-                </dmrpp:chunks>
-            </Float32>
-            <Int16 name="air">
-                <Dim name="/time"/>
-                <Dim name="/lat"/>
-                <Dim name="/lon"/>
-                <Attribute name="long_name" type="String">
-                    <Value>4xDaily Air temperature at sigma level 995</Value>
-                </Attribute>
-                <Attribute name="units" type="String">
-                    <Value>degK</Value>
-                </Attribute>
-                <Attribute name="precision" type="Int16">
-                    <Value>2</Value>
-                </Attribute>
-                <Attribute name="GRIB_id" type="Int16">
-                    <Value>11</Value>
-                </Attribute>
-                <Attribute name="GRIB_name" type="String">
-                    <Value>TMP</Value>
-                </Attribute>
-                <Attribute name="var_desc" type="String">
-                    <Value>Air temperature</Value>
-                </Attribute>
-                <Attribute name="dataset" type="String">
-                    <Value>NMC Reanalysis</Value>
-                </Attribute>
-                <Attribute name="level_desc" type="String">
-                    <Value>Surface</Value>
-                </Attribute>
-                <Attribute name="statistic" type="String">
-                    <Value>Individual Obs</Value>
-                </Attribute>
-                <Attribute name="parent_stat" type="String">
-                    <Value>Other</Value>
-                </Attribute>
-                <Attribute name="actual_range" type="Float32">
-                    <Value>185.1600037</Value>
-                    <Value>322.1000061</Value>
-                </Attribute>
-                <Attribute name="scale_factor" type="Float64">
-                    <Value>0.01</Value>
-                </Attribute>
-                <Map name="/time"/>
-                <Map name="/lat"/>
-                <Map name="/lon"/>
-                <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                    <dmrpp:chunk offset="10283" nBytes="7738000"/>
-                </dmrpp:chunks>
-            </Int16>
-            <Attribute name="Conventions" type="String">
-                <Value>COARDS</Value>
-            </Attribute>
-            <Attribute name="title" type="String">
-                <Value>4x daily NMC reanalysis (1948)</Value>
-            </Attribute>
-            <Attribute name="description" type="String">
-                <Value>Data is from NMC initialized reanalysis
-        (4x/day).  These are the 0.9950 sigma level values.</Value>
-            </Attribute>
-            <Attribute name="platform" type="String">
-                <Value>Model</Value>
-            </Attribute>
-            <Attribute name="references" type="String">
-                <Value>http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanalysis.html</Value>
-            </Attribute>
-            <Attribute name="build_dmrpp_metadata" type="Container">
-                <Attribute name="created" type="String">
-                    <Value>2025-07-16T18:48:42Z</Value>
-                </Attribute>
-                <Attribute name="build_dmrpp" type="String">
-                    <Value>3.21.1-451</Value>
-                </Attribute>
-                <Attribute name="bes" type="String">
-                    <Value>3.21.1-451</Value>
-                </Attribute>
-                <Attribute name="libdap" type="String">
-                    <Value>libdap-3.21.1-178</Value>
-                </Attribute>
-                <Attribute name="invocation" type="String">
-                    <Value>build_dmrpp -f /usr/share/hyrax/air.nc -r air.nc.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
-                </Attribute>
-            </Attribute>
-        </Dataset>
-        """
-    ),
-    "hdf5_groups_file": textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="hdf5_groups_file.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
-            <Attribute name="build_dmrpp_metadata" type="Container">
-                <Attribute name="created" type="String">
-                    <Value>2025-07-16T21:57:57Z</Value>
-                </Attribute>
-                <Attribute name="build_dmrpp" type="String">
-                    <Value>3.21.1-451</Value>
-                </Attribute>
-                <Attribute name="bes" type="String">
-                    <Value>3.21.1-451</Value>
-                </Attribute>
-                <Attribute name="libdap" type="String">
-                    <Value>libdap-3.21.1-178</Value>
-                </Attribute>
-                <Attribute name="invocation" type="String">
-                    <Value>build_dmrpp -f /usr/share/hyrax/hdf5_groups_file.nc -r hdf5_groups_file.nc.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
-                </Attribute>
-            </Attribute>
-            <Group name="test">
-                <Group name="group">
-                    <Dimension name="lat" size="25"/>
-                    <Dimension name="lon" size="53"/>
-                    <Dimension name="time" size="2920"/>
-                    <Float32 name="lat">
-                        <Dim name="/test/group/lat"/>
-                        <Attribute name="_FillValue" type="Float32">
-                            <Value>NaN</Value>
-                        </Attribute>
-                        <Attribute name="standard_name" type="String">
-                            <Value>latitude</Value>
-                        </Attribute>
-                        <Attribute name="long_name" type="String">
-                            <Value>Latitude</Value>
-                        </Attribute>
-                        <Attribute name="units" type="String">
-                            <Value>degrees_north</Value>
-                        </Attribute>
-                        <Attribute name="axis" type="String">
-                            <Value>Y</Value>
-                        </Attribute>
-                        <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                            <dmrpp:chunk offset="5533" nBytes="100"/>
-                        </dmrpp:chunks>
-                    </Float32>
-                    <Float32 name="lon">
-                        <Dim name="/test/group/lon"/>
-                        <Attribute name="_FillValue" type="Float32">
-                            <Value>NaN</Value>
-                        </Attribute>
-                        <Attribute name="standard_name" type="String">
-                            <Value>longitude</Value>
-                        </Attribute>
-                        <Attribute name="long_name" type="String">
-                            <Value>Longitude</Value>
-                        </Attribute>
-                        <Attribute name="units" type="String">
-                            <Value>degrees_east</Value>
-                        </Attribute>
-                        <Attribute name="axis" type="String">
-                            <Value>X</Value>
-                        </Attribute>
-                        <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                            <dmrpp:chunk offset="5633" nBytes="212"/>
-                        </dmrpp:chunks>
-                    </Float32>
-                    <Float32 name="time">
-                        <Dim name="/test/group/time"/>
-                        <Attribute name="_FillValue" type="Float32">
-                            <Value>NaN</Value>
-                        </Attribute>
-                        <Attribute name="standard_name" type="String">
-                            <Value>time</Value>
-                        </Attribute>
-                        <Attribute name="long_name" type="String">
-                            <Value>Time</Value>
-                        </Attribute>
-                        <Attribute name="units" type="String">
-                            <Value>hours since 1800-01-01</Value>
-                        </Attribute>
-                        <Attribute name="calendar" type="String">
-                            <Value>standard</Value>
-                        </Attribute>
-                        <dmrpp:chunks fillValue="nan" byteOrder="LE">
-                            <dmrpp:chunk offset="7756034" nBytes="11680"/>
-                        </dmrpp:chunks>
-                    </Float32>
-                    <Int16 name="air">
-                        <Dim name="/test/group/time"/>
-                        <Dim name="/test/group/lat"/>
-                        <Dim name="/test/group/lon"/>
-                        <Attribute name="long_name" type="String">
-                            <Value>4xDaily Air temperature at sigma level 995</Value>
-                        </Attribute>
-                        <Attribute name="units" type="String">
-                            <Value>degK</Value>
-                        </Attribute>
-                        <Attribute name="precision" type="Int16">
-                            <Value>2</Value>
-                        </Attribute>
-                        <Attribute name="GRIB_id" type="Int16">
-                            <Value>11</Value>
-                        </Attribute>
-                        <Attribute name="GRIB_name" type="String">
-                            <Value>TMP</Value>
-                        </Attribute>
-                        <Attribute name="var_desc" type="String">
-                            <Value>Air temperature</Value>
-                        </Attribute>
-                        <Attribute name="dataset" type="String">
-                            <Value>NMC Reanalysis</Value>
-                        </Attribute>
-                        <Attribute name="level_desc" type="String">
-                            <Value>Surface</Value>
-                        </Attribute>
-                        <Attribute name="statistic" type="String">
-                            <Value>Individual Obs</Value>
-                        </Attribute>
-                        <Attribute name="parent_stat" type="String">
-                            <Value>Other</Value>
-                        </Attribute>
-                        <Attribute name="actual_range" type="Float32">
-                            <Value>185.1600037</Value>
-                            <Value>322.1000061</Value>
-                        </Attribute>
-                        <Attribute name="scale_factor" type="Float64">
-                            <Value>0.01</Value>
-                        </Attribute>
-                        <Map name="/test/group/time"/>
-                        <Map name="/test/group/lat"/>
-                        <Map name="/test/group/lon"/>
-                        <dmrpp:chunks fillValue="-32767" byteOrder="LE">
-                            <dmrpp:chunk offset="10554" nBytes="7738000"/>
-                        </dmrpp:chunks>
-                    </Int16>
-                    <Attribute name="Conventions" type="String">
-                        <Value>COARDS</Value>
-                    </Attribute>
-                    <Attribute name="title" type="String">
-                        <Value>4x daily NMC reanalysis (1948)</Value>
-                    </Attribute>
-                    <Attribute name="description" type="String">
-                        <Value>Data is from NMC initialized reanalysis
-        (4x/day).  These are the 0.9950 sigma level values.</Value>
-                    </Attribute>
-                    <Attribute name="platform" type="String">
-                        <Value>Model</Value>
-                    </Attribute>
-                    <Attribute name="references" type="String">
-                        <Value>http://www.esrl.noaa.gov/psd/data/gridded/data.ncep.reanalysis.html</Value>
-                    </Attribute>
-                </Group>
-            </Group>
-        </Dataset>
-            """
-    ),
-    "fill_value_scalar_no_chunks_nc4_url": textwrap.dedent(
-        """\
-        <?xml version="1.0" encoding="ISO-8859-1"?>
-        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="fill_value_scalar_no_chunks.nc4" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-477">
-            <Int32 name="data">
-                <Attribute name="_FillValue" type="Int32">
-                    <Value>-999</Value>
-                </Attribute>
-                <dmrpp:chunks fillValue="-999"/>
-            </Int32>
-            <Attribute name="long_name" type="String">
-                <Value>empty scalar data</Value>
-            </Attribute>
-            <Attribute name="drop_container_attribute" type="Container">
-                <Attribute name="created" type="String">
-                    <Value>2025-08-14T23:32:01Z</Value>
-                </Attribute>
-                <Attribute name="reason" type="String">
-                    <Value>container attributes are no longer supported</Value>
-                </Attribute>
-            </Attribute>
-            <Attribute name="build_dmrpp_metadata" type="Container">
-                <Attribute name="created" type="String">
-                    <Value>2025-08-14T23:32:01Z</Value>
-                </Attribute>
-                <Attribute name="build_dmrpp" type="String">
-                    <Value>3.21.1-477</Value>
-                </Attribute>
-                <Attribute name="bes" type="String">
-                    <Value>3.21.1-477</Value>
-                </Attribute>
-                <Attribute name="libdap" type="String">
-                    <Value>libdap-3.21.1-222</Value>
-                </Attribute>
-                <Attribute name="invocation" type="String">
-                    <Value>build_dmrpp -f /usr/share/hyrax/fill_value_scalar_no_chunks.nc4 -r fill_value_scalar_no_chunks.nc4.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
-                </Attribute>
-            </Attribute>
-        </Dataset>
-        """
-    ),
-}
 
-
+@requires_pydap
 def dmrparser(dmrpp_xml_str: str, filepath: str) -> DMRParser:
     # TODO we should actually create a dmrpp file in a temporary directory
     # this would avoid the need to pass tmp_path separately
@@ -434,6 +76,7 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         assert ds.load()
 
 
+<<<<<<< HEAD
 @pytest.mark.xfail(
     reason="See https://github.com/zarr-developers/VirtualiZarr/issues/904.",
 )
@@ -537,6 +180,9 @@ def test_parse_dataset_nested(hdf5_groups_file):
 
 =======
 >>>>>>> 79b9a79 (rebase)
+=======
+@requires_pydap
+>>>>>>> 5fa3d8f (update dmrpp migration - soft imports and code refactor)
 def test_dmrpp_simple(dmrpp_xml_simple):
     """Test parsing a simple valid DMR++ XML creates virtual chunk manifests."""
     parser = dmrparser(dmrpp_xml_simple, filepath="file:///simple.nc")
@@ -572,6 +218,7 @@ def test_dmrpp_simple(dmrpp_xml_simple):
         assert isinstance(chunk_info["length"], int)
 
 
+@requires_pydap
 def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
     """Test that validation issues are accumulated for missing attributes."""
     parser = dmrparser(
@@ -598,6 +245,7 @@ def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
 
 
 @requires_network
+@requires_pydap
 def test_inlinevalue():
     """
     Test that inline values can be parsed into manifest
