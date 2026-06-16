@@ -11,6 +11,18 @@
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Breaking changes
+
+- `ManifestArray` no longer exposes a `.chunks` attribute; read the Zarr chunk shape from `ManifestArray.metadata.chunks` instead. Exposing `.chunks` made xarray's `is_chunked_array` duck-typing classify virtual arrays as dask-like *computable* chunked arrays, which routed every load/compute/coerce path through a chunk manager that does not exist for `ManifestArray` (raising the opaque `TypeError: Could not find a Chunk Manager which recognises type ManifestArray`) and made `Dataset.chunks`/`Variable.chunksizes` report a malformed chunk structure for virtual datasets. `ManifestArray` is a virtual reference array, not a computable chunked array, so it no longer advertises itself as one.
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Bug fixes
+
+- Eager attempts by xarray to load, compute, or coerce a virtual `ManifestArray` into memory now raise a clear `NotImplementedError` explaining that the array is virtual and pointing at `loadable_variables`, instead of the opaque `TypeError: Could not find a Chunk Manager which recognises type ManifestArray`. As a consequence of `ManifestArray` no longer being misclassified as a computable chunked array, several operations that previously failed with that cryptic error now behave correctly: value comparisons during `xr.concat(..., compat="equals")` and `xr.merge(...)` use `ManifestArray`'s structural equality instead of trying to load (so a genuine mismatch raises a normal `MergeError` rather than crashing), and a failing `xr.testing.assert_identical(...)` reports a normal `AssertionError`. `Dataset.chunks`/`Variable.chunksizes` now correctly report no dask-style chunking for virtual variables rather than a malformed value. Closes [#114](https://github.com/zarr-developers/VirtualiZarr/issues/114), [#354](https://github.com/zarr-developers/VirtualiZarr/issues/354), [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382).
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Documentation
 
 - Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).

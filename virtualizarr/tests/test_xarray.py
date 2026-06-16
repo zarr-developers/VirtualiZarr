@@ -49,7 +49,7 @@ def test_wrapping(array_v3_metadata):
     assert isinstance(ds["a"].data, ManifestArray)
     assert ds["a"].shape == shape
     assert ds["a"].dtype == dtype
-    assert ds["a"].chunks == chunks
+    assert ds["a"].data.metadata.chunks == chunks
 
 
 class TestEquals:
@@ -103,7 +103,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (2, 20)
-        assert result.chunks == (1, 10)
+        assert result.data.metadata.chunks == (1, 10)
         assert result.data.manifest.dict() == {
             "0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -140,7 +140,7 @@ class TestConcat:
 
         # xarray.concat adds new dimensions along axis=0
         assert result.shape == (2, 5, 20)
-        assert result.chunks == (1, 5, 10)
+        assert result.data.metadata.chunks == (1, 5, 10)
         assert result.data.manifest.dict() == {
             "0.0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -181,7 +181,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (40,)
-        assert result.chunks == (10,)
+        assert result.data.metadata.chunks == (10,)
         assert result.data.manifest.dict() == {
             "0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -1049,7 +1049,7 @@ class TestIsel:
         assert sliced.sizes == {"time": 4, "x": 4}
         assert isinstance(sliced["foo"].data, ManifestArray)
         assert sliced["foo"].data.shape == (4, 4)
-        assert sliced["foo"].data.chunks == (2, 4)
+        assert sliced["foo"].data.metadata.chunks == (2, 4)
         # only the two middle chunks should remain, re-indexed from 0
         assert sliced["foo"].data.manifest.dict() == {
             "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
@@ -1094,7 +1094,7 @@ class TestIsel:
         assert sliced.sizes == {"x": 4}
         assert isinstance(sliced["foo"].data, ManifestArray)
         assert sliced["foo"].data.shape == (4,)
-        assert sliced["foo"].data.chunks == (4,)
+        assert sliced["foo"].data.metadata.chunks == (4,)
         assert sliced["foo"].data.manifest.dict() == {
             "0": {"path": "file:///a.nc", "offset": 200, "length": 32},
         }

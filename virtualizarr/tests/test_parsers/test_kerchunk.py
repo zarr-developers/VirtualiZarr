@@ -81,7 +81,7 @@ def test_dataset_from_df_refs(refs_file_factory, local_registry):
         assert isinstance(vda.data, ManifestArray)
         assert vda.dims == ("x", "y")
         assert vda.shape == (2, 3)
-        assert vda.chunks == (2, 3)
+        assert vda.data.metadata.chunks == (2, 3)
         assert vda.dtype == np.dtype("<i8")
         assert vda.attrs == {"value": "1"}
 
@@ -139,7 +139,7 @@ def test_empty_chunk_manifest(refs_file_factory, local_registry):
         assert "a" in vds.variables
         assert isinstance(vds["a"].data, ManifestArray)
         assert vds["a"].sizes == {"x": 100, "y": 200}
-        assert vds["a"].chunksizes == {"x": 50, "y": 100}
+        assert vds["a"].data.metadata.chunks == (50, 100)
 
 
 def test_null_chunk_reference_treated_as_missing():

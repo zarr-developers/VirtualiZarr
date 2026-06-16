@@ -87,7 +87,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [arr.chunks for arr in arrays]
+    arr_chunks = [arr.metadata.chunks for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
@@ -149,7 +149,7 @@ def stack(
     stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
     # chunk shape has changed because a length-1 axis has been inserted
-    old_chunks = first_arr.chunks
+    old_chunks = first_arr.metadata.chunks
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
@@ -187,7 +187,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    old_chunk_shape = x.chunks
+    old_chunk_shape = x.metadata.chunks
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )

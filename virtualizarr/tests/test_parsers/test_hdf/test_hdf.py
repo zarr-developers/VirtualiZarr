@@ -72,11 +72,11 @@ class TestDatasetDims:
 class TestDatasetToManifestArray:
     def test_chunked_dataset(self, chunked_dimensions_netcdf4_url):
         manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
-        assert manifest_store._group.arrays["data"].chunks == (50, 50)
+        assert manifest_store._group.arrays["data"].metadata.chunks == (50, 50)
 
     def test_not_chunked_dataset(self, single_dimension_scale_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(single_dimension_scale_hdf5_url)
-        assert manifest_store._group.arrays["data"].chunks == (2,)
+        assert manifest_store._group.arrays["data"].metadata.chunks == (2,)
 
     def test_dataset_attributes(self, string_attributes_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)

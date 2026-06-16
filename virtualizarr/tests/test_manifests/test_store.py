@@ -484,7 +484,7 @@ class TestToVirtualXarray:
                 obs.put(
                     store,
                     path.split("/")[-1],
-                    np.ones(marr.chunks, dtype=marr.dtype).tobytes(),
+                    np.ones(marr.metadata.chunks, dtype=marr.dtype).tobytes(),
                 )
         registry = ObjectStoreRegistry({"file://": store})
 
