@@ -1009,6 +1009,30 @@ class TestOpenVirtualMFDataset:
         )
         assert combined_vds.sizes["time"] == 2
 
+    def test_nested_concat_dim_none_merges_without_raising(
+        self, netcdf4_file, local_registry
+    ):
+        # combine="nested" with concat_dim=None is the merge-only path: datasets are
+        # merged rather than concatenated, so no new dimension/index is built and the
+        # scalar-concat guard must not fire. Merging a file with itself shares an
+        # identical grid, so the virtual variables need no reindexing; compat="override"
+        # avoids comparing (and thus loading) the duplicate virtual data variable.
+        parser = HDFParser()
+
+        combined_vds = open_virtual_mfdataset(
+            [netcdf4_file, netcdf4_file],
+            registry=local_registry,
+            parser=parser,
+            combine="nested",
+            concat_dim=None,
+            compat="override",
+        )
+
+        with open_virtual_dataset(
+            url=netcdf4_file, registry=local_registry, parser=parser
+        ) as expected_vds:
+            xrt.assert_identical(combined_vds, expected_vds)
+
 
 class TestRaiseOnVirtualScalarConcatDim:
     """Unit tests for the pre-combine guard against virtual scalar concat dimensions."""
