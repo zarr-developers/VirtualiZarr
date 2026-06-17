@@ -11,6 +11,12 @@
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Bug fixes
+
+- `open_virtual_mfdataset(..., combine="nested")` now raises a clear, actionable `ValueError` when a `concat_dim` is a scalar (non-dimension) coordinate that is left virtual (e.g. when each file holds a single timestep so `time` is a scalar). Previously this produced an opaque `TypeError: Could not find a Chunk Manager which recognises type ManifestArray` from xarray, because concatenating along a new dimension requires building an index from the coordinate's values, which a virtual `ManifestArray` cannot provide. The new error tells the user to load the coordinate via `loadable_variables`. Related to [#114](https://github.com/zarr-developers/VirtualiZarr/issues/114).
+  ([#1015](https://github.com/zarr-developers/VirtualiZarr/pull/1015)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Documentation
 
 - Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).

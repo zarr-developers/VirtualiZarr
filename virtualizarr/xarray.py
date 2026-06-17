@@ -383,6 +383,7 @@ def open_virtual_mfdataset(
     # Combine all datasets, closing them in case of a ValueError
     try:
         if combine == "nested":
+            _raise_on_virtual_scalar_concat_dim(virtual_datasets, concat_dim)
             # Combined nested list by successive concat and merge operations
             # along each dimension, using structure given by "ids"
             combined_vds = _nested_combine(
@@ -428,6 +429,59 @@ def open_virtual_mfdataset(
     # TODO If loadable_variables is eager then we should have already read everything we're ever going to read into memory at this point
 
     return combined_vds
+
+
+def _raise_on_virtual_scalar_concat_dim(
+    virtual_datasets: Sequence[Dataset],
+    concat_dims: (
+        str
+        | DataArray
+        | Index
+        | Sequence[str]
+        | Sequence[DataArray]
+        | Sequence[Index]
+        | None
+    ),
+) -> None:
+    """Raise a clear error when a concatenation dimension is an unloaded scalar coordinate.
+
+    When ``concat_dim`` names a scalar (non-dimension) coordinate, ``xarray.concat``
+    promotes it to a new dimension and builds a pandas index from its values. That
+    requires materializing the coordinate as a numpy array, which is impossible for a
+    virtual [ManifestArray][virtualizarr.manifests.ManifestArray]; the result is an
+    opaque ``TypeError`` from xarray's chunk-manager lookup. Such a coordinate must
+    instead be loaded into memory via ``loadable_variables``.
+
+    Index creation happens in ``expand_dims`` on each dataset individually, so a single
+    offending source is enough to fail the concat. We therefore check every dataset, not
+    just the first, since the datasets may be heterogeneous (e.g. the dimension could be
+    scalar in only one file).
+
+    Concatenating along an *existing* dimension does not create a new index, so a virtual
+    dimension coordinate is fine in that case and is left untouched here.
+    """
+    if concat_dims is None:
+        return
+    dims: Sequence[Any] = (
+        [concat_dims]
+        if isinstance(concat_dims, str | DataArray | Index)
+        else concat_dims
+    )
+    concat_dim_names = [dim for dim in dims if isinstance(dim, str)]
+    for ds in virtual_datasets:
+        for dim in concat_dim_names:
+            if dim in ds.dims:
+                continue
+            var = ds.variables.get(dim)
+            if var is not None and isinstance(var.data, ManifestArray):
+                raise ValueError(
+                    f"Cannot concatenate along {dim!r} because it is a scalar "
+                    "coordinate that has not been loaded into memory in at least one "
+                    "source. xarray builds an index for the new dimension when "
+                    "concatenating, which requires the coordinate's values, but it is "
+                    "backed by a virtual ManifestArray. Load it by passing "
+                    f"loadable_variables=[{dim!r}, ...] to open_virtual_mfdataset."
+                )
 
 
 def construct_fully_virtual_dataset(

@@ -29,6 +29,7 @@ from virtualizarr.tests import (
     slow_test,
 )
 from virtualizarr.tests.utils import obstore_http, obstore_s3
+from virtualizarr.xarray import _raise_on_virtual_scalar_concat_dim
 
 
 def test_wrapping(array_v3_metadata):
@@ -967,6 +968,118 @@ class TestOpenVirtualMFDataset:
                 preprocess=preprocess,
             )
             xrt.assert_identical(combined_vds, expected_vds)
+
+    def test_nested_concat_dim_scalar_virtual_coord_raises(
+        self, tmp_path, local_registry
+    ):
+        # When each file holds a single timestep, `time` is a scalar coordinate that
+        # is left virtual by default. xarray.concat must build an index for the new
+        # dimension, which can't be done from a virtual ManifestArray. Raise a clear,
+        # actionable error pointing at loadable_variables instead of a cryptic
+        # chunk-manager TypeError.
+        filepath1 = tmp_path / "scalar_time1.nc"
+        filepath2 = tmp_path / "scalar_time2.nc"
+        with xr.tutorial.open_dataset("air_temperature") as ds:
+            ds.isel(time=0).to_netcdf(filepath1, format="NETCDF4")
+            ds.isel(time=1).to_netcdf(filepath2, format="NETCDF4")
+
+        parser = HDFParser()
+        with pytest.raises(ValueError, match="loadable_variables"):
+            open_virtual_mfdataset(
+                [str(filepath1), str(filepath2)],
+                registry=local_registry,
+                parser=parser,
+                combine="nested",
+                concat_dim="time",
+            )
+
+        # ...and that loading the scalar concat coordinate makes it work. The other
+        # coordinates (lat/lon) are left virtual here, so we also pass
+        # coords="minimal"/compat="override" to avoid xarray loading them for
+        # comparison (the documented pattern for combining virtual datasets).
+        combined_vds = open_virtual_mfdataset(
+            [str(filepath1), str(filepath2)],
+            registry=local_registry,
+            parser=parser,
+            combine="nested",
+            concat_dim="time",
+            loadable_variables=["time"],
+            coords="minimal",
+            compat="override",
+        )
+        assert combined_vds.sizes["time"] == 2
+
+    def test_nested_concat_dim_none_merges_without_raising(
+        self, netcdf4_file, local_registry
+    ):
+        # combine="nested" with concat_dim=None is the merge-only path: datasets are
+        # merged rather than concatenated, so no new dimension/index is built and the
+        # scalar-concat guard must not fire. Merging a file with itself shares an
+        # identical grid, so the virtual variables need no reindexing; compat="override"
+        # avoids comparing (and thus loading) the duplicate virtual data variable.
+        parser = HDFParser()
+
+        combined_vds = open_virtual_mfdataset(
+            [netcdf4_file, netcdf4_file],
+            registry=local_registry,
+            parser=parser,
+            combine="nested",
+            concat_dim=None,
+            compat="override",
+        )
+
+        with open_virtual_dataset(
+            url=netcdf4_file, registry=local_registry, parser=parser
+        ) as expected_vds:
+            xrt.assert_identical(combined_vds, expected_vds)
+
+
+class TestRaiseOnVirtualScalarConcatDim:
+    """Unit tests for the pre-combine guard against virtual scalar concat dimensions."""
+
+    def _scalar_virtual_coord_ds(self, array_v3_metadata):
+        metadata = array_v3_metadata(chunks=(), shape=())
+        manifest = ChunkManifest(
+            entries={"0": {"path": "/foo.nc", "offset": 0, "length": 8}}
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        return xr.Dataset(coords=xr.Coordinates({"time": ((), marr)}, indexes={}))
+
+    def test_raises_for_scalar_virtual_concat_dim(self, array_v3_metadata):
+        ds = self._scalar_virtual_coord_ds(array_v3_metadata)
+        with pytest.raises(ValueError, match="loadable_variables"):
+            _raise_on_virtual_scalar_concat_dim([ds], ["time"])
+
+    def test_no_raise_for_loaded_scalar_concat_dim(self):
+        ds = xr.Dataset(coords={"time": ((), np.array(5.0))})
+        _raise_on_virtual_scalar_concat_dim([ds], ["time"])
+
+    def test_no_raise_for_existing_virtual_dim_coord(self, array_v3_metadata):
+        # Concatenating along an existing dimension does not build a new index, so a
+        # virtual dimension coordinate is fine.
+        metadata = array_v3_metadata(chunks=(2,), shape=(2,))
+        manifest = ChunkManifest(
+            entries={"0": {"path": "/foo.nc", "offset": 0, "length": 16}}
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        ds = xr.Dataset(coords=xr.Coordinates({"time": (("time",), marr)}, indexes={}))
+        _raise_on_virtual_scalar_concat_dim([ds], ["time"])
+
+    def test_no_raise_for_non_string_or_absent_concat_dim(self):
+        ds = xr.Dataset(coords={"time": ((), np.array(5.0))})
+        _raise_on_virtual_scalar_concat_dim([ds], [None])
+        _raise_on_virtual_scalar_concat_dim([ds], ["nonexistent"])
+
+    def test_raises_when_only_one_dataset_is_offending(self, array_v3_metadata):
+        # The dimension may be scalar+virtual in only some of the files; a single
+        # offending source is enough for concat to fail.
+        good = xr.Dataset(coords={"time": ((), np.array(5.0))})
+        bad = self._scalar_virtual_coord_ds(array_v3_metadata)
+        with pytest.raises(ValueError, match="loadable_variables"):
+            _raise_on_virtual_scalar_concat_dim([good, bad], ["time"])
+
+    def test_no_raise_for_empty_datasets(self):
+        _raise_on_virtual_scalar_concat_dim([], ["time"])
 
 
 def test_drop_variables(netcdf4_file, local_registry):
