@@ -81,11 +81,22 @@ class TestDatasetToManifestArray:
     def test_unlimited_dimension_chunks(self, unlimited_dimension_netcdf4_url):
         # see https://github.com/zarr-developers/VirtualiZarr/issues/803
         # HDF5 reports chunks=(512,) for an unlimited dim holding only 5 values;
-        # the chunk shape must not exceed the array shape
+        # the reported chunk shape is trimmed to the actual array shape
         manifest_store = manifest_store_from_hdf_url(unlimited_dimension_netcdf4_url)
         time = manifest_store._group.arrays["time"]
         assert time.shape == (5,)
-        assert time.chunks <= time.shape
+        assert time.chunks == (5,)
+        # the trimmed manifest must still read back the written values
+        result = zarr.open(manifest_store, mode="r")["time"][:]
+        np.testing.assert_array_equal(result, np.full(5, 10, dtype="i8"))
+
+    def test_unlimited_dimension_compressed_chunks_raises(
+        self, unlimited_dimension_compressed_hdf5_url
+    ):
+        # an oversized compressed chunk cannot be trimmed to the array shape, so
+        # parsing must raise rather than emit an unconcatenatable/unwritable manifest
+        with pytest.raises(ValueError, match="cannot be safely trimmed"):
+            manifest_store_from_hdf_url(unlimited_dimension_compressed_hdf5_url)
 
     def test_dataset_attributes(self, string_attributes_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)

@@ -67,6 +67,25 @@ def unlimited_dimension_netcdf4_url(tmpdir):
 
 
 @pytest.fixture
+def unlimited_dimension_compressed_hdf5_url(tmpdir):
+    # an oversized chunk along an unlimited dim that is compressed cannot be
+    # safely trimmed to the array shape (its bytes are not a contiguous prefix)
+    filepath = f"{tmpdir}/unlimited_dimension_compressed.nc"
+    f = h5py.File(filepath, "w")
+    d = f.create_dataset(
+        "data",
+        shape=(5,),
+        maxshape=(None,),
+        chunks=(512,),
+        dtype="i8",
+        compression="gzip",
+    )
+    d[:] = 10
+    f.close()
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def chunked_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/chunks.nc"
     f = h5py.File(filepath, "w")
