@@ -11,6 +11,11 @@
 - `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Bug fixes
+
+- Handle chunk shapes larger than the array shape for variables along an unlimited dimension. HDF5 allocates a chunk sized for the full (unlimited) `maxshape` — e.g. a coordinate holding 5 values reports `chunks=(512,)` — which inhibited concatenation of the resulting virtual dataset. The `HDFParser` now trims the chunk shape down to the array shape (adjusting the manifest byte ranges accordingly) when it is safe to do so, i.e. the chunk is uncompressed and only its leading dimension is oversized. When trimming isn't possible (e.g. a compressed coordinate, as in the ERA5 archive), the variable is left untrimmed — it still reads and writes as virtual references correctly — and `to_virtual_dataset` now emits a warning naming the affected variable(s) and suggesting they be passed to `loadable_variables` so the dataset can be concatenated. Closes [#803](https://github.com/zarr-developers/VirtualiZarr/issues/803).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 - Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
