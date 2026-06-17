@@ -392,9 +392,10 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
     Warn if any still-virtual variable has a chunk larger than its array shape.
 
     Such chunks arise for variables along an unlimited dimension whose oversized
-    chunk could not be trimmed (e.g. because it is compressed). They read fine
-    from a single source but cannot be concatenated or written as virtual
-    references, so point the user at loading them instead. Variables that were
+    chunk could not be trimmed (e.g. because it is compressed). They read and
+    write as virtual references fine, but cannot be concatenated with other
+    virtual datasets - the oversized final chunk prevents forming a regular
+    chunk grid - so point the user at loading them instead. Variables that were
     loaded (no longer backed by a ManifestArray) are unaffected and not warned
     about.
     """
@@ -408,9 +409,11 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
         warnings.warn(
             f"Variable(s) {oversized} have a chunk shape larger than their array "
             "shape, which typically happens for variables along an unlimited "
-            "dimension. They will read correctly from this source but cannot be "
-            "concatenated or written as virtual references. Pass them to "
-            "loadable_variables to load them as in-memory arrays instead.",
+            "dimension. They read and write as virtual references correctly, but "
+            "cannot be concatenated with other virtual datasets because the "
+            "oversized chunk prevents forming a regular chunk grid. Pass them to "
+            "loadable_variables to load them as in-memory arrays if you need to "
+            "concatenate them.",
             UserWarning,
             stacklevel=3,
         )

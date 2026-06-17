@@ -100,8 +100,8 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     chunk shape allocated for the full maxshape, which can exceed the actual
     array shape - e.g. a coordinate holding 5 values along an unlimited
     dimension reports ``chunks=(512,)``. An oversized chunk inhibits
-    concatenation and writing of the resulting virtual dataset, so trim it down
-    to the array shape where it is safe to do so.
+    concatenation of the resulting virtual dataset, so trim it down to the array
+    shape where it is safe to do so.
 
     Trimming the chunk shrinks the in-bounds region the chunk covers, so the
     manifest must point at fewer bytes than the full stored chunk. That region
@@ -109,10 +109,12 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     entry - when the chunk is unfiltered (uncompressed) and only the leading
     (slowest-varying) dimension is trimmed. When an oversized chunk can't be
     trimmed safely (e.g. it is compressed) the original chunk shape is kept: the
-    variable still reads correctly (zarr crops the oversized edge chunk), but it
-    can't be concatenated or written as a virtual reference. That case is
-    surfaced to the user as a warning at ``ManifestStore.to_virtual_dataset``
-    time, suggesting they load the variable instead.
+    variable still reads correctly (zarr crops the oversized edge chunk) and can
+    be written as virtual references, but it can't be concatenated with other
+    virtual datasets (the oversized chunk prevents a regular chunk grid). That
+    case is surfaced to the user as a warning at
+    ``ManifestStore.to_virtual_dataset`` time, suggesting they load the variable
+    instead.
 
     This relies on the same invariant as the sub-chunk slicing in
     ``virtualizarr.manifests.indexing`` (a contiguous sub-range of an
