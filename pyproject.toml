@@ -66,6 +66,10 @@ fits = [
 tiff = [
     "virtual-tiff",
 ]
+# GRIB1/GRIB2 parser, provided by the (Rust-backed) gribberish package.
+grib = [
+    "gribberish>=1.0.0",
+]
 kerchunk_parquet = [
    "virtualizarr[remote]",
    "fastparquet",
@@ -78,6 +82,7 @@ all_parsers = [
     "virtualizarr[fits]",
     "virtualizarr[kerchunk_parquet]",
     "virtualizarr[tiff]",
+    "virtualizarr[grib]",
     "virtualizarr[zarr]"
 ]
 
@@ -209,17 +214,18 @@ run-flaky-tests = { cmd = "pytest -m flaky --run-flaky --run-network-tests --ver
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py312"] # test against python 3.13
-test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "py313"] # test against python 3.13
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py312"] # test against python 3.13
+test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 # tiff (virtual-tiff) is excluded: virtual-tiff 0.5.0 imports zarr's CodecJSON
 # (added in zarr 3.1.2) but only declares a bare `zarr` dependency, so it is
 # incompatible with our minimum pin of zarr==3.1.0.
+# NB grib is intentionally omitted: gribberish declares zarr>=3.1.1, but this env pins zarr==3.1.0.
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "zarr", "all_parsers", "all_writers", "py313"]
-docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff","zarr", "py313"]
+all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
+docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
 
 [tool.pixi.dependencies]
 pytest = "*"
@@ -252,6 +258,7 @@ show_error_codes = true
 module = [
     "docker",
     "fsspec.*",
+    "gribberish.*",
     "s3fs.*",
     "h5py",
     "kerchunk.*",
@@ -269,9 +276,14 @@ line-length = 88
 indent-width = 4
 target-version = "py310"
 
+# force-exclude so the patterns below are honoured even when pre-commit
+# passes excluded files explicitly on the command line.
+force-exclude = true
 exclude = [
     "docs",
-    ".eggs"
+    ".eggs",
+    # Notebook ported verbatim from a blog post; not held to repo lint rules.
+    "examples/V2/goes-16-ingest.ipynb",
 ]
 
 [tool.ruff.lint]
