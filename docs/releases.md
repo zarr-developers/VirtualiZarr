@@ -11,7 +11,7 @@
 
 ### Bug fixes
 
-- The `HDFParser` no longer reports a chunk shape larger than the array shape for variables along an unlimited dimension. HDF5 allocates a chunk sized for the full (unlimited) `maxshape` — e.g. a coordinate holding 5 values reports `chunks=(512,)` — which previously inhibited concatenation and writing of the resulting virtual dataset. The chunk shape is now trimmed to the array shape (with the manifest byte ranges adjusted accordingly) when the trimmed region is a contiguous prefix of an unfiltered chunk; otherwise a `ValueError` is raised rather than emitting an unconcatenatable manifest. Closes [#803](https://github.com/zarr-developers/VirtualiZarr/issues/803).
+- Handle chunk shapes larger than the array shape for variables along an unlimited dimension. HDF5 allocates a chunk sized for the full (unlimited) `maxshape` — e.g. a coordinate holding 5 values reports `chunks=(512,)` — which inhibited concatenation and writing of the resulting virtual dataset. The `HDFParser` now trims the chunk shape down to the array shape (adjusting the manifest byte ranges accordingly) when it is safe to do so, i.e. the chunk is uncompressed and only its leading dimension is oversized. When trimming isn't possible (e.g. a compressed coordinate, as in the ERA5 archive), the variable is left untrimmed — it still reads correctly — and `to_virtual_dataset` now emits a warning naming the affected variable(s) and suggesting they be passed to `loadable_variables` so the dataset can be concatenated and written. Closes [#803](https://github.com/zarr-developers/VirtualiZarr/issues/803).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation

@@ -1,3 +1,5 @@
+import warnings
+
 import h5py  # type: ignore
 import numpy as np
 import pytest
@@ -90,13 +92,34 @@ class TestDatasetToManifestArray:
         result = zarr.open(manifest_store, mode="r")["time"][:]
         np.testing.assert_array_equal(result, np.full(5, 10, dtype="i8"))
 
-    def test_unlimited_dimension_compressed_chunks_raises(
+    def test_unlimited_dimension_compressed_chunks_not_trimmed(
         self, unlimited_dimension_compressed_hdf5_url
     ):
-        # an oversized compressed chunk cannot be trimmed to the array shape, so
-        # parsing must raise rather than emit an unconcatenatable/unwritable manifest
-        with pytest.raises(ValueError, match="cannot be safely trimmed"):
-            manifest_store_from_hdf_url(unlimited_dimension_compressed_hdf5_url)
+        # a compressed oversized chunk cannot be byte-trimmed to the array shape,
+        # so the parser leaves it as-is (reading still works by cropping); the
+        # user is warned later, at to_virtual_dataset time, to load the variable
+        manifest_store = manifest_store_from_hdf_url(
+            unlimited_dimension_compressed_hdf5_url
+        )
+        data = manifest_store._group.arrays["data"]
+        assert data.shape == (5,)
+        assert data.chunks == (512,)
+
+    def test_unlimited_dimension_compressed_chunks_warn_unless_loaded(
+        self, unlimited_dimension_compressed_hdf5_url
+    ):
+        manifest_store = manifest_store_from_hdf_url(
+            unlimited_dimension_compressed_hdf5_url
+        )
+        # left virtual, the oversized chunk warns and points at loadable_variables
+        with pytest.warns(UserWarning, match="loadable_variables"):
+            manifest_store.to_virtual_dataset()
+        # loading the variable silences the warning and reads back correctly
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            vds = manifest_store.to_virtual_dataset(loadable_variables=["data"])
+        assert not [w for w in record if "loadable_variables" in str(w.message)]
+        np.testing.assert_array_equal(vds["data"].values, np.full(5, 10, dtype="i8"))
 
     def test_dataset_attributes(self, string_attributes_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)

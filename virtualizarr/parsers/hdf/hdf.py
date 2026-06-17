@@ -101,15 +101,18 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     array shape - e.g. a coordinate holding 5 values along an unlimited
     dimension reports ``chunks=(512,)``. An oversized chunk inhibits
     concatenation and writing of the resulting virtual dataset, so trim it down
-    to the array shape.
+    to the array shape where it is safe to do so.
 
     Trimming the chunk shrinks the in-bounds region the chunk covers, so the
     manifest must point at fewer bytes than the full stored chunk. That region
     is only a contiguous byte range - and so expressible as a single manifest
     entry - when the chunk is unfiltered (uncompressed) and only the leading
-    (slowest-varying) dimension is trimmed. If an oversized chunk can't be
-    trimmed safely, raise rather than emit a manifest that can't be
-    concatenated or written.
+    (slowest-varying) dimension is trimmed. When an oversized chunk can't be
+    trimmed safely (e.g. it is compressed) the original chunk shape is kept: the
+    variable still reads correctly (zarr crops the oversized edge chunk), but it
+    can't be concatenated or written as a virtual reference. That case is
+    surfaced to the user as a warning at ``ManifestStore.to_virtual_dataset``
+    time, suggesting they load the variable instead.
     """
     shape = dataset.shape
     # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
@@ -126,13 +129,7 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     leading_dim_only = chunks[1:] == dataset.chunks[1:]
     if unfiltered and leading_dim_only:
         return chunks
-    raise ValueError(
-        f"Dataset {dataset.name!r} has a chunk shape {dataset.chunks} larger than "
-        f"its array shape {shape} along a dimension that cannot be safely trimmed "
-        f"(chunk is {'filtered/compressed' if not unfiltered else 'oversized in a non-leading dimension'}). "
-        "This typically happens for variables along an unlimited dimension and "
-        "cannot currently be virtualized correctly."
-    )
+    return dataset.chunks
 
 
 def _construct_manifest_group(
