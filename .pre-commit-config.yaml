@@ -27,7 +27,7 @@ repos:
     rev: v2.4.2
     hooks:
       - id: codespell
-        args: ["-L", "fo,ihs,kake,te", "-S", "fixture"]
+        args: ["-L", "fo,ihs,kake,te", "-S", "fixture,*goes-16-ingest.ipynb"]
   - repo: https://github.com/numpy/numpydoc
     rev: v1.10.0
     hooks:
