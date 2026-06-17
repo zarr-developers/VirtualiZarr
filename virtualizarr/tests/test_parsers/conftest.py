@@ -54,6 +54,19 @@ def fill_value_scalar_no_chunks_nc4_url(tmpdir):
 
 
 @pytest.fixture
+def unlimited_dimension_netcdf4_url(tmpdir):
+    # a coordinate variable along an unlimited dimension - HDF5 reports a chunk
+    # shape sized for the (unlimited) maxshape rather than the actual extent
+    filepath = f"{tmpdir}/unlimited_dimension.nc"
+    f = Dataset(filepath, "w")
+    f.createDimension("time", None)
+    var_time = f.createVariable("time", "i8", ("time",))
+    var_time[:5] = 10
+    f.close()
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def chunked_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/chunks.nc"
     f = h5py.File(filepath, "w")

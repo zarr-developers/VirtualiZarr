@@ -78,6 +78,15 @@ class TestDatasetToManifestArray:
         manifest_store = manifest_store_from_hdf_url(single_dimension_scale_hdf5_url)
         assert manifest_store._group.arrays["data"].chunks == (2,)
 
+    def test_unlimited_dimension_chunks(self, unlimited_dimension_netcdf4_url):
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/803
+        # HDF5 reports chunks=(512,) for an unlimited dim holding only 5 values;
+        # the chunk shape must not exceed the array shape
+        manifest_store = manifest_store_from_hdf_url(unlimited_dimension_netcdf4_url)
+        time = manifest_store._group.arrays["time"]
+        assert time.shape == (5,)
+        assert time.chunks <= time.shape
+
     def test_dataset_attributes(self, string_attributes_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
