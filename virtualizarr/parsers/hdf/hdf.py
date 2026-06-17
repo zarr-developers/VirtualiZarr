@@ -113,6 +113,11 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     can't be concatenated or written as a virtual reference. That case is
     surfaced to the user as a warning at ``ManifestStore.to_virtual_dataset``
     time, suggesting they load the variable instead.
+
+    This relies on the same invariant as the sub-chunk slicing in
+    ``virtualizarr.manifests.indexing`` (a contiguous sub-range of an
+    uncompressed, fixed-order chunk is addressable as a single byte range);
+    trimming here is the special case of taking the leading prefix along axis 0.
     """
     shape = dataset.shape
     # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
