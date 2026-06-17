@@ -51,6 +51,27 @@ class TestInit:
         assert marr.ndim == 3
 
 
+class TestNotChunkedArray:
+    # Regression tests for the class of "Could not find a Chunk Manager"
+    # errors (GH #114, #354, #382). A ManifestArray must not advertise
+    # xarray's chunked-array protocol, otherwise xarray duck-types it as a
+    # dask-like computable array and routes loads through a chunk manager
+    # that does not exist for virtual arrays. The Zarr chunk shape is still
+    # available via ``.metadata.chunks``.
+    def test_does_not_expose_chunks_attribute(self, manifest_array):
+        marr = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        assert not hasattr(marr, "chunks")
+        assert marr.metadata.chunks == (5, 2)
+
+    def test_not_recognized_as_chunked_array(self, manifest_array):
+        from xarray.namedarray.pycompat import is_chunked_array
+
+        marr = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        assert is_chunked_array(marr) is False
+
+
 class TestResultType:
     def test_idempotent(self, manifest_array):
         marr1 = manifest_array(shape=(), chunks=(), data_type=np.dtype("int32"))

@@ -52,6 +52,40 @@ def test_wrapping(array_v3_metadata):
     assert ds["a"].data.metadata.chunks == chunks
 
 
+class TestNotChunked:
+    # Regression tests for the opaque "Could not find a Chunk Manager"
+    # TypeError (GH #114, #354, #382). Because a ManifestArray no longer
+    # advertises a ``.chunks`` attribute, xarray no longer misclassifies a
+    # virtual dataset as a dask-style chunked (computable) array.
+    @pytest.fixture
+    def virtual_ds(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+                "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr = ManifestArray(
+            metadata=array_v3_metadata(chunks=(5, 10), shape=(5, 20)),
+            chunkmanifest=manifest,
+        )
+        return xr.Dataset({"a": (["x", "y"], marr)})
+
+    def test_reports_no_dask_style_chunking(self, virtual_ds):
+        # previously these returned a malformed value; reporting no chunking
+        # is the correct behavior for a non-computable array
+        assert virtual_ds.chunks == {}
+        assert virtual_ds["a"].variable.chunksizes == {}
+        assert virtual_ds["a"].variable.chunks is None
+
+    def test_reading_values_raises_clear_error(self, virtual_ds):
+        # accessing values must raise the explanatory NotImplementedError
+        # rather than routing through a non-existent chunk manager and
+        # raising the cryptic "Could not find a Chunk Manager" TypeError
+        with pytest.raises(NotImplementedError, match="virtual references"):
+            virtual_ds["a"].values
+
+
 class TestEquals:
     # regression test for GH29 https://github.com/zarr-developers/VirtualiZarr/issues/29
     def test_equals(self, array_v3_metadata):
