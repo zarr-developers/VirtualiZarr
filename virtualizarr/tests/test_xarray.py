@@ -49,7 +49,41 @@ def test_wrapping(array_v3_metadata):
     assert isinstance(ds["a"].data, ManifestArray)
     assert ds["a"].shape == shape
     assert ds["a"].dtype == dtype
-    assert ds["a"].chunks == chunks
+    assert ds["a"].data.metadata.chunks == chunks
+
+
+class TestNotChunked:
+    # Regression tests for the opaque "Could not find a Chunk Manager"
+    # TypeError (GH #114, #354, #382). Because a ManifestArray no longer
+    # advertises a ``.chunks`` attribute, xarray no longer misclassifies a
+    # virtual dataset as a dask-style chunked (computable) array.
+    @pytest.fixture
+    def virtual_ds(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+                "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr = ManifestArray(
+            metadata=array_v3_metadata(chunks=(5, 10), shape=(5, 20)),
+            chunkmanifest=manifest,
+        )
+        return xr.Dataset({"a": (["x", "y"], marr)})
+
+    def test_reports_no_dask_style_chunking(self, virtual_ds):
+        # previously these returned a malformed value; reporting no chunking
+        # is the correct behavior for a non-computable array
+        assert virtual_ds.chunks == {}
+        assert virtual_ds["a"].variable.chunksizes == {}
+        assert virtual_ds["a"].variable.chunks is None
+
+    def test_reading_values_raises_clear_error(self, virtual_ds):
+        # accessing values must raise the explanatory NotImplementedError
+        # rather than routing through a non-existent chunk manager and
+        # raising the cryptic "Could not find a Chunk Manager" TypeError
+        with pytest.raises(NotImplementedError, match="virtual references"):
+            virtual_ds["a"].values
 
 
 class TestEquals:
@@ -103,7 +137,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (2, 20)
-        assert result.chunks == (1, 10)
+        assert result.data.metadata.chunks == (1, 10)
         assert result.data.manifest.dict() == {
             "0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -140,7 +174,7 @@ class TestConcat:
 
         # xarray.concat adds new dimensions along axis=0
         assert result.shape == (2, 5, 20)
-        assert result.chunks == (1, 5, 10)
+        assert result.data.metadata.chunks == (1, 5, 10)
         assert result.data.manifest.dict() == {
             "0.0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -181,7 +215,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (40,)
-        assert result.chunks == (10,)
+        assert result.data.metadata.chunks == (10,)
         assert result.data.manifest.dict() == {
             "0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -1049,7 +1083,7 @@ class TestIsel:
         assert sliced.sizes == {"time": 4, "x": 4}
         assert isinstance(sliced["foo"].data, ManifestArray)
         assert sliced["foo"].data.shape == (4, 4)
-        assert sliced["foo"].data.chunks == (2, 4)
+        assert sliced["foo"].data.metadata.chunks == (2, 4)
         # only the two middle chunks should remain, re-indexed from 0
         assert sliced["foo"].data.manifest.dict() == {
             "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
@@ -1094,7 +1128,7 @@ class TestIsel:
         assert sliced.sizes == {"x": 4}
         assert isinstance(sliced["foo"].data, ManifestArray)
         assert sliced["foo"].data.shape == (4,)
-        assert sliced["foo"].data.chunks == (4,)
+        assert sliced["foo"].data.metadata.chunks == (4,)
         assert sliced["foo"].data.manifest.dict() == {
             "0": {"path": "file:///a.nc", "offset": 200, "length": 32},
         }

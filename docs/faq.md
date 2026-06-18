@@ -164,6 +164,19 @@ Loading variables can be useful in a few scenarios:
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
 
+### Why do I get `NotImplementedError: ManifestArray ... cannot be converted into a numpy array`?
+
+A `ManifestArray` holds virtual references to chunks in archival files — it never holds the decoded values in memory. Any operation that needs to read those values therefore can't succeed on a virtual variable. The most common triggers are:
+
+- aligning or indexing on a *virtual* dimension coordinate (xarray builds an in-memory pandas index for dimension coordinates),
+- a value comparison during `xr.concat`/`xr.merge` (e.g. `compat="equals"` or `"identical"`), or
+- a failed `xr.testing.assert_identical(...)`, which tries to render the array's values in the diff.
+
+To make the values available, either:
+
+- pass the variable's name in [`loadable_variables`](#why-would-i-want-to-load-variables-using-loadable_variables) when opening, so it is read into memory up front (this is the usual fix for dimension coordinates you want to align/index on), or
+- write the virtual dataset to a Zarr/Icechunk store and reopen it.
+
 ## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:

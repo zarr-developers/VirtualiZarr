@@ -184,7 +184,7 @@ def apply_selection(
     # The byte adjustment is uniform across every surviving chunk, since chunks share layout.
     sub_chunk_byte_adjust: tuple[int, int] | None = None
     for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
-        zip(marr.shape, marr.chunks, narrowed_indexers, strict=True)
+        zip(marr.shape, marr.metadata.chunks, narrowed_indexers, strict=True)
     ):
         chunk_grid_selector: int | slice
         if axis == sub_chunk_axis and _is_sub_chunk_slice(
@@ -196,7 +196,7 @@ def apply_selection(
                     axis_length=axis_length,
                     chunk_size=chunk_size,
                     other_axis_chunks=tuple(
-                        c for i, c in enumerate(marr.chunks) if i != axis
+                        c for i, c in enumerate(marr.metadata.chunks) if i != axis
                     ),
                     itemsize=marr.dtype.itemsize,
                 )

@@ -403,7 +403,7 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
         name
         for name, var in vds.variables.items()
         if isinstance(var.data, ManifestArray)
-        and any(c > s for c, s in zip(var.data.chunks, var.data.shape))
+        and any(c > s for c, s in zip(var.data.metadata.chunks, var.data.shape))
     ]
     if oversized:
         warnings.warn(

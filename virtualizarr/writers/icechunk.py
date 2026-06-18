@@ -430,7 +430,7 @@ def check_compatible_arrays(
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
     check_same_codecs([get_codecs(arr) for arr in arrays])
-    check_same_chunk_shapes([arr.chunks for arr in arrays])
+    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     if append_axis is not None:

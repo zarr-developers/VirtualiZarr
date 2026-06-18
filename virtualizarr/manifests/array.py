@@ -95,13 +95,6 @@ class ManifestArray:
         return self._metadata
 
     @property
-    def chunks(self) -> tuple[int, ...]:
-        """
-        Individual chunk size by number of elements.
-        """
-        return self._metadata.chunks
-
-    @property
     def dtype(self) -> np.dtype:
         """The native dtype of the data (typically a numpy dtype)"""
         zdtype = self.metadata.data_type
@@ -124,7 +117,7 @@ class ManifestArray:
         return int(np.prod(self.shape))
 
     def __repr__(self) -> str:
-        return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.chunks}>"
+        return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.metadata.chunks}>"
 
     @property
     def nbytes_virtual(self) -> int:
@@ -167,7 +160,13 @@ class ManifestArray:
         self, dtype: np.typing.DTypeLike | None = None, copy: bool | None = None
     ) -> np.ndarray:
         raise NotImplementedError(
-            "ManifestArrays can't be converted into numpy arrays or pandas Index objects"
+            "ManifestArray holds virtual references to chunks in archival files and "
+            "cannot be converted into a numpy array or pandas Index. This usually means "
+            "an xarray operation (e.g. alignment, a value comparison during concat/merge, "
+            "or building a repr) tried to read the array's values. To make the values "
+            "available, either pass the variable's name in `loadable_variables` when "
+            "opening so it is read into memory, or write the virtual dataset to a "
+            "Zarr/Icechunk store and reopen it."
         )
 
     def __eq__(  # type: ignore[override]
@@ -329,7 +328,8 @@ class ManifestArray:
         # serializes NaN to the JSON string "NaN")
         new_metadata = dataclasses.replace(self.metadata, fill_value=fill_value)
         empty_manifest = ChunkManifest(
-            entries={}, shape=determine_chunk_grid_shape(self.shape, self.chunks)
+            entries={},
+            shape=determine_chunk_grid_shape(self.shape, self.metadata.chunks),
         )
         return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
 
