@@ -31,6 +31,11 @@
   ([#1006](https://github.com/zarr-developers/VirtualiZarr/pull/1006)).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+### Internal changes
+
+- Speed up virtual chunk container validation when writing to Icechunk by passing the supported prefixes as a tuple to `str.startswith`, which runs the loop over prefixes in C rather than in a Python generator. The per-reference check is now ~2.6x faster in the common single-container case, which matters when writing manifests with millions of virtual references. The check is still a per-reference Python loop overall (see [icechunk#1167](https://github.com/earth-mover/icechunk/issues/1167) for pushing it down to Icechunk entirely).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.2 (18th May 2026)
 
 Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
