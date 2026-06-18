@@ -528,7 +528,7 @@ class TestToVirtualXarray:
             obs.put(
                 store,
                 path.split("/")[-1],
-                np.ones(oversized.chunks, dtype=oversized.dtype).tobytes(),
+                np.ones(oversized.metadata.chunks, dtype=oversized.dtype).tobytes(),
             )
         registry = ObjectStoreRegistry({"file://": store})
         manifest_group = ManifestGroup(arrays={"data": oversized}, attributes={})
