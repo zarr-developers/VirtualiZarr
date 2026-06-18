@@ -54,6 +54,9 @@ Adds an `IcechunkParser` for reading existing icechunk repositories as virtual d
 
 ### Bug fixes
 
+- HDFParser now correctly parses datasets with either no fill value or a string dtype fill value.
+  ([#988](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
+  By [Sean Harkins](https://github.com/sharkinsspatial) and [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
 - Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer now always emits `c/0/0/0`-form chunk keys regardless of the manifest's stored chunk-key separator. Mainly surfaces with `IcechunkParser` (icechunk inlines small chunks aggressively); existing parsers don't produce inlined chunks and aren't affected.
   ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
   By [Tom Nicholas](https://github.com/TomNicholas).

@@ -143,6 +143,19 @@ class TestDatasetToManifestArray:
         metadata = manifest_store._group.arrays["data"].metadata
         assert "_FillValue" in metadata.attributes
 
+    def test_string_dtype_fill_value(self, string_dtype_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(string_dtype_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert isinstance(metadata.fill_value, (str, bytes, np.bytes_))
+
+    def test_string_dtype_cf_fill_value(self, string_dtype_with_fillvalue_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(
+            string_dtype_with_fillvalue_hdf5_url
+        )
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert "_FillValue" in metadata.attributes
+        assert isinstance(metadata.attributes["_FillValue"], str)
+
     def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
         cf_array_fill_value_hdf5_url = f"file://{cf_array_fill_value_hdf5_file}"
         manifest_store = manifest_store_from_hdf_url(cf_array_fill_value_hdf5_url)
@@ -271,3 +284,20 @@ def test_netcdf_over_https():
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
         np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
+
+
+def test_fillvalue_runtime_error():
+    from virtualizarr.parsers.hdf.hdf import _get_fill_value
+
+    dtype = np.dtype("float32")
+
+    class _RuntimeErrorDataset:
+        @property
+        def fillvalue(self):
+            raise RuntimeError("Unable to get fill value")
+
+    dataset = _RuntimeErrorDataset()
+    dataset.dtype = dtype  # type: ignore[attr-defined]
+
+    result = _get_fill_value(dataset)
+    assert result == np.ma.default_fill_value(dtype)

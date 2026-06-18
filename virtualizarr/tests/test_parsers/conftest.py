@@ -491,6 +491,38 @@ def chunked_roundtrip_hdf5_s3_file(minio_bucket, cf_array_fill_value_hdf5_file):
     return f"s3://{minio_bucket['bucket']}/{filepath}"
 
 
+@pytest.fixture(
+    params=[
+        {"dtype": "S10", "data": np.array([b"hello", b"world"], dtype="S10")},
+        {
+            "dtype": None,
+            "data": np.array(["hello", "world"], dtype=h5py.string_dtype()),
+        },
+    ],
+    ids=["fixed-length-bytes", "variable-length-string"],
+)
+def string_dtype_hdf5_url(tmp_path: Path, request) -> str:
+    filepath = str(tmp_path / "string_dtype.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=request.param["data"])
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "string_dtype_fillvalue.nc")
+
+    with h5py.File(filepath, "w") as f:
+        dset = f.create_dataset(
+            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
+        )
+        dset.attrs["_FillValue"] = ""
+
+    return f"file://{filepath}"
+
+
 @pytest.fixture()
 def big_endian_dtype_hdf5_file(tmpdir):
     filepath = f"{tmpdir}/big_endian.nc"
