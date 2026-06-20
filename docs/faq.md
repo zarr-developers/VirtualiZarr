@@ -25,6 +25,8 @@ Depends on some details of your data.
 VirtualiZarr works by mapping your data to the zarr data model from whatever data model is used by the format it was saved in.
 This means that if your data contains anything that cannot be represented within the zarr data model, it cannot be virtualized.
 
+- **Format chunks span contiguous byte ranges** - It's only possible to efficiently access individual chunks of data inside blobs in object storage if each chunk can be fetched via a single HTTP range request, which requires each chunk to occupy a contiguous localized series of bytes within the file layout. Well-designed formats such as netCDF and GRIB have this property, but other formats such as CSV do not. Note also this means that any additional processing which scrambles the byte locations will prevent virtualization - a single netCDF file is virtualizable, but a zipped or gzipped netCDF file is not!
+
 When virtualizing multi-file datasets, it is sometimes the case that it is possible to virtualize one file, but not possible to virtualize all the files together as part of one datacube, because of inconsistencies _between_ the files. The following restrictions apply across every file in the datacube you wish to create!
 
 - **Arrays** - The zarr data model is one of a set of arrays, so your data must be decodable as a set of arrays, each of which will map to single zarr array (via the `ManifestArray` class). If your data cannot be directly mapped to an array, for example because it has inconsistent lengths along a common dimension (known as "ragged data"), then it cannot be virtualized.
