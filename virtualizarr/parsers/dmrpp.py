@@ -1,9 +1,5 @@
-import io
 from typing import Iterable
-from xml.etree import ElementTree as ET
 
-# from obspec_utils.protocols import ReadableStore
-from obspec_utils.readers import EagerStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
@@ -52,23 +48,13 @@ class DMRPPParser:
         ManifestStore
             A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
-        store, path_in_store = registry.resolve(url)
-        reader = EagerStoreReader(store=store, path=path_in_store)
-        file_bytes = reader.readall()
-        stream = io.BytesIO(file_bytes)
-
-        url = (
-            url.removesuffix(".dap.dmrpp")
-            if url.endswith(".dap.dmrpp")
-            else url.removesuffix(".dmrpp")
-        )
 
         from pydap.virtualizarr.parser import DMRParser
 
         parser = DMRParser(
-            root=ET.parse(stream).getroot(),
-            data_filepath=url,
+            url=url,
+            object_store=registry,
             skip_variables=self.skip_variables,
         )
-        manifest_store = parser.parse_dataset(object_store=store, group=self.group)
+        manifest_store = parser.parse_dataset(group=self.group)
         return manifest_store
