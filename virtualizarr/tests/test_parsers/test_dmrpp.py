@@ -1,4 +1,4 @@
-from xml.etree import ElementTree as ET
+# from xml.etree import ElementTree as ET
 
 import pytest
 import requests
@@ -23,11 +23,11 @@ urls = [
 
 
 @requires_pydap
-def dmrparser(dmrpp_xml_str: str, filepath: str) -> DMRParser:
+def dmrparser(url: str, filepath: str) -> DMRParser:
     # TODO we should actually create a dmrpp file in a temporary directory
     # this would avoid the need to pass tmp_path separately
 
-    return DMRParser(root=ET.fromstring(dmrpp_xml_str), data_filepath=filepath)
+    return DMRParser(url=url, data_filepath=filepath)
 
 
 @slow_test
