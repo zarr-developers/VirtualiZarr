@@ -35,6 +35,12 @@ requires_v2_migration = pytest.mark.skipif(
     reason="V2→V3 metadata migration requires zarr>=3.1.3",
 )
 
+# zarr 3.1.0 cannot list group contents past one level deep (fixed in 3.1.1), so
+# parsing a store with multiple levels of nested groups silently drops the deepest
+# arrays there. The parser recursion itself is correct; this is a zarr listing bug.
+# TODO: remove once the minimum zarr is bumped to >=3.1.1.
+HAS_NESTED_GROUP_LISTING = version.parse(zarr.__version__) >= version.parse("3.1.1")
+
 
 async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
     """Helper to open an array from a zarr store and build its chunk manifest."""
@@ -374,6 +380,54 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
         filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
     ) as expected:
         with xr.open_dataset(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)
+
+
+@pytest.mark.xfail(
+    not HAS_NESTED_GROUP_LISTING,
+    reason="zarr 3.1.0 cannot list group contents past one level deep (fixed in 3.1.1)",
+    strict=False,
+)
+@zarr_versions()
+def test_parser_recurses_into_subgroups(tmpdir, zarr_format):
+    """ZarrParser should virtualize arrays nested in subgroups, not just the root group.
+
+    Regression test: previously construct_manifest_group only collected root-level
+    arrays and dropped all subgroups silently.
+    """
+    filepath = f"{tmpdir}/hierarchical.zarr"
+
+    dt = xr.DataTree.from_dict(
+        {
+            "/": xr.Dataset({"root_var": (("x",), np.arange(4, dtype="float32"))}),
+            "/group_a": xr.Dataset({"a_var": (("y",), np.arange(6, dtype="float32"))}),
+            "/group_a/nested": xr.Dataset(
+                {"deep_var": (("z",), np.arange(8, dtype="float32"))}
+            ),
+        }
+    )
+    dt.to_zarr(filepath, consolidated=False, zarr_format=zarr_format)
+
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+    manifeststore = parser(url=filepath, registry=registry)
+
+    # nested arrays surface through the recursion, with the full hierarchy intact
+    manifest_group = manifeststore._group
+    assert "root_var" in manifest_group.arrays
+    assert "group_a" in manifest_group.groups
+    assert "a_var" in manifest_group.groups["group_a"].arrays
+    assert "nested" in manifest_group.groups["group_a"].groups
+    assert "deep_var" in manifest_group.groups["group_a"].groups["nested"].arrays
+
+    # and the hierarchy round-trips end-to-end through a datatree
+    with xr.open_datatree(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_datatree(
             manifeststore, engine="zarr", consolidated=False, zarr_format=3
         ) as actual:
             xr.testing.assert_identical(actual, expected)
