@@ -24,3 +24,7 @@ This notebook accompanies the [_Old format, no problem!: Cloud-optimizing the GO
 2. [Parallel reference generation using Coiled Functions](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V1/coiled/terraclimate.ipynb)
 3. [Serverless parallel reference generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/virtualizarr-with-lithops)
 4. [MUR SST Virtual and Zarr Icechunk Store Generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/mursst-icechunk-with-lithops)
+
+## Next steps
+
+Several of these examples virtualize large archives. To learn how to generate many virtual references in parallel, see [Scaling](scaling.md).

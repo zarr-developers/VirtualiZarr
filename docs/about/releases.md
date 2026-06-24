@@ -483,7 +483,7 @@ Minor release to ensure compatibility with incoming changes to Icechunk.
 
 ### Breaking changes
 
-- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](migration_guide.md) for more details.
+- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](../migration_guide.md) for more details.
 - The recommended virtualizarr Xarray accessor name is `vz` rather than `virtualize`.
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose

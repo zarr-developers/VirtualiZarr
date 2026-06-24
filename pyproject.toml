@@ -114,6 +114,7 @@ docs = [
     "mkdocstrings>=0.29.1",
     "mkdocstrings-python>=1.16.10",
     "markdown-exec[ansi]",
+    "mkdocs-redirects>=1.2.1",
     "ruff",
 ]
 dev = [

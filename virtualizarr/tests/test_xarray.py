@@ -1054,7 +1054,7 @@ def test_to_xarray_nonscalar_no_dimension_names(array_v3_metadata):
 
 
 class TestIsel:
-    # Verifies the workflow documented in docs/scaling.md under
+    # Verifies the workflow documented in docs/how_to/scaling.md under
     # "Splitting a single large virtual dataset across commits": slicing a virtual
     # xarray.Dataset with .isel along a chunk-aligned axis subsets the underlying
     # ChunkManifest without touching the data, and misaligned splits raise.
