@@ -37,6 +37,8 @@
 
 ### Internal changes
 
+- Factor the group-recursion logic shared by the `ZarrParser` and `IcechunkParser` into a single `construct_manifest_group_tree` helper in `virtualizarr.parsers.utils`, parameterized by a per-parser callback that builds a `ManifestArray` from an opened zarr array. Removes the duplicated open-group / filter / recurse / assemble code from both parsers.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Speed up virtual chunk container validation when writing to Icechunk by passing the supported prefixes as a tuple to `str.startswith`, which runs the loop over prefixes in C rather than in a Python generator. The per-reference check is now ~2.6x faster in the common single-container case, which matters when writing manifests with millions of virtual references. The check is still a per-reference Python loop overall (see [icechunk#1167](https://github.com/earth-mover/icechunk/issues/1167) for pushing it down to Icechunk entirely).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
