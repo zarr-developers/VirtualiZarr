@@ -35,12 +35,6 @@ requires_v2_migration = pytest.mark.skipif(
     reason="V2→V3 metadata migration requires zarr>=3.1.3",
 )
 
-# zarr 3.1.0 cannot list group contents past one level deep (fixed in 3.1.1), so
-# parsing a store with multiple levels of nested groups silently drops the deepest
-# arrays there. The parser recursion itself is correct; this is a zarr listing bug.
-# TODO: remove once the minimum zarr is bumped to >=3.1.1.
-HAS_NESTED_GROUP_LISTING = version.parse(zarr.__version__) >= version.parse("3.1.1")
-
 
 async def _build_manifest(zarr_store: ObjectStore, store_base_uri: str):
     """Helper to open an array from a zarr store and build its chunk manifest."""
@@ -385,11 +379,6 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
             xr.testing.assert_identical(actual, expected)
 
 
-@pytest.mark.xfail(
-    not HAS_NESTED_GROUP_LISTING,
-    reason="zarr 3.1.0 cannot list group contents past one level deep (fixed in 3.1.1)",
-    strict=False,
-)
 @zarr_versions()
 def test_parser_recurses_into_subgroups(tmpdir, zarr_format):
     """ZarrParser should virtualize arrays nested in subgroups, not just the root group.
@@ -399,6 +388,10 @@ def test_parser_recurses_into_subgroups(tmpdir, zarr_format):
     """
     filepath = f"{tmpdir}/hierarchical.zarr"
 
+    # Array names deliberately share the "var" substring across levels: zarr<3.1.6
+    # mis-strips keys when listing a nested group, silently dropping such arrays
+    # (zarr-developers/zarr-python#3657). The `zarr>=3.1.6` floor guards against it;
+    # these names would regress on an older zarr.
     dt = xr.DataTree.from_dict(
         {
             "/": xr.Dataset({"root_var": (("x",), np.arange(4, dtype="float32"))}),

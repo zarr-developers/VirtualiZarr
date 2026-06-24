@@ -37,6 +37,8 @@
 
 ### Internal changes
 
+- Bump the minimum supported `zarr` to `>=3.1.6`. Earlier versions mis-strip keys when listing the contents of a nested group, silently dropping arrays whose names collide with others in the store ([zarr-python#3657](https://github.com/zarr-developers/zarr-python/issues/3657)); this would lose nested data when parsing hierarchical Zarr stores with the `ZarrParser`. The bug is fixed in zarr 3.1.6. The bump also lets the `tiff` and `grib` parsers (which required `zarr>=3.1.2` and `>=3.1.1` respectively) re-join the minimum-versions test environment.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Factor the group-recursion logic shared by the `ZarrParser` and `IcechunkParser` into a single `construct_manifest_group_tree` helper in `virtualizarr.parsers.utils`, parameterized by a per-parser callback that builds a `ManifestArray` from an opened zarr array. Removes the duplicated open-group / filter / recurse / assemble code from both parsers.
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Speed up virtual chunk container validation when writing to Icechunk by passing the supported prefixes as a tuple to `str.startswith`, which runs the loop over prefixes in C rather than in a Python generator. The per-reference check is now ~2.6x faster in the common single-container case, which matters when writing manifests with millions of virtual references. The check is still a per-reference Python loop overall (see [icechunk#1167](https://github.com/earth-mover/icechunk/issues/1167) for pushing it down to Icechunk entirely).
