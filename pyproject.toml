@@ -27,7 +27,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.1.0",
+    "zarr>=3.1.6",  # earlier versions mis-list nested group contents, silently dropping arrays (zarr-python#3657)
     "obstore>=0.7.0",
     "obspec_utils>=0.9.0",
 ]
@@ -192,7 +192,7 @@ install-upstream-overrides = { cmd = "pip install --upgrade --no-deps -r ci/upst
 xarray = "==2025.6.0"
 numpy = "==2.1.0"
 numcodecs = "==0.15.1"
-zarr = "==3.1.0"
+zarr = "==3.1.6"
 obstore = "==0.7.0"
 icechunk = "==2.0.3"
 
@@ -218,11 +218,7 @@ test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "ke
 test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
-# tiff (virtual-tiff) is excluded: virtual-tiff 0.5.0 imports zarr's CodecJSON
-# (added in zarr 3.1.2) but only declares a bare `zarr` dependency, so it is
-# incompatible with our minimum pin of zarr==3.1.0.
-# NB grib is intentionally omitted: gribberish declares zarr>=3.1.1, but this env pins zarr==3.1.0.
-minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
+minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
