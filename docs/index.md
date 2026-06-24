@@ -130,7 +130,7 @@ vds.vz.to_icechunk(session.store)
 session.commit("Create virtual store")
 ```
 
-See the [Usage docs page](usage.md) for more details.
+See the [Usage docs page](how_to/usage.md) for more details.
 
 ## Articles
 

@@ -16,15 +16,15 @@ extra:
 nav:
   - "index.md"
   - Getting started:
-    - "installation.md"
+    - "getting_started/installation.md"
   - How-to guides:
-    - "usage.md"
-    - "examples.md"
+    - "how_to/usage.md"
+    - "how_to/examples.md"
   - Explanation:
-    - "data_structures.md"
-    - "custom_parsers.md"
-    - "scaling.md"
-    - "faq.md"
+    - "explanation/data_structures.md"
+    - "explanation/custom_parsers.md"
+    - "explanation/scaling.md"
+    - "explanation/faq.md"
   - API Reference:
     - api/virtualizarr.md
     - Parsers:
@@ -42,9 +42,9 @@ nav:
     - api/developer.md
   - "migration_guide.md"
   - About the project:
-    - "releases.md"
-    - "contributing.md"
-    - "core_team_guide.md"
+    - "about/releases.md"
+    - "about/contributing.md"
+    - "about/core_team_guide.md"
 watch:
   - virtualizarr
   - docs
