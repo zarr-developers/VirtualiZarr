@@ -388,7 +388,7 @@ Combining a large number (e.g., 1000s) of virtual datasets at once should be ver
 
 However creating 1000s of virtual datasets at once can take a very long time.
 (If it were quick to do so, there would be little need for this library!)
-See the page on [Scaling](../explanation/scaling.md) for tips on how to create large numbers of virtual datasets at once.
+See the page on [Scaling](scaling.md) for tips on how to create large numbers of virtual datasets at once.
 
 ## Changing the prefix of urls in the virtual dataset
 

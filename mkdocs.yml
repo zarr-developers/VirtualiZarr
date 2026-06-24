@@ -20,10 +20,10 @@ nav:
   - How-to guides:
     - "how_to/usage.md"
     - "how_to/examples.md"
+    - "how_to/scaling.md"
   - Explanation:
     - "explanation/data_structures.md"
     - "explanation/custom_parsers.md"
-    - "explanation/scaling.md"
     - "explanation/faq.md"
   - API Reference:
     - api/virtualizarr.md
@@ -100,6 +100,19 @@ plugins:
   - search
   - autorefs
   - markdown-exec
+  # Preserve the old flat URLs (e.g. /scaling.html) after grouping pages into directories
+  - redirects:
+      redirect_maps:
+        "installation.md": "getting_started/installation.md"
+        "usage.md": "how_to/usage.md"
+        "examples.md": "how_to/examples.md"
+        "scaling.md": "how_to/scaling.md"
+        "data_structures.md": "explanation/data_structures.md"
+        "custom_parsers.md": "explanation/custom_parsers.md"
+        "faq.md": "explanation/faq.md"
+        "releases.md": "about/releases.md"
+        "contributing.md": "about/contributing.md"
+        "core_team_guide.md": "about/core_team_guide.md"
   - mkdocstrings:
       enable_inventory: true
       handlers:
