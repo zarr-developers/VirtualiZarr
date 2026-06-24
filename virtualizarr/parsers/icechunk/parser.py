@@ -235,12 +235,11 @@ async def _construct_manifest_group(
     skip_variables: Iterable[str] | None = None,
     batch_size: int = _DEFAULT_BATCH_SIZE,
 ) -> ManifestGroup:
-    """Build a ManifestGroup from an icechunk zarr group."""
+    """Build a ManifestGroup from an icechunk zarr group, recursing into subgroups."""
     zarr_group = await open_group_async(store=store, path=group, mode="r")
-
-    array_keys = [key async for key in zarr_group.array_keys()]
     skip = set() if skip_variables is None else set(skip_variables)
 
+    array_keys = [key async for key in zarr_group.array_keys()]
     zarr_arrays = await asyncio.gather(
         *[zarr_group.getitem(k) for k in array_keys if k not in skip]
     )
@@ -253,9 +252,30 @@ async def _construct_manifest_group(
             for arr in zarr_arrays
         ]
     )
-
     arrays = {a.basename: ma for a, ma in zip(zarr_arrays, manifest_arrays)}
-    return ManifestGroup(arrays=arrays, attributes=dict(zarr_group.attrs))
+
+    # Subgroups, recursed depth-first so the full hierarchy is represented.
+    # icechunk native-chunk ids are repo-global, so the same native_chunks_prefix
+    # applies at every depth.
+    group_keys = [key async for key in zarr_group.group_keys()]
+    child_paths = [(key, key if not group else f"{group}/{key}") for key in group_keys]
+    child_groups = await asyncio.gather(
+        *[
+            _construct_manifest_group(
+                store=store,
+                native_chunks_prefix=native_chunks_prefix,
+                group=child_path,
+                skip_variables=skip_variables,
+                batch_size=batch_size,
+            )
+            for _, child_path in child_paths
+        ]
+    )
+    groups = {name: mg for (name, _), mg in zip(child_paths, child_groups)}
+
+    return ManifestGroup(
+        arrays=arrays, groups=groups, attributes=dict(zarr_group.attrs)
+    )
 
 
 async def _construct_manifest_array(
