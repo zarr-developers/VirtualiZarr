@@ -238,7 +238,24 @@ async def construct_manifest_group(
         array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
     }
 
-    return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
+    # Recurse into subgroups so hierarchical stores are represented in full.
+    group_keys = [key async for key in zarr_group.group_keys()]
+    # Keep the short name for the groups dict, but build the full path for recursion.
+    child_paths = [(key, f"{group}/{key}" if group else key) for key in group_keys]
+    child_groups = await asyncio.gather(
+        *[
+            construct_manifest_group(
+                path=path,
+                store=store,
+                skip_variables=skip_variables,
+                group=child_path,
+            )
+            for _, child_path in child_paths
+        ]
+    )
+    groups = {name: mg for (name, _), mg in zip(child_paths, child_groups)}
+
+    return ManifestGroup(manifest_dict, groups=groups, attributes=zarr_group.attrs)
 
 
 async def construct_manifest_array(
