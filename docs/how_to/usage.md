@@ -549,3 +549,9 @@ vds = open_virtual_dataset(
 ```
 
 Note that as the virtualizarr [virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk][] method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.
+
+## Next steps
+
+- See worked end-to-end notebooks in [Examples](examples.md).
+- To generate large numbers of virtual references efficiently, see [Scaling](scaling.md).
+- To understand the data structures underpinning VirtualiZarr, see [Data Structures](../explanation/data_structures.md).

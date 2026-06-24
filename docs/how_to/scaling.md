@@ -347,3 +347,7 @@ Instead what is more efficient is to use per-task retries at te executor level.
 
 
 In the future, we plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
+
+## Next steps
+
+To understand the data structures that make this chunk-manifest slicing and combining cheap, see [Data Structures](../explanation/data_structures.md).
