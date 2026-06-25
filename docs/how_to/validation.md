@@ -257,10 +257,10 @@ Reading data from the second timestep would return the array's `fill_value`.
 
 ### Inhomogeneous Codecs
 
-Zarr arrays are by definition made up of a grid of chunks with idential codecs (e.g. for compression).
+Zarr arrays are by definition made up of a grid of chunks with identical codecs (e.g. for compression).
 If the data archive does not use the same codecs for all the chunk in a single logical array, they cannot be virtualized as a single array.
 
-Such inhomogenous codecs can arise in the real world because:
+Such inhomogeneous codecs can arise in the real world because:
 - Pipelines chose compression parameters to be optimal per-file, instead of prioritising consistency across files.
 - The data provider decided to deliberately change their compression codecs at some point during the operational lifetime of an archive, perhaps because they realized a better compression algorithm was available,
 - The change was unintentional, caused by changing defaults between file writer library versions.
