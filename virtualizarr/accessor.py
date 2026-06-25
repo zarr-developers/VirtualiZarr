@@ -285,7 +285,6 @@ class _VirtualiZarrDatasetAccessor:
             for var in self.ds.variables.values()
         )
 
-
     def nrefs(self) -> int:
         """Count the total number of virtual chunk references in the dataset.
 
@@ -306,6 +305,7 @@ class _VirtualiZarrDatasetAccessor:
             for var in self.ds.variables.values()
             if isinstance(var.data, ManifestArray)
         )
+
 
 @xr.register_dataset_accessor("vz")
 class VirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
