@@ -286,6 +286,27 @@ class _VirtualiZarrDatasetAccessor:
         )
 
 
+    def nrefs(self) -> int:
+        """Count the total number of virtual chunk references in the dataset.
+
+        Ignores non-virtual variables (i.e. those not backed by a ManifestArray).
+
+        Returns
+        -------
+        int
+            Total number of virtual references across all virtual variables.
+
+        Examples
+        --------
+        >>> vds.vz.nrefs
+        42
+        """
+        return sum(
+            len(var.data.manifest)
+            for var in self.ds.variables.values()
+            if isinstance(var.data, ManifestArray)
+        )
+
 @xr.register_dataset_accessor("vz")
 class VirtualiZarrDatasetAccessor(_VirtualiZarrDatasetAccessor):
     pass
