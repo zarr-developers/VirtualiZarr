@@ -89,12 +89,39 @@ Again this can be done as part of the pre-processing step.
 
 ## Example inconsistencies
 
-### Missing variables
+### Missing files/variables/chunks
 
-Sometimes entire variables are missing from files.
-This might break the model of a regular timeseries, but can still be represented in a Zarr store as the array having missing values (i.e. a default `fill_value` such as NaN).
+Real-world datasets have missing data.
+Zarr's convention for representing missing data elements is to set their value to a specified `fill_value`.
 
-### Missing chunks
+But sometimes there are not just one or two elements missing - entire chunks/variables/files are not present.
+In other words the chunks of an array across various files do form a logical grid, but only a sparse grid, not a dense grid.
+
+::: note
+
+    Missing chunks are handled very efficiently by Icechunk - arguably much more efficiently than with the Native Zarr format.
+    
+    In Native Zarr, while a chunk key is allowed to be uninitialized, a reader only discovers the absence at read-time, when the store attempts to fetch the chunk key from storage and finds nothing at that path.
+    
+    In contrast, since Icechunk records in the manifest whether or not each chunk was initialized, it doesn't need to attempt to fetch a chunk to know whether it exists.
+
+These sparse chunk grids can arise in real datasets for a few reasons:
+
+- Perhaps the data model of the archival files gives fewer guarantees about the chunk grid, and allows chunks to be effectively missing, such as is the case with GRIB.
+- Perhaps some variables were not sampled at certain timesteps and ended up being omitted from certain files entirely.
+- Perhaps the data is inherently sparse at a global level, whilst still being dense at a regional level (e.g. tree canopy height data would not exist over the oceans). In that case it might make sense for the data files to all be individually complete, and all be tilable onto a global domain, but some files still not be present.
+
+If the chunks do truly align onto a single grid, it is possible to represent the absence of entire virtual chunks, since **the chunk manifest is allowed to be sparse**.
+
+VirtualiZarr provides some utilities for creating virtual datasets with such sparse chunk grids.
+
+The `ManifestArray.with_fill_value_only` method returns a new ManifestArray with the same schema (shape, chunks, codecs, dimension names, attributes) as a given ManifestArray, but with an empty chunk manifest and the given `fill_value`.
+This is useful for filling in missing files/variables, by creating virtual datasets containing manifestarrays which have no chunk references.
+These empty manifestarrays can then be concatenated with the manifestarrays containing chunk references, to create a virtual dataset which a logical grid spanning regions with both present and missing data.
+
+```python
+# TODO example
+```
 
 ### Inhomogenous Codecs
 
