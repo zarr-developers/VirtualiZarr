@@ -251,6 +251,6 @@ combined
 The combined variable is still a single `ManifestArray` of shape `(2, 3, 4)`, but only the first timestep references real chunks.
 Reading data from the second timestep would return the array's `fill_value`.
 
-### Inhomogenous Codecs
+### Inhomogeneous Codecs
 
 ### Inhomogenenous encoding
