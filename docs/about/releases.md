@@ -1,6 +1,8 @@
 # Release notes
 
-## Unreleased
+## v2.7.0 (25th June 2026)
+
+Adds a `GribberishParser` for reading GRIB1/GRIB2 files as virtual datasets, a `ManifestArray.with_fill_value_only` constructor, and populates `ds.encoding["source"]` to mirror `xarray.open_dataset`. `ManifestArray` no longer advertises a `.chunks` attribute (a breaking change), which fixes a whole class of cryptic errors when xarray tried to load, compute, or compare virtual arrays. Also fixes the `ZarrParser` and `IcechunkParser` silently dropping arrays nested in subgroups, and bumps the minimum supported `zarr` to `>=3.1.6`. Documentation gains a new ["Validation and Cleaning"](../how_to/validation.md) guide on handling the messy inconsistencies typical of real-world datasets during virtual ingestion, plus a new GOES-16 ingestion example.
 
 ### New Features
 
@@ -31,6 +33,12 @@
 
 ### Documentation
 
+- New "Validation and Cleaning" how-to guide covering tips and best practices for handling the messy inconsistencies typical of real-world datasets during virtual ingestion.
+  ([#1026](https://github.com/zarr-developers/VirtualiZarr/pull/1026)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Link the GOES-16 virtual Zarr blog post and add a GOES-16 ingestion notebook to the examples.
+  ([#1012](https://github.com/zarr-developers/VirtualiZarr/pull/1012)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
   ([#1006](https://github.com/zarr-developers/VirtualiZarr/pull/1006)).
   By [Tom Nicholas](https://github.com/TomNicholas).
