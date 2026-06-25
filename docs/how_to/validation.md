@@ -201,6 +201,8 @@ vds = open_virtual_mfdataset(
 
 ## Example inconsistencies
 
+Here are some example types of inconsistencies you might encounter, and what your options are for dealing with them.
+
 ### Missing files/variables/chunks
 
 Real-world datasets have missing data.
@@ -256,3 +258,9 @@ Reading data from the second timestep would return the array's `fill_value`.
 ### Inhomogeneous Codecs
 
 ### Inhomogenenous encoding
+
+
+## Next steps
+
+- To generate large numbers of virtual references efficiently, see [Scaling](scaling.md).
+- To see worked end-to-end notebooks, see [Examples](examples.md).

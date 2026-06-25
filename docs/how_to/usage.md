@@ -552,6 +552,7 @@ Note that as the virtualizarr [virtualizarr.accessor.VirtualiZarrDatasetAccessor
 
 ## Next steps
 
-- See worked end-to-end notebooks in [Examples](examples.md).
-- To generate large numbers of virtual references efficiently, see [Scaling](scaling.md).
 - To understand the data structures underpinning VirtualiZarr, see [Data Structures](../explanation/data_structures.md).
+- To see worked end-to-end notebooks, see [Examples](examples.md).
+- To generate large numbers of virtual references efficiently, see [Scaling](scaling.md).
+- To validate the contents of your archival files before ingestion, see [Validation and Cleaning](validation.md).

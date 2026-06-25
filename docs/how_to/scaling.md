@@ -350,4 +350,6 @@ In the future, we plan to add support for automatic retries to the Lithops and D
 
 ## Next steps
 
-To understand the data structures that make this chunk-manifest slicing and combining cheap, see [Data Structures](../explanation/data_structures.md).
+- To understand the data structures that make this chunk-manifest slicing and combining cheap, see [Data Structures](../explanation/data_structures.md).
+- To validate the contents of your archival files before ingestion, see [Validation and Cleaning](validation.md).
+- Too see worked end-to-end notebooks, see [Examples](examples.md).
