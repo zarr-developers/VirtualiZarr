@@ -1184,4 +1184,4 @@ def test_nrefs(simple_netcdf4, local_registry):
         loadable_variables=["foo"],
     ) as vds:
         # when the only variable is loadable (non-virtual), nrefs should be 0
-        assert vds.vz.nrefs == 0
+        assert vds.vz.nrefs() == 0
