@@ -275,8 +275,37 @@ This is why in the [GOES-16 archive example](examples.md#goes-16-archive-noteboo
 Each group has the same structure, but each represents a different "era", in which the codec was consistent, but the codec varies between groups.
 This creates some extra friction for the user of the virtual store, but that might be acceptable.
 
-### Inhomogenenous encoding
+### Inhomogeneous CF encoding
 
+Many tools (including Xarray) apply an extra decoding step on read that interprets [CF conventions](https://cfconventions.org/) encoding attributes such as `scale_factor` and `add_offset`.
+If these differ between files, the combined store will be decoded incorrectly.
+
+What makes this case especially dangerous is that, unlike inhomogeneous codecs, chunk shapes, or dtypes, a mismatch here does **not** raise an error when you concatenate.
+Xarray's default attribute-merging behaviour silently drops the conflicting values, so you end up with a virtual store that loads without complaint but returns wrongly-decoded data.
+See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) and the warning under [Combining virtual datasets](usage.md#combining-virtual-datasets) for more details.
+
+This silent failure mode is a strong argument for declaring a strict schema and validating the CF encoding of every file _up front_, before combining.
+Because the encoding attributes live in each variable's `attrs`, a schema-level check catches the inconsistency without loading any chunk data:
+
+```python exec="on" session="usage" source="material-block"
+# a virtual temperature variable carrying CF packing attributes
+packed = virtual_variable((3, 4), "int16", ("x", "y"))
+packed.attrs = {"scale_factor": 0.01, "add_offset": 0.0}
+ds_packed = xr.Dataset({"temperature": packed})
+
+# pin the expected CF encoding, so a file packed differently is rejected here
+# rather than silently mis-decoded after combining
+encoding_schema = pa.DatasetSchema(
+    data_vars={
+        "temperature": pa.DataVar(
+            dtype=np.int16,
+            dims=("x", "y"),
+            attrs={"scale_factor": 0.01, "add_offset": 0.0},
+        ),
+    },
+)
+encoding_schema.validate(ds_packed)
+```
 
 ## Next steps
 
