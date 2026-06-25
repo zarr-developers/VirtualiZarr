@@ -100,9 +100,9 @@ In other words the chunks of an array across various files do form a logical gri
 ::: note
 
     Missing chunks are handled very efficiently by Icechunk - arguably much more efficiently than with the Native Zarr format.
-    
+
     In Native Zarr, while a chunk key is allowed to be uninitialized, a reader only discovers the absence at read-time, when the store attempts to fetch the chunk key from storage and finds nothing at that path.
-    
+
     In contrast, since Icechunk records in the manifest whether or not each chunk was initialized, it doesn't need to attempt to fetch a chunk to know whether it exists.
 
 These sparse chunk grids can arise in real datasets for a few reasons:
