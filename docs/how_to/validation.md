@@ -20,7 +20,7 @@ One good tool for defining and validating schemas is `pandera`, whose `pandera.x
 
 As pandera [separates](https://pandera.readthedocs.io/en/v0.31.1/xarray_guide/error_reporting.html#validation-depth-and-what-appears-in-the-report) schema validation from data validation, its default behaviour avoids trying to load virtual chunks, and so it works with virtual datasets out of the box.
 
-In practice you would obtain your virtual dataset from [`open_virtual_dataset`][virtualizarr.open_virtual_dataset]. 
+In practice you would obtain your virtual dataset from [`open_virtual_dataset`][virtualizarr.open_virtual_dataset].
 So that this page is runnable without any real data files, we instead fabricate an equivalent virtual dataset by wrapping [`ManifestArray`][virtualizarr.manifests.ManifestArray] objects (see [Data Structures](../explanation/data_structures.md)) - its data variables are backed by chunk references, exactly as they would be after a real virtual ingestion.
 
 ```python exec="on" session="usage" source="material-block" result="code"
@@ -54,7 +54,7 @@ vds = xr.Dataset(
 vds
 ```
 
-Notice that the data variables are `ManifestArray` objects - no chunk data has been loaded. 
+Notice that the data variables are `ManifestArray` objects - no chunk data has been loaded.
 We can now declare a schema and validate the virtual dataset against it:
 
 ```python exec="on" session="usage" source="material-block" result="code"
@@ -105,7 +105,7 @@ virtual_schema.validate(vds)
 `pandera` also allows you to check [assertions about data values](https://pandera.readthedocs.io/en/v0.31.1/xarray_guide/checks_and_parsers.html), via `pa.Check`.
 This is useful for `loadable_variables` especially - perhaps you want to check that all your files share the same latitude / longitude grid values, or have a datetime coordinate that falls within the expected year.
 
-Value checks force pandera to read the actual array values, so they only apply to variables that are genuinely loadable (for example coordinates, which `open_virtual_dataset` loads by default). 
+Value checks force pandera to read the actual array values, so they only apply to variables that are genuinely loadable (for example coordinates, which `open_virtual_dataset` loads by default).
 Running a value check against a virtual variable would attempt to load its chunks and raise.
 Because reading values is skipped by default for performance, you must opt in by setting the validation depth to `SCHEMA_AND_DATA`:
 
