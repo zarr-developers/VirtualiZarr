@@ -297,7 +297,7 @@ class _VirtualiZarrDatasetAccessor:
 
         Examples
         --------
-        >>> vds.vz.nrefs  # doctest: +SKIP
+        >>> vds.vz.nrefs()  # doctest: +SKIP
         42
         """
         return sum(
