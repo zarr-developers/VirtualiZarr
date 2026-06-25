@@ -1174,14 +1174,14 @@ def test_nrefs(simple_netcdf4, local_registry):
         registry=local_registry,
         parser=parser,
     ) as vds:
-        # simple_netcdf4 has one virtual variable 'air' with a single chunk
+        # simple_netcdf4 has one virtual variable 'foo' with a single chunk
         assert vds.vz.nrefs == 1
 
     with open_virtual_dataset(
         url=simple_netcdf4,
         registry=local_registry,
         parser=parser,
-        loadable_variables=["air"],
+        loadable_variables=["foo"],
     ) as vds:
         # when the only variable is loadable (non-virtual), nrefs should be 0
         assert vds.vz.nrefs == 0
