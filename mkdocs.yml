@@ -20,6 +20,7 @@ nav:
   - How-to guides:
     - "how_to/usage.md"
     - "how_to/examples.md"
+    - "how_to/validation.md"
     - "how_to/scaling.md"
   - Explanation:
     - "explanation/data_structures.md"

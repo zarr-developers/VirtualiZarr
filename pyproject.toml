@@ -115,6 +115,7 @@ docs = [
     "mkdocstrings-python>=1.16.10",
     "markdown-exec[ansi]",
     "mkdocs-redirects>=1.2.1",
+    "pandera[xarray]>=0.31.0",
     "ruff",
 ]
 dev = [
