@@ -257,6 +257,24 @@ Reading data from the second timestep would return the array's `fill_value`.
 
 ### Inhomogeneous Codecs
 
+Zarr arrays are by definition made up of a grid of chunks with idential codecs (e.g. for compression).
+If the data archive does not use the same codecs for all the chunk in a single logical array, they cannot be virtualized as a single array.
+
+Such inhomogenous codecs can arise in the real world because:
+- Pipelines chose compression parameters to be optimal per-file, instead of prioritising consistency across files.
+- The data provider decided to deliberately change their compression codecs at some point during the operational lifetime of an archive, perhaps because they realized a better compression algorithm was available,
+- The change was unintentional, caused by changing defaults between file writer library versions.
+
+!!! note
+
+    Ultimately we want virtualization to be able to handle inconsistent codecs.
+    But it requires a significant change to the Zarr data model and so is likely to take some time to land.
+
+Today your only real option is to split the offending array into multiple arrays.
+This is why in the [GOES-16 archive example](examples.md#goes-16-archive-notebooks) we split the timeseries into multiple similar groups.
+Each group has the same structure, but each represents a different "era", in which the codec was consistent, but the codec varies between groups.
+This creates some extra friction for the user of the virtual store, but that might be acceptable.
+
 ### Inhomogenenous encoding
 
 
