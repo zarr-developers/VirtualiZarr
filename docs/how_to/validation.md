@@ -8,7 +8,8 @@ Assembling a single virtual store from many files requires exploiting some commo
 Sometimes you know that structure a priori, and sometimes you infer it by looking at the contents of the files.
 
 However sometimes you _think_ you know the structure, only to find upon closer examination that the files aren't as orderly as you assumed.
-This can be frustrating, but some best practices can help make it less painful.
+This can be frustrating, as it might [prevent virtualization](../explanation/faq.md#can-my-specific-data-be-virtualized).
+But some best practices can help make it less painful, either by working around such inconsistencies, or at least exposing them earlier.
 
 ## Declarative schema validation
 
