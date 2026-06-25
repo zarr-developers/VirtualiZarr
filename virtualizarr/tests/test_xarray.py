@@ -1175,7 +1175,7 @@ def test_nrefs(simple_netcdf4, local_registry):
         parser=parser,
     ) as vds:
         # simple_netcdf4 has one virtual variable 'foo' with a single chunk
-        assert vds.vz.nrefs == 1
+        assert vds.vz.nrefs() == 1
 
     with open_virtual_dataset(
         url=simple_netcdf4,
