@@ -51,13 +51,14 @@ vds = xr.Dataset(
     },
     coords={"x": np.arange(3, dtype=np.float64)},
 )
-vds
+print(vds)
 ```
 
 Notice that the data variables are `ManifestArray` objects - no chunk data has been loaded.
-We can now declare a schema and validate the virtual dataset against it:
+We can now declare a schema and validate the virtual dataset against it.
+If the dataset conforms to the schema, `validate` returns it unchanged; otherwise it raises an informative error.
 
-```python exec="on" session="usage" source="material-block" result="code"
+```python exec="on" session="usage" source="material-block"
 import pandera.xarray as pa
 
 schema = pa.DatasetSchema(
@@ -89,7 +90,7 @@ Pandera's [duck array support](https://pandera.readthedocs.io/en/v0.31.1/xarray_
 Note that pandera's `chunked=True` option specifically checks for _Dask_-backed arrays, so it will **not** match a virtual variable, which is backed by a `ManifestArray`.
 To assert that a variable is still virtual (i.e. that it has not been accidentally loaded into memory), pass `array_type=ManifestArray`:
 
-```python exec="on" session="usage" source="material-block" result="code"
+```python exec="on" session="usage" source="material-block"
 virtual_schema = pa.DatasetSchema(
     data_vars={
         "temperature": pa.DataVar(
@@ -109,7 +110,7 @@ Value checks force pandera to read the actual array values, so they only apply t
 Running a value check against a virtual variable would attempt to load its chunks and raise.
 Because reading values is skipped by default for performance, you must opt in by setting the validation depth to `SCHEMA_AND_DATA`:
 
-```python exec="on" session="usage" source="material-block" result="code"
+```python exec="on" session="usage" source="material-block"
 from pandera.config import ValidationDepth, config_context
 
 coord_schema = pa.DatasetSchema(
@@ -245,7 +246,7 @@ ds_missing = xr.Dataset({"temperature": missing})
 
 # concatenate into a single logical grid spanning present and missing data
 combined = xr.concat([ds_present, ds_missing], dim="time")
-combined
+print(combined)
 ```
 
 The combined variable is still a single `ManifestArray` of shape `(2, 3, 4)`, but only the first timestep references real chunks.
