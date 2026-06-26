@@ -2,6 +2,15 @@
 
 Contributions are welcome and encouraged! We ask only that all contributors follow the [Zarr Developers Code of Conduct](https://github.com/zarr-developers/.github/blob/main/CODE_OF_CONDUCT.md).
 
+## Community meeting
+
+We hold a bi-weekly VirtualiZarr coordination meeting on Wednesdays, 10-10:30am PST / 1-1:30pm EST / 6-6:30pm UTC, and anyone is welcome to join!
+
+- **Where:** [Zoom](https://numfocus-org.zoom.us/j/88307540201?pwd=Sn2uY0i3wRCqFaZ5oNbJRQrcg1FEyw.1) (also listed on the [Zarr community calendar](https://zarr.dev/community-calls/))
+- **Notes:** [Meeting notes](https://docs.google.com/document/d/18P_Uk2aL1hfcaJf4PJfYZJzmhvMSJjdmB_AJvjiZOVM/edit?usp=sharing)
+
+You can also chat with us in the [VirtualiZarr channel of the Earthmover community Slack](https://earthmover-community.slack.com/archives/C08EXCE8ZQX).
+
 ## Contributing code
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
