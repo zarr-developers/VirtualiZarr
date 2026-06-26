@@ -3,6 +3,7 @@
 ## v2.7.1 (unreleased)
 
 ### New Features
+- Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
 
 ### Breaking changes
 

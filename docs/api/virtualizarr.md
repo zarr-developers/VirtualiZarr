@@ -16,6 +16,8 @@ Users can use xarray for every step apart from reading and serializing virtual r
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nbytes
 
+::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs
+
 ## Renaming paths
 
 ::: virtualizarr.accessor.VirtualiZarrDatasetAccessor.rename_paths
