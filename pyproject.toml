@@ -120,6 +120,7 @@ docs = [
 ]
 dev = [
     "codecov",
+    "hypothesis>=6.100",
     "mypy",
     "pandas-stubs",
     "pooch",
@@ -344,6 +345,7 @@ markers = [
     "network: marks test requiring internet (select with '--run-network-tests')",
     "slow: marks test as slow (select with '--run-slow-tests')",
     "minio: marks test requiring docker and minio (select with '--run-minio-tests')",
+    "hypothesis_tests: property-based tests using hypothesis (slower; exclude with '-m \"not hypothesis_tests\"')",
 ]
 filterwarnings = [
     "ignore:Numcodecs codecs are not in the Zarr version 3 specification*:UserWarning:numcodecs"
