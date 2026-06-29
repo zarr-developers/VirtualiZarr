@@ -8,6 +8,10 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  ### Internal Changes
+  - `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=3.5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one
+  must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 
 ## v2.7.1 (15th July 2026)
 
