@@ -4,6 +4,7 @@
 
 ### New Features
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
+- Added lazy `reindex` and `reindex_like` accessor methods ([VirtualiZarrDatasetAccessor.reindex][virtualizarr.accessor.VirtualiZarrDatasetAccessor.reindex], [VirtualiZarrDatasetAccessor.reindex_like][virtualizarr.accessor.VirtualiZarrDatasetAccessor.reindex_like]) — conform a virtual dataset to new coordinate labels without materializing data, padding absent positions with null-path manifest entries that read back as `fill_value`.
 
 ### Breaking changes
 
