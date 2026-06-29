@@ -6,6 +6,7 @@ from functools import wraps
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Generator,
     Literal,
@@ -20,6 +21,55 @@ from virtualizarr.writers.kerchunk import dataset_to_kerchunk_refs
 
 if TYPE_CHECKING:
     from icechunk import IcechunkStore  # type: ignore[import-not-found]
+
+
+def _reindex_dataset_one_dim(ds: "xr.Dataset", dim: str, target) -> "xr.Dataset":
+    import numpy as np
+    import pandas as pd
+
+    from virtualizarr.manifests.reindex import chunk_index_map
+
+    if dim not in ds.indexes:
+        raise ValueError(
+            f"Cannot reindex dimension {dim!r}: it has no in-memory index. "
+            "Alignment needs real coordinate labels to compare; load the "
+            f"coordinate (e.g. via loadable_variables) before reindexing {dim!r}."
+        )
+
+    source_labels = ds.indexes[dim]
+    target_index = pd.Index(np.asarray(target))
+
+    # variables (data vars or coords) backed by a ManifestArray along this dim
+    virtual_names = [
+        name
+        for name, var in ds.variables.items()
+        if dim in var.dims and isinstance(var.data, ManifestArray)
+    ]
+
+    # record which virtual names are coordinates so we can restore their coord
+    # status after reassignment (assigning result[name] = xr.Variable(...) always
+    # produces a data variable, which would demote aux coords silently).
+    virtual_coord_names = [n for n in virtual_names if n in ds.coords]
+
+    # let xarray reindex everything else (loaded vars + the dim coordinate) — safe,
+    # no ManifestArrays involved — which also produces the new dim coordinate.
+    rest_reindexed = ds.drop_vars(virtual_names).reindex({dim: target_index})
+
+    result = rest_reindexed
+    for name in virtual_names:
+        var = ds[name].variable
+        axis = var.dims.index(dim)
+        chunk_size = var.data.metadata.chunks[axis]
+        cmap = chunk_index_map(source_labels, target_index, chunk_size)
+        new_data = var.data._reindex_axis(axis, cmap, new_size=len(target_index))
+        result[name] = xr.Variable(
+            var.dims, new_data, attrs=var.attrs, encoding=var.encoding
+        )
+
+    if virtual_coord_names:
+        result = result.set_coords(virtual_coord_names)
+
+    return result
 
 
 def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
@@ -305,6 +355,39 @@ class _VirtualiZarrDatasetAccessor:
             for var in self.ds.variables.values()
             if isinstance(var.data, ManifestArray)
         )
+
+    def reindex(self, indexers: Mapping[Any, Any] | None = None, **indexers_kwargs):
+        """
+        Conform this virtual dataset to a new set of coordinate labels, lazily.
+
+        Positions absent from the source are padded with null-path chunk entries
+        that read back as the array's ``fill_value`` — no data is materialized.
+        Only whole-chunk appends, inserts, and reorders are supported; a target
+        that would split a chunk raises ``NotImplementedError``.
+
+        Target labels must be comparable to the source index dtype; labels with
+        no match in the source become fill positions (null chunks), mirroring
+        xarray's ``Dataset.reindex`` behaviour.
+        """
+        from xarray.core.utils import either_dict_or_kwargs
+
+        indexers = either_dict_or_kwargs(indexers, indexers_kwargs, "reindex")
+        ds = self.ds
+        for dim, target in indexers.items():
+            ds = _reindex_dataset_one_dim(ds, dim, target)
+        return ds
+
+    def reindex_like(self, other: "xr.Dataset"):
+        """Conform this virtual dataset to the indexes of ``other`` (lazily).
+
+        Conforms by exact label match only; ``method`` and ``tolerance``
+        arguments (supported by xarray's ``reindex_like``) are not available
+        in v1 of this implementation.
+        """
+        indexers = {
+            dim: other.indexes[dim] for dim in other.indexes if dim in self.ds.dims
+        }
+        return self.reindex(indexers)
 
 
 @xr.register_dataset_accessor("vz")

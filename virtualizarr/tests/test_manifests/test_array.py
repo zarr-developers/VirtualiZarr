@@ -808,6 +808,71 @@ class TestWithFillValueOnly:
         assert result.manifest.dict() == {}
 
 
+class TestReindexAxis:
+    def test_pad_with_null_chunk(self, array_v3_metadata):
+        # shape (4,), chunks (2,) -> two source chunks "0","1"
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 8},
+                "1": {"path": "/b.nc", "offset": 8, "length": 8},
+            }
+        )
+        metadata = array_v3_metadata(shape=(4,), chunks=(2,), dimension_names=["x"])
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        # insert a missing chunk between the two real chunks; new length 6 (3 chunks)
+        result = marr._reindex_axis(axis=0, chunk_map=[0, None, 1], new_size=6)
+
+        assert result.shape == (6,)
+        assert result.metadata.chunks == (2,)
+        # missing chunk is simply omitted from the dict
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 0, "length": 8},
+            "2": {"path": "file:///b.nc", "offset": 8, "length": 8},
+        }
+
+    def test_whole_chunk_reorder(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 8},
+                "1": {"path": "/b.nc", "offset": 8, "length": 8},
+            }
+        )
+        metadata = array_v3_metadata(shape=(4,), chunks=(2,), dimension_names=["x"])
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr._reindex_axis(axis=0, chunk_map=[1, 0], new_size=4)
+
+        assert result.shape == (4,)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///b.nc", "offset": 8, "length": 8},
+            "1": {"path": "file:///a.nc", "offset": 0, "length": 8},
+        }
+
+    def test_only_target_axis_remapped_2d(self, array_v3_metadata):
+        # shape (2,4) chunks (2,2) -> chunk grid (1,2): keys "0.0","0.1"
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 16},
+                "0.1": {"path": "/b.nc", "offset": 16, "length": 16},
+            }
+        )
+        metadata = array_v3_metadata(
+            shape=(2, 4), chunks=(2, 2), dimension_names=["y", "x"]
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        # reindex axis 1 (x): keep chunk 0, append a null chunk -> shape (2,6)
+        result = marr._reindex_axis(axis=1, chunk_map=[0, 1, None], new_size=6)
+
+        assert result.shape == (2, 6)
+        assert result.metadata.chunks == (2, 2)
+        assert result.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 0, "length": 16},
+            "0.1": {"path": "file:///b.nc", "offset": 16, "length": 16},
+        }
+
+
 def test_refuse_combine(array_v3_metadata):
     # TODO test refusing to concatenate arrays that have conflicting shapes / chunk sizes
     chunks = (5, 1, 10)

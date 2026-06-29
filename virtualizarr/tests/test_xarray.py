@@ -17,8 +17,14 @@ from virtualizarr import (
     open_virtual_datatree,
     open_virtual_mfdataset,
 )
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestGroup,
+    ManifestStore,
+)
 from virtualizarr.manifests.indexing import SubChunkIndexingError
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_dask,
@@ -375,6 +381,298 @@ class TestCombine:
             assert isinstance(combined_vds["time"].data, ManifestArray)
             assert isinstance(combined_vds["lat"].data, ManifestArray)
             assert isinstance(combined_vds["lon"].data, ManifestArray)
+
+
+class TestAlignment:
+    """
+    Outer-style alignment introduces coordinate labels an array doesn't have and
+    fills the new positions with NaN. The NaN fill is *not* fundamentally a
+    materializing operation: a missing chunk in a manifest (``MISSING_CHUNK_PATH``)
+    already reads back as ``fill_value``, so the NaN can live purely as a chunk
+    reference and only be realized when a reader asks for those bytes (see
+    ``test_missing_chunk_reads_back_as_virtual_nan``).
+
+    What actually breaks today is xarray's *reindex machinery*, not the manifest
+    model. xarray implements an outer join by reindexing each object onto the
+    union of labels, and reindex builds an integer indexer with ``-1`` at every
+    missing (would-be-NaN) position - e.g. ``[0, 1, 2, -1, -1]``. ManifestArray
+    refuses that fancy-indexing operation, so alignment raises before any result
+    is produced. The lazy, manifest-level path (padding with missing chunks) is
+    not yet wired into reindex, which is why the outer join fails here.
+    """
+
+    def _manifest_dataarray(self, array_v3_metadata, path, coord):
+        """A 1D ManifestArray wrapped in a DataArray with a dimension coordinate."""
+        n = len(coord)
+        manifest = ChunkManifest(
+            entries={"0": {"path": path, "offset": 0, "length": n * 4}}
+        )
+        metadata = array_v3_metadata(
+            shape=(n,), chunks=(n,), data_type=np.dtype("float32")
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        return xr.DataArray(marr, dims=["x"], coords={"x": coord}, name="foo")
+
+    def test_align_outer_join_with_unaligned_labels_raises(self, array_v3_metadata):
+        # Partially overlapping labels: the union is x=[0, 1, 2, 3, 4], so each
+        # array gains a would-be-NaN at the labels it personally lacks.
+        da1 = self._manifest_dataarray(array_v3_metadata, "/a.nc", [0, 1, 2])
+        da2 = self._manifest_dataarray(array_v3_metadata, "/b.nc", [2, 3, 4])
+
+        # The outer join reindexes da1 onto [0, 1, 2, 3, 4], producing the
+        # indexer [0, 1, 2, -1, -1]. ManifestArray rejects that fancy index, so
+        # alignment fails inside xarray's reindex - this is a machinery gap, not
+        # proof that the NaN fill must materialize (the manifest could instead be
+        # padded with missing chunks; that path is not yet wired into reindex).
+        with pytest.raises(NotImplementedError, match="fancy indexing"):
+            xr.align(da1, da2, join="outer")
+
+    def test_align_outer_join_already_aligned_stays_lazy(self, array_v3_metadata):
+        # When the labels already match, an outer join needs no reindex (no NaN
+        # fill), so it is a no-op that leaves the data lazy as a ManifestArray.
+        da1 = self._manifest_dataarray(array_v3_metadata, "/a.nc", [0, 1, 2])
+        da2 = self._manifest_dataarray(array_v3_metadata, "/b.nc", [0, 1, 2])
+
+        aligned1, aligned2 = xr.align(da1, da2, join="outer")
+
+        assert isinstance(aligned1.data, ManifestArray)
+        assert isinstance(aligned2.data, ManifestArray)
+
+    def test_reading_manifestarray_values_raises_clear_error(self, array_v3_metadata):
+        # A bare ManifestArray refuses to materialize into numpy, pointing the
+        # user at loadable_variables / writing to a store instead. (To read NaN
+        # fill values lazily you go through a ManifestStore, not __array__ - see
+        # test_missing_chunk_reads_back_as_virtual_nan.)
+        da = self._manifest_dataarray(array_v3_metadata, "/a.nc", [0, 1, 2])
+
+        with pytest.raises(NotImplementedError, match="virtual references"):
+            da.values
+
+    def test_missing_chunk_reads_back_as_virtual_nan(self):
+        # The NaN fill an outer join wants does NOT require materializing a real
+        # array: a MISSING_CHUNK_PATH ("") entry is a virtual NaN that a
+        # ManifestStore serves lazily as fill_value at read time. Here chunk "0"
+        # is a real reference and chunk "1" is missing, so the array reads back as
+        # [1.0, 2.0, nan, nan] without ever materializing a fill array.
+        import obstore as obs
+
+        store = obs.store.MemoryStore()
+        # two little-endian float32 values: 1.0, 2.0
+        obs.put(store, "data.bin", b"\x00\x00\x80\x3f\x00\x00\x00\x40")
+
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "memory:///data.bin", "offset": 0, "length": 8},
+                "1": {"path": "", "offset": 0, "length": 0},  # MISSING_CHUNK_PATH
+            }
+        )
+        metadata = create_v3_array_metadata(
+            shape=(4,),
+            chunk_shape=(2,),
+            data_type=np.dtype("float32"),
+            codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+            fill_value=float("nan"),
+            dimension_names=["x"],
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        # the missing chunk is simply absent from the manifest dict
+        assert manifest.dict() == {
+            "0": {"path": "memory:///data.bin", "offset": 0, "length": 8}
+        }
+
+        manifest_store = ManifestStore(
+            group=ManifestGroup(arrays={"foo": marr}),
+            registry=ObjectStoreRegistry({"memory://": store}),
+        )
+        ds = xr.open_zarr(manifest_store, consolidated=False, zarr_format=3)
+
+        values = ds["foo"].values
+        np.testing.assert_array_equal(values[:2], [1.0, 2.0])
+        assert np.isnan(values[2:]).all()
+
+    def _virtual_ds_with_time_index(self, times, path):
+        # one float32 value per timestep, one chunk per timestep (C=1 along time)
+        n = len(times)
+        manifest = ChunkManifest(
+            entries={
+                str(i): {"path": path, "offset": i * 4, "length": 4} for i in range(n)
+            }
+        )
+        metadata = create_v3_array_metadata(
+            shape=(n,),
+            chunk_shape=(1,),
+            data_type=np.dtype("float32"),
+            codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+            fill_value=float("nan"),
+            dimension_names=["time"],
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        var = xr.Variable(["time"], marr)
+        return xr.Dataset({"foo": var}, coords={"time": list(times)})
+
+    def test_reindex_pads_with_virtual_nan(self):
+        ds = self._virtual_ds_with_time_index([0, 1, 2], "/a.nc")
+        result = ds.vz.reindex(time=[0, 1, 2, 3, 4])
+
+        # still lazy
+        assert isinstance(result["foo"].data, ManifestArray)
+        assert result.sizes["time"] == 5
+        assert list(result["time"].values) == [0, 1, 2, 3, 4]
+        # positions 3 and 4 are null chunks, omitted from the manifest dict
+        assert result["foo"].data.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 0, "length": 4},
+            "1": {"path": "file:///a.nc", "offset": 4, "length": 4},
+            "2": {"path": "file:///a.nc", "offset": 8, "length": 4},
+        }
+
+    def test_reindex_read_back_fill_value(self):
+        import obstore as obs
+
+        store = obs.store.MemoryStore()
+        # three little-endian float32 values: 1.0, 2.0, 3.0
+        obs.put(
+            store,
+            "data.bin",
+            b"\x00\x00\x80\x3f\x00\x00\x00\x40\x00\x00\x40\x40",
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "memory:///data.bin", "offset": 0, "length": 4},
+                "1": {"path": "memory:///data.bin", "offset": 4, "length": 4},
+                "2": {"path": "memory:///data.bin", "offset": 8, "length": 4},
+            }
+        )
+        metadata = create_v3_array_metadata(
+            shape=(3,),
+            chunk_shape=(1,),
+            data_type=np.dtype("float32"),
+            codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+            fill_value=float("nan"),
+            dimension_names=["time"],
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        ds = xr.Dataset(
+            {"foo": xr.Variable(["time"], marr)}, coords={"time": [0, 1, 2]}
+        )
+
+        reindexed = ds.vz.reindex(time=[0, 1, 2, 3, 4])
+
+        manifest_store = ManifestStore(
+            group=ManifestGroup(arrays={"foo": reindexed["foo"].data}),
+            registry=ObjectStoreRegistry({"memory://": store}),
+        )
+        roundtripped = xr.open_zarr(manifest_store, consolidated=False, zarr_format=3)
+        values = roundtripped["foo"].values
+        np.testing.assert_array_equal(values[:3], [1.0, 2.0, 3.0])
+        assert np.isnan(values[3:]).all()
+
+    def test_reindex_like(self):
+        ds = self._virtual_ds_with_time_index([0, 1, 2], "/a.nc")
+        other = xr.Dataset(coords={"time": [0, 1, 2, 3]})
+        result = ds.vz.reindex_like(other)
+        assert result.sizes["time"] == 4
+        assert isinstance(result["foo"].data, ManifestArray)
+
+    def test_reindex_without_index_raises(self):
+        # build a dataset whose "time" dim has NO coordinate/index
+        manifest = ChunkManifest(
+            entries={"0": {"path": "/a.nc", "offset": 0, "length": 12}}
+        )
+        metadata = create_v3_array_metadata(
+            shape=(3,),
+            chunk_shape=(3,),
+            data_type=np.dtype("float32"),
+            dimension_names=["time"],
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        ds = xr.Dataset({"foo": xr.Variable(["time"], marr)})  # no time coord
+
+        with pytest.raises(ValueError, match="index"):
+            ds.vz.reindex(time=[0, 1, 2, 3])
+
+    def test_reindex_non_chunk_aligned_raises(self):
+        # C=2 along time; target inserts a single missing label mid-chunk -> split
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 8},
+                "1": {"path": "/a.nc", "offset": 8, "length": 8},
+            }
+        )
+        metadata = create_v3_array_metadata(
+            shape=(4,),
+            chunk_shape=(2,),
+            data_type=np.dtype("float32"),
+            fill_value=float("nan"),
+            dimension_names=["time"],
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        ds = xr.Dataset(
+            {"foo": xr.Variable(["time"], marr)}, coords={"time": [0, 1, 2, 3]}
+        )
+
+        with pytest.raises(NotImplementedError, match="split"):
+            ds.vz.reindex(time=[0, 1, 99, 2, 3])
+
+    def test_reindex_preserves_aux_coord_status(self):
+        # Regression test for FIX 1: a virtual variable declared as a coordinate
+        # (auxiliary coord, not the dimension coord) must stay in result.coords
+        # after reindexing — it must not be demoted to a data variable.
+        n = 3
+        manifest = ChunkManifest(
+            entries={
+                str(i): {"path": "/a.nc", "offset": i * 4, "length": 4}
+                for i in range(n)
+            }
+        )
+        metadata = create_v3_array_metadata(
+            shape=(n,),
+            chunk_shape=(1,),
+            data_type=np.dtype("float32"),
+            codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+            fill_value=float("nan"),
+            dimension_names=["time"],
+        )
+        marr_data = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        # build an aux coord (ref_time) backed by a ManifestArray along the time dim
+        aux_manifest = ChunkManifest(
+            entries={
+                str(i): {"path": "/b.nc", "offset": i * 4, "length": 4}
+                for i in range(n)
+            }
+        )
+        aux_metadata = create_v3_array_metadata(
+            shape=(n,),
+            chunk_shape=(1,),
+            data_type=np.dtype("float32"),
+            codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+            fill_value=float("nan"),
+            dimension_names=["time"],
+        )
+        aux_marr = ManifestArray(metadata=aux_metadata, chunkmanifest=aux_manifest)
+
+        ds = xr.Dataset(
+            {"foo": xr.Variable(["time"], marr_data)},
+            coords={
+                "time": list(range(n)),
+                "ref_time": xr.Variable(["time"], aux_marr),
+            },
+        )
+
+        # ref_time should be a coord before reindexing
+        assert "ref_time" in ds.coords
+        assert isinstance(ds["ref_time"].data, ManifestArray)
+
+        result = ds.vz.reindex(time=[0, 1, 2, 3, 4])
+
+        # ref_time must remain a coord (not demoted to a data var)
+        assert "ref_time" in result.coords, (
+            "aux coord ref_time was demoted to a data variable after reindex"
+        )
+        # and it must still be a ManifestArray
+        assert isinstance(result["ref_time"].data, ManifestArray)
+        assert result.sizes["time"] == 5
 
 
 class TestRenamePaths:
