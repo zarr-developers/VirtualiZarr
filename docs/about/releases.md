@@ -13,6 +13,9 @@
 
 ### Internal changes
 
+- `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=3.5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
+
 ## v2.7.0 (25th June 2026)
 
 Adds a `GribberishParser` for reading GRIB1/GRIB2 files as virtual datasets, a `ManifestArray.with_fill_value_only` constructor, and populates `ds.encoding["source"]` to mirror `xarray.open_dataset`. `ManifestArray` no longer advertises a `.chunks` attribute (a breaking change), which fixes a whole class of cryptic errors when xarray tried to load, compute, or compare virtual arrays. Also fixes the `ZarrParser` and `IcechunkParser` silently dropping arrays nested in subgroups, and bumps the minimum supported `zarr` to `>=3.1.6`. Documentation gains a new ["Validation and Cleaning"](../how_to/validation.md) guide on handling the messy inconsistencies typical of real-world datasets during virtual ingestion, plus a new GOES-16 ingestion example.
