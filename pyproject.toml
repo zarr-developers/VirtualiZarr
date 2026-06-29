@@ -50,6 +50,11 @@ hdf = [
     "imagecodecs-numcodecs==2024.6.1",
 ]
 
+# dmrpp
+dmrpp = [
+    "pydap>=3.5.10",
+]
+
 zarr = ["arro3-core"]
 
 # kerchunk-based parsers
@@ -83,7 +88,8 @@ all_parsers = [
     "virtualizarr[kerchunk_parquet]",
     "virtualizarr[tiff]",
     "virtualizarr[grib]",
-    "virtualizarr[zarr]"
+    "virtualizarr[zarr]",
+    "virtualizarr[dmrpp]",
 ]
 
 # writers
@@ -216,8 +222,8 @@ run-flaky-tests = { cmd = "pytest -m flaky --run-flaky --run-network-tests --ver
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
 test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py312"] # test against python 3.13
-test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py313"] # test against python 3.13
+test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "dmrpp", "zarr", "py312"] # test against python 3.13
+test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "dmrpp", "zarr", "py313"] # test against python 3.13
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
@@ -265,6 +271,7 @@ module = [
     "ujson",
     "zarr",
     "requests",
+    "pydap.*",
 ]
 ignore_missing_imports = true
 
