@@ -36,13 +36,28 @@ def implements(numpy_function):
 
 @implements(np.result_type)
 def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtype:
-    """Called by xarray to ensure all arguments to concat have the same dtype."""
+    """
+    Resolve a result dtype for ManifestArray arguments.
+
+    Called by xarray both to check that concat/stack inputs share a dtype and,
+    during reindex/alignment, to combine a ManifestArray with a scalar fill
+    value. A ManifestArray's dtype is fixed by its metadata (the same metadata
+    that defines its fill value), so when exactly one ManifestArray is combined
+    with scalars/dtypes we return its dtype rather than promoting — keeping the
+    array's native dtype and declared fill value through a reindex.
+    """
     from virtualizarr.manifests.array import ManifestArray
 
-    dtypes = (
+    manifest_dtypes = [
+        obj.dtype for obj in arrays_and_dtypes if isinstance(obj, ManifestArray)
+    ]
+    if len(manifest_dtypes) == 1:
+        return manifest_dtypes[0]
+
+    dtypes = [
         obj.dtype if isinstance(obj, ManifestArray) else np.dtype(obj)
         for obj in arrays_and_dtypes
-    )
+    ]
     first_dtype, *other_dtypes = dtypes
     unique_dtypes = set(dtypes)
     for other_dtype in other_dtypes:
@@ -52,6 +67,43 @@ def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtyp
             )
 
     return first_dtype
+
+
+@implements(np.where)
+def where(condition, x, y, /):
+    """
+    Support xarray's reindex/alignment fill, which calls
+    ``where(~mask, gathered_array, fill_value)`` after gathering chunks.
+
+    The gathered ManifestArray already carries null-path chunks (which read back
+    as ``fill_value``) at exactly the missing positions, so this is an identity
+    whenever the requested fill positions coincide with the array's missing
+    chunks. In that case ``x`` is returned unchanged and the manifest's own fill
+    value governs. Any other ``where`` usage (e.g. general boolean masking) would
+    require materializing values and is not supported.
+    """
+    from virtualizarr.manifests.array import ManifestArray
+
+    if isinstance(x, ManifestArray) and np.isscalar(y):
+        cond = np.asarray(condition, dtype=bool)
+        if cond.shape == x.shape and np.array_equal(~cond, _missing_element_mask(x)):
+            return x
+
+    raise NotImplementedError(
+        "np.where on a ManifestArray is only supported for the reindex/alignment "
+        "fill pattern (filling an array's own missing chunks); general masking "
+        "would require materializing values."
+    )
+
+
+def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
+    """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
+    from virtualizarr.manifests.manifest import MISSING_CHUNK_PATH
+
+    mask = marr.manifest._paths == MISSING_CHUNK_PATH
+    for axis, chunk_size in enumerate(marr.metadata.chunks):
+        mask = np.repeat(mask, chunk_size, axis=axis)
+    return mask[tuple(slice(0, length) for length in marr.shape)]
 
 
 @implements(np.concatenate)
