@@ -142,6 +142,36 @@ class TestNativeReindex:
         assert isinstance(excinfo.value.__cause__, NotImplementedError)
 
 
+class TestNativeReindexMultiAxis:
+    def test_reindex_two_axes_simultaneously(self):
+        # A 2D outer-join reindexes BOTH axes in one call. xarray then sends a
+        # single broadcast (vectorized) indexer -- one N-D array per axis, shaped
+        # (Nt, 1) and (1, Nx) -- rather than two 1D indexers. The chunk-grid remap
+        # must collapse each broadcast component back to its 1D per-axis indexer,
+        # or it misreads the array's rank (the real ITS_LIVE x+y mosaic case).
+        import obstore as obs
+
+        store = obs.store.MemoryStore()
+        # 2x2 grid, row-major (time, x): (t0,x0)=1 (t0,x1)=2 (t1,x0)=3 (t1,x1)=1
+        obs.put(store, "a.bin", F32[1.0] + F32[2.0] + F32[3.0] + F32[1.0])
+        ds = _ds_2d([0, 1], [0, 1], "memory:///a.bin")  # x=[0,1], time=[0,1]
+
+        result = ds.reindex(time=[0, 1, 2], x=[0, 1, 2])
+
+        assert isinstance(result["foo"].data, ManifestArray)
+        assert list(result.time.values) == [0, 1, 2]
+        assert list(result.x.values) == [0, 1, 2]
+
+        ms = ManifestStore(
+            group=ManifestGroup(arrays={"foo": result["foo"].data}),
+            registry=ObjectStoreRegistry({"memory://": store}),
+        )
+        vals = xr.open_zarr(ms, consolidated=False, zarr_format=3)["foo"].values
+        np.testing.assert_array_equal(vals[:2, :2], [[1.0, 2.0], [3.0, 1.0]])
+        assert np.isnan(vals[2, :]).all()  # appended time row reads back as fill
+        assert np.isnan(vals[:, 2]).all()  # appended x column reads back as fill
+
+
 class TestNativeAlign:
     def test_align_outer_union(self):
         a = _ds_1d([0, 1, 2], "/a.nc")

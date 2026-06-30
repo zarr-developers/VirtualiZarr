@@ -145,9 +145,31 @@ def apply_indexer(
     return output_arr
 
 
-def _is_reindex_indexer(indexer_1d: T_BasicIndexer_1d) -> bool:
+def _is_reindex_indexer(indexer_1d: T_BasicIndexer_1d) -> TypeGuard[np.ndarray]:
     """True if this 1D indexer is an integer array (xarray's reindex indexer)."""
     return isinstance(indexer_1d, np.ndarray) and indexer_1d.dtype.kind in ("i", "u")
+
+
+def _collapse_outer_indexer(
+    indexer_1d: T_BasicIndexer_1d, axis: int
+) -> T_BasicIndexer_1d:
+    """Collapse a broadcast reindex indexer back to its 1D per-axis form.
+
+    When xarray reindexes more than one dimension at once it sends a single
+    *broadcast* (vectorized) indexer: one integer array per axis, shaped to the
+    array's rank with the real labels on its own axis and length 1 everywhere
+    else (e.g. ``(N, 1)`` for axis 0 and ``(1, M)`` for axis 1). Because reindex
+    indexing is orthogonal, each such array reshapes losslessly to the 1D
+    indexer for ``axis``. int/slice indexers and already-1D arrays pass through.
+    """
+    if not (isinstance(indexer_1d, np.ndarray) and indexer_1d.ndim > 1):
+        return indexer_1d
+    if any(size != 1 for ax, size in enumerate(indexer_1d.shape) if ax != axis):
+        raise NotImplementedError(
+            "Pointwise (vectorized) fancy indexing is not supported on a "
+            f"ManifestArray; received a {indexer_1d.shape} indexer for axis {axis}."
+        )
+    return indexer_1d.reshape(-1)
 
 
 def _is_full_slice(indexer_1d: T_BasicIndexer_1d, length: int) -> bool:
@@ -175,7 +197,8 @@ def _apply_reindex(
     from virtualizarr.manifests.reindex import chunk_map_from_indexer
 
     result = marr
-    for axis, indexer_1d in enumerate(indexers):
+    for axis, raw_indexer_1d in enumerate(indexers):
+        indexer_1d = _collapse_outer_indexer(raw_indexer_1d, axis)
         if _is_reindex_indexer(indexer_1d):
             chunk_size = result.metadata.chunks[axis]
             try:
