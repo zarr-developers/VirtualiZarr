@@ -7,6 +7,7 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
 from virtualizarr.manifests.manifest import ChunkManifest
+from virtualizarr.manifests.reindex import chunk_map_from_indexer
 from virtualizarr.manifests.utils import copy_and_replace_metadata
 
 # indexer with only basic selectors, no new axes or ellipsis
@@ -194,8 +195,6 @@ def _apply_reindex(
     full-axis slice (the shape xarray's reindex/alignment produces); combining
     reindexing with chunk subsetting in a single call is not supported.
     """
-    from virtualizarr.manifests.reindex import chunk_map_from_indexer
-
     result = marr
     for axis, raw_indexer_1d in enumerate(indexers):
         indexer_1d = _collapse_outer_indexer(raw_indexer_1d, axis)

@@ -7,6 +7,7 @@ fill stays virtual (null-path chunks that read back as the array's fill_value).
 """
 
 import numpy as np
+import obstore as obs
 import pytest
 import xarray as xr
 from obspec_utils.registry import ObjectStoreRegistry
@@ -87,8 +88,6 @@ class TestNativeReindex:
         }
 
     def test_reindex_float_reads_back_nan(self):
-        import obstore as obs
-
         store = obs.store.MemoryStore()
         obs.put(store, "a.bin", F32[1.0] + F32[2.0] + F32[3.0])
         ds = _ds_1d([0, 1, 2], "memory:///a.bin")
@@ -112,8 +111,6 @@ class TestNativeReindex:
     def test_reindex_int_keeps_dtype_and_sentinel(self):
         # xarray would normally promote int->float+NaN; the manifest keeps int32
         # and its declared sentinel fill instead.
-        import obstore as obs
-
         store = obs.store.MemoryStore()
         obs.put(store, "a.bin", I32[10] + I32[20] + I32[30])
         ds = _ds_1d([0, 1, 2], "memory:///a.bin", dtype="int32", fill_value=-9999)
@@ -149,8 +146,6 @@ class TestNativeReindexMultiAxis:
         # (Nt, 1) and (1, Nx) -- rather than two 1D indexers. The chunk-grid remap
         # must collapse each broadcast component back to its 1D per-axis indexer,
         # or it misreads the array's rank (the real ITS_LIVE x+y mosaic case).
-        import obstore as obs
-
         store = obs.store.MemoryStore()
         # 2x2 grid, row-major (time, x): (t0,x0)=1 (t0,x1)=2 (t1,x0)=3 (t1,x1)=1
         obs.put(store, "a.bin", F32[1.0] + F32[2.0] + F32[3.0] + F32[1.0])
@@ -185,8 +180,6 @@ class TestNativeAlign:
 
     def test_align_exclude_then_concat_spatial(self):
         # the ITS_LIVE pattern: align on the spatial dim (exclude time), concat on time
-        import obstore as obs
-
         store = obs.store.MemoryStore()
         obs.put(store, "a.bin", F32[1.0] + F32[2.0])  # time=0, x=0,1
         obs.put(store, "b.bin", F32[3.0] + F32[1.0])  # time=1, x=2,3
