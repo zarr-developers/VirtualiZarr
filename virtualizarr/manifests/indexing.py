@@ -145,6 +145,91 @@ def apply_indexer(
     return output_arr
 
 
+def _is_reindex_indexer(indexer_1d: T_BasicIndexer_1d) -> TypeGuard[np.ndarray]:
+    """True if this 1D indexer is an integer array (xarray's reindex indexer)."""
+    return isinstance(indexer_1d, np.ndarray) and indexer_1d.dtype.kind in ("i", "u")
+
+
+def _collapse_outer_indexer(
+    indexer_1d: T_BasicIndexer_1d, axis: int
+) -> T_BasicIndexer_1d:
+    """Collapse a broadcast reindex indexer back to its 1D per-axis form.
+
+    When xarray reindexes more than one dimension at once it sends a single
+    *broadcast* (vectorized) indexer: one integer array per axis, shaped to the
+    array's rank with the real labels on its own axis and length 1 everywhere
+    else (e.g. ``(N, 1)`` for axis 0 and ``(1, M)`` for axis 1). Because reindex
+    indexing is orthogonal, each such array reshapes losslessly to the 1D
+    indexer for ``axis``. int/slice indexers and already-1D arrays pass through.
+    """
+    if not (isinstance(indexer_1d, np.ndarray) and indexer_1d.ndim > 1):
+        return indexer_1d
+    if any(size != 1 for ax, size in enumerate(indexer_1d.shape) if ax != axis):
+        raise NotImplementedError(
+            "Pointwise (vectorized) fancy indexing is not supported on a "
+            f"ManifestArray; received a {indexer_1d.shape} indexer for axis {axis}."
+        )
+    return indexer_1d.reshape(-1)
+
+
+def _is_full_slice(indexer_1d: T_BasicIndexer_1d, length: int) -> bool:
+    """True if this slice selects the whole axis (a no-op)."""
+    if not isinstance(indexer_1d, slice):
+        return False
+    return (
+        indexer_1d == slice(None)
+        or indexer_1d == slice(0, length, None)
+        or (indexer_1d.indices(length) == (0, length, 1))
+    )
+
+
+def _apply_reindex(
+    marr: "ManifestArray", indexers: tuple[T_BasicIndexer_1d, ...]
+) -> "ManifestArray":
+    """
+    Remap the chunk grid for one or more integer-array (reindex) indexers.
+
+    Each integer-array axis is reindexed by translating its indexer into a
+    chunk-grid map (null chunks for missing positions). Any other axis must be a
+    full-axis slice (the shape xarray's reindex/alignment produces); combining
+    reindexing with chunk subsetting in a single call is not supported.
+    """
+    from virtualizarr.manifests.reindex import chunk_map_from_indexer
+
+    result = marr
+    for axis, raw_indexer_1d in enumerate(indexers):
+        indexer_1d = _collapse_outer_indexer(raw_indexer_1d, axis)
+        if _is_reindex_indexer(indexer_1d):
+            chunk_size = result.metadata.chunks[axis]
+            try:
+                chunk_map = chunk_map_from_indexer(
+                    np.asarray(indexer_1d), chunk_size, result.shape[axis]
+                )
+            except NotImplementedError as err:
+                # chunk_map_from_indexer is reached from deep inside xarray's
+                # reindex/alignment machinery, so re-raise with call-site context
+                # naming the operation, the axis, and what the user can do.
+                raise NotImplementedError(
+                    f"Cannot align/reindex this virtual array along axis {axis} "
+                    f"(chunk size {chunk_size}) without materializing data: the "
+                    "target coordinate labels do not line up with chunk boundaries, "
+                    "so filling them would require splitting a chunk. VirtualiZarr "
+                    "only supports whole-chunk appends, inserts, and reorders. "
+                    "Re-chunk along this dimension, or load the variable into memory, "
+                    "if you need this alignment. See "
+                    "https://github.com/zarr-developers/VirtualiZarr/issues/51."
+                ) from err
+            result = result._reindex_axis(axis, chunk_map, new_size=len(indexer_1d))
+        elif _is_full_slice(indexer_1d, marr.shape[axis]):
+            continue
+        else:
+            raise NotImplementedError(
+                "Combining reindexing (an integer-array indexer) with chunk "
+                "subsetting in a single operation is not supported."
+            )
+    return result
+
+
 def apply_selection(
     marr: "ManifestArray", indexer_without_newaxes: tuple[T_BasicIndexer_1d, ...]
 ) -> "ManifestArray":
@@ -162,6 +247,14 @@ def apply_selection(
 
     # at this point there should be no ellipsis, no Nones, and one 1D indexer for each axis.
     assert len(indexer_without_newaxes) == marr.ndim
+
+    # An integer array indexer is xarray's reindex/alignment indexer (with -1
+    # marking missing labels). Rather than reject it as fancy indexing, remap the
+    # chunk grid: missing positions become null-path chunks that read back as
+    # fill_value. This is what lets xarray's reindex/align/concat machinery work
+    # over ManifestArrays without materializing data.
+    if any(_is_reindex_indexer(ind) for ind in indexer_without_newaxes):
+        return _apply_reindex(marr, indexer_without_newaxes)
 
     # validate types and reject anything we can never support per-axis
     narrowed_indexers: list[int | slice] = []
