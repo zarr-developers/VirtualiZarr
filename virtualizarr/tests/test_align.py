@@ -1,5 +1,5 @@
 """
-End-to-end tests that native xarray alignment machinery works over ManifestArrays.
+End-to-end tests that xarray alignment machinery works over ManifestArrays.
 
 Users call plain ``xr.reindex`` / ``xr.align`` / ``xr.concat`` -- no
 VirtualiZarr-specific API -- and the fill stays virtual: null-path chunks that
@@ -47,7 +47,7 @@ def _read_back(marr: ManifestArray, dims: list[str], registry) -> np.ndarray:
     return xr.open_zarr(ms, consolidated=False, zarr_format=3)["v"].values
 
 
-class TestNativeReindex:
+class TestReindex:
     def test_reindex_stays_lazy(self, array_v3_metadata):
         metadata = array_v3_metadata(shape=(3,), chunks=(1,), dimension_names=["x"])
         marr = ManifestArray(
@@ -131,7 +131,7 @@ class TestNativeReindex:
         assert isinstance(excinfo.value.__cause__, NotImplementedError)
 
 
-class TestNativeAlign:
+class TestAlign:
     def test_align_outer_union(self, array_v3_metadata):
         def _ds(path, xs):
             metadata = array_v3_metadata(shape=(3,), chunks=(1,), dimension_names=["x"])
@@ -156,7 +156,7 @@ class TestNativeAlign:
 
 @requires_hdf5plugin
 @requires_imagecodecs
-class TestNativeReindexReadback:
+class TestReindexReadback:
     """Reindex fill reads back as the array's fill_value, verified over real files.
 
     Uses the air_temperature tiles from ``netcdf4_files_factory_2d`` (as
