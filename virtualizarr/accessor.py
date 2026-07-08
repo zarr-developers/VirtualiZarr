@@ -75,6 +75,7 @@ class _VirtualiZarrDatasetAccessor:
         store: "IcechunkStore",
         *,
         group: str | None = None,
+        mode: Literal["w", "w-", "a"] | None = None,
         append_dim: str | None = None,
         region: Literal["auto"] | Mapping[str, Literal["auto"] | slice] | None = None,
         validate_containers: bool = True,
@@ -104,6 +105,16 @@ class _VirtualiZarrDatasetAccessor:
             Store to write dataset into.
         group
             Path of the group to write the dataset into (default: the root group).
+        mode
+            How to handle a pre-existing group at the target path:
+
+            - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
+            - ``"w"``: create the group, overwriting any existing contents at that path.
+            - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+            - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
+              is given, in which case the existing group is opened.
+
+            ``mode="w"`` and ``mode="w-"`` are incompatible with ``append_dim`` and ``region``.
         append_dim
             Dimension along which to append the virtual dataset.
         region
@@ -133,6 +144,7 @@ class _VirtualiZarrDatasetAccessor:
             self.ds,
             store,
             group=group,
+            mode=mode,
             append_dim=append_dim,
             region=region,
             validate_containers=validate_containers,
@@ -337,6 +349,7 @@ class _VirtualiZarrDataTreeAccessor:
         self,
         store: "IcechunkStore",
         *,
+        mode: Literal["w", "w-", "a"] | None = None,
         write_inherited_coords: bool = False,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
@@ -361,6 +374,13 @@ class _VirtualiZarrDataTreeAccessor:
         ----------
         store
             Store to write dataset into.
+        mode
+            How to handle pre-existing groups at the target paths:
+
+            - ``"w-"`` or ``None`` (default): create each group, raising a
+              ``ContainsGroupError`` if it already exists.
+            - ``"w"``: create each group, overwriting any existing contents at that path.
+            - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
         write_inherited_coords
             If ``True``, replicate inherited coordinates on all descendant nodes.
             Otherwise, only write coordinates at the level at which they are
@@ -400,6 +420,7 @@ class _VirtualiZarrDataTreeAccessor:
         virtual_datatree_to_icechunk(
             self.dt,
             store,
+            mode=mode,
             write_inherited_coords=write_inherited_coords,
             validate_containers=validate_containers,
             last_updated_at=last_updated_at,

@@ -4,6 +4,8 @@
 
 ### New Features
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
+- `vds.vz.to_icechunk` and `vdt.vz.to_icechunk` now accept a `mode` parameter controlling how a pre-existing group at the target path is handled: `"w-"` (create, error if the group exists — the previous and still-default behaviour), `"w"` (overwrite existing contents), or `"a"` (open the existing group and add/update variables in it). `mode="a"` enables e.g. splitting a large virtual dataset across commits by variable. Closes #1001.
+  By [Aaron Spring](https://github.com/aaronspring).
 
 ### Breaking changes
 
