@@ -9,6 +9,9 @@
 
 ### Bug fixes
 
+- Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
+  By [Aaron Spring](https://github.com/aaronspring).
+
 ### Documentation
 
 ### Internal changes
