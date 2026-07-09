@@ -231,7 +231,6 @@ VirtualiZarr provides some utilities for creating virtual datasets with such spa
 
 The `ManifestArray.with_fill_value_only` method returns a new ManifestArray with the same schema (shape, chunks, codecs, dimension names, attributes) as a given ManifestArray, but with an empty chunk manifest and the given `fill_value`.
 This is useful for filling in missing files/variables, by creating virtual datasets containing manifestarrays which have no chunk references.
-These empty manifestarrays can then be concatenated with the manifestarrays containing chunk references, to create a virtual dataset which a logical grid spanning regions with both present and missing data.
 
 ```python exec="on" session="usage" source="material-block" result="code"
 # a virtual variable from a file where the data is present
@@ -254,6 +253,16 @@ print(combined)
 
 The combined variable is still a single `ManifestArray` of shape `(2, 3, 4)`, but only the first timestep references real chunks.
 Reading data from the second timestep would return the array's `fill_value`.
+
+In the previously mentioned case when a dataset is "inherently sparse at a global level, whilst still being dense at a regional level", when users want to concatenate these sparse datasets they can use normal xarray concatenation patterns with outer join.
+
+```
+xr.concat([ds_1, ds_2], dim="time", join="outer")
+```
+This will internally align the sparse datasets on a larger logical grid spanning both regions with null chunks for the sparse regions where no source chunks exist prior to concatenating them.
+
+![Aligning two regionally-dense but globally-sparse datasets onto a shared logical grid before concatenation along time](grid_alignment.png)
+
 
 ### Inhomogeneous Codecs
 
