@@ -12,7 +12,6 @@ import numpy as np
 import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
-from zarr.api.asynchronous import open_group as open_group_async
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.storage import ObjectStore
 
@@ -26,6 +25,7 @@ from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
+from virtualizarr.parsers.utils import construct_manifest_group_tree
 from virtualizarr.utils import determine_chunk_grid_shape
 
 if TYPE_CHECKING:
@@ -216,29 +216,13 @@ async def construct_manifest_group(
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestGroup:
-    """Construct a ManifestGroup from a zarr group."""
-    zarr_group = await open_group_async(store=store, path=group, mode="r")
-
-    zarr_array_keys = [key async for key in zarr_group.array_keys()]
-    _skip_variables = [] if skip_variables is None else list(skip_variables)
-
-    zarr_arrays = await asyncio.gather(
-        *[
-            zarr_group.getitem(var)
-            for var in zarr_array_keys
-            if var not in _skip_variables
-        ]
+    """Construct a ManifestGroup from a zarr group, recursing into subgroups."""
+    return await construct_manifest_group_tree(
+        store,
+        build_manifest_array=lambda array: construct_manifest_array(array, path),
+        group=group,
+        skip_variables=skip_variables,
     )
-
-    manifest_arrays = await asyncio.gather(
-        *[construct_manifest_array(array, path) for array in zarr_arrays]  # type: ignore[arg-type]
-    )
-
-    manifest_dict = {
-        array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
-    }
-
-    return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
 async def construct_manifest_array(

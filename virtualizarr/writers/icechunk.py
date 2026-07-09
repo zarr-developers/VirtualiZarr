@@ -274,15 +274,17 @@ def validate_virtual_chunk_containers(
         raise ValueError("No Virtual Chunk Containers set")
 
     # check all refs against existing virtual chunk containers
+    # passing a tuple to str.startswith runs the loop over prefixes in C
+    supported_prefixes_tuple = tuple(supported_prefixes)
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
         for ref in marr.manifest.iter_nonempty_paths():
-            validate_single_ref(ref, supported_prefixes)
+            validate_single_ref(ref, supported_prefixes_tuple)
 
 
-def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
-    if not any(ref.startswith(prefix) for prefix in supported_prefixes):
+def validate_single_ref(ref: str, supported_prefixes: tuple[str, ...]) -> None:
+    if not ref.startswith(supported_prefixes):
         raise ValueError(
             f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
@@ -430,7 +432,7 @@ def check_compatible_arrays(
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
     check_same_codecs([get_codecs(arr) for arr in arrays])
-    check_same_chunk_shapes([arr.chunks for arr in arrays])
+    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     if append_axis is not None:

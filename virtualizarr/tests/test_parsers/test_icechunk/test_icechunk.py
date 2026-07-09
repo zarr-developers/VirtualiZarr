@@ -107,6 +107,31 @@ def local_icechunk_repo(tmp_path: Path) -> tuple[Path, icechunk.Repository]:
     return repo_path, repo
 
 
+@pytest.fixture
+def nested_icechunk_repo() -> icechunk.Repository:
+    """In-memory icechunk repo whose only array lives under /level1/level2, not at root.
+
+    Root holds no arrays — only the parser recursing into subgroups surfaces ``a``.
+    """
+    repo = _make_repo(icechunk.in_memory_storage())
+    session = repo.writable_session("main")
+    root = zarr.group(store=session.store, overwrite=True)
+    root.attrs["title"] = "root attrs survive"
+    level1 = root.create_group("level1")
+    level2 = level1.create_group("level2")
+    arr = level2.create_array(
+        "a",
+        shape=(2,),
+        chunks=(1,),
+        dtype="i4",
+        compressors=None,
+        dimension_names=("x",),
+    )
+    arr[0] = 7
+    session.commit("init nested")
+    return repo
+
+
 # ----------------------------------------------------------------------
 # parse_session: escape-hatch path
 # ----------------------------------------------------------------------
@@ -189,6 +214,45 @@ class TestParseSession:
             native_chunks_prefix="s3://bucket/repo/chunks",
         )
         assert "a" not in ms._group.arrays
+
+    def test_recurses_into_nested_groups(
+        self, nested_icechunk_repo: icechunk.Repository
+    ) -> None:
+        """Arrays under subgroups must be reached by recursing into group_keys().
+
+        Regression test: previously only arrays directly in the parsed group were
+        collected, so a hierarchical repo produced a root-only ManifestGroup.
+        """
+        session = nested_icechunk_repo.readonly_session(branch="main")
+        ms = IcechunkParser().parse_session(
+            session,
+            registry=ObjectStoreRegistry({}),
+            native_chunks_prefix="s3://bucket/repo/chunks",
+        )
+        root = ms._group
+        # root carries its attributes but no arrays
+        assert "a" not in root.arrays
+        assert root.metadata.attributes.get("title") == "root attrs survive"
+        # the nested array is reachable through the subgroup hierarchy
+        assert "level1" in root.groups
+        assert "level2" in root.groups["level1"].groups
+        ma = root.groups["level1"].groups["level2"].arrays["a"]
+        assert isinstance(ma, ManifestArray)
+        assert ma.shape == (2,)
+
+    def test_nested_groups_surface_in_virtual_datatree(
+        self, nested_icechunk_repo: icechunk.Repository
+    ) -> None:
+        """The recursion is visible end-to-end via ManifestStore.to_virtual_datatree."""
+        session = nested_icechunk_repo.readonly_session(branch="main")
+        ms = IcechunkParser().parse_session(
+            session,
+            registry=ObjectStoreRegistry({}),
+            native_chunks_prefix="s3://bucket/repo/chunks",
+        )
+        dt = ms.to_virtual_datatree(loadable_variables=[])
+        assert "/level1/level2" in dt.groups
+        assert "a" in dt["level1/level2"].to_dataset().data_vars
 
     def test_requires_native_chunks_prefix(
         self, mixed_icechunk_repo: icechunk.Repository

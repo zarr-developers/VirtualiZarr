@@ -13,7 +13,6 @@ from collections.abc import Coroutine, Iterable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
-from zarr.api.asynchronous import open_group as open_group_async
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -23,6 +22,7 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.parsers.icechunk.obstore_utils import obstore_to_icechunk_storage
+from virtualizarr.parsers.utils import construct_manifest_group_tree
 from virtualizarr.parsers.zarr import metadata_as_v3
 from virtualizarr.utils import determine_chunk_grid_shape
 
@@ -235,27 +235,19 @@ async def _construct_manifest_group(
     skip_variables: Iterable[str] | None = None,
     batch_size: int = _DEFAULT_BATCH_SIZE,
 ) -> ManifestGroup:
-    """Build a ManifestGroup from an icechunk zarr group."""
-    zarr_group = await open_group_async(store=store, path=group, mode="r")
+    """Build a ManifestGroup from an icechunk zarr group, recursing into subgroups.
 
-    array_keys = [key async for key in zarr_group.array_keys()]
-    skip = set() if skip_variables is None else set(skip_variables)
-
-    zarr_arrays = await asyncio.gather(
-        *[zarr_group.getitem(k) for k in array_keys if k not in skip]
+    icechunk native-chunk ids are repo-global, so the same ``native_chunks_prefix``
+    applies at every depth.
+    """
+    return await construct_manifest_group_tree(
+        store,
+        build_manifest_array=lambda arr: _construct_manifest_array(
+            arr, store, native_chunks_prefix, batch_size
+        ),
+        group=group,
+        skip_variables=skip_variables,
     )
-
-    # zarr_group.getitem() returns AsyncArray | AsyncGroup; we filtered to
-    # array_keys above, so every element is an AsyncArray in practice.
-    manifest_arrays = await asyncio.gather(
-        *[
-            _construct_manifest_array(arr, store, native_chunks_prefix, batch_size)  # type: ignore[arg-type]
-            for arr in zarr_arrays
-        ]
-    )
-
-    arrays = {a.basename: ma for a, ma in zip(zarr_arrays, manifest_arrays)}
-    return ManifestGroup(arrays=arrays, attributes=dict(zarr_group.attrs))
 
 
 async def _construct_manifest_array(

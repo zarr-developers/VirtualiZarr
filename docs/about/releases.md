@@ -1,5 +1,70 @@
 # Release notes
 
+## v2.7.1 (unreleased)
+
+### New Features
+- Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+## v2.7.0 (25th June 2026)
+
+Adds a `GribberishParser` for reading GRIB1/GRIB2 files as virtual datasets, a `ManifestArray.with_fill_value_only` constructor, and populates `ds.encoding["source"]` to mirror `xarray.open_dataset`. `ManifestArray` no longer advertises a `.chunks` attribute (a breaking change), which fixes a whole class of cryptic errors when xarray tried to load, compute, or compare virtual arrays. Also fixes the `ZarrParser` and `IcechunkParser` silently dropping arrays nested in subgroups, and bumps the minimum supported `zarr` to `>=3.1.6`. Documentation gains a new ["Validation and Cleaning"](../how_to/validation.md) guide on handling the messy inconsistencies typical of real-world datasets during virtual ingestion, plus a new GOES-16 ingestion example.
+
+### New Features
+
+- GRIB1/GRIB2 files can now be read as virtual datasets via the `GribberishParser` from the [gribberish](https://github.com/mpiannucci/gribberish) library (`>=1.0.0`), installable with `pip install "virtualizarr[grib]"`. Each GRIB message becomes one chunk, decoded on read through gribberish's registered zarr codec. Like the TIFF parser, the parser itself lives in the third-party package; VirtualiZarr just adds the optional dependency, docs, and tests.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+- `ManifestArray` no longer exposes a `.chunks` attribute; read the Zarr chunk shape from `ManifestArray.metadata.chunks` instead. Exposing `.chunks` made xarray's `is_chunked_array` duck-typing classify virtual arrays as dask-like *computable* chunked arrays, which routed every load/compute/coerce path through a chunk manager that does not exist for `ManifestArray` (raising the opaque `TypeError: Could not find a Chunk Manager which recognizes type ManifestArray`) and made `Dataset.chunks`/`Variable.chunksizes` report a malformed chunk structure for virtual datasets. `ManifestArray` is a virtual reference array, not a computable chunked array, so it no longer advertises itself as one.
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Bug fixes
+
+- Fix `IcechunkParser` only virtualizing the root group of an icechunk repository. `_construct_manifest_group` now recurses into subgroups (iterating `group_keys()`) and populates `ManifestGroup(groups=...)`, so hierarchical repositories are represented in full when parsing. Previously `parse_session` / `to_virtual_datatree` returned a root-only group — empty when no arrays live at the root.
+  By [Ignacio Masari](https://github.com/ignaciomasari).
+- Fix `ZarrParser` only virtualizing the root group of a Zarr store, silently dropping any arrays nested in subgroups. The parser now recurses into subgroups (matching the `IcechunkParser` and `HDFParser`), so hierarchical Zarr stores are represented in full.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Handle chunk shapes larger than the array shape for variables along an unlimited dimension. HDF5 allocates a chunk sized for the full (unlimited) `maxshape` — e.g. a coordinate holding 5 values reports `chunks=(512,)` — which inhibited concatenation of the resulting virtual dataset. The `HDFParser` now trims the chunk shape down to the array shape (adjusting the manifest byte ranges accordingly) when it is safe to do so, i.e. the chunk is uncompressed and only its leading dimension is oversized. When trimming isn't possible (e.g. a compressed coordinate, as in the ERA5 archive), the variable is left untrimmed — it still reads and writes as virtual references correctly — and `to_virtual_dataset` now emits a warning naming the affected variable(s) and suggesting they be passed to `loadable_variables` so the dataset can be concatenated. Closes [#803](https://github.com/zarr-developers/VirtualiZarr/issues/803).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Eager attempts by xarray to load, compute, or coerce a virtual `ManifestArray` into memory now raise a clear `NotImplementedError` explaining that the array is virtual and pointing at `loadable_variables`, instead of the opaque `TypeError: Could not find a Chunk Manager which recognizes type ManifestArray`. As a consequence of `ManifestArray` no longer being misclassified as a computable chunked array, several operations that previously failed with that cryptic error now behave correctly: value comparisons during `xr.concat(..., compat="equals")` and `xr.merge(...)` use `ManifestArray`'s structural equality instead of trying to load (so a genuine mismatch raises a normal `MergeError` rather than crashing), and a failing `xr.testing.assert_identical(...)` reports a normal `AssertionError`. `Dataset.chunks`/`Variable.chunksizes` now correctly report no dask-style chunking for virtual variables rather than a malformed value. Closes [#114](https://github.com/zarr-developers/VirtualiZarr/issues/114), [#354](https://github.com/zarr-developers/VirtualiZarr/issues/354), [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382).
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Documentation
+
+- New "Validation and Cleaning" how-to guide covering tips and best practices for handling the messy inconsistencies typical of real-world datasets during virtual ingestion.
+  ([#1026](https://github.com/zarr-developers/VirtualiZarr/pull/1026)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Link the GOES-16 virtual Zarr blog post and add a GOES-16 ingestion notebook to the examples.
+  ([#1012](https://github.com/zarr-developers/VirtualiZarr/pull/1012)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+  ([#1006](https://github.com/zarr-developers/VirtualiZarr/pull/1006)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- Bump the minimum supported `zarr` to `>=3.1.6`. Earlier versions mis-strip keys when listing the contents of a nested group, silently dropping arrays whose names collide with others in the store ([zarr-python#3657](https://github.com/zarr-developers/zarr-python/issues/3657)); this would lose nested data when parsing hierarchical Zarr stores with the `ZarrParser`. The bug is fixed in zarr 3.1.6. The bump also lets the `tiff` and `grib` parsers (which required `zarr>=3.1.2` and `>=3.1.1` respectively) re-join the minimum-versions test environment.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Factor the group-recursion logic shared by the `ZarrParser` and `IcechunkParser` into a single `construct_manifest_group_tree` helper in `virtualizarr.parsers.utils`, parameterized by a per-parser callback that builds a `ManifestArray` from an opened zarr array. Removes the duplicated open-group / filter / recurse / assemble code from both parsers.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Speed up virtual chunk container validation when writing to Icechunk by passing the supported prefixes as a tuple to `str.startswith`, which runs the loop over prefixes in C rather than in a Python generator. The per-reference check is now ~2.6x faster in the common single-container case, which matters when writing manifests with millions of virtual references. The check is still a per-reference Python loop overall (see [icechunk#1167](https://github.com/earth-mover/icechunk/issues/1167) for pushing it down to Icechunk entirely).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.6.2 (18th May 2026)
 
 Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
@@ -442,7 +507,7 @@ Minor release to ensure compatibility with incoming changes to Icechunk.
 
 ### Breaking changes
 
-- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](migration_guide.md) for more details.
+- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](../migration_guide.md) for more details.
 - The recommended virtualizarr Xarray accessor name is `vz` rather than `virtualize`.
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose

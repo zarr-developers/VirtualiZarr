@@ -32,6 +32,7 @@ When virtualizing multi-file datasets, it is sometimes the case that it is possi
 - **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
 - **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
 - **Homogeneous data types** - The zarr data model assumes that every chunk of data in a single array decodes to the same data type (i.e. dtype). For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent data types your data cannot be virtualized. This is arguably inherent to the concept of what an array is.
+- **Homogeneous CF encoding** - Many tools (including Xarray) apply an additional decoding step upon opening which interprets the values of specific [CF-conventions](https://cfconventions.org/)-compliant attribute fields such as `scale_factor` and `add_offset`. This decoding is applied per-variable, but Xarray/VirtualiZarr's default attribute concatenation behaviour is to merge all attributes by overwriting. This means that concatenating two virtual datasets created from netCDF files with different values of `scale_factor` and `add_offset` can create a result which is silently decoded incorrectly by Xarray! We know this is a major footgun, and have plans to resolve it via pushing these extra encoding steps down to also become Zarr codecs (see [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) for more details).
 - **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
 
 If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
@@ -163,6 +164,19 @@ Loading variables can be useful in a few scenarios:
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
 
+### Why do I get `NotImplementedError: ManifestArray ... cannot be converted into a numpy array`?
+
+A `ManifestArray` holds virtual references to chunks in archival files — it never holds the decoded values in memory. Any operation that needs to read those values therefore can't succeed on a virtual variable. The most common triggers are:
+
+- aligning or indexing on a *virtual* dimension coordinate (xarray builds an in-memory pandas index for dimension coordinates),
+- a value comparison during `xr.concat`/`xr.merge` (e.g. `compat="equals"` or `"identical"`), or
+- a failed `xr.testing.assert_identical(...)`, which tries to render the array's values in the diff.
+
+To make the values available, either:
+
+- pass the variable's name in [`loadable_variables`](#why-would-i-want-to-load-variables-using-loadable_variables) when opening, so it is read into memory up front (this is the usual fix for dimension coordinates you want to align/index on), or
+- write the virtual dataset to a Zarr/Icechunk store and reopen it.
+
 ## How does this actually work?
 
 I'm glad you asked! We can think of the problem of providing virtualized zarr-like access to a set of archival files in some other format as a series of steps:
@@ -198,7 +212,7 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                       |
 | From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
 | From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser().parse_session(session, registry, native_chunks_prefix=...)` if you already have an open icechunk session |
-| From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
+| From a GRIB1/GRIB2 file                                                  | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_dataset(..., parser=GribberishParser())` (or `open_virtual_datatree(...)`), via [gribberish](https://github.com/mpiannucci/gribberish)                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., parser=FITSParser())`, via `kerchunk.fits.process_file`                                                                                      |
 | From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |
 | From a [DMR++](https://opendap.github.io/DMRpp-wiki/DMRpp.html) metadata file                                                    | ❌                                                                                                        | `open_virtual_dataset(..., parser=DMRPPParser)`                                                                                     |

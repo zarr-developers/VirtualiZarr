@@ -75,10 +75,7 @@ def _construct_manifest_array(
     -------
     ManifestArray
     """
-    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
-    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
-    # https://github.com/zarr-developers/zarr-python/issues/3711.
-    chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
+    chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
@@ -126,8 +123,55 @@ def _construct_manifest_array(
         dimension_names=dims,
         attributes=attrs,
     )
-    manifest = _dataset_chunk_manifest(filepath, dataset)
+    manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+
+def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
+    """
+    Determine the chunk shape to report for an h5py dataset.
+
+    For a dataset along an unlimited (extendable) dimension, h5py reports the
+    chunk shape allocated for the full maxshape, which can exceed the actual
+    array shape - e.g. a coordinate holding 5 values along an unlimited
+    dimension reports ``chunks=(512,)``. An oversized chunk inhibits
+    concatenation of the resulting virtual dataset, so trim it down to the array
+    shape where it is safe to do so.
+
+    Trimming the chunk shrinks the in-bounds region the chunk covers, so the
+    manifest must point at fewer bytes than the full stored chunk. That region
+    is only a contiguous byte range - and so expressible as a single manifest
+    entry - when the chunk is unfiltered (uncompressed) and only the leading
+    (slowest-varying) dimension is trimmed. When an oversized chunk can't be
+    trimmed safely (e.g. it is compressed) the original chunk shape is kept: the
+    variable still reads correctly (zarr crops the oversized edge chunk) and can
+    be written as virtual references, but it can't be concatenated with other
+    virtual datasets (the oversized chunk prevents a regular chunk grid). That
+    case is surfaced to the user as a warning at
+    ``ManifestStore.to_virtual_dataset`` time, suggesting they load the variable
+    instead.
+
+    This relies on the same invariant as the sub-chunk slicing in
+    ``virtualizarr.manifests.indexing`` (a contiguous sub-range of an
+    uncompressed, fixed-order chunk is addressable as a single byte range);
+    trimming here is the special case of taking the leading prefix along axis 0.
+    """
+    shape = dataset.shape
+    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
+    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
+    # https://github.com/zarr-developers/zarr-python/issues/3711.
+    if dataset.chunks is None:
+        return tuple(max(s, 1) for s in shape)
+
+    chunks = tuple(min(c, max(s, 1)) for c, s in zip(dataset.chunks, shape))
+    if chunks == dataset.chunks:
+        return chunks
+
+    unfiltered = dataset.id.get_create_plist().get_nfilters() == 0
+    leading_dim_only = chunks[1:] == dataset.chunks[1:]
+    if unfiltered and leading_dim_only:
+        return chunks
+    return dataset.chunks
 
 
 def _construct_manifest_group(
@@ -238,6 +282,8 @@ class HDFParser:
 def _dataset_chunk_manifest(
     filepath: str,
     dataset: H5Dataset,
+    *,
+    chunks: tuple[int, ...],
 ) -> ChunkManifest:
     """
     Generate ChunkManifest for HDF5 dataset.
@@ -248,6 +294,11 @@ def _dataset_chunk_manifest(
         The path of the HDF5 file
     dataset
         h5py dataset for which to create a ChunkManifest
+    chunks
+        The chunk shape to use, as returned by ``_chunk_shape``. This may be
+        smaller than ``dataset.chunks`` when an oversized chunk has been trimmed
+        to the array shape (see ``_chunk_shape``), in which case each chunk's
+        byte length is recomputed for the trimmed, in-bounds region.
 
     Returns
     -------
@@ -279,21 +330,26 @@ def _dataset_chunk_manifest(
         if num_chunks == 0:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
-            shape = tuple(
-                math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
-            )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)
-            offsets = np.empty(shape, dtype=np.uint64)
-            lengths = np.empty(shape, dtype=np.uint64)
+            grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
+            paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
+            offsets = np.empty(grid_shape, dtype=np.uint64)
+            lengths = np.empty(grid_shape, dtype=np.uint64)
+
+            # When an oversized chunk has been trimmed the stored chunk holds
+            # more bytes than the in-bounds region, so use the trimmed chunk's
+            # byte size (valid because the trimmed region is a contiguous prefix
+            # of an unfiltered chunk - see _chunk_shape) rather than blob.size.
+            trimmed = chunks != dataset.chunks
+            trimmed_length = math.prod(chunks) * dataset.dtype.itemsize
 
             def get_key(blob):
-                return tuple(a // b for a, b in zip(blob.chunk_offset, dataset.chunks))
+                return tuple(a // b for a, b in zip(blob.chunk_offset, chunks))
 
             def add_chunk_info(blob):
                 key = get_key(blob)
                 paths[key] = filepath
                 offsets[key] = blob.byte_offset
-                lengths[key] = blob.size
+                lengths[key] = trimmed_length if trimmed else blob.size
 
             has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
             if has_chunk_iter:

@@ -332,7 +332,7 @@ def check_combinable_zarr_arrays(
     check_same_codecs([get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
-    check_same_chunk_shapes([arr.chunks for arr in arrays])
+    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
 
 
 def check_compatible_arrays(

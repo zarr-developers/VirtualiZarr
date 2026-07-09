@@ -130,7 +130,11 @@ vds.vz.to_icechunk(session.store)
 session.commit("Create virtual store")
 ```
 
-See the [Usage docs page](usage.md) for more details.
+See the [Usage docs page](how_to/usage.md) for more details.
+
+## Articles
+
+- 2026/06/02 - Earthmover blog - Tom Nicholas - [Old format, no problem!: Cloud-optimizing the GOES-16 archive as Virtual Zarr](https://www.earthmover.io/blog/virtual-zarr)
 
 ## Talks and Presentations
 

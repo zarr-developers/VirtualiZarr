@@ -9,7 +9,7 @@ Before you attempt to use VirtualiZarr on a large number of files at once, you s
 In particular, you should check that:
 
 - You can call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on one of your files, which requires there to be a parser which can interpret that file format.
-- After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
+- After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
 - You can serialize those virtual references to some format (e.g. Kerchunk/Icechunk) and read the data back.
 - The data you read back is exactly what you would have expected to get if you read the data from the original files.
 
@@ -103,9 +103,6 @@ One way to parallelize creating virtual references from a single machine is to u
 For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
 You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
-!!! note
-    We are also working on adding support for [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor], see [PR #889](https://github.com/zarr-developers/VirtualiZarr/pull/889).
-
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
@@ -116,7 +113,7 @@ This can work well when virtualizing files in remote object storage because it p
 
 !!! warning
     Some file parsers, such as the [`HDFParser`][virtualizarr.parsers.HDFParser], rely on C libraries (e.g. HDF5) that hold a process-level lock, which means `ThreadPoolExecutor` will effectively run in serial despite using multiple threads.
-    If you need true parallelism with such parsers, consider using `parallel='lithops'` or `parallel='dask'` instead. If no lithops config file is present (see the [Lithops](#lithops) section), lithops will default to using the [localhost executor](https://lithops-cloud.github.io/docs/source/api_futures.html#lithops.executors.LocalhostExecutor) on the current host, which spawns separate processes that bypass the GIL limitation. These are currently your best options when the file parser is not thread-safe.
+    If you need true parallelism with such parsers, you can use the `ProcessPoolExecutor`, `parallel='lithops'` or `parallel='dask'` instead. If no lithops config file is present (see the [Lithops](#lithops) section), lithops will default to using the [localhost executor](https://lithops-cloud.github.io/docs/source/api_futures.html#lithops.executors.LocalhostExecutor) on the current host, which spawns separate processes that bypass the GIL limitation. These are currently your best options when the file parser is not thread-safe.
 
 ### Dask Delayed
 
@@ -350,3 +347,9 @@ Instead what is more efficient is to use per-task retries at te executor level.
 
 
 In the future, we plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
+
+## Next steps
+
+- To understand the data structures that make this chunk-manifest slicing and combining cheap, see [Data Structures](../explanation/data_structures.md).
+- To validate the contents of your archival files before ingestion, see [Validation and Cleaning](validation.md).
+- Too see worked end-to-end notebooks, see [Examples](examples.md).

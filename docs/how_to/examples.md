@@ -9,6 +9,12 @@ These examples use the VirtualiZarr 2.x API with `obstore` for cloud storage acc
 1. [Virtualizing GOES-16 satellite data (basic)](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes_basic.py) - Virtualizes a GOES-16 file using a standard obstore. Use as a baseline for performance comparison.
 2. [Virtualizing GOES-16 satellite data with optimized store wrappers](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes_with_caching_stores.py) - Demonstrates using `CachingReadableStore` and `SplittingReadableStore` from `obspec-utils` to optimize metadata access when virtualizing remote HDF5/NetCDF files.
 
+### GOES-16 archive notebooks
+
+This notebook accompanies the [_Old format, no problem!: Cloud-optimizing the GOES-16 archive as Virtual Zarr_](https://www.earthmover.io/blog/virtual-zarr) blog post, which virtualizes NOAA's entire 7-year GOES-16 archive into a single virtual Zarr datacube:
+
+1. [Ingesting the GOES-16 archive](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes-16-ingest.ipynb) - End-to-end notebook building the virtual store from the netCDF archive.
+
 ## V1 Examples
 
 !!! note
@@ -18,3 +24,7 @@ These examples use the VirtualiZarr 2.x API with `obstore` for cloud storage acc
 2. [Parallel reference generation using Coiled Functions](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V1/coiled/terraclimate.ipynb)
 3. [Serverless parallel reference generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/virtualizarr-with-lithops)
 4. [MUR SST Virtual and Zarr Icechunk Store Generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/mursst-icechunk-with-lithops)
+
+## Next steps
+
+Several of these examples virtualize large archives. To learn how to generate many virtual references in parallel, see [Scaling](scaling.md).

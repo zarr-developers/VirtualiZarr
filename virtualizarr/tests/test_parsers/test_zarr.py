@@ -380,6 +380,53 @@ def test_parser_roundtrip_matches_xarray(tmpdir, zarr_format):
 
 
 @zarr_versions()
+def test_parser_recurses_into_subgroups(tmpdir, zarr_format):
+    """ZarrParser should virtualize arrays nested in subgroups, not just the root group.
+
+    Regression test: previously construct_manifest_group only collected root-level
+    arrays and dropped all subgroups silently.
+    """
+    filepath = f"{tmpdir}/hierarchical.zarr"
+
+    # Array names deliberately share the "var" substring across levels: zarr<3.1.6
+    # mis-strips keys when listing a nested group, silently dropping such arrays
+    # (zarr-developers/zarr-python#3657). The `zarr>=3.1.6` floor guards against it;
+    # these names would regress on an older zarr.
+    dt = xr.DataTree.from_dict(
+        {
+            "/": xr.Dataset({"root_var": (("x",), np.arange(4, dtype="float32"))}),
+            "/group_a": xr.Dataset({"a_var": (("y",), np.arange(6, dtype="float32"))}),
+            "/group_a/nested": xr.Dataset(
+                {"deep_var": (("z",), np.arange(8, dtype="float32"))}
+            ),
+        }
+    )
+    dt.to_zarr(filepath, consolidated=False, zarr_format=zarr_format)
+
+    store = LocalStore(prefix=filepath)
+    registry = ObjectStoreRegistry({f"file://{filepath}": store})
+    parser = ZarrParser()
+    manifeststore = parser(url=filepath, registry=registry)
+
+    # nested arrays surface through the recursion, with the full hierarchy intact
+    manifest_group = manifeststore._group
+    assert "root_var" in manifest_group.arrays
+    assert "group_a" in manifest_group.groups
+    assert "a_var" in manifest_group.groups["group_a"].arrays
+    assert "nested" in manifest_group.groups["group_a"].groups
+    assert "deep_var" in manifest_group.groups["group_a"].groups["nested"].arrays
+
+    # and the hierarchy round-trips end-to-end through a datatree
+    with xr.open_datatree(
+        filepath, engine="zarr", consolidated=False, zarr_format=zarr_format
+    ) as expected:
+        with xr.open_datatree(
+            manifeststore, engine="zarr", consolidated=False, zarr_format=3
+        ) as actual:
+            xr.testing.assert_identical(actual, expected)
+
+
+@zarr_versions()
 def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
     """Roundtrip a small dataset through the ZarrParser and compare with xarray."""
 

@@ -66,7 +66,10 @@ def _xarray_subset():
     return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
 
 
-@pytest.fixture(params=[2, 3])
+# params supplied indirectly by tests via the `zarr_versions` parametrize
+# decorator (see test_zarr.py); defining params here too would be a duplicate
+# parametrization, which pytest>=9.1 rejects.
+@pytest.fixture
 def zarr_store(tmpdir, request):
     ds = _xarray_subset()
     filepath = f"{tmpdir}/air.zarr"

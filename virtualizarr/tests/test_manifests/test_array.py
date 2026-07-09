@@ -24,7 +24,7 @@ class TestInit:
         metadata = array_v3_metadata(shape=shape, chunks=chunks)
 
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
-        assert marr.chunks == chunks
+        assert marr.metadata.chunks == chunks
         assert marr.dtype == np.dtype("int32")
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
@@ -44,11 +44,32 @@ class TestInit:
         metadata_dict = ArrayV3Metadata.from_dict(metadata.to_dict())
 
         marr = ManifestArray(metadata=metadata_dict, chunkmanifest=manifest)
-        assert marr.chunks == chunks
+        assert marr.metadata.chunks == chunks
         assert marr.dtype == np.dtype("int32")
         assert marr.shape == shape
         assert marr.size == 5 * 2 * 20
         assert marr.ndim == 3
+
+
+class TestNotChunkedArray:
+    # Regression tests for the class of "Could not find a Chunk Manager"
+    # errors (GH #114, #354, #382). A ManifestArray must not advertise
+    # xarray's chunked-array protocol, otherwise xarray duck-types it as a
+    # dask-like computable array and routes loads through a chunk manager
+    # that does not exist for virtual arrays. The Zarr chunk shape is still
+    # available via ``.metadata.chunks``.
+    def test_does_not_expose_chunks_attribute(self, manifest_array):
+        marr = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        assert not hasattr(marr, "chunks")
+        assert marr.metadata.chunks == (5, 2)
+
+    def test_not_recognized_as_chunked_array(self, manifest_array):
+        from xarray.namedarray.pycompat import is_chunked_array
+
+        marr = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        assert is_chunked_array(marr) is False
 
 
 class TestResultType:
@@ -202,7 +223,7 @@ class TestBroadcast:
         marr = manifest_array(shape=(1, 2), chunks=(1, 2))
         expanded = np.broadcast_to(marr, shape=(3, 2))
         assert expanded.shape == (3, 2)
-        assert expanded.chunks == (1, 2)
+        assert expanded.metadata.chunks == (1, 2)
         assert expanded.manifest.dict() == {
             "0.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
             "1.0": {"path": "file:///foo.0.0.nc", "offset": 0, "length": 8},
@@ -213,7 +234,7 @@ class TestBroadcast:
         marr = manifest_array(shape=(3,), chunks=(1,))
         expanded = np.broadcast_to(marr, shape=(1, 3))
         assert expanded.shape == (1, 3)
-        assert expanded.chunks == (1, 1)
+        assert expanded.metadata.chunks == (1, 1)
         assert expanded.manifest.dict() == {
             "0.0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
             "0.1": {"path": "file:///foo.1.nc", "offset": 0, "length": 4},
@@ -224,14 +245,14 @@ class TestBroadcast:
         # regression test
         marr = manifest_array(shape=(), chunks=())
         assert marr.shape == ()
-        assert marr.chunks == ()
+        assert marr.metadata.chunks == ()
         assert marr.manifest.dict() == {
             "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
-        assert expanded.chunks == (1,)
+        assert expanded.metadata.chunks == (1,)
         assert expanded.manifest.dict() == {
             "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
         }
@@ -272,7 +293,7 @@ class TestBroadcast:
         assert broadcasted_marr.shape == target_shape
 
         # check that chunk shape has plausible ndims and lengths
-        broadcasted_chunk_shape = broadcasted_marr.chunks
+        broadcasted_chunk_shape = broadcasted_marr.metadata.chunks
         assert len(broadcasted_chunk_shape) == broadcasted_marr.ndim
         for len_arr, len_chunk in zip(broadcasted_marr.shape, broadcasted_chunk_shape):
             assert len_chunk <= len_arr
@@ -295,10 +316,10 @@ class TestBroadcast:
 
         expanded = np.broadcast_to(marr, shape=target_shape)
         assert expanded.shape == target_shape
-        assert len(expanded.chunks) == expanded.ndim
+        assert len(expanded.metadata.chunks) == expanded.ndim
         assert all(
             len_chunk <= len_arr
-            for len_arr, len_chunk in zip(expanded.shape, expanded.chunks)
+            for len_arr, len_chunk in zip(expanded.shape, expanded.metadata.chunks)
         )
         assert expanded.manifest.dict() == {}
 
@@ -458,7 +479,7 @@ class TestConcat:
             [manifest_array_with_empty_chunks, manifest_array], axis=1
         )
         assert result.shape == (5, 2, 20)
-        assert result.chunks == (5, 1, 10)
+        assert result.metadata.chunks == (5, 1, 10)
         assert result.manifest.dict() == {
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
@@ -573,7 +594,7 @@ class TestStack:
         result = np.stack([marr1, marr2], axis=1)
 
         assert result.shape == (5, 2, 20)
-        assert result.chunks == (5, 1, 10)
+        assert result.metadata.chunks == (5, 1, 10)
         assert result.manifest.dict() == {
             "0.0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -609,7 +630,7 @@ class TestStack:
         result = np.stack([marr1, marr2], axis=1)
 
         assert result.shape == (5, 2, 20)
-        assert result.chunks == (5, 1, 10)
+        assert result.metadata.chunks == (5, 1, 10)
         assert result.manifest.dict() == {
             "0.1.0": {"path": "file:///foo.nc", "offset": 300, "length": 100},
             "0.1.1": {"path": "file:///foo.nc", "offset": 400, "length": 100},
@@ -705,6 +726,86 @@ class TestStackInlined:
         result = np.stack([marr1, marr2], axis=0)
         assert result.manifest._inlined[(0, 0)] is payload
         assert result.manifest._inlined[(1, 0)] is payload
+
+
+class TestWithFillValueOnly:
+    def test_returns_manifest_array_with_empty_manifest(self, array_v3_metadata):
+        # with_fill_value_only produces a ManifestArray with the same schema
+        # (shape, chunks, codecs) but an empty manifest — reads from any chunk
+        # will return fill_value
+        shape = (5, 2, 20)
+        chunks = (5, 1, 10)
+        codecs = [ARRAYBYTES_CODEC, ZLIB_CODEC]
+        metadata = array_v3_metadata(
+            shape=shape, chunks=chunks, data_type=np.dtype("float32"), codecs=codecs
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0.0.0": {"path": "/foo.nc", "offset": 0, "length": 100},
+                    "0.1.1": {"path": "/foo.nc", "offset": 100, "length": 100},
+                },
+            ),
+        )
+
+        result = marr.with_fill_value_only(np.float32("nan"))
+
+        assert isinstance(result, ManifestArray)
+        assert result.shape == shape
+        assert result.metadata.chunks == chunks
+        assert result.dtype == np.dtype("float32")
+        # manifest carries no entries — every chunk read will return fill_value
+        assert result.manifest.dict() == {}
+        # fill_value reflects the requested value
+        assert np.isnan(result.metadata.fill_value)
+        # metadata identical to input except for fill_value
+        input_md = marr.metadata.to_dict()
+        result_md = result.metadata.to_dict()
+        input_md.pop("fill_value")
+        result_md.pop("fill_value")
+        assert result_md == input_md
+
+    def test_non_nan_fill_value(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(4, 4), chunks=(2, 2), data_type=np.dtype("int32")
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.nc", "offset": 0, "length": 16}}
+            ),
+        )
+
+        result = marr.with_fill_value_only(7)
+
+        assert isinstance(result, ManifestArray)
+        assert result.metadata.fill_value == 7
+        assert result.manifest.dict() == {}
+
+    def test_preserves_existing_fill_value_when_passed(self, array_v3_metadata):
+        # the canonical "missing variable of known schema" use case: the
+        # placeholder should reuse the array's existing fill_value so its
+        # metadata is byte-identical to the source's
+        metadata = array_v3_metadata(
+            shape=(4, 4),
+            chunks=(2, 2),
+            data_type=np.dtype("float32"),
+            fill_value=np.float32("nan"),
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.nc", "offset": 0, "length": 16}}
+            ),
+        )
+
+        result = marr.with_fill_value_only(marr.metadata.fill_value)
+
+        # NaN != NaN breaks dataclass __eq__, so compare the serialized dicts
+        # where NaN becomes the JSON string "NaN"
+        assert result.metadata.to_dict() == marr.metadata.to_dict()
+        assert result.manifest.dict() == {}
 
 
 def test_refuse_combine(array_v3_metadata):
@@ -803,7 +904,7 @@ class TestIndexing:
         marr = manifest_array(shape=(2,), chunks=(1,))
         new_marr = marr[None, ...]
         assert new_marr.shape == (1, 2)
-        assert new_marr.chunks == (1, 1)
+        assert new_marr.metadata.chunks == (1, 1)
 
     @pytest.mark.parametrize(
         "in_shape, in_chunks, indexer, out_shape, out_chunks",
@@ -829,7 +930,7 @@ class TestIndexing:
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
         indexed = marr[indexer]
         assert indexed.shape == out_shape
-        assert indexed.chunks == out_chunks
+        assert indexed.metadata.chunks == out_chunks
 
     def test_raise_on_multiple_ellipses(
         self,
@@ -881,7 +982,7 @@ class TestIndexing:
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
         indexed = marr[indexer]
         assert indexed.shape == out_shape
-        assert indexed.chunks == out_chunks
+        assert indexed.metadata.chunks == out_chunks
 
     def test_integer_indexing_subsets_manifest_to_one_chunk(self, array_v3_metadata):
         # Make sure dropping the axis also drops the manifest's chunk-grid axis and
@@ -900,7 +1001,7 @@ class TestIndexing:
         result = marr[2, ...]
 
         assert result.shape == (2,)
-        assert result.chunks == (2,)
+        assert result.metadata.chunks == (2,)
         assert result.manifest.shape_chunk_grid == (1,)
         assert result.manifest.dict() == {
             "0": {"path": "file:///a.nc", "offset": 200, "length": 16},
@@ -1035,7 +1136,7 @@ class TestSubChunkSlicingUncompressed:
         sliced = marr[indexer]
 
         assert sliced.shape == expected_shape
-        assert sliced.chunks == expected_chunks
+        assert sliced.metadata.chunks == expected_chunks
         expected = {
             k: {"path": "file:///foo.nc", **v} for k, v in expected_entries.items()
         }
@@ -1124,7 +1225,7 @@ class TestSubChunkSlicingUncompressed:
         sliced = marr[indexer]
 
         assert sliced.shape == expected_shape
-        assert sliced.chunks == expected_chunks
+        assert sliced.metadata.chunks == expected_chunks
         expected = {
             k: {"path": "file:///foo.nc", **v} for k, v in expected_entries.items()
         }
