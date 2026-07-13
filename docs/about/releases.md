@@ -8,6 +8,8 @@
 ### Breaking changes
 
 ### Bug fixes
+- Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
+  By [David Stuebe](https://github.com/emfdavid).
 
 ### Documentation
 
