@@ -8,7 +8,7 @@ from typing import (
 )
 
 import numpy as np
-from obspec_utils.protocols import ReadableFile
+from obspec_utils.protocols import ReadableFile, ReadableStore
 from obspec_utils.readers import BlockStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
 
@@ -139,15 +139,47 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     return dataset.chunks
 
 
+def _resolve_local_path(store: ReadableStore, path_in_store: str) -> str | None:
+    """Return the filesystem path of ``path_in_store`` if ``store`` is local.
+
+    When the resolved store is an obstore ``LocalStore`` the file is a real path
+    on disk, so we can hand it straight to ``h5py.File`` and let HDF5's own
+    index-aware driver walk the chunk index natively - reading each index type
+    at native granularity instead of dragging a full block per ~2 KiB index-node
+    read through the object-store reader. See the module for why block-based
+    reading amplifies the chunk-index walk on chunk-dense files.
+
+    Returns ``None`` for any non-local store, or if the reconstructed path does
+    not point at an existing file (in which case we fall back to the reader).
+    """
+    import obstore.store as obs
+
+    if not isinstance(store, obs.LocalStore):
+        return None
+    # ``LocalStore.prefix`` may be None (no prefix), a str, or a PosixPath. With
+    # no prefix, obstore strips the leading "/" from the path, so the resolved
+    # ``path_in_store`` is relative to the filesystem root - rejoin it there.
+    prefix = getattr(store, "prefix", None)
+    root = str(prefix) if prefix is not None else "/"
+    candidate = Path(root) / path_in_store
+    # Guard against any reconstruction we didn't anticipate: only take the native
+    # path when it actually resolves to a file, otherwise fall back to the reader.
+    return str(candidate) if candidate.is_file() else None
+
+
 def _construct_manifest_group(
     filepath: str,
-    reader: ReadableFile,
+    reader: ReadableFile | str,
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
+
+    ``reader`` is either a file-like reader over the object store or, for local
+    files, a filesystem path string that ``h5py.File`` opens with its native
+    driver.
     """
     import h5py
 
@@ -198,17 +230,29 @@ class HDFParser:
         A callable that creates a file-like reader from a store and path.
         Must return an object implementing the
         [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
-        Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+        Defaults to `None`, which uses
+        [BlockStoreReader][obspec_utils.readers.BlockStoreReader] for remote
+        sources and the native fast path (below) for local files.
+
+        When the source is a local file and ``reader_factory`` is left as
+        `None`, the parser bypasses the reader entirely and opens the file with
+        h5py's native driver. HDF5 then walks the chunk index at native
+        granularity, which for chunk-dense datasets reads orders of magnitude
+        fewer bytes than serving each ~2 KiB index-node read through a
+        fixed-block reader. Passing an explicit ``reader_factory`` opts back into
+        the reader path for local files too.
     """
 
     def __init__(
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        reader_factory: ReaderFactory = BlockStoreReader,
+        reader_factory: ReaderFactory | None = None,
     ):
         self.group = group
         self.drop_variables = drop_variables
+        # ``None`` means "take the local native fast path when possible, else fall
+        # back to BlockStoreReader"; an explicit factory is always honoured.
         self.reader_factory = reader_factory
 
     def __call__(
@@ -233,7 +277,15 @@ class HDFParser:
             A [ManifestStore][virtualizarr.manifests.ManifestStore] which provides a Zarr representation of the parsed file.
         """
         store, path_in_store = registry.resolve(url)
-        reader = self.reader_factory(store, path_in_store)
+        # With no explicit reader_factory, a local file takes the native fast path
+        # (h5py opens it directly); everything else goes through the block reader.
+        reader: ReadableFile | str
+        if self.reader_factory is None:
+            reader = _resolve_local_path(store, path_in_store) or BlockStoreReader(
+                store, path_in_store
+            )
+        else:
+            reader = self.reader_factory(store, path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,
