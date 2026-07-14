@@ -11,6 +11,10 @@
 
 ### Documentation
 
+- Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
+  ([#1040](https://github.com/zarr-developers/VirtualiZarr/pull/1040)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 ## v2.7.0 (25th June 2026)
