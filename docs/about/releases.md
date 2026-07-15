@@ -8,10 +8,24 @@
 ### Breaking changes
 
 ### Bug fixes
+- Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
+  By [David Stuebe](https://github.com/emfdavid).
+
+- Fix `ZarrParser` raising `ValueError: need a chunk grid shape if no chunks given` when a scalar array's chunk is uninitialized. Scalar variables that carry only attributes and hold no data — such as CF grid-mapping / CRS variables — have no chunk written to storage, so the `HEAD` request 404s. The empty manifest built for this case now passes its (empty) chunk grid shape, matching the non-scalar path.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `IcechunkParser` building a 1-d `(1,)` chunk manifest (keyed `"0"`) for scalar arrays instead of a 0-d manifest (keyed `""`) matching the array's `()` shape. The `grid_shape or (1,)` fallback coerced the empty (falsy) scalar grid shape to `(1,)`; reshaping to `grid_shape` directly produces the correct 0-d manifest, so scalar values (e.g. a data-bearing scalar, or a CF grid-mapping / CRS variable) round-trip correctly.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
+- Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
+  ([#1040](https://github.com/zarr-developers/VirtualiZarr/pull/1040)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
+
+- Bump the minimum supported `gribberish` to `>=1.3.0`. From that release the `GribberishParser` groups GRIB messages by level-type and step-type (like cfgrib), nesting variables under subgroups such as `/depth_bls/instant` rather than at the store root. The grib tests now open the source as a `DataTree` via `open_virtual_datatree` and assert against that grouped layout.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.7.0 (25th June 2026)
 
