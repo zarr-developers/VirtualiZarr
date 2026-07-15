@@ -364,8 +364,10 @@ async def build_chunk_manifest(
         try:
             head = await obstore.head_async(obs_store, store_key)
         except (FileNotFoundError, obstore.exceptions.NotFoundError):
-            # technically I think the zarr spec allows for the possibility that the scalar chunk is uninitialized
-            return ChunkManifest({})
+            # The zarr spec allows the scalar chunk to be uninitialized (e.g. CF
+            # grid-mapping / CRS variables carry only attributes). An empty
+            # manifest still needs its (empty) chunk grid shape.
+            return ChunkManifest({}, shape=chunk_grid_shape)
 
         size = head["size"]
         full_path = join_url(store_base_uri, store_key)

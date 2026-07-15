@@ -9,6 +9,9 @@
 
 ### Bug fixes
 
+- Fix `ZarrParser` raising `ValueError: need a chunk grid shape if no chunks given` when a scalar array's chunk is uninitialized. Scalar variables that carry only attributes and hold no data — such as CF grid-mapping / CRS variables — have no chunk written to storage, so the `HEAD` request 404s. The empty manifest built for this case now passes its (empty) chunk grid shape, matching the non-scalar path.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
