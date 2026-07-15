@@ -11,6 +11,8 @@
 
 - Fix `ZarrParser` raising `ValueError: need a chunk grid shape if no chunks given` when a scalar array's chunk is uninitialized. Scalar variables that carry only attributes and hold no data — such as CF grid-mapping / CRS variables — have no chunk written to storage, so the `HEAD` request 404s. The empty manifest built for this case now passes its (empty) chunk grid shape, matching the non-scalar path.
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `IcechunkParser` building a 1-d `(1,)` chunk manifest (keyed `"0"`) for scalar arrays instead of a 0-d manifest (keyed `""`) matching the array's `()` shape. The `grid_shape or (1,)` fallback coerced the empty (falsy) scalar grid shape to `(1,)`; reshaping to `grid_shape` directly produces the correct 0-d manifest, so scalar values (e.g. a data-bearing scalar, or a CF grid-mapping / CRS variable) round-trip correctly.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
