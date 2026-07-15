@@ -76,12 +76,20 @@ def from_kerchunk_refs(decoded_arr_refs_zarray, zattrs) -> "ArrayV3Metadata":
     )  # Ensure filters is a list
     compressor = decoded_arr_refs_zarray.get("compressor")  # Might be None
 
-    # Ensure compressor is a list before unpacking
-    codec_configs = [*filters, *(compressor if compressor is not None else [])]
+    # compressor may be None, a single codec config dict (standard zarr v2), or
+    # a list of codec config dicts; normalize to a list before unpacking.
+    if compressor is None:
+        compressor = []
+    elif isinstance(compressor, dict):
+        compressor = [compressor]
+    codec_configs = [*filters, *compressor]
     numcodec_configs = [zarr_codec_config_to_v3(config) for config in codec_configs]
     dimension_names = decoded_arr_refs_zarray["dimension_names"]
+    # A zero-length dimension has no chunks, but kerchunk reports a chunk edge of
+    # 0 for it, which Zarr v3 rejects (edges must be >= 1). Coerce 0 -> 1.
+    chunk_shape = tuple(c or 1 for c in decoded_arr_refs_zarray["chunks"])
     return create_v3_array_metadata(
-        chunk_shape=tuple(decoded_arr_refs_zarray["chunks"]),
+        chunk_shape=chunk_shape,
         data_type=dtype,
         codecs=numcodec_configs,
         fill_value=fill_value,

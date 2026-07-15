@@ -4,6 +4,8 @@
 
 ### New Features
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
+- HDF4 files can now be read as virtual datasets via the new `HDF4Parser`, which wraps `kerchunk.hdf4.HDF4ToZarr` (the same pattern as the `FITSParser`). Closes [#216](https://github.com/zarr-developers/VirtualiZarr/issues/216).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
@@ -14,6 +16,8 @@
 - Fix `ZarrParser` raising `ValueError: need a chunk grid shape if no chunks given` when a scalar array's chunk is uninitialized. Scalar variables that carry only attributes and hold no data — such as CF grid-mapping / CRS variables — have no chunk written to storage, so the `HEAD` request 404s. The empty manifest built for this case now passes its (empty) chunk grid shape, matching the non-scalar path.
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix `IcechunkParser` building a 1-d `(1,)` chunk manifest (keyed `"0"`) for scalar arrays instead of a 0-d manifest (keyed `""`) matching the array's `()` shape. The `grid_shape or (1,)` fallback coerced the empty (falsy) scalar grid shape to `(1,)`; reshaping to `grid_shape` directly produces the correct 0-d manifest, so scalar values (e.g. a data-bearing scalar, or a CF grid-mapping / CRS variable) round-trip correctly.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix the Kerchunk reference translator mishandling a `compressor` given as a single codec-config dict (the standard Zarr v2 form, as emitted by `kerchunk.hdf4`), which previously raised `TypeError: Expected codec config to be a dict`. Also coerce a zero-length chunk edge to 1 so zero-length arrays translate to valid Zarr v3 metadata.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
