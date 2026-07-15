@@ -14,6 +14,10 @@
 
 ### Documentation
 
+- Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
+  ([#1040](https://github.com/zarr-developers/VirtualiZarr/pull/1040)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 - Bump the minimum supported `gribberish` to `>=1.3.0`. From that release the `GribberishParser` groups GRIB messages by level-type and step-type (like cfgrib), nesting variables under subgroups such as `/depth_bls/instant` rather than at the store root. The grib tests now open the source as a `DataTree` via `open_virtual_datatree` and assert against that grouped layout.
