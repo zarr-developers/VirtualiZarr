@@ -4,7 +4,7 @@
 
 ### New Features
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
-- HDF4 files can now be read as virtual datasets via the new `HDF4Parser`, which wraps `kerchunk.hdf4.HDF4ToZarr` (the same pattern as the `FITSParser`). Closes [#216](https://github.com/zarr-developers/VirtualiZarr/issues/216).
+- HDF4 files can now be read as virtual datasets via the new `HDF4Parser`, which wraps `kerchunk.hdf4.HDF4ToZarr` (the same pattern as the `FITSParser`), installable with `pip install "virtualizarr[hdf4]"`. Closes [#216](https://github.com/zarr-developers/VirtualiZarr/issues/216).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
