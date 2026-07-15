@@ -298,7 +298,8 @@ class TestParseSession:
         with_data = ms._group.arrays["with_data"]
         assert with_data.shape == ()
         assert with_data._manifest.shape_chunk_grid == ()
-        assert with_data._manifest.dict()[""]["length"] == 4
+        # 0-d manifest: the single chunk is indexed with an empty tuple, not [0]
+        assert int(with_data._manifest._lengths[()]) == 4
 
         crs_like = ms._group.arrays["crs_like"]
         assert crs_like.shape == ()
