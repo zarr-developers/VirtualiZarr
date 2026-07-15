@@ -68,7 +68,7 @@ tiff = [
 ]
 # GRIB1/GRIB2 parser, provided by the (Rust-backed) gribberish package.
 grib = [
-    "gribberish>=1.0.0",
+    "gribberish>=1.3.0",
 ]
 kerchunk_parquet = [
    "virtualizarr[remote]",
