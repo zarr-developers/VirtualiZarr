@@ -285,12 +285,9 @@ def virtual_datatree_to_icechunk(
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
     for store_path, vds in paths_and_virtual_datasets:
-        if kwargs.get("append_dim") or kwargs.get("region"):
-            # both require the group (and arrays) to already exist
-            group = Group.open(store=store_path, zarr_format=3)
-        else:
-            # create the group if it doesn't already exist
-            group = Group.from_store(store=store_path, zarr_format=3)
+        group = open_group(
+            store_path, mode=open_mode, zarr_format=3, use_consolidated=False
+        )
 
         write_virtual_dataset_to_icechunk_group(
             vds=vds,
