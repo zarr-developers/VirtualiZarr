@@ -20,6 +20,9 @@
 - Fix the Kerchunk reference translator mishandling a `compressor` given as a single codec-config dict (the standard Zarr v2 form, as emitted by `kerchunk.hdf4`), which previously raised `TypeError: Expected codec config to be a dict`. Also coerce a zero-length chunk edge to 1 so zero-length arrays translate to valid Zarr v3 metadata.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+- Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
+  By [Aaron Spring](https://github.com/aaronspring).
+
 ### Documentation
 
 - Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
