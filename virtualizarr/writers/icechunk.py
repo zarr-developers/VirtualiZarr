@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
-from zarr import Array, Group
+from zarr import Array, Group, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.sync import sync
@@ -34,12 +34,39 @@ if TYPE_CHECKING:
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
 
+VALID_MODES = ("w", "w-", "a")
+
+
+def _resolve_mode(
+    mode: Optional[Literal["w", "w-", "a"]],
+    append_dim: Optional[str] = None,
+    region: object = None,
+) -> Literal["w", "w-", "a", "r+"]:
+    """Validate ``mode`` and resolve it to the effective zarr group-open mode."""
+    if not isinstance(mode, (type(None), str)):
+        raise TypeError(f"mode: expected type Optional[str], but got type {type(mode)}")
+
+    if mode is not None and mode not in VALID_MODES:
+        raise ValueError(f"mode: expected one of {VALID_MODES}, but got {mode!r}")
+
+    if append_dim or region:
+        if mode in ("w", "w-"):
+            raise ValueError(
+                f"mode {mode!r} cannot be used together with append_dim or region, "
+                "which require opening an existing group"
+            )
+        # appending or writing to a region requires the group (and arrays) to already exist
+        return "r+"
+
+    return mode or "w-"
+
 
 def virtual_dataset_to_icechunk(
     vds: xr.Dataset,
     store: "IcechunkStore",
     *,
     group: Optional[str] = None,
+    mode: Optional[Literal["w", "w-", "a"]] = None,
     append_dim: Optional[str] = None,
     region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
     validate_containers: bool = True,
@@ -58,6 +85,16 @@ def virtual_dataset_to_icechunk(
         Store to write the dataset to, which must not be read-only.
     group
         Path to the group in which to store the dataset, defaulting to the root group.
+    mode
+        How to handle a pre-existing group at the target path:
+
+        - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
+        - ``"w"``: create the group, overwriting any existing contents at that path.
+        - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+        - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
+          is given, in which case the existing group is opened.
+
+        ``mode="w"`` and ``mode="w-"`` are incompatible with ``append_dim`` and ``region``.
     append_dim
         Name of the dimension along which to append data. If provided, the dataset must
         have a dimension with this name.
@@ -87,7 +124,6 @@ def virtual_dataset_to_icechunk(
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr import Group  # type: ignore[import-untyped]
         from zarr.storage import StorePath  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError(
@@ -103,6 +139,8 @@ def virtual_dataset_to_icechunk(
         raise TypeError(
             f"group: expected type Optional[str], but got type {type(group)}"
         )
+
+    open_mode = _resolve_mode(mode, append_dim=append_dim, region=region)
 
     if not isinstance(append_dim, (type(None), str)):
         raise TypeError(
@@ -134,11 +172,9 @@ def virtual_dataset_to_icechunk(
     if validate_containers:
         validate_virtual_chunk_containers(store.session.config, [vds])
 
-    if append_dim or region:
-        group_object = Group.open(store=store_path, zarr_format=3)
-    else:
-        # create the group if it doesn't already exist
-        group_object = Group.from_store(store=store_path, zarr_format=3)
+    group_object = open_group(
+        store_path, mode=open_mode, zarr_format=3, use_consolidated=False
+    )
 
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
@@ -154,6 +190,7 @@ def virtual_datatree_to_icechunk(
     vdt: xr.DataTree,
     store: "IcechunkStore",
     *,
+    mode: Optional[Literal["w", "w-", "a"]] = None,
     write_inherited_coords: bool = False,
     validate_containers: bool = True,
     last_updated_at: datetime | None = None,
@@ -170,6 +207,13 @@ def virtual_datatree_to_icechunk(
         DataTree to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
     store
         Store to write the dataset to, which must not be read-only.
+    mode
+        How to handle pre-existing groups at the target paths:
+
+        - ``"w-"`` or ``None`` (default): create each group, raising a
+          ``ContainsGroupError`` if it already exists.
+        - ``"w"``: create each group, overwriting any existing contents at that path.
+        - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
     write_inherited_coords
         If ``True``, replicate inherited coordinates on all descendant nodes of the
         tree. Otherwise, only write coordinates at the level at which they are
@@ -197,7 +241,6 @@ def virtual_datatree_to_icechunk(
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr import Group  # type: ignore[import-untyped]
         from zarr.storage import StorePath  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError(
@@ -208,6 +251,10 @@ def virtual_datatree_to_icechunk(
         raise TypeError(
             f"store: expected type IcechunkStore, but got type {type(store)}"
         )
+
+    open_mode = _resolve_mode(
+        mode, append_dim=kwargs.get("append_dim"), region=kwargs.get("region")
+    )
 
     if not isinstance(last_updated_at, (type(None), datetime)):
         raise TypeError(
@@ -238,12 +285,9 @@ def virtual_datatree_to_icechunk(
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
     for store_path, vds in paths_and_virtual_datasets:
-        if kwargs.get("append_dim") or kwargs.get("region"):
-            # both require the group (and arrays) to already exist
-            group = Group.open(store=store_path, zarr_format=3)
-        else:
-            # create the group if it doesn't already exist
-            group = Group.from_store(store=store_path, zarr_format=3)
+        group = open_group(
+            store_path, mode=open_mode, zarr_format=3, use_consolidated=False
+        )
 
         write_virtual_dataset_to_icechunk_group(
             vds=vds,

@@ -334,7 +334,7 @@ for i, start in enumerate(range(0, vds.sizes["time"], step)):
 
 If the slice boundaries don't align with chunk edges along that axis, the indexing call raises `SubChunkIndexingError`.
 
-(Remember you can also subset the Dataset to specific variables and commit those separately too if necessary.)
+(Remember you can also subset the Dataset to specific variables and commit those separately too if necessary — pass `mode="a"` to `to_icechunk` from the second write onwards, so that writing into the already-existing group doesn't raise a `ContainsGroupError`.)
 
 ### Retries
 
