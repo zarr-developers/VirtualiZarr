@@ -1,6 +1,8 @@
 # Release notes
 
-## v2.7.1 (unreleased)
+## v2.7.1 (15th July 2026)
+
+Adds a `nrefs` accessor for counting virtual chunk references, a `mode` parameter on `vz.to_icechunk` for controlling how a pre-existing group is handled, and an `HDF4Parser` for reading HDF4 files. Also fixes several scalar-array and Kerchunk-reference edge cases in the `ZarrParser`, `IcechunkParser`, and Kerchunk translator (including FITS structured dtypes), and fixes writing a virtual `DataTree` with `region`/`append_dim` into existing groups.
 
 ### New Features
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
@@ -23,9 +25,6 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix the Kerchunk reference translator mishandling a `compressor` given as a single codec-config dict (the standard Zarr v2 form, as emitted by `kerchunk.hdf4`), which previously raised `TypeError: Expected codec config to be a dict`. Also coerce a zero-length chunk edge to 1 so zero-length arrays translate to valid Zarr v3 metadata.
   By [Tom Nicholas](https://github.com/TomNicholas).
-
-- Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
-  By [Aaron Spring](https://github.com/aaronspring).
 
 ### Documentation
 
