@@ -996,9 +996,6 @@ class TestRegion:
                 write_session.store, region={"y": "auto", "x": "auto"}
             )
 
-    @pytest.mark.xfail(
-        reason="This doesn't work in xarray either, maybe not even intended?",
-    )
     def test_write_datatree_region(
         self,
         icechunk_repo: "Repository",

@@ -176,6 +176,25 @@ def test_scalar_chunk_mapping(tmpdir, zarr_format):
     assert chunk_dict[""]["length"] > 0
 
 
+@zarr_versions()
+def test_uninitialized_scalar_chunk_mapping(tmpdir, zarr_format):
+    """Test chunk mapping for a scalar array whose chunk was never written.
+
+    This is common for CF grid-mapping / CRS variables, which are scalar arrays
+    that carry only attributes and hold no data, so their single chunk is
+    uninitialized. The parser must produce an empty (all-fill) manifest rather
+    than raising.
+    """
+
+    filepath = f"{tmpdir}/uninitialized_scalar.zarr"
+    zarr.create(shape=(), dtype="int8", store=filepath, zarr_format=zarr_format)
+
+    zarr_store = ObjectStore(store=LocalStore(prefix=filepath))
+    manifest = asyncio.run(_build_manifest(zarr_store, filepath))
+    assert manifest.dict() == {}
+    assert manifest.shape_chunk_grid == ()
+
+
 def test_join_url_empty_base():
     """Test join_url with empty base."""
 
