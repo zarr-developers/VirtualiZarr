@@ -351,6 +351,26 @@ def test_convert_v3_to_v2_metadata(
     assert v2_metadata.attributes == {}
 
 
+def test_codec_endian_normalizes_enum_and_str():
+    # zarr's BytesCodec.endian was an Endian enum through 3.2.x and became a plain str on main
+    # (zarr-developers/zarr-python#3968). _codec_endian must return the string either way, so
+    # the str shape (which released zarr can't construct) is fed via a stand-in codec.
+    from types import SimpleNamespace
+    from typing import cast
+
+    from zarr.abc.codec import ArrayBytesCodec
+    from zarr.codecs import BytesCodec
+
+    from virtualizarr.utils import _codec_endian
+
+    assert _codec_endian(BytesCodec(endian="big")) == "big"
+    assert _codec_endian(BytesCodec(endian="little")) == "little"
+    assert _codec_endian(BytesCodec(endian=None)) is None
+    # zarr-main shape: endian is already a plain string
+    assert _codec_endian(cast(ArrayBytesCodec, SimpleNamespace(endian="big"))) == "big"
+    assert _codec_endian(cast(ArrayBytesCodec, SimpleNamespace(endian=None))) is None
+
+
 def test_warn_if_no_virtual_vars():
     non_virtual_ds = xr.Dataset({"foo": ("x", [10, 20, 30]), "x": ("x", [1, 2, 3])})
     with pytest.warns(UserWarning, match="non-virtual"):
