@@ -26,6 +26,9 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 - Fix the Kerchunk reference translator mishandling a `compressor` given as a single codec-config dict (the standard Zarr v2 form, as emitted by `kerchunk.hdf4`), which previously raised `TypeError: Expected codec config to be a dict`. Also coerce a zero-length chunk edge to 1 so zero-length arrays translate to valid Zarr v3 metadata.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+- `HDFParser` now walks a local file's chunk index with h5py's native driver instead of routing every index-node read through the object-store block reader. For chunk-dense datasets (e.g. sparse single-cell `.h5ad`) this avoids reading a large fraction of the whole file just to build the manifest — HDF5 reads the index at native granularity. The reader path is unchanged for remote sources and when a custom `reader_factory` is supplied.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Documentation
 
 - Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
