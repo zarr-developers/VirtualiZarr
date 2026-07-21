@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import warnings
-from collections.abc import AsyncGenerator, Iterable
+from collections.abc import AsyncGenerator, Iterable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal, NamedTuple, TypeAlias
 from urllib.parse import urlparse
 
 from obspec_utils.registry import ObjectStoreRegistry
@@ -42,6 +43,76 @@ class StoreRequest:
     """The ObjectStore instance to use for making the request."""
     key: str
     """The key within the store to request."""
+
+
+@dataclass
+class _ChunkRef:
+    """A single chunk request resolved to an absolute byte range in a source file."""
+
+    store: ObjectStore
+    path: str
+    start: int
+    end: int
+
+
+class _Member(NamedTuple):
+    """One chunk request within a file group."""
+
+    request_index: int
+    """Position of this request in the original ``get_many`` ``requests``."""
+    start: int
+    """Start of the chunk's byte range, absolute within the source file."""
+    end: int
+    """End (exclusive) of the chunk's byte range, absolute within the source file."""
+
+
+@dataclass
+class _FileGroup:
+    """A set of chunk requests that all read from the same source file."""
+
+    store: ObjectStore
+    path: str
+    members: list[_Member]
+
+
+def _coalesce_members(
+    members: list[_Member], *, max_gap: int, max_bytes: int
+) -> list[list[_Member]]:
+    """Group members (all in the same file) into runs, each served by one read.
+
+    Two members join the same run when the gap between them is at most
+    ``max_gap`` *and* the resulting run span stays at most ``max_bytes``.
+
+    The two knobs play distinct roles:
+
+    - ``max_gap`` decides *whether* to bridge a gap between references, i.e. how
+      much unwanted data coalescing is allowed to pull in. This is what governs
+      strided access (a large gap bridges the stride of a 2D grid and over-reads;
+      ``0`` merges only adjacent references and never over-reads).
+    - ``max_bytes`` caps the *size* of any single read, so a long run of
+      (near-)adjacent members is split into several bounded reads that the caller
+      fetches concurrently. It bounds per-read memory and lets a large contiguous
+      span be fetched over several parallel connections rather than one. It does
+      *not* affect over-read.
+
+    Runs are returned sorted by start offset and cover every member exactly
+    once. A member larger than ``max_bytes`` still forms its own (single) run.
+    """
+    ordered = sorted(members, key=lambda member: member.start)
+    runs: list[list[_Member]] = []
+    run_start = run_end = 0
+    for member in ordered:
+        if (
+            runs
+            and member.start - run_end <= max_gap
+            and max(run_end, member.end) - run_start <= max_bytes
+        ):
+            runs[-1].append(member)
+            run_end = max(run_end, member.end)
+        else:
+            runs.append([member])
+            run_start, run_end = member.start, member.end
+    return runs
 
 
 def get_store_prefix(url: str) -> str:
@@ -112,7 +183,12 @@ class ManifestStore(Store):
         NotImplementedError
 
     def __init__(
-        self, group: ManifestGroup, *, registry: ObjectStoreRegistry | None = None
+        self,
+        group: ManifestGroup,
+        *,
+        registry: ObjectStoreRegistry | None = None,
+        coalesce_max_gap_bytes: int = 0,
+        coalesce_max_bytes: int = 8 * 1024 * 1024,
     ) -> None:
         """Instantiate a new ManifestStore.
 
@@ -123,6 +199,27 @@ class ManifestStore(Store):
         registry
             A registry mapping the URL scheme and netloc to  [ObjectStore][obstore.store.ObjectStore] instances,
             allowing [ManifestStores][virtualizarr.manifests.ManifestStore] to read from different  [ObjectStore][obstore.store.ObjectStore] instances.
+        coalesce_max_gap_bytes
+            When multiple chunks requested together (via ``get_many``) refer to the
+            same source file, virtual references separated by at most this many bytes
+            are coalesced into a single, larger read. Defaults to ``0``, which merges
+            only references that are exactly adjacent in the file - a pure win, since
+            no unwanted bytes are read. A larger value additionally bridges gaps up to
+            that size, trading some wasted bytes for fewer requests; this can backfire
+            for strided access patterns (e.g. a 2D spatial box, whose chunks are
+            contiguous along one axis but far apart along another), where bridging the
+            stride pulls in the intervening chunks. See
+            [ManifestStore.get_many][virtualizarr.manifests.ManifestStore.get_many].
+        coalesce_max_bytes
+            Upper bound on the size of a single coalesced read. A run of adjacent (or,
+            with a non-zero gap, near-adjacent) references longer than this is split
+            into several reads that are fetched concurrently, bounding per-read memory
+            and letting a large contiguous span be pulled over several parallel
+            connections instead of one. This is the equivalent of icechunk's
+            ``ideal_concurrent_request_size``, provided here because obstore does not
+            split a single ranged read on its own. It does not affect over-read (that
+            is ``coalesce_max_gap_bytes``), and is inert unless a query coalesces into a
+            run larger than this. Defaults to 8 MiB.
         """
 
         if not isinstance(group, ManifestGroup):
@@ -131,6 +228,8 @@ class ManifestStore(Store):
         super().__init__(read_only=True)
         self._registry = ObjectStoreRegistry() if registry is None else registry
         self._group = group
+        self._coalesce_max_gap_bytes = coalesce_max_gap_bytes
+        self._coalesce_max_bytes = coalesce_max_bytes
 
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, registry={self._registry})"
@@ -182,28 +281,12 @@ class ManifestStore(Store):
         entry = manifest.get_entry(chunk_indexes)
         if entry is None:
             return None
-        path = entry["path"]
-        offset = entry["offset"]
-        length = entry["length"]
-        # Get the configured object store instance that matches the path
-        store, path_after_prefix = self._registry.resolve(path)
-        if not store:
-            raise ValueError(
-                f"Could not find a store to use for {path} in the store registry"
-            )
-
-        path_in_store = urlparse(path).path
-        if hasattr(store, "prefix") and store.prefix:
-            prefix = str(store.prefix).lstrip("/")
-        elif hasattr(store, "url"):
-            prefix = urlparse(store.url).path.lstrip("/")
-        else:
-            prefix = ""
-        path_in_store = path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
+        store, path_in_store = self._resolve_store_and_path(entry["path"])
         # Transform the input byte range to account for the chunk location in the file
-        chunk_end_exclusive = offset + length
         byte_range = _transform_byte_range(
-            byte_range, chunk_start=offset, chunk_end_exclusive=chunk_end_exclusive
+            byte_range,
+            chunk_start=entry["offset"],
+            chunk_end_exclusive=entry["offset"] + entry["length"],
         )
 
         # Actually get the bytes
@@ -214,6 +297,55 @@ class ManifestStore(Store):
         )
         return prototype.buffer.from_bytes(bytes)  # type: ignore[arg-type]
 
+    def _resolve_store_and_path(self, path: str) -> tuple[ObjectStore, str]:
+        """Resolve a manifest entry ``path`` to its ObjectStore and the path
+        within that store (with any store prefix stripped)."""
+        store, _ = self._registry.resolve(path)
+        if not store:
+            raise ValueError(
+                f"Could not find a store to use for {path} in the store registry"
+            )
+        path_in_store = urlparse(path).path
+        if hasattr(store, "prefix") and store.prefix:
+            prefix = str(store.prefix).lstrip("/")
+        elif hasattr(store, "url"):
+            prefix = urlparse(store.url).path.lstrip("/")
+        else:
+            prefix = ""
+        return store, path_in_store.lstrip("/").removeprefix(prefix).lstrip("/")
+
+    def _resolve_chunk_ref(
+        self, key: str, byte_range: ByteRequest | None
+    ) -> _ChunkRef | None:
+        """Resolve a chunk key to an absolute byte range within its source file.
+
+        Returns ``None`` when the key is not a plain, manifest-backed chunk that
+        can participate in coalescing - i.e. metadata documents, inlined chunks,
+        missing chunks, or group keys. Those are handled individually by ``get``.
+        """
+        node, suffix = _get_deepest_group_or_array(self._group, key)
+        if suffix.endswith(
+            ("zarr.json", ".zattrs", ".zgroup", ".zarray", ".zmetadata")
+        ) or isinstance(node, ManifestGroup):
+            return None
+        manifest = node.manifest
+        separator: Literal[".", "/"] = getattr(
+            node.metadata.chunk_key_encoding, "separator", "."
+        )
+        chunk_indexes = parse_manifest_index(key, separator, expand_pattern=True)
+        if chunk_indexes in manifest._inlined:
+            return None
+        entry = manifest.get_entry(chunk_indexes)
+        if entry is None:
+            return None
+        store, path_in_store = self._resolve_store_and_path(entry["path"])
+        rng = _transform_byte_range(
+            byte_range,
+            chunk_start=entry["offset"],
+            chunk_end_exclusive=entry["offset"] + entry["length"],
+        )
+        return _ChunkRef(store=store, path=path_in_store, start=rng.start, end=rng.end)
+
     async def get_partial_values(
         self,
         prototype: BufferPrototype,
@@ -222,6 +354,95 @@ class ManifestStore(Store):
         # docstring inherited
         # TODO: Implement using private functions from the upstream Zarr obstore integration
         raise NotImplementedError
+
+    async def get_many(
+        self,
+        requests: Sequence[tuple[str, ByteRequest | None] | str],
+        *,
+        prototype: BufferPrototype,
+    ) -> AsyncGenerator[Sequence[tuple[int, Buffer | None]], None]:
+        """Retrieve many chunks at once, coalescing reads from the same file.
+
+        Overrides [Store.get_many][zarr.abc.store.Store.get_many]. Requested
+        chunks are resolved through the manifests to ``(source file, byte
+        range)`` and grouped by source file. Within each file, references closer
+        together than ``coalesce_max_gap_bytes`` are coalesced into runs; each run
+        is then split into reads of at most ``coalesce_max_bytes`` and served by a
+        ranged read that is sliced back into per-chunk buffers. The gap controls
+        how much unwanted data coalescing may pull in - ``0`` (the default) merges
+        only adjacent references and never over-reads, which matters for strided
+        access such as a 2D spatial box - while the size cap only bounds how large
+        any single read may get (splitting big contiguous runs into parallel
+        reads); it does not affect over-read.
+        This is the same technique object_store and async-tiff use to read many
+        tiles efficiently, applied here to virtual chunk references.
+
+        Keys that are not plain manifest-backed chunks (metadata documents,
+        inlined chunks, or missing chunks) are served individually via ``get``.
+        Results are yielded as ``(request_index, Buffer | None)`` batches in
+        completion order, per the ``Store.get_many`` contract.
+        """
+        # Local import so importing this module doesn't require the zarr config.
+        from zarr.core.config import config
+
+        # Partition requests into coalescable chunk reads (grouped by source
+        # file) and everything else (served one-by-one via ``get``).
+        groups: dict[tuple[int, str], _FileGroup] = {}
+        singletons: list[tuple[int, str, ByteRequest | None]] = []
+        for index, request in enumerate(requests):
+            key, byte_range = (request, None) if isinstance(request, str) else request
+            ref = self._resolve_chunk_ref(key, byte_range)
+            if ref is None:
+                singletons.append((index, key, byte_range))
+                continue
+            group = groups.setdefault(
+                (id(ref.store), ref.path), _FileGroup(ref.store, ref.path, [])
+            )
+            group.members.append(_Member(index, ref.start, ref.end))
+
+        semaphore = asyncio.Semaphore(config.get("async.concurrency"))
+
+        async def fetch_run(
+            store: ObjectStore, path: str, run: list[_Member]
+        ) -> Sequence[tuple[int, Buffer | None]]:
+            # One ranged read spanning the whole run, sliced back per chunk.
+            run_start = run[0].start
+            run_end = max(member.end for member in run)
+            async with semaphore:
+                data = await store.get_range_async(path, start=run_start, end=run_end)
+            view = memoryview(data)  # type: ignore[arg-type]
+            return [
+                (
+                    member.request_index,
+                    prototype.buffer.from_bytes(
+                        view[member.start - run_start : member.end - run_start]
+                    ),
+                )
+                for member in run
+            ]
+
+        async def fetch_single(
+            index: int, key: str, byte_range: ByteRequest | None
+        ) -> Sequence[tuple[int, Buffer | None]]:
+            async with semaphore:
+                buffer = await self.get(key, prototype, byte_range)
+            return ((index, buffer),)
+
+        tasks = [
+            asyncio.ensure_future(fetch_run(group.store, group.path, run))
+            for group in groups.values()
+            for run in _coalesce_members(
+                group.members,
+                max_gap=self._coalesce_max_gap_bytes,
+                max_bytes=self._coalesce_max_bytes,
+            )
+        ]
+        tasks += [
+            asyncio.ensure_future(fetch_single(index, key, byte_range))
+            for index, key, byte_range in singletons
+        ]
+        for coro in asyncio.as_completed(tasks):
+            yield await coro
 
     async def exists(self, key: str) -> bool:
         # docstring inherited
