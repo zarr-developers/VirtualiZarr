@@ -52,6 +52,20 @@ class TestManifestGroup:
         assert len(manifest_group) == 1
         assert list(manifest_group) == [var]
 
+    def test_nbytes_empty(self):
+        assert ManifestGroup().nbytes == 0
+
+    def test_nbytes(self, manifest_array):
+        a, b = manifest_array(), manifest_array()
+        manifest_group = ManifestGroup(arrays={"a": a, "b": b})
+        assert manifest_group.nbytes == a.nbytes_virtual + b.nbytes_virtual
+
+    def test_nbytes_nested(self, manifest_array):
+        a, b = manifest_array(), manifest_array()
+        subgroup = ManifestGroup(arrays={"b": b})
+        manifest_group = ManifestGroup(arrays={"a": a}, groups={"sub": subgroup})
+        assert manifest_group.nbytes == a.nbytes_virtual + b.nbytes_virtual
+
     def test_manifest_repr(self, manifest_array):
         marr = manifest_array(shape=(5, 2), chunks=(5, 2))
         manifest_group = ManifestGroup(arrays={"foo": marr}, attributes={})

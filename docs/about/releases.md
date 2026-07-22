@@ -1,5 +1,14 @@
 # Release notes
 
+ ## v2.7.2 (unreleased)
+
+  ### New Features
+
+  - Added [ManifestGroup.nbytes][virtualizarr.manifests.ManifestGroup.nbytes] and
+    [ManifestStore.nbytes][virtualizarr.manifests.ManifestStore.nbytes] — mirroring `ds.vz.nbytes`. Closes
+    [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
+
+
 ## v2.7.1 (15th July 2026)
 
 Adds a `nrefs` accessor for counting virtual chunk references, a `mode` parameter on `vz.to_icechunk` for controlling how a pre-existing group is handled, and an `HDF4Parser` for reading HDF4 files. Also fixes several scalar-array and Kerchunk-reference edge cases in the `ZarrParser`, `IcechunkParser`, and Kerchunk translator (including FITS structured dtypes), and fixes writing a virtual `DataTree` with `region`/`append_dim` into existing groups.

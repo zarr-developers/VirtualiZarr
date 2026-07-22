@@ -66,6 +66,18 @@ class ManifestGroup(
         return self._metadata
 
     @property
+    def nbytes(self) -> int:
+        """
+        Size required to hold these references in memory in bytes.
+
+        Note this is not the size of the referenced chunks if they were actually loaded into memory,
+        this is only the size of the pointers to the chunk locations.
+        """
+        return sum(arr.nbytes_virtual for arr in self.arrays.values()) + sum(
+            g.nbytes for g in self.groups.values()
+        )
+
+    @property
     def arrays(self) -> dict[str, ManifestArray]:
         """ManifestArrays contained in this group."""
         return {k: v for k, v in self._members.items() if isinstance(v, ManifestArray)}
