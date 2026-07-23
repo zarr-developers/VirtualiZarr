@@ -25,6 +25,8 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 ### Bug fixes
 - Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
   By [David Stuebe](https://github.com/emfdavid).
+- Fix the bytes codec recording the wrong `endian` for a **big-endian structured dtype**, which made virtual references to big-endian record data (e.g. a FITS `BinTableHDU`) decode to silently wrong values. The byte order was read from `dtype.byteorder`, which numpy reports as `"|"` for any structured dtype whatever its fields hold, so such arrays fell through to the little-endian default; it is now read from the fields, looking through subarray and nested-struct fields and ignoring fields that carry no byte order (single-byte numbers, strings). A structured dtype whose fields mix byte orders now raises, since a Zarr V3 array has a single bytes codec and cannot express it.
+  By [David Stuebe](https://github.com/emfdavid).
 
 - Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
   By [Aaron Spring](https://github.com/aaronspring).
