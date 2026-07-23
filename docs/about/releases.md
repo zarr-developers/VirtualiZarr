@@ -4,8 +4,8 @@
 
   ### New Features
 
-  - Added [ManifestGroup.nbytes][virtualizarr.manifests.ManifestGroup.nbytes] and
-    [ManifestStore.nbytes][virtualizarr.manifests.ManifestStore.nbytes] — mirroring `ds.vz.nbytes`. Closes
+  - Added [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual] and
+    [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
 

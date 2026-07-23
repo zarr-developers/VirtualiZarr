@@ -282,13 +282,13 @@ class TestManifestStore:
         marr = manifest_array()
         group = ManifestGroup(arrays={"foo": marr})
         store = ManifestStore(group)
-        assert store.nbytes == group.nbytes == marr.nbytes_virtual
+        assert store.nbytes_virtual == group.nbytes_virtual == marr.nbytes_virtual
 
     def test_nbytes_matches_fully_virtual_dataset(self, manifest_array):
         # a fully-virtual store matches the dataset's virtual-only vz.nbytes
         marr = manifest_array(dimension_names=["x", "y"])
         store = ManifestStore(ManifestGroup(arrays={"foo": marr}))
-        assert store.nbytes == store.to_virtual_dataset().vz.nbytes
+        assert store.nbytes_virtual == store.to_virtual_dataset().vz.nbytes
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

@@ -66,7 +66,7 @@ class ManifestGroup(
         return self._metadata
 
     @property
-    def nbytes(self) -> int:
+    def nbytes_virtual(self) -> int:
         """
         Size required to hold these references in memory in bytes.
 
@@ -74,7 +74,7 @@ class ManifestGroup(
         this is only the size of the pointers to the chunk locations.
         """
         return sum(arr.nbytes_virtual for arr in self.arrays.values()) + sum(
-            g.nbytes for g in self.groups.values()
+            g.nbytes_virtual for g in self.groups.values()
         )
 
     @property
