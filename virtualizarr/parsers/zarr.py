@@ -459,7 +459,19 @@ async def build_1d_chunk_mapping(
         for suffix in zarr_format.metadata_key_names:
             is_metadata |= np.strings.endswith(paths_np, suffix)
         is_directory = np.strings.endswith(paths_np, "/")
-        chunk_keys_mask = ~(is_metadata | is_directory)
+        # Zero-byte "directory marker" objects are common on S3 (created by
+        # e.g. `aws s3 sync`, `s3fs`, or `boto3.put_object(Key=prefix + "/")`)
+        # and are keyed exactly as ``array_chunks_prefix`` (with a trailing
+        # slash). obstore's client-side path parsing strips that trailing
+        # slash before the listed path reaches here, so such a marker is
+        # indistinguishable from any other key ending in "/" (``is_directory``
+        # above) *except* that it's one character shorter than the prefix
+        # instead of longer -- it can never actually be a valid nested chunk
+        # key, since only genuine descendants literally start with the full
+        # prefix. Filtering on that catches the marker regardless of whether
+        # obstore has already stripped its trailing slash.
+        is_not_nested = ~np.strings.startswith(paths_np, array_chunks_prefix)
+        chunk_keys_mask = ~(is_metadata | is_directory | is_not_nested)
 
         path_batches.append(paths_np[chunk_keys_mask])
         size_batches.append(sizes_np[chunk_keys_mask])

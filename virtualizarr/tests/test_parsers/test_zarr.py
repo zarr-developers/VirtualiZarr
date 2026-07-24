@@ -331,6 +331,75 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)
 
 
+def test_build_chunk_manifest_ignores_directory_marker_object():
+    """A zero-byte "directory marker" object at the array's own chunks prefix
+    (e.g. created by `aws s3 sync`, `s3fs`, or `boto3.put_object(Key=prefix +
+    "/")`) must not be mistaken for a chunk key.
+
+    On S3 such a marker's key literally ends in "/" (confirmed via a raw
+    ListObjectsV2 call against a public bucket carrying one), but obstore's
+    client-side path parsing strips that trailing slash before the listed
+    path reaches Python -- so by the time ``build_1d_chunk_mapping`` sees it,
+    it's indistinguishable from a prefix one character shorter rather than a
+    nested chunk key. No in-memory or local obstore backend reproduces that
+    S3-specific slash-stripping quirk (writes and lists are both normalized
+    the same way for those backends), so this test fabricates the listing
+    response directly to pin down the exact shape a real S3 store produces.
+    Regression test for #1052.
+    """
+
+    class _FakeColumn:
+        def __init__(self, values: list) -> None:
+            self._values = values
+
+        def to_numpy(self) -> np.ndarray:
+            return np.array(self._values)
+
+    class _FakeBatch:
+        def __init__(self, paths: list[str], sizes: list[int]) -> None:
+            self._columns = {"path": paths, "size": sizes}
+
+        def column(self, name: str) -> _FakeColumn:
+            return _FakeColumn(self._columns[name])
+
+    class _FakeObstoreStore:
+        """Simulates the exact listing shape a real S3 store returns for a
+        directory containing both a zero-byte marker object and a real
+        chunk: the marker's path already has its trailing slash stripped."""
+
+        def list_async(self, prefix: str, return_arrow: bool = True):
+            async def _stream():
+                yield _FakeBatch(
+                    paths=["arr/c", "arr/c/0.0"],  # "arr/c" is the marker
+                    sizes=[0, 4],
+                )
+
+            return _stream()
+
+    metadata = metadata_as_v3(
+        zarr.create(
+            shape=(10, 10),
+            chunks=(5, 5),
+            dtype="int8",
+            store=zarr.storage.MemoryStore(),
+            zarr_format=3,
+        ).metadata
+    )
+
+    manifest = asyncio.run(
+        build_chunk_manifest(
+            obs_store=_FakeObstoreStore(),
+            array_path="arr",
+            store_base_uri="test://path",
+            metadata=metadata,
+            on_disk_zarr_format=ZarrFormat.V3,
+            on_disk_separator=".",
+        )
+    )
+    assert manifest.shape_chunk_grid == (2, 2)
+    assert manifest.dict().keys() == {"0.0"}
+
+
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
