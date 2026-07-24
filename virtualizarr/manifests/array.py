@@ -144,8 +144,11 @@ class ManifestArray:
             return NotImplemented
 
         # Note: this allows subclasses that don't override
-        # __array_function__ to handle ManifestArray objects
-        if not all(issubclass(t, ManifestArray) for t in types):
+        # __array_function__ to handle ManifestArray objects. Plain ndarrays are
+        # also permitted among the argument types because some handled functions
+        # legitimately mix them with ManifestArrays — e.g. np.where, whose boolean
+        # condition arrives as an ndarray during xarray's reindex/alignment fill.
+        if not all(issubclass(t, (ManifestArray, np.ndarray)) for t in types):
             return NotImplemented
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
@@ -332,6 +335,71 @@ class ManifestArray:
             shape=determine_chunk_grid_shape(self.shape, self.metadata.chunks),
         )
         return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
+
+    def _reindex_axis(
+        self, axis: int, chunk_map: list[int | None], new_size: int
+    ) -> "ManifestArray":
+        """
+        Return a new ManifestArray with the chunk grid along ``axis`` remapped.
+
+        Each entry of ``chunk_map`` is the source chunk index to copy into that
+        target chunk slot, or ``None`` for a missing (null-path) chunk that reads
+        back as ``fill_value``. ``new_size`` is the new length of ``axis`` in
+        elements; the chunk size is unchanged.
+        """
+        from virtualizarr.manifests.manifest import (
+            MISSING_CHUNK_PATH,
+            ChunkManifest,
+        )
+        from virtualizarr.manifests.utils import copy_and_replace_metadata
+
+        manifest = self.manifest
+        src_paths = manifest._paths
+        src_offsets = manifest._offsets
+        src_lengths = manifest._lengths
+
+        new_grid_shape = list(src_paths.shape)
+        new_grid_shape[axis] = len(chunk_map)
+
+        new_paths = np.full(
+            new_grid_shape, MISSING_CHUNK_PATH, dtype=np.dtypes.StringDType()
+        )
+        new_offsets = np.zeros(new_grid_shape, dtype=np.uint64)
+        new_lengths = np.zeros(new_grid_shape, dtype=np.uint64)
+
+        new_inlined: dict[tuple[int, ...], bytes] = {}
+        for new_idx, src_chunk in enumerate(chunk_map):
+            if src_chunk is None:
+                continue  # leave this slab as missing/null
+            src_slice: list[Any] = [slice(None)] * src_paths.ndim
+            src_slice[axis] = src_chunk
+            dst_slice: list[Any] = [slice(None)] * src_paths.ndim
+            dst_slice[axis] = new_idx
+            new_paths[tuple(dst_slice)] = src_paths[tuple(src_slice)]
+            new_offsets[tuple(dst_slice)] = src_offsets[tuple(src_slice)]
+            new_lengths[tuple(dst_slice)] = src_lengths[tuple(src_slice)]
+            # re-key any inlined chunks that lived in this source slab
+            for key, data in manifest._inlined.items():
+                if key[axis] == src_chunk:
+                    shifted = list(key)
+                    shifted[axis] = new_idx
+                    new_inlined[tuple(shifted)] = data
+
+        new_manifest = ChunkManifest.from_arrays(
+            paths=new_paths,
+            offsets=new_offsets,
+            lengths=new_lengths,
+            validate_paths=False,
+            inlined=new_inlined if new_inlined else None,
+        )
+
+        new_shape = list(self.shape)
+        new_shape[axis] = new_size
+        new_metadata = copy_and_replace_metadata(
+            old_metadata=self.metadata, new_shape=new_shape
+        )
+
+        return ManifestArray(chunkmanifest=new_manifest, metadata=new_metadata)
 
     def to_virtual_variable(self) -> xr.Variable:
         """

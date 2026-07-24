@@ -15,6 +15,10 @@ This notebook accompanies the [_Old format, no problem!: Cloud-optimizing the GO
 
 1. [Ingesting the GOES-16 archive](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes-16-ingest.ipynb) - End-to-end notebook building the virtual store from the netCDF archive.
 
+### ITS_LIVE glacier-velocity mosaic
+
+1. [Mosaicking ITS_LIVE granules into a virtual cube](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/its_live.ipynb) - Aligns granules that share a global grid but cover different regions using native xarray `concat(..., join="outer")`, stacks them along `time`, and writes the sparse virtual cube to Icechunk.
+
 ## V1 Examples
 
 !!! note
