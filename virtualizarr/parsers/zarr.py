@@ -458,7 +458,9 @@ async def build_1d_chunk_mapping(
         is_metadata = np.zeros(len(paths_np), dtype=bool)
         for suffix in zarr_format.metadata_key_names:
             is_metadata |= np.strings.endswith(paths_np, suffix)
-        is_directory = np.strings.endswith(paths_np, "/")
+        is_directory = np.strings.endswith(paths_np, "/") | (
+            (sizes_np == 0) & (paths_np == array_chunks_prefix.rstrip("/"))
+        )
         chunk_keys_mask = ~(is_metadata | is_directory)
 
         path_batches.append(paths_np[chunk_keys_mask])

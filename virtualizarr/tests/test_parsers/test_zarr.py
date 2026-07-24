@@ -331,6 +331,44 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)
 
 
+def test_build_chunk_manifest_skips_normalized_directory_marker():
+    """Zero-byte directory markers remain non-chunks after path normalization."""
+    from arro3.core import Array, RecordBatch
+
+    class NormalizedDirectoryMarkerStore:
+        async def list_async(self, *, prefix, return_arrow):
+            assert prefix == "x/"
+            assert return_arrow is True
+            paths = Array.from_numpy(np.array(["x/0", "x"], dtype="U3"))
+            sizes = Array.from_numpy(np.array([32, 0], dtype=np.uint64))
+            yield RecordBatch.from_arrays([paths, sizes], names=["path", "size"])
+
+    metadata_store = ObjectStore(store=ObsMemoryStore())
+    zarr_array = zarr.create(
+        shape=(4,),
+        chunks=(4,),
+        dtype="int64",
+        store=metadata_store,
+        zarr_format=2,
+    )
+    metadata = metadata_as_v3(zarr_array.metadata)
+
+    manifest = asyncio.run(
+        build_chunk_manifest(
+            obs_store=NormalizedDirectoryMarkerStore(),
+            array_path="x",
+            store_base_uri="memory://bucket/store.zarr",
+            metadata=metadata,
+            on_disk_zarr_format=ZarrFormat.V2,
+            on_disk_separator=".",
+        )
+    )
+
+    chunk_dict = manifest.dict()
+    assert set(chunk_dict) == {"0"}
+    assert next(iter(chunk_dict.values()))["length"] == 32
+
+
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
