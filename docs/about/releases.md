@@ -8,6 +8,18 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  ### Bug fixes
+
+  - Fix `AttributeError: 'str' object has no attribute 'value'` when writing Kerchunk references with
+    zarr >= 3.3.0. Zarr 3.3.0 deprecated its string-valued codec enums, so `BytesCodec.endian` is now a
+    plain string rather than an `Endian` member; `convert_v3_to_v2_metadata` now handles both forms.
+  - Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
+    containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose
+    `FP_*` fire-pixel variables all have shape `(0,)`. `kerchunk.hdf4` uses such a variable's dimensions
+    as its chunk shape, and zarr now (correctly) requires chunk edges to be positive, so the parser
+    coerces a zero-length chunk edge to 1 — matching what the Kerchunk reference translator already does
+    when reading those references back.
+
 
 ## v2.7.1 (15th July 2026)
 

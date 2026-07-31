@@ -96,6 +96,17 @@ def determine_chunk_grid_shape(
     return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
 
 
+def _codec_endianness(codec: ArrayBytesCodec) -> str | None:
+    """
+    Return a codec's endianness as ``"little"``, ``"big"``, or ``None``.
+
+    zarr < 3.3 types ``BytesCodec.endian`` as an ``Endian`` enum, whereas
+    zarr >= 3.3 types it as a plain string, so unwrap the enum when present.
+    """
+    endian = getattr(codec, "endian", None)
+    return getattr(endian, "value", endian)
+
+
 def convert_v3_to_v2_metadata(
     v3_metadata: ArrayV3Metadata, fill_value: Any = None
 ) -> ArrayV2Metadata:
@@ -125,9 +136,7 @@ def convert_v3_to_v2_metadata(
     # This logic is based on the (default) Bytes codec's endian property,
     # but other codec pipelines could store endianness elsewhere.
     big_endian = any(
-        isinstance(codec, ArrayBytesCodec)
-        and getattr(codec, "endian", None) is not None
-        and codec.endian.value == "big"  # type: ignore[attr-defined]
+        isinstance(codec, ArrayBytesCodec) and _codec_endianness(codec) == "big"
         for codec in v3_metadata.codecs
     )
     if big_endian:

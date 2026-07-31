@@ -1,11 +1,52 @@
-from collections.abc import Iterable
+import threading
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers.kerchunk.translator import manifestgroup_from_kerchunk_refs
 from virtualizarr.types.kerchunk import KerchunkStoreRefs
+
+# Serializes the monkeypatch in _positive_chunk_edges, which mutates zarr.Group
+# for the duration of a single kerchunk translation.
+_patch_lock = threading.Lock()
+
+
+@contextmanager
+def _positive_chunk_edges() -> Iterator[None]:
+    """
+    Clamp zero-sized chunk edges requested by `kerchunk.hdf4` to 1.
+
+    HDF4 granules routinely hold zero-length variables — a MODIS fire-mask granule
+    that detected no fires stores every one of its 27 `FP_*` fire-pixel variables
+    with shape `(0,)`. `HDF4ToZarr.translate` passes those zero-length dimensions
+    through as the chunk shape (`chunks=v.get("chunks", v["dims"])`), which zarr
+    rejects from 3.3.0 onwards because a chunk edge must be positive. A zero-length
+    array holds no chunks whatever its chunk shape, so coercing the edge to 1 is
+    lossless, and it matches what `from_kerchunk_refs` already does when reading
+    such references back.
+
+    TODO: Remove once kerchunk clamps the chunk shape itself.
+    """
+    import zarr
+
+    with _patch_lock:
+        original = zarr.Group.require_array
+
+        def require_array(self: zarr.Group, name: str, **kwargs: Any) -> Any:
+            chunks = kwargs.get("chunks")
+            if isinstance(chunks, Iterable):
+                kwargs["chunks"] = tuple(edge or 1 for edge in chunks)
+            return original(self, name, **kwargs)
+
+        zarr.Group.require_array = require_array  # type: ignore[method-assign]
+        try:
+            yield
+        finally:
+            zarr.Group.require_array = original  # type: ignore[method-assign]
 
 
 class HDF4Parser:
@@ -55,9 +96,10 @@ class HDF4Parser:
         from kerchunk.hdf4 import HDF4ToZarr
 
         # handle inconsistency in kerchunk, see GH issue https://github.com/zarr-developers/VirtualiZarr/issues/160
-        refs = KerchunkStoreRefs(
-            {"refs": HDF4ToZarr(url, **self.reader_options).translate()}
-        )
+        with _positive_chunk_edges():
+            refs = KerchunkStoreRefs(
+                {"refs": HDF4ToZarr(url, **self.reader_options).translate()}
+            )
 
         manifestgroup = manifestgroup_from_kerchunk_refs(
             refs,

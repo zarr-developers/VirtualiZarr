@@ -42,6 +42,19 @@ def test_hdf4_skip_variables() -> None:
 
 
 @requires_kerchunk
+def test_hdf4_zero_length_variables() -> None:
+    """This granule detected no fires, so every `FP_*` fire-pixel variable has
+    shape (0,). Kerchunk reports a chunk edge of 0 for them, which Zarr rejects,
+    so the parser coerces the edge to 1 without altering the (empty) shape."""
+    registry, url = _registry_and_url()
+    store = HDF4Parser()(url, registry)
+    marr = store._group.arrays["FP_line"]
+    assert marr.shape == (0,)
+    assert marr.metadata.chunks == (1,)
+    assert marr.manifest.shape_chunk_grid == (0,)
+
+
+@requires_kerchunk
 def test_hdf4_chunk_decodes_via_codec() -> None:
     """Read the "fire mask" array back through its byte references and zlib
     codec, asserting the exact max value the kerchunk test suite checks for."""
