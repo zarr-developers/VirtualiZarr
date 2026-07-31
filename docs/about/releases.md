@@ -8,6 +8,13 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  ### Bug fixes
+
+  - Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
+    array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
+    variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
+    `iter_refs()` had the same `np.nditer` problem and now yields nothing.
+
 
 ## v2.7.1 (15th July 2026)
 
