@@ -8,6 +8,13 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  ### Bug fixes
+
+  - Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
+    `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
+    `"."` for V2 instead of reading the array's `dimension_separator`.
+    By [Tom Nicholas](https://github.com/TomNicholas).
+
 
 ## v2.7.1 (15th July 2026)
 

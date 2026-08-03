@@ -243,7 +243,7 @@ async def construct_manifest_array(
     on_disk_separator: ChunkKeySeparator = (
         zarr_array.metadata.chunk_key_encoding.separator
         if on_disk_zarr_format == ZarrFormat.V3
-        else "."
+        else cast(ArrayV2Metadata, zarr_array.metadata).dimension_separator
     )
 
     obs_store = cast(ObjectStore, zarr_array.store).store
