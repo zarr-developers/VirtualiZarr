@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import math
-from collections.abc import Coroutine, Iterable
+from collections.abc import Coroutine, Iterable, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
@@ -225,16 +225,22 @@ async def construct_manifest_group(
     )
 
 
-async def construct_manifest_array(
-    zarr_array: zarr.AsyncArray[Any], path: str
-) -> ManifestArray:
-    """Construct a ManifestArray from a zarr array."""
-    array_v3_metadata = metadata_as_v3(zarr_array.metadata)
+def parse_array_layout(
+    zarr_array: zarr.AsyncArray[Any],
+) -> tuple[ArrayV3Metadata, ZarrFormat, ChunkKeySeparator, tuple[int, ...]]:
+    """Extract what any parser needs to build a ManifestArray from an opened zarr array.
 
-    if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGridMetadata):
+    Returns
+    -------
+    Tuple of (normalized V3 metadata, on-disk zarr format, on-disk chunk key separator,
+    chunk grid shape).
+    """
+    metadata = metadata_as_v3(zarr_array.metadata)
+
+    if not isinstance(metadata.chunk_grid, RegularChunkGridMetadata):
         raise NotImplementedError(
             f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
-            f"uses {type(array_v3_metadata.chunk_grid).__name__}."
+            f"uses {type(metadata.chunk_grid).__name__}."
         )
 
     # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
@@ -244,6 +250,80 @@ async def construct_manifest_array(
         zarr_array.metadata.chunk_key_encoding.separator
         if on_disk_zarr_format == ZarrFormat.V3
         else cast(ArrayV2Metadata, zarr_array.metadata).dimension_separator
+    )
+
+    # For sharded arrays, chunk_grid.chunk_shape is the shard shape (not the inner
+    # chunk shape, which lives inside the ShardingCodec config). So this grid describes
+    # the number of shard files on disk, which is exactly what we want for the manifest.
+    chunk_grid_shape = determine_chunk_grid_shape(
+        metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
+    )
+
+    return metadata, on_disk_zarr_format, on_disk_separator, chunk_grid_shape
+
+
+def chunk_entries_to_manifest(
+    chunk_keys: np.ndarray | Sequence[str],
+    paths: np.ndarray | str,
+    offsets: np.ndarray | Sequence[int],
+    lengths: np.ndarray | Sequence[int],
+    *,
+    separator: ChunkKeySeparator,
+    chunk_grid_shape: tuple[int, ...],
+) -> ChunkManifest:
+    """Scatter sparse chunk entries into a dense ChunkManifest.
+
+    Chunks absent from ``chunk_keys`` are left uninitialized in the manifest, preserving
+    sparsity (zarr returns the fill_value for those regions when the array is read).
+
+    Parameters
+    ----------
+    chunk_keys
+        Separator-delimited grid coordinates, one per initialized chunk (e.g. "0.0.0").
+    paths
+        Full URI per chunk, or a single URI shared by every chunk.
+    offsets
+        Byte offset within the file per chunk.
+    lengths
+        Byte length per chunk.
+    separator
+        The chunk key separator used in ``chunk_keys`` (e.g. ``"."`` or ``"/"``).
+    chunk_grid_shape
+        Shape of the array's chunk grid.
+    """
+    if len(chunk_keys) == 0:
+        return ChunkManifest({}, shape=chunk_grid_shape)
+
+    # split "0.0.0" style keys into per-dimension integer coords
+    # TODO replace np.char.split with np.strings.split once it exists
+    split_keys = np.char.split(np.asarray(chunk_keys), sep=separator)
+    coords = np.array(
+        [[int(c) for c in key] for key in split_keys], dtype=np.int64
+    ).T  # shape: (ndim, nchunks)
+    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
+
+    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
+    total_size = math.prod(chunk_grid_shape)
+    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
+    dense_offsets = np.zeros(total_size, dtype=np.uint64)
+    dense_lengths = np.zeros(total_size, dtype=np.uint64)
+    dense_paths[flat_positions] = paths
+    dense_offsets[flat_positions] = offsets
+    dense_lengths[flat_positions] = lengths
+
+    return ChunkManifest.from_arrays(
+        paths=dense_paths.reshape(chunk_grid_shape),
+        offsets=dense_offsets.reshape(chunk_grid_shape),
+        lengths=dense_lengths.reshape(chunk_grid_shape),
+    )
+
+
+async def construct_manifest_array(
+    zarr_array: zarr.AsyncArray[Any], path: str
+) -> ManifestArray:
+    """Construct a ManifestArray from a zarr array."""
+    array_v3_metadata, on_disk_zarr_format, on_disk_separator, _ = parse_array_layout(
+        zarr_array
     )
 
     obs_store = cast(ObjectStore, zarr_array.store).store
@@ -353,7 +433,6 @@ async def build_chunk_manifest(
     chunk_grid_shape = determine_chunk_grid_shape(
         metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
     )
-    total_size = math.prod(chunk_grid_shape)
 
     # Handle scalar arrays
     if metadata.shape == ():
@@ -394,30 +473,13 @@ async def build_chunk_manifest(
         len(metadata.shape),
     )
 
-    if len(stripped_keys) == 0:
-        # No initialized chunks found, so manifest is empty, and we can exit early.
-        return ChunkManifest({}, shape=chunk_grid_shape)
-
-    # split "0.0.0" style keys into per-dimension integer coords
-    # TODO replace np.char.split with np.strings.split once it exists
-    split_keys = np.char.split(stripped_keys, sep=on_disk_separator)
-    coords = np.array(
-        [[int(c) for c in key] for key in split_keys], dtype=np.int64
-    ).T  # shape: (ndim, nchunks)
-    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
-
-    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
-    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
-    dense_lengths = np.zeros(total_size, dtype=np.uint64)
-    dense_offsets = np.zeros(total_size, dtype=np.uint64)
-
-    dense_paths[flat_positions] = full_paths
-    dense_lengths[flat_positions] = all_lengths
-
-    return ChunkManifest.from_arrays(
-        paths=dense_paths.reshape(chunk_grid_shape),
-        offsets=dense_offsets.reshape(chunk_grid_shape),
-        lengths=dense_lengths.reshape(chunk_grid_shape),
+    return chunk_entries_to_manifest(
+        stripped_keys,
+        full_paths,
+        np.zeros(len(stripped_keys), dtype=np.uint64),
+        all_lengths,
+        separator=on_disk_separator,
+        chunk_grid_shape=chunk_grid_shape,
     )
 
 

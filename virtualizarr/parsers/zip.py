@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import math
 import struct
 from collections.abc import AsyncIterator, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-import numpy as np
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.abc.store import (
     ByteRequest,
@@ -18,7 +16,6 @@ from zarr.abc.store import (
     SuffixByteRequest,
 )
 from zarr.core.buffer import Buffer, BufferPrototype
-from zarr.core.metadata import ArrayV2Metadata
 
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -26,17 +23,14 @@ from virtualizarr.manifests import (
     ManifestStore,
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
-from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.parsers.utils import construct_manifest_group_tree
 from virtualizarr.parsers.zarr import (
     ObstoreStore,
-    RegularChunkGridMetadata,
-    ZarrFormat,
     _run_async,
+    chunk_entries_to_manifest,
     join_url,
-    metadata_as_v3,
+    parse_array_layout,
 )
-from virtualizarr.utils import determine_chunk_grid_shape
 
 ZIP_METHOD_STORED = 0
 
@@ -347,24 +341,8 @@ async def _construct_manifest_array(
     index: Mapping[str, ZipEntry],
 ) -> ManifestArray:
     """Build a ManifestArray for one array, sourcing chunk locations from the zip index."""
-    metadata = metadata_as_v3(zarr_array.metadata)
-
-    if not isinstance(metadata.chunk_grid, RegularChunkGridMetadata):
-        raise NotImplementedError(
-            f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
-            f"uses {type(metadata.chunk_grid).__name__}."
-        )
-
-    on_disk_format = ZarrFormat(zarr_array.metadata.zarr_format)
-    separator: ChunkKeySeparator = (
-        zarr_array.metadata.chunk_key_encoding.separator
-        if on_disk_format == ZarrFormat.V3
-        else cast(ArrayV2Metadata, zarr_array.metadata).dimension_separator
-    )
-
-    chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape,
-        cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape,
+    metadata, on_disk_format, separator, chunk_grid_shape = parse_array_layout(
+        zarr_array
     )
 
     array_path = zarr_array.path
@@ -403,29 +381,13 @@ async def _construct_manifest_array(
         offsets.append(entry.data_offset)
         lengths.append(entry.compressed_length)
 
-    if not chunk_keys:
-        return ManifestArray(
-            metadata=metadata, chunkmanifest=ChunkManifest({}, shape=chunk_grid_shape)
-        )
-
-    coords = np.array(
-        [[int(c) for c in key.split(separator)] for key in chunk_keys],
-        dtype=np.int64,
-    ).T  # shape: (ndim, nchunks)
-    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
-
-    total_size = math.prod(chunk_grid_shape)
-    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
-    dense_offsets = np.zeros(total_size, dtype=np.uint64)
-    dense_lengths = np.zeros(total_size, dtype=np.uint64)
-    dense_paths[flat_positions] = zip_uri
-    dense_offsets[flat_positions] = offsets
-    dense_lengths[flat_positions] = lengths
-
-    chunk_manifest = ChunkManifest.from_arrays(
-        paths=dense_paths.reshape(chunk_grid_shape),
-        offsets=dense_offsets.reshape(chunk_grid_shape),
-        lengths=dense_lengths.reshape(chunk_grid_shape),
+    chunk_manifest = chunk_entries_to_manifest(
+        chunk_keys,
+        zip_uri,
+        offsets,
+        lengths,
+        separator=separator,
+        chunk_grid_shape=chunk_grid_shape,
     )
     return ManifestArray(metadata=metadata, chunkmanifest=chunk_manifest)
 
