@@ -18,6 +18,26 @@ Some reasons are:
 - Chunk sizes matter, and it's generally good to force data providers to think up-front about about what chunk sizes would be optimal for expected user queries.
 - For static datasets, native Zarr stores scale effortlessly to arbitrary numbers of chunks today, without having to even think about things like [manifest splitting](https://icechunk.io/en/latest/performance/#splitting-manifests).
 
+### Can my file format be virtualized?
+
+<!-- TODO: accompanying text to follow. -->
+
+```python exec="true" html="true"
+import pathlib
+import sys
+
+root = pathlib.Path.cwd()
+for candidate in [root, *root.parents]:
+    diagrams = candidate / "docs" / "_diagrams"
+    if diagrams.is_dir():
+        sys.path.insert(0, str(diagrams))
+        break
+
+from format_tiers import render
+
+print(render())
+```
+
 ### Can my specific data be virtualized?
 
 Depends on some details of your data.
