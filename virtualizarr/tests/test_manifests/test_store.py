@@ -278,6 +278,18 @@ class TestManifestStore:
         assert not local_store.supports_partial_writes
         assert not local_store.supports_consolidated_metadata
 
+    def test_nbytes(self, manifest_array):
+        marr = manifest_array()
+        group = ManifestGroup(arrays={"foo": marr})
+        store = ManifestStore(group)
+        assert store.nbytes_virtual == group.nbytes_virtual == marr.nbytes_virtual
+
+    def test_nbytes_matches_fully_virtual_dataset(self, manifest_array):
+        # a fully-virtual store matches the dataset's virtual-only vz.nbytes
+        marr = manifest_array(dimension_names=["x", "y"])
+        store = ManifestStore(ManifestGroup(arrays={"foo": marr}))
+        assert store.nbytes_virtual == store.to_virtual_dataset().vz.nbytes
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",

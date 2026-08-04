@@ -1,5 +1,14 @@
 # Release notes
 
+ ## v2.7.2 (unreleased)
+
+  ### New Features
+
+  - Added [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual] and
+    [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
+    [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
+
+
 ## v2.7.1 (15th July 2026)
 
 Adds a `nrefs` accessor for counting virtual chunk references, a `mode` parameter on `vz.to_icechunk` for controlling how a pre-existing group is handled, and an `HDF4Parser` for reading HDF4 files. Also fixes several scalar-array and Kerchunk-reference edge cases in the `ZarrParser`, `IcechunkParser`, and Kerchunk translator (including FITS structured dtypes), and fixes writing a virtual `DataTree` with `region`/`append_dim` into existing groups.
@@ -17,6 +26,7 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 - Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
   By [David Stuebe](https://github.com/emfdavid).
 - Fix the bytes codec recording the wrong `endian` for a **big-endian structured dtype**, which made virtual references to big-endian record data (e.g. a FITS `BinTableHDU`) decode to silently wrong values. The byte order was read from `dtype.byteorder`, which numpy reports as `"|"` for any structured dtype whatever its fields hold, so such arrays fell through to the little-endian default; it is now read from the fields, looking through subarray and nested-struct fields and ignoring fields that carry no byte order (single-byte numbers, strings). A structured dtype whose fields mix byte orders now raises, since a Zarr V3 array has a single bytes codec and cannot express it.
+- Read the bytes codec's `endian` robustly across zarr versions when converting v3 metadata to v2. zarr's `BytesCodec.endian` was an `Endian` enum through 3.2.x and is a plain `str` on zarr's `main` (following zarr's enum-to-string-literal deprecation, zarr-developers/zarr-python#3968); `convert_v3_to_v2_metadata` read `endian.value`, which raises `AttributeError` on the plain string, so writing kerchunk references for big-endian data would break against newer zarr. The endianness is now normalized to a string either way.
   By [David Stuebe](https://github.com/emfdavid).
 
 - Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
