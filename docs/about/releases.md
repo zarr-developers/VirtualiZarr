@@ -10,6 +10,9 @@
 
   ### Bug fixes
 
+  - Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
+    `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
+    `"."` for V2 instead of reading the array's `dimension_separator`.
   - Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
     array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
     variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;

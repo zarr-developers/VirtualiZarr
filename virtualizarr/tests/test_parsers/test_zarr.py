@@ -636,3 +636,37 @@ def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
         manifeststore, engine="zarr", consolidated=False, zarr_format=3
     ) as actual:
         xr.testing.assert_identical(actual, ds)
+
+
+@requires_v2_migration
+def test_v2_slash_dimension_separator(tmp_path, local_registry):
+    """Zarr V2 stores may use dimension_separator="/", giving chunk keys like "data/0/0"."""
+    store_path = tmp_path / "slash_sep.zarr"
+    group = zarr.create_group(str(store_path), zarr_format=2)
+    arr = group.create_array(
+        "data",
+        shape=(4, 6),
+        chunks=(2, 3),
+        dtype="float64",
+        chunk_key_encoding={"name": "v2", "separator": "/"},
+        attributes={"_ARRAY_DIMENSIONS": ["x", "y"]},
+    )
+    expected = np.arange(24, dtype="float64").reshape(4, 6)
+    arr[:] = expected
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(),
+        loadable_variables=[],
+    ) as vds:
+        manifest = vds["data"].data.manifest.dict()
+        assert set(manifest.keys()) == {"0.0", "0.1", "1.0", "1.1"}
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(),
+        loadable_variables=["data"],
+    ) as vds:
+        np.testing.assert_array_equal(vds["data"].values, expected)
