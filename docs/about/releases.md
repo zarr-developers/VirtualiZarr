@@ -8,6 +8,22 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  ### Bug fixes
+
+  - Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
+    array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
+    variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
+    `iter_refs()` had the same `np.nditer` problem and now yields nothing.
+  - Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
+    containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose `FP_*`
+    fire-pixel variables all have shape `(0,)`. `HDF4Parser` no longer asks `kerchunk.hdf4` to round-trip its
+    findings through a Zarr v2 group, building [ManifestArrays][virtualizarr.manifests.ManifestArray]
+    directly from kerchunk's decoded HDF4 tags instead. All of the HDF4 decoding still comes from kerchunk.
+    By [Tom Nicholas](https://github.com/TomNicholas).
+  - `HDF4Parser` no longer leaks a variable's chunk shape into its attributes as a spurious `chunks`
+    attribute.
+    By [Tom Nicholas](https://github.com/TomNicholas).
+
 
 ## v2.7.1 (15th July 2026)
 
@@ -24,6 +40,8 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 
 ### Bug fixes
 - Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
+  By [David Stuebe](https://github.com/emfdavid).
+- Read the bytes codec's `endian` robustly across zarr versions when converting v3 metadata to v2. zarr's `BytesCodec.endian` was an `Endian` enum through 3.2.x and is a plain `str` on zarr's `main` (following zarr's enum-to-string-literal deprecation, zarr-developers/zarr-python#3968); `convert_v3_to_v2_metadata` read `endian.value`, which raises `AttributeError` on the plain string, so writing kerchunk references for big-endian data would break against newer zarr. The endianness is now normalized to a string either way.
   By [David Stuebe](https://github.com/emfdavid).
 
 - Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
