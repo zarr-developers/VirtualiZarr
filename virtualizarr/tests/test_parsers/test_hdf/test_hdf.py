@@ -143,11 +143,43 @@ class TestDatasetToManifestArray:
         metadata = manifest_store._group.arrays["data"].metadata
         assert "_FillValue" in metadata.attributes
 
+    @pytest.mark.filterwarnings("ignore:.*variable-length string dataset.*:UserWarning")
     def test_string_dtype_fill_value(self, string_dtype_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_dtype_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert isinstance(metadata.fill_value, (str, bytes, np.bytes_))
 
+    def test_fixed_length_bytes_roundtrip(self, fixed_length_bytes_hdf5_url):
+        with (
+            manifest_store_from_hdf_url(fixed_length_bytes_hdf5_url) as ms,
+            xr.open_zarr(ms, zarr_format=3, consolidated=False).load() as ds,
+        ):
+            np.testing.assert_array_equal(
+                ds["data"].to_numpy(), np.array([b"hello", b"world"], dtype="S10")
+            )
+
+    def test_fixed_length_bytes_fill_value_preserved(
+        self, non_utf8_fill_value_hdf5_url
+    ):
+        manifest_store = manifest_store_from_hdf_url(non_utf8_fill_value_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert metadata.fill_value == b"\xff\xfe\xff\xfe\xff"
+
+    def test_variable_length_string_warns_on_parse(self, vlen_string_hdf5_url):
+        with pytest.warns(UserWarning, match="variable-length string"):
+            manifest_store_from_hdf_url(vlen_string_hdf5_url)
+
+    def test_ascii_variable_length_string_warns_on_parse(
+        self, ascii_vlen_string_hdf5_url
+    ):
+        # an ascii-cset vlen string is still a vlen string, so it should warn like
+        # the utf-8 case rather than fail the whole file as an unsupported object dtype
+        with pytest.warns(UserWarning, match="variable-length string"):
+            manifest_store = manifest_store_from_hdf_url(ascii_vlen_string_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert metadata.data_type.to_native_dtype() == np.dtypes.StringDType()
+
+    @pytest.mark.filterwarnings("ignore:.*variable-length string dataset.*:UserWarning")
     def test_string_dtype_cf_fill_value(self, string_dtype_with_fillvalue_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(
             string_dtype_with_fillvalue_hdf5_url

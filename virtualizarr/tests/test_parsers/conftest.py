@@ -511,6 +511,55 @@ def string_dtype_hdf5_url(tmp_path: Path, request) -> str:
 
 
 @pytest.fixture
+def fixed_length_bytes_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "fixed_length_bytes.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=np.array([b"hello", b"world"], dtype="S10"))
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def non_utf8_fill_value_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "non_utf8_fill_value.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello"], dtype="S5"),
+            fillvalue=b"\xff\xfe\xff\xfe\xff",
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def vlen_string_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "vlen_string.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def ascii_vlen_string_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "ascii_vlen_string.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello", b"world"], dtype=h5py.string_dtype("ascii")),
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "string_dtype_fillvalue.nc")
 

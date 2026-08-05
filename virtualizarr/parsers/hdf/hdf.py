@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -44,9 +45,13 @@ def _get_fill_value(dataset: H5Dataset):
         raw = dataset.fillvalue
     except RuntimeError:
         return np.ma.default_fill_value(dataset.dtype)
-    if isinstance(raw, bytes):
-        return raw.decode("utf-8", errors="replace")
-    elif isinstance(raw, str):
+    if h5py.check_vlen_dtype(dataset.dtype) in (str, bytes):
+        # Variable-length string fill values come back as raw bytes; the array
+        # is virtualized as VariableLengthUTF8, so the fill value must be str.
+        # Decode strictly: a fill value that is not valid UTF-8 cannot be
+        # represented in that dtype, and silently replacing bytes would corrupt it.
+        if isinstance(raw, bytes):
+            return raw.decode("utf-8")
         return raw
     elif isinstance(raw, np.generic):
         return raw.item()
@@ -82,10 +87,24 @@ def _construct_manifest_array(
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
     # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
+    # Only remap true variable-length strings: h5py.check_string_dtype also
+    # matches fixed-length ("S" kind) dtypes, which zarr handles natively and
+    # whose raw chunk bytes a vlen-utf8 codec cannot decode. Both cset flavours
+    # count — check_vlen_dtype reports `str` for a utf-8 vlen string dtype and
+    # `bytes` for an ascii one.
     # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
     # region references) that would silently be coerced to StringDType and
     # produce garbage downstream — those aren't supported yet, so fail loudly.
-    if h5py.check_string_dtype(dtype) is not None:
+    if h5py.check_vlen_dtype(dtype) in (str, bytes):
+        warnings.warn(
+            f"Variable {dataset.name!r} is an HDF5 variable-length string "
+            f"dataset. Its metadata will be virtualized, but its chunks store "
+            f"references into the HDF5 global heap rather than the string data "
+            f"itself, so reading this variable through the resulting virtual "
+            f"store will fail. Consider excluding it via drop_variables.",
+            UserWarning,
+            stacklevel=2,
+        )
         dtype = np.dtypes.StringDType()
     elif dtype.kind == "O":
         raise NotImplementedError(
