@@ -1,57 +1,103 @@
 # Release notes
 
- ## v2.7.2 (unreleased)
+## v2.7.2 (5th August 2026)
 
-  ### New Features
+Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unzipping them, lazy support for xarray's `reindex`/`align`/`concat` over virtual arrays, and `nbytes_virtual` on `ManifestGroup`/`ManifestStore`. Also fixes a batch of `ZarrParser` chunk-key bugs (custom separators, S3 directory markers, Zarr V2 `dimension_separator="/"`), zero-length arrays in `ChunkManifest` and `HDF4Parser`, string-dtype fill values in the HDF5 parser, and big-endian structured dtypes in the bytes codec. The docs gain a *"Can my file format be virtualized?"* FAQ entry, illustrated by a diagram of how file formats relate to cloud object storage.
 
-  - Added [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual] and
-    [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
-    [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
+### New Features
 
-  - Zipped Zarr stores (e.g. `.zarr.zip` files) can now be virtualized via the new
-    [ZippedZarrParser][virtualizarr.parsers.ZippedZarrParser]. The archive's central directory is read with a
-    handful of range requests and each chunk becomes a virtual reference to a byte range within
-    the archive itself, so no unzipping is ever needed — at ingestion or read time. Supports Zarr
-    V2 and V3, hierarchical groups, and remote archives on object storage; only archives with
-    uncompressed (`STORED`) members are supported, which is the default for
-    `zarr.storage.ZipStore`. Part of [#604](https://github.com/zarr-developers/VirtualiZarr/issues/604).
-    By [Tom Nicholas](https://github.com/TomNicholas).
+- Added [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual] and
+  [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
+  [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
 
-  ### Bug fixes
+- `ds.reindex`, `xr.align(join="outer")`, and `xr.concat` now work over virtual arrays and stay lazy, instead of
+  being rejected as fancy indexing. `ManifestArray` handles xarray's alignment indexer at the array-protocol
+  layer: each target chunk must be either entirely missing — emitted as a null-path manifest entry, which Zarr
+  reads back as the array's `fill_value` — or a contiguous run exactly filling one source chunk, whose reference
+  is reused. Anything else would require materializing chunks, and raises. Closes
+  [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382),
+  [#882](https://github.com/zarr-developers/VirtualiZarr/issues/882) and
+  [#883](https://github.com/zarr-developers/VirtualiZarr/issues/883).
+  By [Sean Harkins](https://github.com/sharkinsspatial).
 
-  - Fix `ZarrParser` and `ZippedZarrParser` silently returning an **empty chunk manifest** for a Zarr V3 array
-    whose `chunk_key_encoding` separator is `"."` (chunk keys like `air/c.0.0` rather than `air/c/0/0`), which
-    made such an array read back as entirely fill-value with no error raised. The chunk key prefix was
-    hardcoded to `air/c/`, which matches no such key. It is now derived from the array's separator, and
-    `ZarrParser` lists the array's own directory rather than that prefix, since `obstore` matches a list prefix
-    one whole path component at a time and so would match nothing at all for a prefix ending mid-component
-    (`air/c.`). Closes [#1069](https://github.com/zarr-developers/VirtualiZarr/issues/1069).
-    By [Tom Nicholas](https://github.com/TomNicholas).
-  - Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte
-    "directory marker" objects, which are common on S3 (created by e.g. `aws s3 sync`, `s3fs`, or
-    `boto3.put_object(Key=prefix + "/")`). `obstore` strips the trailing slash from such a key before it
-    reaches the parser, so it could not be filtered out by its trailing slash and was instead parsed as a
-    chunk coordinate. Rather than matching markers by name, only keys shaped like a genuine chunk key — a
-    literal descendant of the array's chunks prefix with exactly one coordinate component per dimension —
-    are now treated as chunks, which also covers markers for *nested* chunk subdirectories (e.g. `air/c/0/`
-    alongside the chunk `air/c/0/0`).
-    By [Sanjay Santhanam](https://github.com/Sanjays2402) and [Tom Nicholas](https://github.com/TomNicholas).
-  - Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
-    `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
-    `"."` for V2 instead of reading the array's `dimension_separator`.
-  - Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
-    array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
-    variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
-    `iter_refs()` had the same `np.nditer` problem and now yields nothing.
-  - Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
-    containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose `FP_*`
-    fire-pixel variables all have shape `(0,)`. `HDF4Parser` no longer asks `kerchunk.hdf4` to round-trip its
-    findings through a Zarr v2 group, building [ManifestArrays][virtualizarr.manifests.ManifestArray]
-    directly from kerchunk's decoded HDF4 tags instead. All of the HDF4 decoding still comes from kerchunk.
-    By [Tom Nicholas](https://github.com/TomNicholas).
-  - `HDF4Parser` no longer leaks a variable's chunk shape into its attributes as a spurious `chunks`
-    attribute.
-    By [Tom Nicholas](https://github.com/TomNicholas).
+- Zipped Zarr stores (e.g. `.zarr.zip` files) can now be virtualized via the new
+  [ZippedZarrParser][virtualizarr.parsers.ZippedZarrParser]. The archive's central directory is read with a
+  handful of range requests and each chunk becomes a virtual reference to a byte range within
+  the archive itself, so no unzipping is ever needed — at ingestion or read time. Supports Zarr
+  V2 and V3, hierarchical groups, and remote archives on object storage; only archives with
+  uncompressed (`STORED`) members are supported, which is the default for
+  `zarr.storage.ZipStore`. Part of [#604](https://github.com/zarr-developers/VirtualiZarr/issues/604).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- Fix `ZarrParser` and `ZippedZarrParser` silently returning an **empty chunk manifest** for a Zarr V3 array
+  whose `chunk_key_encoding` separator is `"."` (chunk keys like `air/c.0.0` rather than `air/c/0/0`), which
+  made such an array read back as entirely fill-value with no error raised. The chunk key prefix was
+  hardcoded to `air/c/`, which matches no such key. It is now derived from the array's separator, and
+  `ZarrParser` lists the array's own directory rather than that prefix, since `obstore` matches a list prefix
+  one whole path component at a time and so would match nothing at all for a prefix ending mid-component
+  (`air/c.`). Closes [#1069](https://github.com/zarr-developers/VirtualiZarr/issues/1069).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte
+  "directory marker" objects, which are common on S3 (created by e.g. `aws s3 sync`, `s3fs`, or
+  `boto3.put_object(Key=prefix + "/")`). `obstore` strips the trailing slash from such a key before it
+  reaches the parser, so it could not be filtered out by its trailing slash and was instead parsed as a
+  chunk coordinate. Rather than matching markers by name, only keys shaped like a genuine chunk key — a
+  literal descendant of the array's chunks prefix with exactly one coordinate component per dimension —
+  are now treated as chunks, which also covers markers for *nested* chunk subdirectories (e.g. `air/c/0/`
+  alongside the chunk `air/c/0/0`).
+  By [Sanjay Santhanam](https://github.com/Sanjays2402) and [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
+  `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
+  `"."` for V2 instead of reading the array's `dimension_separator`.
+- Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
+  array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
+  variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
+  `iter_refs()` had the same `np.nditer` problem and now yields nothing.
+- Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
+  containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose `FP_*`
+  fire-pixel variables all have shape `(0,)`. `HDF4Parser` no longer asks `kerchunk.hdf4` to round-trip its
+  findings through a Zarr v2 group, building [ManifestArrays][virtualizarr.manifests.ManifestArray]
+  directly from kerchunk's decoded HDF4 tags instead. All of the HDF4 decoding still comes from kerchunk.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `HDF4Parser` no longer leaks a variable's chunk shape into its attributes as a spurious `chunks`
+  attribute.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix the bytes codec recording the wrong `endian` for a **big-endian structured dtype**, which made virtual
+  references to big-endian record data (e.g. a FITS `BinTableHDU`) decode to silently wrong values. The byte order
+  was read from `dtype.byteorder`, which numpy reports as `"|"` for any structured dtype whatever its fields hold,
+  so such arrays fell through to the little-endian default; it is now read from the fields, looking through
+  subarray and nested-struct fields and ignoring fields that carry no byte order (single-byte numbers, strings). A
+  structured dtype whose fields mix byte orders now raises, since a Zarr V3 array has a single bytes codec and
+  cannot express it.
+  By [David Stuebe](https://github.com/emfdavid).
+- Read the bytes codec's `endian` robustly across zarr versions when converting v3 metadata to v2. zarr's
+  `BytesCodec.endian` was an `Endian` enum through 3.2.x and is a plain `str` on newer zarr (following zarr's
+  enum-to-string-literal deprecation, zarr-developers/zarr-python#3968); `convert_v3_to_v2_metadata` read
+  `endian.value`, which raises `AttributeError` on the plain string, so writing kerchunk references for
+  big-endian data would break against newer zarr. The endianness is now normalized to a string either way.
+  By [David Stuebe](https://github.com/emfdavid).
+- `HDFParser` now handles a **string-dtype fill value** — an HDF5 dataset whose `fillvalue` is `bytes` or `str`
+  previously raised rather than being virtualized. Variable-length string fill values are decoded to `str` to
+  match the `VariableLengthUTF8` dtype the array is virtualized as, while fixed-length (`S`-kind) fill values are
+  kept as raw bytes, since zarr handles that dtype natively. Closes
+  [#878](https://github.com/zarr-developers/VirtualiZarr/issues/878).
+  By [Sean Harkins](https://github.com/sharkinsspatial), [Aimee Barciauskas](https://github.com/abarciauskas-bgse)
+  and [Max Jones](https://github.com/maxrjones).
+- `HDFParser` now warns at parse time that a **variable-length string** variable cannot be read back through the
+  resulting virtual store: such a dataset's chunks store references into the HDF5 global heap rather than the
+  string data itself. Pass the variable to `drop_variables` to silence the warning. Both cset flavours of vlen
+  string are treated alike; previously an ascii-cset one failed the whole file as an unsupported object dtype.
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Added a *"Can my file format be virtualized?"* FAQ entry, illustrated by a generated diagram of how file
+  formats relate to cloud object storage — format-level suitability first, then the existing data-model
+  constraints in *"Can my specific data be virtualized?"*.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 
 ## v2.7.1 (15th July 2026)
@@ -69,9 +115,6 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 
 ### Bug fixes
 - Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
-  By [David Stuebe](https://github.com/emfdavid).
-- Fix the bytes codec recording the wrong `endian` for a **big-endian structured dtype**, which made virtual references to big-endian record data (e.g. a FITS `BinTableHDU`) decode to silently wrong values. The byte order was read from `dtype.byteorder`, which numpy reports as `"|"` for any structured dtype whatever its fields hold, so such arrays fell through to the little-endian default; it is now read from the fields, looking through subarray and nested-struct fields and ignoring fields that carry no byte order (single-byte numbers, strings). A structured dtype whose fields mix byte orders now raises, since a Zarr V3 array has a single bytes codec and cannot express it.
-- Read the bytes codec's `endian` robustly across zarr versions when converting v3 metadata to v2. zarr's `BytesCodec.endian` was an `Endian` enum through 3.2.x and is a plain `str` on zarr's `main` (following zarr's enum-to-string-literal deprecation, zarr-developers/zarr-python#3968); `convert_v3_to_v2_metadata` read `endian.value`, which raises `AttributeError` on the plain string, so writing kerchunk references for big-endian data would break against newer zarr. The endianness is now normalized to a string either way.
   By [David Stuebe](https://github.com/emfdavid).
 
 - Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
