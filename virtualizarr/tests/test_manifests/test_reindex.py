@@ -8,9 +8,6 @@ level -- ``marr[indexer]`` -- by remapping the chunk grid: a run of ``-1`` that
 covers a whole chunk becomes a null-path chunk (reads back as ``fill_value``),
 and a chunk-aligned run of real indices keeps its chunk reference. Nothing that
 would split a chunk is allowed.
-
-These tests drive that public indexing path directly rather than the private
-``chunk_map_from_indexer``/``_reindex_axis`` helpers that implement it.
 """
 
 import numpy as np
