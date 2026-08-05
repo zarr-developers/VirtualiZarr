@@ -18,9 +18,53 @@ Some reasons are:
 - Chunk sizes matter, and it's generally good to force data providers to think up-front about about what chunk sizes would be optimal for expected user queries.
 - For static datasets, native Zarr stores scale effortlessly to arbitrary numbers of chunks today, without having to even think about things like [manifest splitting](https://icechunk.io/en/latest/performance/#splitting-manifests).
 
+### Can my file format be virtualized?
+
+Not all file formats can be virtualized.
+Some have an internal layout which prevents efficient cloud-optimized access to their data.
+
+In cloud object storage, the only way to fetch data is via a GET operation, which issues a single HTTP range request.
+This creates two requirements for a file format to be "virtualizable":
+
+1. Each chunk of array data (i.e. each compressed block) must be accessible via a single targeted HTTP range request, without pulling a significant number of extraneous bytes.
+This means that the file format must have its data arranged as contiguous chunks (which may or may not be compressed), with each chunk on disk corresponding to a single chunk of a Zarr array.
+Some file formats do not co-locate related bytes next to each other.
+For example gzip compression scrambles the byte order within a file, so even though a NetCDF4 file is virtualizable (since it contains many chunks, each of which are contiguous on disk) a gzipped NetCDF4 is not (the bytes of those chunks are now mixed up with one another).
+2. The bytes to be decodable by a relatively cheap, self-contained, per-chunk transform (which we represent as a Zarr codec). For formats that do not use an efficient binary encoding (such as text files like CSV), fetching chunks via HTTP requests would still require an expensive decoding step.
+
+Some file formats have enough flexibility in their internal layout that they can provide relatively efficient access even without a post-hoc virtualization step.
+Sometimes this layout requires opt-in settings upon writing the file, and sometimes it is the default.
+For example the flexibility of TIFF's internal layout allowed the convention of writing "Cloud-Optimized GeoTIFFs".
+
+"Cloud-native" formats such as Zarr take this a step further - they are designed to provide simple and efficient parallel writes as well as reads, which they achieve by spreading their contents over multiple objects.
+Once the data is in separate objects, it becomes possible to perform atomic transactions via special single-object operations (e.g. `put-if-not-exists`).
+See the [Icechunk format specification](https://icechunk.io/en/latest/reference/spec-v2-1/#storage-operations).
+
+Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
+
+Note that this diagram deliberately covers only array formats.
+Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
+
+```python exec="true" html="true"
+import pathlib
+import sys
+
+root = pathlib.Path.cwd()
+for candidate in [root, *root.parents]:
+    diagrams = candidate / "docs" / "_diagrams"
+    if diagrams.is_dir():
+        sys.path.insert(0, str(diagrams))
+        break
+
+from format_tiers import render
+
+print(render())
+```
+
 ### Can my specific data be virtualized?
 
 Depends on some details of your data.
+Firstly, the file format must be supported (see above).
 
 VirtualiZarr works by mapping your data to the zarr data model from whatever data model is used by the format it was saved in.
 This means that if your data contains anything that cannot be represented within the zarr data model, it cannot be virtualized.

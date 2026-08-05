@@ -13,6 +13,9 @@ extra:
     alias: true
     provider: mike
 
+exclude_docs: |
+  _diagrams/
+
 nav:
   - "index.md"
   - Getting started:
