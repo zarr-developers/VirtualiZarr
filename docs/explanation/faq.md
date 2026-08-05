@@ -37,7 +37,7 @@ Sometimes this layout requires opt-in settings upon writing the file, and someti
 For example the flexibility of TIFF's internal layout allowed the convention of writing "Cloud-Optimized GeoTIFFs".
 
 "Cloud-native" formats such as Zarr take this a step further - they are designed to provide simple and efficient parallel writes as well as reads, which they achieve by spreading their contents over multiple objects.
-Once the data is in separate objects, it becomes possible to perform atomic transactions via special single-object operations (e.g. `put-if-not-exists`). 
+Once the data is in separate objects, it becomes possible to perform atomic transactions via special single-object operations (e.g. `put-if-not-exists`).
 See the [Icechunk format specification](https://icechunk.io/en/latest/reference/spec-v2-1/#storage-operations).
 
 Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
