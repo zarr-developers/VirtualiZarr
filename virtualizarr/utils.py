@@ -96,6 +96,20 @@ def determine_chunk_grid_shape(
     return tuple(ceildiv(length, chunksize) for length, chunksize in zip(shape, chunks))
 
 
+def _codec_endian(codec: ArrayBytesCodec) -> str | None:
+    """The bytes codec's endianness as a plain string, or None if it has none.
+
+    ``BytesCodec.endian`` was a ``zarr.codecs.bytes.Endian`` enum through zarr 3.2.x and became a
+    plain ``str`` on zarr's ``main`` branch, following zarr's enum-to-string-literal deprecation
+    (zarr-developers/zarr-python#3968, #3457). Normalize both so the endianness check works across
+    zarr versions without touching the deprecated ``Endian`` enum.
+    """
+    endian = getattr(codec, "endian", None)
+    if endian is None:
+        return None
+    return endian if isinstance(endian, str) else endian.value
+
+
 def convert_v3_to_v2_metadata(
     v3_metadata: ArrayV3Metadata, fill_value: Any = None
 ) -> ArrayV2Metadata:
@@ -125,10 +139,9 @@ def convert_v3_to_v2_metadata(
     # This logic is based on the (default) Bytes codec's endian property,
     # but other codec pipelines could store endianness elsewhere.
     big_endian = any(
-        isinstance(codec, ArrayBytesCodec)
-        and getattr(codec, "endian", None) is not None
-        and codec.endian.value == "big"  # type: ignore[attr-defined]
+        _codec_endian(codec) == "big"
         for codec in v3_metadata.codecs
+        if isinstance(codec, ArrayBytesCodec)
     )
     if big_endian:
         na_dtype = v3_metadata.data_type.to_native_dtype().newbyteorder(">")

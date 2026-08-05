@@ -331,6 +331,122 @@ def test_build_chunk_manifest_empty_with_shape():
     assert manifest.shape_chunk_grid == (2, 2)
 
 
+def test_build_chunk_manifest_skips_normalized_directory_marker():
+    """Zero-byte directory markers remain non-chunks after path normalization."""
+    from arro3.core import Array, RecordBatch
+
+    class NormalizedDirectoryMarkerStore:
+        async def list_async(self, *, prefix, return_arrow):
+            assert prefix == "x/"
+            assert return_arrow is True
+            paths = Array.from_numpy(np.array(["x/0", "x"], dtype="U3"))
+            sizes = Array.from_numpy(np.array([32, 0], dtype=np.uint64))
+            yield RecordBatch.from_arrays([paths, sizes], names=["path", "size"])
+
+    metadata_store = ObjectStore(store=ObsMemoryStore())
+    zarr_array = zarr.create(
+        shape=(4,),
+        chunks=(4,),
+        dtype="int64",
+        store=metadata_store,
+        zarr_format=2,
+    )
+    metadata = metadata_as_v3(zarr_array.metadata)
+
+    manifest = asyncio.run(
+        build_chunk_manifest(
+            obs_store=NormalizedDirectoryMarkerStore(),
+            array_path="x",
+            store_base_uri="memory://bucket/store.zarr",
+            metadata=metadata,
+            on_disk_zarr_format=ZarrFormat.V2,
+            on_disk_separator=".",
+        )
+    )
+
+    chunk_dict = manifest.dict()
+    assert set(chunk_dict) == {"0"}
+    assert next(iter(chunk_dict.values()))["length"] == 32
+
+
+@pytest.mark.parametrize(
+    "zarr_format,separator,listed_keys,expected_key",
+    [
+        # marker for a chunk subdirectory, which only exists when chunk keys are
+        # themselves nested (V2 dimension_separator="/", or any V3 array)
+        pytest.param(
+            ZarrFormat.V2,
+            "/",
+            {"x/0/0": 4, "x/0": 0, "x": 0},
+            "0.0",
+            id="v2-nested-marker",
+        ),
+        pytest.param(
+            ZarrFormat.V3,
+            "/",
+            {"x/c/0/0": 4, "x/c/0": 0, "x/c": 0},
+            "0.0",
+            id="v3-nested-marker",
+        ),
+        # an object keyed at the chunks prefix itself that isn't zero-byte, so
+        # isn't recognisable as a directory marker by its size
+        pytest.param(
+            ZarrFormat.V2,
+            "/",
+            {"x/0/0": 4, "x": 7},
+            "0.0",
+            id="v2-nonempty-object-at-prefix",
+        ),
+    ],
+)
+def test_build_chunk_manifest_skips_nested_directory_markers(
+    zarr_format, separator, listed_keys, expected_key
+):
+    """Only keys shaped like a genuine chunk key (one coordinate component per
+    dimension, nested under the chunks prefix) are treated as chunks.
+
+    obstore strips the trailing slash from a listed directory marker's key, so a
+    marker for a *nested* chunk subdirectory (e.g. ``x/0/`` alongside the chunk
+    ``x/0/0``) arrives looking like a chunk key one component short. Regression
+    test for the nested case left open by #1054.
+    """
+    # arro3 is an optional dependency, so it can't be imported at module scope
+    from arro3.core import Array, RecordBatch
+
+    class FabricatedListingStore:
+        async def list_async(self, *, prefix, return_arrow):
+            paths = Array.from_numpy(np.array(list(listed_keys), dtype="U16"))
+            sizes = Array.from_numpy(
+                np.array(list(listed_keys.values()), dtype=np.uint64)
+            )
+            yield RecordBatch.from_arrays([paths, sizes], names=["path", "size"])
+
+    metadata_store = ObjectStore(store=ObsMemoryStore())
+    zarr_array = zarr.create(
+        shape=(10, 10),
+        chunks=(5, 5),
+        dtype="int8",
+        store=metadata_store,
+        zarr_format=zarr_format.value,
+    )
+    metadata = metadata_as_v3(zarr_array.metadata)
+
+    manifest = asyncio.run(
+        build_chunk_manifest(
+            obs_store=FabricatedListingStore(),
+            array_path="x",
+            store_base_uri="memory://bucket/store.zarr",
+            metadata=metadata,
+            on_disk_zarr_format=zarr_format,
+            on_disk_separator=separator,
+        )
+    )
+
+    chunk_dict = manifest.dict()
+    assert set(chunk_dict) == {expected_key}
+    assert chunk_dict[expected_key]["length"] == 4
+
+
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
@@ -636,3 +752,37 @@ def test_zarr_parser_nolist_bucket(minio_nolist_bucket):
         manifeststore, engine="zarr", consolidated=False, zarr_format=3
     ) as actual:
         xr.testing.assert_identical(actual, ds)
+
+
+@requires_v2_migration
+def test_v2_slash_dimension_separator(tmp_path, local_registry):
+    """Zarr V2 stores may use dimension_separator="/", giving chunk keys like "data/0/0"."""
+    store_path = tmp_path / "slash_sep.zarr"
+    group = zarr.create_group(str(store_path), zarr_format=2)
+    arr = group.create_array(
+        "data",
+        shape=(4, 6),
+        chunks=(2, 3),
+        dtype="float64",
+        chunk_key_encoding={"name": "v2", "separator": "/"},
+        attributes={"_ARRAY_DIMENSIONS": ["x", "y"]},
+    )
+    expected = np.arange(24, dtype="float64").reshape(4, 6)
+    arr[:] = expected
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(),
+        loadable_variables=[],
+    ) as vds:
+        manifest = vds["data"].data.manifest.dict()
+        assert set(manifest.keys()) == {"0.0", "0.1", "1.0", "1.1"}
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(),
+        loadable_variables=["data"],
+    ) as vds:
+        np.testing.assert_array_equal(vds["data"].values, expected)

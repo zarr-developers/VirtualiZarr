@@ -77,6 +77,43 @@ def extract_codecs(
     return (arrayarray_codecs, arraybytes_codec, bytesbytes_codecs)
 
 
+def _byte_orders(dtype: np.dtype) -> set[str]:
+    """
+    Collect the byte-order characters of a dtype's multi-byte values.
+
+    ``dtype.byteorder`` describes only the dtype itself, and numpy reports ``"|"`` for every
+    structured dtype regardless of what its fields hold, so the fields are walked instead. A
+    subarray field (``("<f4", (3,))``) hides its byte order behind ``.base``, and a nested struct
+    hides it one level further down, hence the recursion. Values that have no byte order at all --
+    single-byte numbers, strings -- contribute nothing rather than counting as little-endian.
+    """
+    base = dtype.base  # see through a subarray field
+    if base.fields is None:
+        return set() if base.byteorder == "|" else {base.byteorder}
+    return set().union(*(_byte_orders(field[0]) for field in base.fields.values()))
+
+
+def _is_big_endian(dtype: np.dtype) -> bool:
+    """
+    Whether ``dtype``'s multi-byte values are stored big-endian.
+
+    Raises
+    ------
+    ValueError
+        If the dtype's fields mix byte orders, which a Zarr V3 array cannot express.
+    """
+    orders = _byte_orders(dtype)
+    if ">" not in orders:
+        return False
+    if len(orders) > 1:
+        raise ValueError(
+            f"Cannot represent {dtype} as a Zarr V3 array: its fields mix byte orders "
+            f"({sorted(orders)}). A Zarr V3 array has one bytes codec, so every multi-byte "
+            f"field must share a single byte order."
+        )
+    return True
+
+
 def convert_to_codec_pipeline(
     dtype: np.dtype,
     codecs: list[dict] | None = [],
@@ -106,7 +143,7 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        if dtype.byteorder == ">":
+        if _is_big_endian(dtype):
             arraybytes_codec = BytesCodec(endian="big")
         else:
             arraybytes_codec = BytesCodec()
