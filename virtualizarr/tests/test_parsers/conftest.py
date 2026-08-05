@@ -547,6 +547,19 @@ def vlen_string_hdf5_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture
+def ascii_vlen_string_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "ascii_vlen_string.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello", b"world"], dtype=h5py.string_dtype("ascii")),
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "string_dtype_fillvalue.nc")
 

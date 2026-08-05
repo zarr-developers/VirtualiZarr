@@ -169,6 +169,16 @@ class TestDatasetToManifestArray:
         with pytest.warns(UserWarning, match="variable-length string"):
             manifest_store_from_hdf_url(vlen_string_hdf5_url)
 
+    def test_ascii_variable_length_string_warns_on_parse(
+        self, ascii_vlen_string_hdf5_url
+    ):
+        # an ascii-cset vlen string is still a vlen string, so it should warn like
+        # the utf-8 case rather than fail the whole file as an unsupported object dtype
+        with pytest.warns(UserWarning, match="variable-length string"):
+            manifest_store = manifest_store_from_hdf_url(ascii_vlen_string_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert metadata.data_type.to_native_dtype() == np.dtypes.StringDType()
+
     @pytest.mark.filterwarnings("ignore:.*variable-length string dataset.*:UserWarning")
     def test_string_dtype_cf_fill_value(self, string_dtype_with_fillvalue_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(

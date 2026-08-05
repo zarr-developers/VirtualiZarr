@@ -45,7 +45,7 @@ def _get_fill_value(dataset: H5Dataset):
         raw = dataset.fillvalue
     except RuntimeError:
         return np.ma.default_fill_value(dataset.dtype)
-    if h5py.check_vlen_dtype(dataset.dtype) is str:
+    if h5py.check_vlen_dtype(dataset.dtype) in (str, bytes):
         # Variable-length string fill values come back as raw bytes; the array
         # is virtualized as VariableLengthUTF8, so the fill value must be str.
         # Decode strictly: a fill value that is not valid UTF-8 cannot be
@@ -89,11 +89,13 @@ def _construct_manifest_array(
     # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
     # Only remap true variable-length strings: h5py.check_string_dtype also
     # matches fixed-length ("S" kind) dtypes, which zarr handles natively and
-    # whose raw chunk bytes a vlen-utf8 codec cannot decode.
+    # whose raw chunk bytes a vlen-utf8 codec cannot decode. Both cset flavours
+    # count — check_vlen_dtype reports `str` for a utf-8 vlen string dtype and
+    # `bytes` for an ascii one.
     # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
     # region references) that would silently be coerced to StringDType and
     # produce garbage downstream — those aren't supported yet, so fail loudly.
-    if h5py.check_vlen_dtype(dtype) is str:
+    if h5py.check_vlen_dtype(dtype) in (str, bytes):
         warnings.warn(
             f"Variable {dataset.name!r} is an HDF5 variable-length string "
             f"dataset. Its metadata will be virtualized, but its chunks store "
