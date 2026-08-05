@@ -8,6 +8,15 @@
     [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
     [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
 
+  - Zipped Zarr stores (e.g. `.zarr.zip` files) can now be virtualized via the new
+    [ZippedZarrParser][virtualizarr.parsers.ZippedZarrParser]. The archive's central directory is read with a
+    handful of range requests and each chunk becomes a virtual reference to a byte range within
+    the archive itself, so no unzipping is ever needed — at ingestion or read time. Supports Zarr
+    V2 and V3, hierarchical groups, and remote archives on object storage; only archives with
+    uncompressed (`STORED`) members are supported, which is the default for
+    `zarr.storage.ZipStore`. Part of [#604](https://github.com/zarr-developers/VirtualiZarr/issues/604).
+    By [Tom Nicholas](https://github.com/TomNicholas).
+
   ### Bug fixes
 
   - Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte

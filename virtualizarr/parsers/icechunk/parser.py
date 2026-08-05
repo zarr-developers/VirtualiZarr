@@ -23,7 +23,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.parsers.icechunk.obstore_utils import obstore_to_icechunk_storage
 from virtualizarr.parsers.utils import construct_manifest_group_tree
-from virtualizarr.parsers.zarr import metadata_as_v3
+from virtualizarr.parsers.zarr.common import metadata_as_v3
 from virtualizarr.utils import determine_chunk_grid_shape
 
 if TYPE_CHECKING:
