@@ -88,6 +88,13 @@ TITLE_FS = 22
 TITLE_TRACK = -0.03  # -3% tracking on the title
 HEAD = 40  # space the title occupies above the panels
 
+CAPTION = (
+    "Container formats (.tar, .zip, .gz) refer to archives of "
+    "otherwise-virtualizable array data."
+)
+CAPTION_FS = 12
+CAPTION_GAP = 30  # panels' bottom edge -> caption baseline
+
 
 # ---------------------------------------------------------------- parse
 
@@ -332,7 +339,8 @@ def build_svg(
 
     chain_bottom = tops[-1] + heights[-1] + INSET * (n - 1)
     chain_h = chain_bottom - top
-    fig_h = chain_bottom + MARGIN
+    caption_y = chain_bottom + CAPTION_GAP
+    fig_h = caption_y + 16
     fig_w = MARGIN * 2 + APART_W + GROUP_GAP + CHAIN_W
 
     apart_x = float(MARGIN)
@@ -382,6 +390,11 @@ def build_svg(
         f'<text class="eu-text eu-ink" x="{fig_w / 2:.1f}" y="{MARGIN + 6}" '
         f'text-anchor="middle" font-size="{TITLE_FS}" font-weight="{NAME_W}" '
         f'letter-spacing="{TITLE_FS * TITLE_TRACK:.2f}">{esc(TITLE)}</text>'
+    )
+    parts.append(
+        f'<text class="eu-text eu-ink" opacity="0.7" x="{fig_w / 2:.1f}" '
+        f'y="{caption_y:.1f}" text-anchor="middle" font-size="{CAPTION_FS}" '
+        f'font-weight="{ITEM_W}">{esc(CAPTION)}</text>'
     )
     parts.append("</svg>")
     return "\n".join(parts)

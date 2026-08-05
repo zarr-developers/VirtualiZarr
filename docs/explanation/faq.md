@@ -45,9 +45,6 @@ Overall, we end up with a hierarchy of cloud suitability for array formats, wher
 Note that this diagram deliberately covers only array formats.
 Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
 
-The container formats in the diagram (`.tar`, `.zip`, `.gz`) refer to archives *of otherwise-virtualizable array data*, e.g. a netCDF file or a native Zarr store inside the archive.
-Wrapping data in a container never makes it more virtualizable than it already was - an uncompressed archive of unvirtualizable files is still unvirtualizable - and gzip compression makes anything unvirtualizable, because it scrambles bytes across the entire archive rather than compressing each member individually.
-
 ```python exec="true" html="true"
 import pathlib
 import sys
