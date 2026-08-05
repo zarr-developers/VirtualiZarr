@@ -135,6 +135,11 @@ class ManifestStore(Store):
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, registry={self._registry})"
 
+    @property
+    def nbytes_virtual(self) -> int:
+        """Size required to hold these references in memory in bytes. See [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual]."""
+        return self._group.nbytes_virtual
+
     async def get(
         self,
         key: str,

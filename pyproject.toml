@@ -226,7 +226,7 @@ test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechu
 test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
-upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "fits", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
 
