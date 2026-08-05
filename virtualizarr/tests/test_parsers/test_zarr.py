@@ -369,6 +369,84 @@ def test_build_chunk_manifest_skips_normalized_directory_marker():
     assert next(iter(chunk_dict.values()))["length"] == 32
 
 
+@pytest.mark.parametrize(
+    "zarr_format,separator,listed_keys,expected_key",
+    [
+        # marker for a chunk subdirectory, which only exists when chunk keys are
+        # themselves nested (V2 dimension_separator="/", or any V3 array)
+        pytest.param(
+            ZarrFormat.V2,
+            "/",
+            {"x/0/0": 4, "x/0": 0, "x": 0},
+            "0.0",
+            id="v2-nested-marker",
+        ),
+        pytest.param(
+            ZarrFormat.V3,
+            "/",
+            {"x/c/0/0": 4, "x/c/0": 0, "x/c": 0},
+            "0.0",
+            id="v3-nested-marker",
+        ),
+        # an object keyed at the chunks prefix itself that isn't zero-byte, so
+        # isn't recognisable as a directory marker by its size
+        pytest.param(
+            ZarrFormat.V2,
+            "/",
+            {"x/0/0": 4, "x": 7},
+            "0.0",
+            id="v2-nonempty-object-at-prefix",
+        ),
+    ],
+)
+def test_build_chunk_manifest_skips_nested_directory_markers(
+    zarr_format, separator, listed_keys, expected_key
+):
+    """Only keys shaped like a genuine chunk key (one coordinate component per
+    dimension, nested under the chunks prefix) are treated as chunks.
+
+    obstore strips the trailing slash from a listed directory marker's key, so a
+    marker for a *nested* chunk subdirectory (e.g. ``x/0/`` alongside the chunk
+    ``x/0/0``) arrives looking like a chunk key one component short. Regression
+    test for the nested case left open by #1054.
+    """
+    # arro3 is an optional dependency, so it can't be imported at module scope
+    from arro3.core import Array, RecordBatch
+
+    class FabricatedListingStore:
+        async def list_async(self, *, prefix, return_arrow):
+            paths = Array.from_numpy(np.array(list(listed_keys), dtype="U16"))
+            sizes = Array.from_numpy(
+                np.array(list(listed_keys.values()), dtype=np.uint64)
+            )
+            yield RecordBatch.from_arrays([paths, sizes], names=["path", "size"])
+
+    metadata_store = ObjectStore(store=ObsMemoryStore())
+    zarr_array = zarr.create(
+        shape=(10, 10),
+        chunks=(5, 5),
+        dtype="int8",
+        store=metadata_store,
+        zarr_format=zarr_format.value,
+    )
+    metadata = metadata_as_v3(zarr_array.metadata)
+
+    manifest = asyncio.run(
+        build_chunk_manifest(
+            obs_store=FabricatedListingStore(),
+            array_path="x",
+            store_base_uri="memory://bucket/store.zarr",
+            metadata=metadata,
+            on_disk_zarr_format=zarr_format,
+            on_disk_separator=separator,
+        )
+    )
+
+    chunk_dict = manifest.dict()
+    assert set(chunk_dict) == {expected_key}
+    assert chunk_dict[expected_key]["length"] == 4
+
+
 @zarr_versions()
 def test_sparse_array_with_missing_chunks(tmpdir, zarr_format):
     """Test that arrays with some missing chunks (sparse arrays) are handled correctly."""
