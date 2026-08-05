@@ -236,14 +236,15 @@ async def build_chunk_manifest(
             }
         )
 
-    # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = join_url(
-        array_path, on_disk_zarr_format.chunks_dir_prefix
-    )
+    # Build 1d array of all initialized chunk paths and their lengths.
+    # Listing the array's own directory (rather than the chunk key prefix) keeps this
+    # correct when that prefix isn't a whole path component, e.g. "air/c." for a V3
+    # array whose chunk key separator is "." — see chunks_prefix.
     stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(
         obs_store,
         store_base_uri,
-        nonscalar_chunks_prefix,
+        join_url(array_path, ""),
+        join_url(array_path, on_disk_zarr_format.chunks_prefix(on_disk_separator)),
         on_disk_zarr_format,
         on_disk_separator,
         len(metadata.shape),
@@ -262,6 +263,7 @@ async def build_chunk_manifest(
 async def build_1d_chunk_mapping(
     obs_store: ObstoreStore,
     store_base_uri: str,
+    list_prefix: str,
     array_chunks_prefix: str,
     zarr_format: ZarrFormat,
     chunk_key_separator: str,
@@ -279,8 +281,13 @@ async def build_1d_chunk_mapping(
         The obstore ObjectStore to list.
     store_base_uri
         The base URI of the store (e.g. "s3://bucket/store.zarr"), used to construct full chunk paths.
+    list_prefix
+        Store-relative path prefix to list (e.g. "air/"). obstore matches a list prefix
+        one whole path component at a time, so this must end at a "/" boundary even when
+        ``array_chunks_prefix`` doesn't.
     array_chunks_prefix
-        Store-relative prefix to list and strip from chunk keys (e.g. "air/c/").
+        Store-relative prefix that every chunk key starts with, and which is stripped to
+        get the chunk's coordinates (e.g. "air/c/", "air/c.", or "air/").
     zarr_format
         The zarr format version.
     chunk_key_separator
@@ -295,7 +302,7 @@ async def build_1d_chunk_mapping(
     """
     path_batches: list[np.ndarray] = []
     size_batches: list[np.ndarray] = []
-    stream = obs_store.list_async(prefix=array_chunks_prefix, return_arrow=True)
+    stream = obs_store.list_async(prefix=list_prefix, return_arrow=True)
     async for batch in stream:
         # Immediately convert to numpy arrays - we can still do efficient manipulations, and don't need any extra arrow dependencies.
         # Note: The .astype is only needed because .to_numpy converts to a numpy object array of python `str` objects, which is inefficient.

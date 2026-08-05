@@ -79,13 +79,21 @@ class ZarrFormat(Enum):
             case ZarrFormat.V3:
                 return "c"
 
-    @property
-    def chunks_dir_prefix(self) -> str:
+    def chunks_prefix(self, separator: ChunkKeySeparator) -> str:
+        """
+        Prefix that every non-scalar chunk key of an array shares, relative to the
+        array's own path.
+
+        V3 keys are prefixed with ``"c"`` joined to the coordinates by the array's chunk
+        key separator, so this is a directory only when that separator is ``"/"``
+        (e.g. ``"c/"`` for ``air/c/0/0``, but ``"c."`` for ``air/c.0.0``). V2 keys carry
+        no prefix at all.
+        """
         match self:
             case ZarrFormat.V2:
                 return ""
             case ZarrFormat.V3:
-                return "c/"
+                return f"c{separator}"
 
 
 def join_url(base: str, key: str) -> str:
