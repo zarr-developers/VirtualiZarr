@@ -386,7 +386,12 @@ async def build_chunk_manifest(
         array_path, on_disk_zarr_format.chunks_dir_prefix
     )
     stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(
-        obs_store, store_base_uri, nonscalar_chunks_prefix, on_disk_zarr_format
+        obs_store,
+        store_base_uri,
+        nonscalar_chunks_prefix,
+        on_disk_zarr_format,
+        on_disk_separator,
+        len(metadata.shape),
     )
 
     if len(stripped_keys) == 0:
@@ -421,6 +426,8 @@ async def build_1d_chunk_mapping(
     store_base_uri: str,
     array_chunks_prefix: str,
     zarr_format: ZarrFormat,
+    chunk_key_separator: str,
+    ndim: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build chunk mapping by listing the object store with obstore.
@@ -438,6 +445,11 @@ async def build_1d_chunk_mapping(
         Store-relative prefix to list and strip from chunk keys (e.g. "air/c/").
     zarr_format
         The zarr format version.
+    chunk_key_separator
+        The chunk key separator used on disk (e.g. ``"."`` or ``"/"``).
+    ndim
+        Number of dimensions of the array, i.e. how many coordinate components a
+        genuine chunk key has.
 
     Returns
     -------
@@ -454,14 +466,26 @@ async def build_1d_chunk_mapping(
         sizes_np = batch.column("size").to_numpy()
 
         # filter out metadata and directory keys, leaving only valid chunk keys
-        # (assumes that there are no other objects inside this directory)
         is_metadata = np.zeros(len(paths_np), dtype=bool)
         for suffix in zarr_format.metadata_key_names:
             is_metadata |= np.strings.endswith(paths_np, suffix)
-        is_directory = np.strings.endswith(paths_np, "/") | (
-            (sizes_np == 0) & (paths_np == array_chunks_prefix.rstrip("/"))
-        )
-        chunk_keys_mask = ~(is_metadata | is_directory)
+        is_directory = np.strings.endswith(paths_np, "/")
+
+        # Zero-byte "directory marker" objects (created by e.g. `aws s3 sync`, `s3fs`,
+        # or `boto3.put_object(Key=prefix + "/")`) are keyed with a trailing slash, but
+        # obstore's client-side path parsing strips that slash before the listed path
+        # reaches here, so `is_directory` above can never catch them. Rather than
+        # matching markers by name, keep only keys shaped like a genuine chunk key:
+        # a literal descendant of the prefix with exactly one coordinate component per
+        # dimension. A marker for the chunks directory itself ends up one character
+        # shorter than the prefix, and a marker for a nested chunk subdirectory (only
+        # possible when the separator is "/") ends up short a component, so both fail.
+        is_descendant = np.strings.startswith(paths_np, array_chunks_prefix)
+        relative_keys = np.strings.replace(paths_np, array_chunks_prefix, "", 1)
+        n_components = np.strings.count(relative_keys, chunk_key_separator) + 1
+        has_chunk_key_shape = is_descendant & (n_components == ndim)
+
+        chunk_keys_mask = ~(is_metadata | is_directory) & has_chunk_key_shape
 
         path_batches.append(paths_np[chunk_keys_mask])
         size_batches.append(sizes_np[chunk_keys_mask])

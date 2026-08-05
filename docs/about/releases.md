@@ -10,6 +10,15 @@
 
   ### Bug fixes
 
+  - Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte
+    "directory marker" objects, which are common on S3 (created by e.g. `aws s3 sync`, `s3fs`, or
+    `boto3.put_object(Key=prefix + "/")`). `obstore` strips the trailing slash from such a key before it
+    reaches the parser, so it could not be filtered out by its trailing slash and was instead parsed as a
+    chunk coordinate. Rather than matching markers by name, only keys shaped like a genuine chunk key — a
+    literal descendant of the array's chunks prefix with exactly one coordinate component per dimension —
+    are now treated as chunks, which also covers markers for *nested* chunk subdirectories (e.g. `air/c/0/`
+    alongside the chunk `air/c/0/0`).
+    By [Sanjay Santhanam](https://github.com/Sanjays2402) and [Tom Nicholas](https://github.com/TomNicholas).
   - Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
     `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
     `"."` for V2 instead of reading the array's `dimension_separator`.
