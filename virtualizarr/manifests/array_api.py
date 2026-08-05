@@ -5,7 +5,7 @@ import numpy as np
 
 from virtualizarr.utils import determine_chunk_grid_shape
 
-from .manifest import ChunkManifest
+from .manifest import MISSING_CHUNK_PATH, ChunkManifest
 from .utils import (
     check_combinable_zarr_arrays,
     check_no_partial_chunks_on_concat_axis,
@@ -98,8 +98,6 @@ def where(condition, x, y, /):
 
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
-    from virtualizarr.manifests.manifest import MISSING_CHUNK_PATH
-
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
     for axis, chunk_size in enumerate(marr.metadata.chunks):
         mask = np.repeat(mask, chunk_size, axis=axis)
