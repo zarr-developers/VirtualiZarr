@@ -4,7 +4,7 @@ import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
-from zarr.codecs import BytesCodec
+from zarr.codecs import BytesCodec, VLenUTF8Codec
 from zarr.core.codec_pipeline import BatchedCodecPipeline
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
@@ -143,7 +143,9 @@ def convert_to_codec_pipeline(
     arrayarray_codecs, arraybytes_codec, bytesbytes_codecs = extract_codecs(zarr_codecs)
 
     if arraybytes_codec is None:
-        if _is_big_endian(dtype):
+        if isinstance(dtype, np.dtypes.StringDType):
+            arraybytes_codec = VLenUTF8Codec()
+        elif _is_big_endian(dtype):
             arraybytes_codec = BytesCodec(endian="big")
         else:
             arraybytes_codec = BytesCodec()
