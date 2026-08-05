@@ -40,6 +40,7 @@ nav:
       - api/parsers/kerchunk.md
       - api/parsers/netcdf3.md
       - api/parsers/zarr.md
+      - api/parsers/zip.md
       - api/parsers/dmrpp.md
       - api/parsers/tiff.md
       - api/parsers/grib.md

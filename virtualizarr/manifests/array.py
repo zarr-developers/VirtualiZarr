@@ -144,8 +144,11 @@ class ManifestArray:
             return NotImplemented
 
         # Note: this allows subclasses that don't override
-        # __array_function__ to handle ManifestArray objects
-        if not all(issubclass(t, ManifestArray) for t in types):
+        # __array_function__ to handle ManifestArray objects. Plain ndarrays are
+        # also permitted among the argument types because some handled functions
+        # legitimately mix them with ManifestArrays — e.g. np.where, whose boolean
+        # condition arrives as an ndarray during xarray's reindex/alignment fill.
+        if not all(issubclass(t, (ManifestArray, np.ndarray)) for t in types):
             return NotImplemented
 
         return MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS[func](*args, **kwargs)
