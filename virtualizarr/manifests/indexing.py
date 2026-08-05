@@ -7,7 +7,7 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.manifests.array_api import expand_dims
 from virtualizarr.manifests.manifest import ChunkManifest
-from virtualizarr.manifests.reindex import chunk_map_from_indexer
+from virtualizarr.manifests.reindex import chunk_map_from_indexer, reindex_axis
 from virtualizarr.manifests.utils import copy_and_replace_metadata
 
 # indexer with only basic selectors, no new axes or ellipsis
@@ -218,7 +218,7 @@ def _apply_reindex(
                     "if you need this alignment. See "
                     "https://github.com/zarr-developers/VirtualiZarr/issues/51."
                 ) from err
-            result = result._reindex_axis(axis, chunk_map, new_size=len(indexer_1d))
+            result = reindex_axis(result, axis, chunk_map, new_size=len(indexer_1d))
         elif _is_full_slice(indexer_1d, marr.shape[axis]):
             continue
         else:
