@@ -365,9 +365,7 @@ async def _construct_manifest_array(
             )
         return ManifestArray(metadata=metadata, chunkmanifest=chunk_manifest)
 
-    chunks_prefix = join_url(array_path, on_disk_format.chunks_dir_prefix)
-    if not chunks_prefix.endswith("/"):
-        chunks_prefix += "/"
+    chunks_prefix = join_url(array_path, on_disk_format.chunks_prefix(separator))
 
     chunk_keys: list[str] = []
     offsets: list[int] = []

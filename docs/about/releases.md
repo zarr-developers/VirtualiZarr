@@ -19,6 +19,14 @@
 
   ### Bug fixes
 
+  - Fix `ZarrParser` and `ZippedZarrParser` silently returning an **empty chunk manifest** for a Zarr V3 array
+    whose `chunk_key_encoding` separator is `"."` (chunk keys like `air/c.0.0` rather than `air/c/0/0`), which
+    made such an array read back as entirely fill-value with no error raised. The chunk key prefix was
+    hardcoded to `air/c/`, which matches no such key. It is now derived from the array's separator, and
+    `ZarrParser` lists the array's own directory rather than that prefix, since `obstore` matches a list prefix
+    one whole path component at a time and so would match nothing at all for a prefix ending mid-component
+    (`air/c.`). Closes [#1069](https://github.com/zarr-developers/VirtualiZarr/issues/1069).
+    By [Tom Nicholas](https://github.com/TomNicholas).
   - Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte
     "directory marker" objects, which are common on S3 (created by e.g. `aws s3 sync`, `s3fs`, or
     `boto3.put_object(Key=prefix + "/")`). `obstore` strips the trailing slash from such a key before it

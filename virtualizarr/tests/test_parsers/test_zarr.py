@@ -786,3 +786,41 @@ def test_v2_slash_dimension_separator(tmp_path, local_registry):
         loadable_variables=["data"],
     ) as vds:
         np.testing.assert_array_equal(vds["data"].values, expected)
+
+
+@pytest.mark.parametrize("group_path", ["", "nested"], ids=["root", "in-group"])
+def test_v3_dot_chunk_key_separator(tmp_path, local_registry, group_path):
+    """Zarr V3 arrays may use a "." chunk key separator, giving chunk keys like
+    "data/c.0.0" rather than "data/c/0/0". Regression test for #1069."""
+    store_path = tmp_path / "dot_sep.zarr"
+    root = zarr.create_group(str(store_path), zarr_format=3)
+    group = root.create_group(group_path) if group_path else root
+    arr = group.create_array(
+        "data",
+        shape=(4, 6),
+        chunks=(2, 3),
+        dtype="float64",
+        chunk_key_encoding={"name": "default", "separator": "."},
+        dimension_names=["x", "y"],
+    )
+    expected = np.arange(24, dtype="float64").reshape(4, 6)
+    arr[:] = expected
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(group=group_path or None),
+        loadable_variables=[],
+    ) as vds:
+        manifest = vds["data"].data.manifest.dict()
+        assert set(manifest.keys()) == {"0.0", "0.1", "1.0", "1.1"}
+        # the manifest must point at the real (dot-separated) chunk keys
+        assert manifest["0.0"]["path"].endswith(f"{group_path}/data/c.0.0".lstrip("/"))
+
+    with open_virtual_dataset(
+        url=f"file://{store_path}",
+        registry=local_registry,
+        parser=ZarrParser(group=group_path or None),
+        loadable_variables=["data"],
+    ) as vds:
+        np.testing.assert_array_equal(vds["data"].values, expected)

@@ -217,3 +217,47 @@ def test_scalar_array(tmp_path, local_registry):
         loadable_variables=["scalar"],
     ) as vds:
         xr.testing.assert_identical(vds, ds)
+
+
+def test_v3_dot_chunk_key_separator(tmp_path, local_registry):
+    """Zarr V3 arrays may use a "." chunk key separator, giving members like
+    "air/c.0.0" rather than "air/c/0/0". Regression test for #1069."""
+    ds = _test_dataset()
+    zip_path = tmp_path / "dot_sep.zarr.zip"
+    store = ZipStore(zip_path, mode="w")
+    try:
+        ds.to_zarr(
+            store,
+            zarr_format=3,
+            consolidated=False,
+            encoding={
+                "air": {
+                    "chunks": (2, 3, 2),
+                    "chunk_key_encoding": {
+                        "name": "default",
+                        "configuration": {"separator": "."},
+                    },
+                }
+            },
+        )
+    finally:
+        store.close()
+
+    with zipfile.ZipFile(zip_path) as zf:
+        assert "air/c.0.0.0" in zf.namelist()
+
+    with open_virtual_dataset(
+        url=f"file://{zip_path}",
+        registry=local_registry,
+        parser=ZippedZarrParser(),
+        loadable_variables=[],
+    ) as vds:
+        assert set(vds["air"].data.manifest.dict()) == {"0.0.0", "1.0.0"}
+
+    with open_virtual_dataset(
+        url=f"file://{zip_path}",
+        registry=local_registry,
+        parser=ZippedZarrParser(),
+        loadable_variables=list(ds.variables),
+    ) as vds:
+        xr.testing.assert_identical(vds, ds)
