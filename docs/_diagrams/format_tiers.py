@@ -83,7 +83,7 @@ APART_W = 400.0
 GROUP_GAP = 64  # clear space between the two disjoint groups
 MARGIN = 40
 
-TITLE = "Cloud suitability of various formats"
+TITLE = "Cloud suitability of array file formats"
 TITLE_FS = 22
 TITLE_TRACK = -0.03  # -3% tracking on the title
 HEAD = 40  # space the title occupies above the panels

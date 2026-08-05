@@ -40,7 +40,10 @@ For example the flexibility of TIFF's internal layout allowed the convention of 
 Once the data is in separate objects, it becomes possible to perform atomic transactions via special single-object operations (e.g. `put-if-not-exists`). 
 See the [Icechunk format specification](https://icechunk.io/en/latest/reference/spec-v2-1/#storage-operations).
 
-Overall, we end up with a heirarchy of cloud suitability, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
+Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
+
+Note that this diagram deliberately covers only array formats.
+Tabular formats such as Parquet and Iceberg are cloud-optimized by design, but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
 
 ```python exec="true" html="true"
 import pathlib

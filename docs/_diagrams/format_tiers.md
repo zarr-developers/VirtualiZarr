@@ -1,7 +1,5 @@
 | format                 | Non-cloud-optimizable   | Cloud-optimizable via virtualization | Cloud-optimizable upon write | Cloud-optimized by default | Cloud-Native (static) | Cloud-Native (transactional) |
 | ---------------------- | ----------------------- | ------------- | ---------------------------- | -------------------------- | --------------------- | ---------------------------- |
-| CSV                    | x                       |               |                              |                            |                       |                              |
-| JSON                   | x                       |               |                              |                            |                       |                              |
 | .tar                   |                         | x             |                              |                            |                       |                              |
 | .gzip                  | x                       |               |                              |                            |                       |                              |
 | .zip (deflate)         | x                       |               |                              |                            |                       |                              |
@@ -15,12 +13,6 @@
 | TIFF (untiled)         |                         | x             |                              |                            |                       |                              |
 | GeoTIFF                |                         | x             | x                            |                            |                       |                              |
 | COG                    |                         | x             | x                            | x                          |                       |                              |
-| Shapefile              |                         | x             |                              |                            |                       |                              |
-| GeoJSON                | x                       |               |                              |                            |                       |                              |
-| GeoPackage             | x                       |               |                              |                            |                       |                              |
-| Parquet                |                         | x             | x                            | x                          |                       |                              |
-| GeoParquet             |                         | x             | x                            | x                          |                       |                              |
 | Native Zarr (v2 or v3) |                         | x             | x                            | x                          | x                     |                              |
 | Zipped Native Zarr     |                         | x             | x                            | x                          |                       |                              |
 | Icechunk               |                         | x             | x                            | x                          | x                     | x                            |
-| Iceberg                |                         | x             | x                            | x                          | x                     | x                            |
