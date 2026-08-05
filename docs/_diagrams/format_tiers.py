@@ -69,12 +69,12 @@ FONT_STACK = "inherit, ui-sans-serif, sans-serif"
 
 ITEM_W, NAME_W = 400, 500  # which weight each text role uses
 
-NAME_FS = 15  # set-name label
-ITEM_FS = 13  # format label
-LINE_H = 22
-NAME_GAP = 11  # set name baseline -> first item baseline
-PAD_TOP = 26  # a panel's top edge -> its name baseline
-PAD_BOT = 16  # last item baseline -> the next panel's top edge
+NAME_FS = 19  # set-name label
+ITEM_FS = 16  # format label
+LINE_H = 27
+NAME_GAP = 13  # set name baseline -> first item baseline
+PAD_TOP = 32  # a panel's top edge -> its name baseline
+PAD_BOT = 20  # last item baseline -> the next panel's top edge
 MAX_COLS = 4
 
 INSET = 17  # how far each nested panel sits inside its parent
@@ -84,16 +84,13 @@ GROUP_GAP = 64  # clear space between the two disjoint groups
 MARGIN = 40
 
 TITLE = "Cloud suitability of array file formats"
-TITLE_FS = 22
+TITLE_FS = 26
 TITLE_TRACK = -0.03  # -3% tracking on the title
 HEAD = 40  # space the title occupies above the panels
 
-CAPTION = (
-    "Container formats (.tar, .zip, .gz) refer to archives of "
-    "otherwise-virtualizable array data."
-)
-CAPTION_FS = 12
-CAPTION_GAP = 30  # panels' bottom edge -> caption baseline
+CAPTION = "* archives of otherwise-virtualizable array data"
+CAPTION_FS = 14
+CAPTION_GAP = 34  # panels' bottom edge -> caption baseline
 
 
 # ---------------------------------------------------------------- parse
