@@ -12,7 +12,7 @@ from zarr.storage import ZipStore
 from virtualizarr import open_virtual_dataset, open_virtual_datatree
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.parsers import ZippedZarrParser
-from virtualizarr.parsers.zip import ZIP_METHOD_STORED, parse_zip_index
+from virtualizarr.parsers.zarr.zip import ZIP_METHOD_STORED, parse_zip_index
 
 requires_v2_migration = pytest.mark.skipif(
     version.parse(zarr.__version__) < version.parse("3.1.3"),

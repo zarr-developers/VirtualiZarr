@@ -6,8 +6,7 @@ from virtualizarr.parsers.icechunk import IcechunkParser
 from virtualizarr.parsers.kerchunk.json import KerchunkJSONParser
 from virtualizarr.parsers.kerchunk.parquet import KerchunkParquetParser
 from virtualizarr.parsers.netcdf3 import NetCDF3Parser
-from virtualizarr.parsers.zarr import ZarrParser
-from virtualizarr.parsers.zip import ZippedZarrParser
+from virtualizarr.parsers.zarr import ZarrParser, ZippedZarrParser
 
 __all__ = [
     "DMRPPParser",

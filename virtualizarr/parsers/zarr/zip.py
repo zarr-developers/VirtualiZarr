@@ -24,7 +24,7 @@ from virtualizarr.manifests import (
 )
 from virtualizarr.manifests.manifest import validate_and_normalize_path_to_uri
 from virtualizarr.parsers.utils import construct_manifest_group_tree
-from virtualizarr.parsers.zarr import (
+from virtualizarr.parsers.zarr.common import (
     ObstoreStore,
     _run_async,
     chunk_entries_to_manifest,

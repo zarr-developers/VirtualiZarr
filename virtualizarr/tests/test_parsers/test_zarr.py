@@ -17,13 +17,13 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.parsers import ZarrParser
-from virtualizarr.parsers.zarr import (
+from virtualizarr.parsers.zarr.common import (
     ZarrFormat,
     _run_async,
-    build_chunk_manifest,
     join_url,
     metadata_as_v3,
 )
+from virtualizarr.parsers.zarr.zarr import build_chunk_manifest
 from virtualizarr.tests import requires_arro3, requires_minio
 
 pytestmark = requires_arro3
