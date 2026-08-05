@@ -65,6 +65,7 @@ def open_virtual_datatree(
         A parser to use for the given data source. For example:
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.HDF4Parser][] for virtualizing HDF4 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
@@ -206,6 +207,7 @@ def open_virtual_dataset(
         A parser to use for the given data source. For example:
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.HDF4Parser][] for virtualizing HDF4 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
         - [virtualizarr.parsers.IcechunkParser][] for virtualizing existing icechunk repos.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.

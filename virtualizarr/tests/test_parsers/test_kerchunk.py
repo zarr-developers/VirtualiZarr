@@ -578,4 +578,33 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     actual_marr = manifeststore._group._members["a"]
     assert (actual_marr == expected_marr).all()
 
+
+def test_from_kerchunk_refs_structured_dtype():
+    """A FITS BinTableHDU (e.g. an SDSS spectrum) is emitted by kerchunk as a
+    structured dtype: its fields arrive as JSON *lists* (``["flux", ">f4"]``) and
+    its ``fill_value`` as base64-encoded raw bytes. Both need coercing before they
+    reach ``np.dtype`` / zarr-v3, which previously raised ``TypeError``."""
+    import base64
+
+    from virtualizarr.parsers.kerchunk.translator import from_kerchunk_refs
+
+    fields = [["flux", ">f4"], ["mask", ">i4"]]
+    itemsize = np.dtype([tuple(f) for f in fields]).itemsize
+    zarray = {
+        "dtype": fields,
+        "fill_value": base64.b64encode(b"\x00" * itemsize).decode(),
+        "zarr_format": 2,
+        "filters": None,
+        "compressor": None,
+        "chunks": [10],
+        "shape": [10],
+        "dimension_names": ["x"],
+    }
+
+    metadata = from_kerchunk_refs(zarray, {"value": "1"})
+
+    assert metadata.data_type.to_native_dtype().names == ("flux", "mask")
+    # the base64 fill decodes to the structured zero, not the raw string
+    assert metadata.fill_value == np.zeros((), metadata.data_type.to_native_dtype())[()]
+
     # TODO assert that manifeststore.to_kerchunk_refs() roundtrips, once we have that method

@@ -132,6 +132,20 @@ def nested_icechunk_repo() -> icechunk.Repository:
     return repo
 
 
+@pytest.fixture
+def scalar_icechunk_repo() -> icechunk.Repository:
+    """In-memory icechunk repo with a scalar array holding data and an
+    uninitialized scalar array (as CF grid-mapping / CRS variables are)."""
+    repo = _make_repo(icechunk.in_memory_storage())
+    session = repo.writable_session("main")
+    group = zarr.group(store=session.store, overwrite=True)
+    with_data = group.create_array("with_data", shape=(), dtype="i4", compressors=None)
+    with_data[()] = 42
+    group.create_array("crs_like", shape=(), dtype="i4", compressors=None)
+    session.commit("init scalars")
+    return repo
+
+
 # ----------------------------------------------------------------------
 # parse_session: escape-hatch path
 # ----------------------------------------------------------------------
@@ -263,6 +277,34 @@ class TestParseSession:
             IcechunkParser().parse_session(  # type: ignore[call-arg]
                 session, registry=ObjectStoreRegistry({})
             )
+
+    def test_scalar_array_manifest_shape(
+        self, scalar_icechunk_repo: icechunk.Repository
+    ) -> None:
+        """Scalar arrays must produce a 0-d manifest matching their metadata.
+
+        A scalar has ``metadata.shape == ()`` and a single chunk keyed ``""``.
+        The chunk grid shape is ``()`` (falsy), so the manifest must not be
+        coerced to a 1-d ``(1,)`` grid keyed ``"0"``. Covers both a scalar with
+        data written and an uninitialized scalar (e.g. a CRS variable).
+        """
+        session = scalar_icechunk_repo.readonly_session(branch="main")
+        ms = IcechunkParser().parse_session(
+            session,
+            registry=ObjectStoreRegistry({}),
+            native_chunks_prefix="s3://bucket/repo/chunks",
+        )
+
+        with_data = ms._group.arrays["with_data"]
+        assert with_data.shape == ()
+        assert with_data._manifest.shape_chunk_grid == ()
+        # 0-d manifest: the single chunk is indexed with an empty tuple, not [0]
+        assert int(with_data._manifest._lengths[()]) == 4
+
+        crs_like = ms._group.arrays["crs_like"]
+        assert crs_like.shape == ()
+        assert crs_like._manifest.shape_chunk_grid == ()
+        assert crs_like._manifest.dict() == {}
 
     def test_round_trip_to_icechunk_writes_valid_chunk_keys(
         self, mixed_icechunk_repo: icechunk.Repository

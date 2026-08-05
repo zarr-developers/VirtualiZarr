@@ -307,10 +307,13 @@ async def _construct_manifest_array(
             coord = tuple(int(x) for x in b_coords[batch_i])
             inlined[coord] = data
 
+    # Reshape the flat buffers to the chunk grid. For a scalar array grid_shape
+    # is () and the single-element buffers reshape to a 0-d manifest (keyed "")
+    # matching the array metadata — not a 1-d (1,) grid.
     chunk_manifest = ChunkManifest.from_arrays(
-        paths=paths.reshape(grid_shape or (1,)),
-        offsets=offsets.reshape(grid_shape or (1,)),
-        lengths=lengths.reshape(grid_shape or (1,)),
+        paths=paths.reshape(grid_shape),
+        offsets=offsets.reshape(grid_shape),
+        lengths=lengths.reshape(grid_shape),
         validate_paths=False,
         inlined=inlined or None,
     )

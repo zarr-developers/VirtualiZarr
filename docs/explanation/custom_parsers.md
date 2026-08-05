@@ -214,7 +214,7 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
     2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
     3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
 
-    Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
+    Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, HDF4, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
 
 ## Fill values
 
@@ -266,11 +266,12 @@ NetCDF-3 defines [default fill values per data type](https://www.unidata.ucar.ed
 
 GRIB and GRIB2 files use a fundamentally different missing data model from the attribute-based approach of NetCDF/HDF5. Instead of a sentinel fill value, GRIB uses a **bitmap section** (Section 6 in GRIB2) where each bit indicates whether the corresponding data point is present or missing. The data section only contains values for present points, so missing points have no storage representation at all.
 
-VirtualiZarr does not yet include a GRIB parser, but custom parser authors targeting GRIB data should be aware that:
+GRIB is worth calling out because it illustrates a case where the missing-data logic cannot live in a `_FillValue` attribute at all — it has to be handled by the codec that decodes each chunk:
 
 - There is no direct equivalent of `_FillValue` in the GRIB data model. The bitmap _is_ the missing data indicator.
-- When mapping GRIB to Zarr, the parser must choose a fill value to represent bitmap-masked points in the output array, and emit a corresponding `_FillValue` attribute so that xarray can mask the data.
 - GRIB2 also supports ["complex packing"](https://codes.ecmwf.int/grib/format/grib2/templates/5/) and ["second-order packing"](https://codes.ecmwf.int/grib/format/grib1/packing/2/) where the decompression algorithm itself must account for the bitmap. This means the codec pipeline must be bitmap-aware, not just the fill value.
+
+The [`GribberishParser`](../api/parsers/grib.md), backed by the Rust [gribberish](https://github.com/mpiannucci/gribberish) library, is VirtualiZarr's GRIB1/GRIB2 parser (`pip install "virtualizarr[grib]"`) and handles exactly this. It maps each GRIB message to a single chunk and registers a `gribberish` zarr codec that decodes the message bytes on read. Because the bitmap can only be applied while unpacking the data section, that work happens inside the codec: it expands the packed values back onto the full grid and writes `NaN` into every bitmap-masked point. The parser then simply declares the array's Zarr `fill_value` as `NaN` (no `_FillValue` attribute is needed, and the packing scheme — simple, complex, or second-order — is transparent to VirtualiZarr since decoding is entirely the codec's responsibility). This is the general pattern for any format where missing values are entangled with the on-disk compression: pair a fill value on the array with a codec that reconstructs the mask at read time, rather than trying to express it as an attribute.
 
 ### Encoding the `_FillValue` attribute
 
