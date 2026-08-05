@@ -1,5 +1,18 @@
 # Release notes
 
+## v2.7.3 (unreleased)
+
+### New Features
+
+### Breaking changes
+
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+
 ## v2.7.2 (5th August 2026)
 
 Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unzipping them, lazy support for xarray's `reindex`/`align`/`concat` over virtual arrays, and `nbytes_virtual` on `ManifestGroup`/`ManifestStore`. Also fixes a batch of `ZarrParser` chunk-key bugs (custom separators, S3 directory markers, Zarr V2 `dimension_separator="/"`), zero-length arrays in `ChunkManifest` and `HDF4Parser`, string-dtype fill values in the HDF5 parser, and big-endian structured dtypes in the bytes codec. The docs gain a *"Can my file format be virtualized?"* FAQ entry, illustrated by a diagram of how file formats relate to cloud object storage.
