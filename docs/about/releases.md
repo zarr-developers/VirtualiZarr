@@ -52,10 +52,12 @@ Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unz
 - Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
   `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
   `"."` for V2 instead of reading the array's `dimension_separator`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
   array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
   variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
   `iter_refs()` had the same `np.nditer` problem and now yields nothing.
+  By [Davis Bennett](https://github.com/d-v-b).
 - Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
   containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose `FP_*`
   fire-pixel variables all have shape `(0,)`. `HDF4Parser` no longer asks `kerchunk.hdf4` to round-trip its
