@@ -27,7 +27,9 @@ repos:
     rev: v2.4.3
     hooks:
       - id: codespell
-        args: ["-L", "fo,ihs,kake,te", "-S", "fixture,*goes-16-ingest.ipynb"]
+        # notebooks with stored outputs embed base64 image data, which trips
+        # codespell on random letter runs
+        args: ["-L", "fo,ihs,kake,te", "-S", "fixture,*goes-16-ingest.ipynb,*its_live.ipynb"]
   - repo: https://github.com/numpy/numpydoc
     rev: v1.11.0rc0
     hooks:
