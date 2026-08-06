@@ -5,6 +5,7 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 from conftest import (
     ARRAYBYTES_CODEC,
     ZLIB_CODEC,
+    sharding_codec,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.indexing import SubChunkIndexingError
@@ -638,6 +639,181 @@ class TestStack:
         codec_dict = result.metadata.codecs[1].to_dict()
         assert codec_dict["name"] == "numcodecs.zlib"
         assert result.metadata.fill_value == metadata.fill_value
+
+
+class TestSharded:
+    """
+    Adding a length-1 axis to a sharded array must add it to the shard config too,
+    otherwise zarr rejects the metadata for having a 2D shard on an N-D array.
+    """
+
+    @pytest.fixture
+    def sharded_marr(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(90, 180),
+            chunks=(90, 180),
+            data_type=np.dtype("float32"),
+            codecs=[sharding_codec((45, 45))],
+        )
+        manifest = ChunkManifest(
+            entries={"0.0": {"path": "/foo.zarr", "offset": 0, "length": 1000}}
+        )
+        return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+    def test_expand_dims_keeps_pointing_at_the_same_shard(self, sharded_marr):
+        result = np.expand_dims(sharded_marr, axis=0)
+
+        assert result.shape == (1, 90, 180)
+        assert result.manifest.dict() == {
+            "0.0.0": {"path": "file:///foo.zarr", "offset": 0, "length": 1000}
+        }
+
+    @pytest.mark.parametrize(
+        "axis, expected_shards, expected_chunks",
+        [
+            (0, (1, 90, 180), (1, 45, 45)),
+            (1, (90, 1, 180), (45, 1, 45)),
+            (2, (90, 180, 1), (45, 45, 1)),
+        ],
+    )
+    def test_expand_dims_at_every_position(
+        self, sharded_marr, axis, expected_shards, expected_chunks
+    ):
+        result = np.expand_dims(sharded_marr, axis=axis)
+
+        assert result.metadata.shards == expected_shards
+        assert result.metadata.chunks == expected_chunks
+
+    def test_expand_dims_when_shard_shape_already_contains_ones(
+        self, array_v3_metadata
+    ):
+        # aligning (1, 45) onto (1, 1, 45) is ambiguous - the new axis could be read as
+        # either of the leading two - but both readings put a 1 next to an existing 1,
+        # so the inner chunk shape comes out the same either way
+        metadata = array_v3_metadata(
+            shape=(1, 180),
+            chunks=(1, 180),
+            data_type=np.dtype("float32"),
+            codecs=[sharding_codec((1, 45))],
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.zarr", "offset": 0, "length": 1000}}
+            ),
+        )
+
+        result = np.expand_dims(marr, axis=0)
+
+        assert result.metadata.shards == (1, 1, 180)
+        assert result.metadata.chunks == (1, 1, 45)
+
+    def test_expand_dims_nested_shards(self, array_v3_metadata):
+        # a shard's inner chunks may themselves be shards, so every level has to gain
+        # the new axis
+        metadata = array_v3_metadata(
+            shape=(90, 180),
+            chunks=(90, 180),
+            data_type=np.dtype("float32"),
+            codecs=[sharding_codec((45, 90), inner_codecs=[sharding_codec((45, 45))])],
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "/foo.zarr", "offset": 0, "length": 1000}}
+            ),
+        )
+
+        result = np.expand_dims(marr, axis=0)
+
+        assert result.metadata.shards == (1, 90, 180)
+        assert result.metadata.chunks == (1, 45, 90)
+        (outer_shard,) = result.metadata.codecs
+        (inner_shard,) = outer_shard.codecs
+        assert inner_shard.chunk_shape == (1, 45, 45)
+
+    def test_stack(self, sharded_marr):
+        result = np.stack([sharded_marr, sharded_marr], axis=0)
+
+        assert result.shape == (2, 90, 180)
+        assert result.metadata.shards == (1, 90, 180)
+        assert result.metadata.chunks == (1, 45, 45)
+
+    def test_broadcast_to_new_axis(self, sharded_marr):
+        result = np.broadcast_to(sharded_marr, shape=(3, 90, 180))
+
+        assert result.shape == (3, 90, 180)
+        assert result.metadata.shards == (1, 90, 180)
+        assert result.metadata.chunks == (1, 45, 45)
+
+    def test_broadcast_to_multiple_new_axes(self, sharded_marr):
+        result = np.broadcast_to(sharded_marr, shape=(2, 3, 90, 180))
+
+        assert result.shape == (2, 3, 90, 180)
+        assert result.metadata.shards == (1, 1, 90, 180)
+        assert result.metadata.chunks == (1, 1, 45, 45)
+
+    def test_concatenate_leaves_shard_config_alone(self, sharded_marr):
+        result = np.concatenate([sharded_marr, sharded_marr], axis=0)
+
+        assert result.shape == (180, 180)
+        assert result.metadata.chunks == (45, 45)
+
+    def test_full_slice_is_a_noop(self, sharded_marr):
+        # the manifest's unit is the shard, so a full slice selects the whole (1, 1)
+        # chunk grid and must short-circuit rather than subset it as if it were the
+        # 2x4 grid of inner chunks
+        result = sharded_marr[:, :]
+
+        assert result is sharded_marr
+
+    def test_integer_index_drops_axis(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(2, 90, 180),
+            chunks=(1, 90, 180),
+            data_type=np.dtype("float32"),
+            codecs=[sharding_codec((1, 45, 45))],
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0.0": {"path": "/foo.zarr", "offset": 0, "length": 1000},
+                "1.0.0": {"path": "/foo.zarr", "offset": 1000, "length": 1000},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr[1, :, :]
+
+        assert result.shape == (90, 180)
+        assert result.metadata.shards == (90, 180)
+        assert result.metadata.chunks == (45, 45)
+        assert result.manifest.dict() == {
+            "0.0": {"path": "file:///foo.zarr", "offset": 1000, "length": 1000}
+        }
+
+    def test_shard_aligned_slice(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(180, 180),
+            chunks=(90, 180),
+            data_type=np.dtype("float32"),
+            codecs=[sharding_codec((45, 45))],
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/foo.zarr", "offset": 0, "length": 1000},
+                "1.0": {"path": "/foo.zarr", "offset": 1000, "length": 1000},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = marr[90:180, :]
+
+        assert result.shape == (90, 180)
+        assert result.metadata.shards == (90, 180)
+        assert result.metadata.chunks == (45, 45)
+        assert result.manifest.dict() == {
+            "0.0": {"path": "file:///foo.zarr", "offset": 1000, "length": 1000}
+        }
 
 
 class TestStackInlined:

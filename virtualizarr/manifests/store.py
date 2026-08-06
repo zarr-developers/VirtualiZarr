@@ -19,7 +19,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.manifests.utils import parse_manifest_index
+from virtualizarr.manifests.utils import manifest_chunk_shape, parse_manifest_index
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -408,7 +408,10 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
         name
         for name, var in vds.variables.items()
         if isinstance(var.data, ManifestArray)
-        and any(c > s for c, s in zip(var.data.metadata.chunks, var.data.shape))
+        and any(
+            c > s
+            for c, s in zip(manifest_chunk_shape(var.data.metadata), var.data.shape)
+        )
     ]
     if oversized:
         warnings.warn(

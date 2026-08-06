@@ -20,9 +20,25 @@
 
 ### Bug fixes
 
+- Concatenating, stacking, broadcasting or indexing virtual arrays that use the `sharding_indexed` codec
+  now works. Operations that add or remove a length-1 axis realign the shard's inner `chunk_shape` to
+  match the array's new dimensionality, instead of leaving a stale config that zarr rejects with
+  *"The shard's `chunk_shape` and array's `shape` need to have the same number of dimensions."*
+  Relatedly, operations on a sharded array now consistently treat a *shard* as the unit that a chunk
+  manifest entry locates — previously they used `ArrayV3Metadata.chunks`, which zarr defines as the
+  *inner* chunk shape when sharding is in play, so e.g. a stacked sharded array came out with an inner
+  chunk shape as its outer chunk grid. Closes
+  [#1076](https://github.com/zarr-developers/VirtualiZarr/issues/1076).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
+
+- Added `virtualizarr.manifests.utils.manifest_chunk_shape`, the shape of the region that one chunk
+  manifest entry locates (a shard, for sharded arrays), and used it in place of `ArrayV3Metadata.chunks`
+  wherever that meaning was intended.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 
 ## v2.7.2 (5th August 2026)

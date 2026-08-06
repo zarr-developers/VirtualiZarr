@@ -1218,3 +1218,55 @@ def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
     # Verify data values match
     ic_ds = xr.open_zarr(ro_session.store, zarr_format=3, consolidated=False)
     npt.assert_array_equal(ic_ds["data"].values, data)
+
+
+def test_concat_sharded_arrays_along_new_dim_roundtrip_icechunk(
+    icechunk_repo, tmp_path
+):
+    """
+    Concatenating sharded virtual arrays along a *new* dimension must produce readable
+    data: the shard's inner chunk_shape has to gain the same length-1 axis, and doing so
+    leaves the shard's inner chunk grid, index layout and chunk bytes untouched.
+
+    Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/1076.
+    """
+    datasets, vdss = [], []
+    for i in range(2):
+        filepath = str(tmp_path / f"step_{i}.zarr")
+        data = np.arange(i * 144, (i + 1) * 144, dtype="float32").reshape(12, 12)
+        ds = xr.Dataset({"data": (("x", "y"), data)})
+        ds.to_zarr(
+            filepath,
+            encoding={"data": {"chunks": (3, 3), "shards": (12, 12)}},
+            consolidated=False,
+            zarr_format=3,
+        )
+        datasets.append(ds)
+
+        registry = ObjectStoreRegistry(
+            {f"file://{filepath}": LocalStore(prefix=filepath)}
+        )
+        vdss.append(
+            open_virtual_dataset(url=filepath, registry=registry, parser=ZarrParser())
+        )
+
+    # this is what used to raise: "The shard's `chunk_shape` and array's `shape` need to
+    # have the same number of dimensions."
+    concatenated = xr.concat(vdss, dim="time")
+
+    assert concatenated["data"].shape == (2, 12, 12)
+    assert concatenated["data"].data.metadata.shards == (1, 12, 12)
+    assert concatenated["data"].data.metadata.chunks == (1, 3, 3)
+
+    session = icechunk_repo.writable_session("main")
+    concatenated.vz.to_icechunk(session.store, validate_containers=False)
+    session.commit("concat sharded arrays along a new dim")
+
+    ro_session = icechunk_repo.readonly_session("main")
+    roundtrip = xr.open_zarr(ro_session.store, zarr_format=3, consolidated=False)
+
+    assert roundtrip["data"].shape == (2, 12, 12)
+    # the payoff: every inner chunk of both shards decodes to its original values
+    npt.assert_array_equal(
+        roundtrip["data"].values, xr.concat(datasets, dim="time")["data"].values
+    )
