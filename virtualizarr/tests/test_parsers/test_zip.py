@@ -261,3 +261,84 @@ def test_v3_dot_chunk_key_separator(tmp_path, local_registry):
         loadable_variables=list(ds.variables),
     ) as vds:
         xr.testing.assert_identical(vds, ds)
+
+
+class _CountingStore:
+    """Wraps an obstore, counting the range requests the parser makes."""
+
+    def __init__(self, store):
+        self._store = store
+        self.n_ranges = 0
+
+    async def head_async(self, path):
+        return await self._store.head_async(path)
+
+    async def get_range_async(self, path, *, start, end):
+        self.n_ranges += 1
+        return await self._store.get_range_async(path, start=start, end=end)
+
+    async def get_ranges_async(self, path, *, starts, ends):
+        self.n_ranges += len(starts)
+        return await self._store.get_ranges_async(path, starts=starts, ends=ends)
+
+
+@zarr_versions
+def test_index_does_not_read_local_headers(tmp_path, zarr_format):
+    """
+    A zipped Zarr's member offsets are derivable from the central directory alone, so
+    building the index must not cost a read per member.
+
+    Reading every 30-byte local header is one request per member - hundreds for a real
+    archive - which dominates the cost of virtualizing it over a high-latency store.
+    """
+    ds = xr.Dataset({f"var_{i}": (("x",), np.arange(8, dtype="f4")) for i in range(30)})
+    zip_path = tmp_path / f"many_v{zarr_format}.zarr.zip"
+    store = ZipStore(zip_path, mode="w")
+    try:
+        ds.to_zarr(store, zarr_format=zarr_format, consolidated=False)
+    finally:
+        store.close()
+
+    counting = _CountingStore(LocalStore(prefix=str(tmp_path)))
+    index = asyncio.run(parse_zip_index(counting, zip_path.name))
+
+    assert len(index) > 30  # metadata + chunks
+    assert counting.n_ranges <= 3, counting.n_ranges
+
+    # and the offsets must still be right
+    raw = zip_path.read_bytes()
+    with zipfile.ZipFile(zip_path) as zf:
+        for name, entry in index.items():
+            assert raw[
+                entry.data_offset : entry.data_offset + entry.compressed_length
+            ] == zf.read(name), name
+
+
+def test_falls_back_to_local_headers_when_offsets_disagree(tmp_path):
+    """
+    Archives whose local extra fields differ from the central directory's must still be
+    read correctly, by falling back to the local headers.
+
+    `force_zip64` is the documented divergence: zipfile writes a 20-byte ZIP64 extra field
+    into the local header but not into the central directory.
+    """
+    zip_path = tmp_path / "forced.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        for i in range(3):
+            with zf.open(
+                zipfile.ZipInfo(f"member_{i}.bin"), "w", force_zip64=True
+            ) as f:
+                f.write(bytes([i]) * 500)
+
+    counting = _CountingStore(LocalStore(prefix=str(tmp_path)))
+    index = asyncio.run(parse_zip_index(counting, zip_path.name))
+
+    raw = zip_path.read_bytes()
+    with zipfile.ZipFile(zip_path) as zf:
+        for name, entry in index.items():
+            assert raw[
+                entry.data_offset : entry.data_offset + entry.compressed_length
+            ] == zf.read(name), name
+
+    # the fallback means it paid for the local headers, rather than being wrong
+    assert counting.n_ranges > 3, counting.n_ranges

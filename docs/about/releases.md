@@ -4,6 +4,18 @@
 
 ### New Features
 
+### Performance
+
+- Building the member index of a zipped Zarr store no longer costs one request per member.
+  Member data offsets are now derived from the central directory, which has already been
+  read, and verified for free against the archive's layout; only archives whose local
+  headers genuinely disagree with it (`zipfile`'s `force_zip64`, Info-ZIP's `zip`) still
+  pay for a read of every local header. For a 336-member archive on remote object storage
+  this took `parse_zip_index` from 337 requests to 1, and cut the wall time of
+  `open_virtual_dataset` from ~7.8 s to ~1.3 s per archive - a 6.8x improvement in
+  throughput when virtualizing many archives at once, which is request-rate bound.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Breaking changes
 
 ### Bug fixes
