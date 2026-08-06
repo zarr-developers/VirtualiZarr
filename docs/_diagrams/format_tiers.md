@@ -14,5 +14,5 @@
 | GeoTIFF                |                         | x             | x                            |                            |                       |                              |
 | COG                    |                         | x             | x                            | x                          |                       |                              |
 | Native Zarr (v2 or v3) |                         | x             | x                            | x                          | x                     |                              |
-| Zipped Native Zarr     |                         | x             | x                            | x                          |                       |                              |
+| Zipped Native Zarr     |                         | x             |                              |                            |                       |                              |
 | Icechunk               |                         | x             | x                            | x                          | x                     | x                            |
