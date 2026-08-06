@@ -126,6 +126,21 @@ BLOSC_CODEC = {
 ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
 
 
+def sharding_codec(
+    inner_chunk_shape: tuple[int, ...], inner_codecs: list[dict] | None = None
+) -> dict:
+    """A `sharding_indexed` codec config splitting each shard into `inner_chunk_shape` chunks."""
+    return {
+        "name": "sharding_indexed",
+        "configuration": {
+            "chunk_shape": inner_chunk_shape,
+            "codecs": inner_codecs or [ARRAYBYTES_CODEC],
+            "index_codecs": [ARRAYBYTES_CODEC, {"name": "crc32c"}],
+            "index_location": "end",
+        },
+    }
+
+
 # Helper functions
 def _generate_chunk_entries(
     shape: tuple[int, ...],

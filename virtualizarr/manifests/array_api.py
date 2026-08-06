@@ -13,6 +13,7 @@ from .utils import (
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
     copy_and_replace_metadata,
+    manifest_chunk_shape,
 )
 
 if TYPE_CHECKING:
@@ -99,7 +100,7 @@ def where(condition, x, y, /):
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
-    for axis, chunk_size in enumerate(marr.metadata.chunks):
+    for axis, chunk_size in enumerate(manifest_chunk_shape(marr.metadata)):
         mask = np.repeat(mask, chunk_size, axis=axis)
     return mask[tuple(slice(0, length) for length in marr.shape)]
 
@@ -137,7 +138,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [arr.metadata.chunks for arr in arrays]
+    arr_chunks = [manifest_chunk_shape(arr.metadata) for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
@@ -199,7 +200,7 @@ def stack(
     stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
     # chunk shape has changed because a length-1 axis has been inserted
-    old_chunks = first_arr.metadata.chunks
+    old_chunks = manifest_chunk_shape(first_arr.metadata)
     new_chunks = list(old_chunks)
     new_chunks.insert(axis, 1)
 
@@ -237,7 +238,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    old_chunk_shape = x.metadata.chunks
+    old_chunk_shape = manifest_chunk_shape(x.metadata)
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )

@@ -332,7 +332,9 @@ class ManifestArray:
         new_metadata = dataclasses.replace(self.metadata, fill_value=fill_value)
         empty_manifest = ChunkManifest(
             entries={},
-            shape=determine_chunk_grid_shape(self.shape, self.metadata.chunks),
+            shape=determine_chunk_grid_shape(
+                self.shape, utils.manifest_chunk_shape(self.metadata)
+            ),
         )
         return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
 

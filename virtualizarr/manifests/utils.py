@@ -1,11 +1,13 @@
+import copy
 import functools
 import re
 import typing
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union, cast
 
 import numpy as np
 from zarr import Array
 from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
+from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import (
     ArrayV3Metadata,
     parse_dimension_names,
@@ -16,7 +18,16 @@ from zarr.dtype import parse_data_type
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
 if TYPE_CHECKING:
+    from zarr.core.metadata.v3 import RegularChunkGridMetadata
+
     from .array import ManifestArray
+else:
+    try:
+        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
+    except ImportError:
+        from zarr.core.metadata.v3 import (
+            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
+        )
 
 ChunkKeySeparator = Literal[".", "/"]
 # Tuple of literal values specified in the Literal type above
@@ -332,7 +343,7 @@ def check_combinable_zarr_arrays(
     check_same_codecs([get_codecs(arr) for arr in arrays])
 
     # Would require variable-length chunks ZEP
-    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
+    check_same_chunk_shapes([manifest_chunk_shape(arr.metadata) for arr in arrays])
 
 
 def check_compatible_arrays(
@@ -344,6 +355,100 @@ def check_compatible_arrays(
     check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
 
 
+def manifest_chunk_shape(
+    metadata: Union[ArrayV3Metadata, "ArrayV2Metadata"],
+) -> tuple[int, ...]:
+    """
+    The shape of the region of the array that one chunk manifest entry locates.
+
+    For a sharded array this is the *shard* shape, because each manifest entry points at
+    a whole shard. Note this is deliberately not ``ArrayV3Metadata.chunks``, which zarr
+    defines as the shape of an *inner* chunk when a sharding codec is present.
+    """
+    if not isinstance(metadata, ArrayV3Metadata):
+        # Zarr V2 has no sharding, so a chunk is the manifest's unit
+        return tuple(metadata.chunks)
+    return tuple(cast("RegularChunkGridMetadata", metadata.chunk_grid).chunk_shape)
+
+
+def _realign_inner_chunk_shape(
+    old_chunks: tuple[int, ...],
+    new_chunks: tuple[int, ...],
+    old_inner_chunks: tuple[int, ...],
+) -> tuple[int, ...]:
+    """
+    Carry a shard's inner chunk shape across a change of axes in the outer chunk shape.
+
+    An outer chunk shape can only ever change by adding or removing length-1 axes - a
+    chunk covers a fixed number of array elements, so any other change would describe
+    different chunks. Adding an axis (`stack`, `expand_dims`, `broadcast_to`) gives the
+    inner shape a 1 in the same place; removing one (integer indexing, which is only
+    legal where the chunk length is already 1) drops the corresponding inner axis. Both
+    leave the inner chunk grid, the C-order shard index layout, and every inner chunk's
+    bytes untouched, so the encoded shard stays byte-for-byte valid.
+
+    Where ``old_chunks`` already contains 1s the alignment is ambiguous, but harmlessly
+    so: an ambiguous position holds a 1 in the outer shape, so the inner shape must hold
+    a 1 there too (it divides the outer), and inserting or dropping a 1 on either side of
+    an existing 1 gives the same result.
+    """
+    new_inner_chunks: list[int] = []
+    old_axis = new_axis = 0
+    while old_axis < len(old_chunks) or new_axis < len(new_chunks):
+        if (
+            old_axis < len(old_chunks)
+            and new_axis < len(new_chunks)
+            and old_chunks[old_axis] == new_chunks[new_axis]
+        ):
+            new_inner_chunks.append(old_inner_chunks[old_axis])
+            old_axis += 1
+            new_axis += 1
+        elif new_axis < len(new_chunks) and new_chunks[new_axis] == 1:
+            new_inner_chunks.append(1)  # axis added
+            new_axis += 1
+        elif old_axis < len(old_chunks) and old_chunks[old_axis] == 1:
+            old_axis += 1  # axis dropped
+        else:
+            raise ValueError(
+                f"chunk shape {new_chunks} is not {old_chunks} with length-1 axes added "
+                "or removed, so it cannot describe the same chunks"
+            )
+    return tuple(new_inner_chunks)
+
+
+def _realign_sharding_codecs(
+    codecs: Iterable[dict[str, Any]],
+    old_chunks: tuple[int, ...],
+    new_chunks: tuple[int, ...],
+) -> list[dict[str, Any]]:
+    """
+    Realign the inner ``chunk_shape`` of any ``sharding_indexed`` codec onto new axes.
+
+    Zarr requires a shard's inner chunk shape to have the same number of dimensions as
+    the array, so changing an array's axes means changing the shard config to match.
+    """
+    updated = []
+    for codec in codecs:
+        if codec.get("name") != "sharding_indexed":
+            updated.append(codec)
+            continue
+
+        codec = copy.deepcopy(codec)
+        configuration = codec["configuration"]
+        old_inner_chunks = tuple(configuration["chunk_shape"])
+        new_inner_chunks = _realign_inner_chunk_shape(
+            old_chunks, new_chunks, old_inner_chunks
+        )
+        configuration["chunk_shape"] = new_inner_chunks
+        # shards may themselves contain shards, for which this shard's inner chunk shape
+        # is in turn the outer one
+        configuration["codecs"] = _realign_sharding_codecs(
+            configuration["codecs"], old_inner_chunks, new_inner_chunks
+        )
+        updated.append(codec)
+    return updated
+
+
 def copy_and_replace_metadata(
     old_metadata: ArrayV3Metadata,
     new_shape: list[int] | None = None,
@@ -353,6 +458,9 @@ def copy_and_replace_metadata(
 ) -> ArrayV3Metadata:
     """
     Update metadata to reflect a new shape and/or chunk shape.
+
+    ``new_chunks`` is the outer chunk shape, i.e. the shard shape for a sharded array -
+    see [manifest_chunk_shape][virtualizarr.manifests.utils.manifest_chunk_shape].
     """
     # TODO this should really be upstreamed into zarr-python
 
@@ -361,10 +469,20 @@ def copy_and_replace_metadata(
     if new_shape is not None:
         metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
     if new_chunks is not None:
+        old_chunks = manifest_chunk_shape(old_metadata)
+        new_chunks = list(new_chunks)
         metadata_copy["chunk_grid"] = {
             "name": "regular",
             "configuration": {"chunk_shape": tuple(new_chunks)},
         }
+        if len(new_chunks) != len(old_chunks):
+            # a sharding codec's inner chunk_shape must match the array's ndim, so it has
+            # to gain or lose the same length-1 axes the outer chunk shape just did
+            metadata_copy["codecs"] = _realign_sharding_codecs(
+                cast(list[dict[str, Any]], metadata_copy["codecs"]),
+                old_chunks,
+                tuple(new_chunks),
+            )
     if new_dimension_names != "default":
         # need the option to use the literal string "default" as a sentinel value because None is a valid choice for zarr dimension_names
         metadata_copy["dimension_names"] = parse_dimension_names(new_dimension_names)
