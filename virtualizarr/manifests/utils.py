@@ -364,6 +364,18 @@ def manifest_chunk_shape(
     For a sharded array this is the *shard* shape, because each manifest entry points at
     a whole shard. Note this is deliberately not ``ArrayV3Metadata.chunks``, which zarr
     defines as the shape of an *inner* chunk when a sharding codec is present.
+
+    Parameters
+    ----------
+    metadata
+        Metadata of the array whose manifest unit is wanted. Zarr V2 metadata is accepted
+        because [check_combinable_zarr_arrays][virtualizarr.manifests.utils.check_combinable_zarr_arrays]
+        may be handed a V2 `zarr.Array` alongside `ManifestArray`s.
+
+    Returns
+    -------
+    The shape covered by one manifest entry: the shard shape if `metadata` has a sharding
+    codec, else the chunk shape.
     """
     if not isinstance(metadata, ArrayV3Metadata):
         # Zarr V2 has no sharding, so a chunk is the manifest's unit
@@ -391,6 +403,28 @@ def _realign_inner_chunk_shape(
     so: an ambiguous position holds a 1 in the outer shape, so the inner shape must hold
     a 1 there too (it divides the outer), and inserting or dropping a 1 on either side of
     an existing 1 gives the same result.
+
+    Parameters
+    ----------
+    old_chunks
+        The outer chunk shape before the change of axes, i.e. one shard.
+    new_chunks
+        The outer chunk shape after the change of axes. Must be `old_chunks` with length-1
+        axes added and/or removed.
+    old_inner_chunks
+        The shard's inner chunk shape, on `old_chunks`' axes. Same length as `old_chunks`,
+        and divides it element-wise.
+
+    Returns
+    -------
+    `old_inner_chunks` mapped onto `new_chunks`' axes, with a 1 at each added axis and the
+    entry at each dropped axis removed. Same length as `new_chunks`.
+
+    Raises
+    ------
+    ValueError
+        If `new_chunks` is not `old_chunks` with length-1 axes added or removed, so no
+        alignment exists.
     """
     new_inner_chunks: list[int] = []
     old_axis = new_axis = 0
@@ -426,6 +460,24 @@ def _realign_sharding_codecs(
 
     Zarr requires a shard's inner chunk shape to have the same number of dimensions as
     the array, so changing an array's axes means changing the shard config to match.
+
+    Parameters
+    ----------
+    codecs
+        A codec pipeline, as plain dicts (i.e. straight out of `ArrayV3Metadata.to_dict`).
+        Codecs other than `sharding_indexed` are passed through untouched.
+    old_chunks
+        The chunk shape these codecs currently encode, on the old axes. For a top-level
+        pipeline this is the array's outer chunk shape; when recursing into a nested shard
+        it is the enclosing shard's inner chunk shape.
+    new_chunks
+        The same shape on the new axes, as `old_chunks` with length-1 axes added and/or
+        removed.
+
+    Returns
+    -------
+    A new codec list. Sharding codecs are deep-copied with their inner `chunk_shape`
+    realigned, so the input dicts are never mutated.
     """
     updated = []
     for codec in codecs:
@@ -459,8 +511,35 @@ def copy_and_replace_metadata(
     """
     Update metadata to reflect a new shape and/or chunk shape.
 
-    ``new_chunks`` is the outer chunk shape, i.e. the shard shape for a sharded array -
-    see [manifest_chunk_shape][virtualizarr.manifests.utils.manifest_chunk_shape].
+    Parameters
+    ----------
+    old_metadata
+        Metadata to copy from. Never mutated.
+    new_shape
+        Replacement array shape, or None to keep the existing one.
+    new_chunks
+        Replacement *outer* chunk shape - the shard shape for a sharded array, see
+        [manifest_chunk_shape][virtualizarr.manifests.utils.manifest_chunk_shape] - or None
+        to keep the existing one. If this changes the number of axes, any sharding codec's
+        inner `chunk_shape` is realigned onto the new axes to match; the change must then
+        be length-1 axes added and/or removed, since a chunk covers a fixed number of
+        elements.
+    new_dimension_names
+        Replacement dimension names, or None to clear them. Defaults to the sentinel
+        `"default"`, meaning leave them as they are - None cannot serve as that sentinel
+        because it is itself a valid value for zarr's `dimension_names`.
+    new_attributes
+        Replacement attributes dict, or None to keep the existing one.
+
+    Returns
+    -------
+    New metadata with the requested replacements applied.
+
+    Raises
+    ------
+    ValueError
+        If `new_chunks` changes the number of axes by anything other than adding or
+        removing length-1 axes, leaving a sharding codec's inner chunk shape unalignable.
     """
     # TODO this should really be upstreamed into zarr-python
 
