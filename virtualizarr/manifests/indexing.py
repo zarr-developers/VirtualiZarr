@@ -8,7 +8,10 @@ from zarr.core.metadata.v3 import ArrayV3Metadata
 from virtualizarr.manifests.array_api import expand_dims
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.reindex import chunk_map_from_indexer, reindex_axis
-from virtualizarr.manifests.utils import copy_and_replace_metadata
+from virtualizarr.manifests.utils import (
+    copy_and_replace_metadata,
+    manifest_chunk_shape,
+)
 
 # indexer with only basic selectors, no new axes or ellipsis
 T_BasicIndexer_1d: TypeAlias = int | slice | np.ndarray
@@ -199,7 +202,7 @@ def _apply_reindex(
     for axis, raw_indexer_1d in enumerate(indexers):
         indexer_1d = _collapse_outer_indexer(raw_indexer_1d, axis)
         if _is_reindex_indexer(indexer_1d):
-            chunk_size = result.metadata.chunks[axis]
+            chunk_size = manifest_chunk_shape(result.metadata)[axis]
             try:
                 chunk_map = chunk_map_from_indexer(
                     np.asarray(indexer_1d), chunk_size, result.shape[axis]
@@ -276,7 +279,12 @@ def apply_selection(
     # The byte adjustment is uniform across every surviving chunk, since chunks share layout.
     sub_chunk_byte_adjust: tuple[int, int] | None = None
     for axis, (axis_length, chunk_size, indexer_1d) in enumerate(
-        zip(marr.shape, marr.metadata.chunks, narrowed_indexers, strict=True)
+        zip(
+            marr.shape,
+            manifest_chunk_shape(marr.metadata),
+            narrowed_indexers,
+            strict=True,
+        )
     ):
         chunk_grid_selector: int | slice
         if axis == sub_chunk_axis and _is_sub_chunk_slice(
@@ -288,7 +296,9 @@ def apply_selection(
                     axis_length=axis_length,
                     chunk_size=chunk_size,
                     other_axis_chunks=tuple(
-                        c for i, c in enumerate(marr.metadata.chunks) if i != axis
+                        c
+                        for i, c in enumerate(manifest_chunk_shape(marr.metadata))
+                        if i != axis
                     ),
                     itemsize=marr.dtype.itemsize,
                 )
