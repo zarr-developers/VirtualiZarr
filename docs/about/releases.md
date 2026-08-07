@@ -1,6 +1,8 @@
 # Release notes
 
-## v2.7.3 (unreleased)
+## v2.7.3 (7th August 2026)
+
+Makes virtualizing `.zarr.zip` archives dramatically cheaper — building a zipped store's member index now takes a single request instead of one per member, a 6.8x throughput improvement when virtualizing many archives — and fixes sharded virtual arrays losing their shard configuration when concatenated, stacked, broadcast or indexed.
 
 ### New Features
 
