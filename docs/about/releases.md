@@ -142,6 +142,11 @@ Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unz
   constraints in *"Can my specific data be virtualized?"*.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+  ### Bug fixes
+
+  - `HDFParser`'s `drop_variables` is now propagated into subgroup recursion, so a listed name is dropped wherever it appears in the walked group hierarchy instead of only at the level the parser was called on. This allows parsing files whose nested groups contain datasets with dtypes zarr cannot represent (e.g. the compound-dtype `legend` tables in ODIM_H5 weather-radar volumes) by dropping them. Closes [#1057](https://github.com/zarr-developers/VirtualiZarr/issues/1057).
+    By [Alfonso Ladino](https://github.com/aladinor).
+
 
 ## v2.7.1 (15th July 2026)
 

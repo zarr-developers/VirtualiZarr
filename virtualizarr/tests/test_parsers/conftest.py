@@ -191,6 +191,21 @@ def nested_group_hdf5_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture
+def nested_compound_dtype_hdf5_url(tmp_path: Path) -> str:
+    # "legend" has a dtype zarr cannot represent (compound with a vlen-string
+    # field) and is nested below the root group (GH issue #1057)
+    filepath = str(tmp_path / "nested_compound_dtype.h5")
+
+    with h5py.File(filepath, "w") as f:
+        g = f.create_group("dataset1/quality1")
+        dt = np.dtype([("code", "<i8"), ("class", h5py.string_dtype())])
+        g.create_dataset("legend", data=np.array([(1, "rain")], dtype=dt))
+        f.create_dataset("dataset1/data", data=np.zeros((4, 5)))
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def multiple_datasets_hdf5_url(tmp_path: Path) -> str:
     filepath = str(tmp_path / "multiple_datasets.nc")
 

@@ -246,6 +246,44 @@ class TestManifestGroupFromHDF:
         manifest_store = parser(url=multiple_datasets_hdf5_url, registry=local_registry)
         assert "data2" not in manifest_store._group.arrays.keys()
 
+    def test_drop_variables_in_nested_groups(self, nested_compound_dtype_hdf5_url):
+        # regression test for GH issue #1057: drop_variables must reach nested groups
+        with pytest.raises(ValueError, match="data type"):
+            manifest_store_from_hdf_url(nested_compound_dtype_hdf5_url)
+
+        manifest_store = manifest_store_from_hdf_url(
+            nested_compound_dtype_hdf5_url, drop_variables=["legend"]
+        )
+        assert "legend" not in manifest_store._group["dataset1"]["quality1"].arrays
+        assert "data" in manifest_store._group["dataset1"].arrays
+
+    def test_drop_variables_applies_at_every_depth(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(
+            nested_group_hdf5_url, drop_variables=["data"]
+        )
+        assert "data" not in manifest_store._group["group"].arrays
+        assert "data" not in manifest_store._group["group"]["nested_group"].arrays
+
+    def test_drop_variables_group_name_skips_subtree(self, nested_group_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(
+            nested_group_hdf5_url, drop_variables=["nested_group"]
+        )
+        assert "nested_group" not in manifest_store._group["group"].groups
+        assert "data" in manifest_store._group["group"].arrays
+
+    def test_dimension_var_drops_stay_group_local(self, tmp_path):
+        # an auto-dropped non-coordinate dimension var in one group must not
+        # drop an identically named variable in a sibling group
+        filepath = str(tmp_path / "sibling_dimension_vars.h5")
+        with h5py.File(filepath, "w") as f:
+            dim = f.create_group("a").create_dataset("n", shape=(5,), dtype="<i4")
+            dim.attrs["_Netcdf4Dimid"] = 0
+            f.create_group("b").create_dataset("n", data=np.arange(3))
+
+        manifest_store = manifest_store_from_hdf_url(f"file://{filepath}")
+        assert "n" not in manifest_store._group["a"].arrays
+        assert "n" in manifest_store._group["b"].arrays
+
     def test_dataset_in_group(self, group_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(group_hdf5_url, group="group")
         assert len(manifest_store._group.arrays) == 1
