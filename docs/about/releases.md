@@ -156,6 +156,10 @@ Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unz
   constraints in *"Can my specific data be virtualized?"*.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+  ### Internal Changes
+  - `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=3.5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one
+  must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 
 ## v2.7.1 (15th July 2026)
 
@@ -461,6 +465,7 @@ Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders 
   By [UserNobody14](https://github.com/UserNobody14).
 - Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
   By [Max Jones](https://github.com/maxrjones).
+
 
 ### Documentation
 
