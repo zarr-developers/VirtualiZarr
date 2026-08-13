@@ -3,7 +3,7 @@
 # Standard library imports
 import itertools
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any, Callable, Iterable, Literal, Mapping, Optional
 
 # Third-party imports
 import h5py  # type: ignore[import]
@@ -100,14 +100,17 @@ def netcdf3_file(tmp_path: Path):
 
 # The three netCDF classic on-disk formats, by the CDF version their magic number
 # carries. CDF-5 is the only one that can hold unsigned and 64-bit integer types.
-NETCDF3_FORMATS = {
+NetCDF3Format = Literal["NETCDF3_CLASSIC", "NETCDF3_64BIT_OFFSET", "NETCDF3_64BIT_DATA"]
+NETCDF3_FORMATS: dict[int, NetCDF3Format] = {
     1: "NETCDF3_CLASSIC",
     2: "NETCDF3_64BIT_OFFSET",
     5: "NETCDF3_64BIT_DATA",
 }
 
 
-def _write_netcdf3_variant(path: Path, netcdf_format: str, cdf_version: int) -> Path:
+def _write_netcdf3_variant(
+    path: Path, netcdf_format: NetCDF3Format, cdf_version: int
+) -> Path:
     """Write a netCDF3 file exercising the features a parser has to get right.
 
     Covers contiguous and record variables, a lone char variable, a scalar, a

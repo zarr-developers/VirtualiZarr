@@ -125,9 +125,6 @@ docs = [
 dev = [
     "codecov",
     "mypy",
-    # Writes the netCDF3 test files: the only writer that can emit all three of
-    # CDF-1, CDF-2 and CDF-5.
-    "netCDF4",
     "pandas-stubs",
     "pooch",
     "pre-commit",
