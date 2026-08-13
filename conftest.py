@@ -7,6 +7,7 @@ from typing import Any, Callable, Iterable, Mapping, Optional
 
 # Third-party imports
 import h5py  # type: ignore[import]
+import netCDF4  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
@@ -95,6 +96,93 @@ def netcdf3_file(tmp_path: Path):
         return filepath
 
     return _make
+
+
+# The three netCDF classic on-disk formats, by the CDF version their magic number
+# carries. CDF-5 is the only one that can hold unsigned and 64-bit integer types.
+NETCDF3_FORMATS = {
+    1: "NETCDF3_CLASSIC",
+    2: "NETCDF3_64BIT_OFFSET",
+    5: "NETCDF3_64BIT_DATA",
+}
+
+
+def _write_netcdf3_variant(path: Path, netcdf_format: str, cdf_version: int) -> Path:
+    """Write a netCDF3 file exercising the features a parser has to get right.
+
+    Covers contiguous and record variables, a lone char variable, a scalar, a
+    fill value, global and per-variable attributes, and -- for CDF-5 only -- the
+    unsigned and 64-bit integer types the earlier formats cannot represent.
+    """
+    ds = netCDF4.Dataset(path, "w", format=netcdf_format)
+    ds.createDimension("x", 4)
+    ds.createDimension("y", 3)
+    ds.createDimension("t", None)  # unlimited
+    ds.createDimension("nchar", 5)
+
+    contiguous = ds.createVariable("contiguous", "f4", ("x", "y"))
+    contiguous[:] = np.arange(12).reshape(4, 3)
+    contiguous.units = "kelvin"
+
+    filled = ds.createVariable("filled", "f8", ("y",), fill_value=-999.0)
+    filled[:] = [1.0, 2.0, 3.0]
+
+    scalar = ds.createVariable("scalar", "i4", ())
+    scalar[()] = 42
+
+    label = ds.createVariable("label", "S1", ("x", "nchar"))
+    label[:] = np.array(
+        [list("abcde"), list("fghij"), list("klmno"), list("pqrst")], "S1"
+    )
+
+    # Three record variables of differing itemsize, so the record stride depends
+    # on all of them and a wrong stride cannot go unnoticed.
+    rec_f8 = ds.createVariable("rec_f8", "f8", ("t", "x"))
+    rec_f8[0:3] = np.arange(12).reshape(3, 4) * 1.5
+    rec_i2 = ds.createVariable("rec_i2", "i2", ("t",))
+    rec_i2[0:3] = [7, 8, 9]
+    rec_i1 = ds.createVariable("rec_i1", "i1", ("t", "y"))
+    rec_i1[0:3] = np.arange(9).reshape(3, 3)
+
+    if cdf_version == 5:
+        u8 = ds.createVariable("big_uint", "u8", ("y",))
+        u8[:] = [1, 2, 2**40]
+        i8 = ds.createVariable("big_int", "i8", ("y",))
+        i8[:] = [-(2**40), 0, 2**40]
+        u2 = ds.createVariable("ushort", "u2", ("y",))
+        u2[:] = [0, 1, 65535]
+
+    ds.title = "netCDF3 test file"
+    ds.answer = 42
+    ds.close()
+    return path
+
+
+@pytest.fixture(params=sorted(NETCDF3_FORMATS))
+def netcdf3_variant_file(request, tmp_path: Path):
+    """A netCDF3 file, once per CDF version. Yields ``(path, cdf_version)``."""
+    cdf_version = request.param
+    path = tmp_path / f"cdf{cdf_version}.nc"
+    _write_netcdf3_variant(path, NETCDF3_FORMATS[cdf_version], cdf_version)
+    return path, cdf_version
+
+
+@pytest.fixture
+def netcdf3_single_record_var_file(tmp_path: Path) -> Path:
+    """A file whose only record variable has an unpadded record length.
+
+    netCDF3 pads each record variable's per-record slice out to a multiple of 4
+    bytes, except when the file holds exactly one record variable. Here that
+    slice is 3 bytes, so a parser that always pads computes the wrong stride.
+    """
+    path = tmp_path / "single_record_var.nc"
+    ds = netCDF4.Dataset(path, "w", format="NETCDF3_CLASSIC")
+    ds.createDimension("t", None)
+    ds.createDimension("y", 3)
+    only = ds.createVariable("only", "i1", ("t", "y"))
+    only[0:4] = np.arange(12).reshape(4, 3)
+    ds.close()
+    return path
 
 
 @pytest.fixture(params=["int8", "uint8", "float32"])

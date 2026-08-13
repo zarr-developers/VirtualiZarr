@@ -52,12 +52,11 @@ hdf = [
 
 zarr = ["arro3-core"]
 
+# The netCDF3 parser reads the file header itself, so it needs nothing beyond
+# the core dependencies. Kept as an extra so `virtualizarr[netcdf3]` keeps working.
+netcdf3 = []
+
 # kerchunk-based parsers
-netcdf3 = [
-    "virtualizarr[remote]",
-    "kerchunk>=0.2.8",
-    "scipy",
-]
 fits = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
@@ -126,6 +125,9 @@ docs = [
 dev = [
     "codecov",
     "mypy",
+    # Writes the netCDF3 test files: the only writer that can emit all three of
+    # CDF-1, CDF-2 and CDF-5.
+    "netCDF4",
     "pandas-stubs",
     "pooch",
     "pre-commit",

@@ -27,7 +27,6 @@ from virtualizarr.tests import (
     requires_icechunk,
     requires_kerchunk,
     requires_network,
-    requires_scipy,
     slow_test,
 )
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
@@ -553,7 +552,6 @@ def test_roundtrip_dataset_with_multiple_compressors():
         xr.testing.assert_allclose(expected, observed)
 
 
-@requires_scipy
 @requires_icechunk
 def test_subchunk_slice_netcdf3_through_icechunk_roundtrip(
     netcdf3_file, local_registry
