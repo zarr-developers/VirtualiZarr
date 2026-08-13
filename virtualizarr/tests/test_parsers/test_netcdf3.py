@@ -247,7 +247,7 @@ class TestMalformedFiles:
             _open_virtual(path, local_registry)
 
     def test_subgroup_rejected(self, netcdf3_file, local_registry):
-        """netCDF3 files are flat, so there is no subgroup to open."""
+        """A netCDF3 file is flat, so there is no subgroup to open."""
         parser = NetCDF3Parser(group="subgroup")
         with pytest.raises(ValueError, match="only a root group"):
             parser(url=f"file://{netcdf3_file()}", registry=local_registry)
