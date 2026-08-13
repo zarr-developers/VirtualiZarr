@@ -16,17 +16,6 @@
   CDF-5 can represent, could not be virtualized before because scipy cannot read them.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
-### Performance
-
-- Virtualizing a netCDF3 file with record variables is substantially cheaper. Record
-  variables are interleaved on disk, so they produce one chunk reference per record per
-  variable; these are now built as vectorized numpy arrays directly into a `ChunkManifest`,
-  instead of being materialized as an intermediate kerchunk references dict and parsed back
-  out. Only the file header is read, rather than opening the whole file through fsspec.
-  For a 6.4 MB file with 20 record variables of 4000 records each (80,000 chunk references),
-  `open_virtual_dataset` went from ~997 ms to ~63 ms, a 15.8x improvement.
-  By [Tom Nicholas](https://github.com/TomNicholas).
-
 ### Breaking changes
 
 - `NetCDF3Parser` no longer accepts a `reader_options` argument. It configured kerchunk's
