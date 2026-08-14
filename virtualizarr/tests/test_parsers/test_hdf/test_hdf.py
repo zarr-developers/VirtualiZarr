@@ -13,6 +13,7 @@ from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
+    requires_netcdf4,
 )
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
@@ -39,6 +40,7 @@ class TestDatasetChunkManifest:
         manifest_store = manifest_store_from_hdf_url(chunked_hdf5_url)
         assert manifest_store._group.arrays["data"].manifest.shape_chunk_grid == (2, 2)
 
+    @requires_netcdf4
     def test_chunked_roundtrip(self, chunked_roundtrip_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(chunked_roundtrip_hdf5_url)
         assert manifest_store._group.arrays["var2"].manifest.shape_chunk_grid == (2, 8)
@@ -268,6 +270,7 @@ class TestOpenVirtualDataset:
         ) as vds:
             assert set(vds.coords) == {"lat", "lon"}
 
+    @requires_netcdf4
     def test_big_endian(self, big_endian_dtype_hdf5_file, local_registry):
         big_endian_dtype_hdf5_url = f"file://{big_endian_dtype_hdf5_file}"
         parser = HDFParser()

@@ -25,6 +25,7 @@ from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_lithops,
+    requires_netcdf4,
     requires_network,
     slow_test,
 )
@@ -517,6 +518,7 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
 
 @requires_hdf5plugin
 @requires_imagecodecs
+@requires_netcdf4
 def test_cftime_index(tmp_path: Path, local_registry):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168

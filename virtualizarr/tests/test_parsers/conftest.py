@@ -6,7 +6,6 @@ import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
-from netCDF4 import Dataset
 from packaging.version import Version
 from xarray.tests.test_dataset import create_test_data
 from xarray.util.print_versions import netcdf_and_hdf5_versions
@@ -44,9 +43,9 @@ def no_chunks_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def fill_value_scalar_no_chunks_nc4_url(tmpdir):
+def fill_value_scalar_no_chunks_nc4_url(tmpdir, netcdf4_lib):
     filepath = f"{tmpdir}/fill_value_scalar_no_chunks.nc4"
-    f = Dataset(filepath, "w")
+    f = netcdf4_lib.Dataset(filepath, "w")
     f.createVariable("data", "<i4", fill_value=-999)
     f.long_name = "empty scalar data"
     f.close()
@@ -54,11 +53,11 @@ def fill_value_scalar_no_chunks_nc4_url(tmpdir):
 
 
 @pytest.fixture
-def unlimited_dimension_netcdf4_url(tmpdir):
+def unlimited_dimension_netcdf4_url(tmpdir, netcdf4_lib):
     # a coordinate variable along an unlimited dimension - HDF5 reports a chunk
     # shape sized for the (unlimited) maxshape rather than the actual extent
     filepath = f"{tmpdir}/unlimited_dimension.nc"
-    f = Dataset(filepath, "w")
+    f = netcdf4_lib.Dataset(filepath, "w")
     f.createDimension("time", None)
     var_time = f.createVariable("time", "i8", ("time",))
     var_time[:5] = 10

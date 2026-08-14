@@ -20,6 +20,7 @@ from zarr.errors import ContainsGroupError
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers.zarr import ZarrParser
+from virtualizarr.tests import requires_netcdf4
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
@@ -497,6 +498,7 @@ def test_raise_if_zero_chunk_containers(
     assert not session.has_uncommitted_changes, session.status()
 
 
+@requires_netcdf4
 def test_checksum(
     icechunk_filestore: "IcechunkStore",
     tmpdir: Path,

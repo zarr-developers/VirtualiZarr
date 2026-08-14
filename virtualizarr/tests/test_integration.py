@@ -26,6 +26,7 @@ from virtualizarr.tests import (
     has_kerchunk,
     requires_icechunk,
     requires_kerchunk,
+    requires_netcdf4,
     requires_network,
     requires_scipy,
     slow_test,
@@ -192,6 +193,7 @@ def roundtrip_as_in_memory_icechunk(
         *([roundtrip_as_in_memory_icechunk] if has_icechunk else []),
     ],
 )
+@requires_netcdf4
 class TestRoundtrip:
     def test_zarr_roundtrip(
         self,
@@ -382,6 +384,7 @@ class TestRoundtrip:
 @pytest.mark.parametrize("decode_times", (False, True))
 @pytest.mark.parametrize("time_vars", ([], ["time"]))
 @pytest.mark.parametrize("inherit", (False, True))
+@requires_netcdf4
 def test_datatree_roundtrip(
     tmp_path: Path,
     roundtrip_func: RoundtripFunction,
@@ -473,6 +476,7 @@ def test_datatree_roundtrip(
                     )
 
 
+@requires_netcdf4
 def test_open_scalar_variable(tmp_path: Path, local_registry):
     # regression test for GH issue #100
 

@@ -39,6 +39,8 @@ has_tifffile, requires_tifffile = _importorskip("tifffile")
 has_imagecodecs, requires_imagecodecs = _importorskip("imagecodecs")
 has_hdf5plugin, requires_hdf5plugin = _importorskip("hdf5plugin")
 has_dask, requires_dask = _importorskip("dask")
+# Needed to read xarray's tutorial datasets and to write NetCDF test files.
+has_netcdf4, requires_netcdf4 = _importorskip("netCDF4")
 has_obstore, requires_obstore = _importorskip("obstore")
 has_tiff, requires_tiff = _importorskip("virtual_tiff")
 has_arro3, requires_arro3 = _importorskip("arro3.core")

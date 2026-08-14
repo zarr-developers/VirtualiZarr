@@ -12,6 +12,14 @@
 
 ### Internal changes
 
+- The test suite now skips rather than errors when `netCDF4` is not installed. It is used
+  only to *write* test files and to read xarray's tutorial datasets, but was imported
+  unconditionally in `virtualizarr/tests/test_parsers/conftest.py`, which broke collection
+  outright. Fixtures that need it now go through a `netcdf4_lib` fixture that skips when it
+  is absent, and the tests that write netCDF files directly are marked `requires_netcdf4`.
+  Every CI environment installs `netcdf4` via the `hdf5-lib` feature, so coverage there is
+  unchanged. By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.7.3 (7th August 2026)
 
 Makes virtualizing `.zarr.zip` archives dramatically cheaper — building a zipped store's member index now takes a single request instead of one per member, a 6.8x throughput improvement when virtualizing many archives — and fixes sharded virtual arrays losing their shard configuration when concatenated, stacked, broadcast or indexed.
