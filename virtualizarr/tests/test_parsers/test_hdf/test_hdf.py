@@ -1,6 +1,5 @@
 import warnings
 
-import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
@@ -16,6 +15,9 @@ from virtualizarr.tests import (
     requires_netcdf4,
 )
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
+
+# Only needed to read this module's HDF5 test files; skips the module when absent.
+h5py = pytest.importorskip("h5py")
 
 
 @requires_hdf5plugin

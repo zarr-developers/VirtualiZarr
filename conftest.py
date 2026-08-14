@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 # Third-party imports
-import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
@@ -92,6 +91,16 @@ def netcdf4_lib():
     under test read those files without it.
     """
     return pytest.importorskip("netCDF4", reason="needed to write netCDF test files")
+
+
+@pytest.fixture
+def h5py_lib():
+    """The h5py library, skipping the test when it is not installed.
+
+    Only needed to *write* the HDF5 test files. The HDF parser reads them through
+    its own soft import, so it is not required to exercise the code under test.
+    """
+    return pytest.importorskip("h5py", reason="needed to write HDF5 test files")
 
 
 @pytest.fixture
@@ -337,7 +346,7 @@ def netcdf4_file_with_2d_coords(tmp_path: Path, netcdf4_lib) -> str:
 
 
 @pytest.fixture
-def netcdf4_virtual_dataset(netcdf4_file):
+def netcdf4_virtual_dataset(netcdf4_file, h5py_lib):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers import HDFParser
@@ -375,20 +384,20 @@ def hdf5_groups_file(tmp_path: Path, netcdf4_lib) -> str:
 
 
 @pytest.fixture
-def hdf5_empty(tmp_path: Path) -> str:
+def hdf5_empty(tmp_path: Path, h5py_lib) -> str:
     """Create an empty HDF5 file."""
     filepath = tmp_path / "empty.nc"
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dataset = f.create_dataset("empty", shape=(), dtype="float32")
         dataset.attrs["empty"] = "true"
     return str(filepath)
 
 
 @pytest.fixture
-def hdf5_scalar(tmp_path: Path) -> str:
+def hdf5_scalar(tmp_path: Path, h5py_lib) -> str:
     """Create an HDF5 file with a scalar dataset."""
     filepath = tmp_path / "scalar.nc"
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
         dataset.attrs["scalar"] = "true"
     return str(filepath)

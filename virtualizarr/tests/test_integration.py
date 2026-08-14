@@ -24,6 +24,7 @@ from virtualizarr.tests import (
     has_fastparquet,
     has_icechunk,
     has_kerchunk,
+    requires_h5py,
     requires_icechunk,
     requires_kerchunk,
     requires_netcdf4,
@@ -70,6 +71,7 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
     xrt.assert_equal(roundtrip, vds)
 
 
+@requires_h5py
 @requires_kerchunk
 @pytest.mark.parametrize(
     "inline_threshold, vars_to_inline",
@@ -222,6 +224,7 @@ class TestRoundtrip:
                 for coord in ds.coords:
                     assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
+    @requires_h5py
     def test_roundtrip_no_concat(
         self, tmp_path, roundtrip_func: RoundtripFunction, local_registry
     ):
@@ -247,6 +250,7 @@ class TestRoundtrip:
                 for coord in ds.coords:
                     assert ds.coords[coord].attrs == roundtrip.coords[coord].attrs
 
+    @requires_h5py
     @pytest.mark.parametrize("decode_times,time_vars", [(False, []), (True, ["time"])])
     def test_kerchunk_roundtrip_concat(
         self,
@@ -315,6 +319,7 @@ class TestRoundtrip:
                         == ds.time.encoding["calendar"]
                     )
 
+    @requires_h5py
     def test_non_dimension_coordinates(
         self, tmp_path: Path, roundtrip_func: RoundtripFunction, local_registry
     ):
@@ -378,6 +383,7 @@ class TestRoundtrip:
         assert roundtrip.a.attrs == vds.a.attrs
 
 
+@requires_h5py
 @pytest.mark.parametrize(
     "roundtrip_func", [roundtrip_as_in_memory_icechunk] if has_icechunk else []
 )
@@ -476,6 +482,7 @@ def test_datatree_roundtrip(
                     )
 
 
+@requires_h5py
 @requires_netcdf4
 def test_open_scalar_variable(tmp_path: Path, local_registry):
     # regression test for GH issue #100
@@ -497,6 +504,7 @@ def test_open_scalar_variable(tmp_path: Path, local_registry):
 
 
 class TestPathsToURLs:
+    @requires_h5py
     def test_convert_absolute_paths_to_urls(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -510,6 +518,7 @@ class TestPathsToURLs:
 
             assert path == expected_path
 
+    @requires_h5py
     def test_convert_relative_paths_to_urls(self, netcdf4_file, local_registry):
         relative_path = relpath(netcdf4_file)
         parser = HDFParser()
@@ -525,6 +534,7 @@ class TestPathsToURLs:
             assert path == expected_path
 
 
+@requires_h5py
 @requires_kerchunk
 @requires_network
 @slow_test

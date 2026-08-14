@@ -12,13 +12,15 @@
 
 ### Internal changes
 
-- The test suite now skips rather than errors when `netCDF4` is not installed. It is used
-  only to *write* test files and to read xarray's tutorial datasets, but was imported
-  unconditionally in `virtualizarr/tests/test_parsers/conftest.py`, which broke collection
-  outright. Fixtures that need it now go through a `netcdf4_lib` fixture that skips when it
-  is absent, and the tests that write netCDF files directly are marked `requires_netcdf4`.
-  Every CI environment installs `netcdf4` via the `hdf5-lib` feature, so coverage there is
-  unchanged. By [Tom Nicholas](https://github.com/TomNicholas).
+- The test suite now skips rather than errors when `netCDF4` or `h5py` is not installed.
+  Both are used only to *write* test files (and, for netCDF4, to read xarray's tutorial
+  datasets), but each was imported unconditionally in several conftest and test modules,
+  which broke collection outright. Fixtures that need them now go through `netcdf4_lib` and
+  `h5py_lib` fixtures that skip when the library is absent, and tests that use them
+  directly -- including everything exercising `HDFParser`, which needs `h5py` at runtime --
+  are marked `requires_netcdf4` / `requires_h5py`. Every CI environment installs both via
+  the `hdf5-lib` and `hdf` features, so coverage there is unchanged.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ## v2.7.3 (7th August 2026)
 

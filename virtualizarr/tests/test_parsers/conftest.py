@@ -2,7 +2,6 @@ import textwrap
 import warnings
 from pathlib import Path
 
-import h5py  # type: ignore
 import numpy as np
 import pytest
 import xarray as xr
@@ -26,17 +25,17 @@ def empty_chunks_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def empty_dataset_hdf5_url(tmpdir):
+def empty_dataset_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/empty_dataset.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     f.create_dataset("data", shape=(0,), dtype="f")
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def no_chunks_hdf5_url(tmpdir):
+def no_chunks_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/no_chunks.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
     return f"file://{filepath}"
@@ -66,11 +65,11 @@ def unlimited_dimension_netcdf4_url(tmpdir, netcdf4_lib):
 
 
 @pytest.fixture
-def unlimited_dimension_compressed_hdf5_url(tmpdir):
+def unlimited_dimension_compressed_hdf5_url(tmpdir, h5py_lib):
     # an oversized chunk along an unlimited dim that is compressed cannot be
     # safely trimmed to the array shape (its bytes are not a contiguous prefix)
     filepath = f"{tmpdir}/unlimited_dimension_compressed.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     d = f.create_dataset(
         "data",
         shape=(5,),
@@ -85,18 +84,18 @@ def unlimited_dimension_compressed_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def chunked_hdf5_url(tmpdir):
+def chunked_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/chunks.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = np.random.random((100, 100))
     f.create_dataset(name="data", data=data, chunks=(50, 50))
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def single_dimension_scale_hdf5_url(tmpdir):
+def single_dimension_scale_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/single_dimension_scale.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = [1, 2]
     x = [0, 1]
     f.create_dataset(name="data", data=data)
@@ -107,9 +106,9 @@ def single_dimension_scale_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def is_scale_hdf5_url(tmpdir):
+def is_scale_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/is_scale.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = [1, 2]
     f.create_dataset(name="data", data=data)
     f["data"].make_scale()
@@ -117,9 +116,9 @@ def is_scale_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def multiple_dimension_scales_hdf5_url(tmpdir):
+def multiple_dimension_scales_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/multiple_dimension_scales.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = [1, 2]
     f.create_dataset(name="data", data=data)
     f.create_dataset(name="x", data=[0, 1])
@@ -132,9 +131,9 @@ def multiple_dimension_scales_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def chunked_dimensions_netcdf4_url(tmpdir):
+def chunked_dimensions_netcdf4_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/chunks_dimension.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = np.random.random((100, 100))
     x = np.random.random((100))
     y = np.random.random((100))
@@ -147,9 +146,9 @@ def chunked_dimensions_netcdf4_url(tmpdir):
 
 
 @pytest.fixture
-def string_attributes_hdf5_url(tmpdir):
+def string_attributes_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/attributes.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     data = np.random.random((10, 10))
     f.create_dataset(name="data", data=data, chunks=None)
     f["data"].attrs["attribute_name"] = "attribute_name"
@@ -158,17 +157,17 @@ def string_attributes_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def root_attributes_hdf5_url(tmpdir):
+def root_attributes_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/root_attributes.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     f.attrs["attribute_name"] = "attribute_name"
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def group_hdf5_url(tmpdir):
+def group_hdf5_url(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/group.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     g = f.create_group("group")
     data = np.random.random((10, 10))
     g.create_dataset("data", data=data)
@@ -176,10 +175,10 @@ def group_hdf5_url(tmpdir):
 
 
 @pytest.fixture
-def nested_group_hdf5_url(tmp_path: Path) -> str:
+def nested_group_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "nested_group.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         g = f.create_group("group")
         data = np.random.random((10, 10))
         g.create_dataset("data", data=data)
@@ -190,10 +189,10 @@ def nested_group_hdf5_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def multiple_datasets_hdf5_url(tmp_path: Path) -> str:
+def multiple_datasets_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "multiple_datasets.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = np.random.random((10, 10))
         f.create_dataset(name="data", data=data, chunks=None)
         f.create_dataset(name="data2", data=data, chunks=None)
@@ -207,11 +206,11 @@ def np_uncompressed():
 
 
 @pytest.fixture(params=["gzip", "blosc_lz4", "lz4", "bzip2", "zstd", "shuffle"])
-def filter_encoded_hdf5_file(tmp_path: Path, np_uncompressed, request) -> str:
+def filter_encoded_hdf5_file(tmp_path: Path, np_uncompressed, request, h5py_lib) -> str:
     assert hdf5plugin is not None  # make type-checkers happy
     filepath = str(tmp_path / f"{request.param}.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         if request.param == "gzip":
             f.create_dataset(
                 name="data",
@@ -304,10 +303,12 @@ def offset():
 
 
 @pytest.fixture
-def add_offset_hdf5_file(tmp_path: Path, np_uncompressed_int16, offset) -> str:
+def add_offset_hdf5_file(
+    tmp_path: Path, np_uncompressed_int16, offset, h5py_lib
+) -> str:
     filepath = str(tmp_path / "offset.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = np_uncompressed_int16 - offset
         f.create_dataset(name="data", data=data, chunks=True)
         f["data"].attrs.create(name="add_offset", data=offset)
@@ -322,11 +323,11 @@ def scale_factor():
 
 @pytest.fixture
 def scale_add_offset_hdf5_file(
-    tmp_path: Path, np_uncompressed_int16, offset, scale_factor
+    tmp_path: Path, np_uncompressed_int16, offset, scale_factor, h5py_lib
 ) -> str:
     filepath = str(tmp_path / "scale_offset.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = (np_uncompressed_int16 - offset) / scale_factor
         f.create_dataset(name="data", data=data, chunks=True)
         f["data"].attrs.create(name="add_offset", data=offset)
@@ -384,10 +385,10 @@ def filter_and_cf_roundtrip_hdf5_file(tmpdir, request):
 
 
 @pytest.fixture
-def root_coordinates_hdf5_file(tmp_path: Path, np_uncompressed_int16) -> str:
+def root_coordinates_hdf5_file(tmp_path: Path, np_uncompressed_int16, h5py_lib) -> str:
     filepath = str(tmp_path / "coordinates.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = np.random.random((100, 100))
         f.create_dataset(name="data", data=data, chunks=True)
         f.create_dataset(name="lat", data=data)
@@ -407,10 +408,10 @@ def non_coord_dim(tmpdir):
 
 
 @pytest.fixture
-def scalar_fill_value_hdf5_url(tmp_path: Path) -> str:
+def scalar_fill_value_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "scalar_fill_value.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = np.random.randint(0, 10, size=(5))
         fill_value = 42
         f.create_dataset(name="data", data=data, chunks=True, fillvalue=fill_value)
@@ -446,10 +447,10 @@ fill_values = [
 
 
 @pytest.fixture(params=fill_values)
-def cf_fill_value_hdf5_file(tmp_path: Path, request) -> str:
+def cf_fill_value_hdf5_file(tmp_path: Path, request, h5py_lib) -> str:
     filepath = str(tmp_path / "cf_fill_value.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dset = f.create_dataset(name="data", data=request.param["data"], chunks=True)
         dim_scale = f.create_dataset(
             name="dim_scale", data=request.param["data"], chunks=True
@@ -462,10 +463,10 @@ def cf_fill_value_hdf5_file(tmp_path: Path, request) -> str:
 
 
 @pytest.fixture
-def cf_array_fill_value_hdf5_file(tmp_path: Path) -> str:
+def cf_array_fill_value_hdf5_file(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "cf_array_fill_value.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         data = np.random.random(5)
         dset = f.create_dataset(name="data", data=data, chunks=True)
         dset.attrs["_FillValue"] = np.array([np.nan])
@@ -490,40 +491,38 @@ def chunked_roundtrip_hdf5_s3_file(minio_bucket, cf_array_fill_value_hdf5_file):
     return f"s3://{minio_bucket['bucket']}/{filepath}"
 
 
-@pytest.fixture(
-    params=[
-        {"dtype": "S10", "data": np.array([b"hello", b"world"], dtype="S10")},
-        {
-            "dtype": None,
-            "data": np.array(["hello", "world"], dtype=h5py.string_dtype()),
-        },
-    ],
-    ids=["fixed-length-bytes", "variable-length-string"],
-)
-def string_dtype_hdf5_url(tmp_path: Path, request) -> str:
+# Parametrized by name rather than by value: h5py.string_dtype() cannot be
+# evaluated at import time, since h5py may not be installed.
+@pytest.fixture(params=["fixed-length-bytes", "variable-length-string"])
+def string_dtype_hdf5_url(tmp_path: Path, request, h5py_lib) -> str:
     filepath = str(tmp_path / "string_dtype.nc")
 
-    with h5py.File(filepath, "w") as f:
-        f.create_dataset(name="data", data=request.param["data"])
+    if request.param == "fixed-length-bytes":
+        data = np.array([b"hello", b"world"], dtype="S10")
+    else:
+        data = np.array(["hello", "world"], dtype=h5py_lib.string_dtype())
+
+    with h5py_lib.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=data)
 
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def fixed_length_bytes_hdf5_url(tmp_path: Path) -> str:
+def fixed_length_bytes_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "fixed_length_bytes.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         f.create_dataset(name="data", data=np.array([b"hello", b"world"], dtype="S10"))
 
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def non_utf8_fill_value_hdf5_url(tmp_path: Path) -> str:
+def non_utf8_fill_value_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "non_utf8_fill_value.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         f.create_dataset(
             name="data",
             data=np.array([b"hello"], dtype="S5"),
@@ -534,37 +533,39 @@ def non_utf8_fill_value_hdf5_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def vlen_string_hdf5_url(tmp_path: Path) -> str:
+def vlen_string_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "vlen_string.nc")
 
-    with h5py.File(filepath, "w") as f:
-        f.create_dataset(
-            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
-        )
-
-    return f"file://{filepath}"
-
-
-@pytest.fixture
-def ascii_vlen_string_hdf5_url(tmp_path: Path) -> str:
-    filepath = str(tmp_path / "ascii_vlen_string.nc")
-
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         f.create_dataset(
             name="data",
-            data=np.array([b"hello", b"world"], dtype=h5py.string_dtype("ascii")),
+            data=np.array(["hello", "world"], dtype=h5py_lib.string_dtype()),
         )
 
     return f"file://{filepath}"
 
 
 @pytest.fixture
-def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
+def ascii_vlen_string_hdf5_url(tmp_path: Path, h5py_lib) -> str:
+    filepath = str(tmp_path / "ascii_vlen_string.nc")
+
+    with h5py_lib.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello", b"world"], dtype=h5py_lib.string_dtype("ascii")),
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path, h5py_lib) -> str:
     filepath = str(tmp_path / "string_dtype_fillvalue.nc")
 
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dset = f.create_dataset(
-            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
+            name="data",
+            data=np.array(["hello", "world"], dtype=h5py_lib.string_dtype()),
         )
         dset.attrs["_FillValue"] = ""
 
@@ -572,9 +573,9 @@ def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture()
-def big_endian_dtype_hdf5_file(tmpdir):
+def big_endian_dtype_hdf5_file(tmpdir, h5py_lib):
     filepath = f"{tmpdir}/big_endian.nc"
-    f = h5py.File(filepath, "w")
+    f = h5py_lib.File(filepath, "w")
     f.create_dataset("data", shape=(10,), dtype=">f4")
     dset = f["data"]
     dset[...] = 10
