@@ -7,7 +7,6 @@ from typing import Any, Callable, Iterable, Literal, Mapping, Optional
 
 # Third-party imports
 import h5py  # type: ignore[import]
-import netCDF4  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
@@ -85,7 +84,18 @@ def local_registry():
 
 
 @pytest.fixture
-def netcdf3_file(tmp_path: Path):
+def netcdf4_lib():
+    """The netCDF4 library, skipping the test when it is not installed.
+
+    Only needed to *write* the netCDF3 test files, never to read them: it is the
+    only writer that can emit CDF-5, which neither xarray nor scipy supports. The
+    parser under test needs nothing beyond virtualizarr's core dependencies.
+    """
+    return pytest.importorskip("netCDF4", reason="needed to write netCDF3 test files")
+
+
+@pytest.fixture
+def netcdf3_file(tmp_path: Path, netcdf4_lib):
     """Factory for writing a temporary netCDF3 file with a caller-supplied Dataset."""
 
     def _make(ds: xr.Dataset | None = None, name: str = "file.nc") -> Path:
@@ -109,7 +119,7 @@ NETCDF3_FORMATS: dict[int, NetCDF3Format] = {
 
 
 def _write_netcdf3_variant(
-    path: Path, netcdf_format: NetCDF3Format, cdf_version: int
+    netCDF4, path: Path, netcdf_format: NetCDF3Format, cdf_version: int
 ) -> Path:
     """Write a netCDF3 file exercising the features a parser has to get right.
 
@@ -162,16 +172,16 @@ def _write_netcdf3_variant(
 
 
 @pytest.fixture(params=sorted(NETCDF3_FORMATS))
-def netcdf3_variant_file(request, tmp_path: Path):
+def netcdf3_variant_file(request, tmp_path: Path, netcdf4_lib):
     """A netCDF3 file, once per CDF version. Yields ``(path, cdf_version)``."""
     cdf_version = request.param
     path = tmp_path / f"cdf{cdf_version}.nc"
-    _write_netcdf3_variant(path, NETCDF3_FORMATS[cdf_version], cdf_version)
+    _write_netcdf3_variant(netcdf4_lib, path, NETCDF3_FORMATS[cdf_version], cdf_version)
     return path, cdf_version
 
 
 @pytest.fixture
-def netcdf3_single_record_var_file(tmp_path: Path) -> Path:
+def netcdf3_single_record_var_file(tmp_path: Path, netcdf4_lib) -> Path:
     """A file whose only record variable has an unpadded record length.
 
     netCDF3 pads each record variable's per-record slice out to a multiple of 4
@@ -179,7 +189,7 @@ def netcdf3_single_record_var_file(tmp_path: Path) -> Path:
     slice is 3 bytes, so a parser that always pads computes the wrong stride.
     """
     path = tmp_path / "single_record_var.nc"
-    ds = netCDF4.Dataset(path, "w", format="NETCDF3_CLASSIC")
+    ds = netcdf4_lib.Dataset(path, "w", format="NETCDF3_CLASSIC")
     ds.createDimension("t", None)
     ds.createDimension("y", 3)
     only = ds.createVariable("only", "i1", ("t", "y"))

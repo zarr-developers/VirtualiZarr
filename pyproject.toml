@@ -52,9 +52,8 @@ hdf = [
 
 zarr = ["arro3-core"]
 
-# The netCDF3 parser reads the file header itself, so it needs nothing beyond
-# the core dependencies. Kept as an extra so `virtualizarr[netcdf3]` keeps working.
-netcdf3 = []
+# NOTE: there is deliberately no `netcdf3` extra. The netCDF3 parser reads the file
+# header itself and needs nothing beyond the core dependencies.
 
 # kerchunk-based parsers
 fits = [
@@ -81,7 +80,6 @@ kerchunk_parquet = [
 # kerchunk
 all_parsers = [
     "virtualizarr[hdf]",
-    "virtualizarr[netcdf3]",
     "virtualizarr[fits]",
     "virtualizarr[hdf4]",
     "virtualizarr[kerchunk_parquet]",
@@ -177,7 +175,11 @@ python = "3.14.*"
 "docker" = "*"
 "minio" = "*"
 
-# Install NetCDF and HDF5 from conda-forge for extra plugin capabilities
+# Install NetCDF and HDF5 from conda-forge for extra plugin capabilities.
+# netcdf4 must come from conda, not pip: the pip wheel bundles its own libhdf5,
+# which collides with the conda one and breaks hdf5plugin's filters on py314.
+# The test suite uses it only to *write* netCDF3 files, since it is the only
+# writer that can emit CDF-5.
 [tool.pixi.feature.hdf5-lib.dependencies]
 netcdf4 = ">=1.7.2,<2"
 hdf5 = ">=1.14.4,<2"
@@ -219,15 +221,15 @@ run-flaky-tests = { cmd = "pytest -m flaky --run-flaky --run-network-tests --ver
 [tool.pixi.environments]
 min-deps = ["dev", "test", "hdf", "hdf5-lib"] # VirtualiZarr/conftest.py using h5py, so the minimum set of dependencies for testing still includes hdf libs
 # Inherit from min-deps to get all the test commands, along with optional dependencies
-test = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
-test-py312 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py312"] # test against python 3.13
-test-py313 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py313"] # test against python 3.13
-test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
-minio = ["dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
-minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
-upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "fits", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
-all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
-docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
+test = ["dev", "test", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"]
+test-py312 = ["dev", "test", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py312"] # test against python 3.13
+test-py313 = ["dev", "test", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "py313"] # test against python 3.13
+test-py314 = ["dev", "test", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr", "py314"] # test against python 3.14
+minio = ["dev", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
+minimum-versions = ["dev", "test", "remote", "hdf", "fits", "hdf4", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
+upstream = ["dev", "test", "hdf", "hdf5-lib", "fits", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
+all = ["dev", "test", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
+docs = ["docs", "dev", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
 
 [tool.pixi.dependencies]
 pytest = "*"

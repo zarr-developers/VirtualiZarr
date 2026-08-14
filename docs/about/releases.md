@@ -6,10 +6,8 @@
 
 - `NetCDF3Parser` now reads the netCDF3 header itself instead of going through
   `kerchunk.netCDF3.NetCDF3ToZarr`, so virtualizing a netCDF3 file no longer requires
-  `kerchunk` or `scipy`. The `virtualizarr[netcdf3]` extra is now empty — the parser needs
-  nothing beyond the core dependencies, and no longer pulls in `virtualizarr[remote]`
-  (`requests`, `aiohttp`, `s3fs`). It reads the header through the `ObjectStoreRegistry`
-  like every other native parser, rather than opening the file with fsspec.
+  `kerchunk` or `scipy`. It reads the header through the `ObjectStoreRegistry` like every
+  other native parser, rather than opening the file with fsspec.
   By [Tom Nicholas](https://github.com/TomNicholas).
 - `NetCDF3Parser` now supports CDF-5 (the 64-bit-data variant), alongside CDF-1 (classic)
   and CDF-2 (64-bit offset). CDF-5 files, and the unsigned and 64-bit integer types only
@@ -21,6 +19,11 @@
 - `NetCDF3Parser` no longer accepts a `reader_options` argument. It configured kerchunk's
   fsspec backend, which the parser no longer uses; storage configuration belongs to the
   `ObjectStoreRegistry` passed to the parser. By [Tom Nicholas](https://github.com/TomNicholas).
+- The `netcdf3` extra has been removed. The netCDF3 parser now needs nothing beyond
+  virtualizarr's core dependencies, so `pip install virtualizarr[netcdf3]` no longer
+  resolves — install plain `virtualizarr` instead. It previously pulled in `kerchunk`,
+  `scipy` and `virtualizarr[remote]` (`fsspec`, `requests`, `aiohttp`, `s3fs`), none of
+  which the parser uses any more. By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
 
