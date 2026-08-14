@@ -12,6 +12,16 @@
 
 ### Internal changes
 
+- The test suite now skips rather than errors when `netCDF4` or `h5py` is not installed.
+  Both are used only to *write* test files (and, for netCDF4, to read xarray's tutorial
+  datasets), but each was imported unconditionally in several conftest and test modules,
+  which broke collection outright. Fixtures that need them now go through `netcdf4_lib` and
+  `h5py_lib` fixtures that skip when the library is absent, and tests that use them
+  directly -- including everything exercising `HDFParser`, which needs `h5py` at runtime --
+  are marked `requires_netcdf4` / `requires_h5py`. Every CI environment installs both via
+  the `hdf5-lib` and `hdf` features, so coverage there is unchanged.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ## v2.7.3 (7th August 2026)
 
 Makes virtualizing `.zarr.zip` archives dramatically cheaper — building a zipped store's member index now takes a single request instead of one per member, a 6.8x throughput improvement when virtualizing many archives — and fixes sharded virtual arrays losing their shard configuration when concatenated, stacked, broadcast or indexed.

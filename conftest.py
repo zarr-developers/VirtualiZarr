@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Optional
 
 # Third-party imports
-import h5py  # type: ignore[import]
 import numpy as np
 import pytest
 import xarray as xr
@@ -70,7 +69,7 @@ def _xarray_subset():
 # decorator (see test_zarr.py); defining params here too would be a duplicate
 # parametrization, which pytest>=9.1 rejects.
 @pytest.fixture
-def zarr_store(tmpdir, request):
+def zarr_store(tmpdir, request, netcdf4_lib):
     ds = _xarray_subset()
     filepath = f"{tmpdir}/air.zarr"
     ds.to_zarr(filepath, zarr_format=request.param)
@@ -84,7 +83,28 @@ def local_registry():
 
 
 @pytest.fixture
-def netcdf3_file(tmp_path: Path):
+def netcdf4_lib():
+    """The netCDF4 library, skipping the test when it is not installed.
+
+    Only needed to *write* the test files -- it is the engine xarray uses to emit
+    NetCDF4/HDF5 and netCDF3, and the only writer that can emit CDF-5. The parsers
+    under test read those files without it.
+    """
+    return pytest.importorskip("netCDF4", reason="needed to write netCDF test files")
+
+
+@pytest.fixture
+def h5py_lib():
+    """The h5py library, skipping the test when it is not installed.
+
+    Only needed to *write* the HDF5 test files. The HDF parser reads them through
+    its own soft import, so it is not required to exercise the code under test.
+    """
+    return pytest.importorskip("h5py", reason="needed to write HDF5 test files")
+
+
+@pytest.fixture
+def netcdf3_file(tmp_path: Path, netcdf4_lib):
     """Factory for writing a temporary netCDF3 file with a caller-supplied Dataset."""
 
     def _make(ds: xr.Dataset | None = None, name: str = "file.nc") -> Path:
@@ -225,7 +245,7 @@ def _generate_chunk_manifest(
 
 # NetCDF file fixtures
 @pytest.fixture
-def empty_netcdf4_file(tmp_path: Path) -> str:
+def empty_netcdf4_file(tmp_path: Path, netcdf4_lib) -> str:
     """Create an empty NetCDF4 file."""
     filepath = tmp_path / "empty.nc"
     with xr.Dataset() as ds:
@@ -234,7 +254,7 @@ def empty_netcdf4_file(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_file(tmp_path: Path) -> str:
+def netcdf4_file(tmp_path: Path, netcdf4_lib) -> str:
     """Create a NetCDF4 file with air temperature data."""
     filepath = tmp_path / "air.nc"
     with xr.tutorial.open_dataset("air_temperature") as ds:
@@ -243,7 +263,7 @@ def netcdf4_file(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
+def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path, netcdf4_lib) -> str:
     """Create a NetCDF4 file with data in multiple groups."""
     filepath = tmp_path / "test.nc"
     ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
@@ -254,7 +274,7 @@ def netcdf4_file_with_data_in_multiple_groups(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path) -> str:
+def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path, netcdf4_lib) -> str:
     """Create a NetCDF4 file with data in sibling groups."""
     filepath = tmp_path / "test.nc"
     ds1 = xr.DataArray([1, 2, 3], name="foo").to_dataset()
@@ -265,7 +285,7 @@ def netcdf4_file_with_data_in_sibling_groups(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
+def netcdf4_files_factory(tmp_path: Path, netcdf4_lib) -> Callable[[], tuple[str, str]]:
     """Factory fixture to create multiple NetCDF4 files."""
 
     def create_netcdf4_files(
@@ -287,7 +307,9 @@ def netcdf4_files_factory(tmp_path: Path) -> Callable[[], tuple[str, str]]:
 
 
 @pytest.fixture
-def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str, str, str]]:
+def netcdf4_files_factory_2d(
+    tmp_path: Path, netcdf4_lib
+) -> Callable[[], tuple[str, str, str, str]]:
     """Factory fixture to create multiple NetCDF4 files."""
 
     def create_netcdf4_files(
@@ -315,7 +337,7 @@ def netcdf4_files_factory_2d(tmp_path: Path) -> Callable[[], tuple[str, str, str
 
 
 @pytest.fixture
-def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
+def netcdf4_file_with_2d_coords(tmp_path: Path, netcdf4_lib) -> str:
     """Create a NetCDF4 file with 2D coordinates."""
     filepath = tmp_path / "ROMS_example.nc"
     with xr.tutorial.open_dataset("ROMS_example") as ds:
@@ -324,7 +346,7 @@ def netcdf4_file_with_2d_coords(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def netcdf4_virtual_dataset(netcdf4_file):
+def netcdf4_virtual_dataset(netcdf4_file, h5py_lib):
     """Create a virtual dataset from a NetCDF4 file."""
     from virtualizarr import open_virtual_dataset
     from virtualizarr.parsers import HDFParser
@@ -353,7 +375,7 @@ def netcdf4_inlined_ref(netcdf4_file):
 
 # HDF5 file fixtures
 @pytest.fixture
-def hdf5_groups_file(tmp_path: Path) -> str:
+def hdf5_groups_file(tmp_path: Path, netcdf4_lib) -> str:
     """Create an HDF5 file with groups."""
     filepath = tmp_path / "air.nc"
     with xr.tutorial.open_dataset("air_temperature") as ds:
@@ -362,27 +384,27 @@ def hdf5_groups_file(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def hdf5_empty(tmp_path: Path) -> str:
+def hdf5_empty(tmp_path: Path, h5py_lib) -> str:
     """Create an empty HDF5 file."""
     filepath = tmp_path / "empty.nc"
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dataset = f.create_dataset("empty", shape=(), dtype="float32")
         dataset.attrs["empty"] = "true"
     return str(filepath)
 
 
 @pytest.fixture
-def hdf5_scalar(tmp_path: Path) -> str:
+def hdf5_scalar(tmp_path: Path, h5py_lib) -> str:
     """Create an HDF5 file with a scalar dataset."""
     filepath = tmp_path / "scalar.nc"
-    with h5py.File(filepath, "w") as f:
+    with h5py_lib.File(filepath, "w") as f:
         dataset = f.create_dataset("scalar", data=0.1, dtype="float32")
         dataset.attrs["scalar"] = "true"
     return str(filepath)
 
 
 @pytest.fixture
-def simple_netcdf4(tmp_path: Path) -> str:
+def simple_netcdf4(tmp_path: Path, netcdf4_lib) -> str:
     """Create a simple NetCDF4 file with a single variable."""
     filepath = tmp_path / "simple.nc"
     arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4)
