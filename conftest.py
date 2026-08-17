@@ -171,7 +171,9 @@ def _generate_chunk_entries(
     )
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,), (0,), itemsize)}
+        # a scalar array has a single chunk holding a single element, so passing
+        # chunks=() gives it a length of one itemsize rather than zero
+        return {"0": entry_generator((0,), (), itemsize)}
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]

@@ -6,6 +6,19 @@
 
 ### Breaking changes
 
+- Creating a `ChunkManifest` (and so a `ManifestArray`) containing a zero-length chunk reference
+  now raises `ValueError`. A chunk must decode to the full chunk shape, so no valid chunk is ever
+  zero bytes long, and such a reference can only fail at read time - after it has been written to
+  a store. Applies to virtual and inlined references alike, via every constructor
+  (`ChunkManifest`, `ChunkManifest.from_arrays`, `ChunkEntry.with_validation`).
+  A chunk which simply isn't stored - as in a sparse array - should be given the empty path
+  instead, which reads back as the array's `fill_value` and fetches nothing.
+  This catches bugs like [virtual-tiff#108](https://github.com/virtual-zarr/virtual-tiff/issues/108),
+  where sparse GeoTIFF tiles (`offset = 0, byteCount = 0`) became references that committed
+  successfully to Icechunk and only failed on read. Closes
+  [#1088](https://github.com/zarr-developers/VirtualiZarr/issues/1088).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Bug fixes
 
 ### Documentation

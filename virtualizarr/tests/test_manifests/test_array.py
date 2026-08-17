@@ -248,14 +248,14 @@ class TestBroadcast:
         assert marr.shape == ()
         assert marr.metadata.chunks == ()
         assert marr.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
         }
 
         expanded = np.broadcast_to(marr, shape=(1,))
         assert expanded.shape == (1,)
         assert expanded.metadata.chunks == (1,)
         assert expanded.manifest.dict() == {
-            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 0},
+            "0": {"path": "file:///foo.0.nc", "offset": 0, "length": 4},
         }
 
     @pytest.mark.parametrize(

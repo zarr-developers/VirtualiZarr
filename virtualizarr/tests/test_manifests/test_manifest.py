@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import pytest
 
-from virtualizarr.manifests import ChunkEntry, ChunkManifest
+from virtualizarr.manifests import ChunkEntry, ChunkManifest, ManifestArray
 
 
 class TestPathValidation:
@@ -261,6 +261,82 @@ class TestCreateFromArrays:
         ChunkManifest.from_arrays(
             paths=bad_paths, offsets=offsets, lengths=lengths, validate_paths=False
         )
+
+
+class TestZeroLengthChunks:
+    """Zero-length chunk references are always invalid - a chunk can never decode to
+    the full chunk shape from zero bytes. See VirtualiZarr#1088, virtual-tiff#108."""
+
+    @pytest.mark.parametrize("validate_paths", [True, False])
+    def test_from_arrays_raises(self, validate_paths):
+        paths = np.asarray(["/foo1.nc", "/foo2.nc"], dtype=np.dtypes.StringDType)
+        offsets = np.asarray([100, 0], dtype=np.uint64)
+        lengths = np.asarray([100, 0], dtype=np.uint64)
+
+        with pytest.raises(ValueError, match="zero-length chunk reference"):
+            ChunkManifest.from_arrays(
+                paths=paths,
+                offsets=offsets,
+                lengths=lengths,
+                validate_paths=validate_paths,
+            )
+
+    def test_from_arrays_reports_offending_index(self):
+        paths = np.asarray([["/foo.nc", "/foo.nc"]] * 2, dtype=np.dtypes.StringDType)
+        offsets = np.zeros((2, 2), dtype=np.uint64)
+        lengths = np.asarray([[100, 100], [100, 0]], dtype=np.uint64)
+
+        with pytest.raises(ValueError, match=r"at index \(1, 1\)"):
+            ChunkManifest.from_arrays(
+                paths=paths, offsets=offsets, lengths=lengths, validate_paths=False
+            )
+
+    def test_missing_chunks_may_be_zero_length(self):
+        """The empty path is how a not-stored chunk is spelled, so it keeps length 0."""
+        paths = np.asarray(["/foo1.nc", ""], dtype=np.dtypes.StringDType)
+        offsets = np.asarray([100, 0], dtype=np.uint64)
+        lengths = np.asarray([100, 0], dtype=np.uint64)
+
+        manifest = ChunkManifest.from_arrays(
+            paths=paths, offsets=offsets, lengths=lengths, validate_paths=True
+        )
+        assert manifest.dict() == {
+            "0": {"path": "file:///foo1.nc", "offset": 100, "length": 100},
+        }
+
+    def test_dict_constructor_raises(self):
+        with pytest.raises(ValueError, match="zero-length chunk reference"):
+            ChunkManifest(
+                entries={
+                    "0.0": {"path": "s3://bucket/foo.nc", "offset": 0, "length": 0}
+                }
+            )
+
+    def test_chunk_entry_raises(self):
+        with pytest.raises(ValueError, match="zero-length chunk reference"):
+            ChunkEntry.with_validation(path="s3://bucket/foo.nc", offset=0, length=0)
+
+    def test_inlined_raises(self):
+        with pytest.raises(ValueError, match="zero-length inlined chunk"):
+            ChunkEntry.with_validation(path="", offset=0, length=0, inlined_data=b"")
+
+    def test_inlined_dict_constructor_raises(self):
+        with pytest.raises(ValueError, match="zero-length inlined chunk"):
+            ChunkManifest(
+                entries={"0.0": {"path": "", "offset": 0, "length": 0, "data": b""}}
+            )
+
+    def test_manifestarray_raises(self, array_v3_metadata):
+        """The check covers ManifestArray however its manifest is spelled."""
+        metadata = array_v3_metadata(shape=(2,), chunks=(1,))
+        with pytest.raises(ValueError, match="zero-length chunk reference"):
+            ManifestArray(
+                metadata=metadata,
+                chunkmanifest={
+                    "0": {"path": "s3://bucket/foo.nc", "offset": 0, "length": 100},
+                    "1": {"path": "s3://bucket/foo.nc", "offset": 100, "length": 0},
+                },
+            )
 
 
 class TestEquals:

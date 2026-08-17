@@ -64,6 +64,8 @@ class ChunkEntry(TypedDict):
 
         # note: we can't just use `__init__` or a dataclass' `__post_init__` because we need `fs_root` to be an optional kwarg
         if inlined_data is not None:
+            if len(inlined_data) == 0:
+                raise ValueError(zero_length_chunk_error_message())
             return ChunkEntry(
                 path=INLINED_CHUNK_PATH,
                 offset=0,
@@ -72,6 +74,8 @@ class ChunkEntry(TypedDict):
             )
         if path != MISSING_CHUNK_PATH:
             path = validate_and_normalize_path_to_uri(path, fs_root=fs_root)
+            if length == 0:
+                raise ValueError(zero_length_chunk_error_message(path=path))
         validate_byte_range(offset=offset, length=length)
         return ChunkEntry(path=path, offset=offset, length=length)
 
@@ -126,6 +130,21 @@ def convert_relative_path_to_absolute(path: PosixPath, fs_root: str) -> str:
             f"(e.g. /data, file:///data, s3://bucket/), but got {fs_root}"
         )
     return (_fs_root / path).resolve().as_uri()
+
+
+def zero_length_chunk_error_message(
+    *, path: str | None = None, index: tuple[int, ...] | None = None
+) -> str:
+    """Build the error message raised when a chunk reference has zero length."""
+    subject = "inlined chunk" if path is None else f"chunk reference to {path!r}"
+    at = "" if index is None else f" at index {index}"
+    return (
+        f"Found a zero-length {subject}{at}. A chunk must decode to the full chunk "
+        "shape, so no valid chunk is ever zero bytes long. To record that a chunk is "
+        "not stored at all (as in a sparse array), give it the empty path "
+        f"{MISSING_CHUNK_PATH!r} instead, which reads back as the array's fill_value "
+        "without fetching anything."
+    )
 
 
 def validate_byte_range(*, offset: Any, length: Any) -> None:
@@ -260,6 +279,8 @@ class ChunkManifest:
 
             if "data" in entry:
                 # Inlined chunk: store bytes in the sparse dict
+                if len(entry["data"]) == 0:
+                    raise ValueError(zero_length_chunk_error_message(index=split_key))
                 inlined[split_key] = entry["data"]
                 paths[split_key] = INLINED_CHUNK_PATH
                 offsets[split_key] = 0
@@ -347,6 +368,24 @@ class ChunkManifest:
             raise ValueError(
                 f"Shapes of the arrays must be consistent, but shapes of paths array and lengths array do not match: {paths.shape} vs {lengths.shape}"
             )
+
+        # A zero length is only meaningful for chunks which aren't stored at all.
+        # Comparing the paths array is ~30x more expensive than scanning lengths, so only
+        # do it for manifests which actually contain zero lengths.
+        zero_length = lengths == 0
+        if zero_length.any():
+            invalid = zero_length & (paths != MISSING_CHUNK_PATH)
+            if invalid.any():
+                first = tuple(int(i) for i in np.argwhere(invalid)[0])
+                offending_path = str(paths[first])
+                raise ValueError(
+                    zero_length_chunk_error_message(
+                        path=None
+                        if offending_path == INLINED_CHUNK_PATH
+                        else offending_path,
+                        index=first,
+                    )
+                )
 
         if validate_paths:
             vectorized_validation_fn = np.vectorize(
