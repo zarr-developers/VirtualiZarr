@@ -269,26 +269,20 @@ class TestZeroLengthChunks:
 
     @pytest.mark.parametrize("validate_paths", [True, False])
     def test_from_arrays_raises(self, validate_paths):
-        paths = np.asarray(["/foo1.nc", "/foo2.nc"], dtype=np.dtypes.StringDType)
-        offsets = np.asarray([100, 0], dtype=np.uint64)
-        lengths = np.asarray([100, 0], dtype=np.uint64)
+        """The offending chunk is named, and skipping path validation is no escape."""
+        paths = np.asarray([["/foo.nc", "/foo.nc"]] * 2, dtype=np.dtypes.StringDType)
+        offsets = np.zeros((2, 2), dtype=np.uint64)
+        lengths = np.asarray([[100, 100], [100, 0]], dtype=np.uint64)
 
-        with pytest.raises(ValueError, match="zero-length chunk reference"):
+        with pytest.raises(
+            ValueError,
+            match=r"zero-length chunk reference to '/foo.nc' at index \(1, 1\)",
+        ):
             ChunkManifest.from_arrays(
                 paths=paths,
                 offsets=offsets,
                 lengths=lengths,
                 validate_paths=validate_paths,
-            )
-
-    def test_from_arrays_reports_offending_index(self):
-        paths = np.asarray([["/foo.nc", "/foo.nc"]] * 2, dtype=np.dtypes.StringDType)
-        offsets = np.zeros((2, 2), dtype=np.uint64)
-        lengths = np.asarray([[100, 100], [100, 0]], dtype=np.uint64)
-
-        with pytest.raises(ValueError, match=r"at index \(1, 1\)"):
-            ChunkManifest.from_arrays(
-                paths=paths, offsets=offsets, lengths=lengths, validate_paths=False
             )
 
     def test_missing_chunks_may_be_zero_length(self):
