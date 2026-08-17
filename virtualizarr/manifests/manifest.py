@@ -376,7 +376,12 @@ class ChunkManifest:
         if zero_length.any():
             invalid = zero_length & (paths != MISSING_CHUNK_PATH)
             if invalid.any():
-                first = tuple(int(i) for i in np.argwhere(invalid)[0])
+                # argmax gives the first offending chunk without materializing the
+                # position of every other one, which may be most of the manifest
+                first = tuple(
+                    int(i)
+                    for i in np.unravel_index(int(np.argmax(invalid)), invalid.shape)
+                )
                 offending_path = str(paths[first])
                 raise ValueError(
                     zero_length_chunk_error_message(
