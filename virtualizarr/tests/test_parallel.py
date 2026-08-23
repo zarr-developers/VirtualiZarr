@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import pytest
 
@@ -33,9 +34,8 @@ def test_lithops_executor_with_partial():
     reason="Default multiprocessing start method is not 'fork'",
 )
 def test_get_executor_process_pool_mode():
-    from concurrent.futures import ProcessPoolExecutor
-
-    executor = get_executor(ProcessPoolExecutor)()
+    with pytest.warns(DeprecationWarning, match="executor class"):
+        executor = get_executor(ProcessPoolExecutor)()
 
     assert isinstance(executor, ProcessPoolExecutor), "Expected a ProcessPoolExecutor"
 
@@ -43,3 +43,13 @@ def test_get_executor_process_pool_mode():
 
     assert ctx is not None, "Expected executor to have a multiprocessing context"
     assert ctx.get_start_method() == "forkserver"
+
+
+def test_get_executor_accepts_instance():
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        assert get_executor(executor) is executor
+
+
+def test_get_executor_warns_for_class():
+    with pytest.warns(DeprecationWarning, match="executor class"):
+        assert get_executor(ThreadPoolExecutor) is ThreadPoolExecutor

@@ -32,9 +32,9 @@ T = TypeVar("T")
 
 
 def get_executor(
-    parallel: Literal["dask", "lithops", False] | type[Executor],
-) -> Callable[..., Executor]:
-    """Get a callable with a return type that follows the concurrent.futures.Executor ABC API."""
+    parallel: Literal["dask", "lithops", False] | type[Executor] | Executor,
+) -> Callable[..., Executor] | Executor:
+    """Get an executor instance or a callable that creates one."""
 
     if parallel == "dask":
         return DaskDelayedExecutor
@@ -42,7 +42,15 @@ def get_executor(
         return LithopsEagerFunctionExecutor
     if parallel is False:
         return SerialExecutor
+    if isinstance(parallel, Executor):
+        return parallel
     if parallel is ProcessPoolExecutor:
+        warnings.warn(
+            "Passing an executor class to `parallel` is deprecated; pass an "
+            "instantiated executor instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # TODO Once we drop support for python <3.14, we can remove this context
         # dance because from 3.14 onward, POSIX defaults to "forkserver" rather
         # than "fork".
@@ -50,12 +58,19 @@ def get_executor(
         context = mp.get_context("forkserver" if method == "fork" else method)
         return partial(ProcessPoolExecutor, mp_context=context)
     if inspect.isclass(parallel) and issubclass(parallel, Executor):
+        warnings.warn(
+            "Passing an executor class to `parallel` is deprecated; pass an "
+            "instantiated executor instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return parallel
 
     raise ValueError(
         f"Invalid value for `parallel`: {parallel}.  Please supply "
-        "either the string 'dask' or 'lithops', or a concrete subclass of "
-        "concurrent.futures.Executor.  To obtain a serial executor, specify "
+        "either the string 'dask' or 'lithops', a concrete subclass of "
+        "concurrent.futures.Executor, or an executor instance.  To obtain a "
+        "serial executor, specify "
         "the boolean value `False`."
     )
 
