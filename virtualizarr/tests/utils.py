@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -40,8 +41,10 @@ def obstore_http(url: str) -> ObjectStore:
     return store
 
 
-def manifest_store_from_hdf_url(url, group: str | None = None):
+def manifest_store_from_hdf_url(
+    url, group: str | None = None, drop_variables: Iterable[str] | None = None
+):
     registry: ObjectStoreRegistry = ObjectStoreRegistry()
     registry.register(url, obstore_local(url=url))
-    parser = HDFParser(group=group)
+    parser = HDFParser(group=group, drop_variables=drop_variables)
     return parser(url=url, registry=registry)

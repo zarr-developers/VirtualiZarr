@@ -214,13 +214,14 @@ def _construct_manifest_group(
         # yet supported in zarr-python v3.  We'll drop these variables for the
         # moment until big endian support is included upstream.
 
-        non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
-        drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
+        non_coordinate_dimension_vars = set(_find_non_coord_dimension_vars(group=g))
+        drop_variables = frozenset(drop_variables or ())
         group_name = str(g.name)  # NOTE: this will always include leading "/"
         arrays = {
             key: _construct_manifest_array(filepath, dataset, group_name)
             for key in g.keys()
             if key not in drop_variables
+            if key not in non_coordinate_dimension_vars
             if isinstance(dataset := g[key], h5py.Dataset)
         }
         groups = {
@@ -228,6 +229,7 @@ def _construct_manifest_group(
                 filepath,
                 reader,
                 group=str(Path(group) / key) if group is not None else key,
+                drop_variables=drop_variables,
             )
             for key in g.keys()
             if key not in drop_variables
@@ -246,7 +248,8 @@ class HDFParser:
     group
         Name of the group within the HDF5 file to virtualize.
     drop_variables
-        Variables in the file that will be ignored when creating the ManifestStore
+        Variables in the file that will be ignored when creating the ManifestStore,
+        wherever they appear in the walked group hierarchy
         (default: `None`, do not ignore any variables).
     reader_factory
         A callable that creates a file-like reader from a store and path.
