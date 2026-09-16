@@ -432,6 +432,42 @@ class TestBroadcastInlined:
         }
 
 
+class TestChunkGrid:
+    def test_chunk_grid_regular(self, manifest_array):
+        marr = manifest_array(shape=(10, 20), chunks=(5, 20))
+        grid = marr.chunk_grid
+        assert grid.is_regular is True
+        assert grid.chunk_shape == (5, 20)
+
+    def test_chunk_grid_rectilinear(self, array_v3_metadata_rectilinear):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(5, 5), chunk_shapes=((2, 2, 1), (5,))
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
+        )
+        grid = marr.chunk_grid
+        assert grid.is_regular is False
+        assert grid.chunk_sizes == ((2, 2, 1), (5,))
+
+
+class TestBroadcastRectilinear:
+    def test_broadcast_to_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
+        # broadcast_to only supports regular chunk grids (a chunk's element count can
+        # only change by adding length-1 axes, which doesn't hold for a rectilinear grid)
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
+        )
+
+        with pytest.raises(ValueError, match="only available for regular chunk grids"):
+            np.broadcast_to(marr, shape=(2, 60, 50))
+
+
 # TODO we really need some kind of fixtures to generate useful example data
 # The hard part is having an alternative way to get to the expected result of concatenation
 class TestConcat:
@@ -569,6 +605,79 @@ class TestConcatInlined:
 
         result = np.concatenate([marr1, marr2], axis=0)
         assert result.manifest._inlined == {}
+
+
+class TestConcatRectilinear:
+    def test_concat_regular_arrays_stays_regular(self, manifest_array):
+        # concatenating regular-grid arrays must not promote the result to a
+        # rectilinear chunk grid - the concat axis's chunk sizes are unchanged
+        marr1 = manifest_array(shape=(5, 2), chunks=(5, 2))
+        marr2 = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        result = np.concatenate([marr1, marr2], axis=0)
+
+        assert result.chunk_grid.is_regular is True
+        assert result.metadata.chunk_grid.to_dict()["name"] == "regular"
+        assert result.chunk_grid.chunk_shape == (5, 2)
+
+    def test_concat_two_rectilinear_arrays_merges_chunk_edges_along_axis(
+        self, array_v3_metadata_rectilinear
+    ):
+        # array A: 60 elements along axis 0 chunked as (10, 20, 30); axis 1 uniform at 50
+        metadata_a = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        manifest_a = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 100},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr_a = ManifestArray(metadata=metadata_a, chunkmanifest=manifest_a)
+
+        # array B: a single 15-element chunk along axis 0
+        metadata_b = array_v3_metadata_rectilinear(
+            shape=(15, 50), chunk_shapes=((15,), (50,))
+        )
+        manifest_b = ChunkManifest(
+            entries={"0.0": {"path": "/b.nc", "offset": 0, "length": 100}}
+        )
+        marr_b = ManifestArray(metadata=metadata_b, chunkmanifest=manifest_b)
+
+        result = np.concatenate([marr_a, marr_b], axis=0)
+
+        assert result.shape == (75, 50)
+        assert result.chunk_grid.is_regular is False
+        assert result.chunk_grid.chunk_sizes == ((10, 20, 30, 15), (50,))
+
+    def test_concat_rectilinear_arrays_along_uniform_axis(
+        self, array_v3_metadata_rectilinear
+    ):
+        # concatenating along an axis that happens to be uniformly chunked
+        # (within an otherwise-rectilinear array) just appends its edges
+        metadata = array_v3_metadata_rectilinear(
+            shape=(30, 50), chunk_shapes=((10, 20), (50,))
+        )
+        manifest1 = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 100},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest1)
+        manifest2 = ChunkManifest(
+            entries={
+                "0.0": {"path": "/b.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/b.nc", "offset": 100, "length": 100},
+            }
+        )
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest2)
+
+        result = np.concatenate([marr1, marr2], axis=1)
+
+        assert result.shape == (30, 100)
+        assert result.chunk_grid.chunk_sizes == ((10, 20), (50, 50))
 
 
 class TestStack:
@@ -904,6 +1013,39 @@ class TestStackInlined:
         assert result.manifest._inlined[(1, 0)] is payload
 
 
+class TestStackRectilinear:
+    def test_stack_regular_arrays_stays_regular(self, manifest_array):
+        marr1 = manifest_array(shape=(5, 2), chunks=(5, 2))
+        marr2 = manifest_array(shape=(5, 2), chunks=(5, 2))
+
+        result = np.stack([marr1, marr2], axis=0)
+
+        assert result.chunk_grid.is_regular is True
+        assert result.metadata.chunk_grid.to_dict()["name"] == "regular"
+
+    def test_stack_rectilinear_arrays_inserts_singleton_edge(
+        self, array_v3_metadata_rectilinear
+    ):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 100},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        result = np.stack([marr1, marr2], axis=0)
+
+        assert result.shape == (2, 60, 50)
+        assert result.chunk_grid.is_regular is False
+        assert result.chunk_grid.chunk_sizes == ((1,), (10, 20, 30), (50,))
+
+
 class TestWithFillValueOnly:
     def test_returns_manifest_array_with_empty_manifest(self, array_v3_metadata):
         # with_fill_value_only produces a ManifestArray with the same schema
@@ -982,6 +1124,20 @@ class TestWithFillValueOnly:
         # where NaN becomes the JSON string "NaN"
         assert result.metadata.to_dict() == marr.metadata.to_dict()
         assert result.manifest.dict() == {}
+
+    def test_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
+        # documents a known gap: with_fill_value_only goes through
+        # manifest_chunk_shape, which assumes a regular chunk grid
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
+        )
+
+        with pytest.raises(AttributeError):
+            marr.with_fill_value_only(0)
 
 
 def test_refuse_combine(array_v3_metadata):
@@ -1208,6 +1364,26 @@ class TestIndexing:
         marr = manifest_array(shape=in_shape, chunks=in_chunks)
         with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[indexer]
+
+
+class TestIndexingRectilinear:
+    def test_getitem_on_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
+        # documents a known gap: indexing goes through manifest_chunk_shape,
+        # which assumes a regular chunk grid
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60,), chunk_shapes=((10, 20, 30),)
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1": {"path": "/a.nc", "offset": 100, "length": 100},
+                "2": {"path": "/a.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        with pytest.raises(AttributeError):
+            marr[0:10]
 
 
 class TestSubChunkSlicingUncompressed:
