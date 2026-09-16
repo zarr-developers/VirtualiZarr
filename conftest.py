@@ -171,7 +171,7 @@ def _generate_chunk_entries(
     )
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,), (0,), itemsize)}
+        return {"0": entry_generator((0,), (), itemsize)}
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]
