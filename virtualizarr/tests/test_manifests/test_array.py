@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import zarr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from conftest import (
@@ -679,6 +680,61 @@ class TestConcatRectilinear:
         assert result.shape == (30, 100)
         assert result.chunk_grid.chunk_sizes == ((10, 20), (50, 50))
 
+    def test_concat_regular_arrays_with_different_chunk_sizes_raises_when_disabled(
+        self, array_v3_metadata
+    ):
+        # two regular arrays whose declared chunk sizes genuinely differ along the
+        # concat axis can only be combined as a rectilinear grid
+        metadata_a = array_v3_metadata(shape=(20,), chunks=(10,))
+        manifest_a = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 40},
+                "1": {"path": "/a.nc", "offset": 40, "length": 40},
+            }
+        )
+        marr_a = ManifestArray(metadata=metadata_a, chunkmanifest=manifest_a)
+
+        metadata_b = array_v3_metadata(shape=(15,), chunks=(15,))
+        manifest_b = ChunkManifest(
+            entries={"0": {"path": "/b.nc", "offset": 0, "length": 60}}
+        )
+        marr_b = ManifestArray(metadata=metadata_b, chunkmanifest=manifest_b)
+
+        with zarr.config.set({"array.rectilinear_chunks": False}):
+            with pytest.raises(ValueError) as exc_info:
+                np.concatenate([marr_a, marr_b], axis=0)
+
+        # error must clearly explain how to turn rectilinear chunks on
+        assert "rectilinear" in str(exc_info.value)
+        assert "zarr.config.set" in str(exc_info.value)
+        assert "ZARR_ARRAY__RECTILINEAR_CHUNKS" in str(exc_info.value)
+
+    def test_concat_regular_arrays_with_different_chunk_sizes_succeeds_when_enabled(
+        self, array_v3_metadata
+    ):
+        metadata_a = array_v3_metadata(shape=(20,), chunks=(10,))
+        manifest_a = ChunkManifest(
+            entries={
+                "0": {"path": "/a.nc", "offset": 0, "length": 40},
+                "1": {"path": "/a.nc", "offset": 40, "length": 40},
+            }
+        )
+        marr_a = ManifestArray(metadata=metadata_a, chunkmanifest=manifest_a)
+
+        metadata_b = array_v3_metadata(shape=(15,), chunks=(15,))
+        manifest_b = ChunkManifest(
+            entries={"0": {"path": "/b.nc", "offset": 0, "length": 60}}
+        )
+        marr_b = ManifestArray(metadata=metadata_b, chunkmanifest=manifest_b)
+
+        # flag is already enabled for all tests in this suite (see the autouse
+        # fixture), so this should succeed and produce a rectilinear result
+        result = np.concatenate([marr_a, marr_b], axis=0)
+
+        assert result.shape == (35,)
+        assert result.chunk_grid.is_regular is False
+        assert result.chunk_grid.chunk_sizes == ((10, 10, 15),)
+
 
 class TestStack:
     def test_stack(self, array_v3_metadata):
@@ -1043,7 +1099,30 @@ class TestStackRectilinear:
 
         assert result.shape == (2, 60, 50)
         assert result.chunk_grid.is_regular is False
-        assert result.chunk_grid.chunk_sizes == ((1,), (10, 20, 30), (50,))
+        assert result.chunk_grid.chunk_sizes == ((1, 1), (10, 20, 30), (50,))
+
+    def test_stack_rectilinear_arrays_raises_when_disabled(
+        self, array_v3_metadata_rectilinear
+    ):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 100},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        marr2 = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        with zarr.config.set({"array.rectilinear_chunks": False}):
+            with pytest.raises(ValueError) as exc_info:
+                np.stack([marr1, marr2], axis=0)
+
+        assert "rectilinear" in str(exc_info.value)
+        assert "zarr.config.set" in str(exc_info.value)
 
 
 class TestWithFillValueOnly:

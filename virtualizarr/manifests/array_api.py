@@ -2,6 +2,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
+import zarr
 from zarr.experimental import ChunkGrid
 
 from .manifest import MISSING_CHUNK_PATH, ChunkManifest
@@ -11,7 +12,9 @@ from .utils import (
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
+    chunk_grid_sizes,
     copy_and_replace_metadata,
+    full_chunk_edges,
     manifest_chunk_shape,
 )
 
@@ -113,6 +116,17 @@ def _chunk_sizes(
     return grid.chunk_shape if grid.is_regular else grid.chunk_sizes
 
 
+def _require_rectilinear_chunks_enabled(context: str) -> None:
+    """Raise a clear, actionable error unless rectilinear chunk grids are enabled."""
+    if not zarr.config.get("array.rectilinear_chunks"):
+        raise ValueError(
+            f"{context} would require a rectilinear (variable-length) chunk grid. "
+            "Rectilinear chunk grids are an experimental zarr-python feature; enable "
+            "them with zarr.config.set({'array.rectilinear_chunks': True}) or the "
+            "ZARR_ARRAY__RECTILINEAR_CHUNKS environment variable."
+        )
+
+
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
@@ -144,7 +158,9 @@ def concatenate(
         raise TypeError()
 
     # ensure dtypes, shapes, codecs etc. are consistent
-    check_combinable_zarr_arrays(arrays)
+    # (chunk sizes along the concat axis are allowed to differ - that's what a
+    # rectilinear chunk grid is for)
+    check_combinable_zarr_arrays(arrays, exclude_axis=axis)
 
     check_same_ndims([arr.ndim for arr in arrays])
 
@@ -154,7 +170,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [manifest_chunk_shape(arr.metadata) for arr in arrays]
+    arr_chunks = [chunk_grid_sizes(arr.metadata) for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
@@ -169,13 +185,24 @@ def concatenate(
         [arr.manifest for arr in arrays], axis=axis
     )
 
-    # For rectilinear grids, concatenate chunk edges along the concat axis
+    # The result stays a regular grid only if every input is itself regular and they
+    # all declare the same chunk size along the concat axis. Otherwise the concat
+    # axis's real per-chunk edges (which may already differ, or may only differ once
+    # merged) have to be spelled out explicitly, promoting the result to a rectilinear
+    # chunk grid.
+    stays_regular = all(arr.chunk_grid.is_regular for arr in arrays) and (
+        len({arr.chunk_grid.chunk_shape[axis] for arr in arrays}) == 1
+    )
+
     new_chunks = None
-    if not first_arr.chunk_grid.is_regular:
-        new_chunks = list(_chunk_sizes(first_arr))
+    if not stays_regular:
+        _require_rectilinear_chunks_enabled(
+            f"Concatenating these arrays along axis {axis}"
+        )
+        new_chunks = list(full_chunk_edges(first_arr.metadata))
         concat_edges: tuple[int, ...] = ()
         for arr in arrays:
-            concat_edges = concat_edges + _chunk_sizes(arr)[axis]  # type: ignore[operator]
+            concat_edges = concat_edges + full_chunk_edges(arr.metadata)[axis]
         new_chunks[axis] = concat_edges
 
     new_metadata = copy_and_replace_metadata(
@@ -224,12 +251,15 @@ def stack(
     # do stacking of entries in manifest
     stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
-    # chunk shape has changed because a length-1 axis has been inserted
+    # chunk shape has changed because a new axis has been inserted, with one
+    # length-1 chunk per stacked array
     old_chunks = _chunk_sizes(first_arr)
     new_chunks = list(old_chunks)
-    # For rectilinear grids, each element is a sequence; insert a single-element tuple
+    # For rectilinear grids, each element is a sequence of edges rather than a
+    # single chunk size, so the new axis needs one size-1 edge per stacked array
     if not first_arr.chunk_grid.is_regular:
-        new_chunks.insert(axis, (1,))
+        _require_rectilinear_chunks_enabled("Stacking these arrays")
+        new_chunks.insert(axis, (1,) * length_along_new_stacked_axis)
     else:
         new_chunks.insert(axis, 1)
 
