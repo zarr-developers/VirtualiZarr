@@ -4,6 +4,13 @@
 
 ### New Features
 
+- [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] now accepts an
+  instantiated [`concurrent.futures.Executor`][] through `parallel`, allowing
+  callers to configure and reuse an executor. Executor classes remain supported
+  temporarily with a deprecation warning. Caller-supplied instances are not shut
+  down by VirtualiZarr. Closes
+  [#801](https://github.com/zarr-developers/VirtualiZarr/issues/801).
+
 ### Breaking changes
 
 ### Bug fixes
