@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypeAlias
@@ -18,7 +19,7 @@ from zarr.core.common import BytesLike
 
 from virtualizarr.manifests.array import ManifestArray
 from virtualizarr.manifests.group import ManifestGroup
-from virtualizarr.manifests.utils import parse_manifest_index
+from virtualizarr.manifests.utils import manifest_chunk_shape, parse_manifest_index
 
 if TYPE_CHECKING:
     from obstore.store import (
@@ -133,6 +134,11 @@ class ManifestStore(Store):
 
     def __str__(self) -> str:
         return f"ManifestStore(group={self._group}, registry={self._registry})"
+
+    @property
+    def nbytes_virtual(self) -> int:
+        """Size required to hold these references in memory in bytes. See [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual]."""
+        return self._group.nbytes_virtual
 
     async def get(
         self,
@@ -340,12 +346,14 @@ class ManifestStore(Store):
                 f"ManifestStore contains an empty store registry, but {loadable_variables} were provided as loadable variables. Must provide an ObjectStore instance in order to load variables."
             )
 
-        return construct_virtual_dataset(
+        vds = construct_virtual_dataset(
             manifest_store=self,
             group=group,
             loadable_variables=loadable_variables,
             decode_times=decode_times,
         )
+        _warn_about_oversized_virtual_chunks(vds)
+        return vds
 
     def to_virtual_datatree(
         self,
@@ -381,6 +389,41 @@ class ManifestStore(Store):
             group=group,
             loadable_variables=loadable_variables,
             decode_times=decode_times,
+        )
+
+
+def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
+    """
+    Warn if any still-virtual variable has a chunk larger than its array shape.
+
+    Such chunks arise for variables along an unlimited dimension whose oversized
+    chunk could not be trimmed (e.g. because it is compressed). They read and
+    write as virtual references fine, but cannot be concatenated with other
+    virtual datasets - the oversized final chunk prevents forming a regular
+    chunk grid - so point the user at loading them instead. Variables that were
+    loaded (no longer backed by a ManifestArray) are unaffected and not warned
+    about.
+    """
+    oversized = [
+        name
+        for name, var in vds.variables.items()
+        if isinstance(var.data, ManifestArray)
+        and any(
+            c > s
+            for c, s in zip(manifest_chunk_shape(var.data.metadata), var.data.shape)
+        )
+    ]
+    if oversized:
+        warnings.warn(
+            f"Variable(s) {oversized} have a chunk shape larger than their array "
+            "shape, which typically happens for variables along an unlimited "
+            "dimension. They read and write as virtual references correctly, but "
+            "cannot be concatenated with other virtual datasets because the "
+            "oversized chunk prevents forming a regular chunk grid. Pass them to "
+            "loadable_variables to load them as in-memory arrays if you need to "
+            "concatenate them.",
+            UserWarning,
+            stacklevel=3,
         )
 
 

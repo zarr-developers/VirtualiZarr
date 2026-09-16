@@ -1,0 +1,3 @@
+# Icechunk
+
+::: virtualizarr.parsers.IcechunkParser

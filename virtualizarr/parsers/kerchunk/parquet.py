@@ -27,6 +27,20 @@ if TYPE_CHECKING:
 
 
 class KerchunkParquetParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a Kerchunk Parquet references directory.
+
+    Parameters
+    ----------
+    group
+        The group within the input Kerchunk Parquet references to be used as the Zarr root group for the ManifestStore.
+    fs_root
+        The qualifier to be used for chunk references containing relative paths.
+    skip_variables
+        Variables in the Kerchunk Parquet references that will be ignored when creating the ManifestStore.
+    reader_options
+        Configuration options used internally for the fsspec backend.
+    """
+
     def __init__(
         self,
         group: str | None = None,
@@ -34,22 +48,6 @@ class KerchunkParquetParser:
         skip_variables: Iterable[str] | None = None,
         reader_options: dict | None = None,
     ):
-        """
-        Instantiate a parser for virtualizing Kerchunk's Parquet references into a Virtual Zarr store
-        using the `__call__` method.
-
-        Parameters
-        ----------
-        group
-            The group within the input Kerchunk Parquet references to be used as the Zarr root group for the ManifestStore.
-        fs_root
-            The qualifier to be used for chunk references containing relative paths.
-        skip_variables
-            Variables in the Kerchunk Parquet references that will be ignored when creating the ManifestStore.
-        reader_options
-            Configuration options used internally for the fsspec backend.
-        """
-
         self.group = group
         self.fs_root = fs_root
         self.skip_variables = skip_variables
@@ -61,7 +59,7 @@ class KerchunkParquetParser:
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given Kerchunk Parquet directory to product a
+        Parse the metadata and byte offsets from a given Kerchunk Parquet directory to produce a
         VirtualiZarr ManifestStore.
 
         Parameters

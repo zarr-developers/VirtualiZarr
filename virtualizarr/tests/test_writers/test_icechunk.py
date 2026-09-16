@@ -15,6 +15,7 @@ from obstore.store import LocalStore
 from zarr.codecs import BytesCodec
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.dtype import parse_data_type
+from zarr.errors import ContainsGroupError
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -62,7 +63,7 @@ def icechunk_filestore(icechunk_repo: "Repository") -> "IcechunkStore":
     return session.store
 
 
-@pytest.mark.parametrize("kwarg", [("group", {}), ("append_dim", {})])
+@pytest.mark.parametrize("kwarg", [("group", {}), ("mode", {}), ("append_dim", {})])
 def test_invalid_kwarg_type(
     icechunk_filestore: "IcechunkStore",
     vds_with_manifest_arrays: xr.Dataset,
@@ -111,6 +112,118 @@ def test_write_new_virtual_variable(
     # check dimensions
     if isinstance(arr.metadata, ArrayV3Metadata):
         assert arr.metadata.dimension_names == ("x", "y")
+
+
+@pytest.mark.parametrize("mode", [None, "w-"])
+def test_write_to_existing_group_fails_by_default(
+    icechunk_filestore: "IcechunkStore",
+    vds_with_manifest_arrays: xr.Dataset,
+    mode: Optional[str],
+):
+    vds = vds_with_manifest_arrays
+    vds.vz.to_icechunk(icechunk_filestore, validate_containers=False)
+
+    with pytest.raises(ContainsGroupError):
+        vds.vz.to_icechunk(icechunk_filestore, mode=mode, validate_containers=False)
+
+
+def test_write_variables_across_commits_with_mode_a(
+    icechunk_repo: "Repository",
+    synthetic_vds_multiple_vars,
+):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/1001
+    vds, arr = synthetic_vds_multiple_vars
+
+    session1 = icechunk_repo.writable_session("main")
+    vds[["foo"]].vz.to_icechunk(session1.store)
+    session1.commit("wrote foo")
+
+    session2 = icechunk_repo.writable_session("main")
+    vds[["bar"]].vz.to_icechunk(session2.store, mode="a")
+    session2.commit("wrote bar")
+
+    with xr.open_zarr(
+        icechunk_repo.readonly_session("main").store, zarr_format=3, consolidated=False
+    ) as ds:
+        # both variables have encoding={"scale_factor": 2}
+        np.testing.assert_equal(ds["foo"].data, arr * 2)
+        np.testing.assert_equal(ds["bar"].data, arr * 2)
+
+
+def test_write_parent_group_after_child_group_with_mode_a(
+    icechunk_filestore: "IcechunkStore",
+    vds_with_manifest_arrays: xr.Dataset,
+):
+    # regression test for https://github.com/zarr-developers/VirtualiZarr/issues/1001
+    vds = vds_with_manifest_arrays
+    vds.vz.to_icechunk(
+        icechunk_filestore, group="supgroup/subgroup", validate_containers=False
+    )
+    vds.vz.to_icechunk(
+        icechunk_filestore, group="supgroup", mode="a", validate_containers=False
+    )
+
+    assert "a" in zarr.group(store=icechunk_filestore, path="supgroup")
+    assert "a" in zarr.group(store=icechunk_filestore, path="supgroup/subgroup")
+
+
+def test_mode_w_overwrites_existing_group(
+    icechunk_filestore: "IcechunkStore",
+    synthetic_vds_multiple_vars,
+):
+    vds, arr = synthetic_vds_multiple_vars
+    vds.vz.to_icechunk(icechunk_filestore)
+    vds[["foo"]].vz.to_icechunk(icechunk_filestore, mode="w")
+
+    group = zarr.group(store=icechunk_filestore)
+    assert "foo" in group
+    assert "bar" not in group
+
+
+def test_invalid_mode(
+    icechunk_filestore: "IcechunkStore",
+    vds_with_manifest_arrays: xr.Dataset,
+):
+    with pytest.raises(ValueError, match="mode"):
+        vds_with_manifest_arrays.vz.to_icechunk(icechunk_filestore, mode="r+")
+
+
+@pytest.mark.parametrize("mode", ["w", "w-"])
+def test_mode_incompatible_with_append_dim(
+    icechunk_filestore: "IcechunkStore",
+    vds_with_manifest_arrays: xr.Dataset,
+    mode: str,
+):
+    with pytest.raises(ValueError, match="append_dim or region"):
+        vds_with_manifest_arrays.vz.to_icechunk(
+            icechunk_filestore, mode=mode, append_dim="x"
+        )
+
+
+def test_write_datatree_to_existing_groups_with_mode_a(
+    icechunk_repo: "Repository",
+    synthetic_vds_multiple_vars,
+):
+    vds, arr = synthetic_vds_multiple_vars
+
+    session1 = icechunk_repo.writable_session("main")
+    vdt1 = xr.DataTree.from_dict({"nested/group": vds[["foo"]]})
+    vdt1.vz.to_icechunk(session1.store)
+    session1.commit("wrote foo")
+
+    session2 = icechunk_repo.writable_session("main")
+    vdt2 = xr.DataTree.from_dict({"nested/group": vds[["bar"]]})
+    vdt2.vz.to_icechunk(session2.store, mode="a")
+    session2.commit("wrote bar")
+
+    with xr.open_zarr(
+        icechunk_repo.readonly_session("main").store,
+        zarr_format=3,
+        consolidated=False,
+        group="nested/group",
+    ) as ds:
+        np.testing.assert_equal(ds["foo"].data, arr * 2)
+        np.testing.assert_equal(ds["bar"].data, arr * 2)
 
 
 def test_set_single_virtual_ref_without_encoding(
@@ -996,9 +1109,6 @@ class TestRegion:
                 write_session.store, region={"y": "auto", "x": "auto"}
             )
 
-    @pytest.mark.xfail(
-        reason="This doesn't work in xarray either, maybe not even intended?",
-    )
     def test_write_datatree_region(
         self,
         icechunk_repo: "Repository",
@@ -1108,3 +1218,55 @@ def test_sharded_array_roundtrip_icechunk(icechunk_repo, tmp_path):
     # Verify data values match
     ic_ds = xr.open_zarr(ro_session.store, zarr_format=3, consolidated=False)
     npt.assert_array_equal(ic_ds["data"].values, data)
+
+
+def test_concat_sharded_arrays_along_new_dim_roundtrip_icechunk(
+    icechunk_repo, tmp_path
+):
+    """
+    Concatenating sharded virtual arrays along a *new* dimension must produce readable
+    data: the shard's inner chunk_shape has to gain the same length-1 axis, and doing so
+    leaves the shard's inner chunk grid, index layout and chunk bytes untouched.
+
+    Regression test for https://github.com/zarr-developers/VirtualiZarr/issues/1076.
+    """
+    datasets, vdss = [], []
+    for i in range(2):
+        filepath = str(tmp_path / f"step_{i}.zarr")
+        data = np.arange(i * 144, (i + 1) * 144, dtype="float32").reshape(12, 12)
+        ds = xr.Dataset({"data": (("x", "y"), data)})
+        ds.to_zarr(
+            filepath,
+            encoding={"data": {"chunks": (3, 3), "shards": (12, 12)}},
+            consolidated=False,
+            zarr_format=3,
+        )
+        datasets.append(ds)
+
+        registry = ObjectStoreRegistry(
+            {f"file://{filepath}": LocalStore(prefix=filepath)}
+        )
+        vdss.append(
+            open_virtual_dataset(url=filepath, registry=registry, parser=ZarrParser())
+        )
+
+    # this is what used to raise: "The shard's `chunk_shape` and array's `shape` need to
+    # have the same number of dimensions."
+    concatenated = xr.concat(vdss, dim="time")
+
+    assert concatenated["data"].shape == (2, 12, 12)
+    assert concatenated["data"].data.metadata.shards == (1, 12, 12)
+    assert concatenated["data"].data.metadata.chunks == (1, 3, 3)
+
+    session = icechunk_repo.writable_session("main")
+    concatenated.vz.to_icechunk(session.store, validate_containers=False)
+    session.commit("concat sharded arrays along a new dim")
+
+    ro_session = icechunk_repo.readonly_session("main")
+    roundtrip = xr.open_zarr(ro_session.store, zarr_format=3, consolidated=False)
+
+    assert roundtrip["data"].shape == (2, 12, 12)
+    # the payoff: every inner chunk of both shards decodes to its original values
+    npt.assert_array_equal(
+        roundtrip["data"].values, xr.concat(datasets, dim="time")["data"].values
+    )

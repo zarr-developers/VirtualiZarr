@@ -196,6 +196,18 @@ class TestCreateManifest:
         with pytest.raises(ValueError, match="Invalid format for chunk key"):
             ChunkManifest(entries=chunks)
 
+    @pytest.mark.parametrize("shape", [(0,), (0, 0), (2, 0), (0, 2)])
+    def test_zero_sized_chunk_grid(self, shape):
+        """A zero-length array has no chunks, so the manifest should be empty rather than raise."""
+        manifest = ChunkManifest(entries={}, shape=shape)
+        assert len(manifest) == 0
+        assert manifest.dict() == {}
+        assert list(manifest.keys()) == []
+        assert list(manifest.values()) == []
+        assert list(manifest.items()) == []
+        assert list(manifest.iter_refs()) == []
+        assert list(manifest.iter_nonempty_paths()) == []
+
     def test_remove_chunks_with_empty_paths(self):
         chunks = {
             "0.0.0": {"path": "", "offset": 0, "length": 100},

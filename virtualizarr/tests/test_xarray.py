@@ -18,6 +18,7 @@ from virtualizarr import (
     open_virtual_mfdataset,
 )
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.indexing import SubChunkIndexingError
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_dask,
@@ -48,7 +49,41 @@ def test_wrapping(array_v3_metadata):
     assert isinstance(ds["a"].data, ManifestArray)
     assert ds["a"].shape == shape
     assert ds["a"].dtype == dtype
-    assert ds["a"].chunks == chunks
+    assert ds["a"].data.metadata.chunks == chunks
+
+
+class TestNotChunked:
+    # Regression tests for the opaque "Could not find a Chunk Manager"
+    # TypeError (GH #114, #354, #382). Because a ManifestArray no longer
+    # advertises a ``.chunks`` attribute, xarray no longer misclassifies a
+    # virtual dataset as a dask-style chunked (computable) array.
+    @pytest.fixture
+    def virtual_ds(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/foo.nc", "offset": 100, "length": 100},
+                "0.1": {"path": "/foo.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr = ManifestArray(
+            metadata=array_v3_metadata(chunks=(5, 10), shape=(5, 20)),
+            chunkmanifest=manifest,
+        )
+        return xr.Dataset({"a": (["x", "y"], marr)})
+
+    def test_reports_no_dask_style_chunking(self, virtual_ds):
+        # previously these returned a malformed value; reporting no chunking
+        # is the correct behavior for a non-computable array
+        assert virtual_ds.chunks == {}
+        assert virtual_ds["a"].variable.chunksizes == {}
+        assert virtual_ds["a"].variable.chunks is None
+
+    def test_reading_values_raises_clear_error(self, virtual_ds):
+        # accessing values must raise the explanatory NotImplementedError
+        # rather than routing through a non-existent chunk manager and
+        # raising the cryptic "Could not find a Chunk Manager" TypeError
+        with pytest.raises(NotImplementedError, match="virtual references"):
+            virtual_ds["a"].values
 
 
 class TestEquals:
@@ -102,7 +137,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (2, 20)
-        assert result.chunks == (1, 10)
+        assert result.data.metadata.chunks == (1, 10)
         assert result.data.manifest.dict() == {
             "0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -139,7 +174,7 @@ class TestConcat:
 
         # xarray.concat adds new dimensions along axis=0
         assert result.shape == (2, 5, 20)
-        assert result.chunks == (1, 5, 10)
+        assert result.data.metadata.chunks == (1, 5, 10)
         assert result.data.manifest.dict() == {
             "0.0.0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "0.0.1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -180,7 +215,7 @@ class TestConcat:
         assert result.indexes == {}
 
         assert result.shape == (40,)
-        assert result.chunks == (10,)
+        assert result.data.metadata.chunks == (10,)
         assert result.data.manifest.dict() == {
             "0": {"path": "file:///foo.nc", "offset": 100, "length": 100},
             "1": {"path": "file:///foo.nc", "offset": 200, "length": 100},
@@ -538,6 +573,16 @@ class TestOpenVirtualDatasetAttrs:
                 "units": "degrees_north",
                 "axis": "Y",
             }
+
+    def test_source_url_stored_in_encoding(self, netcdf4_file, local_registry):
+        # mirrors xarray.open_dataset behaviour of populating ds.encoding["source"]
+        parser = HDFParser()
+        with open_virtual_dataset(
+            url=netcdf4_file,
+            registry=local_registry,
+            parser=parser,
+        ) as vds:
+            assert vds.encoding["source"] == Path(netcdf4_file).as_uri()
 
 
 class TestDetermineCoords:
@@ -1006,3 +1051,137 @@ def test_to_xarray_nonscalar_no_dimension_names(array_v3_metadata):
 
     with pytest.raises(ValueError, match="without dimension names"):
         marr.to_virtual_variable()
+
+
+class TestIsel:
+    # Verifies the workflow documented in docs/how_to/scaling.md under
+    # "Splitting a single large virtual dataset across commits": slicing a virtual
+    # xarray.Dataset with .isel along a chunk-aligned axis subsets the underlying
+    # ChunkManifest without touching the data, and misaligned splits raise.
+
+    def _virtual_dataset(self, array_v3_metadata):
+        # shape=(8, 4), chunks=(2, 4): 4 chunks along "time", 1 chunk along "x"
+        metadata = array_v3_metadata(
+            shape=(8, 4), chunks=(2, 4), dimension_names=["time", "x"]
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 64},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 64},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 64},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 64},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        return xr.Dataset({"foo": (["time", "x"], marr)})
+
+    def test_isel_along_chunk_boundary(self, array_v3_metadata):
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        sliced = vds.isel(time=slice(2, 6))
+
+        assert sliced.sizes == {"time": 4, "x": 4}
+        assert isinstance(sliced["foo"].data, ManifestArray)
+        assert sliced["foo"].data.shape == (4, 4)
+        assert sliced["foo"].data.metadata.chunks == (2, 4)
+        # only the two middle chunks should remain, re-indexed from 0
+        assert sliced["foo"].data.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
+            "1.0": {"path": "file:///a.nc", "offset": 200, "length": 64},
+        }
+
+    def test_isel_single_chunk_via_length_1_slice(self, array_v3_metadata):
+        # A length-1 slice picks a single chunk while preserving the axis as length 1
+        # (the array stays 2D). Useful when the caller wants to keep dimensions stable.
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        sliced = vds.isel(time=slice(2, 4))
+
+        assert sliced.sizes == {"time": 2, "x": 4}
+        assert isinstance(sliced["foo"].data, ManifestArray)
+        # slice(2, 4) on chunks=(2, 4) picks chunk index 1 (the second chunk)
+        assert sliced["foo"].data.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 100, "length": 64},
+        }
+
+    def test_isel_integer_drops_axis(self, array_v3_metadata):
+        # Integer .isel drops the indexed axis (numpy / array-API semantics). Only
+        # works when chunk_size == 1 along that axis; otherwise it's sub-chunk indexing.
+        # shape=(4, 4), chunks=(1, 4): 4 single-row chunks along "time".
+        metadata = array_v3_metadata(
+            shape=(4, 4), chunks=(1, 4), dimension_names=["time", "x"]
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 32},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 32},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 32},
+                "3.0": {"path": "/a.nc", "offset": 300, "length": 32},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        vds = xr.Dataset({"foo": (["time", "x"], marr)})
+
+        sliced = vds.isel(time=2)
+
+        assert sliced["foo"].dims == ("x",)
+        assert sliced.sizes == {"x": 4}
+        assert isinstance(sliced["foo"].data, ManifestArray)
+        assert sliced["foo"].data.shape == (4,)
+        assert sliced["foo"].data.metadata.chunks == (4,)
+        assert sliced["foo"].data.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 200, "length": 32},
+        }
+
+    def test_isel_integer_misaligned_raises(self, array_v3_metadata):
+        # chunk_size > 1 along the indexed axis — picking one element would split a chunk.
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            vds.isel(time=1)
+
+    def test_isel_misaligned_raises(self, array_v3_metadata):
+        vds = self._virtual_dataset(array_v3_metadata)
+
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            vds.isel(time=slice(1, 5))
+
+    def test_isel_iterative_append_simulation(self, array_v3_metadata):
+        # Simulate the scaling.md recipe: walk a chunk-aligned step across "time"
+        # and confirm each slice yields a valid ManifestArray with the expected refs.
+        vds = self._virtual_dataset(array_v3_metadata)
+        step = 4  # two chunks of size 2 per slice
+
+        seen_refs = []
+        for start in range(0, vds.sizes["time"], step):
+            slice_vds = vds.isel(time=slice(start, start + step))
+            assert isinstance(slice_vds["foo"].data, ManifestArray)
+            seen_refs.extend(
+                entry["offset"]
+                for entry in slice_vds["foo"].data.manifest.dict().values()
+            )
+
+        # every original chunk should have been visited exactly once
+        assert sorted(seen_refs) == [0, 100, 200, 300]
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+def test_nrefs(simple_netcdf4, local_registry):
+    parser = HDFParser()
+    with open_virtual_dataset(
+        url=simple_netcdf4,
+        registry=local_registry,
+        parser=parser,
+    ) as vds:
+        # simple_netcdf4 has one virtual variable 'foo' with a single chunk
+        assert vds.vz.nrefs() == 1
+
+    with open_virtual_dataset(
+        url=simple_netcdf4,
+        registry=local_registry,
+        parser=parser,
+        loadable_variables=["foo"],
+    ) as vds:
+        # when the only variable is loadable (non-virtual), nrefs should be 0
+        assert vds.vz.nrefs() == 0

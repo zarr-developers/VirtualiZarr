@@ -7,9 +7,9 @@ import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
-from zarr import Array, Group
+from zarr import Array, Group, open_group
 from zarr.core.buffer import default_buffer_prototype
-from zarr.core.chunk_key_encodings import ChunkKeyEncoding
+from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.sync import sync
 
 from virtualizarr.codecs import extract_codecs, get_codecs
@@ -34,12 +34,39 @@ if TYPE_CHECKING:
 
 ENCODING_KEYS = {"_FillValue", "missing_value", "scale_factor", "add_offset"}
 
+VALID_MODES = ("w", "w-", "a")
+
+
+def _resolve_mode(
+    mode: Optional[Literal["w", "w-", "a"]],
+    append_dim: Optional[str] = None,
+    region: object = None,
+) -> Literal["w", "w-", "a", "r+"]:
+    """Validate ``mode`` and resolve it to the effective zarr group-open mode."""
+    if not isinstance(mode, (type(None), str)):
+        raise TypeError(f"mode: expected type Optional[str], but got type {type(mode)}")
+
+    if mode is not None and mode not in VALID_MODES:
+        raise ValueError(f"mode: expected one of {VALID_MODES}, but got {mode!r}")
+
+    if append_dim or region:
+        if mode in ("w", "w-"):
+            raise ValueError(
+                f"mode {mode!r} cannot be used together with append_dim or region, "
+                "which require opening an existing group"
+            )
+        # appending or writing to a region requires the group (and arrays) to already exist
+        return "r+"
+
+    return mode or "w-"
+
 
 def virtual_dataset_to_icechunk(
     vds: xr.Dataset,
     store: "IcechunkStore",
     *,
     group: Optional[str] = None,
+    mode: Optional[Literal["w", "w-", "a"]] = None,
     append_dim: Optional[str] = None,
     region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
     validate_containers: bool = True,
@@ -58,6 +85,16 @@ def virtual_dataset_to_icechunk(
         Store to write the dataset to, which must not be read-only.
     group
         Path to the group in which to store the dataset, defaulting to the root group.
+    mode
+        How to handle a pre-existing group at the target path:
+
+        - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
+        - ``"w"``: create the group, overwriting any existing contents at that path.
+        - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+        - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
+          is given, in which case the existing group is opened.
+
+        ``mode="w"`` and ``mode="w-"`` are incompatible with ``append_dim`` and ``region``.
     append_dim
         Name of the dimension along which to append data. If provided, the dataset must
         have a dimension with this name.
@@ -87,7 +124,6 @@ def virtual_dataset_to_icechunk(
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr import Group  # type: ignore[import-untyped]
         from zarr.storage import StorePath  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError(
@@ -103,6 +139,8 @@ def virtual_dataset_to_icechunk(
         raise TypeError(
             f"group: expected type Optional[str], but got type {type(group)}"
         )
+
+    open_mode = _resolve_mode(mode, append_dim=append_dim, region=region)
 
     if not isinstance(append_dim, (type(None), str)):
         raise TypeError(
@@ -134,11 +172,9 @@ def virtual_dataset_to_icechunk(
     if validate_containers:
         validate_virtual_chunk_containers(store.session.config, [vds])
 
-    if append_dim or region:
-        group_object = Group.open(store=store_path, zarr_format=3)
-    else:
-        # create the group if it doesn't already exist
-        group_object = Group.from_store(store=store_path, zarr_format=3)
+    group_object = open_group(
+        store_path, mode=open_mode, zarr_format=3, use_consolidated=False
+    )
 
     write_virtual_dataset_to_icechunk_group(
         vds=vds,
@@ -154,6 +190,7 @@ def virtual_datatree_to_icechunk(
     vdt: xr.DataTree,
     store: "IcechunkStore",
     *,
+    mode: Optional[Literal["w", "w-", "a"]] = None,
     write_inherited_coords: bool = False,
     validate_containers: bool = True,
     last_updated_at: datetime | None = None,
@@ -170,6 +207,13 @@ def virtual_datatree_to_icechunk(
         DataTree to write to an Icechunk store. Can contain both "virtual" variables (backed by ManifestArray objects) and "loadable" variables (backed by numpy arrays).
     store
         Store to write the dataset to, which must not be read-only.
+    mode
+        How to handle pre-existing groups at the target paths:
+
+        - ``"w-"`` or ``None`` (default): create each group, raising a
+          ``ContainsGroupError`` if it already exists.
+        - ``"w"``: create each group, overwriting any existing contents at that path.
+        - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
     write_inherited_coords
         If ``True``, replicate inherited coordinates on all descendant nodes of the
         tree. Otherwise, only write coordinates at the level at which they are
@@ -197,7 +241,6 @@ def virtual_datatree_to_icechunk(
     """
     try:
         from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr import Group  # type: ignore[import-untyped]
         from zarr.storage import StorePath  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError(
@@ -208,6 +251,10 @@ def virtual_datatree_to_icechunk(
         raise TypeError(
             f"store: expected type IcechunkStore, but got type {type(store)}"
         )
+
+    open_mode = _resolve_mode(
+        mode, append_dim=kwargs.get("append_dim"), region=kwargs.get("region")
+    )
 
     if not isinstance(last_updated_at, (type(None), datetime)):
         raise TypeError(
@@ -238,7 +285,9 @@ def virtual_datatree_to_icechunk(
 
     # TODO this serial loop could be slow writing lots of groups to high-latency store, see https://github.com/pydata/xarray/issues/9455
     for store_path, vds in paths_and_virtual_datasets:
-        group = Group.from_store(store=store_path, zarr_format=3)
+        group = open_group(
+            store_path, mode=open_mode, zarr_format=3, use_consolidated=False
+        )
 
         write_virtual_dataset_to_icechunk_group(
             vds=vds,
@@ -274,15 +323,17 @@ def validate_virtual_chunk_containers(
         raise ValueError("No Virtual Chunk Containers set")
 
     # check all refs against existing virtual chunk containers
+    # passing a tuple to str.startswith runs the loop over prefixes in C
+    supported_prefixes_tuple = tuple(supported_prefixes)
     for marr in manifestarrays:
         # TODO this loop over every virtual reference is likely inefficient in python,
         # is there a way to push this down to Icechunk? (see https://github.com/earth-mover/icechunk/issues/1167)
         for ref in marr.manifest.iter_nonempty_paths():
-            validate_single_ref(ref, supported_prefixes)
+            validate_single_ref(ref, supported_prefixes_tuple)
 
 
-def validate_single_ref(ref: str, supported_prefixes: set[str]) -> None:
-    if not any(ref.startswith(prefix) for prefix in supported_prefixes):
+def validate_single_ref(ref: str, supported_prefixes: tuple[str, ...]) -> None:
+    if not ref.startswith(supported_prefixes):
         raise ValueError(
             f"No Virtual Chunk Container set which supports prefix of path {ref}"
         )
@@ -430,7 +481,7 @@ def check_compatible_arrays(
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
     check_same_codecs([get_codecs(arr) for arr in arrays])
-    check_same_chunk_shapes([arr.chunks for arr in arrays])
+    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
     arr_shapes = [ma.shape, existing_array.shape]
     if append_axis is not None:
@@ -537,7 +588,6 @@ def write_virtual_variable_to_icechunk(
         group=group,
         arr_name=name,
         manifest=ma.manifest,
-        chunk_key_encoding=ma.metadata.chunk_key_encoding,
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
@@ -548,7 +598,6 @@ def write_manifest_to_icechunk(
     group: "Group",
     arr_name: str,
     manifest: ChunkManifest,
-    chunk_key_encoding: ChunkKeyEncoding,
     chunk_index_offsets: tuple[int, ...],
     last_updated_at: Optional[datetime] = None,
 ) -> None:
@@ -584,7 +633,6 @@ def write_manifest_to_icechunk(
             write_inlined_chunks_as_native(
                 store=store,
                 key_prefix=key_prefix,
-                chunk_key_encoding=chunk_key_encoding,
                 inlined=manifest._inlined,
                 chunk_index_offsets=chunk_index_offsets,
             )
@@ -614,11 +662,17 @@ def write_manifest_to_icechunk(
 async def write_inlined_chunks_as_native(
     store: "IcechunkStore",
     key_prefix: str,
-    chunk_key_encoding: ChunkKeyEncoding,
     inlined: Mapping[tuple[int, ...], bytes],
     chunk_index_offsets: tuple[int, ...],
 ) -> None:
-    """Write each inlined chunk as a native chunk at its zarr chunk key."""
+    """Write each inlined chunk as a native chunk at its zarr chunk key.
+
+    Icechunk's ``Key::parse`` only accepts the standard zarr v3 ``/``-separated
+    ``c/i0/i1/...`` chunk-key form; the manifest's stored chunk_key_encoding
+    uses ``.`` (the ManifestStore's internal convention), so we encode with a
+    slash-separated encoding here regardless.
+    """
+    encoding = DefaultChunkKeyEncoding(separator="/")
     prototype = default_buffer_prototype()
     has_offset = any(chunk_index_offsets)
     coros = []
@@ -628,7 +682,7 @@ async def write_inlined_chunks_as_native(
             if has_offset
             else chunk_idx
         )
-        encoded_chunk_key = chunk_key_encoding.encode_chunk_key(shifted_idx)
+        encoded_chunk_key = encoding.encode_chunk_key(shifted_idx)
         coros.append(
             store.set(
                 f"{key_prefix}/{encoded_chunk_key}",

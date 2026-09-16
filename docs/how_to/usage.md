@@ -1,6 +1,6 @@
 # Usage
 
-This page explains how to use VirtualiZarr. Review the [Data Structures](data_structures.md) documentation if you want to understand the conceptual models underpinning VirtualiZarr.
+This page explains how to use VirtualiZarr. Review the [Data Structures](../explanation/data_structures.md) documentation if you want to understand the conceptual models underpinning VirtualiZarr.
 
 ## Opening files as virtual datasets
 
@@ -207,7 +207,7 @@ vds = open_virtual_dataset(
     This is important to avoid accumulating open file handles and for avoiding leaks, so is recommended for production code.
     However we omit the context managers from the examples in the documentation for brevity.
 
-Printing this "virtual dataset" shows that although it is an instance of [xarray.Dataset][], unlike a typical xarray dataset, it wraps [virtualizarr.manifests.ManifestArray][] objects in addition to a few in-memory NumPy arrays. You can learn more about the `ManifestArray` class in the [Data Structures documentation](data_structures.md).
+Printing this "virtual dataset" shows that although it is an instance of [xarray.Dataset][], unlike a typical xarray dataset, it wraps [virtualizarr.manifests.ManifestArray][] objects in addition to a few in-memory NumPy arrays. You can learn more about the `ManifestArray` class in the [Data Structures documentation](../explanation/data_structures.md).
 
 ```python exec="on" session="usage" source="material-block" result="code"
 print(vds)
@@ -241,7 +241,7 @@ print(vds.vz.nbytes)
 
 Once a virtual dataset is created, you won't be able to load the values of the virtual variables into memory.
 Instead, you could load specific variables during virtual dataset creation using the `loadable_variables` parameter.
-Loading the variables during virtual dataset creation has several benefits detailed in the [FAQ](faq.md#why-would-i-want-to-load-variables-using-loadable_variables).
+Loading the variables during virtual dataset creation has several benefits detailed in the [FAQ](../explanation/faq.md#why-would-i-want-to-load-variables-using-loadable_variables).
 
 ```python exec="on" session="usage" source="material-block" result="code"
 vds = open_virtual_dataset(
@@ -288,7 +288,10 @@ For combining along multiple dimensions in one call we also have [xarray.combine
 If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
 !!! important
-    Currently the virtual approach requires the same chunking and encoding across datasets. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
+    Currently the virtual approach requires the same chunking and encoding across datasets. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
+
+!!! warning
+    CF encoding attributes (such as `scale_factor` and `add_offset`) must also be consistent across files. Unlike the chunking/codec/dtype requirements above, a mismatch here will _not_ raise an error — xarray's default attribute-merging behaviour can silently drop conflicting values, leaving you with a combined dataset that is decoded incorrectly on read. See [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) and the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for details.
 
 ### Manual concatenation ordering
 
@@ -456,7 +459,7 @@ You can append a virtual dataset to an existing Icechunk store using the `append
 This option is designed to behave similarly to the `append_dim` option to xarray's [xarray.Dataset.to_zarr][] method, and is especially useful for datasets that grow over time.
 
 !!! important
-    Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for more details.
+    Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
 
 ```python exec="on" session="usage" source="material-block" result="code"
 # write the virtual dataset to the session with the IcechunkStore
@@ -546,3 +549,10 @@ vds = open_virtual_dataset(
 ```
 
 Note that as the virtualizarr [virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_kerchunk][] method only writes absolute paths, the only scenario in which you might come across references containing relative paths is if you are opening references that were previously created using the `kerchunk` library alone.
+
+## Next steps
+
+- To understand the data structures underpinning VirtualiZarr, see [Data Structures](../explanation/data_structures.md).
+- To see worked end-to-end notebooks, see [Examples](examples.md).
+- To generate large numbers of virtual references efficiently, see [Scaling](scaling.md).
+- To validate the contents of your archival files before ingestion, see [Validation and Cleaning](validation.md).

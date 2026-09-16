@@ -24,7 +24,7 @@ A single chunk manifest can store references to any number of chunks, spread acr
 
 Note there is no need for the files the chunk manifest refers to to be local, or even to be currently accessible to your code (but you will need to be able to access them when you intend to read the actual chunk data!).
 
-The virtual dataset we created in the [usage guide](usage.md) above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
+The virtual dataset we created in the [usage guide](../how_to/usage.md) above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
 
 ```python
 marr = vds['air'].data
@@ -244,8 +244,10 @@ NotImplementedError: ManifestArrays can't be converted into numpy arrays or pand
 The whole point is to manipulate references to the data without actually loading any data.
 
 !!! note
-    You also cannot currently index into a `ManifestArray`, as arbitrary indexing would require loading data values to create the new array.
-    We could imagine supporting indexing without loading data when slicing only along chunk boundaries, but this has not yet been implemented (see [GH issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51)).
+    You can index into a `ManifestArray` as long as the selection aligns with chunk boundaries — slicing through the interior of a chunk would require loading the chunk's bytes, which a virtual array deliberately cannot do.
+    Chunk-aligned integer and slice indexing is supported, including mixed integer + slice indexers; integer indexers drop the indexed axis as in numpy. Misaligned selections raise `SubChunkIndexingError`.
+    As a special case, an **uncompressed** array supports slicing _within_ a single source chunk along its largest-stride storage axis — the result is a new chunk reference with a bumped byte offset and a smaller length, no data loaded. This works for `[BytesCodec]` arrays (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` arrays (the axis is `order[0]` — e.g. the last axis for F-order). Useful for picking out a row from a multi-row chunk produced by a parser like the netCDF3 one.
+    Arbitrary fancy indexing (e.g. with a boolean mask or integer array) is not supported, since it would generally require loading data.
 
 ## Zarr Groups
 
@@ -269,7 +271,7 @@ This is what the virtual datasets we created in the usage guide represent - all 
 Any `ManifestGroup` (or single-group `ManifestStore`) can be converted to a virtual dataset.
 
 The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
-See the [usage guide on combining virtual datasets](usage.md#combining-virtual-datasets) for more information.
+See the [usage guide on combining virtual datasets](../how_to/usage.md#combining-virtual-datasets) for more information.
 
 !!! note
     In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.

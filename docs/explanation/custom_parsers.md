@@ -1,0 +1,492 @@
+# Custom parsers
+
+This page explains how to write a custom parser for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
+This is advanced material intended for 3rd-party developers, and assumes you have read the page on [Data Structures](data_structures.md).
+
+!!! note
+    "Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr.
+    We renamed them to avoid confusion with obstore readers and xarray backends.
+
+## What is a VirtualiZarr parser?
+
+All VirtualiZarr parsers are simply callables that accept the URL pointing to a data source and a [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that may contain instantiated [ObjectStores][obstore.store.ObjectStore] that can read from that URL, and return an instance of the [`virtualizarr.manifests.ManifestStore`][] class containing information about the contents of the data source.
+
+```python
+from obspec_utils.registry import ObjectStoreRegistry
+
+from virtualizarr.manifests import ManifestStore
+
+
+def custom_parser(url: str, registry: ObjectStoreRegistry) -> ManifestStore:
+    # access the file's contents, e.g. using the ObjectStore instance in the registry
+    store, path_in_store = registry.resolve(url)
+    readable_file = obstore.open_reader(store, path_in_store)
+
+    # parse the file contents to extract its metadata
+    # this is generally where the format-specific logic lives
+    manifestgroup: ManifestGroup = extract_metadata(readable_file)
+
+    # construct the Manifeststore from the parsed metadata and the object store registry
+    return ManifestStore(group=manifestgroup, registry=registry)
+
+
+vds = vz.open_virtual_dataset(
+    url,
+    registry=registry,
+    parser=custom_parser,
+)
+```
+
+All parsers _must_ follow this exact call signature, enforced at runtime by checking against the [`virtualizarr.parsers.typing.Parser`][] typing protocol.
+
+!!! note
+    The object store registry can technically be empty, but to be able to read actual chunks of data back from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] later, the registry needs to contain at least one [`ObjectStore`][obstore.store.ObjectStore] matched to the URL prefix of the data sources.
+
+    The only time you might want to use an empty object store registry is if you are attempting to parse a custom metadata-only references format without touching the original files they refer to -- i.e., a format like Kerchunk or DMR++, that doesn't contain actual binary data values.
+
+## What is the responsibility of a parser?
+
+The VirtualiZarr package really does four separate things, in order:
+
+1. Maps the contents of common archival file formats to the Zarr data model, including references to the locations of the chunks.
+2. Allows reading chosen variables into memory (e.g. via the `loadable_variables` kwarg, or reading from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] using zarr-python directly).
+3. Provides a way to combine arrays of chunk references using a convenient API (the Xarray API).
+4. Allows persisting these references to storage for later use, in either the Kerchunk or Icechunk format.
+
+**VirtualiZarr parsers are responsible for the entirety of step (1).**
+In other words, all of the assumptions required to map the data model of an archival file format to the Zarr data model, and the logic for doing so for a specific file, together constitute a parser.
+
+**The ObjectStore instances are responsible for fetching the bytes in step (2).**
+
+This design provides a neat separation of concerns, which is helpful in two ways:
+
+1. The Xarray data model is subtly different from the Zarr data model (see below), so as the final objective is to create a virtual store which programmatically maps Zarr API calls to the archival file format at read-time, it is useful to separate that logic up front, before we convert to use the xarray virtual dataset representation and potentially subtly confuse matters.
+2. It also allows us to support reading data from the file via the [`ManifestStore`][virtualizarr.manifests.ManifestStore] interface, using zarr-python and obstore, but without using Xarray.
+
+## Reading data from the `ManifestStore`
+
+As well as being a well-defined representation of the archival data in the Zarr model, you can also read chunk data directly from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] object.
+
+This works because the [`ManifestStore`][virtualizarr.manifests.ManifestStore] class is an implementation of the Zarr-Python `zarr.abc.Store` interface, and uses the [obstore](https://developmentseed.org/obstore/latest/) package internally to actually fetch chunk data when requested.
+
+Reading data from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] can therefore be done using the zarr-python API directly:
+
+```python
+manifest_store = parser(url, registry)
+
+zarr_group = zarr.open_group(manifest_store)
+zarr_group.tree()
+```
+or using xarray:
+```python
+manifest_store = parser(url, registry)
+
+ds = xr.open_zarr(manifest_store, zarr_format=3, consolidated=False)
+```
+
+Note using xarray like this would produce an entirely non-virtual dataset, so is equivalent to passing
+
+```python
+ds = vz.open_virtual_dataset(
+    url,
+    registry=registry,
+    parser=parser,
+    loadable_variables=<all_the_variable_names>,
+)
+```
+
+## How is the parser called internally?
+
+The parser is passed to [`open_virtual_dataset`][virtualizarr.open_virtual_dataset], and immediately called on the url to produce a [`ManifestStore`][virtualizarr.manifests.ManifestStore] instance.
+
+The [`ManifestStore`][virtualizarr.manifests.ManifestStore] is then converted to the xarray data model using [`ManifestStore.to_virtual_dataset`][virtualizarr.manifests.ManifestStore.to_virtual_dataset], which loads `loadable_variables` by reading from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] using [`xarray.open_zarr`][].
+
+This virtual dataset object is then returned to the user, so [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] is really a very thin wrapper around the parser.
+
+## Parser-specific keyword arguments
+
+The [`Parser`][virtualizarr.parsers.typing.Parser] `__call__` method does not accept arbitrary optional keyword arguments.
+
+However, extra information is often needed to fully map the archival format to the Zarr data model, for example if the format does not include array names or dimension names.
+
+Instead, to pass arbitrary extra information to your parser callable, it is recommended that you bind that information to class attributes (or use [`functools.partial`][]). For example:
+
+```python
+class CustomParser:
+    def __init__(self, option_1: bool = False,  option_2: int | None = None) -> None:
+        self.option_1 = option_1
+        self.option_2 = option_2
+
+    def __call__(self, url: str, registry: ObjectStoreRegistry) -> ManifestStore:
+        # access the file's contents, e.g. using the ObjectStore instance in the registry
+        store, path_in_store = registry.resolve(url)
+        readable_file = obstore.open_reader(store, path_in_store)
+
+        # parse the file contents to extract its metadata
+        # this is generally where the format-specific logic lives
+        manifestgroup: ManifestGroup = extract_metadata(readable_file, option_1=self.option_1, option_2=self.option_2)
+
+        # construct the Manifeststore from the parsed metadata and the object store registry
+        return ManifestStore(group=manifestgroup, registry=registry)
+
+parser = CustomParser(option_1=True, option_2=6)
+vds = vz.open_virtual_dataset(
+    url,
+    registry=registry,
+    parser=parser,
+)
+```
+
+This helps to keep format-specific parser configuration separate from kwargs to [`open_virtual_dataset`][virtualizarr.open_virtual_dataset].
+
+## How to write your own custom parser
+
+As long as your custom parser callable follows the interface above, you can implement it in any way you like.
+However there are few common approaches.
+
+### Typical VirtualiZarr parsers
+
+The recommended way to implement a custom parser by parsing a file of a given format, and construct the [`ManifestStore`][virtualizarr.manifests.ManifestStore] object explicitly, component by component, extracting the metadata that you need.
+
+Generally you want to follow steps like this:
+
+1.  Extract file header or magic bytes to confirm the file passed is the format your parser expects.
+2.  Read metadata to determine how many arrays there are in the file, their shapes, chunk shapes, dimensions, codecs, and other metadata.
+3.  For each array in the file:
+    1.  Create a `zarr.core.metadata.ArrayV3Metadata` object to hold that metadata, including dimension names. At this point you may have to define new Zarr codecs to support deserializing your data (though hopefully the standard Zarr codecs are sufficient).
+    2.  Extract the byte ranges of each chunk and store them alongside the fully-qualified filepath in a [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] object.
+    3. Create one [`ManifestArray`][virtualizarr.manifests.ManifestArray] object, using the corresponding `zarr.core.metadata.ArrayV3Metadata` and [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] objects.
+4.  Group [`ManifestArray`][virtualizarr.manifests.ManifestArray]s into one or more [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] objects. Ideally you would only have one group, but your format's data model may preclude that. If there is group-level metadata attach this to the [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] object as a `zarr.metadata.GroupMetadata` object. Remember that [`ManifestGroup`][virtualizarr.manifests.ManifestGroup]s can contain other groups as well as arrays.
+5.  Instantiate the final [`ManifestStore`][virtualizarr.manifests.ManifestStore] using the top-most [`ManifestGroup`][virtualizarr.manifests.ManifestGroup] and return it.
+
+!!! note
+
+    The [regular chunk grid](https://github.com/zarr-developers/zarr-specs/blob/main/docs/v3/chunk-grids/regular-grid/index.rst) for Zarr V3 data expects that chunks at the border of an array always have the full chunk size, even when the array only covers parts of it.
+
+    For example, having an array with ``"shape": [30, 30]`` and ``"chunk_shape": [16, 16]``, the chunk ``0,1`` would also contain unused values for the indices ``0-16, 30-31``. If the file format that you are virtualizing does not fill in partial chunks, it is recommended that you raise a `ValueError` until Zarr supports [variable chunk sizes](https://github.com/orgs/zarr-developers/discussions/52).
+
+### Parsing existing in-memory references
+
+A `Parser` can be used to parse existing references that are in-memory, as well as those on-disk. This can be done by using the [`obstore.store.MemoryStore`][], and highlights the power of delegating all IO to a general store-like interface.
+
+```python
+# some example kerchunk-formatted JSON references, as an in-memory python dict
+refs = {
+    'version': 1,
+    'refs': {
+        '.zgroup': '{"zarr_format":2}',
+        'a/.zarray': '{"chunks":[2,3],"compressor":null,"dtype":"<i8","fill_value":null,"filters":null,"order":"C","shape":[2,3],"zarr_format":2}',
+        'a/.zattrs': '{"_ARRAY_DIMENSIONS":["x","y"],"value": "1"}',
+        'a/0.0': ['/test1.nc', 6144, 48],
+    }
+}
+
+memory_store = obstore.store.MemoryStore()
+memory_store.put("refs.json", ujson.dumps(refs).encode())
+
+registry = ObjectStoreRegistry({"memory://": memory_store})
+parser = KerchunkJSONParser()
+manifeststore = parser("memory://refs.json", registry)
+```
+
+Note that the [`MemoryStore`][obstore.store.MemoryStore] is needed for reading metadata(/inlined chunk data) from the in-memory `dict`, but if you wanted to be able to load data actually referred to by the kerchunk references you would need more stores in the registry (for example to read from the local file `/test1.nc` the registry would also need to contain a [`LocalStore`][obstore.store.LocalStore]).
+
+### Parsing a sidecar file
+
+A custom parser can parse multiple files, perhaps by passing a glob string and looking for expected file naming conventions, or by passing additional parser-specific keyword arguments.
+This can be useful for reading file formats which include some kind of additional "index" sidecar file, but don't have all the information necessary to construct the entire [`ManifestStore`][virtualizarr.manifests.ManifestStore] object from the sidecar file alone.
+
+!!! note
+    If you do have some type of custom sidecar metadata file which contains all the information necessary to create the [`ManifestStore`][virtualizarr.manifests.ManifestStore], then you should just create a custom parser for that metadata file format instead!
+    Examples of this approach which come packaged with VirtualiZarr are the [`DMRPPparser`][virtualizarr.parsers.DMRPPParser] and the [`KerchunkJSONparser`][virtualizarr.parsers.KerchunkJSONParser]
+
+### Kerchunk-based parsers
+
+The Kerchunk package includes code for parsing various array file formats, returning the result as an in-memory nested dictionary, following the [Kerchunk references specification](https://fsspec.github.io/kerchunk/spec).
+These references can be directly read and converted into a [`ManifestStore`][virtualizarr.manifests.ManifestStore] by VirtualiZarr's [`KerchunkJSONParser`][virtualizarr.parsers.KerchunkJSONParser] and [`KerchunkParquetParser`][virtualizarr.parsers.KerchunkParquetParser].
+
+You can therefore use a function which returns in-memory kerchunk JSON references inside your parser, then simply call [`KerchunkJSONParser`][virtualizarr.parsers.KerchunkJSONParser] and return the result.
+
+!!! note
+    Whilst this might be the quickest way to get a custom parser working, we do not really recommend this approach, as:
+
+    1. The Kerchunk in-memory nested dictionary format is very memory-inefficient compared to the numpy array representation used internally by VirtualiZarr's [`ChunkManifest`][virtualizarr.manifests.ChunkManifest] class,
+    2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
+    3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
+
+    Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, HDF4, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
+
+## Fill values
+
+There are two distinct "fill value" concepts that parsers may interact with:
+
+1. Value for uninitialized chunks - (e.g., **Zarr `fill_value`**) — the default value returned for uninitialized or missing chunks. This is set via the `fill_value` parameter when creating `ArrayV3Metadata`.
+2. Sentinel value - (e.g., **CF `_FillValue`** )) — a sentinel value that CF-aware readers like xarray use to mask individual data points as missing within chunks that _do_ contain data.
+
+These serve different purposes and are stored in different places. Many source formats interact with these distinct concepts. For example, HDF5 has a storage-level `fillvalue` (returned for unallocated chunks) and a CF `_FillValue` attribute (used for masking). Parsers should preserve this separation faithfully: the source format's storage fill value maps to the zarr `fill_value`, and the CF `_FillValue` attribute is carried through as a zarr attribute.
+
+!!! note
+
+    When the source format uses [packed data](#packing-and-scaling) (`scale_factor`/`add_offset`), the `_FillValue` must be in the packed (encoded) domain. See [Fill values in packed data](#fill-values-in-packed-data) for details.
+
+### Format-specific fill value attributes
+
+Source formats may carry additional attributes that serve a similar role to `_FillValue`. Parsers should understand their semantics to avoid conflicts or data loss.
+
+#### CF conventions: `missing_value`
+
+The `missing_value` attribute is an older CF convention attribute with the same meaning as `_FillValue`: a sentinel value indicating missing data points. Xarray treats the two equivalently, decoding both to NaN (for floats) or masked values. If _both_ `_FillValue` and `missing_value` are present as attributes on the same array and their values differ, xarray will raise an error. Parsers should therefore ensure consistency: either emit only one of the two, or ensure they carry the same value (with the same encoding).
+
+#### GeoTIFF/GDAL: `gdal_no_data`
+
+The `gdal_no_data` attribute comes from GeoTIFF's `GDAL_NODATA` tag (tag 42113). This is specific to the TIFF/GeoTIFF ecosystem and is _not_ part of the CF conventions. Xarray does not recognize or decode this attribute, so it is carried through as an opaque attribute. Parsers for TIFF-based formats should decide how to handle this value:
+
+- If the source data uses `gdal_no_data` as a true missing-data sentinel, the parser may want to also emit a properly encoded `_FillValue` so that xarray can mask the data automatically.
+- Avoid emitting conflicting values between `gdal_no_data`, `_FillValue`, and `missing_value` unless the distinction is intentional.
+
+Note that [rioxarray](https://corteva.github.io/rioxarray/) also does _not_ look at `gdal_no_data` by name. Its nodata resolution checks `_FillValue`, `missing_value`, `fill_value`, `nodata`, and rasterio's `DatasetReader.nodata` (which reads the GDAL_NODATA tag via GDAL). When data is accessed through a virtual Zarr store rather than rasterio, the rasterio path is unavailable, so `gdal_no_data` alone is not sufficient for either xarray or rioxarray to detect missing data.
+
+#### HDF5: storage-level `fillvalue`
+
+HDF5 datasets have a storage-level fill value (`dataset.fillvalue`) that is returned for unallocated chunks. This is distinct from the CF `_FillValue` attribute, which is application-level metadata for masking. The HDF parser maps `dataset.fillvalue` to the Zarr `fill_value` and carries the CF `_FillValue` attribute through separately (with proper encoding). Parsers for HDF5-derived formats should preserve this separation.
+
+#### OPeNDAP/DMR++: `fillValue`
+
+DMR++ files may include a `fillValue` attribute on chunk definitions, representing the server-side fill for unallocated chunks. This maps to the Zarr `fill_value`. Any CF `_FillValue` attribute present in the DMR++ variable metadata is carried through as an encoded attribute, the same as for HDF5.
+
+#### FITS: `BLANK` keyword
+
+FITS files use the `BLANK` keyword in the header to indicate undefined integer pixel values. For floating-point data, IEEE NaN is used by convention instead. FITS also has `BZERO` and `BSCALE` for linear scaling, which interact with `BLANK` (the blank value is applied _before_ scaling). Parsers for FITS data should map `BLANK` to either the Zarr `fill_value` or a `_FillValue` attribute depending on whether it represents uninitialized storage or a data-level sentinel.
+
+#### NetCDF-3: default fill values
+
+NetCDF-3 defines [default fill values per data type](https://www.unidata.ucar.edu/software/netcdf/docs/file_format_specifications.html) (e.g., `9.9692e+36` for float, `–32767` for short) that are used when no explicit `_FillValue` attribute is set. If a variable was written with `nofill` mode, no fill value applies. Parsers should check whether a `_FillValue` attribute is explicitly present; if not, they may need to apply the NetCDF-3 default for the variable's type.
+
+#### GRIB/GRIB2: bitmap-based missing data
+
+GRIB and GRIB2 files use a fundamentally different missing data model from the attribute-based approach of NetCDF/HDF5. Instead of a sentinel fill value, GRIB uses a **bitmap section** (Section 6 in GRIB2) where each bit indicates whether the corresponding data point is present or missing. The data section only contains values for present points, so missing points have no storage representation at all.
+
+GRIB is worth calling out because it illustrates a case where the missing-data logic cannot live in a `_FillValue` attribute at all — it has to be handled by the codec that decodes each chunk:
+
+- There is no direct equivalent of `_FillValue` in the GRIB data model. The bitmap _is_ the missing data indicator.
+- GRIB2 also supports ["complex packing"](https://codes.ecmwf.int/grib/format/grib2/templates/5/) and ["second-order packing"](https://codes.ecmwf.int/grib/format/grib1/packing/2/) where the decompression algorithm itself must account for the bitmap. This means the codec pipeline must be bitmap-aware, not just the fill value.
+
+The [`GribberishParser`](../api/parsers/grib.md), backed by the Rust [gribberish](https://github.com/mpiannucci/gribberish) library, is VirtualiZarr's GRIB1/GRIB2 parser (`pip install "virtualizarr[grib]"`) and handles exactly this. It maps each GRIB message to a single chunk and registers a `gribberish` zarr codec that decodes the message bytes on read. Because the bitmap can only be applied while unpacking the data section, that work happens inside the codec: it expands the packed values back onto the full grid and writes `NaN` into every bitmap-masked point. The parser then simply declares the array's Zarr `fill_value` as `NaN` (no `_FillValue` attribute is needed, and the packing scheme — simple, complex, or second-order — is transparent to VirtualiZarr since decoding is entirely the codec's responsibility). This is the general pattern for any format where missing values are entangled with the on-disk compression: pair a fill value on the array with a codec that reconstructs the mask at read time, rather than trying to express it as an attribute.
+
+### Encoding the `_FillValue` attribute
+
+In order to be correctly parsed by xarray, the `_FillValue` attribute must be encoded in a way that xarray's `FillValueCoder.decode()` expects. You could use `FillValueCoder.encode()` directly to accomplish this. The internal parsers use a convenience function (`virtualizarr.parsers.utils.encode_cf_fill_value`) which handles extracting scalar values from numpy arrays before delegating to `FillValueCoder.encode()`.
+
+The zarr `fill_value` in `ArrayV3Metadata` does **not** need this encoding — zarr handles its own serialization.
+
+#### Supported dtypes
+
+Xarray's `FillValueCoder` (as of xarray >= 2026.4.0) supports the following dtype kinds:
+
+| dtype kind | Encoding | Decoding |
+|------------|----------|----------|
+| `f` (float) | base64-encoded little-endian double | base64 → `float` |
+| `c` (complex) | 2-element list of base64-encoded doubles | list → `complex` |
+| `iu` (integer) | Python `int` | `int` |
+| `b` (boolean) | Python `bool` | `bool` |
+| `U` (unicode string) | Python `str` | `str` |
+| `S` (byte string) | base64-encoded | base64 → `bytes` |
+| `string` (Zarr V3) | — | `str` |
+| `bytes` (Zarr V3) | — | base64 → `bytes` |
+
+Any other dtype (structured/compound, datetime, etc.) will cause `FillValueCoder` to raise a `ValueError`.
+
+!!! note
+
+    Complex dtype support was added to xarray's `FillValueCoder` in 2026.4.0 and is not yet covered by the in-progress `_FillValue` Zarr convention. Emitting a complex `_FillValue` is xarray-specific and may not be portable to other readers that follow the convention strictly.
+
+!!! warning
+
+    The `_FillValue` attribute must be the **encoded** form, not a raw scalar. A common mistake is to emit `_FillValue` as a plain numeric value or string (e.g., `"-9999"` for a float32 array). For float dtypes, xarray expects a base64-encoded 8-byte little-endian double; passing a numeric string instead will cause a `struct.error` at decode time. This is especially likely when parsing formats that store metadata as text (e.g., GDAL metadata XML in GeoTIFF), where type information from the original source format has been lost.
+
+### `valid_range`, `valid_min`, `valid_max`
+
+The CF conventions define `valid_range`, `valid_min`, and `valid_max` attributes for specifying the range of physically meaningful values. Values outside this range are considered missing.
+
+!!! warning
+
+    **Xarray does not process these attributes.** Unlike the netcdf4 Python library (which masks out-of-range values when `auto_maskandscale` is enabled), xarray passes `valid_range`, `valid_min`, and `valid_max` through as opaque attributes without applying any masking.
+
+    If your source format relies on these attributes for missing data detection, your parser should either:
+
+    - Convert out-of-range values to a `_FillValue` sentinel during parsing, or
+    - Document that downstream consumers must handle range-based masking themselves.
+
+## Packing and scaling
+
+Many source formats store data in a "packed" form using integer types for storage efficiency, with metadata that defines the transformation to physical values. Parsers need to decide how to represent this packing in the Zarr data model: as attributes that xarray decodes at read time, or as codecs in the Zarr codec pipeline.
+
+### Packing as attributes
+
+The recommended approach for custom parsers is to emit `scale_factor` and `add_offset` as zarr array attributes, and store the data in its packed dtype (e.g., `int16`). Xarray's CF decoding will apply the transformation `decoded = encoded * scale_factor + add_offset` at read time. This is how VirtualiZarr's built-in parsers currently work.
+
+#### Fill values in packed data
+
+When packing is represented as attributes, xarray applies `CFMaskCoder` (fill value masking) _before_ `CFScaleOffsetCoder` (scaling). This decode order means:
+
+- The `_FillValue` attribute must be in the **packed (encoded) domain**, not the decoded domain. For example, if the packed data is `int16` with `scale_factor=0.01` and the intended missing value is `-9999.0` in physical units, the `_FillValue` should be the packed integer representation (e.g., `-999900`), not the float `-9999.0`.
+- Parsers should emit `_FillValue`, `scale_factor`, and `add_offset` as separate attributes and let xarray handle the decode order. Do not pre-apply the scaling transformation to the fill value.
+
+!!! warning
+
+    If your source format stores the fill value in the _decoded_ (physical) domain, you must reverse the packing transformation before emitting `_FillValue`. The reverse transformation is: `encoded_fill = (decoded_fill - add_offset) / scale_factor`.
+
+#### `_Unsigned`
+
+Some NetCDF4 files use signed integer types (e.g., `int16`) to store unsigned data (e.g., `uint16`), with a `_Unsigned = "true"` attribute to signal the intended interpretation. xarray's `CFMaskCoder` handles this conversion before applying fill value masking.
+
+Parsers should be aware that:
+
+- If `_Unsigned = "true"` is present, the fill value must be interpreted in the _unsigned_ domain. For example, a `_FillValue` of `-1` stored as `int16` corresponds to `65535` when reinterpreted as `uint16`.
+- The `_Unsigned` attribute should be passed through as a regular attribute. xarray will handle the type reinterpretation during decoding.
+- This attribute is most common in NetCDF4 files created by tools that predate native unsigned integer support in NetCDF4.
+
+### Packing as codecs
+
+!!! note
+
+    The `scale_offset` and `cast_value` codecs are [specified](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset) in the Zarr V3 extension registry but are not yet available in a released version of zarr-python. They are implemented on the [`feat/scale-offset-cast-value`](https://github.com/zarr-developers/zarr-python/tree/feat/scale-offset-cast-value) branch. Additionally, `cast_value` requires the optional [`cast-value-rs`](https://github.com/zarr-developers/cast-value-rs) package. Until these are merged and released, custom parsers should use the [attributes approach](#packing-as-attributes).
+
+Instead of relying on xarray's CF decoding, packing can be encoded directly into the zarr codec pipeline using the Zarr V3 [`scale_offset`](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset) and [`cast_value`](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value) codecs:
+
+- **`scale_offset`**: An array-to-array codec that applies `out = (in - offset) * scale` during encoding and `out = (in / scale) + offset` during decoding. This codec operates within a single data type — it does not change the dtype.
+- **`cast_value`**: An array-to-array codec that converts values between numeric types, with configurable rounding (`"nearest-even"`, `"towards-zero"`, `"towards-positive"`, `"towards-negative"`, `"nearest-away"`) and out-of-range handling (`"clamp"`, `"wrap"`, or error). It also supports a `scalar_map` for explicit scalar mappings (e.g., mapping `NaN` to `0` during a float-to-integer cast).
+
+When using the codec approach, `scale_factor` and `add_offset` are removed from the attributes (since the transformation is now encoded in the codec chain), and the array's declared `data_type` is the _decoded_ (physical) type.
+
+For example, a `float32` array packed into `uint8` with `offset=1000` and `scale=0.1`:
+
+```json
+{
+    "data_type": "float32",
+    "codecs": [
+        {
+            "name": "scale_offset",
+            "configuration": {
+                "offset": 1000,
+                "scale": 0.1
+            }
+        },
+        {
+            "name": "cast_value",
+            "configuration": {
+                "data_type": "uint8",
+                "out_of_range": "wrap"
+            }
+        },
+        "bytes"
+    ]
+}
+```
+
+#### Fill values with packing codecs
+
+When packing is expressed as codecs rather than attributes, the fill value semantics change:
+
+- The zarr `fill_value` is specified in the array's declared data type (the _decoded_ domain, e.g., `float32`), and both `scale_offset` and `cast_value` transform the fill value as it propagates through the codec chain. This ensures that fill-value-aware codecs downstream (such as `sharding_indexed`) see the correctly transformed fill value.
+- There is no `_FillValue` _attribute_ needed for uninitialized chunks — the zarr `fill_value` and the codec chain together handle that, and xarray will not apply `CFMaskCoder` because there is no `_FillValue` attribute to trigger it.
+- If the source data uses a fill/sentinel value for masking _within_ chunks (distinct from the storage fill), the parser must still emit a `_FillValue` attribute for that purpose. In this case, the `_FillValue` should be in the **decoded** domain (since the codec chain handles the type transformation), and `cast_value`'s `scalar_map` can be used to preserve the fill value through the cast. For example, mapping `NaN` to `0` on encode and `0` back to `NaN` on decode:
+
+    ```json
+    {
+        "name": "cast_value",
+        "configuration": {
+            "data_type": "uint8",
+            "rounding": "nearest-even",
+            "scalar_map": {
+                "encode": [["NaN", 0]],
+                "decode": [[0, "NaN"]]
+            }
+        }
+    }
+    ```
+
+#### Handling NaN values during casts
+
+The example above relies on `cast_value`'s `scalar_map` to route `NaN` through an integer encoding, which is necessary because of the [rules `cast_value` defines for non-finite values](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value#numpy-compatibility):
+
+- When both endpoints support IEEE 754 (e.g., `float32` ↔ `float64`), `NaN` and `±Infinity` are propagated through the cast unchanged unless `scalar_map` overrides them.
+- When the output dtype does not support NaN or transfinite values (any integer or boolean type), the codec raises an error if the input contains `NaN` or `±Infinity`, unless `scalar_map` provides an explicit mapping for those values. There is no silent coercion.
+
+This means a parser packing floating-point data into an integer type must decide up front how non-finite inputs should be encoded — emitting a `cast_value` configuration that crosses the IEEE-754 boundary without a `scalar_map` will fail at encode time as soon as a `NaN` appears in the data.
+
+There are two common patterns:
+
+1. **Round-trip-faithful sentinel mapping (preferred).** If `NaN` represents missing data in the source, map `NaN` to a reserved integer on `encode` _and_ back to `NaN` on `decode`, as in the example above. Pair this with a matching `_FillValue` attribute in the **decoded** domain so that xarray and other CF-aware readers also mask the value.
+2. **NumPy-compatible cast.** If the source data was written by tooling that relied on NumPy's default float-to-integer cast (where `NaN`, `+Infinity`, and `-Infinity` are silently coerced to `0` and finite out-of-range values wrap), reproduce that behavior explicitly using the [NumPy compatibility recipe](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/cast_value#numpy-compatibility) from the spec:
+
+    ```json
+    {
+        "name": "cast_value",
+        "configuration": {
+            "data_type": "uint8",
+            "rounding": "towards-zero",
+            "out_of_range": "wrap",
+            "scalar_map": {
+                "encode": [
+                    ["NaN", 0],
+                    ["+Infinity", 0],
+                    ["-Infinity", 0]
+                ]
+            }
+        }
+    }
+    ```
+
+    This recipe deliberately omits a `decode` mapping: once `NaN` is written as `0`, it cannot be recovered on read, and any genuine `0` values in the source will round-trip as `0` rather than `NaN`. Use it only when faithfully reproducing legacy NumPy semantics is the explicit goal; for real missing-data sentinels, prefer the bidirectional pattern in (1).
+
+#### Relationship to `numcodecs.fixedscaleoffset`
+
+The `scale_offset` + `cast_value` pair supersedes the legacy `numcodecs.fixedscaleoffset` codec, which combined scaling, offset, rounding, and type casting into a single monolithic operation. The new codecs address several problems with the legacy approach:
+
+- **Fill value awareness**: `FixedScaleOffset` applies `(x - offset) * scale` to _every_ element indiscriminately, including fill/sentinel values. For integer fill values like `-9999`, this silently produces a different value, corrupting the sentinel. With the separated codecs, `cast_value`'s `scalar_map` provides explicit control over how sentinels are mapped across type boundaries, and each codec independently transforms the fill value through the chain.
+- **Overflow handling**: `FixedScaleOffset` wraps silently on integer overflow with no error or warning. The `cast_value` codec makes this behavior explicit and configurable via the `out_of_range` field.
+- **Rounding control**: `FixedScaleOffset` always rounds to the nearest integer using `numpy.around`. The `cast_value` codec supports five rounding modes.
+
+The Zarr extensions registry [documents the conversion procedure](https://github.com/zarr-developers/zarr-extensions/tree/main/codecs/scale_offset#conversion-to-scale_offset) between the two representations. Custom parsers should prefer emitting the new codec pair when encoding packing as codecs.
+
+## Data model differences between Zarr and Xarray
+
+Whilst the [`ManifestStore`][virtualizarr.manifests.ManifestStore] class enforces nothing other than the minimum required to conform to the Zarr model, if you want to convert your [`ManifestStore`][virtualizarr.manifests.ManifestStore] to a virtual xarray dataset using [`ManifestStore.to_virtual_dataset`][virtualizarr.manifests.ManifestStore.to_virtual_dataset], there are a couple of additional requirements, set by Xarray's data model.
+
+1. All arrays must have dimension names, specified in the `zarr.core.metadata.ArrayV3Metadata` objects.
+2. All arrays in the same group with a common dimension name must have the same length along that common dimension.
+
+You also may want to set the `coordinates` field of the group metadata to tell xarray to set those variables as coordinates upon conversion.
+
+## Testing your new parser
+
+The fact we can read data from the [`ManifestStore`][virtualizarr.manifests.ManifestStore] is useful for testing that our parser implementation behaves as expected.
+
+If we already have some other way to read data directly into memory from that archival file format -- for example, a conventional xarray IO backend -- we can compare the results of opening and loading data via the two approaches.
+
+For example we could test the ability of VirtualiZarr's in-built [`HDFParser`][virtualizarr.parsers.HDFParser] to read netCDF files by comparing the output to xarray's `h5netcdf` backend.
+
+```python
+import xarray.testing as xrt
+from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
+
+from virtualizarr.parsers import HDFParser
+
+
+project_directory = "/Users/user/my-project"
+project_url = f"file://{project_directory}"
+registry = ObjectStoreRegistry({project_url: LocalStore(prefix=project_directory)})
+parser = HDFParser()
+manifest_store = parser(url=f"{project_url}/netcdf-file.nc", registry=registry)
+
+with (
+    xr.open_dataset(manifest_store, engine="zarr", zarr_format=3, consolidated=False) as actual,
+    xr.open_dataset(f"{project_directory}/netcdf-file.nc", engine="h5netcdf") as expected,
+):
+    xrt.assert_identical(actual, expected)
+```
+
+These two approaches do not share any IO code, other than potentially the CF-metadata decoding that [`xarray.open_dataset`][] optionally applies when opening any file.
+Therefore if the results are the same, we know our custom parser implementation behaves as expected, and that reading the netCDF data back via Icechunk/Kerchunk should give the same result as reading it directly.

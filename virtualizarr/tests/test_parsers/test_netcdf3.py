@@ -8,9 +8,10 @@ from virtualizarr.tests import requires_kerchunk, requires_network, requires_sci
 from virtualizarr.tests.utils import obstore_http
 
 
+@requires_kerchunk
 @requires_scipy
 def test_read_netcdf3(netcdf3_file, array_v3_metadata, local_registry):
-    filepath = str(netcdf3_file)
+    filepath = str(netcdf3_file())
     url = f"file://{filepath}"
     parser = NetCDF3Parser()
     with (

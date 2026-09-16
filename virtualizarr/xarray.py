@@ -65,6 +65,7 @@ def open_virtual_datatree(
         A parser to use for the given data source. For example:
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.HDF4Parser][] for virtualizing HDF4 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
@@ -166,10 +167,16 @@ def open_virtual_datatree(
         registry=registry,
     )
 
-    return manifest_store.to_virtual_datatree(
+    vdt = manifest_store.to_virtual_datatree(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
     )
+
+    # mirror xarray.open_datatree behaviour by recording the source url
+    if "source" not in vdt.encoding:
+        vdt.encoding["source"] = filepath
+
+    return vdt
 
 
 def open_virtual_dataset(
@@ -200,7 +207,9 @@ def open_virtual_dataset(
         A parser to use for the given data source. For example:
 
         - [virtualizarr.parsers.HDFParser][] for virtualizing NetCDF4 or HDF5 files.
+        - [virtualizarr.parsers.HDF4Parser][] for virtualizing HDF4 files.
         - [virtualizarr.parsers.FITSParser][] for virtualizing FITS files.
+        - [virtualizarr.parsers.IcechunkParser][] for virtualizing existing icechunk repos.
         - [virtualizarr.parsers.NetCDF3Parser][] for virtualizing NetCDF3 files.
         - [virtualizarr.parsers.DMRPPParser][] for virtualizing DMR++ files.
         - [virtualizarr.parsers.KerchunkJSONParser][] for re-opening Kerchunk JSONs.
@@ -232,7 +241,13 @@ def open_virtual_dataset(
         loadable_variables=loadable_variables,
         decode_times=decode_times,
     )
-    return ds.drop_vars(list(drop_variables or ()))
+    ds = ds.drop_vars(list(drop_variables or ()))
+
+    # mirror xarray.open_dataset behaviour by recording the source url
+    if "source" not in ds.encoding:
+        ds.encoding["source"] = filepath
+
+    return ds
 
 
 def open_virtual_mfdataset(

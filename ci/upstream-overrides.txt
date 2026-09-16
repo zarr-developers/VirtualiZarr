@@ -1,0 +1,21 @@
+# Dev versions of upstream libraries used by the `Upstream` CI job to test
+# VirtualiZarr against bleeding-edge releases of its dependencies.
+#
+# Installed via `pip install --upgrade --no-deps -r ci/upstream-overrides.txt`
+# on top of an already-resolved pixi `upstream` env, so pip only swaps the
+# named packages and does not re-resolve the dependency graph.
+#
+# These deliberately do NOT live in pyproject.toml: keeping git+https sources
+# out of the pixi workspace prevents every other env's lockfile solve (docs,
+# minimum-versions, etc.) from having to build them. See issue #995.
+xarray @ git+https://github.com/pydata/xarray
+universal_pathlib @ git+https://github.com/fsspec/universal_pathlib
+numcodecs @ git+https://github.com/zarr-developers/numcodecs
+ujson @ git+https://github.com/ultrajson/ultrajson
+zarr @ git+https://github.com/zarr-developers/zarr-python
+obspec_utils @ git+https://github.com/virtual-zarr/obspec-utils
+astropy @ git+https://github.com/astropy/astropy
+s3fs @ git+https://github.com/fsspec/s3fs
+kerchunk @ git+https://github.com/fsspec/kerchunk
+icechunk @ git+https://github.com/earth-mover/icechunk#subdirectory=icechunk-python
+virtual_tiff @ git+https://github.com/virtual-zarr/virtual-tiff

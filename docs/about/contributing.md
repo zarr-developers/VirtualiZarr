@@ -2,6 +2,15 @@
 
 Contributions are welcome and encouraged! We ask only that all contributors follow the [Zarr Developers Code of Conduct](https://github.com/zarr-developers/.github/blob/main/CODE_OF_CONDUCT.md).
 
+## Community meeting
+
+We hold a bi-weekly VirtualiZarr coordination meeting on Wednesdays, 10-10:30am PST / 1-1:30pm EST / 6-6:30pm UTC, and anyone is welcome to join!
+
+- **Where:** [Zoom](https://numfocus-org.zoom.us/j/88307540201?pwd=Sn2uY0i3wRCqFaZ5oNbJRQrcg1FEyw.1) (also listed on the [Zarr community calendar](https://zarr.dev/community-calls/))
+- **Notes:** [Meeting notes](https://docs.google.com/document/d/18P_Uk2aL1hfcaJf4PJfYZJzmhvMSJjdmB_AJvjiZOVM/edit?usp=sharing)
+
+You can also chat with us in the [VirtualiZarr channel of the Earthmover community Slack](https://earthmover-community.slack.com/archives/C08EXCE8ZQX).
+
 ## Contributing code
 
 Before opening a PR to contribute code you should check that your changes work by running the test suite locally.
@@ -23,9 +32,17 @@ You can also run tests in other environments:
 
 ```bash
 pixi run --environment min-deps run-tests # Test with the minimal set of dependencies installed
-pixi run --environment upstream run-tests # Test with unreleased versions of upstream libraries
 # List which versions are installed in the `min-deps` environment
 pixi list --environment min-deps
+```
+
+To test against unreleased dev versions of upstream libraries (xarray, zarr, numcodecs, etc.),
+install the regular `upstream` env and then pip-overlay the dev versions on top:
+
+```bash
+pixi install --environment upstream
+pixi run -e upstream install-upstream-overrides
+pixi run --environment upstream run-tests
 ```
 
 Further, the `pytest-cov` plugin is a test dependency, so you can generate a test

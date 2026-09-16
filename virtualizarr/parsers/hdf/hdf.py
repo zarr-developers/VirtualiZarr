@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -35,6 +36,29 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+def _get_fill_value(dataset: H5Dataset):
+    """
+    Extract the fill value from an h5py dataset, handling string/bytes dtypes
+    that don't return numpy scalars from dataset.fillvalue.
+    """
+    try:
+        raw = dataset.fillvalue
+    except RuntimeError:
+        return np.ma.default_fill_value(dataset.dtype)
+    if h5py.check_vlen_dtype(dataset.dtype) in (str, bytes):
+        # Variable-length string fill values come back as raw bytes; the array
+        # is virtualized as VariableLengthUTF8, so the fill value must be str.
+        # Decode strictly: a fill value that is not valid UTF-8 cannot be
+        # represented in that dtype, and silently replacing bytes would corrupt it.
+        if isinstance(raw, bytes):
+            return raw.decode("utf-8")
+        return raw
+    elif isinstance(raw, np.generic):
+        return raw.item()
+    else:
+        return raw
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -56,13 +80,40 @@ def _construct_manifest_array(
     -------
     ManifestArray
     """
-    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
-    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
-    # https://github.com/zarr-developers/zarr-python/issues/3711.
-    chunks = dataset.chunks or tuple(max(s, 1) for s in dataset.shape)
+    chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
     attrs = _extract_attrs(dataset)
     dtype = dataset.dtype
+
+    # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
+    # resolve automatically. Map to StringDType which zarr maps to VariableLengthUTF8.
+    # Only remap true variable-length strings: h5py.check_string_dtype also
+    # matches fixed-length ("S" kind) dtypes, which zarr handles natively and
+    # whose raw chunk bytes a vlen-utf8 codec cannot decode. Both cset flavours
+    # count — check_vlen_dtype reports `str` for a utf-8 vlen string dtype and
+    # `bytes` for an ascii one.
+    # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
+    # region references) that would silently be coerced to StringDType and
+    # produce garbage downstream — those aren't supported yet, so fail loudly.
+    if h5py.check_vlen_dtype(dtype) in (str, bytes):
+        warnings.warn(
+            f"Variable {dataset.name!r} is an HDF5 variable-length string "
+            f"dataset. Its metadata will be virtualized, but its chunks store "
+            f"references into the HDF5 global heap rather than the string data "
+            f"itself, so reading this variable through the resulting virtual "
+            f"store will fail. Consider excluding it via drop_variables.",
+            UserWarning,
+            stacklevel=2,
+        )
+        dtype = np.dtypes.StringDType()
+    elif dtype.kind == "O":
+        raise NotImplementedError(
+            f"HDF5 object dtype {dtype!r} is not a variable-length string and "
+            f"is not yet supported by HDFParser. h5py exposes vlen arrays "
+            f"(`h5py.vlen_dtype`) and object/region references "
+            f"(`h5py.ref_dtype`, `h5py.regionref_dtype`) as numpy object dtype; "
+            f"please open an issue if your file needs one of these."
+        )
 
     # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
     # cfcodec = cfcodec_from_dataset(dataset)
@@ -74,13 +125,13 @@ def _construct_manifest_array(
     # else:
     # dtype = dataset.dtype
 
-    if "_FillValue" in attrs:
+    if "_FillValue" in attrs and dtype.kind not in ("S", "U", "O", "T"):
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
     codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
 
-    fill_value = dataset.fillvalue.item()
+    fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
     metadata = create_v3_array_metadata(
         shape=dataset.shape,
@@ -91,8 +142,55 @@ def _construct_manifest_array(
         dimension_names=dims,
         attributes=attrs,
     )
-    manifest = _dataset_chunk_manifest(filepath, dataset)
+    manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+
+def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
+    """
+    Determine the chunk shape to report for an h5py dataset.
+
+    For a dataset along an unlimited (extendable) dimension, h5py reports the
+    chunk shape allocated for the full maxshape, which can exceed the actual
+    array shape - e.g. a coordinate holding 5 values along an unlimited
+    dimension reports ``chunks=(512,)``. An oversized chunk inhibits
+    concatenation of the resulting virtual dataset, so trim it down to the array
+    shape where it is safe to do so.
+
+    Trimming the chunk shrinks the in-bounds region the chunk covers, so the
+    manifest must point at fewer bytes than the full stored chunk. That region
+    is only a contiguous byte range - and so expressible as a single manifest
+    entry - when the chunk is unfiltered (uncompressed) and only the leading
+    (slowest-varying) dimension is trimmed. When an oversized chunk can't be
+    trimmed safely (e.g. it is compressed) the original chunk shape is kept: the
+    variable still reads correctly (zarr crops the oversized edge chunk) and can
+    be written as virtual references, but it can't be concatenated with other
+    virtual datasets (the oversized chunk prevents a regular chunk grid). That
+    case is surfaced to the user as a warning at
+    ``ManifestStore.to_virtual_dataset`` time, suggesting they load the variable
+    instead.
+
+    This relies on the same invariant as the sub-chunk slicing in
+    ``virtualizarr.manifests.indexing`` (a contiguous sub-range of an
+    uncompressed, fixed-order chunk is addressable as a single byte range);
+    trimming here is the special case of taking the leading prefix along axis 0.
+    """
+    shape = dataset.shape
+    # Clamp each dim to >= 1: zarr v3 allows shape=(0,) but forbids zero-length
+    # chunk dimensions (enforced by zarr-python >= 3.2.0). See
+    # https://github.com/zarr-developers/zarr-python/issues/3711.
+    if dataset.chunks is None:
+        return tuple(max(s, 1) for s in shape)
+
+    chunks = tuple(min(c, max(s, 1)) for c, s in zip(dataset.chunks, shape))
+    if chunks == dataset.chunks:
+        return chunks
+
+    unfiltered = dataset.id.get_create_plist().get_nfilters() == 0
+    leading_dim_only = chunks[1:] == dataset.chunks[1:]
+    if unfiltered and leading_dim_only:
+        return chunks
+    return dataset.chunks
 
 
 def _construct_manifest_group(
@@ -141,29 +239,28 @@ def _construct_manifest_group(
 
 
 class HDFParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from an HDF5/NetCDF4 file.
+
+    Parameters
+    ----------
+    group
+        Name of the group within the HDF5 file to virtualize.
+    drop_variables
+        Variables in the file that will be ignored when creating the ManifestStore
+        (default: `None`, do not ignore any variables).
+    reader_factory
+        A callable that creates a file-like reader from a store and path.
+        Must return an object implementing the
+        [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
+        Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+    """
+
     def __init__(
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
     ):
-        """
-        Instantiate a parser that can be used to virtualize HDF5/NetCDF4 files using the
-        `__call__` method.
-
-        Parameters
-        ----------
-        group
-            Name of the group within the HDF5 file to virtualize.
-        drop_variables
-            Variables in the file that will be ignored when creating the ManifestStore
-            (default: `None`, do not ignore any variables).
-        reader_factory
-            A callable that creates a file-like reader from a store and path.
-            Must return an object implementing the
-            [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
-            Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
-        """
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
@@ -204,6 +301,8 @@ class HDFParser:
 def _dataset_chunk_manifest(
     filepath: str,
     dataset: H5Dataset,
+    *,
+    chunks: tuple[int, ...],
 ) -> ChunkManifest:
     """
     Generate ChunkManifest for HDF5 dataset.
@@ -214,6 +313,11 @@ def _dataset_chunk_manifest(
         The path of the HDF5 file
     dataset
         h5py dataset for which to create a ChunkManifest
+    chunks
+        The chunk shape to use, as returned by ``_chunk_shape``. This may be
+        smaller than ``dataset.chunks`` when an oversized chunk has been trimmed
+        to the array shape (see ``_chunk_shape``), in which case each chunk's
+        byte length is recomputed for the trimmed, in-bounds region.
 
     Returns
     -------
@@ -245,21 +349,26 @@ def _dataset_chunk_manifest(
         if num_chunks == 0:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
-            shape = tuple(
-                math.ceil(a / b) for a, b in zip(dataset.shape, dataset.chunks)
-            )
-            paths = np.empty(shape, dtype=np.dtypes.StringDType)
-            offsets = np.empty(shape, dtype=np.uint64)
-            lengths = np.empty(shape, dtype=np.uint64)
+            grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
+            paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
+            offsets = np.empty(grid_shape, dtype=np.uint64)
+            lengths = np.empty(grid_shape, dtype=np.uint64)
+
+            # When an oversized chunk has been trimmed the stored chunk holds
+            # more bytes than the in-bounds region, so use the trimmed chunk's
+            # byte size (valid because the trimmed region is a contiguous prefix
+            # of an unfiltered chunk - see _chunk_shape) rather than blob.size.
+            trimmed = chunks != dataset.chunks
+            trimmed_length = math.prod(chunks) * dataset.dtype.itemsize
 
             def get_key(blob):
-                return tuple(a // b for a, b in zip(blob.chunk_offset, dataset.chunks))
+                return tuple(a // b for a, b in zip(blob.chunk_offset, chunks))
 
             def add_chunk_info(blob):
                 key = get_key(blob)
                 paths[key] = filepath
                 offsets[key] = blob.byte_offset
-                lengths[key] = blob.size
+                lengths[key] = trimmed_length if trimmed else blob.size
 
             has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
             if has_chunk_iter:

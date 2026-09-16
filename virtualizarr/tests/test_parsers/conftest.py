@@ -54,6 +54,38 @@ def fill_value_scalar_no_chunks_nc4_url(tmpdir):
 
 
 @pytest.fixture
+def unlimited_dimension_netcdf4_url(tmpdir):
+    # a coordinate variable along an unlimited dimension - HDF5 reports a chunk
+    # shape sized for the (unlimited) maxshape rather than the actual extent
+    filepath = f"{tmpdir}/unlimited_dimension.nc"
+    f = Dataset(filepath, "w")
+    f.createDimension("time", None)
+    var_time = f.createVariable("time", "i8", ("time",))
+    var_time[:5] = 10
+    f.close()
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def unlimited_dimension_compressed_hdf5_url(tmpdir):
+    # an oversized chunk along an unlimited dim that is compressed cannot be
+    # safely trimmed to the array shape (its bytes are not a contiguous prefix)
+    filepath = f"{tmpdir}/unlimited_dimension_compressed.nc"
+    f = h5py.File(filepath, "w")
+    d = f.create_dataset(
+        "data",
+        shape=(5,),
+        maxshape=(None,),
+        chunks=(512,),
+        dtype="i8",
+        compression="gzip",
+    )
+    d[:] = 10
+    f.close()
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def chunked_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/chunks.nc"
     f = h5py.File(filepath, "w")
@@ -367,16 +399,6 @@ def root_coordinates_hdf5_file(tmp_path: Path, np_uncompressed_int16) -> str:
 
 
 @pytest.fixture
-def netcdf3_file(tmp_path: Path) -> Path:
-    ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
-
-    filepath = tmp_path / "file.nc"
-    ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
-
-    return filepath
-
-
-@pytest.fixture
 def non_coord_dim(tmpdir):
     filepath = f"{tmpdir}/non_coord_dim.nc"
     ds = create_test_data(dim_sizes=(20, 80, 10))
@@ -467,6 +489,87 @@ def chunked_roundtrip_hdf5_s3_file(minio_bucket, cf_array_fill_value_hdf5_file):
     filepath = "data/cf_array_fill_value.nc"
     obs.put(store, filepath, cf_array_fill_value_hdf5_file)
     return f"s3://{minio_bucket['bucket']}/{filepath}"
+
+
+@pytest.fixture(
+    params=[
+        {"dtype": "S10", "data": np.array([b"hello", b"world"], dtype="S10")},
+        {
+            "dtype": None,
+            "data": np.array(["hello", "world"], dtype=h5py.string_dtype()),
+        },
+    ],
+    ids=["fixed-length-bytes", "variable-length-string"],
+)
+def string_dtype_hdf5_url(tmp_path: Path, request) -> str:
+    filepath = str(tmp_path / "string_dtype.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=request.param["data"])
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def fixed_length_bytes_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "fixed_length_bytes.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(name="data", data=np.array([b"hello", b"world"], dtype="S10"))
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def non_utf8_fill_value_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "non_utf8_fill_value.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello"], dtype="S5"),
+            fillvalue=b"\xff\xfe\xff\xfe\xff",
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def vlen_string_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "vlen_string.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def ascii_vlen_string_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "ascii_vlen_string.nc")
+
+    with h5py.File(filepath, "w") as f:
+        f.create_dataset(
+            name="data",
+            data=np.array([b"hello", b"world"], dtype=h5py.string_dtype("ascii")),
+        )
+
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def string_dtype_with_fillvalue_hdf5_url(tmp_path: Path) -> str:
+    filepath = str(tmp_path / "string_dtype_fillvalue.nc")
+
+    with h5py.File(filepath, "w") as f:
+        dset = f.create_dataset(
+            name="data", data=np.array(["hello", "world"], dtype=h5py.string_dtype())
+        )
+        dset.attrs["_FillValue"] = ""
+
+    return f"file://{filepath}"
 
 
 @pytest.fixture()

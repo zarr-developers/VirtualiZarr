@@ -9,7 +9,7 @@ Before you attempt to use VirtualiZarr on a large number of files at once, you s
 In particular, you should check that:
 
 - You can call [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on one of your files, which requires there to be a parser which can interpret that file format.
-- After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
+- After calling [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] on a few files making up a representative subset of your data, you can concatenate them into one logical datacube without errors (see the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for possible reasons for errors at this stage).
 - You can serialize those virtual references to some format (e.g. Kerchunk/Icechunk) and read the data back.
 - The data you read back is exactly what you would have expected to get if you read the data from the original files.
 
@@ -103,9 +103,6 @@ One way to parallelize creating virtual references from a single machine is to u
 For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
 You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
 
-!!! note
-    We are also working on adding support for [`ProcessPoolExecutor`][concurrent.futures.ProcessPoolExecutor], see [PR #889](https://github.com/zarr-developers/VirtualiZarr/pull/889).
-
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
@@ -116,7 +113,7 @@ This can work well when virtualizing files in remote object storage because it p
 
 !!! warning
     Some file parsers, such as the [`HDFParser`][virtualizarr.parsers.HDFParser], rely on C libraries (e.g. HDF5) that hold a process-level lock, which means `ThreadPoolExecutor` will effectively run in serial despite using multiple threads.
-    If you need true parallelism with such parsers, consider using `parallel='lithops'` or `parallel='dask'` instead. If no lithops config file is present (see the [Lithops](#lithops) section), lithops will default to using the [localhost executor](https://lithops-cloud.github.io/docs/source/api_futures.html#lithops.executors.LocalhostExecutor) on the current host, which spawns separate processes that bypass the GIL limitation. These are currently your best options when the file parser is not thread-safe.
+    If you need true parallelism with such parsers, you can use the `ProcessPoolExecutor`, `parallel='lithops'` or `parallel='dask'` instead. If no lithops config file is present (see the [Lithops](#lithops) section), lithops will default to using the [localhost executor](https://lithops-cloud.github.io/docs/source/api_futures.html#lithops.executors.LocalhostExecutor) on the current host, which spawns separate processes that bypass the GIL limitation. These are currently your best options when the file parser is not thread-safe.
 
 ### Dask Delayed
 
@@ -308,6 +305,37 @@ for i, batch in enumerate(file_batches):
 
 Notice this workflow could also be used for appending data only as it becomes available, e.g. by replacing the for loop with a cron job.
 
+### Splitting a single large virtual dataset across commits
+
+A single Icechunk commit cannot include more than 50 million chunk references at once.
+If a single source — typically a massive Zarr store opened via [`ZarrParser`][virtualizarr.parsers.ZarrParser] — produces a virtual dataset whose arrays together exceed that, you can't write it in one transaction even after all the references are already in memory.
+
+In that case you can slice the virtual dataset along an axis where the slicing falls on chunk boundaries (often `time`), and commit each slice with `append_dim`. Chunk-aligned slicing on a `ManifestArray` (and therefore on the variables of a virtual `xarray.Dataset`) only subsets the manifest, so this is cheap — no chunks are loaded.
+
+```python
+import icechunk as ic
+
+# Parse the giant Zarr store once, producing a virtual dataset that exceeds
+# 50M refs in total but whose `time` axis is chunked.
+vds = vz.open_virtual_dataset(<zarr_store>, parser=ZarrParser(), registry=registry)
+
+chunk_size_time = vds.chunksizes["time"]  # must align the splits to chunk boundaries
+step = chunk_size_time * N  # pick N so that each slice has < 50M refs
+
+repo = ic.Repository.open(<repo_url>)
+
+for i, start in enumerate(range(0, vds.sizes["time"], step)):
+    session = repo.writable_session("main")
+    slice_vds = vds.isel(time=slice(start, start + step))
+    append_dim = "time" if i > 0 else None
+    slice_vds.vz.to_icechunk(session.store, append_dim=append_dim)
+    session.commit(f"wrote virtual references for time slice {i}")
+```
+
+If the slice boundaries don't align with chunk edges along that axis, the indexing call raises `SubChunkIndexingError`.
+
+(Remember you can also subset the Dataset to specific variables and commit those separately too if necessary — pass `mode="a"` to `to_icechunk` from the second write onwards, so that writing into the already-existing group doesn't raise a `ContainsGroupError`.)
+
 ### Retries
 
 Sometimes an [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] call might fail for a transient reason, such as a failed HTTP response from a server.
@@ -319,3 +347,9 @@ Instead what is more efficient is to use per-task retries at te executor level.
 
 
 In the future, we plan to add support for automatic retries to the Lithops and Dask executors (see Github PR #575)
+
+## Next steps
+
+- To understand the data structures that make this chunk-manifest slicing and combining cheap, see [Data Structures](../explanation/data_structures.md).
+- To validate the contents of your archival files before ingestion, see [Validation and Cleaning](validation.md).
+- Too see worked end-to-end notebooks, see [Examples](examples.md).

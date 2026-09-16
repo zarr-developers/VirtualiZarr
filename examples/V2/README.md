@@ -20,6 +20,10 @@ Virtualizes the same GOES-16 file using `CachingReadableStore` and `SplittingRea
 uv run --script examples/V2/goes_with_caching_stores.py
 ```
 
+### [its_live.ipynb](its_live.ipynb)
+
+Mosaics two [ITS_LIVE](https://its-live.jpl.nasa.gov/) glacier-velocity granules that share a global grid but each cover only part of it. Uses native xarray `concat(..., join="outer")` to align them onto the shared grid (sparse, with fill where a granule has no data) and stack them along `time`, keeping the data variables virtual (`ManifestArray`) throughout, then writes the result to Icechunk without copying any pixel data.
+
 ## Performance Comparison
 
 Run both scripts and compare the "Virtualization time" printed at the end of each:

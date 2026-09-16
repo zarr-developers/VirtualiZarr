@@ -65,7 +65,10 @@ def _xarray_subset():
     return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
 
 
-@pytest.fixture(params=[2, 3])
+# params supplied indirectly by tests via the `zarr_versions` parametrize
+# decorator (see test_zarr.py); defining params here too would be a duplicate
+# parametrization, which pytest>=9.1 rejects.
+@pytest.fixture
 def zarr_store(tmpdir, request):
     ds = _xarray_subset()
     filepath = f"{tmpdir}/air.zarr"
@@ -77,6 +80,20 @@ def zarr_store(tmpdir, request):
 @pytest.fixture()
 def local_registry():
     return ObjectStoreRegistry({"file://": LocalStore()})
+
+
+@pytest.fixture
+def netcdf3_file(tmp_path: Path):
+    """Factory for writing a temporary netCDF3 file with a caller-supplied Dataset."""
+
+    def _make(ds: xr.Dataset | None = None, name: str = "file.nc") -> Path:
+        if ds is None:
+            ds = xr.Dataset({"foo": ("x", np.array([1, 2, 3]))})
+        filepath = tmp_path / name
+        ds.to_netcdf(filepath, format="NETCDF3_CLASSIC")
+        return filepath
+
+    return _make
 
 
 @pytest.fixture(params=["int8", "uint8", "float32"])
@@ -108,6 +125,21 @@ BLOSC_CODEC = {
 ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
 
 
+def sharding_codec(
+    inner_chunk_shape: tuple[int, ...], inner_codecs: list[dict] | None = None
+) -> dict:
+    """A `sharding_indexed` codec config splitting each shard into `inner_chunk_shape` chunks."""
+    return {
+        "name": "sharding_indexed",
+        "configuration": {
+            "chunk_shape": inner_chunk_shape,
+            "codecs": inner_codecs or [ARRAYBYTES_CODEC],
+            "index_codecs": [ARRAYBYTES_CODEC, {"name": "crc32c"}],
+            "index_location": "end",
+        },
+    }
+
+
 # Helper functions
 def _generate_chunk_entries(
     shape: tuple[int, ...],
@@ -137,7 +169,7 @@ def _generate_chunk_entries(
     chunk_grid_shape = ChunkGrid.from_sizes(shape, chunks).grid_shape
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,), (0,), itemsize)}
+        return {"0": entry_generator((0,), (), itemsize)}
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]

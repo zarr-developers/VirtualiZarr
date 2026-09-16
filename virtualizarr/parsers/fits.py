@@ -9,26 +9,24 @@ from virtualizarr.types.kerchunk import KerchunkStoreRefs
 
 
 class FITSParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a FITS file.
+
+    Parameters
+    ----------
+    group
+        The group within the file to be used as the Zarr root group for the ManifestStore.
+    skip_variables
+        Variables in the file that will be ignored when creating the ManifestStore.
+    reader_options
+        Configuration options used internally for kerchunk's fsspec backend.
+    """
+
     def __init__(
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
         reader_options: Optional[dict] = None,
     ):
-        """
-        Instantiate a parser with parser-specific parameters that can be used in the
-        `__call__` method.
-
-        Parameters
-        ----------
-        group
-            The group within the file to be used as the Zarr root group for the ManifestStore.
-        skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore.
-        reader_options
-            Configuration options used internally for kerchunk's fsspec backend.
-        """
-
         self.group = group
         self.skip_variables = skip_variables
         self.reader_options = reader_options or {}

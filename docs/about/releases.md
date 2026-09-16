@@ -1,31 +1,339 @@
 # Release notes
 
-## v2.6.1 (unreleased)
+## v2.7.4 (unreleased)
 
 ### New Features
 
-- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
-  By [Tom Nicholas](https://github.com/TomNicholas).
-- The icechunk writer now handles `ChunkManifest` entries containing inlined chunk data. For arrays with no inlined chunks the existing fast bulk `set_virtual_refs_arr` path is unchanged; otherwise inlined positions are sent to icechunk as empty (missing) virtual refs and the inlined bytes are written separately as managed chunks. A virtual dataset with inlined chunks can now be `to_icechunk`'d and re-opened via `xr.open_zarr` without data loss.
-  By [Tom Nicholas](https://github.com/TomNicholas).
+### Breaking changes
 
-- `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
-  ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
-  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
-- `KerchunkJSONParser` and `KerchunkParquetParser` now parse inline chunk data (both raw-string and `base64:`-prefixed forms) into inlined `ChunkManifest` entries, instead of raising `NotImplementedError`. Fixes the read side of [#489](https://github.com/zarr-developers/VirtualiZarr/issues/489); writer support for inlined chunks will follow in a separate PR.
-  ([#979](https://github.com/zarr-developers/VirtualiZarr/pull/979)).
+### Bug fixes
+
+### Documentation
+
+### Internal changes
+
+## v2.7.3 (7th August 2026)
+
+Makes virtualizing `.zarr.zip` archives dramatically cheaper — building a zipped store's member index now takes a single request instead of one per member, a 6.8x throughput improvement when virtualizing many archives — and fixes sharded virtual arrays losing their shard configuration when concatenated, stacked, broadcast or indexed.
+
+### New Features
+
+### Performance
+
+- Building the member index of a zipped Zarr store no longer costs one request per member.
+  Member data offsets are now derived from the central directory, which has already been
+  read, and verified for free against the archive's layout; only archives whose local
+  headers genuinely disagree with it (`zipfile`'s `force_zip64`, Info-ZIP's `zip`) still
+  pay for a read of every local header. For a 336-member archive on remote object storage
+  this took `parse_zip_index` from 337 requests to 1, and cut the wall time of
+  `open_virtual_dataset` from ~7.8 s to ~1.3 s per archive - a 6.8x improvement in
+  throughput when virtualizing many archives at once, which is request-rate bound.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Breaking changes
 
 ### Bug fixes
 
-- Fix `HDFParser` failing on HDF5 datasets with a zero-length dimension under `zarr-python >= 3.2.0`, which forbids zero-length chunk dimensions. Chunk dimensions are now clamped to a minimum of 1 when falling back from dataset shape.
+- Concatenating, stacking, broadcasting or indexing virtual arrays that use the `sharding_indexed` codec
+  now works. Operations that add or remove a length-1 axis realign the shard's inner `chunk_shape` to
+  match the array's new dimensionality, instead of leaving a stale config that zarr rejects with
+  *"The shard's `chunk_shape` and array's `shape` need to have the same number of dimensions."*
+  Relatedly, operations on a sharded array now consistently treat a *shard* as the unit that a chunk
+  manifest entry locates — previously they used `ArrayV3Metadata.chunks`, which zarr defines as the
+  *inner* chunk shape when sharding is in play, so e.g. a stacked sharded array came out with an inner
+  chunk shape as its outer chunk grid. Closes
+  [#1076](https://github.com/zarr-developers/VirtualiZarr/issues/1076).
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
 ### Internal changes
+
+- Added `virtualizarr.manifests.utils.manifest_chunk_shape`, the shape of the region that one chunk
+  manifest entry locates (a shard, for sharded arrays), and used it in place of `ArrayV3Metadata.chunks`
+  wherever that meaning was intended.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+
+## v2.7.2 (5th August 2026)
+
+Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unzipping them, lazy support for xarray's `reindex`/`align`/`concat` over virtual arrays, and `nbytes_virtual` on `ManifestGroup`/`ManifestStore`. Also fixes a batch of `ZarrParser` chunk-key bugs (custom separators, S3 directory markers, Zarr V2 `dimension_separator="/"`), zero-length arrays in `ChunkManifest` and `HDF4Parser`, string-dtype fill values in the HDF5 parser, and big-endian structured dtypes in the bytes codec. The docs gain a *"Can my file format be virtualized?"* FAQ entry, illustrated by a diagram of how file formats relate to cloud object storage.
+
+### New Features
+
+- Added [ManifestGroup.nbytes_virtual][virtualizarr.manifests.ManifestGroup.nbytes_virtual] and
+  [ManifestStore.nbytes_virtual][virtualizarr.manifests.ManifestStore.nbytes_virtual] — mirroring `ds.vz.nbytes`. Closes
+  [#798](https://github.com/zarr-developers/VirtualiZarr/issues/798).
+  By [Raphael Hagen](https://github.com/norlandrhagen).
+
+- `ds.reindex`, `xr.align(join="outer")`, and `xr.concat` now work over virtual arrays and stay lazy, instead of
+  being rejected as fancy indexing. `ManifestArray` handles xarray's alignment indexer at the array-protocol
+  layer: each target chunk must be either entirely missing — emitted as a null-path manifest entry, which Zarr
+  reads back as the array's `fill_value` — or a contiguous run exactly filling one source chunk, whose reference
+  is reused. Anything else would require materializing chunks, and raises. Closes
+  [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382),
+  [#882](https://github.com/zarr-developers/VirtualiZarr/issues/882) and
+  [#883](https://github.com/zarr-developers/VirtualiZarr/issues/883).
+  By [Sean Harkins](https://github.com/sharkinsspatial).
+
+- Zipped Zarr stores (e.g. `.zarr.zip` files) can now be virtualized via the new
+  [ZippedZarrParser][virtualizarr.parsers.ZippedZarrParser]. The archive's central directory is read with a
+  handful of range requests and each chunk becomes a virtual reference to a byte range within
+  the archive itself, so no unzipping is ever needed — at ingestion or read time. Supports Zarr
+  V2 and V3, hierarchical groups, and remote archives on object storage; only archives with
+  uncompressed (`STORED`) members are supported, which is the default for
+  `zarr.storage.ZipStore`. Part of [#604](https://github.com/zarr-developers/VirtualiZarr/issues/604).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- Fix `ZarrParser` and `ZippedZarrParser` silently returning an **empty chunk manifest** for a Zarr V3 array
+  whose `chunk_key_encoding` separator is `"."` (chunk keys like `air/c.0.0` rather than `air/c/0/0`), which
+  made such an array read back as entirely fill-value with no error raised. The chunk key prefix was
+  hardcoded to `air/c/`, which matches no such key. It is now derived from the array's separator, and
+  `ZarrParser` lists the array's own directory rather than that prefix, since `obstore` matches a list prefix
+  one whole path component at a time and so would match nothing at all for a prefix ending mid-component
+  (`air/c.`). Closes [#1069](https://github.com/zarr-developers/VirtualiZarr/issues/1069).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ZarrParser` raising `ValueError: invalid literal for int()` when a store contains zero-byte
+  "directory marker" objects, which are common on S3 (created by e.g. `aws s3 sync`, `s3fs`, or
+  `boto3.put_object(Key=prefix + "/")`). `obstore` strips the trailing slash from such a key before it
+  reaches the parser, so it could not be filtered out by its trailing slash and was instead parsed as a
+  chunk coordinate. Rather than matching markers by name, only keys shaped like a genuine chunk key — a
+  literal descendant of the array's chunks prefix with exactly one coordinate component per dimension —
+  are now treated as chunks, which also covers markers for *nested* chunk subdirectories (e.g. `air/c/0/`
+  alongside the chunk `air/c/0/0`).
+  By [Sanjay Santhanam](https://github.com/Sanjays2402) and [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ZarrParser` raising `ValueError: invalid literal for int()` for Zarr V2 stores written with
+  `dimension_separator="/"` (chunk keys like `data/0/0`). The on-disk separator was hardcoded to
+  `"."` for V2 instead of reading the array's `dimension_separator`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `ChunkManifest.dict()` raising `ValueError: Iteration of zero-sized operands is not enabled` for a zero-length
+  array (a chunk grid shape containing a `0`), which also broke `.keys()`/`.values()`/`.items()` and writing such a
+  variable to Kerchunk references. A zero-length array legitimately has no chunks, so `dict()` now returns `{}`;
+  `iter_refs()` had the same `np.nditer` problem and now yields nothing.
+  By [Davis Bennett](https://github.com/d-v-b).
+- Fix `HDF4Parser` raising `ValueError: Chunk size must be positive, got 0` with zarr >= 3.3.0 on files
+  containing a zero-length variable — e.g. a MODIS fire-mask granule that detected no fires, whose `FP_*`
+  fire-pixel variables all have shape `(0,)`. `HDF4Parser` no longer asks `kerchunk.hdf4` to round-trip its
+  findings through a Zarr v2 group, building [ManifestArrays][virtualizarr.manifests.ManifestArray]
+  directly from kerchunk's decoded HDF4 tags instead. All of the HDF4 decoding still comes from kerchunk.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `HDF4Parser` no longer leaks a variable's chunk shape into its attributes as a spurious `chunks`
+  attribute.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix the bytes codec recording the wrong `endian` for a **big-endian structured dtype**, which made virtual
+  references to big-endian record data (e.g. a FITS `BinTableHDU`) decode to silently wrong values. The byte order
+  was read from `dtype.byteorder`, which numpy reports as `"|"` for any structured dtype whatever its fields hold,
+  so such arrays fell through to the little-endian default; it is now read from the fields, looking through
+  subarray and nested-struct fields and ignoring fields that carry no byte order (single-byte numbers, strings). A
+  structured dtype whose fields mix byte orders now raises, since a Zarr V3 array has a single bytes codec and
+  cannot express it.
+  By [David Stuebe](https://github.com/emfdavid).
+- Read the bytes codec's `endian` robustly across zarr versions when converting v3 metadata to v2. zarr's
+  `BytesCodec.endian` was an `Endian` enum through 3.2.x and is a plain `str` on newer zarr (following zarr's
+  enum-to-string-literal deprecation, zarr-developers/zarr-python#3968); `convert_v3_to_v2_metadata` read
+  `endian.value`, which raises `AttributeError` on the plain string, so writing kerchunk references for
+  big-endian data would break against newer zarr. The endianness is now normalized to a string either way.
+  By [David Stuebe](https://github.com/emfdavid).
+- `HDFParser` now handles a **string-dtype fill value** — an HDF5 dataset whose `fillvalue` is `bytes` or `str`
+  previously raised rather than being virtualized. Variable-length string fill values are decoded to `str` to
+  match the `VariableLengthUTF8` dtype the array is virtualized as, while fixed-length (`S`-kind) fill values are
+  kept as raw bytes, since zarr handles that dtype natively. Closes
+  [#878](https://github.com/zarr-developers/VirtualiZarr/issues/878).
+  By [Sean Harkins](https://github.com/sharkinsspatial), [Aimee Barciauskas](https://github.com/abarciauskas-bgse)
+  and [Max Jones](https://github.com/maxrjones).
+- `HDFParser` now warns at parse time that a **variable-length string** variable cannot be read back through the
+  resulting virtual store: such a dataset's chunks store references into the HDF5 global heap rather than the
+  string data itself. Pass the variable to `drop_variables` to silence the warning. Both cset flavours of vlen
+  string are treated alike; previously an ascii-cset one failed the whole file as an unsupported object dtype.
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Added a *"Can my file format be virtualized?"* FAQ entry, illustrated by a generated diagram of how file
+  formats relate to cloud object storage — format-level suitability first, then the existing data-model
+  constraints in *"Can my specific data be virtualized?"*.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+
+## v2.7.1 (15th July 2026)
+
+Adds a `nrefs` accessor for counting virtual chunk references, a `mode` parameter on `vz.to_icechunk` for controlling how a pre-existing group is handled, and an `HDF4Parser` for reading HDF4 files. Also fixes several scalar-array and Kerchunk-reference edge cases in the `ZarrParser`, `IcechunkParser`, and Kerchunk translator (including FITS structured dtypes), and fixes writing a virtual `DataTree` with `region`/`append_dim` into existing groups.
+
+### New Features
+- Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
+- `vds.vz.to_icechunk` and `vdt.vz.to_icechunk` now accept a `mode` parameter controlling how a pre-existing group at the target path is handled: `"w-"` (create, error if the group exists — the previous and still-default behaviour), `"w"` (overwrite existing contents), or `"a"` (open the existing group and add/update variables in it). `mode="a"` enables e.g. splitting a large virtual dataset across commits by variable. Closes #1001.
+  By [Aaron Spring](https://github.com/aaronspring).
+- HDF4 files can now be read as virtual datasets via the new `HDF4Parser`, which wraps `kerchunk.hdf4.HDF4ToZarr` (the same pattern as the `FITSParser`), installable with `pip install "virtualizarr[hdf4]"`. Closes [#216](https://github.com/zarr-developers/VirtualiZarr/issues/216).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+### Bug fixes
+- Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
+  By [David Stuebe](https://github.com/emfdavid).
+
+- Writing a virtual `DataTree` with `region` or `append_dim` (forwarded to each node) previously always failed with `ContainsGroupError`, because every group was unconditionally created; the existing groups are now opened instead.
+  By [Aaron Spring](https://github.com/aaronspring).
+- Fix `ZarrParser` raising `ValueError: need a chunk grid shape if no chunks given` when a scalar array's chunk is uninitialized. Scalar variables that carry only attributes and hold no data — such as CF grid-mapping / CRS variables — have no chunk written to storage, so the `HEAD` request 404s. The empty manifest built for this case now passes its (empty) chunk grid shape, matching the non-scalar path.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `IcechunkParser` building a 1-d `(1,)` chunk manifest (keyed `"0"`) for scalar arrays instead of a 0-d manifest (keyed `""`) matching the array's `()` shape. The `grid_shape or (1,)` fallback coerced the empty (falsy) scalar grid shape to `(1,)`; reshaping to `grid_shape` directly produces the correct 0-d manifest, so scalar values (e.g. a data-bearing scalar, or a CF grid-mapping / CRS variable) round-trip correctly.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix the Kerchunk reference translator mishandling a `compressor` given as a single codec-config dict (the standard Zarr v2 form, as emitted by `kerchunk.hdf4`), which previously raised `TypeError: Expected codec config to be a dict`. Also coerce a zero-length chunk edge to 1 so zero-length arrays translate to valid Zarr v3 metadata.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Correct the GRIB bitmap section of the custom parsers explanation, which claimed VirtualiZarr had no GRIB parser. It now ships `GribberishParser`, whose registered zarr codec applies the bitmap while unpacking each message (masked points decode to `NaN`, and the array's `fill_value` is `NaN`), so no `_FillValue` attribute is needed.
+  ([#1040](https://github.com/zarr-developers/VirtualiZarr/pull/1040)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- Bump the minimum supported `gribberish` to `>=1.3.0`. From that release the `GribberishParser` groups GRIB messages by level-type and step-type (like cfgrib), nesting variables under subgroups such as `/depth_bls/instant` rather than at the store root. The grib tests now open the source as a `DataTree` via `open_virtual_datatree` and assert against that grouped layout.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+## v2.7.0 (25th June 2026)
+
+Adds a `GribberishParser` for reading GRIB1/GRIB2 files as virtual datasets, a `ManifestArray.with_fill_value_only` constructor, and populates `ds.encoding["source"]` to mirror `xarray.open_dataset`. `ManifestArray` no longer advertises a `.chunks` attribute (a breaking change), which fixes a whole class of cryptic errors when xarray tried to load, compute, or compare virtual arrays. Also fixes the `ZarrParser` and `IcechunkParser` silently dropping arrays nested in subgroups, and bumps the minimum supported `zarr` to `>=3.1.6`. Documentation gains a new ["Validation and Cleaning"](../how_to/validation.md) guide on handling the messy inconsistencies typical of real-world datasets during virtual ingestion, plus a new GOES-16 ingestion example.
+
+### New Features
+
+- GRIB1/GRIB2 files can now be read as virtual datasets via the `GribberishParser` from the [gribberish](https://github.com/mpiannucci/gribberish) library (`>=1.0.0`), installable with `pip install "virtualizarr[grib]"`. Each GRIB message becomes one chunk, decoded on read through gribberish's registered zarr codec. Like the TIFF parser, the parser itself lives in the third-party package; VirtualiZarr just adds the optional dependency, docs, and tests.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ManifestArray.with_fill_value_only(fill_value)` — return a new `ManifestArray` with the same schema (shape, chunks, codecs, dimension names, attributes) as the original but with an empty chunk manifest and the given `fill_value`. Useful as a typed placeholder for a variable that is absent from one source but present in others.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `open_virtual_dataset` and `open_virtual_datatree` now populate `ds.encoding["source"]` with the normalized source URI, mirroring [`xarray.open_dataset`][]'s behaviour. Parsers that have already set `encoding["source"]` are left untouched.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Breaking changes
+
+- `ManifestArray` no longer exposes a `.chunks` attribute; read the Zarr chunk shape from `ManifestArray.metadata.chunks` instead. Exposing `.chunks` made xarray's `is_chunked_array` duck-typing classify virtual arrays as dask-like *computable* chunked arrays, which routed every load/compute/coerce path through a chunk manager that does not exist for `ManifestArray` (raising the opaque `TypeError: Could not find a Chunk Manager which recognizes type ManifestArray`) and made `Dataset.chunks`/`Variable.chunksizes` report a malformed chunk structure for virtual datasets. `ManifestArray` is a virtual reference array, not a computable chunked array, so it no longer advertises itself as one.
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Bug fixes
+
+- Fix `IcechunkParser` only virtualizing the root group of an icechunk repository. `_construct_manifest_group` now recurses into subgroups (iterating `group_keys()`) and populates `ManifestGroup(groups=...)`, so hierarchical repositories are represented in full when parsing. Previously `parse_session` / `to_virtual_datatree` returned a root-only group — empty when no arrays live at the root.
+  By [Ignacio Masari](https://github.com/ignaciomasari).
+- Fix `ZarrParser` only virtualizing the root group of a Zarr store, silently dropping any arrays nested in subgroups. The parser now recurses into subgroups (matching the `IcechunkParser` and `HDFParser`), so hierarchical Zarr stores are represented in full.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Handle chunk shapes larger than the array shape for variables along an unlimited dimension. HDF5 allocates a chunk sized for the full (unlimited) `maxshape` — e.g. a coordinate holding 5 values reports `chunks=(512,)` — which inhibited concatenation of the resulting virtual dataset. The `HDFParser` now trims the chunk shape down to the array shape (adjusting the manifest byte ranges accordingly) when it is safe to do so, i.e. the chunk is uncompressed and only its leading dimension is oversized. When trimming isn't possible (e.g. a compressed coordinate, as in the ERA5 archive), the variable is left untrimmed — it still reads and writes as virtual references correctly — and `to_virtual_dataset` now emits a warning naming the affected variable(s) and suggesting they be passed to `loadable_variables` so the dataset can be concatenated. Closes [#803](https://github.com/zarr-developers/VirtualiZarr/issues/803).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Eager attempts by xarray to load, compute, or coerce a virtual `ManifestArray` into memory now raise a clear `NotImplementedError` explaining that the array is virtual and pointing at `loadable_variables`, instead of the opaque `TypeError: Could not find a Chunk Manager which recognizes type ManifestArray`. As a consequence of `ManifestArray` no longer being misclassified as a computable chunked array, several operations that previously failed with that cryptic error now behave correctly: value comparisons during `xr.concat(..., compat="equals")` and `xr.merge(...)` use `ManifestArray`'s structural equality instead of trying to load (so a genuine mismatch raises a normal `MergeError` rather than crashing), and a failing `xr.testing.assert_identical(...)` reports a normal `AssertionError`. `Dataset.chunks`/`Variable.chunksizes` now correctly report no dask-style chunking for virtual variables rather than a malformed value. Closes [#114](https://github.com/zarr-developers/VirtualiZarr/issues/114), [#354](https://github.com/zarr-developers/VirtualiZarr/issues/354), [#382](https://github.com/zarr-developers/VirtualiZarr/issues/382).
+  ([#1016](https://github.com/zarr-developers/VirtualiZarr/pull/1016)).
+  By [Max Jones](https://github.com/maxrjones).
+
+### Documentation
+
+- New "Validation and Cleaning" how-to guide covering tips and best practices for handling the messy inconsistencies typical of real-world datasets during virtual ingestion.
+  ([#1026](https://github.com/zarr-developers/VirtualiZarr/pull/1026)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Link the GOES-16 virtual Zarr blog post and add a GOES-16 ingestion notebook to the examples.
+  ([#1012](https://github.com/zarr-developers/VirtualiZarr/pull/1012)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Document that virtual concatenation also requires homogeneous CF encoding (`scale_factor`/`add_offset`) across files — xarray's default attribute-merging silently drops mismatched values and produces incorrectly-decoded data on read. Added a new FAQ bullet and a warning admonition under "Combining virtual datasets" in the usage docs. See [#1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004).
+  ([#1006](https://github.com/zarr-developers/VirtualiZarr/pull/1006)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- Bump the minimum supported `zarr` to `>=3.1.6`. Earlier versions mis-strip keys when listing the contents of a nested group, silently dropping arrays whose names collide with others in the store ([zarr-python#3657](https://github.com/zarr-developers/zarr-python/issues/3657)); this would lose nested data when parsing hierarchical Zarr stores with the `ZarrParser`. The bug is fixed in zarr 3.1.6. The bump also lets the `tiff` and `grib` parsers (which required `zarr>=3.1.2` and `>=3.1.1` respectively) re-join the minimum-versions test environment.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Factor the group-recursion logic shared by the `ZarrParser` and `IcechunkParser` into a single `construct_manifest_group_tree` helper in `virtualizarr.parsers.utils`, parameterized by a per-parser callback that builds a `ManifestArray` from an opened zarr array. Removes the duplicated open-group / filter / recurse / assemble code from both parsers.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Speed up virtual chunk container validation when writing to Icechunk by passing the supported prefixes as a tuple to `str.startswith`, which runs the loop over prefixes in C rather than in a Python generator. The per-reference check is now ~2.6x faster in the common single-container case, which matters when writing manifests with millions of virtual references. The check is still a per-reference Python loop overall (see [icechunk#1167](https://github.com/earth-mover/icechunk/issues/1167) for pushing it down to Icechunk entirely).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+## v2.6.2 (18th May 2026)
+
+Adds an `IcechunkParser` for reading existing icechunk repositories as virtual datasets without copying data, chunk-aligned indexing on `ManifestArray` (so `xarray.Dataset.isel` works end-to-end on virtual datasets), and limited sub-chunk slicing for uncompressed arrays.
+
+### New Features
+
+- New `IcechunkParser` — opens an existing icechunk repository and converts it into a `ManifestStore` without copying data. Maps icechunk virtual refs straight through, exposes native (managed) chunks as VirtualiZarr virtual refs under `{native_chunks_prefix}/{chunk_id}`, and preserves inline chunks. Provides both the protocol-conformant `IcechunkParser()(url, registry)` entry point and an `IcechunkParser().parse_session(session, registry, ...)` escape hatch for callers that already have an open icechunk `Session`. Requires `icechunk >= 2.0.5`; the `[icechunk]` extra still pins `>=2.0.3` so writer-only users aren't forced to upgrade.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ManifestArray` now supports chunk-aligned integer and slice indexing along each axis, including multi-chunk slices, mixed integer + slice indexers, and selections that include a partial final chunk. Integer indexers drop the indexed axis (numpy / array-API semantics) and are legal only when `chunk_size == 1` along that axis; slice indexers preserve the axis. This makes `xarray.Dataset.isel` work end-to-end on virtual datasets for any chunk-aligned selection. Indexers that would split individual chunks raise a new `SubChunkIndexingError` (a `ValueError` subclass). Closes [#51](https://github.com/zarr-developers/VirtualiZarr/issues/51), supersedes [#499](https://github.com/zarr-developers/VirtualiZarr/pull/499).
+  ([#994](https://github.com/zarr-developers/VirtualiZarr/pull/994)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Slicing along the largest-stride storage axis of an uncompressed `ManifestArray` can now sub-divide a chunk — the result is a new reference into the same source file with a bumped byte offset and a smaller length. Eligible codec stacks are `[BytesCodec]` (C-order) and `[TransposeCodec(...), BytesCodec]` (e.g. F-order). Useful for picking a single timestep from a multi-row chunk produced by, e.g., the netCDF3 parser, without rechunking. Limited to slices that fit within one source chunk. Addresses part of [#86](https://github.com/zarr-developers/VirtualiZarr/issues/86).
+  ([#996](https://github.com/zarr-developers/VirtualiZarr/pull/996)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- HDFParser now correctly parses datasets with either no fill value or a string dtype fill value.
+  ([#988](https://github.com/zarr-developers/VirtualiZarr/pull/988)).
+  By [Sean Harkins](https://github.com/sharkinsspatial) and [Aimee Barciauskas](https://github.com/abarciauskas-bgse).
+- Fix `vds.vz.to_icechunk()` raising `IcechunkError("invalid zarr key format")` when the manifest contains inlined chunks. The icechunk writer now always emits `c/0/0/0`-form chunk keys regardless of the manifest's stored chunk-key separator. Mainly surfaces with `IcechunkParser` (icechunk inlines small chunks aggressively); existing parsers don't produce inlined chunks and aren't affected.
+  ([#991](https://github.com/zarr-developers/VirtualiZarr/pull/991)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Add guidance on fill values and scale/offset to the custom parser docs.
+  ([#974](https://github.com/zarr-developers/VirtualiZarr/pull/974)).
+  By [Max Jones](https://github.com/maxrjones).
+- Align all parser docstrings with `IcechunkParser` — promote per-parser docstrings to the class level so the rendered API reference is consistent across parsers.
+  ([#999](https://github.com/zarr-developers/VirtualiZarr/pull/999)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Internal changes
+
+- Mark `test_read_netcdf3` as also requiring `kerchunk`, since `NetCDF3Parser` lazily imports `kerchunk.netCDF3` and the test would otherwise raise `ModuleNotFoundError` in environments with scipy but not kerchunk.
+  ([#998](https://github.com/zarr-developers/VirtualiZarr/pull/998)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Move dev-version git sources out of the pixi workspace (`pyproject.toml`'s `upstream` dependency group) into `ci/upstream-overrides.txt`, applied as a pip overlay in the Upstream CI job. Stops every pixi solve (docs, minimum-versions, etc.) from having to build wheels for those packages, which was causing intermittent SIGSEGV / `ETXTBSY` failures on memory-constrained CI runners. Closes [#995](https://github.com/zarr-developers/VirtualiZarr/issues/995).
+  ([#997](https://github.com/zarr-developers/VirtualiZarr/pull/997)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+## v2.6.1 (3rd May 2026)
+
+Adds end-to-end support for inlined chunk references in `ChunkManifest` (read via Kerchunk parsers, write via Kerchunk and Icechunk writers), plus Zarr-Python 3.2.0 compatibility and several bug fixes.
+
+### New Features
+
+- `ChunkManifest` can now hold inlined chunks — raw chunk bytes carried directly in memory rather than as references to external files. Intended for parser authors (e.g., loading Kerchunk references with inlined data); not exposed via `loadable_variables`.
+  ([#938](https://github.com/zarr-developers/VirtualiZarr/pull/938)).
+  By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).
+- `KerchunkJSONParser` and `KerchunkParquetParser` now parse inline chunk data (both raw-string and `base64:`-prefixed forms) into inlined `ChunkManifest` entries, instead of raising `NotImplementedError`. Fixes the read side of [#489](https://github.com/zarr-developers/VirtualiZarr/issues/489).
+  ([#979](https://github.com/zarr-developers/VirtualiZarr/pull/979)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- The kerchunk writer now serializes inlined `ChunkManifest` entries as kerchunk's `base64:`-prefixed inline form, rather than emitting broken `["__inlined__", 0, length]` triples. Together with the read-side support added in #979, this means a virtual dataset with inlined chunks can be round-tripped through both `to_kerchunk(format="json"/"parquet")` and the corresponding `KerchunkJSONParser`/`KerchunkParquetParser`.
+  ([#980](https://github.com/zarr-developers/VirtualiZarr/pull/980)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- The icechunk writer now handles `ChunkManifest` entries containing inlined chunk data. For arrays with no inlined chunks the existing fast bulk `set_virtual_refs_arr` path is unchanged; otherwise inlined positions are sent to icechunk as empty (missing) virtual refs and the inlined bytes are written separately as managed chunks. A virtual dataset with inlined chunks can now be `to_icechunk`'d and re-opened via `xr.open_zarr` without data loss.
+  ([#981](https://github.com/zarr-developers/VirtualiZarr/pull/981)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Bug fixes
+
+- Fix `KerchunkParser` rejecting cloud URI roots (e.g. `s3://bucket`) in `fs_root`.
+  ([#976](https://github.com/zarr-developers/VirtualiZarr/pull/976)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `HDFParser` failing on HDF5 datasets with a zero-length dimension under `zarr-python >= 3.2.0`, which forbids zero-length chunk dimensions. Chunk dimensions are now clamped to a minimum of 1 when falling back from dataset shape.
+  ([#977](https://github.com/zarr-developers/VirtualiZarr/pull/977)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Fix `KerchunkParser` mangling scheme-only `fs_root` values like `s3://` into `s3:/key` when joining paths.
+  ([#984](https://github.com/zarr-developers/VirtualiZarr/pull/984)).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
+### Documentation
+
+- Expand `ChunkManifest` documentation with detail on construction and the `shape` argument.
+  ([#961](https://github.com/zarr-developers/VirtualiZarr/pull/961)).
+  By [Tyler Anderson](https://github.com/tylanderson).
+
+### Internal changes
+
+- Add compatibility with Zarr-Python 3.2.0.
+  ([#957](https://github.com/zarr-developers/VirtualiZarr/pull/957)).
+  By [Max Jones](https://github.com/maxrjones).
+- Update typing for internal changes in Zarr-Python 3.2.0.
+  ([#985](https://github.com/zarr-developers/VirtualiZarr/pull/985)).
+  By [Max Jones](https://github.com/maxrjones).
 
 ## v2.6.0 (16th April 2026)
 
@@ -380,7 +688,7 @@ Minor release to ensure compatibility with incoming changes to Icechunk.
 
 ### Breaking changes
 
-- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](migration_guide.md) for more details.
+- As [`virtualizarr.open_virtual_dataset`][] now uses parsers, it's API has changed. [#601](https://github.com/zarr-developers/VirtualiZarr/pull/601)) See the [migration-guide](../migration_guide.md) for more details.
 - The recommended virtualizarr Xarray accessor name is `vz` rather than `virtualize`.
 - Which variables are loadable by default has changed. The behaviour is now to make loadable by default the
   same variables which `xarray.open_dataset` would create indexes for: i.e. one-dimensional coordinate variables whose

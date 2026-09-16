@@ -9,6 +9,6 @@ Acceptance criteria:
 - [ ] Tests passing
 - [ ] No test coverage regression
 - [ ] Full type hint coverage
-- [ ] Changes are documented in `docs/releases.md`
+- [ ] Changes are documented in `docs/about/releases.md`
 - [ ] New functions/methods are listed in an appropriate `*.md` file under `docs/api`
 - [ ] New functionality has documentation

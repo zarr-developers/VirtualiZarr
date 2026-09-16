@@ -63,3 +63,7 @@ To build the documentation locally you will need further dependencies:
 ```shell
 pip install '-e .[docs]'
 ```
+
+## Next steps
+
+Now that VirtualiZarr is installed, head to the [Usage guide](../how_to/usage.md) to create your first virtual dataset.

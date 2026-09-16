@@ -18,9 +18,53 @@ Some reasons are:
 - Chunk sizes matter, and it's generally good to force data providers to think up-front about about what chunk sizes would be optimal for expected user queries.
 - For static datasets, native Zarr stores scale effortlessly to arbitrary numbers of chunks today, without having to even think about things like [manifest splitting](https://icechunk.io/en/latest/performance/#splitting-manifests).
 
+### Can my file format be virtualized?
+
+Not all file formats can be virtualized.
+Some have an internal layout which prevents efficient cloud-optimized access to their data.
+
+In cloud object storage, the only way to fetch data is via a GET operation, which issues a single HTTP range request.
+This creates two requirements for a file format to be "virtualizable":
+
+1. Each chunk of array data (i.e. each compressed block) must be accessible via a single targeted HTTP range request, without pulling a significant number of extraneous bytes.
+This means that the file format must have its data arranged as contiguous chunks (which may or may not be compressed), with each chunk on disk corresponding to a single chunk of a Zarr array.
+Some file formats do not co-locate related bytes next to each other.
+For example gzip compression scrambles the byte order within a file, so even though a NetCDF4 file is virtualizable (since it contains many chunks, each of which are contiguous on disk) a gzipped NetCDF4 is not (the bytes of those chunks are now mixed up with one another).
+2. The bytes to be decodable by a relatively cheap, self-contained, per-chunk transform (which we represent as a Zarr codec). For formats that do not use an efficient binary encoding (such as text files like CSV), fetching chunks via HTTP requests would still require an expensive decoding step.
+
+Some file formats have enough flexibility in their internal layout that they can provide relatively efficient access even without a post-hoc virtualization step.
+Sometimes this layout requires opt-in settings upon writing the file, and sometimes it is the default.
+For example the flexibility of TIFF's internal layout allowed the convention of writing "Cloud-Optimized GeoTIFFs".
+
+"Cloud-native" formats such as Zarr take this a step further - they are designed to provide simple and efficient parallel writes as well as reads, which they achieve by spreading their contents over multiple objects.
+Once the data is in separate objects, it becomes possible to perform atomic transactions via special single-object operations (e.g. `put-if-not-exists`).
+See the [Icechunk format specification](https://icechunk.io/en/latest/reference/spec-v2-1/#storage-operations).
+
+Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
+
+Note that this diagram deliberately covers only array formats.
+Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
+
+```python exec="true" html="true"
+import pathlib
+import sys
+
+root = pathlib.Path.cwd()
+for candidate in [root, *root.parents]:
+    diagrams = candidate / "docs" / "_diagrams"
+    if diagrams.is_dir():
+        sys.path.insert(0, str(diagrams))
+        break
+
+from format_tiers import render
+
+print(render())
+```
+
 ### Can my specific data be virtualized?
 
 Depends on some details of your data.
+Firstly, the file format must be supported (see above).
 
 VirtualiZarr works by mapping your data to the zarr data model from whatever data model is used by the format it was saved in.
 This means that if your data contains anything that cannot be represented within the zarr data model, it cannot be virtualized.
@@ -32,6 +76,7 @@ When virtualizing multi-file datasets, it is sometimes the case that it is possi
 - **Homogeneous codecs** - The zarr data model assumes that every chunk of data in a single array uses the same set of codecs for compression etc. For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent compression or other codecs your data cannot be virtualized. This is another big restriction, and there are also plans to relax it in the future.
 - **Registered codecs** - The codecs needed to decompress and deserialize your data must be known to zarr. This might require defining and registering a new zarr codec.
 - **Homogeneous data types** - The zarr data model assumes that every chunk of data in a single array decodes to the same data type (i.e. dtype). For multi-file datasets each chunk often corresponds to (part of) one file, so if all your files do not have consistent data types your data cannot be virtualized. This is arguably inherent to the concept of what an array is.
+- **Homogeneous CF encoding** - Many tools (including Xarray) apply an additional decoding step upon opening which interprets the values of specific [CF-conventions](https://cfconventions.org/)-compliant attribute fields such as `scale_factor` and `add_offset`. This decoding is applied per-variable, but Xarray/VirtualiZarr's default attribute concatenation behaviour is to merge all attributes by overwriting. This means that concatenating two virtual datasets created from netCDF files with different values of `scale_factor` and `add_offset` can create a result which is silently decoded incorrectly by Xarray! We know this is a major footgun, and have plans to resolve it via pushing these extra encoding steps down to also become Zarr codecs (see [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) for more details).
 - **Registered data types** - The dtype of your data must be known to zarr. This might require registering a new zarr data type.
 
 If you attempt to use virtualizarr to create virtual references for data which violates any of these restrictions, it should raise an informative error telling you why it's not possible.
@@ -101,6 +146,49 @@ vds.vz.to_icechunk(icechunkstore)
 
 No! VirtualiZarr can create virtual references pointing to existing Zarr stores in the same way as for other file formats, using the `ZarrParser`.
 
+### I already have some data in Icechunk — can I virtualize it without rewriting?
+
+Yes — use the [`IcechunkParser`][virtualizarr.parsers.IcechunkParser]. It walks an existing icechunk repository and returns a VirtualiZarr [`ManifestStore`][virtualizarr.manifests.ManifestStore] in which:
+
+- icechunk virtual refs become VZ virtual refs (URLs preserved),
+- icechunk native (managed) chunks become VZ virtual refs whose paths are `{native_chunks_prefix}/{chunk_id}`,
+- icechunk inline chunks stay inline.
+
+There are two entry points. The protocol-conformant one matches every other parser and works through [`open_virtual_dataset`][virtualizarr.open_virtual_dataset]:
+
+```python
+from virtualizarr import open_virtual_dataset
+from virtualizarr.parsers import IcechunkParser
+
+vds = open_virtual_dataset(
+    url="s3://my-bucket/my-repo",
+    registry=registry,
+    parser=IcechunkParser(),
+)
+```
+
+Native chunk paths are rendered as `f"{url}/chunks/{chunk_id}"` — icechunk's format-constant chunks directory for the repo at that URL.
+
+If you already have an open icechunk Session in hand (the common case if you're using icechunk in the same process), use the `parse_session` escape hatch to skip re-opening the repo:
+
+```python
+import icechunk
+
+repo = icechunk.Repository.open(storage=...)
+session = repo.readonly_session(branch="main")
+
+manifest_store = IcechunkParser().parse_session(
+    session,
+    registry=registry,
+    native_chunks_prefix="s3://my-bucket/my-repo/chunks",
+)
+```
+
+`native_chunks_prefix` is required here — without a URL the parser can't derive a default.
+
+!!! note
+    `IcechunkParser` requires `icechunk >= 2.0.5` (it uses the `IcechunkStore.array_chunk_iterator` API added in that release). The `to_icechunk` writer still works against `icechunk >= 2.0.3`, so VirtualiZarr's `[icechunk]` extra is not bumped — only parser users need to upgrade. `IcechunkParser()` raises `ImportError` with an upgrade hint if it detects an older icechunk at construction time.
+
 ### Can I add a new parser for my custom file format?
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
@@ -119,6 +207,19 @@ Loading variables can be useful in a few scenarios:
 3. Storing a variable on-disk as a set of references would be inefficient, e.g. because it's a very small array (saving the values like this is similar to kerchunk's concept of "inlining" data),
 4. The variable has encoding, and the simplest way to decode it correctly is to let xarray's standard decoding machinery load it into memory and apply the decoding,
 5. Some of your variables have inconsistent-length chunks, and you want to be able to concatenate them together. For example you might have multiple virtual datasets with coordinates of inconsistent length (e.g., leap years within multi-year daily data). Loading them allows you to rechunk them however you like.
+
+### Why do I get `NotImplementedError: ManifestArray ... cannot be converted into a numpy array`?
+
+A `ManifestArray` holds virtual references to chunks in archival files — it never holds the decoded values in memory. Any operation that needs to read those values therefore can't succeed on a virtual variable. The most common triggers are:
+
+- aligning or indexing on a *virtual* dimension coordinate (xarray builds an in-memory pandas index for dimension coordinates),
+- a value comparison during `xr.concat`/`xr.merge` (e.g. `compat="equals"` or `"identical"`), or
+- a failed `xr.testing.assert_identical(...)`, which tries to render the array's values in the diff.
+
+To make the values available, either:
+
+- pass the variable's name in [`loadable_variables`](#why-would-i-want-to-load-variables-using-loadable_variables) when opening, so it is read into memory up front (this is the usual fix for dimension coordinates you want to align/index on), or
+- write the virtual dataset to a Zarr/Icechunk store and reopen it.
 
 ## How does this actually work?
 
@@ -153,11 +254,12 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | From a netCDF3 file                                                      | `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                                    | `open_virtual_dataset(..., parser=NetCDF3Parser())`, via `kerchunk.netCDF3.NetCDF3ToZarr`                                                                                     |
 | From a COG / tiff file                                                   | `kerchunk.tiff.tiff_to_zarr`                                                                                                        | `open_virtual_dataset(..., parser=VirtualTIFF())`, via [virtual_tiff](https://github.com/virtual-zarr/virtual-tiff)                                                              |
 | From a Zarr v2 store                                                     | `kerchunk.zarr.ZarrToZarr`                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                       |
-| From a Zarr v3 store                                                     |                                                                                                          | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
-| From a GRIB2 file                                                        | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_datatree(..., parser=GribParser())` (❌ Not yet implemented - see [issue #11](https://github.com/zarr-developers/VirtualiZarr/issues/11))                                                                                |
+| From a Zarr v3 store                                                     | ❌                                                                                                         | `open_virtual_dataset(..., parser=ZarrParser())`                                                                                        |
+| From an existing [Icechunk](https://icechunk.io/) repo                   | ❌                                                                                                        | `open_virtual_dataset(..., parser=IcechunkParser())`, or `IcechunkParser().parse_session(session, registry, native_chunks_prefix=...)` if you already have an open icechunk session |
+| From a GRIB1/GRIB2 file                                                  | `kerchunk.grib2.scan_grib`                                                                                                          | `open_virtual_dataset(..., parser=GribberishParser())` (or `open_virtual_datatree(...)`), via [gribberish](https://github.com/mpiannucci/gribberish)                                                                                |
 | From a FITS file                                                         | `kerchunk.fits.process_file`                                                                                                        | `open_virtual_dataset(..., parser=FITSParser())`, via `kerchunk.fits.process_file`                                                                                      |
-| From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr` (❌ Not yet implemented - see [issue #216](https://github.com/zarr-developers/VirtualiZarr/issues/216))                                                        |
-| From a [DMR++](https://opendap.github.io/DMRpp-wiki/DMRpp.html) metadata file                                                    | ❌                                                                                                        | `open_virtual_dataset(..., parser=DMRPPParser)`                                                                                     |
+| From a HDF4 file                                                         | `kerchunk.hdf4.HDF4ToZarr`                                                                                                        | `open_virtual_dataset(..., parser=HDF4Parser())`, via `kerchunk.hdf4.HDF4ToZarr`                                                        |
+| From a [DMR++](https://opendap.github.io/DMRpp-wiki/DMRpp.html) metadata file                                                    | ❌                                                                                                        | `open_virtual_dataset(..., parser=DMRPPParser())`                                                                                     |
 | From existing kerchunk JSON references                                                 | `kerchunk.combine.MultiZarrToZarr(append=True)`                                                                                                       | `open_virtual_dataset(..., parser=KerchunkJSONParser())`                                                                                      |
 | From existing kerchunk parquet references                                                 | `kerchunk.combine.MultiZarrToZarr(append=True)`                                                                                                       | `open_virtual_dataset(..., parser=KerchunkParquetParser())`                                                                                      |
 | **In-memory representation (2)**                                         |                                                                                                                                     |                                                                                                                                                  |
@@ -173,14 +275,14 @@ Users of Kerchunk may find the following comparison table useful, which shows wh
 | Renaming variables              | ❌                                                                                                                                  | `xarray.Dataset.rename_vars`                                                                                                                          |
 | Renaming dimensions              | ❌                                                                                                                                  | `xarray.Dataset.rename_dims`                                                                                                                          |
 | Renaming manifest file paths | `kerchunk.utils.rename_target`                                                                                                                                  | `vds.vz.rename_paths`                                                                                                                          |
-| Splitting uncompressed data into chunks | `kerchunk.utils.subchunk`                                                                                                                                  | `xarray.Dataset.chunk` (❌ Not yet implemented - see [PR #199](https://github.com/zarr-developers/VirtualiZarr/pull/199))
-| Selecting specific chunks | ❌                                                                                                                                  | `xarray.Dataset.isel` (❌ Not yet implemented - see [issue #51](https://github.com/zarr-developers/VirtualiZarr/issues/51))                                                                                                                          |
+| Sub-dividing an uncompressed chunk | `kerchunk.utils.subchunk`                                                                                                                                  | `xarray.Dataset.isel` (✅ for uncompressed arrays — a slice along the largest-stride axis rewrites the reference's byte offset/length, see [#996](https://github.com/zarr-developers/VirtualiZarr/pull/996); a finer chunk grid along that axis can be built by combining `isel` with `xarray.concat`, so no dedicated rechunk method is needed) |
+| Selecting specific chunks | ❌                                                                                                                                  | `xarray.Dataset.isel` (✅ chunk-aligned selections, plus sub-chunk slicing of uncompressed arrays)                                                                                                                          |
 **Parallelization**                                                      |                                                                                                                                     |                                                                                                                                                  |
-| Parallelized generation of references                                    | Wrapping kerchunk's opener inside `dask.delayed`                                                                                    | Wrapping `open_virtual_dataset` inside `dask.delayed`
-| Parallelized combining of references (tree-reduce)                       | `kerchunk.combine.auto_dask`                                                                                                        | Wrapping `ManifestArray` objects within `dask.array.Array` objects inside `xarray.Dataset` to use dask's `concatenate` (⚠️ Untested, but also unnecessary)                         |
+| Parallelized generation of references                                    | Wrapping kerchunk's opener inside `dask.delayed`                                                                                    | `open_virtual_mfdataset(..., parallel="dask" \| "lithops" \| Executor)`, which parallelizes the per-file `open_virtual_dataset` map step; or manually wrap `open_virtual_dataset` in `dask.delayed` |
+| Parallelized combining of references (tree-reduce)                       | `kerchunk.combine.auto_dask`                                                                                                        | Not needed — references are small, so the combine (reduce) step runs serially on the client, deliberately avoiding a distributed tree-reduce (see [Scaling](../how_to/scaling.md)) |
 | **On-disk serialization (6) and reading (7)**                            |                                                                                                                                     |                                                                                                                                                  |
-| Kerchunk reference format as JSON                                        | `ujson.dumps(h5chunks.translate())` , then read using an `fsspec.filesystem` mapper                                | `ds.vz.to_kerchunk('combined.json', format='JSON')` , then read using an `fsspec.filesystem` mapper                                      |
-| Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.vz.to_kerchunk('combined.parq', format=parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
+| Kerchunk reference format as JSON                                        | `ujson.dumps(h5chunks.translate())` , then read using an `fsspec.filesystem` mapper                                | `ds.vz.to_kerchunk('combined.json', format='json')` , then read using an `fsspec.filesystem` mapper                                      |
+| Kerchunk reference format as parquet                                     | `df.refs_to_dataframe(out_dict, "combined.parq")`, then read using an `fsspec` `ReferenceFileSystem` mapper | `ds.vz.to_kerchunk('combined.parq', format='parquet')` , then read using an `fsspec` `ReferenceFileSystem` mapper |
 | [Icechunk](https://icechunk.io/) store                          | ❌                                                                                                                                 | `ds.vz.to_icechunk()`, then read back via xarray (requires zarr-python v3).                                |
 
 ### Which format should I save my virtual references as?
@@ -196,13 +298,14 @@ This is because Icechunk provides several compelling advantages over either Kerc
 - **Version Control and Time Travel** - Icechunk stores a git-like history of all commits, allowing you to roll back to any previous version, or even create multiple branches and tags. See the [Icechunk docs on Version Control](https://icechunk.io/en/latest/version-control/).
 - **Read performance** - Reading data from Icechunk is faster than reading from Kerchunk references. This is because reading from Kerchunk references is done using the fsspec python library, whereas reading data from Icechunk (virtual references or native chunks) uses the Icechunk rust library. For this and a number of other reasons, reading data from Icechunk generally provides a much higher throughput.
 - **Mix "native" and virtual chunks** - Icechunk's manifests can store any mixture of virtual chunks and "native" zarr chunks. Kerchunk's formats cannot do this ("inlined" chunks are something separate).
-- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)). However a direct head-to-head comparison of the scalability of these formats has yet to be performed.
+- **Scalability** - Kerchunk JSON does not scale well to a large number of virtual references. Note that Kerchunk Parquet is much more scalable than Kerchunk JSON, but in theory the scalability of Icechunk manifests should be similar to that of Kerchunk Parquet because they both have partitioning (Icechunk calls this ["Manifest Splitting"](https://icechunk.io/en/latest/performance/#splitting-manifests)). While a direct head-to-head comparison of the scalability of these formats has yet to be performed, it has been shown that Icechunk can scale up to over [7 billion virtual chunk references in a single store](https://virtualizarr.readthedocs.io/en/stable/how_to/examples.html#goes-16-archive-notebooks), way more than most datasets would ever require.
 
 Conversely, the two Kerchunk formats have some advantages over Icechunk:
 
 - **Spec complexity** - Icechunk's format [specification](https://icechunk.io/en/latest/spec/) is considerably more complex than Kerchunk's format [specification](https://fsspec.github.io/kerchunk/spec.html) (as it includes more features).
 - **Standard file formats** - JSON and Parquet are very standard formats, readable by many tools, and JSON is even human-readable. Icechunk uses [FlatBuffers](https://github.com/google/flatbuffers), which are standardized but not human-readable.
 - **Write latency** - In theory writing a single JSON or writing Parquet to object storage can be done with fewer roundtrips to object storage. However the latency incurred when writing the references will almost always be negligible compared to the time taken to parse the archival file formats in the first place.
+- **Storage compactness** - While Kerchunk JSON is extremely inefficient in its use of storage space, Kerchunk Parquet is actually very efficient, creating Parquet files that take up about ~3x less space on disk than Icechunk (v2.0's) manifest files do. In practice this is dwarfed by the storage space required for the actual data, but although future versions of Icechunk could improve on this, for now Kerchunk Parquet is strictly more compact in this sense.
 
 If there is another persistent format for manifests which you wish VirtualiZarr could write to, please open an issue.
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pickle
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -277,6 +278,18 @@ class TestManifestStore:
         assert not local_store.supports_partial_writes
         assert not local_store.supports_consolidated_metadata
 
+    def test_nbytes(self, manifest_array):
+        marr = manifest_array()
+        group = ManifestGroup(arrays={"foo": marr})
+        store = ManifestStore(group)
+        assert store.nbytes_virtual == group.nbytes_virtual == marr.nbytes_virtual
+
+    def test_nbytes_matches_fully_virtual_dataset(self, manifest_array):
+        # a fully-virtual store matches the dataset's virtual-only vz.nbytes
+        marr = manifest_array(dimension_names=["x", "y"])
+        store = ManifestStore(ManifestGroup(arrays={"foo": marr}))
+        assert store.nbytes_virtual == store.to_virtual_dataset().vz.nbytes
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "manifest_store",
@@ -484,7 +497,7 @@ class TestToVirtualXarray:
                 obs.put(
                     store,
                     path.split("/")[-1],
-                    np.ones(marr.chunks, dtype=marr.dtype).tobytes(),
+                    np.ones(marr.metadata.chunks, dtype=marr.dtype).tobytes(),
                 )
         registry = ObjectStoreRegistry({"file://": store})
 
@@ -515,3 +528,50 @@ class TestToVirtualXarray:
             # check dims info is not duplicated in two places
             assert var.data.metadata.dimension_names is None
             assert var.attrs == {}
+
+    def _store_with_oversized_chunk(self, manifest_array, store):
+        # a (non-coordinate) variable whose chunk is larger than its shape, e.g.
+        # as produced for a variable along an unlimited dimension - see issue #803
+        oversized = manifest_array(
+            shape=(5,), chunks=(512,), dimension_names=["x"], codecs=None
+        )
+        # populate the backing store so the variable can actually be loaded
+        for path in {v["path"] for v in oversized.manifest.values()}:
+            obs.put(
+                store,
+                path.split("/")[-1],
+                np.ones(oversized.metadata.chunks, dtype=oversized.dtype).tobytes(),
+            )
+        registry = ObjectStoreRegistry({"file://": store})
+        manifest_group = ManifestGroup(arrays={"data": oversized}, attributes={})
+        return ManifestStore(manifest_group, registry=registry)
+
+    def test_warns_about_oversized_virtual_chunks(self, manifest_array):
+        manifest_store = self._store_with_oversized_chunk(manifest_array, MemoryStore())
+
+        with pytest.warns(UserWarning, match="loadable_variables") as record:
+            manifest_store.to_virtual_dataset(loadable_variables=[])
+        # the warning must name the offending variable
+        assert any("data" in str(w.message) for w in record)
+
+    def test_no_warning_when_oversized_chunk_is_loaded(self, manifest_array):
+        manifest_store = self._store_with_oversized_chunk(manifest_array, MemoryStore())
+
+        # loading the variable resolves the issue, so no warning is emitted
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            manifest_store.to_virtual_dataset(loadable_variables=["data"])
+        assert not [w for w in record if "loadable_variables" in str(w.message)]
+
+    def test_no_warning_for_regular_chunks(self, manifest_array):
+        registry = ObjectStoreRegistry({"file://": MemoryStore()})
+        regular = manifest_array(
+            shape=(5,), chunks=(5,), dimension_names=["x"], codecs=None
+        )
+        manifest_group = ManifestGroup(arrays={"data": regular}, attributes={})
+        manifest_store = ManifestStore(manifest_group, registry=registry)
+
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            manifest_store.to_virtual_dataset(loadable_variables=[])
+        assert not [w for w in record if "loadable_variables" in str(w.message)]

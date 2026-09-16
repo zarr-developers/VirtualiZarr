@@ -453,6 +453,10 @@ class ChunkManifest:
         Entries whose path is ``MISSING_CHUNK_PATH`` will be interpreted as missing chunks and omitted from the dictionary.
         Entries whose path is ``INLINED_CHUNK_PATH`` have their data stored in memory and are included.
         """
+        if self._paths.size == 0:
+            # a zero-length array has no chunks, and np.nditer refuses zero-sized operands
+            return cast(ChunkDict, {})
+
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]
@@ -520,6 +524,10 @@ class ChunkManifest:
 
     def iter_refs(self) -> Iterator[tuple[tuple[int, ...], ChunkEntry]]:
         """Yield (grid_indices, chunk_entry) for every non-missing chunk."""
+        if self._paths.size == 0:
+            # a zero-length array has no chunks, and np.nditer refuses zero-sized operands
+            return
+
         coord_vectors = np.mgrid[
             tuple(slice(None, length) for length in self.shape_chunk_grid)
         ]

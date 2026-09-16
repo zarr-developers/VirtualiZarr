@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Union, cast
 import numpy as np
 from zarr.experimental import ChunkGrid
 
-from .manifest import ChunkManifest
+from .manifest import MISSING_CHUNK_PATH, ChunkManifest
 from .utils import (
     check_combinable_zarr_arrays,
     check_no_partial_chunks_on_concat_axis,
@@ -12,6 +12,7 @@ from .utils import (
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
     copy_and_replace_metadata,
+    manifest_chunk_shape,
 )
 
 if TYPE_CHECKING:
@@ -35,13 +36,28 @@ def implements(numpy_function):
 
 @implements(np.result_type)
 def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtype:
-    """Called by xarray to ensure all arguments to concat have the same dtype."""
+    """
+    Resolve a result dtype for ManifestArray arguments.
+
+    Called by xarray both to check that concat/stack inputs share a dtype and,
+    during reindex/alignment, to combine a ManifestArray with a scalar fill
+    value. A ManifestArray's dtype is fixed by its metadata (the same metadata
+    that defines its fill value), so when exactly one ManifestArray is combined
+    with scalars/dtypes we return its dtype rather than promoting — keeping the
+    array's native dtype and declared fill value through a reindex.
+    """
     from virtualizarr.manifests.array import ManifestArray
 
-    dtypes = (
+    manifest_dtypes = [
+        obj.dtype for obj in arrays_and_dtypes if isinstance(obj, ManifestArray)
+    ]
+    if len(manifest_dtypes) == 1:
+        return manifest_dtypes[0]
+
+    dtypes = [
         obj.dtype if isinstance(obj, ManifestArray) else np.dtype(obj)
         for obj in arrays_and_dtypes
-    )
+    ]
     first_dtype, *other_dtypes = dtypes
     unique_dtypes = set(dtypes)
     for other_dtype in other_dtypes:
@@ -51,6 +67,58 @@ def result_type(*arrays_and_dtypes: Union["ManifestArray", np.dtype]) -> np.dtyp
             )
 
     return first_dtype
+
+
+@implements(np.where)
+def where(condition, x, y, /):
+    """
+    Support xarray's reindex/alignment fill, which calls
+    ``where(~mask, gathered_array, fill_value)`` after gathering chunks.
+
+    The gathered ManifestArray already carries null-path chunks (which read back
+    as ``fill_value``) at exactly the missing positions, so this is an identity
+    whenever the requested fill positions coincide with the array's missing
+    chunks. In that case ``x`` is returned unchanged and the manifest's own fill
+    value governs. Any other ``where`` usage (e.g. general boolean masking) would
+    require materializing values and is not supported.
+    """
+    from virtualizarr.manifests.array import ManifestArray
+
+    if isinstance(x, ManifestArray) and np.isscalar(y):
+        cond = np.asarray(condition, dtype=bool)
+        if cond.shape == x.shape and np.array_equal(~cond, _missing_element_mask(x)):
+            return x
+
+    raise NotImplementedError(
+        "np.where on a ManifestArray is only supported for the reindex/alignment "
+        "fill pattern (filling an array's own missing chunks); general masking "
+        "would require materializing values."
+    )
+
+
+def _chunk_sizes(
+    arr: "ManifestArray",
+) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
+    """
+    Per-axis chunk size(s) of a ManifestArray.
+
+    For a regular grid this is a tuple of ints (e.g. ``(30, 50)``); for a rectilinear
+    grid it's a tuple of per-axis chunk-edge tuples (e.g. ``((10, 20, 30), (50, 50))``).
+
+    Deliberately not exposed as ``ManifestArray.chunks`` - xarray's ``is_chunked_array``
+    duck-types on ``hasattr(x, "chunks")`` and would misclassify a virtual array as a
+    computable dask-like array (see #1016).
+    """
+    grid = arr.chunk_grid
+    return grid.chunk_shape if grid.is_regular else grid.chunk_sizes
+
+
+def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
+    """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
+    mask = marr.manifest._paths == MISSING_CHUNK_PATH
+    for axis, chunk_size in enumerate(manifest_chunk_shape(marr.metadata)):
+        mask = np.repeat(mask, chunk_size, axis=axis)
+    return mask[tuple(slice(0, length) for length in marr.shape)]
 
 
 @implements(np.concatenate)
@@ -86,7 +154,7 @@ def concatenate(
         axis = axis % first_arr.ndim
 
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [arr.chunks for arr in arrays]
+    arr_chunks = [manifest_chunk_shape(arr.metadata) for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
@@ -104,10 +172,10 @@ def concatenate(
     # For rectilinear grids, concatenate chunk edges along the concat axis
     new_chunks = None
     if not first_arr.chunk_grid.is_regular:
-        new_chunks = list(first_arr.chunks)
+        new_chunks = list(_chunk_sizes(first_arr))
         concat_edges: tuple[int, ...] = ()
         for arr in arrays:
-            concat_edges = concat_edges + arr.chunks[axis]  # type: ignore[index]
+            concat_edges = concat_edges + _chunk_sizes(arr)[axis]  # type: ignore[operator]
         new_chunks[axis] = concat_edges
 
     new_metadata = copy_and_replace_metadata(
@@ -157,7 +225,7 @@ def stack(
     stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
     # chunk shape has changed because a length-1 axis has been inserted
-    old_chunks = first_arr.chunks
+    old_chunks = _chunk_sizes(first_arr)
     new_chunks = list(old_chunks)
     # For rectilinear grids, each element is a sequence; insert a single-element tuple
     if not first_arr.chunk_grid.is_regular:
@@ -200,7 +268,7 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
     # broadcast_to only applies to regular chunk grids
-    old_chunk_shape: tuple[int, ...] = x.chunks  # type: ignore[assignment]
+    old_chunk_shape = x.chunk_grid.chunk_shape
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )
@@ -327,6 +395,8 @@ def full_like(
     Returns a numpy array instead of a ManifestArray.
 
     Only implemented to get past some checks deep inside xarray, see https://github.com/zarr-developers/VirtualiZarr/issues/29.
+    For creating a ManifestArray placeholder backed entirely by a fill_value, use
+    :meth:`ManifestArray.fill_value_placeholder` instead.
     """
     return np.full(
         shape=x.shape,

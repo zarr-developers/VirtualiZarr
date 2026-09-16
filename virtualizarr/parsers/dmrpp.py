@@ -21,22 +21,21 @@ from virtualizarr.types import ChunkKey
 
 
 class DMRPPParser:
+    """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a DMR++ file.
+
+    Parameters
+    ----------
+    group
+        The group within the file to be used as the Zarr root group for the ManifestStore.
+    skip_variables
+        Variables in the file that will be ignored when creating the ManifestStore.
+    """
+
     def __init__(
         self,
         group: str | None = None,
         skip_variables: Iterable[str] | None = None,
     ):
-        """
-        Instantiate a parser with parser-specific parameters that can be used in the __call__ method.
-
-        Parameters
-        ----------
-        group
-            The group within the file to be used as the Zarr root group for the ManifestStore.
-        skip_variables
-            Variables in the file that will be ignored when creating the ManifestStore.
-        """
-
         self.group = group
         self.skip_variables = skip_variables
 
@@ -46,7 +45,7 @@ class DMRPPParser:
         registry: ObjectStoreRegistry,
     ) -> ManifestStore:
         """
-        Parse the metadata and byte offsets from a given DMR++ file to product a
+        Parse the metadata and byte offsets from a given DMR++ file to produce a
         VirtualiZarr ManifestStore.
 
         Parameters

@@ -1,3 +1,5 @@
+import warnings
+
 import h5py  # type: ignore
 import numpy as np
 import pytest
@@ -72,11 +74,52 @@ class TestDatasetDims:
 class TestDatasetToManifestArray:
     def test_chunked_dataset(self, chunked_dimensions_netcdf4_url):
         manifest_store = manifest_store_from_hdf_url(chunked_dimensions_netcdf4_url)
-        assert manifest_store._group.arrays["data"].chunks == (50, 50)
+        assert manifest_store._group.arrays["data"].metadata.chunks == (50, 50)
 
     def test_not_chunked_dataset(self, single_dimension_scale_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(single_dimension_scale_hdf5_url)
-        assert manifest_store._group.arrays["data"].chunks == (2,)
+        assert manifest_store._group.arrays["data"].metadata.chunks == (2,)
+
+    def test_unlimited_dimension_chunks(self, unlimited_dimension_netcdf4_url):
+        # see https://github.com/zarr-developers/VirtualiZarr/issues/803
+        # HDF5 reports chunks=(512,) for an unlimited dim holding only 5 values;
+        # the reported chunk shape is trimmed to the actual array shape
+        manifest_store = manifest_store_from_hdf_url(unlimited_dimension_netcdf4_url)
+        time = manifest_store._group.arrays["time"]
+        assert time.shape == (5,)
+        assert time.metadata.chunks == (5,)
+        # the trimmed manifest must still read back the written values
+        result = zarr.open(manifest_store, mode="r")["time"][:]
+        np.testing.assert_array_equal(result, np.full(5, 10, dtype="i8"))
+
+    def test_unlimited_dimension_compressed_chunks_not_trimmed(
+        self, unlimited_dimension_compressed_hdf5_url
+    ):
+        # a compressed oversized chunk cannot be byte-trimmed to the array shape,
+        # so the parser leaves it as-is (reading still works by cropping); the
+        # user is warned later, at to_virtual_dataset time, to load the variable
+        manifest_store = manifest_store_from_hdf_url(
+            unlimited_dimension_compressed_hdf5_url
+        )
+        data = manifest_store._group.arrays["data"]
+        assert data.shape == (5,)
+        assert data.metadata.chunks == (512,)
+
+    def test_unlimited_dimension_compressed_chunks_warn_unless_loaded(
+        self, unlimited_dimension_compressed_hdf5_url
+    ):
+        manifest_store = manifest_store_from_hdf_url(
+            unlimited_dimension_compressed_hdf5_url
+        )
+        # left virtual, the oversized chunk warns and points at loadable_variables
+        with pytest.warns(UserWarning, match="loadable_variables"):
+            manifest_store.to_virtual_dataset()
+        # loading the variable silences the warning and reads back correctly
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            vds = manifest_store.to_virtual_dataset(loadable_variables=["data"])
+        assert not [w for w in record if "loadable_variables" in str(w.message)]
+        np.testing.assert_array_equal(vds["data"].values, np.full(5, 10, dtype="i8"))
 
     def test_dataset_attributes(self, string_attributes_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)
@@ -99,6 +142,51 @@ class TestDatasetToManifestArray:
         manifest_store = manifest_store_from_hdf_url(cf_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert "_FillValue" in metadata.attributes
+
+    @pytest.mark.filterwarnings("ignore:.*variable-length string dataset.*:UserWarning")
+    def test_string_dtype_fill_value(self, string_dtype_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(string_dtype_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert isinstance(metadata.fill_value, (str, bytes, np.bytes_))
+
+    def test_fixed_length_bytes_roundtrip(self, fixed_length_bytes_hdf5_url):
+        with (
+            manifest_store_from_hdf_url(fixed_length_bytes_hdf5_url) as ms,
+            xr.open_zarr(ms, zarr_format=3, consolidated=False).load() as ds,
+        ):
+            np.testing.assert_array_equal(
+                ds["data"].to_numpy(), np.array([b"hello", b"world"], dtype="S10")
+            )
+
+    def test_fixed_length_bytes_fill_value_preserved(
+        self, non_utf8_fill_value_hdf5_url
+    ):
+        manifest_store = manifest_store_from_hdf_url(non_utf8_fill_value_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert metadata.fill_value == b"\xff\xfe\xff\xfe\xff"
+
+    def test_variable_length_string_warns_on_parse(self, vlen_string_hdf5_url):
+        with pytest.warns(UserWarning, match="variable-length string"):
+            manifest_store_from_hdf_url(vlen_string_hdf5_url)
+
+    def test_ascii_variable_length_string_warns_on_parse(
+        self, ascii_vlen_string_hdf5_url
+    ):
+        # an ascii-cset vlen string is still a vlen string, so it should warn like
+        # the utf-8 case rather than fail the whole file as an unsupported object dtype
+        with pytest.warns(UserWarning, match="variable-length string"):
+            manifest_store = manifest_store_from_hdf_url(ascii_vlen_string_hdf5_url)
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert metadata.data_type.to_native_dtype() == np.dtypes.StringDType()
+
+    @pytest.mark.filterwarnings("ignore:.*variable-length string dataset.*:UserWarning")
+    def test_string_dtype_cf_fill_value(self, string_dtype_with_fillvalue_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(
+            string_dtype_with_fillvalue_hdf5_url
+        )
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert "_FillValue" in metadata.attributes
+        assert isinstance(metadata.attributes["_FillValue"], str)
 
     def test_cf_array_fill_value(self, cf_array_fill_value_hdf5_file):
         cf_array_fill_value_hdf5_url = f"file://{cf_array_fill_value_hdf5_file}"
@@ -215,7 +303,8 @@ def test_subgroup_variable_names(
         assert list(vds.dims) == ["dim_0"]
 
 
-# @requires_network
+@pytest.mark.network
+@pytest.mark.flaky
 def test_netcdf_over_https():
     url = "https://www.earthbyte.org/webdav/gmt_mirror/gmt/data/cache/topo_32.nc"
     store = from_url(url)
@@ -227,3 +316,20 @@ def test_netcdf_over_https():
     ):
         np.testing.assert_allclose(ds["z"].min().to_numpy(), -6)
         np.testing.assert_allclose(ds["z"].max().to_numpy(), 817)
+
+
+def test_fillvalue_runtime_error():
+    from virtualizarr.parsers.hdf.hdf import _get_fill_value
+
+    dtype = np.dtype("float32")
+
+    class _RuntimeErrorDataset:
+        @property
+        def fillvalue(self):
+            raise RuntimeError("Unable to get fill value")
+
+    dataset = _RuntimeErrorDataset()
+    dataset.dtype = dtype  # type: ignore[attr-defined]
+
+    result = _get_fill_value(dataset)
+    assert result == np.ma.default_fill_value(dtype)
