@@ -27,7 +27,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.1.6",  # earlier versions mis-list nested group contents, silently dropping arrays (zarr-python#3657)
+    "zarr>=3.2.1",  # first release exposing zarr.experimental.ChunkGrid, used for regular and rectilinear chunk grid handling
     "obstore>=0.7.0",
     "obspec_utils>=0.9.0",
 ]
@@ -205,7 +205,7 @@ install-upstream-overrides = { cmd = "pip install --upgrade --no-deps -r ci/upst
 xarray = "==2025.6.0"
 numpy = "==2.1.0"
 numcodecs = "==0.15.1"
-zarr = "==3.1.6"
+zarr = "==3.2.1"
 obstore = "==0.7.0"
 icechunk = "==2.0.3"
 
