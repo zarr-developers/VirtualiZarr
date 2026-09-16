@@ -286,6 +286,38 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", synthetic_vd
     npt.assert_equal(observed, arr)
 
 
+def test_set_rectilinear_virtual_refs(
+    icechunk_filestore: "IcechunkStore", synthetic_vds_rectilinear_grid
+):
+    vds, arr = synthetic_vds_rectilinear_grid
+
+    vds.vz.to_icechunk(icechunk_filestore)
+
+    root_group = zarr.group(store=icechunk_filestore)
+    observed = root_group["foo"]
+    assert isinstance(observed, zarr.Array)
+    assert (
+        observed.metadata.chunk_grid.__class__.__name__
+        == "RectilinearChunkGridMetadata"
+    )
+
+    npt.assert_equal(observed[:], arr)
+
+
+def test_append_rectilinear_array_raises_not_implemented(
+    icechunk_repo: "Repository", synthetic_vds_rectilinear_grid
+):
+    vds, arr = synthetic_vds_rectilinear_grid
+
+    session = icechunk_repo.writable_session("main")
+    vds.vz.to_icechunk(session.store)
+    session.commit("initial write")
+
+    append_session = icechunk_repo.writable_session("main")
+    with pytest.raises(NotImplementedError, match="rectilinear"):
+        vds.vz.to_icechunk(append_session.store, append_dim="x")
+
+
 def test_set_inlined_and_virtual_refs(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",

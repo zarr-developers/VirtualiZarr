@@ -11,6 +11,7 @@ from zarr import Array, Group, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.sync import sync
+from zarr.experimental import ChunkGrid
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -23,6 +24,7 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_axes,
     check_same_shapes_except_on_concat_axis,
+    chunk_grid_sizes,
 )
 
 if TYPE_CHECKING:
@@ -510,8 +512,22 @@ def write_virtual_variable_to_icechunk(
     if append_dim and append_dim in dims:
         # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
         # for example, if you resize an array, it resizes the array but not the bound variable.
-        if not isinstance(group[name], Array):
+        existing_arr = group[name]
+        if not isinstance(existing_arr, Array):
             raise ValueError("Expected existing array to be a zarr.core.Array")
+
+        # Appending has to merge the append axis's chunk sizes on either side of the
+        # join, exactly like concatenate() does - not yet implemented for icechunk writes.
+        if (
+            not ma.chunk_grid.is_regular
+            or not ChunkGrid.from_metadata(existing_arr.metadata).is_regular
+        ):
+            raise NotImplementedError(
+                f"Cannot append variable {name!r} to icechunk along dimension "
+                f"{append_dim!r}: appending is not yet supported for arrays with a "
+                "rectilinear (variable-length) chunk grid."
+            )
+
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
@@ -568,10 +584,19 @@ def write_virtual_variable_to_icechunk(
     else:
         chunk_offsets = [0 for _ in dims]
         filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
+        try:
+            # For a sharded array, ArrayV3Metadata.chunks is the *inner* chunk shape
+            # (from the sharding codec) - the shape create_array expects for `chunks`
+            # alongside `shards`. chunk_grid_sizes gives the *outer*/shard shape
+            # instead (the manifest's unit), which is wrong here, so only fall back to
+            # it where .chunks itself doesn't apply (a rectilinear chunk grid).
+            chunks = metadata.chunks
+        except NotImplementedError:
+            chunks = chunk_grid_sizes(metadata)
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
-            chunks=metadata.chunks,
+            chunks=chunks,
             shards=metadata.shards,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,
