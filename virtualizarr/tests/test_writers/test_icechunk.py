@@ -16,6 +16,7 @@ from zarr.codecs import BytesCodec
 from zarr.core.metadata import ArrayV3Metadata
 from zarr.dtype import parse_data_type
 from zarr.errors import ContainsGroupError
+from zarr.experimental import ChunkGrid
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -304,7 +305,142 @@ def test_set_rectilinear_virtual_refs(
     npt.assert_equal(observed[:], arr)
 
 
-def test_append_rectilinear_array_raises_not_implemented(
+def test_append_regular_arrays_with_different_chunk_sizes_produces_rectilinear(
+    icechunk_repo: "Repository", tmpdir, array_v3_metadata
+):
+    # first array: 20 elements chunked in blocks of 10
+    arr1 = np.arange(20, dtype="<i8")
+    filepath1 = f"{tmpdir}/first"
+    obs.put(obs.store.LocalStore(), filepath1, arr1.tobytes())
+    metadata1 = array_v3_metadata(
+        shape=(20,), chunks=(10,), data_type=arr1.dtype, dimension_names=("x",)
+    )
+    manifest1 = ChunkManifest(
+        entries={
+            "0": {"path": filepath1, "offset": 0, "length": 80},
+            "1": {"path": filepath1, "offset": 80, "length": 80},
+        }
+    )
+    vds1 = xr.Dataset(
+        {"foo": (["x"], ManifestArray(metadata=metadata1, chunkmanifest=manifest1))}
+    )
+
+    # second array: 15 elements in a single chunk - a genuinely different chunk size
+    arr2 = np.arange(20, 35, dtype="<i8")
+    filepath2 = f"{tmpdir}/second"
+    obs.put(obs.store.LocalStore(), filepath2, arr2.tobytes())
+    metadata2 = array_v3_metadata(
+        shape=(15,), chunks=(15,), data_type=arr2.dtype, dimension_names=("x",)
+    )
+    manifest2 = ChunkManifest(
+        entries={"0": {"path": filepath2, "offset": 0, "length": 120}}
+    )
+    vds2 = xr.Dataset(
+        {"foo": (["x"], ManifestArray(metadata=metadata2, chunkmanifest=manifest2))}
+    )
+
+    session = icechunk_repo.writable_session("main")
+    vds1.vz.to_icechunk(session.store)
+    session.commit("initial write")
+
+    append_session = icechunk_repo.writable_session("main")
+    vds2.vz.to_icechunk(append_session.store, append_dim="x")
+    append_session.commit("appended data")
+
+    ro_session = icechunk_repo.readonly_session("main")
+    observed = zarr.open_group(store=ro_session.store, mode="r")["foo"]
+    assert isinstance(observed, zarr.Array)
+    assert observed.shape == (35,)
+    assert (
+        observed.metadata.chunk_grid.__class__.__name__
+        == "RectilinearChunkGridMetadata"
+    )
+    npt.assert_equal(observed[:], np.concatenate([arr1, arr2]))
+
+
+def test_append_rectilinear_arrays_merges_chunk_edges(
+    icechunk_repo: "Repository",
+    synthetic_vds_rectilinear_grid,
+    tmpdir,
+    array_v3_metadata,
+):
+    vds1, arr1 = synthetic_vds_rectilinear_grid
+
+    # append a further 4-element, single-chunk array
+    arr2 = np.arange(6, 10, dtype="<i8")
+    filepath2 = f"{tmpdir}/second"
+    obs.put(obs.store.LocalStore(), filepath2, arr2.tobytes())
+    metadata2 = array_v3_metadata(
+        shape=(4,), chunks=(4,), data_type=arr2.dtype, dimension_names=("x",)
+    )
+    manifest2 = ChunkManifest(
+        entries={"0": {"path": filepath2, "offset": 0, "length": 32}}
+    )
+    vds2 = xr.Dataset(
+        {"foo": (["x"], ManifestArray(metadata=metadata2, chunkmanifest=manifest2))}
+    )
+
+    session = icechunk_repo.writable_session("main")
+    vds1.vz.to_icechunk(session.store)
+    session.commit("initial write")
+
+    append_session = icechunk_repo.writable_session("main")
+    vds2.vz.to_icechunk(append_session.store, append_dim="x")
+    append_session.commit("appended data")
+
+    ro_session = icechunk_repo.readonly_session("main")
+    observed = zarr.open_group(store=ro_session.store, mode="r")["foo"]
+    assert isinstance(observed, zarr.Array)
+    assert observed.shape == (10,)
+    assert ChunkGrid.from_metadata(observed.metadata).chunk_sizes == ((2, 1, 3, 4),)
+    npt.assert_equal(observed[:], np.concatenate([arr1, arr2]))
+
+
+def test_append_raises_clear_error_when_rectilinear_chunks_disabled(
+    icechunk_repo: "Repository", tmpdir, array_v3_metadata
+):
+    arr1 = np.arange(20, dtype="<i8")
+    filepath1 = f"{tmpdir}/first"
+    obs.put(obs.store.LocalStore(), filepath1, arr1.tobytes())
+    metadata1 = array_v3_metadata(
+        shape=(20,), chunks=(10,), data_type=arr1.dtype, dimension_names=("x",)
+    )
+    manifest1 = ChunkManifest(
+        entries={
+            "0": {"path": filepath1, "offset": 0, "length": 80},
+            "1": {"path": filepath1, "offset": 80, "length": 80},
+        }
+    )
+    vds1 = xr.Dataset(
+        {"foo": (["x"], ManifestArray(metadata=metadata1, chunkmanifest=manifest1))}
+    )
+
+    arr2 = np.arange(20, 35, dtype="<i8")
+    filepath2 = f"{tmpdir}/second"
+    obs.put(obs.store.LocalStore(), filepath2, arr2.tobytes())
+    metadata2 = array_v3_metadata(
+        shape=(15,), chunks=(15,), data_type=arr2.dtype, dimension_names=("x",)
+    )
+    manifest2 = ChunkManifest(
+        entries={"0": {"path": filepath2, "offset": 0, "length": 120}}
+    )
+    vds2 = xr.Dataset(
+        {"foo": (["x"], ManifestArray(metadata=metadata2, chunkmanifest=manifest2))}
+    )
+
+    session = icechunk_repo.writable_session("main")
+    vds1.vz.to_icechunk(session.store)
+    session.commit("initial write")
+
+    append_session = icechunk_repo.writable_session("main")
+    with zarr.config.set({"array.rectilinear_chunks": False}):
+        with pytest.raises(ValueError) as exc_info:
+            vds2.vz.to_icechunk(append_session.store, append_dim="x")
+
+    assert "zarr.config.set" in str(exc_info.value)
+
+
+def test_region_write_rectilinear_array_raises_not_implemented(
     icechunk_repo: "Repository", synthetic_vds_rectilinear_grid
 ):
     vds, arr = synthetic_vds_rectilinear_grid
@@ -313,9 +449,9 @@ def test_append_rectilinear_array_raises_not_implemented(
     vds.vz.to_icechunk(session.store)
     session.commit("initial write")
 
-    append_session = icechunk_repo.writable_session("main")
+    region_session = icechunk_repo.writable_session("main")
     with pytest.raises(NotImplementedError, match="rectilinear"):
-        vds.vz.to_icechunk(append_session.store, append_dim="x")
+        vds.vz.to_icechunk(region_session.store, region={"x": slice(0, 6)})
 
 
 def test_read_rectilinear_virtual_refs_with_xarray(synthetic_vds_rectilinear_grid):

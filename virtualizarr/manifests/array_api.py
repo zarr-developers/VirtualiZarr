@@ -2,7 +2,6 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
-import zarr
 from zarr.experimental import ChunkGrid
 
 from .manifest import MISSING_CHUNK_PATH, ChunkManifest
@@ -16,6 +15,7 @@ from .utils import (
     copy_and_replace_metadata,
     full_chunk_edges,
     manifest_chunk_shape,
+    require_rectilinear_chunks_enabled,
 )
 
 if TYPE_CHECKING:
@@ -116,17 +116,6 @@ def _chunk_sizes(
     return grid.chunk_shape if grid.is_regular else grid.chunk_sizes
 
 
-def _require_rectilinear_chunks_enabled(context: str) -> None:
-    """Raise a clear, actionable error unless rectilinear chunk grids are enabled."""
-    if not zarr.config.get("array.rectilinear_chunks"):
-        raise ValueError(
-            f"{context} would require a rectilinear (variable-length) chunk grid. "
-            "Rectilinear chunk grids are an experimental zarr-python feature; enable "
-            "them with zarr.config.set({'array.rectilinear_chunks': True}) or the "
-            "ZARR_ARRAY__RECTILINEAR_CHUNKS environment variable."
-        )
-
-
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
@@ -201,7 +190,7 @@ def concatenate(
 
     new_chunks = None
     if not stays_regular:
-        _require_rectilinear_chunks_enabled(
+        require_rectilinear_chunks_enabled(
             f"Concatenating these arrays along axis {axis}"
         )
         new_chunks = list(full_chunk_edges(first_arr.metadata))
@@ -263,7 +252,7 @@ def stack(
     # For rectilinear grids, each element is a sequence of edges rather than a
     # single chunk size, so the new axis needs one size-1 edge per stacked array
     if not first_arr.chunk_grid.is_regular:
-        _require_rectilinear_chunks_enabled("Stacking these arrays")
+        require_rectilinear_chunks_enabled("Stacking these arrays")
         new_chunks.insert(axis, (1,) * length_along_new_stacked_axis)
     else:
         new_chunks.insert(axis, 1)

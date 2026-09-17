@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union, cast
 
 import numpy as np
+import zarr
 from zarr import Array
 from zarr.core.chunk_grids import _is_rectilinear_chunks
 from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
@@ -260,10 +261,21 @@ def check_same_chunk_shapes(
         sizes may differ (that's exactly what a rectilinear chunk grid is for).
     """
 
+    def _normalize(size: Union[int, Sequence[int]]) -> tuple[int, ...]:
+        # A bare int (a regular axis) and a 1-tuple of that same value (an axis
+        # zarr's ChunkGrid classified as regular despite the grid being declared
+        # rectilinear, since every axis of a rectilinear grid with only uniform
+        # axes still reports as regular overall) describe the same chunking, and
+        # must compare equal regardless of which form either side happens to use.
+        return (size,) if isinstance(size, int) else tuple(size)
+
     def _comparable(chunks: Sequence) -> tuple:
-        if exclude_axis is None:
-            return tuple(chunks)
-        return _remove_element_at_position(tuple(chunks), exclude_axis)
+        axes = (
+            tuple(chunks)
+            if exclude_axis is None
+            else _remove_element_at_position(tuple(chunks), exclude_axis)
+        )
+        return tuple(_normalize(axis) for axis in axes)
 
     first_chunks, *other_chunks_list = chunks_list
     for other_chunks in other_chunks_list:
@@ -378,7 +390,7 @@ def check_combinable_zarr_arrays(
     check_same_codecs([get_codecs(arr) for arr in arrays])
 
     check_same_chunk_shapes(
-        [full_chunk_edges(arr.metadata) for arr in arrays], exclude_axis=exclude_axis
+        [chunk_grid_sizes(arr.metadata) for arr in arrays], exclude_axis=exclude_axis
     )
 
 
@@ -501,6 +513,17 @@ def full_chunk_edges(
             for extent, size in zip(metadata.shape, grid.chunk_shape)
         )
     return grid.chunk_sizes
+
+
+def require_rectilinear_chunks_enabled(context: str) -> None:
+    """Raise a clear, actionable error unless rectilinear chunk grids are enabled."""
+    if not zarr.config.get("array.rectilinear_chunks"):
+        raise ValueError(
+            f"{context} would require a rectilinear (variable-length) chunk grid. "
+            "Rectilinear chunk grids are an experimental zarr-python feature; enable "
+            "them with zarr.config.set({'array.rectilinear_chunks': True}) or the "
+            "ZARR_ARRAY__RECTILINEAR_CHUNKS environment variable."
+        )
 
 
 def _realign_inner_chunk_shape(
