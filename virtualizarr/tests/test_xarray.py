@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import xarray.testing as xrt
+import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset, open_dataset, open_datatree
 from xarray.core.indexes import Index
@@ -226,6 +227,133 @@ class TestConcat:
         metadata_copy["shape"] = (40,)
         metadata_copy["chunk_grid"]["configuration"]["chunk_shape"] = (10,)
         assert result.data.metadata.to_dict() == metadata_copy
+
+
+class TestConcatRectilinear:
+    def test_concat_regular_arrays_with_different_chunk_sizes_via_xr_concat(
+        self, array_v3_metadata
+    ):
+        # two virtual datasets whose declared chunk sizes genuinely differ along the
+        # concat dimension - xr.concat must dispatch into ManifestArray's rectilinear
+        # promotion rather than erroring or silently keeping a (now wrong) regular grid
+        metadata1 = array_v3_metadata(chunks=(10,), shape=(20,))
+        manifest1 = ChunkManifest(
+            entries={
+                "0": {"path": "/foo.nc", "offset": 0, "length": 40},
+                "1": {"path": "/foo.nc", "offset": 40, "length": 40},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x"], marr1)})
+
+        metadata2 = array_v3_metadata(chunks=(15,), shape=(15,))
+        manifest2 = ChunkManifest(
+            entries={"0": {"path": "/foo.nc", "offset": 80, "length": 60}}
+        )
+        marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest2)
+        ds2 = xr.Dataset({"a": (["x"], marr2)})
+
+        result = xr.concat([ds1, ds2], dim="x")["a"]
+
+        assert result.shape == (35,)
+        marr = result.data
+        assert isinstance(marr, ManifestArray)
+        assert marr.chunk_grid.is_regular is False
+        assert marr.chunk_grid.chunk_sizes == ((10, 10, 15),)
+
+    def test_concat_rectilinear_manifest_arrays_via_xr_concat(
+        self, array_v3_metadata_rectilinear
+    ):
+        # two already-rectilinear virtual datasets concatenated along their
+        # rectilinear axis must merge chunk edges rather than erroring
+        metadata1 = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
+        )
+        manifest1 = ChunkManifest(
+            entries={
+                "0.0": {"path": "/a.nc", "offset": 0, "length": 100},
+                "1.0": {"path": "/a.nc", "offset": 100, "length": 100},
+                "2.0": {"path": "/a.nc", "offset": 200, "length": 100},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x", "y"], marr1)})
+
+        metadata2 = array_v3_metadata_rectilinear(
+            shape=(15, 50), chunk_shapes=((15,), (50,))
+        )
+        manifest2 = ChunkManifest(
+            entries={"0.0": {"path": "/b.nc", "offset": 0, "length": 100}}
+        )
+        marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest2)
+        ds2 = xr.Dataset({"a": (["x", "y"], marr2)})
+
+        result = xr.concat([ds1, ds2], dim="x")["a"]
+
+        assert result.shape == (75, 50)
+        marr = result.data
+        assert isinstance(marr, ManifestArray)
+        assert marr.chunk_grid.is_regular is False
+        assert marr.chunk_grid.chunk_sizes == ((10, 20, 30, 15), (50,))
+
+    def test_concat_raises_clear_error_when_rectilinear_chunks_disabled(
+        self, array_v3_metadata
+    ):
+        metadata1 = array_v3_metadata(chunks=(10,), shape=(20,))
+        manifest1 = ChunkManifest(
+            entries={
+                "0": {"path": "/foo.nc", "offset": 0, "length": 40},
+                "1": {"path": "/foo.nc", "offset": 40, "length": 40},
+            }
+        )
+        marr1 = ManifestArray(metadata=metadata1, chunkmanifest=manifest1)
+        ds1 = xr.Dataset({"a": (["x"], marr1)})
+
+        metadata2 = array_v3_metadata(chunks=(15,), shape=(15,))
+        manifest2 = ChunkManifest(
+            entries={"0": {"path": "/foo.nc", "offset": 80, "length": 60}}
+        )
+        marr2 = ManifestArray(metadata=metadata2, chunkmanifest=manifest2)
+        ds2 = xr.Dataset({"a": (["x"], marr2)})
+
+        with zarr.config.set({"array.rectilinear_chunks": False}):
+            with pytest.raises(ValueError) as exc_info:
+                xr.concat([ds1, ds2], dim="x")
+
+        assert "zarr.config.set" in str(exc_info.value)
+
+    @requires_hdf5plugin
+    @requires_imagecodecs
+    def test_open_virtual_mfdataset_combines_differently_chunked_real_files(
+        self, tmp_path: Path, local_registry
+    ):
+        # true end-to-end path: two real HDF5 files, deliberately chunked
+        # differently along the dimension they get concatenated over
+        arr1 = np.arange(20, dtype="float32")
+        arr2 = np.arange(15, dtype="float32")
+        filepath1 = tmp_path / "a.nc"
+        filepath2 = tmp_path / "b.nc"
+        xr.Dataset({"foo": ("x", arr1)}).to_netcdf(
+            filepath1, encoding={"foo": {"chunksizes": (10,)}}
+        )
+        xr.Dataset({"foo": ("x", arr2)}).to_netcdf(
+            filepath2, encoding={"foo": {"chunksizes": (15,)}}
+        )
+
+        parser = HDFParser()
+        combined_vds = open_virtual_mfdataset(
+            [str(filepath1), str(filepath2)],
+            registry=local_registry,
+            parser=parser,
+            combine="nested",
+            concat_dim="x",
+        )
+
+        marr = combined_vds["foo"].data
+        assert isinstance(marr, ManifestArray)
+        assert marr.chunk_grid.is_regular is False
+        assert marr.chunk_grid.chunk_sizes == ((10, 10, 15),)
+        assert combined_vds.sizes == {"x": 35}
 
 
 @requires_hdf5plugin
