@@ -4,9 +4,35 @@
 
 ### New Features
 
+- `NetCDF3Parser` now reads the netCDF3 header itself instead of going through
+  `kerchunk.netCDF3.NetCDF3ToZarr`, so virtualizing a netCDF3 file no longer requires
+  `kerchunk` or `scipy`. It reads the header through the `ObjectStoreRegistry` like every
+  other native parser, rather than opening the file with fsspec.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `NetCDF3Parser` now supports CDF-5 (the 64-bit-data variant), alongside CDF-1 (classic)
+  and CDF-2 (64-bit offset). CDF-5 files, and the unsigned and 64-bit integer types only
+  CDF-5 can represent, could not be virtualized before because scipy cannot read them.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Breaking changes
 
+- `NetCDF3Parser` no longer accepts a `reader_options` argument. It configured kerchunk's
+  fsspec backend, which the parser no longer uses; storage configuration belongs to the
+  `ObjectStoreRegistry` passed to the parser. By [Tom Nicholas](https://github.com/TomNicholas).
+- The `netcdf3` extra has been removed. The netCDF3 parser now needs nothing beyond
+  virtualizarr's core dependencies, so `pip install virtualizarr[netcdf3]` no longer
+  resolves — install plain `virtualizarr` instead. It previously pulled in `kerchunk`,
+  `scipy` and `virtualizarr[remote]` (`fsspec`, `requests`, `aiohttp`, `s3fs`), none of
+  which the parser uses any more. By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Bug fixes
+
+- The netCDF3 parser now preserves the `_FillValue` attribute, so sentinel values decode to
+  NaN instead of surviving into the loaded data. The kerchunk backend it previously used
+  explicitly excludes `_FillValue` from the attributes it copies, following a Zarr V2
+  convention where `fill_value` and `attrs["_FillValue"]` were conflated. Closes
+  [#982](https://github.com/zarr-developers/VirtualiZarr/issues/982).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
