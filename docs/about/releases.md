@@ -4,6 +4,18 @@
 
 ### New Features
 
+- Added experimental support for **rectilinear (variable-length) chunk grids**. Concatenating or
+  stacking virtual datasets whose chunk sizes genuinely differ along the join axis - previously
+  one of the restrictions on what data could be virtualized - now produces a rectilinear chunk
+  grid instead of raising, and the result can be written to an
+  [Icechunk](https://icechunk.io/) store. This is gated behind zarr-python's own experimental
+  `array.rectilinear_chunks` config flag; with it disabled, the same operations raise a clear
+  error explaining how to enable it. Appending to an existing rectilinear-chunked Icechunk array,
+  and region writes, are not yet supported. See
+  [Rectilinear chunk grids](../explanation/data_structures.md#rectilinear-chunk-grids) for
+  details.
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Breaking changes
 
 ### Bug fixes
