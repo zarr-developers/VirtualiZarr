@@ -52,16 +52,16 @@ hdf = [
 
 zarr = ["arro3-core"]
 
+fits = [
+    "virtualizarr[remote]",
+    "astropy",
+]
+
 # kerchunk-based parsers
 netcdf3 = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
     "scipy",
-]
-fits = [
-    "virtualizarr[remote]",
-    "kerchunk>=0.2.8",
-    "astropy",
 ]
 hdf4 = [
     "virtualizarr[remote]",
@@ -259,6 +259,7 @@ show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = [
+    "astropy.*",
     "docker",
     "fsspec.*",
     "gribberish.*",

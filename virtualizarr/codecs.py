@@ -1,12 +1,18 @@
-from typing import TYPE_CHECKING, Any, Tuple, Union
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Self, Tuple, Union
 
 import numpy as np
 import zarr
 from zarr.abc.codec import ArrayArrayCodec, ArrayBytesCodec, BytesBytesCodec
 from zarr.abc.codec import Codec as ZarrCodec
 from zarr.codecs import BytesCodec, VLenUTF8Codec
+from zarr.core.array_spec import ArraySpec
+from zarr.core.buffer import Buffer, NDBuffer
 from zarr.core.codec_pipeline import BatchedCodecPipeline
+from zarr.core.common import JSON, parse_named_configuration
 from zarr.core.metadata.v3 import ArrayV3Metadata
+from zarr.registry import register_codec
 
 if TYPE_CHECKING:
     from .manifests.array import ManifestArray
@@ -209,3 +215,110 @@ def get_codecs(array: Union["ManifestArray", "zarr.Array"]) -> CodecPipeline:
         )
 
     return array.metadata.codecs
+
+
+FITS_ASCII_CODEC_NAME = "virtualizarr.fits_ascii_table"
+
+
+@dataclass(frozen=True)
+class FITSAsciiTableCodec(ArrayBytesCodec):
+    """Decode the fixed-width text columns of a FITS ASCII table (TABLE HDU).
+
+    Every value in such a table is written as text in a column that starts at a fixed
+    byte within the row and runs for a fixed width, so decoding means slicing each
+    column's characters out of the row and parsing them.
+
+    Parameters
+    ----------
+    columns
+        One ``(name, offset, width, dtype)`` per column, giving the byte the column
+        starts at within a row, how many characters it spans, and the dtype its text
+        parses to.
+    row_nbytes
+        The stride from one row to the next. Columns need not fill it: FITS permits
+        gaps between them and padding after the last.
+    """
+
+    columns: tuple[tuple[str, int, int, str], ...]
+    row_nbytes: int
+
+    def __init__(
+        self,
+        columns: Iterable[Sequence[Any]],
+        row_nbytes: int,
+    ) -> None:
+        # Columns arrive as JSON lists when read back from a manifest, so normalize to
+        # tuples to keep the dataclass hashable.
+        object.__setattr__(
+            self,
+            "columns",
+            tuple((str(n), int(o), int(w), str(d)) for n, o, w, d in columns),
+        )
+        object.__setattr__(self, "row_nbytes", int(row_nbytes))
+
+    @classmethod
+    def from_dict(cls, data: dict[str, JSON]) -> Self:
+        _, configuration = parse_named_configuration(data, FITS_ASCII_CODEC_NAME)
+        return cls(**configuration)  # type: ignore[arg-type]
+
+    def to_dict(self) -> dict[str, JSON]:
+        return {
+            "name": FITS_ASCII_CODEC_NAME,
+            "configuration": {
+                "columns": [list(column) for column in self.columns],
+                "row_nbytes": self.row_nbytes,
+            },
+        }
+
+    @property
+    def _stored_dtype(self) -> np.dtype:
+        """The rows as laid out on disk, one byte string per column."""
+        return np.dtype(
+            {
+                "names": [name for name, _, _, _ in self.columns],
+                "formats": [f"S{width}" for _, _, width, _ in self.columns],
+                "offsets": [offset for _, offset, _, _ in self.columns],
+                "itemsize": self.row_nbytes,
+            }
+        )
+
+    @property
+    def _decoded_dtype(self) -> np.dtype:
+        return np.dtype([(name, dtype) for name, _, _, dtype in self.columns])
+
+    async def _decode_single(
+        self, chunk_data: Buffer, chunk_spec: ArraySpec
+    ) -> NDBuffer:
+        stored = np.frombuffer(chunk_data.to_bytes(), dtype=self._stored_dtype)
+        decoded = np.empty(stored.shape, dtype=self._decoded_dtype)
+        for name, _, _, dtype in self.columns:
+            decoded[name] = _parse_ascii_column(stored[name], np.dtype(dtype))
+        return chunk_spec.prototype.nd_buffer.from_ndarray_like(
+            decoded.reshape(chunk_spec.shape)
+        )
+
+    async def _encode_single(
+        self, chunk_data: NDBuffer, chunk_spec: ArraySpec
+    ) -> Buffer:
+        raise NotImplementedError(
+            "VirtualiZarr can read FITS ASCII tables but not write them"
+        )
+
+    def compute_encoded_size(
+        self, input_byte_length: int, chunk_spec: ArraySpec
+    ) -> int:
+        return input_byte_length
+
+
+def _parse_ascii_column(text: np.ndarray, dtype: np.dtype) -> np.ndarray:
+    """Parse one FITS ASCII table column's text into ``dtype``."""
+    if dtype.kind not in "fc":
+        return text.astype(dtype)
+    # FITS inherits Fortran's exponent letters, which numpy will not parse.
+    for exponent in (b"D", b"d", b"e"):
+        text = np.strings.replace(text, exponent, b"E")
+    # An all-blank field is how the format writes an undefined value.
+    return np.where(np.strings.strip(text) == b"", b"NaN", text).astype(dtype)
+
+
+register_codec(FITS_ASCII_CODEC_NAME, FITSAsciiTableCodec)

@@ -4,9 +4,42 @@
 
 ### New Features
 
+- `FITSParser` now reads FITS files natively and no longer depends on kerchunk — the `fits`
+  extra installs only `astropy`. It also exposes *every* data HDU in a file rather than just
+  the first, and reads ASCII tables (`TABLE` HDUs), which previously failed because no codec
+  was registered to decode them.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now maps an integer image's `BLANK` keyword to a `_FillValue` attribute, so
+  undefined pixels are masked on read. The sentinel is scaled alongside the data when `BSCALE`
+  or `BZERO` is present.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Breaking changes
 
+- `FITSParser` no longer accepts `reader_options`. It reads through the `ObjectStoreRegistry`
+  it is given rather than through fsspec, so fsspec-specific `storage_options` no longer apply;
+  configure credentials on the store you register instead.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now returns one array per data HDU instead of only the first, and names each
+  HDU's axes after that HDU (`SCI_y`, `SCI_x`) rather than using a shared `y`/`x`. Separate
+  HDUs routinely disagree about the length of a given axis, which a shared name cannot express.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now raises on binary table (`BINTABLE`) HDUs, which it previously accepted and
+  returned byte-swapped values for. A binary table's columns form a big-endian structured dtype,
+  and the Zarr v3 `struct` data type cannot record its fields' byte order. Pass `skip_variables`
+  to exclude such HDUs.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Bug fixes
+
+- Scaled FITS images are now decoded correctly. `BSCALE` was previously passed straight to
+  `FixedScaleOffset`, which divides rather than multiplies on decode, so every scaled image
+  came back scaled by `1/BSCALE` instead of `BSCALE`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- FITS ASCII table columns are now located by `TBCOL`, and parsed allowing Fortran `D` exponents
+  and blank (undefined) fields. The previous approach assumed columns tiled the row with a
+  one-byte separator between them, which is not how the format works.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
