@@ -490,6 +490,61 @@ class TestConcat:
         assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
 
+    def test_concat_partial_chunk_on_last_input_succeeds(self, array_v3_metadata):
+        # a trailing partial chunk on the *last* input is just ordinary regular-grid
+        # boundary truncation of the concatenated result - it must not be rejected
+        metadata_full = array_v3_metadata(shape=(200,), chunks=(200,))
+        metadata_short = array_v3_metadata(shape=(150,), chunks=(200,))
+        marr1 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/a.nc", "offset": 0, "length": 800}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/b.nc", "offset": 0, "length": 800}}
+            ),
+        )
+        marr3 = ManifestArray(
+            metadata=metadata_short,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/c.nc", "offset": 0, "length": 600}}
+            ),
+        )
+
+        result = np.concatenate([marr1, marr2, marr3], axis=0)
+
+        assert result.shape == (550,)
+        assert result.metadata.chunks == (200,)
+
+    def test_concat_partial_chunk_before_last_input_still_raises(
+        self, array_v3_metadata
+    ):
+        # a partial chunk anywhere *except* the last input would leave a short
+        # chunk with more data appended after it - not representable without
+        # rewriting bytes
+        metadata_full = array_v3_metadata(shape=(200,), chunks=(200,))
+        metadata_short = array_v3_metadata(shape=(150,), chunks=(200,))
+        marr_short = ManifestArray(
+            metadata=metadata_short,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/a.nc", "offset": 0, "length": 600}}
+            ),
+        )
+        marr_full = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/b.nc", "offset": 0, "length": 800}}
+            ),
+        )
+
+        with pytest.raises(
+            ValueError, match="Cannot concatenate arrays with partial chunks"
+        ):
+            np.concatenate([marr_short, marr_full], axis=0)
+
 
 class TestConcatInlined:
     def test_concat_two_inlined_along_axis_0(self, array_v3_metadata):
