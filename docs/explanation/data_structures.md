@@ -274,7 +274,7 @@ concatenated.chunk_grid.chunk_sizes
 If rectilinear chunk grids are not enabled, the same call raises a `ValueError`, rather than silently producing metadata that most Zarr tooling can't yet read.
 
 !!! warning
-    Rectilinear chunk grid support is still limited. Concatenation and stacking are supported, and the result can be written to an [Icechunk](https://icechunk.io/) store. But **appending** to an existing rectilinear-chunked array in Icechunk, and **region writes**, are not yet implemented.
+    Rectilinear chunk grid support is still limited. Concatenation, stacking, and appending are supported, and the result can be written to an [Icechunk](https://icechunk.io/) store. But **region writes** to a rectilinear-chunked array are not yet implemented - region alignment is checked against a single chunk size per axis, which has no equivalent for irregular chunk boundaries.
 
     Note also that some formats (including Zarr and Icechunk stores) could in principle already be rectilinear on disk, but VirtualiZarr can't read those back yet either.
 

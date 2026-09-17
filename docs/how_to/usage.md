@@ -463,7 +463,7 @@ You can append a virtual dataset to an existing Icechunk store using the `append
 This option is designed to behave similarly to the `append_dim` option to xarray's [xarray.Dataset.to_zarr][] method, and is especially useful for datasets that grow over time.
 
 !!! important
-    Note again that the virtual Zarr approach requires the same chunking and encoding across datasets. This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
+    Note again that the virtual Zarr approach requires the same encoding across datasets, and the same chunking too - unless the chunk sizes only differ along the append axis, in which case appending promotes the array to a **rectilinear** chunk grid instead of raising, provided you've opted in (see [Rectilinear chunk grids](../explanation/data_structures.md#rectilinear-chunk-grids)). This including when appending to an existing Icechunk-backed Zarr store. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
 
 ```python exec="on" session="usage" source="material-block" result="code"
 # write the virtual dataset to the session with the IcechunkStore
