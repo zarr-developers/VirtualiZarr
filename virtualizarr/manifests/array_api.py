@@ -157,11 +157,6 @@ def concatenate(
     elif not isinstance(axis, int):
         raise TypeError()
 
-    # ensure dtypes, shapes, codecs etc. are consistent
-    # (chunk sizes along the concat axis are allowed to differ - that's what a
-    # rectilinear chunk grid is for)
-    check_combinable_zarr_arrays(arrays, exclude_axis=axis)
-
     check_same_ndims([arr.ndim for arr in arrays])
 
     # Ensure we handle axis being passed as a negative integer
@@ -169,9 +164,19 @@ def concatenate(
     if axis < 0:
         axis = axis % first_arr.ndim
 
+    # Check shapes are consistent before chunk shapes: a mismatched array shape on a
+    # non-concat axis can also change that axis's boundary-truncated chunk edges,
+    # which would otherwise surface as a confusing "needs a rectilinear chunk grid"
+    # error instead of the more direct "differing shapes" one.
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [chunk_grid_sizes(arr.metadata) for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+
+    # ensure dtypes, codecs and chunk shapes are consistent (chunk sizes along the
+    # concat axis itself are allowed to differ - that's what a rectilinear chunk
+    # grid is for)
+    check_combinable_zarr_arrays(arrays, exclude_axis=axis)
+
+    arr_chunks = [chunk_grid_sizes(arr.metadata) for arr in arrays]
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
     # find what new array shape must be

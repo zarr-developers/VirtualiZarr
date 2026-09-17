@@ -609,6 +609,26 @@ class TestConcatInlined:
 
 
 class TestConcatRectilinear:
+    def test_concat_mismatched_shapes_on_non_concat_axis_raises_shape_error(
+        self, array_v3_metadata
+    ):
+        # regression test: both arrays declare the same chunk size (5), but shape
+        # (5, 6) truncates its last chunk on axis 1 differently than shape (5, 5)
+        # does. This must be caught as a shape mismatch, not misreported as
+        # needing a rectilinear chunk grid just because the boundary-truncated
+        # chunk edges happen to differ as a result.
+        metadata1 = array_v3_metadata(shape=(5, 5), chunks=(3, 3))
+        marr1 = ManifestArray(
+            metadata=metadata1, chunkmanifest=ChunkManifest(entries={}, shape=(2, 2))
+        )
+        metadata2 = array_v3_metadata(shape=(5, 6), chunks=(3, 3))
+        marr2 = ManifestArray(
+            metadata=metadata2, chunkmanifest=ChunkManifest(entries={}, shape=(2, 2))
+        )
+
+        with pytest.raises(ValueError, match="Cannot concatenate arrays with shapes"):
+            np.concatenate([marr1, marr2], axis=0)
+
     def test_concat_regular_arrays_stays_regular(self, manifest_array):
         # concatenating regular-grid arrays must not promote the result to a
         # rectilinear chunk grid - the concat axis's chunk sizes are unchanged
