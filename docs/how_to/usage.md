@@ -287,11 +287,12 @@ In general we should be able to combine all the datasets from our archival files
 For combining along multiple dimensions in one call we also have [xarray.combine_nested][] and [xarray.combine_by_coords][].
 If you're not familiar with any of these functions we recommend you skim through [xarray's docs on combining](https://docs.xarray.dev/en/stable/user-guide/combining.html).
 
-!!! important
-    Currently the virtual approach requires the same encoding across datasets, and (outside of the experimental case described next) the same chunking too. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
 
 !!! note
-    If your datasets have genuinely different (but internally uniform) chunk sizes along the concatenation axis, concatenating them produces a **rectilinear** chunk grid instead of raising - but only once you opt in with `zarr.config.set({"array.rectilinear_chunks": True})`, since this is still an experimental zarr feature. See [Rectilinear chunk grids](../explanation/data_structures.md#rectilinear-chunk-grids) for details and current limitations.
+    If your datasets have different chunk sizes along the concatenation axis, concatenating them produces a **rectilinear** chunk grid instead of raising - but only once you opt in with `zarr.config.set({"array.rectilinear_chunks": True})`, since this is still an experimental zarr feature. See [Rectilinear chunk grids](../explanation/data_structures.md#rectilinear-chunk-grids) for details and current limitations.
+
+!!! important
+    Currently the virtual approach requires the same encoding across datasets. See the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for more details.
 
 !!! warning
     CF encoding attributes (such as `scale_factor` and `add_offset`) must also be consistent across files. Unlike the chunking/codec/dtype requirements above, a mismatch here will _not_ raise an error — xarray's default attribute-merging behaviour can silently drop conflicting values, leaving you with a combined dataset that is decoded incorrectly on read. See [issue #1004](https://github.com/zarr-developers/VirtualiZarr/issues/1004) and the [FAQ](../explanation/faq.md#can-my-specific-data-be-virtualized) for details.
