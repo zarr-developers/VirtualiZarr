@@ -318,6 +318,42 @@ def test_append_rectilinear_array_raises_not_implemented(
         vds.vz.to_icechunk(append_session.store, append_dim="x")
 
 
+@pytest.mark.xfail(
+    reason="Requires xarray's zarr backend to support reading rectilinear "
+    "chunk grids, not yet merged - see "
+    "https://github.com/pydata/xarray/pull/11592"
+)
+def test_read_rectilinear_virtual_refs_with_xarray(synthetic_vds_rectilinear_grid):
+    """
+    Round-trip a rectilinear-chunked virtual dataset through an in-memory
+    Icechunk store and read it back with xarray, to check that xarray's own
+    zarr backend (not just zarr-python directly) can open a rectilinear array
+    and load correct values from it.
+    """
+    vds, arr = synthetic_vds_rectilinear_grid
+
+    storage = icechunk.Storage.new_in_memory()
+    config = icechunk.RepositoryConfig.default()
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+    )
+    config.set_virtual_chunk_container(container)
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+    session = repo.writable_session("main")
+    vds.vz.to_icechunk(session.store)
+    session.commit("write rectilinear array")
+
+    ro_session = repo.readonly_session("main")
+    with xr.open_zarr(ro_session.store, consolidated=False, zarr_format=3) as ds:
+        np.testing.assert_equal(ds["foo"].values, arr)
+
+
 def test_set_inlined_and_virtual_refs(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
