@@ -318,17 +318,16 @@ def test_append_rectilinear_array_raises_not_implemented(
         vds.vz.to_icechunk(append_session.store, append_dim="x")
 
 
-@pytest.mark.xfail(
-    reason="Requires xarray's zarr backend to support reading rectilinear "
-    "chunk grids, not yet merged - see "
-    "https://github.com/pydata/xarray/pull/11592"
-)
 def test_read_rectilinear_virtual_refs_with_xarray(synthetic_vds_rectilinear_grid):
     """
     Round-trip a rectilinear-chunked virtual dataset through an in-memory
     Icechunk store and read it back with xarray, to check that xarray's own
     zarr backend (not just zarr-python directly) can open a rectilinear array
     and load correct values from it.
+
+    Requires xarray's zarr backend to support reading rectilinear chunk
+    grids, not yet merged - see https://github.com/pydata/xarray/pull/11592.
+    Confirmed passing locally against that PR's branch.
     """
     vds, arr = synthetic_vds_rectilinear_grid
 
