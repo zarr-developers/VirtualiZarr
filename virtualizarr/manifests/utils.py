@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union,
 import numpy as np
 import zarr
 from zarr import Array
-from zarr.core.chunk_grids import _is_rectilinear_chunks
 from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
 from zarr.core.metadata.v2 import ArrayV2Metadata
 from zarr.core.metadata.v3 import (
@@ -314,6 +313,21 @@ def _remove_elements_at_positions(
     t: tuple[int, ...], pos: list[int]
 ) -> tuple[int, ...]:
     return tuple(x for i, x in enumerate(t) if i not in pos)
+
+
+def _is_rectilinear_chunks(chunk_shape: Sequence) -> bool:
+    """True if `chunk_shape` is a per-axis sequence of chunk-edge sequences (e.g.
+    ``((10, 20), (5, 5))``) rather than a flat tuple of ints (e.g. ``(10, 5)``).
+
+    Vendored from zarr-python's own (private) ``zarr.core.chunk_grids._is_rectilinear_chunks``,
+    trimmed to the inputs we actually pass it (always a non-empty tuple/list of
+    per-axis chunk sizes, never a bare int/str or a `ChunkGrid` itself), so we don't
+    depend on a zarr-python internal that could change without notice.
+    """
+    if len(chunk_shape) == 0:
+        return False
+    first = chunk_shape[0]
+    return isinstance(first, Sequence) and not isinstance(first, (str, bytes))
 
 
 def check_no_partial_chunks_on_concat_axis(
