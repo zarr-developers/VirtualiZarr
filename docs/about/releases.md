@@ -8,6 +8,14 @@
 
 ### Bug fixes
 
+- Concatenating regularly-chunked arrays no longer fails just because the *last* input
+  has a shorter trailing chunk than its declared chunk size - a common pattern when
+  combining several regularly-chunked files, scenes, or tiles of differing lengths. A
+  partial chunk on any earlier input is still rejected, since that would leave a short
+  chunk with more data appended after it, which a regular chunk grid can't represent
+  without rewriting bytes.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
