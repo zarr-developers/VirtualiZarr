@@ -7,25 +7,16 @@ import concurrent.futures
 import math
 from collections.abc import Coroutine, Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import numpy as np
 import zarr
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.core.metadata.v3 import RegularChunkGridMetadata
+from zarr.experimental import ChunkGrid
 
 from virtualizarr.manifests import ChunkManifest
 from virtualizarr.manifests.utils import ChunkKeySeparator
-from virtualizarr.utils import determine_chunk_grid_shape
-
-if TYPE_CHECKING:
-    from zarr.core.metadata.v3 import RegularChunkGridMetadata
-else:
-    try:
-        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
-    except ImportError:
-        from zarr.core.metadata.v3 import (
-            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
-        )
 
 # obstore doesn't export a public base type for stores, so we use Any for now.
 ObstoreStore = Any
@@ -176,7 +167,7 @@ def parse_array_layout(
 
     if not isinstance(metadata.chunk_grid, RegularChunkGridMetadata):
         raise NotImplementedError(
-            f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
+            f"Only RegularChunkGridMetadata is supported, but array {zarr_array.path} "
             f"uses {type(metadata.chunk_grid).__name__}."
         )
 
@@ -189,12 +180,9 @@ def parse_array_layout(
         else cast(ArrayV2Metadata, zarr_array.metadata).dimension_separator
     )
 
-    # For sharded arrays, chunk_grid.chunk_shape is the shard shape (not the inner
-    # chunk shape, which lives inside the ShardingCodec config). So this grid describes
-    # the number of shard files on disk, which is exactly what we want for the manifest.
-    chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
-    )
+    # For sharded arrays, grid_shape reflects the number of shard files on disk,
+    # which is exactly what we want for the manifest.
+    chunk_grid_shape = ChunkGrid.from_metadata(metadata).grid_shape
 
     return metadata, on_disk_zarr_format, on_disk_separator, chunk_grid_shape
 

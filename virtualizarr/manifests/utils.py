@@ -2,9 +2,11 @@ import copy
 import functools
 import re
 import typing
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Literal, Optional, Union, cast
 
 import numpy as np
+import zarr
 from zarr import Array
 from zarr.core.chunk_key_encodings import ChunkKeyEncodingLike
 from zarr.core.metadata.v2 import ArrayV2Metadata
@@ -14,6 +16,7 @@ from zarr.core.metadata.v3 import (
     parse_shapelike,
 )
 from zarr.dtype import parse_data_type
+from zarr.experimental import ChunkGrid
 
 from virtualizarr.codecs import convert_to_codec_pipeline, get_codecs
 
@@ -241,12 +244,41 @@ def check_same_codecs(codecs: list[Any]) -> None:
             )
 
 
-def check_same_chunk_shapes(chunks_list: list[tuple[int, ...]]) -> None:
-    """Check all the chunk shapes are the same"""
+def check_same_chunk_shapes(
+    chunks_list: list[Sequence], exclude_axis: int | None = None
+) -> None:
+    """
+    Check all the chunk shapes are the same.
+
+    Parameters
+    ----------
+    chunks_list
+        Each array's per-axis chunk size(s), as returned by
+        [chunk_grid_sizes][virtualizarr.manifests.utils.chunk_grid_sizes].
+    exclude_axis
+        An axis to ignore when comparing, e.g. the concat axis - along which chunk
+        sizes may differ (that's exactly what a rectilinear chunk grid is for).
+    """
+
+    def _normalize(size: Union[int, Sequence[int]]) -> tuple[int, ...]:
+        # A bare int (a regular axis) and a 1-tuple of that same value (an axis
+        # zarr's ChunkGrid classified as regular despite the grid being declared
+        # rectilinear, since every axis of a rectilinear grid with only uniform
+        # axes still reports as regular overall) describe the same chunking, and
+        # must compare equal regardless of which form either side happens to use.
+        return (size,) if isinstance(size, int) else tuple(size)
+
+    def _comparable(chunks: Sequence) -> tuple:
+        axes = (
+            tuple(chunks)
+            if exclude_axis is None
+            else _remove_element_at_position(tuple(chunks), exclude_axis)
+        )
+        return tuple(_normalize(axis) for axis in axes)
 
     first_chunks, *other_chunks_list = chunks_list
     for other_chunks in other_chunks_list:
-        if other_chunks != first_chunks:
+        if _comparable(other_chunks) != _comparable(first_chunks):
             raise ValueError(
                 f"Cannot concatenate arrays with inconsistent chunk shapes: {other_chunks} vs {first_chunks} ."
                 "Requires ZEP003 (Variable-length Chunks)."
@@ -283,11 +315,29 @@ def _remove_elements_at_positions(
     return tuple(x for i, x in enumerate(t) if i not in pos)
 
 
+def _is_rectilinear_chunks(chunk_shape: Sequence) -> bool:
+    """True if `chunk_shape` is a per-axis sequence of chunk-edge sequences (e.g.
+    ``((10, 20), (5, 5))``) rather than a flat tuple of ints (e.g. ``(10, 5)``).
+
+    Vendored from zarr-python's own (private) ``zarr.core.chunk_grids._is_rectilinear_chunks``,
+    trimmed to the inputs we actually pass it (always a non-empty tuple/list of
+    per-axis chunk sizes, never a bare int/str or a `ChunkGrid` itself), so we don't
+    depend on a zarr-python internal that could change without notice.
+    """
+    if len(chunk_shape) == 0:
+        return False
+    first = chunk_shape[0]
+    return isinstance(first, Sequence) and not isinstance(first, (str, bytes))
+
+
 def check_no_partial_chunks_on_concat_axis(
-    shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
+    shapes: list[tuple[int, ...]], chunks: list, axis: int
 ):
     """Check that there are no partial chunks before the last input on the
     concatenation axis.
+
+    Only applies to regular chunk grids; rectilinear grids explicitly encode
+    variable chunk sizes so partial-chunk checks are not needed.
 
     A partial (boundary-truncated) chunk is only ever valid on the very last
     input - that's just the ordinary regular-grid case of a shorter trailing
@@ -298,6 +348,9 @@ def check_no_partial_chunks_on_concat_axis(
     last_index = len(shapes) - 1
     # loop over the arrays to be concatenated
     for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        # Rectilinear grids have sequences along each axis; skip the check
+        if _is_rectilinear_chunks(chunk_shape):
+            continue
         if i == last_index:
             continue
         if shape[axis] % chunk_shape[axis] > 0:
@@ -342,19 +395,28 @@ def check_same_shapes_except_on_concat_axis(shapes: list[tuple[int, ...]], axis:
 
 def check_combinable_zarr_arrays(
     arrays: Iterable[Union["ManifestArray", "Array"]],
+    exclude_axis: int | None = None,
 ) -> None:
     """
     The downside of the ManifestArray approach compared to the VirtualZarrArray concatenation proposal is that
     the result must also be a single valid zarr array, implying that the inputs must have the same dtype, codec etc.
+
+    Parameters
+    ----------
+    exclude_axis
+        An axis to ignore when comparing chunk shapes, e.g. the concat axis - passed
+        through to [check_same_chunk_shapes][virtualizarr.manifests.utils.check_same_chunk_shapes].
     """
+    arrays = list(arrays)
     check_same_dtypes([arr.dtype for arr in arrays])
 
     # Can't combine different codecs in one manifest
     # see https://github.com/zarr-developers/zarr-specs/issues/288
     check_same_codecs([get_codecs(arr) for arr in arrays])
 
-    # Would require variable-length chunks ZEP
-    check_same_chunk_shapes([manifest_chunk_shape(arr.metadata) for arr in arrays])
+    check_same_chunk_shapes(
+        [chunk_grid_sizes(arr.metadata) for arr in arrays], exclude_axis=exclude_axis
+    )
 
 
 def check_compatible_arrays(
@@ -380,18 +442,113 @@ def manifest_chunk_shape(
     ----------
     metadata
         Metadata of the array whose manifest unit is wanted. Zarr V2 metadata is accepted
-        because [check_combinable_zarr_arrays][virtualizarr.manifests.utils.check_combinable_zarr_arrays]
-        may be handed a V2 `zarr.Array` alongside `ManifestArray`s.
+        because [chunk_grid_sizes][virtualizarr.manifests.utils.chunk_grid_sizes] may be
+        handed a V2 `zarr.Array` alongside `ManifestArray`s.
 
     Returns
     -------
     The shape covered by one manifest entry: the shard shape if `metadata` has a sharding
     codec, else the chunk shape.
+
+    Raises
+    ------
+    AttributeError
+        If `metadata` has a rectilinear chunk grid, which has no single chunk shape.
+        Use [chunk_grid_sizes][virtualizarr.manifests.utils.chunk_grid_sizes] instead
+        where a rectilinear grid needs to be tolerated rather than rejected.
     """
     if not isinstance(metadata, ArrayV3Metadata):
         # Zarr V2 has no sharding, so a chunk is the manifest's unit
         return tuple(metadata.chunks)
     return tuple(cast("RegularChunkGridMetadata", metadata.chunk_grid).chunk_shape)
+
+
+def chunk_grid_sizes(
+    metadata: Union[ArrayV3Metadata, "ArrayV2Metadata"],
+) -> tuple:
+    """
+    Per-axis chunk size(s) of `metadata`'s chunk grid, tolerating a rectilinear grid.
+
+    Unlike [manifest_chunk_shape][virtualizarr.manifests.utils.manifest_chunk_shape],
+    this doesn't assume a regular grid: for a rectilinear grid each axis comes back as
+    its declared tuple of per-chunk edge lengths (e.g. `((10, 20, 30), (50, 50))`)
+    instead of raising, while a regular axis stays a bare int. Reports each axis as
+    declared, *not* expanded to account for a boundary-truncated final chunk, so a
+    genuinely regular axis with a partial last chunk stays distinguishable from a
+    rectilinear one - see
+    [check_no_partial_chunks_on_concat_axis][virtualizarr.manifests.utils.check_no_partial_chunks_on_concat_axis].
+    For a form that's safe to compare for equality across grids that may or may not
+    have been simplified to regular, see
+    [full_chunk_edges][virtualizarr.manifests.utils.full_chunk_edges].
+
+    Parameters
+    ----------
+    metadata
+        Metadata of the array whose chunk grid is wanted. Zarr V2 metadata is accepted
+        because [check_combinable_zarr_arrays][virtualizarr.manifests.utils.check_combinable_zarr_arrays]
+        may be handed a V2 `zarr.Array` alongside `ManifestArray`s.
+    """
+    if not isinstance(metadata, ArrayV3Metadata):
+        return tuple(metadata.chunks)
+    grid = ChunkGrid.from_metadata(metadata)
+    return grid.chunk_shape if grid.is_regular else grid.chunk_sizes
+
+
+def _axis_edges(extent: int, chunk_size: int) -> tuple[int, ...]:
+    """The real per-chunk lengths a regular axis breaks `extent` into, including a
+    truncated final chunk."""
+    n_full, remainder = divmod(extent, chunk_size)
+    edges = (chunk_size,) * n_full
+    return edges + (remainder,) if remainder else edges
+
+
+def full_chunk_edges(
+    metadata: Union[ArrayV3Metadata, "ArrayV2Metadata"],
+) -> tuple[tuple[int, ...], ...]:
+    """
+    Every axis's real per-chunk edge lengths, tolerating a rectilinear grid.
+
+    Unlike [chunk_grid_sizes][virtualizarr.manifests.utils.chunk_grid_sizes], always
+    returns one explicit tuple of edge lengths per axis (e.g.
+    ``((10, 20, 30), (50, 50))``) - including for a regular grid's uniform axes, and
+    including a boundary-truncated final chunk - rather than a bare chunk size. zarr's
+    `ChunkGrid` classifies a whole grid as regular or rectilinear based on its *actual*
+    edge values, so a grid declared rectilinear but with only uniform axes still
+    reports as regular; always expanding to edge tuples keeps two grids comparable
+    regardless of that whole-grid classification. Used to compare grids for
+    compatibility, or to build a concat axis's merged edges - not where a boundary
+    chunk still needs to be told apart from a genuinely rectilinear one.
+
+    Parameters
+    ----------
+    metadata
+        Metadata of the array whose chunk grid is wanted. Zarr V2 metadata is accepted
+        because [check_combinable_zarr_arrays][virtualizarr.manifests.utils.check_combinable_zarr_arrays]
+        may be handed a V2 `zarr.Array` alongside `ManifestArray`s.
+    """
+    if not isinstance(metadata, ArrayV3Metadata):
+        return tuple(
+            _axis_edges(extent, size)
+            for extent, size in zip(metadata.shape, metadata.chunks)
+        )
+    grid = ChunkGrid.from_metadata(metadata)
+    if grid.is_regular:
+        return tuple(
+            _axis_edges(extent, size)
+            for extent, size in zip(metadata.shape, grid.chunk_shape)
+        )
+    return grid.chunk_sizes
+
+
+def require_rectilinear_chunks_enabled(context: str) -> None:
+    """Raise a clear, actionable error unless rectilinear chunk grids are enabled."""
+    if not zarr.config.get("array.rectilinear_chunks"):
+        raise ValueError(
+            f"{context} would require a rectilinear (variable-length) chunk grid. "
+            "Rectilinear chunk grids are an experimental zarr-python feature; enable "
+            "them with zarr.config.set({'array.rectilinear_chunks': True}) or the "
+            "ZARR_ARRAY__RECTILINEAR_CHUNKS environment variable."
+        )
 
 
 def _realign_inner_chunk_shape(
@@ -515,7 +672,7 @@ def _realign_sharding_codecs(
 def copy_and_replace_metadata(
     old_metadata: ArrayV3Metadata,
     new_shape: list[int] | None = None,
-    new_chunks: list[int] | None = None,
+    new_chunks: list | None = None,
     new_dimension_names: Iterable[str] | None | Literal["default"] = "default",
     new_attributes: dict | None = None,
 ) -> ArrayV3Metadata:
@@ -559,20 +716,30 @@ def copy_and_replace_metadata(
     if new_shape is not None:
         metadata_copy["shape"] = parse_shapelike(new_shape)  # type: ignore[assignment]
     if new_chunks is not None:
-        old_chunks = manifest_chunk_shape(old_metadata)
-        new_chunks = list(new_chunks)
-        metadata_copy["chunk_grid"] = {
-            "name": "regular",
-            "configuration": {"chunk_shape": tuple(new_chunks)},
-        }
-        if len(new_chunks) != len(old_chunks):
-            # a sharding codec's inner chunk_shape must match the array's ndim, so it has
-            # to gain or lose the same length-1 axes the outer chunk shape just did
-            metadata_copy["codecs"] = _realign_sharding_codecs(
-                cast(list[dict[str, Any]], metadata_copy["codecs"]),
-                old_chunks,
-                tuple(new_chunks),
-            )
+        if _is_rectilinear_chunks(new_chunks):
+            metadata_copy["chunk_grid"] = {
+                "name": "rectilinear",
+                "configuration": {
+                    "kind": "inline",
+                    "chunk_shapes": [list(c) for c in new_chunks],
+                },
+            }
+        else:
+            new_chunks = list(new_chunks)
+            metadata_copy["chunk_grid"] = {
+                "name": "regular",
+                "configuration": {"chunk_shape": tuple(new_chunks)},
+            }
+            if isinstance(old_metadata.chunk_grid, RegularChunkGridMetadata):
+                old_chunks = manifest_chunk_shape(old_metadata)
+                if len(new_chunks) != len(old_chunks):
+                    # a sharding codec's inner chunk_shape must match the array's ndim, so it has
+                    # to gain or lose the same length-1 axes the outer chunk shape just did
+                    metadata_copy["codecs"] = _realign_sharding_codecs(
+                        cast(list[dict[str, Any]], metadata_copy["codecs"]),
+                        old_chunks,
+                        tuple(new_chunks),
+                    )
     if new_dimension_names != "default":
         # need the option to use the literal string "default" as a sentinel value because None is a valid choice for zarr dimension_names
         metadata_copy["dimension_names"] = parse_dimension_names(new_dimension_names)

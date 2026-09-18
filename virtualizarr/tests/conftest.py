@@ -2,6 +2,14 @@ import json
 import time
 
 import pytest
+import zarr
+
+
+@pytest.fixture(autouse=True)
+def _enable_rectilinear_chunks():
+    """Enable rectilinear chunks for all tests."""
+    with zarr.config.set({"array.rectilinear_chunks": True}):
+        yield
 
 
 @pytest.fixture(scope="session")
