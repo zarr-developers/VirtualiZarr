@@ -15,6 +15,10 @@
   chunk with more data appended after it, which a regular chunk grid can't represent
   without rewriting bytes.
   By [Tom Nicholas](https://github.com/TomNicholas).
+- `ZarrParser` no longer emits manifest paths as `file:/...` when the registry's store is
+  rooted at the filesystem root (`file:///`). The store root URI was stripped of every
+  trailing slash, mangling the scheme so Icechunk's virtual chunk container prefix never
+  matched. By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Documentation
 
