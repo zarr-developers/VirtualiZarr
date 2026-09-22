@@ -16,6 +16,11 @@
   without rewriting bytes.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+- `HDFParser` no longer fails on HDF5 files with attributes stored as arrays of
+  fixed-length byte strings. Such an attribute is now read as a list of `str`, one per
+  element, keeping the array's shape.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Documentation
 
 ### Internal changes
