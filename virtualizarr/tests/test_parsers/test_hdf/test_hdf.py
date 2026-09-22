@@ -337,6 +337,8 @@ def test_fillvalue_runtime_error():
 
     result = _get_fill_value(dataset)
     assert result == np.ma.default_fill_value(dtype)
+
+
 class _ByteTallyStore:
     """Wrap an obstore store to count bytes served at the store layer.
 
