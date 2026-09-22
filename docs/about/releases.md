@@ -4,6 +4,11 @@
 
 ### New Features
 
+### Performance
+
+- `HDFParser` now walks a local file's chunk index with h5py's native driver instead of routing every index-node read through the object-store block reader. For chunk-dense datasets (e.g. sparse single-cell `.h5ad`) this avoids reading a large fraction of the whole file just to build the manifest — HDF5 reads the index at native granularity. The reader path is unchanged for remote sources and when a custom `reader_factory` is supplied.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
 ### Bug fixes
@@ -19,8 +24,6 @@
   rooted at the filesystem root (`file:///`). The store root URI was stripped of every
   trailing slash, mangling the scheme so Icechunk's virtual chunk container prefix never
   matched. By [Tom Nicholas](https://github.com/TomNicholas).
-- `HDFParser` now walks a local file's chunk index with h5py's native driver instead of routing every index-node read through the object-store block reader. For chunk-dense datasets (e.g. sparse single-cell `.h5ad`) this avoids reading a large fraction of the whole file just to build the manifest — HDF5 reads the index at native granularity. The reader path is unchanged for remote sources and when a custom `reader_factory` is supplied.
-  By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Documentation
 

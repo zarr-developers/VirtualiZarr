@@ -33,6 +33,7 @@ h5py = soft_import("h5py", "reading hdf files", strict=False)
 
 if TYPE_CHECKING:
     from h5py import Dataset as H5Dataset
+    from h5py import File as H5File
     from h5py import Group as H5Group
 
 
@@ -193,15 +194,16 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     return dataset.chunks
 
 
-def _resolve_local_path(store: ReadableStore, path_in_store: str) -> str | None:
+def resolve_local_path(store: ReadableStore, path_in_store: str) -> str | None:
     """Return the filesystem path of ``path_in_store`` if ``store`` is local.
 
     When the resolved store is an obstore ``LocalStore`` the file is a real path
     on disk, so we can hand it straight to ``h5py.File`` and let HDF5's own
     index-aware driver walk the chunk index natively - reading each index type
     at native granularity instead of dragging a full block per ~2 KiB index-node
-    read through the object-store reader. See the module for why block-based
-    reading amplifies the chunk-index walk on chunk-dense files.
+    read through the object-store reader. On chunk-dense files a fixed-block
+    reader can otherwise fetch a large fraction of the file just to walk the
+    chunk index.
 
     Returns ``None`` for any non-local store, or if the reconstructed path does
     not point at an existing file (in which case we fall back to the reader).
@@ -221,6 +223,22 @@ def _resolve_local_path(store: ReadableStore, path_in_store: str) -> str | None:
     return str(candidate) if candidate.is_file() else None
 
 
+def open_hdf_file(reader: ReadableFile | str) -> H5File:
+    import h5py
+
+    try:
+        return h5py.File(reader, mode="r")
+    except BlockingIOError:
+        if not isinstance(reader, str):
+            raise
+        # HDF5 locks files opened by path, which the reader path never does, so
+        # another process holding the file open for writing would otherwise fail
+        # a read-only metadata walk. Locking stays at the default on the first
+        # attempt because HDF5 rejects reopening a file this process already has
+        # open with a different locking setting.
+        return h5py.File(reader, mode="r", locking=False)
+
+
 def _construct_manifest_group(
     filepath: str,
     reader: ReadableFile | str,
@@ -237,7 +255,7 @@ def _construct_manifest_group(
     """
     import h5py
 
-    with h5py.File(reader, mode="r") as f:
+    with open_hdf_file(reader) as f:
         if not isinstance(g := f.get(group or "/"), h5py.Group):
             raise ValueError(f"Group {group!r} is not an HDF Group")
 
@@ -335,7 +353,7 @@ class HDFParser:
         # (h5py opens it directly); everything else goes through the block reader.
         reader: ReadableFile | str
         if self.reader_factory is None:
-            reader = _resolve_local_path(store, path_in_store) or BlockStoreReader(
+            reader = resolve_local_path(store, path_in_store) or BlockStoreReader(
                 store, path_in_store
             )
         else:
