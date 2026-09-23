@@ -343,12 +343,33 @@ def netcdf4_virtual_dataset(netcdf4_file):
         yield ds
 
 
+def kerchunk_hdf5_refs(url: str, **kwargs) -> dict:
+    """Generate kerchunk references for an HDF5 file with `SingleHdf5ToZarr`.
+
+    Automatic garbage collection is paused during translation to avoid a deadlock.
+    `translate` calls zarr from inside `h5py.Group.visititems`, which holds h5py's
+    global lock while zarr's sync wrapper blocks the calling thread on zarr's IO-loop
+    thread. If a collection runs on that IO thread and frees h5py objects left over
+    from earlier tests, their deallocation waits on the same lock and neither thread
+    can proceed.
+    """
+    import gc
+
+    from kerchunk.hdf import SingleHdf5ToZarr
+
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        return SingleHdf5ToZarr(url, **kwargs).translate()
+    finally:
+        if gc_was_enabled:
+            gc.enable()
+
+
 @pytest.fixture
 def netcdf4_inlined_ref(netcdf4_file):
     """Create an inlined reference from a NetCDF4 file."""
-    from kerchunk.hdf import SingleHdf5ToZarr
-
-    return SingleHdf5ToZarr(netcdf4_file, inline_threshold=1000).translate()
+    return kerchunk_hdf5_refs(netcdf4_file, inline_threshold=1000)
 
 
 # HDF5 file fixtures

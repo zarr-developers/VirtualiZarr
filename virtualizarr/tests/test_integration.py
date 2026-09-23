@@ -10,7 +10,7 @@ import xarray.testing as xrt
 from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore, from_url
 
-from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC
+from conftest import ARRAYBYTES_CODEC, ZLIB_CODEC, kerchunk_hdf5_refs
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import (
     ChunkManifest,
@@ -85,12 +85,8 @@ def test_kerchunk_roundtrip_in_memory_no_concat(array_v3_metadata):
 def test_numpy_arrays_to_inlined_kerchunk_refs(
     netcdf4_file, inline_threshold, vars_to_inline, local_registry
 ):
-    from kerchunk.hdf import SingleHdf5ToZarr
-
     # inline_threshold is chosen to test inlining only the variables listed in vars_to_inline
-    expected = SingleHdf5ToZarr(
-        netcdf4_file, inline_threshold=int(inline_threshold)
-    ).translate()
+    expected = kerchunk_hdf5_refs(netcdf4_file, inline_threshold=int(inline_threshold))
 
     # loading the variables should produce same result as inlining them using kerchunk
     parser = HDFParser()
