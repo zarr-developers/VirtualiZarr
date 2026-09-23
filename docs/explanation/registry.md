@@ -49,19 +49,26 @@ from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
 
 bucket = "s3://nex-gddp-cmip6"
-url = f"{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+url = (
+    f"{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
+    "tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+)
 
-store = S3Store.from_url(bucket, region="us-west-2", skip_signature=True)
+store = S3Store.from_url(
+    bucket, region="us-west-2", skip_signature=True
+)
 registry = ObjectStoreRegistry({bucket: store})
 
-vds = open_virtual_dataset(url, registry=registry, parser=HDFParser())
+vds = open_virtual_dataset(
+    url, registry=registry, parser=HDFParser()
+)
 
 first_chunk = vds["tasmax"].data.manifest.dict()["0.0.0"]
 print(pformat(first_chunk))
 ```
 
-The parser read the file's header through that store and recorded where each chunk lives.
-The output is the record for the first chunk of `tasmax`.
+The parser read the file's header through that store and created a virtual chunk reference for each chunk: the URL of the file it lives in, the `offset` where it starts, and its `length` in bytes.
+The output is the reference for the first chunk of `tasmax`.
 To load that chunk, the loading step asks for `length` bytes starting at `offset` from the object at `path`.
 That object is in the same bucket, so the loading step reads through the same store.
 
@@ -95,11 +102,17 @@ The chunks now live in two buckets with different settings, so loading them need
 Register a store for the second bucket in the same registry, and the registry returns the right store for each chunk:
 
 ```python exec="on" session="registry" source="above" result="code"
-private_store = S3Store(bucket="my-private-bucket", region="eu-west-1")
+private_store = S3Store(
+    bucket="my-private-bucket", region="eu-west-1"
+)
 registry.register("s3://my-private-bucket", private_store)
 
-nex_store, _ = registry.resolve("s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/some-file.nc")
-private_store_match, _ = registry.resolve("s3://my-private-bucket/model-output/file.nc")
+nex_store, _ = registry.resolve(
+    "s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/some-file.nc"
+)
+private_store_match, _ = registry.resolve(
+    "s3://my-private-bucket/model-output/file.nc"
+)
 
 print(nex_store)
 print(private_store_match)
@@ -109,9 +122,9 @@ print(private_store_match)
 
 Local files have nothing to configure, but the parser and the loading step only read through stores, so you still need one: [`LocalStore`][obstore.store.LocalStore], the store for your disk.
 Registered under `"file:///"`, it covers every file on the machine.
-This example writes a small netCDF file to a temporary directory and virtualizes it:
+To show this, first write a small netCDF file to a temporary directory:
 
-```python exec="on" session="registry" source="above" result="code"
+```python exec="on" session="registry" source="above"
 import tempfile
 from pathlib import Path
 
@@ -120,15 +133,40 @@ import xarray as xr
 from obstore.store import LocalStore
 
 local_file = str(Path(tempfile.mkdtemp()) / "air.nc")
-xr.Dataset({"air": ("time", np.arange(4.0))}).to_netcdf(local_file, engine="h5netcdf")
-
-local_registry = ObjectStoreRegistry({"file:///": LocalStore()})
-
-local_vds = open_virtual_dataset(local_file, registry=local_registry, parser=HDFParser())
-print(pformat(local_vds["air"].data.manifest.dict()["0"]))
+ds = xr.Dataset({"air": ("time", np.arange(4.0))})
+ds.to_netcdf(local_file, engine="h5netcdf")
 ```
 
-`open_virtual_dataset` accepted a plain path, and the parser recorded it in the chunk records as a `file://` URL.
+Create the registry, then ask it which store it would use for that file:
+
+```python exec="on" session="registry" source="above" result="code"
+local_registry = ObjectStoreRegistry({"file:///": LocalStore()})
+
+matched_store, path_in_store = local_registry.resolve(
+    f"file://{local_file}"
+)
+print(matched_store)
+print(path_in_store)
+```
+
+The registry returns the `LocalStore`, with the file's path relative to the filesystem root.
+With the registry in place, you can virtualize the file:
+
+```python exec="on" session="registry" source="above"
+local_vds = open_virtual_dataset(
+    local_file, registry=local_registry, parser=HDFParser()
+)
+```
+
+The `air` variable in `local_vds` holds virtual chunk references rather than data.
+Here is the reference for its first chunk:
+
+```python exec="on" session="registry" source="above" result="code"
+first_local_chunk = local_vds["air"].data.manifest.dict()["0"]
+print(pformat(first_local_chunk))
+```
+
+`open_virtual_dataset` accepted a plain path, and the parser recorded it in the virtual chunk reference as a `file://` URL.
 The loading step asks the registry for a store for that URL, so the registry key must be a `file://` prefix of it.
 `"file:///"` is a prefix of every local file URL.
 
