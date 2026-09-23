@@ -39,8 +39,8 @@ On top of that, VirtualiZarr refuses combinations that Zarr can't represent, suc
 
 ### Reading on the fly
 
-A parsed file is a Zarr store, so zarr-python and Xarray can load data from the original file directly (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
-Nothing is ingested or copied, and the code reading the data doesn't need to understand the original format.
+Some files are already cloud-optimized, such as cloud-optimized GeoTIFFs, so they don't need rewriting, but your tools may only work with Zarr.
+A parsed file is a Zarr store, so zarr-python and Xarray can load data from the original file directly, without persisting anything first (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
 
 ### Persisting to Icechunk
 
