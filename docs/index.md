@@ -40,11 +40,12 @@ On top of that, VirtualiZarr refuses combinations that Zarr can't represent, suc
 ### Reading on the fly
 
 Some files are already cloud-optimized, such as cloud-optimized GeoTIFFs, so they don't need rewriting, but your tools may only work with Zarr.
-A parsed file is a Zarr store, so zarr-python and Xarray can load data from the original file directly, without persisting anything first (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
+When VirtualiZarr parses a file, it creates a Zarr store that reads from that file, so zarr-python and Xarray can load its data directly, without persisting anything first (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
 
 ### Persisting to Icechunk
 
-Writing the combined dataset to [Icechunk](https://icechunk.io/) lets you, or anyone else, reopen it later with [xarray.open_zarr][] or zarr-python.
+Writing the combined dataset to [Icechunk](https://icechunk.io/) lets you, or anyone else, reopen it later with zarr-python, without VirtualiZarr or Xarray in the read path.
+Xarray users can open it with [xarray.open_zarr][].
 The work of parsing and assembling the dataset only has to happen once, and every later read benefits from it (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
 
 ## Inspired by Kerchunk
