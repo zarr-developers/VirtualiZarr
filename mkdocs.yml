@@ -27,6 +27,7 @@ nav:
     - "how_to/scaling.md"
   - Explanation:
     - "explanation/data_structures.md"
+    - "explanation/registry.md"
     - "explanation/custom_parsers.md"
     - "explanation/faq.md"
   - API Reference:

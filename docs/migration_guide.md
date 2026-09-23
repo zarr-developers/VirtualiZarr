@@ -25,6 +25,7 @@ You now must pass in a valid [Parser][virtualizarr.parsers.typing.Parser] and a 
 This change adds a bit more verbosity, but is intended to make virtualizing datasets more robust. It is most common for the
 [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] to contain one or more [ObjectStores][obstore.store.ObjectStore]
 for reading the original data, but some parsers may accept an empty [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry].
+See [The object store registry](explanation/registry.md) for what the registry does and why it's needed.
 
 === "S3 Store"
 
