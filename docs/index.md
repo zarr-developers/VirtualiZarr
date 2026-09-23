@@ -44,8 +44,8 @@ A parsed file is a Zarr store, so zarr-python and Xarray can load data from the 
 
 ### Persisting to Icechunk
 
-Writing the combined dataset to [Icechunk](https://icechunk.io/) saves the work of assembling it.
-Anyone can then open it with [xarray.open_zarr][] or zarr-python (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
+Writing the combined dataset to [Icechunk](https://icechunk.io/) lets you, or anyone else, reopen it later with [xarray.open_zarr][] or zarr-python.
+The work of parsing and assembling the dataset only has to happen once, and every later read benefits from it (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
 
 ## Inspired by Kerchunk
 
