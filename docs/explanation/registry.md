@@ -2,20 +2,20 @@
 
 This page explains the `registry` argument that [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] requires.
 
-Virtualizing a file doesn't copy its data, but VirtualiZarr still has to read from the file in order to virtualize it, and again whenever you load data from it:
+Virtualizing a file doesn't copy its data, but VirtualiZarr still has to read from the file in order to virtualize it, and again whenever you load data from it.
 
 - **Building the virtual dataset.** The parser reads the file's header and chunk index to find where each chunk lives.
 - **Loading data.** After parsing, a separate loading step fetches the bytes of any variable you load. By default, `open_virtual_dataset` loads the dimension coordinates (such as `time`, `lat` and `lon`) so that xarray can index the dataset.
 
-Both steps need an object that can do the I/O: fetch just the byte ranges they need from wherever the file lives, whether that's S3, an HTTP server, or your own disk.
-VirtualiZarr uses an [obstore](https://developmentseed.org/obstore/latest/) [`ObjectStore`][obstore.store.ObjectStore] for this (see [section 1](#1-what-a-store-holds)).
+Both steps need an object that can do the I/O, fetching just the byte ranges they need from wherever the file lives, whether that's S3, an HTTP server, or your own disk.
+VirtualiZarr uses an [obstore](https://developmentseed.org/obstore/latest/) [`ObjectStore`][obstore.store.ObjectStore] object for this, called a store on the rest of this page (see [section 1](#1-what-a-store-holds)).
 
 A store covers a single bucket or host.
 When your files are spread across more than one, you need several stores, and VirtualiZarr needs to know which store to use for each file.
-The [`ObjectStoreRegistry`][obspec_utils.registry.ObjectStoreRegistry] organizes them: a map from URL prefixes to the stores you configured.
+The [`ObjectStoreRegistry`][obspec_utils.registry.ObjectStoreRegistry] organizes them by mapping URL prefixes to the stores you configured, so it can match each file's URL to its store for you.
 `open_virtual_dataset` always takes a registry, so with a single store you pass a registry with one entry.
 
-For files on your own disk, `ObjectStoreRegistry({"file:///": LocalStore()})` works for every file (see [section 5](#5-local-files)).
+For files on your own disk, `ObjectStoreRegistry({"file:///": LocalStore()})` works for every file (see [section 4](#4-local-files)).
 
 ```python exec="on" session="registry"
 import warnings
@@ -28,101 +28,139 @@ warnings.filterwarnings(
 
 ## 1. What a store holds
 
-Take one file from the NASA NEX-GDDP-CMIP6 dataset, which is stored in the public `nex-gddp-cmip6` bucket on AWS S3.
-To virtualize it, the parser has to read it, but the URL is not enough information on its own.
-You also need to provide:
+This page builds a time series of sea surface temperature from GOES-East, the NOAA weather satellite that views the Americas and the Atlantic.
+On 7 April 2025, GOES-19 replaced GOES-16 as GOES-East.
+NOAA publishes each satellite's data in its own public bucket on AWS S3, so the time series reads from `noaa-goes16` before the handover and from `noaa-goes19` after it.
+
+To virtualize a file, the parser has to read it, but the file's URL alone is not enough information.
+You also need to provide three settings.
 
 - **The service.** `s3://` URLs are also used for S3-compatible services such as Cloudflare R2 or a Ceph cluster, which need a custom endpoint (see the R2 and CEPH tabs in the [usage guide](../how_to/usage.md#opening-files-as-virtual-datasets)).
-- **The region.** The `nex-gddp-cmip6` bucket is in `us-west-2`.
-- **The credentials.** `nex-gddp-cmip6` is public, so requests go unsigned (`skip_signature=True`). A private bucket needs your keys.
+- **The region.** Each S3 bucket lives in one AWS region, and the store needs to know which.
+- **The credentials.** Private data needs your access keys. Public data can be read with anonymous (unsigned) requests, which obstore calls `skip_signature=True`.
 
 A store holds exactly these settings.
-Below, `S3Store.from_url(...)` creates a store that can read any object in the `nex-gddp-cmip6` bucket, and the registry wraps it so `open_virtual_dataset` can use it:
+Both GOES buckets are public and in `us-east-1`, so both stores use that region and anonymous requests.
+Each [`S3Store`][obstore.store.S3Store] reads from one bucket, so the two buckets still need two stores.
+VirtualiZarr can't guess the settings, so you create the stores yourself.
 
-```python exec="on" session="registry" source="above" result="code"
+```python exec="on" session="registry" source="above"
 from pprint import pformat
 
 from obstore.store import S3Store
 from obspec_utils.registry import ObjectStoreRegistry
 
-from virtualizarr import open_virtual_dataset
+from virtualizarr import (
+    open_virtual_dataset,
+    open_virtual_mfdataset,
+)
 from virtualizarr.parsers import HDFParser
 
-bucket = "s3://nex-gddp-cmip6"
-url = (
-    f"{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
-    "tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-)
+goes16_bucket = "s3://noaa-goes16"
+goes19_bucket = "s3://noaa-goes19"
 
-store = S3Store.from_url(
-    bucket, region="us-west-2", skip_signature=True
+goes16_store = S3Store.from_url(
+    goes16_bucket,
+    region="us-east-1",
+    # public bucket, so send anonymous (unsigned) requests
+    skip_signature=True,
 )
-registry = ObjectStoreRegistry({bucket: store})
-
-vds = open_virtual_dataset(
-    url, registry=registry, parser=HDFParser()
+goes19_store = S3Store.from_url(
+    goes19_bucket,
+    region="us-east-1",
+    # public bucket, so send anonymous (unsigned) requests
+    skip_signature=True,
 )
-
-first_chunk = vds["tasmax"].data.manifest.dict()["0.0.0"]
-print(pformat(first_chunk))
 ```
 
-The parser read the file's header through that store and created a virtual chunk reference for each chunk: the URL of the file it lives in, the `offset` where it starts, and its `length` in bytes.
-The output is the reference for the first chunk of `tasmax`.
-To load that chunk, the loading step asks for `length` bytes starting at `offset` from the object at `path`.
-That object is in the same bucket, so the loading step reads through the same store.
+## 2. Building the time series
 
-## 2. Why VirtualiZarr doesn't create the stores itself
+A time series that spans the handover needs at least one file from each side of it.
+This example uses two files, taken at 12:00 UTC on 6 April and 8 April 2025, but the same code works for any number of files.
 
-VirtualiZarr can't create a store for you, because it doesn't have the settings from section 1: which service to connect to, which region, and which credentials to use.
-Only you know those, so you create the stores and pass them in, once, as a registry.
-`open_virtual_dataset` gives the registry to the parser, and the parser passes it on to the loading step (a [`ManifestStore`][virtualizarr.manifests.ManifestStore]).
-Both steps then read through the stores you configured.
-See [Data structures](data_structures.md) for what a `ManifestStore` holds, and [Custom parsers](custom_parsers.md) if you are writing a parser.
+```python exec="on" session="registry" source="above"
+goes16_url = (
+    f"{goes16_bucket}/ABI-L2-SSTF/2025/096/12/"
+    "OR_ABI-L2-SSTF-M6_G16_s20250961200208_"
+    "e20250961259516_c20250961304427.nc"
+)
+goes19_url = (
+    f"{goes19_bucket}/ABI-L2-SSTF/2025/098/12/"
+    "OR_ABI-L2-SSTF-M6_G19_s20250981200209_"
+    "e20250981259517_c20250981304588.nc"
+)
+```
+
+Each file has to be read through the store for its own bucket.
+If you opened the files one at a time in a loop, you could pick the store for each URL yourself.
+A registry does that matching for you, and it's the only way to do it when a single call opens many files.
+Register each store under the URL prefix it serves, usually its bucket, then pass the registry to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset], which opens both files and joins them along time.
+
+```python exec="on" session="registry" source="above" result="code"
+registry = ObjectStoreRegistry(
+    {goes16_bucket: goes16_store, goes19_bucket: goes19_store}
+)
+
+vds = open_virtual_mfdataset(
+    [goes16_url, goes19_url],
+    registry=registry,
+    parser=HDFParser(),
+    combine="nested",
+    concat_dim="t",
+    data_vars="minimal",
+    coords="minimal",
+    compat="override",
+    loadable_variables=["t", "x", "y"],
+)
+print(vds["SST"].sizes)
+```
+
+The arguments after `parser` are xarray's options for combining datasets, and have nothing to do with the registry.
+They stop xarray from comparing values that exist only as virtual references (see [Combining virtual datasets](../how_to/usage.md#combining-virtual-datasets)).
+
+For each file, the parser read the header through the store the registry matched to it, and created a virtual chunk reference for each chunk.
+Each reference records the URL of the file the chunk lives in, the `offset` where the chunk starts, and its `length` in bytes.
+The chunk keys of `SST` start with the time index, so here is one reference from each side of the handover.
+
+```python exec="on" session="registry" source="above" result="code"
+chunks = vds["SST"].data.manifest.dict()
+
+before = next(v for k, v in chunks.items() if k.startswith("0."))
+after = next(v for k, v in chunks.items() if k.startswith("1."))
+
+print(pformat(before))
+print(pformat(after))
+```
+
+One variable now holds chunks from both buckets.
+To load a chunk, the loading step asks the registry for the store that matches its `path`, then reads `length` bytes starting at `offset` through that store.
 
 ## 3. How the registry picks a store
 
-With more than one store registered, each step needs to know which store to use for a given URL.
-When the parser or the loading step needs to read a URL, it asks the registry for the store that can read it.
-You register each store under the URL prefix it serves, usually its bucket.
-The registry then returns the store whose prefix matches the URL, along with the object's path inside that store:
+Whenever the parser or the loading step needs to read a URL, it asks the registry for the store that can read it.
+The registry returns the store whose prefix matches the URL, along with the object's path inside that store.
 
 ```python exec="on" session="registry" source="above" result="code"
-matched_store, path_in_store = registry.resolve(url)
-print(matched_store)
-print(path_in_store)
+goes16_match, goes16_path = registry.resolve(goes16_url)
+goes19_match, goes19_path = registry.resolve(goes19_url)
+
+print(goes16_match)
+print(f"  {goes16_path}")
+print(goes19_match)
+print(f"  {goes19_path}")
 ```
 
 The registry matches the scheme and bucket (or host) exactly, then picks the longest registered path that is a prefix of the URL.
 
-## 4. Multiple buckets in one registry
+`open_virtual_mfdataset` gives the registry to the parser for each file, and each parser passes it on to its loading step (a [`ManifestStore`][virtualizarr.manifests.ManifestStore]).
+See [Data structures](data_structures.md) for what a `ManifestStore` holds, and [Custom parsers](custom_parsers.md) if you are writing a parser.
 
-Suppose you combine the NEX-GDDP-CMIP6 file above with files from a private bucket of your own.
-The chunks now live in two buckets with different settings, so loading them needs two stores.
-Register a store for the second bucket in the same registry, and the registry returns the right store for each chunk:
+## 4. Local files
 
-```python exec="on" session="registry" source="above" result="code"
-private_store = S3Store(
-    bucket="my-private-bucket", region="eu-west-1"
-)
-registry.register("s3://my-private-bucket", private_store)
-
-nex_store, _ = registry.resolve(
-    "s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/some-file.nc"
-)
-private_store_match, _ = registry.resolve(
-    "s3://my-private-bucket/model-output/file.nc"
-)
-
-print(nex_store)
-print(private_store_match)
-```
-
-## 5. Local files
-
-Local files have nothing to configure, but the parser and the loading step only read through stores, so you still need one: [`LocalStore`][obstore.store.LocalStore], the store for your disk.
+Local files have nothing to configure, but the parser and the loading step only read through stores, so you still need one.
+[`LocalStore`][obstore.store.LocalStore] is the store for your disk.
 Registered under `"file:///"`, it covers every file on the machine.
-To show this, first write a small netCDF file to a temporary directory:
+To show this, first write a small netCDF file to a temporary directory.
 
 ```python exec="on" session="registry" source="above"
 import tempfile
@@ -137,7 +175,7 @@ ds = xr.Dataset({"air": ("time", np.arange(4.0))})
 ds.to_netcdf(local_file, engine="h5netcdf")
 ```
 
-Create the registry, then ask it which store it would use for that file:
+Create the registry, then ask it which store it would use for that file.
 
 ```python exec="on" session="registry" source="above" result="code"
 local_registry = ObjectStoreRegistry({"file:///": LocalStore()})
@@ -150,7 +188,7 @@ print(path_in_store)
 ```
 
 The registry returns the `LocalStore`, with the file's path relative to the filesystem root.
-With the registry in place, you can virtualize the file:
+With the registry in place, you can virtualize the file.
 
 ```python exec="on" session="registry" source="above"
 local_vds = open_virtual_dataset(
@@ -159,7 +197,7 @@ local_vds = open_virtual_dataset(
 ```
 
 The `air` variable in `local_vds` holds virtual chunk references rather than data.
-Here is the reference for its first chunk:
+Here is the reference for its first chunk.
 
 ```python exec="on" session="registry" source="above" result="code"
 first_local_chunk = local_vds["air"].data.manifest.dict()["0"]
@@ -175,24 +213,26 @@ The loading step asks the registry for a store for that URL, so the registry key
     Opening a second file from the same directory then fails with `Could not find an ObjectStore matching the url`, because the first file's URL is not a prefix of the second's.
     Register a directory, or `"file:///"`, instead.
 
-## 6. Reading the data later
+## 5. Reading the data later
 
 Whoever reads your virtual dataset later, including you in a new Python session, has to fetch the same chunks, so they need stores with the same settings.
-The registry can't give them those stores: it exists only in your Python session, and writing a virtual dataset with [`to_icechunk`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_icechunk] saves the chunk URLs, not the registry.
+The registry can't give them those stores, because it exists only in your Python session.
+Writing a virtual dataset with [`to_icechunk`][virtualizarr.accessor.VirtualiZarrDatasetAccessor.to_icechunk] saves the chunk URLs, not the registry.
 
 Icechunk solves this with its own mapping.
-Its virtual chunk containers ([`icechunk.VirtualChunkContainer`][icechunk.VirtualChunkContainer]) map a URL prefix to a storage configuration, just as the registry does, but they are saved in the repository's config.
-Writing to Icechunk therefore means describing the same locations twice: once as registry entries for VirtualiZarr, and once as virtual chunk containers for Icechunk (see [Writing to an Icechunk Store](../how_to/usage.md#writing-to-an-icechunk-store)).
+Its virtual chunk containers ([`icechunk.VirtualChunkContainer`][icechunk.VirtualChunkContainer]) map URL prefixes to storage configurations, just as the registry does, but they are saved in the repository's config.
+See [Writing to an Icechunk Store](../how_to/usage.md#writing-to-an-icechunk-store).
 
 ## Troubleshooting
 
 ### "Could not find an ObjectStore matching the url"
 
 This error means the parser or the loading step asked the registry for a store for a URL, and no registry key was a prefix of it.
-The URL in the message is the one that failed; compare it with your registry keys:
+The URL in the message is the one that failed.
+Compare it with your registry keys, checking each of these.
 
 - **Scheme.** `https://my-bucket.s3.amazonaws.com/...` and `s3://my-bucket/...` refer to the same object but need different keys.
 - **Bucket or host.** Must match exactly.
-- **Path.** For local files, the key must be a `file://` prefix of the file's absolute path (see [section 5](#5-local-files)).
+- **Path.** For local files, the key must be a `file://` prefix of the file's absolute path (see [section 4](#4-local-files)).
 
 `registry.resolve(url)` raises the same error, so you can check a registry against a URL before opening anything.
