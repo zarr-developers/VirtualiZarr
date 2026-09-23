@@ -68,8 +68,8 @@ path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_s
 store = obstore.store.from_url(bucket, region="us-west-2", skip_signature=True)
 ```
 
-We also need to create an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that
-maps the URL structure to the ObjectStore.
+We also need to create an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry], which tells VirtualiZarr to use this store for every URL in the bucket.
+See [The object store registry](explanation/registry.md) for why it's needed.
 
 ```python exec="on" source="above" session="homepage"
 registry = ObjectStoreRegistry({bucket: store})
