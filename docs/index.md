@@ -1,6 +1,6 @@
 # VirtualiZarr
 
-**Create virtual Zarr stores for cloud-friendly access to netCDF, HDF5, GRIB, TIFF and other formats, using familiar NumPy or Xarray syntax.**
+**Create virtual Zarr stores for cloud-friendly access to netCDF, HDF5, GRIB, TIFF and other formats, using familiar Xarray syntax.**
 
 VirtualiZarr does three things.
 
@@ -34,8 +34,8 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 
 A parser reads each file and maps it onto Zarr: its arrays, its metadata, and where every chunk lives.
 VirtualiZarr has parsers for [many formats](explanation/faq.md#can-my-file-format-be-virtualized).
-You then combine the files into one dataset, with NumPy functions such as `np.concatenate` or, when your data fits Xarray's model of named dimensions, with [Xarray's combining functions](how_to/usage.md#combining-virtual-datasets).
-VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
+You then combine the files into one dataset using [Xarray's combining logic](how_to/usage.md#combining-virtual-datasets), which matches variables and dimensions by name and checks that the files line up.
+On top of that, VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
 
 ### Reading on the fly
 
