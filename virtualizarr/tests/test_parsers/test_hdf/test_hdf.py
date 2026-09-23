@@ -17,16 +17,6 @@ from virtualizarr.tests import (
 from virtualizarr.tests.utils import manifest_store_from_hdf_url
 
 
-def _hdf5_dataset_dtype(filepath: str, name: str) -> np.dtype:
-    # Keeps h5py objects out of the calling test's frame. If that test then calls
-    # `pytest.xfail`, the traceback would keep them alive in a reference cycle,
-    # and the cyclic collector can later free them on a thread that deadlocks
-    # against h5py's global lock (e.g. zarr's IO thread during kerchunk's
-    # SingleHdf5ToZarr.translate).
-    with h5py.File(filepath) as f:
-        return f[name].dtype
-
-
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestDatasetChunkManifest:
@@ -143,7 +133,12 @@ class TestDatasetToManifestArray:
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         cf_fill_value_hdf5_url = f"file://{cf_fill_value_hdf5_file}"
-        dtype = _hdf5_dataset_dtype(cf_fill_value_hdf5_file, "data")
+        with h5py.File(cf_fill_value_hdf5_file) as f:
+            dtype = f["data"].dtype
+        # A pytest.xfail traceback would keep `f` alive in a reference cycle, and
+        # h5py objects freed by the cyclic GC on another thread can deadlock on
+        # h5py's global lock (e.g. during kerchunk's SingleHdf5ToZarr.translate).
+        del f
         if dtype.kind in "S":
             pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
         if dtype.names:
