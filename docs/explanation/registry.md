@@ -17,15 +17,6 @@ The [`ObjectStoreRegistry`][obspec_utils.registry.ObjectStoreRegistry] organizes
 
 For files on your own disk, `ObjectStoreRegistry({"file:///": LocalStore()})` works for every file (see [section 4](#4-local-files)).
 
-```python exec="on" session="registry"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
-)
-```
-
 ## 1. What a store holds
 
 This page builds a time series of sea surface temperature from GOES-East, the NOAA weather satellite that views the Americas and the Atlantic.
@@ -236,3 +227,13 @@ Compare it with your registry keys, checking each of these.
 - **Path.** For local files, the key must be a `file://` prefix of the file's absolute path (see [section 4](#4-local-files)).
 
 `registry.resolve(url)` raises the same error, so you can check a registry against a URL before opening anything.
+
+### Registry keys and bucket names
+
+Registry keys are URLs, so they include the scheme, but `S3Store(bucket=...)` takes the bare bucket name.
+Mixing up the two forms fails in different ways.
+
+- **A registry key without a scheme**, such as `"noaa-goes16"`, raises `ValueError: Urls are expected to contain a scheme` when you create the registry.
+- **A bucket name with a scheme**, such as `S3Store(bucket="s3://noaa-goes16")`, is accepted when you create the store, but every request then fails with an S3 error, because the store sends `s3://noaa-goes16` as the bucket name.
+
+[`S3Store.from_url`][obstore.store.S3Store.from_url] takes the URL form, so you can pass the same string to the store and use it as the registry key, as the examples on this page do.

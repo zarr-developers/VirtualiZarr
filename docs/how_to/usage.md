@@ -169,17 +169,6 @@ See [The object store registry](../explanation/registry.md) for why this is need
 
     ```
 
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
-)
-```
-
 We can open a virtual representation of this file using [virtualizarr.open_virtual_dataset][]. VirtualiZarr has various
 "parsers" that understand different file formats. You must supply a parser, and as all netCDF4 files are HDF5 files,
 here we used the [HDFParser][virtualizarr.parsers.HDFParser].

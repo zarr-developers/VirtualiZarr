@@ -1,6 +1,14 @@
 # VirtualiZarr
 
-**Create virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
+**Create virtual Zarr stores for cloud-friendly access to netCDF, HDF5, GRIB, TIFF and other formats, using familiar NumPy or Xarray syntax.**
+
+VirtualiZarr does three things.
+
+1. **Assembles many files into a hypercube**, combining them into one dataset and checking that the result is valid Zarr.
+2. **Reads files on the fly** as though they were Zarr, using zarr-python or Xarray.
+3. **Persists the result to Icechunk**, so anyone can open it with Zarr or Xarray from then on.
+
+See [How it works](#how-it-works) for more on each.
 
 The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in archival pre-Cloud file formats such as netCDF.
 
@@ -12,13 +20,24 @@ The best way to distribute large scientific datasets is via the Cloud, in [Cloud
 
 VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data from existing scientific data as easy as possible.
 
-## Features
+## How it works
 
-* Create virtual references pointing to bytes inside a archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
-* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
-* [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger store using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html),
-* Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
-* Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
+### Assembling a hypercube
+
+A parser reads each file and maps it onto Zarr: its arrays, its metadata, and where every chunk lives.
+VirtualiZarr has parsers for [many formats](explanation/faq.md#can-my-file-format-be-virtualized).
+You then combine the files into one dataset, with NumPy functions such as `np.concatenate` or, when your data fits Xarray's model of named dimensions, with [Xarray's combining functions](how_to/usage.md#combining-virtual-datasets).
+VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
+
+### Reading on the fly
+
+A parsed file is a Zarr store, so zarr-python and Xarray can load data from the original file directly (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
+Nothing is ingested or copied, and the code reading the data doesn't need to understand the original format.
+
+### Persisting to Icechunk
+
+Writing the combined dataset to [Icechunk](https://icechunk.io/) saves the work of assembling it.
+Anyone can then open it with [xarray.open_zarr][] or zarr-python (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
 
 ## Inspired by Kerchunk
 
@@ -43,20 +62,6 @@ from virtualizarr import (
     open_virtual_mfdataset,
 )
 from virtualizarr.parsers import HDFParser
-```
-
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
-specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message=(
-    "Numcodecs codecs are not in the Zarr version 3 specification*"
-  ),
-  category=UserWarning
-)
 ```
 
 ```python exec="on" session="homepage"
