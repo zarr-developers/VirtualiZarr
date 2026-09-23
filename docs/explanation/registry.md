@@ -230,10 +230,11 @@ Compare it with your registry keys, checking each of these.
 
 ### Registry keys and bucket names
 
-Registry keys are URLs, so they include the scheme, but `S3Store(bucket=...)` takes the bare bucket name.
-Mixing up the two forms fails in different ways.
+The registry key and the store's bucket look like the same value, but they take different forms.
+The registry key is a URL (`"s3://noaa-goes16"`), while `S3Store(bucket=...)` takes only the bucket name (`"noaa-goes16"`).
+Using one form in place of the other fails.
 
-- **A registry key without a scheme**, such as `"noaa-goes16"`, raises `ValueError: Urls are expected to contain a scheme` when you create the registry.
-- **A bucket name with a scheme**, such as `S3Store(bucket="s3://noaa-goes16")`, is accepted when you create the store, but every request then fails with an S3 error, because the store sends `s3://noaa-goes16` as the bucket name.
+- `ObjectStoreRegistry({"noaa-goes16": store})` raises `ValueError: Urls are expected to contain a scheme` straight away.
+- `S3Store(bucket="s3://noaa-goes16")` succeeds, but every request through that store then fails with an S3 error, because the store sends `s3://noaa-goes16` as the bucket name.
 
-[`S3Store.from_url`][obstore.store.S3Store.from_url] takes the URL form, so you can pass the same string to the store and use it as the registry key, as the examples on this page do.
+To avoid both, create the store with [`S3Store.from_url`][obstore.store.S3Store.from_url], which takes the same URL as the registry key, as the examples on this page do.
