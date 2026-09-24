@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
@@ -7,11 +8,11 @@ import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
-from zarr import Array, Group, create_array, open_group
+from zarr import Array, Group, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
+from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.core.sync import sync
-from zarr.storage import MemoryStore
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -586,7 +587,7 @@ def write_virtual_variable_to_icechunk(
         )
         existing = group.get(name)
         if isinstance(existing, Array):
-            _check_existing_array_matches(existing, array_kwargs)
+            _check_existing_array_matches(existing, metadata, dims)
         arr = group.require_array(name=name, **array_kwargs)
 
         update_attributes(arr, var.attrs, encoding=var.encoding)
@@ -601,9 +602,11 @@ def write_virtual_variable_to_icechunk(
     )
 
 
-def _check_existing_array_matches(existing: Array, array_kwargs: dict) -> None:
+def _check_existing_array_matches(
+    existing: Array, metadata: ArrayV3Metadata, dimension_names: list[str]
+) -> None:
     """
-    Raise if an existing array has different metadata, apart from attributes, than ``array_kwargs`` would create.
+    Raise if an existing array has different metadata, apart from attributes, than ``metadata``.
 
     Raises
     ------
@@ -612,13 +615,18 @@ def _check_existing_array_matches(existing: Array, array_kwargs: dict) -> None:
         metadata, so the new refs would be decoded with the wrong codecs or read under
         the wrong dimension names.
     """
-    # build the requested metadata through zarr so it is normalized the same way as the stored metadata
-    requested = create_array(MemoryStore(), **array_kwargs).metadata.to_dict()
-    stored = existing.metadata.to_dict()
+    # Compare the JSON form rather than the dataclasses: before zarr 3.3.0 the generated
+    # __eq__ treats two NaN fill values as unequal (zarr-python#2929), whereas to_dict
+    # serializes NaN to the string "NaN".
+    # TODO: compare the metadata objects directly once zarr>=3.3.0 is the minimum version.
+    requested = dataclasses.replace(
+        metadata, attributes={}, dimension_names=tuple(dimension_names)
+    ).to_dict()
+    stored = dataclasses.replace(existing.metadata, attributes={}).to_dict()
     differing = sorted(
         key
         for key in requested.keys() | stored.keys()
-        if key != "attributes" and requested.get(key) != stored.get(key)
+        if requested.get(key) != stored.get(key)
     )
     if differing:
         raise ValueError(
