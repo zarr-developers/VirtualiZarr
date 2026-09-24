@@ -260,8 +260,8 @@ VirtualiZarr has two different ways of doing this internally, which are used for
 A `ManifestGroup` is a dedicated class that contains multiple `ManifestArray`, plus group-level metadata.
 It is designed to act similar to a Zarr group, such that a named collection of one or more `ManifestGroup` objects can be combined together to form a `ManifestStore`.
 
-The `ManifestStore` (and `ManifestGroup`) classes are only used during `open_virtual_dataset`, to simplify the creation of virtual references and loading of variables from archival file formats.
-You should therefore probably only use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom parser](custom_parsers.md) for an unsupported archival file format.
+Parsers return a `ManifestStore`, which `open_virtual_dataset` converts into a virtual dataset, loading any `loadable_variables` from it.
+You only need to use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom parser](custom_parsers.md) for an unsupported archival file format, or to [write a file to Icechunk without going via xarray](../how_to/usage.md#writing-to-icechunk-without-xarray), for instance because its structure doesn't fit [xarray's data model](#how-the-zarr-and-xarray-data-models-differ).
 
 ## "Virtual" Xarray Datasets
 
@@ -275,3 +275,40 @@ See the [usage guide on combining virtual datasets](../how_to/usage.md#combining
 
 !!! note
     In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.
+
+## How the Zarr and xarray data models differ
+
+VirtualiZarr can use xarray to combine virtual references because the two data models are close: a Zarr group of arrays with named dimensions maps onto an [xarray.Dataset][] of variables.
+Wrapping `ManifestArray` objects in xarray means VirtualiZarr doesn't have to reimplement named-dimension handling or functions like `concat` and `merge`.
+The models are not identical: xarray adds constraints that Zarr doesn't have, and the two representations keep some metadata in different places.
+
+### Structures valid in Zarr but not in xarray
+
+| Structure | Zarr | xarray |
+| --- | --- | --- |
+| An array with no dimension names | Valid: `dimension_names` is optional | Can't be opened: every variable needs a name for each dimension |
+| An array that repeats a dimension name, such as `("x", "x")` | Valid | Warns "Duplicate dimension names present", and many operations don't support it |
+| Sibling arrays that share a dimension name at different lengths, like the levels of a multiscale image pyramid | Valid: each array's shape is independent | A Dataset gives each dimension one length, so this raises "conflicting sizes for dimension" |
+| A subgroup that reuses one of its parent's dimension names at a different length | Valid | An [xarray.DataTree][] requires each node to align with its parents, so this raises "not aligned with its parents" |
+
+Parsers can still represent all of these, because a `ManifestStore` follows the Zarr model.
+Converting such a store to a virtual dataset or datatree either fails or, for repeated dimension names, warns. You can instead write it to Icechunk directly with [ManifestStore.to_icechunk][virtualizarr.manifests.ManifestStore.to_icechunk], as shown in [the usage guide](../how_to/usage.md#writing-to-icechunk-without-xarray).
+
+### Where each representation keeps metadata
+
+| | `ManifestArray` and `ManifestGroup` | Virtual xarray Dataset |
+| --- | --- | --- |
+| Dimension names | `ManifestArray.metadata.dimension_names` | `Variable.dims` |
+| Array attributes | `ManifestArray.metadata.attributes` | `Variable.attrs` |
+| Group attributes | `ManifestGroup.metadata.attributes` | `Dataset.attrs` |
+| Which variables are coordinates | Not part of the Zarr model; a file may record it in a CF `coordinates` attribute on each array | `Dataset.coords`, which `vds.vz.to_icechunk` writes as a `coordinates` attribute on each group |
+| CF encoding, such as `scale_factor`, `_FillValue` or time `units` | Array attributes, with values left encoded | Virtual variables: the same attributes, still not decoded. Loaded variables: decoded, with the encoding moved to `Variable.encoding` |
+
+When a `ManifestGroup` becomes a virtual dataset, each array's dimension names and attributes move onto its xarray variable, and the wrapped `ManifestArray` no longer carries them.
+xarray then keeps track of them as you combine datasets, and `vds.vz.to_icechunk` writes them from the variables.
+`ManifestStore.to_icechunk` instead writes each `ManifestArray`'s own metadata, so if you combine `ManifestArray` objects yourself with functions such as `np.concatenate`, the dimension names they hold are the ones that get stored.
+
+### Loaded variables only exist in xarray
+
+[Loading a variable](faq.md#why-would-i-want-to-load-variables-using-loadable_variables) replaces its `ManifestArray` with an in-memory array, which only an xarray Dataset can hold alongside virtual variables.
+A `ManifestStore` has no loaded variables. Everything it writes stays a reference, apart from any chunks the parser inlined.
