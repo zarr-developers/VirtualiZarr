@@ -126,6 +126,13 @@ class TestDatasetToManifestArray:
         metadata = manifest_store._group.arrays["data"].metadata
         assert metadata.attributes["attribute_name"] == "attribute_name"
 
+    def test_bytes_array_attributes(self, bytes_attributes_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(bytes_attributes_hdf5_url)
+        attributes = manifest_store._group.arrays["data"].metadata.attributes
+        assert attributes["character_array"] == ["2", "0", "4", "2"]
+        assert attributes["array"] == ["first", "second"]
+        assert attributes["array_2d"] == [["a", "b"], ["c", "d"]]
+
     def test_scalar_fill_value(self, scalar_fill_value_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(scalar_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata

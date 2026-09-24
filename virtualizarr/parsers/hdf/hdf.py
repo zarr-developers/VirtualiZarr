@@ -461,7 +461,7 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
             v = v.decode("utf-8") or " "
         elif isinstance(v, (np.ndarray, np.number, np.bool_)):
             if v.dtype.kind == "S":
-                v = v.astype(str)
+                v = np.strings.decode(np.asarray(v), "utf-8").tolist()
             elif v.size == 1:
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
