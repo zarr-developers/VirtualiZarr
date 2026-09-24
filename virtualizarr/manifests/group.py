@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Iterator, Mapping
+from datetime import datetime
+from typing import TYPE_CHECKING, Iterator, Literal, Mapping, Optional
 
 import xarray as xr
 from zarr.core.group import GroupMetadata
 
 from virtualizarr.manifests import ManifestArray
+
+if TYPE_CHECKING:
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
 
 
 class ManifestGroup(
@@ -172,3 +176,75 @@ class ManifestGroup(
         All variables in the returned DataTree will be "virtual", i.e. they will wrap ManifestArray objects.
         """
         return xr.DataTree.from_dict(self.to_virtual_datasets())
+
+    def to_icechunk(
+        self,
+        store: "IcechunkStore",
+        *,
+        group: Optional[str] = None,
+        mode: Optional[Literal["w", "w-", "a"]] = None,
+        validate_containers: bool = True,
+        last_updated_at: Optional[datetime] = None,
+    ) -> None:
+        """
+        Write this group and all its subgroups to an Icechunk store, without going via xarray.
+
+        Each array and group is written with the Zarr metadata it holds (dimension names,
+        attributes, codecs and fill value). This can write structures an xarray Dataset
+        can't hold, such as arrays without dimension names, or sibling arrays that share a
+        dimension name at different lengths.
+
+        Both `icechunk` and `zarr` (v3) must be installed.
+
+        Parameters
+        ----------
+        store
+            Store to write to, which must not be read-only.
+        group
+            Path to the group in which to write this group, defaulting to the root group.
+        mode
+            How to handle pre-existing groups at the target paths:
+
+            - ``"w-"`` or ``None`` (default): create each group, raising a
+              ``ContainsGroupError`` if it already exists.
+            - ``"w"``: create each group, overwriting any existing contents at that path.
+            - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised. Every array is checked
+              before any is written, so on this error nothing is written. The new
+              references are written over the existing ones.
+        validate_containers
+            If ``True``, raise if any virtual chunks refer to locations that don't
+            match any existing virtual chunk container set on this Icechunk repository.
+
+            It is not generally recommended to set this to ``False``, because it can lead to
+            confusing runtime results and errors when reading data back.
+        last_updated_at
+            The time at which the virtual references were last updated. When specified, if
+            any of the virtual chunks written in this session are modified in storage after
+            this time, icechunk will raise an error at runtime when trying to read the
+            virtual chunk. When not specified, icechunk will not check for modifications to
+            the virtual chunks at runtime.
+
+        Raises
+        ------
+        ValueError
+            If the store is read-only, ``mode`` is invalid, a virtual chunk refers to a
+            location without a virtual chunk container (when ``validate_containers`` is set),
+            or ``mode="a"`` would write over an existing array with different metadata.
+        TypeError
+            If an argument has the wrong type.
+        zarr.errors.ContainsGroupError
+            If a group already exists and ``mode`` is ``"w-"`` or ``None``, or if
+            ``mode="a"`` and a group exists where an array would be written.
+        """
+        from virtualizarr.writers.icechunk import manifest_group_to_icechunk
+
+        manifest_group_to_icechunk(
+            self,
+            store,
+            group=group,
+            mode=mode,
+            validate_containers=validate_containers,
+            last_updated_at=last_updated_at,
+        )

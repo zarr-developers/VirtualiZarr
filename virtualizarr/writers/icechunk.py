@@ -1,7 +1,16 @@
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Iterable,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Union,
+    cast,
+)
 
 import numpy as np
 import xarray as xr
@@ -10,11 +19,13 @@ from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group, create_array, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
+from zarr.core.metadata import ArrayV3Metadata
 from zarr.core.sync import sync
-from zarr.storage import MemoryStore
+from zarr.errors import ContainsGroupError, GroupNotFoundError
+from zarr.storage import MemoryStore, StorePath
 
 from virtualizarr.codecs import extract_codecs, get_codecs
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import ChunkManifest, ManifestArray, ManifestGroup
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import (
     check_compatible_encodings,
@@ -60,6 +71,31 @@ def _resolve_mode(
         return "r+"
 
     return mode or "w-"
+
+
+def _check_store_and_last_updated_at(
+    store: "IcechunkStore", last_updated_at: Optional[datetime]
+) -> None:
+    try:
+        from icechunk import IcechunkStore  # type: ignore[import-not-found]
+    except ImportError:
+        raise ImportError(
+            "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
+        ) from None
+
+    if not isinstance(store, IcechunkStore):
+        raise TypeError(
+            f"store: expected type IcechunkStore, but got type {type(store)}"
+        )
+
+    if not isinstance(last_updated_at, (type(None), datetime)):
+        raise TypeError(
+            "last_updated_at: expected type Optional[datetime],"
+            f" but got type {type(last_updated_at)}"
+        )
+
+    if store.read_only:
+        raise ValueError("supplied store is read-only")
 
 
 def virtual_dataset_to_icechunk(
@@ -125,18 +161,7 @@ def virtual_dataset_to_icechunk(
     ValueError
         If the store is read-only.
     """
-    try:
-        from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr.storage import StorePath  # type: ignore[import-untyped]
-    except ImportError:
-        raise ImportError(
-            "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
-        ) from None
-
-    if not isinstance(store, IcechunkStore):
-        raise TypeError(
-            f"store: expected type IcechunkStore, but got type {type(store)}"
-        )
+    _check_store_and_last_updated_at(store, last_updated_at)
 
     if not isinstance(group, (type(None), str)):
         raise TypeError(
@@ -155,15 +180,6 @@ def virtual_dataset_to_icechunk(
             "region: expected type Optional[Literal['auto'] | Mapping[str, Literal['auto'] | slice]],"
             f" but got type {type(last_updated_at)}"
         )
-
-    if not isinstance(last_updated_at, (type(None), datetime)):
-        raise TypeError(
-            "last_updated_at: expected type Optional[datetime],"
-            f" but got type {type(last_updated_at)}"
-        )
-
-    if store.read_only:
-        raise ValueError("supplied store is read-only")
 
     if append_dim and append_dim not in vds.dims:
         raise ValueError(
@@ -244,31 +260,11 @@ def virtual_datatree_to_icechunk(
     ValueError
         If the store is read-only.
     """
-    try:
-        from icechunk import IcechunkStore  # type: ignore[import-not-found]
-        from zarr.storage import StorePath  # type: ignore[import-untyped]
-    except ImportError:
-        raise ImportError(
-            "The 'icechunk' and 'zarr' version 3 libraries are required to use this function"
-        ) from None
-
-    if not isinstance(store, IcechunkStore):
-        raise TypeError(
-            f"store: expected type IcechunkStore, but got type {type(store)}"
-        )
+    _check_store_and_last_updated_at(store, last_updated_at)
 
     open_mode = _resolve_mode(
         mode, append_dim=kwargs.get("append_dim"), region=kwargs.get("region")
     )
-
-    if not isinstance(last_updated_at, (type(None), datetime)):
-        raise TypeError(
-            "last_updated_at: expected type datetime,"
-            f" but got type {type(last_updated_at)}"
-        )
-
-    if store.read_only:
-        raise ValueError("supplied store is read-only")
 
     def node_to_vds(node: xr.DataTree) -> xr.Dataset:
         tree = cast(xr.DataTree, node)  # subtree is typed as Unknown
@@ -303,6 +299,178 @@ def virtual_datatree_to_icechunk(
         )
 
 
+def manifest_group_to_icechunk(
+    manifest_group: ManifestGroup,
+    store: "IcechunkStore",
+    *,
+    group: Optional[str] = None,
+    mode: Optional[Literal["w", "w-", "a"]] = None,
+    validate_containers: bool = True,
+    last_updated_at: Optional[datetime] = None,
+) -> None:
+    """
+    Write a ManifestGroup, and all its subgroups, to an Icechunk store without going via xarray.
+
+    Each array and group is written with the Zarr metadata it holds (dimension names,
+    attributes, codecs and fill value). This can write structures an xarray Dataset
+    can't hold, such as arrays without dimension names, or sibling arrays that share a
+    dimension name at different lengths.
+
+    Both `icechunk` and `zarr` (v3) must be installed.
+
+    Parameters
+    ----------
+    manifest_group
+        Group to write, with all its subgroups.
+    store
+        Store to write to, which must not be read-only.
+    group
+        Path to the group in which to write ``manifest_group``, defaulting to the root group.
+    mode
+        How to handle pre-existing groups at the target paths:
+
+        - ``"w-"`` or ``None`` (default): create each group, raising a
+          ``ContainsGroupError`` if it already exists.
+        - ``"w"``: create each group, overwriting any existing contents at that path.
+        - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+          An existing array of the same name must have the same metadata apart from
+          attributes, otherwise a ``ValueError`` is raised. Every array is checked
+          before any is written, so on this error nothing is written. The new
+          references are written over the existing ones.
+    validate_containers
+        If ``True``, raise if any virtual chunks refer to locations that don't
+        match any existing virtual chunk container set on this Icechunk repository.
+
+        It is not generally recommended to set this to ``False``, because it can lead to
+        confusing runtime results and errors when reading data back.
+    last_updated_at
+        The time at which the virtual references were last updated. When specified, if
+        any of the virtual chunks written in this session are modified in storage after
+        this time, icechunk will raise an error at runtime when trying to read the
+        virtual chunk. When not specified, icechunk will not check for modifications to
+        the virtual chunks at runtime.
+
+    Raises
+    ------
+    ValueError
+        If the store is read-only, ``mode`` is invalid, a virtual chunk refers to a
+        location without a virtual chunk container (when ``validate_containers`` is set),
+        or ``mode="a"`` would write over an existing array with different metadata.
+    TypeError
+        If an argument has the wrong type.
+    zarr.errors.ContainsGroupError
+        If a group already exists and ``mode`` is ``"w-"`` or ``None``, or if
+        ``mode="a"`` and a group exists where an array would be written.
+    """
+    _check_store_and_last_updated_at(store, last_updated_at)
+
+    if not isinstance(group, (type(None), str)):
+        raise TypeError(
+            f"group: expected type Optional[str], but got type {type(group)}"
+        )
+
+    open_mode = _resolve_mode(mode)
+
+    paths_and_groups = list(_walk_manifest_group(manifest_group, path=group or ""))
+
+    if validate_containers:
+        _validate_manifest_arrays_have_containers(
+            store.session.config,
+            [arr for _, mgroup in paths_and_groups for arr in mgroup.arrays.values()],
+        )
+
+    if open_mode == "a":
+        # under "w-" nothing needs checking: zarr creates parent groups, so any existing
+        # group in the tree means the top one exists too, and opening it raises first
+        _check_manifest_groups_can_be_appended(store, paths_and_groups)
+
+    # parents come before children, so mode="w" on a parent cannot erase a child already written
+    for path, mgroup in paths_and_groups:
+        zarr_group = open_group(
+            StorePath(store, path=path),
+            mode=open_mode,
+            zarr_format=3,
+            use_consolidated=False,
+        )
+        for name, marr in mgroup.arrays.items():
+            _write_manifest_array_to_icechunk(
+                store=store,
+                group=zarr_group,
+                name=name,
+                marr=marr,
+                last_updated_at=last_updated_at,
+            )
+        zarr_group.update_attributes(mgroup.metadata.attributes)
+
+
+def _walk_manifest_group(
+    manifest_group: ManifestGroup, path: str
+) -> Iterator[tuple[str, ManifestGroup]]:
+    """Yield (path, group) for this group and every subgroup below it, parents first."""
+    yield path, manifest_group
+    for name, subgroup in manifest_group.groups.items():
+        yield from _walk_manifest_group(subgroup, f"{path}/{name}" if path else name)
+
+
+def _check_manifest_groups_can_be_appended(
+    store: "IcechunkStore",
+    paths_and_groups: Sequence[tuple[str, ManifestGroup]],
+) -> None:
+    """
+    Raise before anything is written if any array in the tree would fail to write under ``mode="a"``.
+
+    Checking up front keeps a failure from leaving part of the tree in the session.
+    """
+    for path, mgroup in paths_and_groups:
+        try:
+            zarr_group = open_group(
+                StorePath(store, path=path),
+                mode="r",
+                zarr_format=3,
+                use_consolidated=False,
+            )
+        except GroupNotFoundError:
+            continue
+        for name, marr in mgroup.arrays.items():
+            existing = zarr_group.get(name)
+            if isinstance(existing, Group):
+                raise ContainsGroupError(store, f"{path}/{name}" if path else name)
+            if isinstance(existing, Array):
+                _check_existing_array_matches(
+                    existing,
+                    _virtual_array_kwargs(marr.metadata, marr.metadata.dimension_names),
+                )
+
+
+def _write_manifest_array_to_icechunk(
+    store: "IcechunkStore",
+    group: Group,
+    name: str,
+    marr: ManifestArray,
+    last_updated_at: Optional[datetime] = None,
+) -> None:
+    """
+    Write one ManifestArray, with its own Zarr metadata, into an existing zarr group of an icechunk store.
+
+    Any existing array of this name must already have been checked with
+    ``_check_existing_array_matches``.
+    """
+    metadata = marr.metadata
+    arr = group.require_array(
+        name=name, **_virtual_array_kwargs(metadata, metadata.dimension_names)
+    )
+    arr.update_attributes(metadata.attributes)
+
+    write_manifest_to_icechunk(
+        store=store,
+        group=group,
+        arr_name=name,
+        manifest=marr.manifest,
+        chunk_index_offsets=(0,) * marr.ndim,
+        last_updated_at=last_updated_at,
+    )
+
+
 # TODO ideally I would be able to just call some Icechunk API to do this (see https://github.com/earth-mover/icechunk/issues/1167)
 def validate_virtual_chunk_containers(
     config: "RepositoryConfig", virtual_datasets: Iterable[xr.Dataset]
@@ -315,6 +483,13 @@ def validate_virtual_chunk_containers(
         for var in dataset.variables.values()
         if isinstance(var.data, ManifestArray)
     ]
+    _validate_manifest_arrays_have_containers(config, manifestarrays)
+
+
+def _validate_manifest_arrays_have_containers(
+    config: "RepositoryConfig", manifestarrays: Sequence[ManifestArray]
+) -> None:
+    """Raise if any ref in these ManifestArrays has no matching virtual chunk container."""
 
     # get the prefixes of all virtual chunk containers
     if config.virtual_chunk_containers is None:
@@ -572,22 +747,7 @@ def write_virtual_variable_to_icechunk(
             chunk_offsets.append(start // chunk_size)
     else:
         chunk_offsets = [0 for _ in dims]
-        filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
-        array_kwargs = dict(
-            shape=metadata.shape,
-            chunks=metadata.chunks,
-            shards=metadata.shards,
-            dtype=metadata.data_type.to_native_dtype(),
-            filters=filters,
-            compressors=compressors,
-            serializer=serializer,
-            dimension_names=var.dims,
-            fill_value=metadata.fill_value,
-        )
-        existing = group.get(name)
-        if isinstance(existing, Array):
-            _check_existing_array_matches(existing, array_kwargs)
-        arr = group.require_array(name=name, **array_kwargs)
+        arr = _require_virtual_array(group, name, metadata, dimension_names=dims)
 
         update_attributes(arr, var.attrs, encoding=var.encoding)
 
@@ -598,6 +758,31 @@ def write_virtual_variable_to_icechunk(
         manifest=ma.manifest,
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
+    )
+
+
+def _virtual_array_kwargs(
+    metadata: ArrayV3Metadata, dimension_names: Iterable[str | None] | None
+) -> dict:
+    """
+    Arguments to zarr's ``create_array`` for the array one ManifestArray's refs will be written into.
+
+    The array takes its shape, chunks, shards, data type, codecs and fill value from
+    ``metadata``. Attributes are left to the caller. The chunk key encoding is not
+    carried over: a ManifestArray's is internal to the manifest, and chunks are always
+    written at the default ``/``-separated keys.
+    """
+    filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
+    return dict(
+        shape=metadata.shape,
+        chunks=metadata.chunks,
+        shards=metadata.shards,
+        dtype=metadata.data_type.to_native_dtype(),
+        filters=filters,
+        compressors=compressors,
+        serializer=serializer,
+        dimension_names=dimension_names,
+        fill_value=metadata.fill_value,
     )
 
 
@@ -626,6 +811,27 @@ def _check_existing_array_matches(existing: Array, array_kwargs: dict) -> None:
             f"{', '.join(differing)}. Writing new references under the stored metadata "
             "would decode them incorrectly; use mode='w' to replace the group instead."
         )
+
+
+def _require_virtual_array(
+    group: Group,
+    name: str,
+    metadata: ArrayV3Metadata,
+    dimension_names: Iterable[str | None] | None,
+) -> Array:
+    """
+    Create or open the zarr array that one ManifestArray's refs will be written into.
+
+    Raises
+    ------
+    ValueError
+        If an array of this name already exists with different metadata.
+    """
+    array_kwargs = _virtual_array_kwargs(metadata, dimension_names)
+    existing = group.get(name)
+    if isinstance(existing, Array):
+        _check_existing_array_matches(existing, array_kwargs)
+    return group.require_array(name=name, **array_kwargs)
 
 
 def write_manifest_to_icechunk(

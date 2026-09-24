@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import numpy as np
 import numpy.testing as npt
 import obstore as obs
+import pandas as pd
 import pytest
 import xarray as xr
 import xarray.testing as xrt
@@ -18,7 +19,13 @@ from zarr.dtype import parse_data_type
 from zarr.errors import ContainsGroupError
 
 from virtualizarr import open_virtual_dataset
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestGroup,
+    ManifestStore,
+)
+from virtualizarr.parsers import HDFParser
 from virtualizarr.parsers.zarr import ZarrParser
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
@@ -1289,3 +1296,361 @@ def test_concat_sharded_arrays_along_new_dim_roundtrip_icechunk(
     npt.assert_array_equal(
         roundtrip["data"].values, xr.concat(datasets, dim="time")["data"].values
     )
+
+
+class TestManifestGroupToIcechunk:
+    @pytest.fixture
+    def raw_marr(
+        self, tmp_path: Path, array_v3_metadata
+    ) -> Callable[..., ManifestArray]:
+        """A single-chunk ManifestArray pointing at the raw bytes of ``arr``, written to a file called ``name``."""
+
+        def _raw_marr(
+            name: str,
+            arr: np.ndarray,
+            dimension_names: Optional[tuple[str, ...]] = None,
+            attributes: Optional[dict] = None,
+            fill_value: Any = 0,
+        ) -> ManifestArray:
+            filepath = tmp_path / name
+            filepath.write_bytes(arr.tobytes())
+            endian = "big" if arr.dtype.str.startswith(">") else "little"
+            metadata = array_v3_metadata(
+                shape=arr.shape,
+                chunks=arr.shape,
+                data_type=arr.dtype,
+                codecs=[{"name": "bytes", "configuration": {"endian": endian}}],
+                dimension_names=dimension_names,
+                attributes=attributes,
+                fill_value=fill_value,
+            )
+            manifest = ChunkManifest(
+                {
+                    ".".join(["0"] * arr.ndim): {
+                        "path": str(filepath),
+                        "offset": 0,
+                        "length": arr.nbytes,
+                    }
+                }
+            )
+            return ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        return _raw_marr
+
+    def test_roundtrip_nested_groups(
+        self, icechunk_filestore: "IcechunkStore", raw_marr
+    ):
+        a = np.arange(24, dtype="<i4").reshape(4, 6)
+        b = np.arange(5, dtype="<f8")
+        mgroup = ManifestGroup(
+            arrays={"a": raw_marr("a", a, ("y", "x"), {"units": "m"})},
+            groups={
+                "sub": ManifestGroup(
+                    arrays={"b": raw_marr("b", b, ("t",))}, attributes={"level": 1}
+                )
+            },
+            attributes={"title": "nested"},
+        )
+
+        ManifestStore(mgroup).to_icechunk(icechunk_filestore)
+
+        store = icechunk_filestore
+        assert zarr.open_group(store, mode="r").attrs.asdict() == {"title": "nested"}
+        assert zarr.open_group(store, path="sub", mode="r").attrs.asdict() == {
+            "level": 1
+        }
+        a_written = zarr.open_array(store, path="a", mode="r")
+        assert isinstance(a_written.metadata, ArrayV3Metadata)
+        assert a_written.metadata.dimension_names == ("y", "x")
+        assert a_written.attrs.asdict() == {"units": "m"}
+        npt.assert_array_equal(a_written[:], a)
+        b_written = zarr.open_array(store, path="sub/b", mode="r")
+        assert isinstance(b_written.metadata, ArrayV3Metadata)
+        assert b_written.metadata.dimension_names == ("t",)
+        npt.assert_array_equal(b_written[:], b)
+
+    @pytest.mark.parametrize(
+        "structure, xarray_error",
+        [
+            ("unnamed_array", "without dimension names"),
+            # the levels of a multiscale image pyramid
+            ("siblings_sharing_a_name_at_different_lengths", "conflicting sizes"),
+            ("subgroup_reusing_a_parent_name", "not aligned with its parents"),
+        ],
+    )
+    def test_writes_structure_xarray_cannot_hold(
+        self,
+        icechunk_filestore: "IcechunkStore",
+        raw_marr,
+        structure: str,
+        xarray_error: str,
+    ):
+        long = np.arange(6, dtype="<i4")
+        short = long[::2].copy()
+        expected: dict[str, tuple[np.ndarray, Optional[tuple[str, ...]]]]
+        if structure == "unnamed_array":
+            expected = {"a": (long, None)}
+            mgroup = ManifestGroup(arrays={"a": raw_marr("a", long)})
+        elif structure == "siblings_sharing_a_name_at_different_lengths":
+            expected = {"0": (long, ("x",)), "1": (short, ("x",))}
+            mgroup = ManifestGroup(
+                arrays={
+                    "0": raw_marr("0", long, ("x",)),
+                    "1": raw_marr("1", short, ("x",)),
+                }
+            )
+        else:
+            expected = {"a": (long, ("x",)), "sub/b": (short, ("x",))}
+            mgroup = ManifestGroup(
+                arrays={"a": raw_marr("a", long, ("x",))},
+                groups={
+                    "sub": ManifestGroup(arrays={"b": raw_marr("b", short, ("x",))})
+                },
+            )
+        with pytest.raises(ValueError, match=xarray_error):
+            mgroup.to_virtual_datatree()
+
+        mgroup.to_icechunk(icechunk_filestore)
+
+        for path, (values, dimension_names) in expected.items():
+            written = zarr.open_array(icechunk_filestore, path=path, mode="r")
+            assert isinstance(written.metadata, ArrayV3Metadata)
+            assert written.metadata.dimension_names == dimension_names
+            npt.assert_array_equal(written[:], values)
+
+    @pytest.fixture
+    def cf_encoded_netcdf4_file(self, tmp_path: Path) -> str:
+        """Packed integers, a CF time axis and compressed chunks: where the xarray path does the most encoding."""
+        filepath = tmp_path / "cf_encoded.nc"
+        ds = xr.Dataset(
+            {
+                "air": (
+                    ("time", "lat", "lon"),
+                    np.random.default_rng(0).random((3, 4, 6), dtype="float32"),
+                    {"units": "K", "long_name": "air temperature"},
+                ),
+                "packed": (("lat", "lon"), np.linspace(0, 100, 24).reshape(4, 6)),
+            },
+            coords={
+                "time": pd.date_range("2020-01-01", periods=3),
+                "lat": np.arange(4.0),
+                "lon": np.arange(6.0),
+            },
+            attrs={"title": "CF-encoded"},
+        )
+        ds.to_netcdf(
+            filepath,
+            engine="h5netcdf",
+            encoding={
+                "air": {"chunksizes": (1, 4, 6), "zlib": True},
+                "packed": {
+                    "dtype": "int16",
+                    "scale_factor": 0.01,
+                    "add_offset": 0.0,
+                    "_FillValue": -9999,
+                },
+            },
+        )
+        return str(filepath)
+
+    @pytest.mark.parametrize(
+        "netcdf_fixture",
+        [
+            "netcdf4_file_with_data_in_sibling_groups",
+            "cf_encoded_netcdf4_file",
+            # non-dimension coordinates, which xarray records in a group attribute this path doesn't write
+            "netcdf4_file_with_2d_coords",
+        ],
+    )
+    def test_writes_same_store_as_xarray_path(
+        self,
+        icechunk_repo: "Repository",
+        tmp_path: Path,
+        local_registry,
+        netcdf_fixture: str,
+        request: pytest.FixtureRequest,
+    ):
+        netcdf_file = request.getfixturevalue(netcdf_fixture)
+        manifest_store = HDFParser()(f"file://{netcdf_file}", local_registry)
+
+        direct_session = icechunk_repo.writable_session("main")
+        manifest_store.to_icechunk(direct_session.store)
+        direct_session.commit("direct")
+
+        xarray_repo = icechunk.Repository.create(
+            storage=icechunk.Storage.new_local_filesystem(str(tmp_path / "xarray")),
+            config=icechunk_repo.config,
+            authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+        )
+        xarray_session = xarray_repo.writable_session("main")
+        # nothing loaded, so both paths write only virtual refs
+        manifest_store.to_virtual_datatree(loadable_variables=[]).vz.to_icechunk(
+            xarray_session.store
+        )
+        xarray_session.commit("via xarray")
+
+        def all_metadata(repo: "Repository") -> dict[str, dict]:
+            root = zarr.open_group(
+                repo.readonly_session("main").store, mode="r", zarr_format=3
+            )
+            members = dict(root.members(max_depth=None))
+            return {
+                "": root.metadata.to_dict(),
+                **{path: node.metadata.to_dict() for path, node in members.items()},
+            }
+
+        direct = all_metadata(icechunk_repo)
+        via_xarray = all_metadata(xarray_repo)
+        assert direct.keys() == via_xarray.keys()
+        for path in direct:
+            if via_xarray[path]["node_type"] == "group":
+                # xarray also lists each group's coordinate variables in a group attribute
+                via_xarray[path]["attributes"].pop("coordinates", None)
+            assert direct[path] == via_xarray[path], path
+
+        def open_written(repo: "Repository") -> xr.DataTree:
+            return xr.open_datatree(
+                repo.readonly_session("main").store,  # type: ignore
+                engine="zarr",
+                zarr_format=3,
+                consolidated=False,
+            )
+
+        with (
+            open_written(icechunk_repo) as roundtrip,
+            open_written(xarray_repo) as roundtrip_via_xarray,
+            xr.open_datatree(netcdf_file, engine="h5netcdf") as source,
+        ):
+            xrt.assert_identical(roundtrip, roundtrip_via_xarray)
+            # equal rather than identical: HDFParser reads some empty-string attributes back as " "
+            xrt.assert_equal(roundtrip, source)
+
+    @pytest.mark.parametrize("group", [None, "", "/a", "a", "/a/b", "a/b", "a/b/"])
+    def test_write_into_group(
+        self, icechunk_filestore: "IcechunkStore", raw_marr, group: Optional[str]
+    ):
+        a = np.arange(4, dtype="<i4")
+        mgroup = ManifestGroup(
+            arrays={"a": raw_marr("a", a, ("x",))},
+            groups={"sub": ManifestGroup(arrays={"b": raw_marr("b", a, ("x",))})},
+        )
+
+        mgroup.to_icechunk(icechunk_filestore, group=group)
+
+        prefix = (group or "").strip("/")
+        for path in ["a", "sub/b"]:
+            written = zarr.open_array(
+                icechunk_filestore,
+                path=f"{prefix}/{path}" if prefix else path,
+                mode="r",
+            )
+            npt.assert_array_equal(written[:], a)
+
+    def test_mode(self, icechunk_filestore: "IcechunkStore", raw_marr):
+        a = np.arange(4, dtype="<i4")
+        foo = ManifestGroup(arrays={"foo": raw_marr("foo", a, ("x",))})
+        bar = ManifestGroup(arrays={"bar": raw_marr("bar", a, ("x",))})
+        foo.to_icechunk(icechunk_filestore)
+
+        with pytest.raises(ContainsGroupError):
+            bar.to_icechunk(icechunk_filestore)
+
+        bar.to_icechunk(icechunk_filestore, mode="a")
+        assert set(zarr.open_group(icechunk_filestore, mode="r")) == {"foo", "bar"}
+
+        foo.to_icechunk(icechunk_filestore, mode="w")
+        assert set(zarr.open_group(icechunk_filestore, mode="r")) == {"foo"}
+
+    @pytest.mark.parametrize(
+        "existing_b, expected_error",
+        [
+            ("array", pytest.raises(ValueError, match="with different codecs")),
+            ("group", pytest.raises(ContainsGroupError, match="later/b")),
+        ],
+    )
+    def test_mode_a_writes_nothing_when_a_later_array_cannot_be_written(
+        self,
+        icechunk_repo: "Repository",
+        raw_marr,
+        existing_b: str,
+        expected_error,
+    ):
+        values = np.arange(4, dtype="<i4")
+        existing = ManifestGroup(arrays={"b": raw_marr("b", values, ("x",))})
+        session = icechunk_repo.writable_session("main")
+        if existing_b == "group":
+            existing = ManifestGroup(groups={"b": existing})
+        existing.to_icechunk(session.store, group="later")
+        session.commit("existing group")
+
+        # "earlier" is written before "later" would fail
+        mgroup = ManifestGroup(
+            groups={
+                "earlier": ManifestGroup(arrays={"a": raw_marr("a", values, ("x",))}),
+                "later": ManifestGroup(
+                    arrays={"b": raw_marr("b2", values.astype(">i4"), ("x",))}
+                ),
+            },
+        )
+        session = icechunk_repo.writable_session("main")
+        with expected_error:
+            mgroup.to_icechunk(session.store, mode="a")
+
+        assert not session.has_uncommitted_changes, session.status()
+
+    @pytest.mark.parametrize(
+        "store_kind, kwargs, error, match",
+        [
+            ("writable", {"group": 1}, TypeError, "group"),
+            (
+                "writable",
+                {"last_updated_at": "2026-01-01"},
+                TypeError,
+                "last_updated_at",
+            ),
+            ("writable", {"mode": "r"}, ValueError, "mode"),
+            ("memory", {}, TypeError, "expected type IcechunkStore"),
+            ("read-only", {}, ValueError, "read-only"),
+        ],
+    )
+    def test_invalid_arguments(
+        self,
+        icechunk_repo: "Repository",
+        raw_marr,
+        store_kind: str,
+        kwargs: dict,
+        error: type[Exception],
+        match: str,
+    ):
+        store: "IcechunkStore | zarr.storage.MemoryStore"
+        if store_kind == "memory":
+            store = zarr.storage.MemoryStore()
+        elif store_kind == "read-only":
+            store = icechunk_repo.readonly_session("main").store
+        else:
+            store = icechunk_repo.writable_session("main").store
+        mgroup = ManifestGroup(arrays={"a": raw_marr("a", np.arange(4), ("x",))})
+
+        with pytest.raises(error, match=match):
+            mgroup.to_icechunk(store, **kwargs)  # type: ignore[arg-type]
+
+    def test_validate_containers(
+        self, icechunk_filestore: "IcechunkStore", array_v3_metadata
+    ):
+        manifest = ChunkManifest(
+            {"0.0": {"path": "s3://bucket/path/file.nc", "offset": 0, "length": 100}}
+        )
+        marr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(shape=(3, 4), chunks=(3, 4)),
+        )
+        # the ref without a container sits in a subgroup, and must still stop the root being written
+        mgroup = ManifestGroup(groups={"sub": ManifestGroup(arrays={"foo": marr})})
+
+        with pytest.raises(
+            ValueError, match="No Virtual Chunk Container set which supports prefix"
+        ):
+            mgroup.to_icechunk(icechunk_filestore)
+
+        session = icechunk_filestore.session
+        assert not session.has_uncommitted_changes, session.status()

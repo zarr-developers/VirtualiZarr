@@ -4,6 +4,14 @@
 
 ### New Features
 
+- Added [ManifestStore.to_icechunk][virtualizarr.manifests.ManifestStore.to_icechunk] and
+  [ManifestGroup.to_icechunk][virtualizarr.manifests.ManifestGroup.to_icechunk], which write
+  a parser's output to Icechunk without converting it to a virtual xarray dataset. Every
+  array and group is written with the Zarr metadata it already holds, so files that are
+  valid Zarr but not valid xarray can be written, such as arrays without dimension names or
+  sibling arrays sharing dimension names at different lengths.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
 ### Bug fixes
