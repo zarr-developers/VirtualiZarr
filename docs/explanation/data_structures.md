@@ -146,6 +146,9 @@ manifest = ChunkManifest.from_arrays(
 
 Inlined chunks participate in all manifest operations: concatenation and stacking shift their indices, broadcasting both prepends singleton dimensions to their keys and replicates the bytes (by reference) across every position of an expanded axis, equality compares the inlined bytes, pickling carries the data along (for Dask/multiprocessing), `ManifestStore` reads return them directly from memory, and `nbytes` includes their size.
 
+Writing to Icechunk keeps virtual chunks virtual and writes inlined chunks as native chunks.
+Icechunk then decides for itself whether to store each native chunk inline in its manifest; VirtualiZarr has no control over this.
+
 ## `ManifestArray` class
 
 A Zarr array is defined not just by the location of its constituent chunk data, but by its array-level attributes such as `shape` and `dtype`.
@@ -273,6 +276,12 @@ Any `ManifestGroup` (or single-group `ManifestStore`) can be converted to a virt
 The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
 See the [usage guide on combining virtual datasets](../how_to/usage.md#combining-virtual-datasets) for more information.
 
+A virtual dataset can also hold [loaded variables](faq.md#why-would-i-want-to-load-variables-using-loadable_variables), whose whole `ManifestArray` has been replaced by an in-memory array of decoded values.
+This is different from [inlining chunks](#inlined-chunks), which keeps the `ManifestArray` and holds some of its encoded chunks in memory.
+A `ManifestStore` has no equivalent of a loaded variable ([#799](https://github.com/zarr-developers/VirtualiZarr/issues/799)).
+An array whose chunks are all inlined is also held in memory, but as encoded chunks, tied to the array's chunk shape and codecs.
+To load arrays while writing a `ManifestStore` to Icechunk, see [the usage guide](../how_to/usage.md#writing-to-icechunk-without-xarray).
+
 !!! note
     In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.
 
@@ -280,7 +289,7 @@ See the [usage guide on combining virtual datasets](../how_to/usage.md#combining
 
 VirtualiZarr can use xarray to combine virtual references because the two data models are close: a Zarr group of arrays with named dimensions maps onto an [xarray.Dataset][] of variables.
 Wrapping `ManifestArray` objects in xarray means VirtualiZarr doesn't have to reimplement named-dimension handling or functions like `concat` and `merge`.
-The models are not identical: xarray adds constraints that Zarr doesn't have, and the two representations keep some metadata in different places.
+The models are not identical: xarray adds constraints that Zarr doesn't have.
 
 ### Structures valid in Zarr but not in xarray
 
@@ -293,8 +302,3 @@ The models are not identical: xarray adds constraints that Zarr doesn't have, an
 
 Parsers can still represent all of these, because a `ManifestStore` follows the Zarr model.
 Converting such a store to a virtual dataset or datatree either fails or, for repeated dimension names, warns. You can instead write it to Icechunk directly with [ManifestStore.to_icechunk][virtualizarr.manifests.ManifestStore.to_icechunk], as shown in [the usage guide](../how_to/usage.md#writing-to-icechunk-without-xarray).
-
-### Loaded variables only exist in xarray
-
-[Loading a variable](faq.md#why-would-i-want-to-load-variables-using-loadable_variables) replaces its `ManifestArray` with an in-memory array, which only an xarray Dataset can hold alongside virtual variables.
-A `ManifestStore` has no loaded variables. Everything it writes stays a reference, apart from any chunks the parser inlined.
