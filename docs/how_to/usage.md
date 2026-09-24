@@ -8,6 +8,8 @@ VirtualiZarr is for creating and manipulating "virtual" references to pre-existi
 
 The first step to virtualizing data is to create an [ObjectStore][obstore.store.ObjectStore] instance
 that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
+You then register the store in an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] under the URL prefix it serves, so VirtualiZarr knows which store to use for each URL.
+See [The object store registry](../explanation/registry.md) for why this is needed and how to set it up for local files.
 
 
 !!! note
@@ -160,25 +162,12 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     from pathlib import Path
 
-    store_path = Path.cwd()
-    file_path = str(store_path / "data.nc")
-    file_url = f"file://{file_path}"
+    file_path = str(Path.cwd() / "data.nc")
+    url = file_path
 
-    store = LocalStore(prefix=store_path)
-    registry = ObjectStoreRegistry({file_url: store})
+    registry = ObjectStoreRegistry({"file:///": LocalStore()})
 
     ```
-
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
-)
-```
 
 We can open a virtual representation of this file using [virtualizarr.open_virtual_dataset][]. VirtualiZarr has various
 "parsers" that understand different file formats. You must supply a parser, and as all netCDF4 files are HDF5 files,

@@ -1,6 +1,14 @@
 # VirtualiZarr
 
-**Create virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
+**Create virtual Zarr stores for cloud-friendly access to netCDF, HDF5, GRIB, TIFF and other formats, using familiar Xarray syntax.**
+
+VirtualiZarr does three things.
+
+1. **Assembles many files into a hypercube**, combining them into one dataset and checking that the result is valid Zarr.
+2. **Reads files on the fly** as though they were Zarr, using zarr-python or Xarray.
+3. **Persists the result to Icechunk**, so anyone can open it with Zarr or Xarray from then on.
+
+See [How it works](#how-it-works) for more on each.
 
 The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in archival pre-Cloud file formats such as netCDF.
 
@@ -20,6 +28,26 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
 
+## How it works
+
+### Assembling a hypercube
+
+A parser reads each file and maps it onto Zarr: its arrays, its metadata, and where every chunk lives.
+VirtualiZarr has parsers for [many formats](explanation/faq.md#can-my-file-format-be-virtualized).
+You then combine the files into one dataset using [Xarray's combining logic](how_to/usage.md#combining-virtual-datasets), which matches variables and dimensions by name and checks that the files line up.
+On top of that, VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
+
+### Reading on the fly
+
+Some files are already cloud-optimized, such as cloud-optimized GeoTIFFs, so they don't need rewriting, but your tools may only work with Zarr.
+When VirtualiZarr parses a file, it creates a Zarr store that reads from that file, so zarr-python and Xarray can load its data directly, without persisting anything first (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
+
+### Persisting to Icechunk
+
+Writing the combined dataset to [Icechunk](https://icechunk.io/) lets you, or anyone else, reopen it later with zarr-python, without VirtualiZarr or Xarray in the read path.
+Xarray users can open it with [xarray.open_zarr][].
+The work of parsing and assembling the dataset only has to happen once, and every later read benefits from it (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
+
 ## Inspired by Kerchunk
 
 VirtualiZarr grew out of [discussions](https://github.com/fsspec/kerchunk/issues/377) on the [Kerchunk repository](https://github.com/fsspec/kerchunk), and is an attempt to provide the game-changing power of kerchunk but in a zarr-native way, and with a familiar array-like API.
@@ -38,20 +66,11 @@ import obstore
 
 from obspec_utils.registry import ObjectStoreRegistry
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
-from virtualizarr.parsers import HDFParser
-```
-
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
-specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
+from virtualizarr import (
+    open_virtual_dataset,
+    open_virtual_mfdataset,
 )
+from virtualizarr.parsers import HDFParser
 ```
 
 ```python exec="on" session="homepage"
@@ -60,16 +79,25 @@ import xarray as xr
 xr.set_options(display_style="html")
 ```
 
-We can use Obstore's [`obstore.store.from_url`][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data from the specified URLs.
+We can use Obstore's [`obstore.store.from_url`][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch the data needed to virtualize the file.
+The store holds the settings for connecting to the bucket, such as its cloud region and credentials.
+This bucket is public and in `us-west-2`, so we set the region and skip signing requests.
 
 ```python exec="on" source="above" session="homepage"
 bucket = "s3://nex-gddp-cmip6"
-path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-store = obstore.store.from_url(bucket, region="us-west-2", skip_signature=True)
+path = (
+    "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
+    "tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+)
+store = obstore.store.from_url(
+    bucket, region="us-west-2", skip_signature=True
+)
 ```
 
-We also need to create an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that
-maps the URL structure to the ObjectStore.
+A virtual dataset can pull from several sources, such as different buckets, different clouds, or HTTPS websites, and each source needs its own store.
+An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] organizes those stores for VirtualiZarr by mapping each URL prefix to the store that serves it.
+Here there is only one source, so the registry maps the bucket to our store.
+See [The object store registry](explanation/registry.md) for more on why it's needed.
 
 ```python exec="on" source="above" session="homepage"
 registry = ObjectStoreRegistry({bucket: store})
@@ -99,8 +127,14 @@ VirtualiZarr's other top-level function is [virtualizarr.open_virtual_mfdataset]
 a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset.
 
 ```python exec="on" source="above" session="homepage" result="code"
-urls = [f"s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc" for year in range(2015, 2017)]
-vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
+urls = [
+    f"{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
+    f"tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc"
+    for year in range(2015, 2017)
+]
+vds = open_virtual_mfdataset(
+    urls, parser=parser, registry=registry
+)
 print(vds)
 ```
 

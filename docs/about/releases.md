@@ -22,6 +22,11 @@
 
 ### Documentation
 
+- New explanation page, [The object store registry](../explanation/registry.md), covering why
+  `open_virtual_dataset` needs a registry, which steps read through it, and how to set one up
+  for cloud and local files. The Local tab in the usage guide now registers `"file:///"`, so
+  it works for more than one file. By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Internal changes
 
 ## v2.7.3 (7th August 2026)
