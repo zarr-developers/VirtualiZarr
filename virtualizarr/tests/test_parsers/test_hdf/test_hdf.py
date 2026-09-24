@@ -1,3 +1,7 @@
+import functools
+import os
+import subprocess
+import sys
 import warnings
 
 import h5py  # type: ignore
@@ -5,11 +9,13 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils.readers import BlockStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import from_url
+from obstore.store import LocalStore, from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
+from virtualizarr.parsers.hdf import hdf as hdf_parser_module
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -333,3 +339,145 @@ def test_fillvalue_runtime_error():
 
     result = _get_fill_value(dataset)
     assert result == np.ma.default_fill_value(dtype)
+
+
+class _ByteTallyStore:
+    """Wrap an obstore store to count bytes served at the store layer.
+
+    Used to demonstrate the read amplification of the block-reader path. Note it
+    is deliberately *not* a ``LocalStore`` subclass (that type can't be
+    subclassed), so it does not trigger the local native fast path - which is
+    exactly what we want when forcing the reader path with an explicit
+    ``reader_factory``.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.bytes = 0
+
+    def get_ranges(self, path, starts, lengths):
+        self.bytes += sum(int(x) for x in lengths)
+        return self._inner.get_ranges(path, starts=starts, lengths=lengths)
+
+    def get_range(self, path, *, start, length):
+        self.bytes += int(length)
+        return self._inner.get_range(path, start=start, length=length)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+class TestLocalNativeFastPath:
+    """A local file is walked with h5py's native driver rather than through the
+    object-store reader, so building a manifest of a chunk-dense dataset does not
+    read the whole file. See ``resolve_local_path`` in the HDF parser.
+    """
+
+    def _spy_on_reader(self, monkeypatch):
+        # Capture the ``reader`` argument handed to _construct_manifest_group on
+        # the first (top-level) call. A ``str`` means the native path (h5py opens
+        # the file directly and the object store is never touched).
+        captured = {}
+        original = hdf_parser_module._construct_manifest_group
+
+        def spy(*args, **kwargs):
+            captured.setdefault("reader", kwargs.get("reader"))
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(hdf_parser_module, "_construct_manifest_group", spy)
+        return captured
+
+    def test_local_default_bypasses_reader(
+        self, chunk_dense_hdf5_url, local_registry, monkeypatch
+    ):
+        captured = self._spy_on_reader(monkeypatch)
+        HDFParser()(url=chunk_dense_hdf5_url, registry=local_registry)
+        assert isinstance(captured["reader"], str), (
+            "default HDFParser should hand h5py a local path, bypassing the reader"
+        )
+
+    def test_explicit_reader_opts_out_of_fast_path(
+        self, chunk_dense_hdf5_url, local_registry, monkeypatch
+    ):
+        captured = self._spy_on_reader(monkeypatch)
+        HDFParser(reader_factory=BlockStoreReader)(
+            url=chunk_dense_hdf5_url, registry=local_registry
+        )
+        assert not isinstance(captured["reader"], str), (
+            "an explicit reader_factory should route local files through the reader"
+        )
+
+    def test_native_manifest_identical_to_reader_and_reader_amplifies(
+        self, chunk_dense_hdf5_url
+    ):
+        path = chunk_dense_hdf5_url.removeprefix("file://")
+        directory = os.path.dirname(path)
+        file_size = os.path.getsize(path)
+
+        # Default parser -> local native fast path.
+        native_registry = ObjectStoreRegistry(
+            {f"file://{directory}": LocalStore(prefix=directory)}
+        )
+        native = HDFParser()(url=chunk_dense_hdf5_url, registry=native_registry)
+        native_arr = native._group.arrays["x"]
+
+        # Explicit block reader -> reader path, with a tally to observe over-read.
+        tally = _ByteTallyStore(LocalStore(prefix=directory))
+        reader_registry = ObjectStoreRegistry({f"file://{directory}": tally})
+        reader = HDFParser(
+            reader_factory=functools.partial(BlockStoreReader, block_size=64 * 1024)
+        )(url=chunk_dense_hdf5_url, registry=reader_registry)
+        reader_arr = reader._group.arrays["x"]
+
+        # Building the manifest needs only the chunk index (~16 bytes of
+        # offset+length per chunk), but the block reader fetches a large fraction
+        # of the whole file. Asserting against the index size rather than a file
+        # fraction keeps the test meaningful if the fixture or block layout shifts.
+        n_chunks = int(np.prod(native_arr.manifest.shape_chunk_grid))
+        assert tally.bytes > 20 * n_chunks * 16
+        assert tally.bytes < file_size  # sanity: it doesn't read past the file
+
+        # ... yet both produce a byte-identical ManifestArray.
+        assert native_arr.metadata == reader_arr.metadata
+        assert native_arr.manifest.dict() == reader_arr.manifest.dict()
+
+    @pytest.mark.parametrize("use_prefix", [True, False])
+    def test_resolves_path_with_spaces(self, tmp_path, use_prefix):
+        directory = tmp_path / "a dir"
+        directory.mkdir()
+        filepath = directory / "a file.h5"
+        with h5py.File(filepath, "w") as f:
+            f["x"] = np.arange(3)
+        store = LocalStore(prefix=directory) if use_prefix else LocalStore()
+        registry = ObjectStoreRegistry(
+            {f"file://{directory}" if use_prefix else "file://": store}
+        )
+        resolved_store, path_in_store = registry.resolve(f"file://{filepath}")
+        assert hdf_parser_module.resolve_local_path(
+            resolved_store, path_in_store
+        ) == str(filepath)
+
+    def test_opens_file_held_open_for_writing(self, chunk_dense_hdf5_url):
+        # HDF5 file locks are per-process, so the writer must live in another
+        # process for the lock to conflict with this one's read.
+        path = chunk_dense_hdf5_url.removeprefix("file://")
+        writer = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                f"import h5py, sys; f = h5py.File({path!r}, 'a'); "
+                "print('ready', flush=True); sys.stdin.read()",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert writer.stdout.readline().strip() == "ready"
+            registry = ObjectStoreRegistry(
+                {f"file://{os.path.dirname(path)}": LocalStore(os.path.dirname(path))}
+            )
+            store = HDFParser()(url=chunk_dense_hdf5_url, registry=registry)
+            assert "x" in store._group.arrays
+        finally:
+            writer.communicate()
