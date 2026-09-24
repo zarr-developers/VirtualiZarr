@@ -491,12 +491,6 @@ snapshot_id = session.commit("Wrote the file without going via xarray")
 print(snapshot_id)
 ```
 
-Nothing is loaded on this path, so references stay virtual and keep the file's own chunking, including for the coordinate variables that `open_virtual_dataset` loads by default.
-Appending and region writes are only available through the virtual dataset API, since both are defined in terms of dimension names.
-To write a single group rather than a whole store, use [ManifestGroup.to_icechunk][virtualizarr.manifests.ManifestGroup.to_icechunk].
-
-##### Loading arrays without xarray
-
 Loading an array copies its data into Icechunk, so reading it no longer touches the archival file.
 This is helpful for small arrays that are read often, such as coordinates, especially when they are split into one chunk per archival file and would be better stored as a few larger chunks.
 
@@ -540,9 +534,6 @@ Merging chunks works the same way: to load a coordinate stored as one chunk per 
 !!! important
     `zarr.from_array` copies the fill value and attributes only from zarr 3.4 onwards.
     With older versions, pass them yourself, as in `fill_value=lat_source.fill_value, attributes=lat_source.attrs.asdict()`.
-
-!!! note
-    `ManifestStore` and `ManifestGroup` are experimental, and their API may change without notice.
 
 ### Writing to Kerchunk's format and reading data via fsspec
 

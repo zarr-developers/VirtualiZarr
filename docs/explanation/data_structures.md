@@ -294,20 +294,6 @@ The models are not identical: xarray adds constraints that Zarr doesn't have, an
 Parsers can still represent all of these, because a `ManifestStore` follows the Zarr model.
 Converting such a store to a virtual dataset or datatree either fails or, for repeated dimension names, warns. You can instead write it to Icechunk directly with [ManifestStore.to_icechunk][virtualizarr.manifests.ManifestStore.to_icechunk], as shown in [the usage guide](../how_to/usage.md#writing-to-icechunk-without-xarray).
 
-### Where each representation keeps metadata
-
-| | `ManifestArray` and `ManifestGroup` | Virtual xarray Dataset |
-| --- | --- | --- |
-| Dimension names | `ManifestArray.metadata.dimension_names` | `Variable.dims` |
-| Array attributes | `ManifestArray.metadata.attributes` | `Variable.attrs` |
-| Group attributes | `ManifestGroup.metadata.attributes` | `Dataset.attrs` |
-| Which variables are coordinates | Not part of the Zarr model; a file may record it in a CF `coordinates` attribute on each array | `Dataset.coords`, which `vds.vz.to_icechunk` writes as a `coordinates` attribute on each group |
-| CF encoding, such as `scale_factor`, `_FillValue` or time `units` | Array attributes, with values left encoded | Virtual variables: the same attributes, still not decoded. Loaded variables: decoded, with the encoding moved to `Variable.encoding` |
-
-When a `ManifestGroup` becomes a virtual dataset, each array's dimension names and attributes move onto its xarray variable, and the wrapped `ManifestArray` no longer carries them.
-xarray then keeps track of them as you combine datasets, and `vds.vz.to_icechunk` writes them from the variables.
-`ManifestStore.to_icechunk` instead writes each `ManifestArray`'s own metadata, so if you combine `ManifestArray` objects yourself with functions such as `np.concatenate`, the dimension names they hold are the ones that get stored.
-
 ### Loaded variables only exist in xarray
 
 [Loading a variable](faq.md#why-would-i-want-to-load-variables-using-loadable_variables) replaces its `ManifestArray` with an in-memory array, which only an xarray Dataset can hold alongside virtual variables.
