@@ -19,6 +19,11 @@
   rooted at the filesystem root (`file:///`). The store root URI was stripped of every
   trailing slash, mangling the scheme so Icechunk's virtual chunk container prefix never
   matched. By [Tom Nicholas](https://github.com/TomNicholas).
+- Writing to Icechunk with `mode="a"` now raises a `ValueError` if an array of the same
+  name already exists with different metadata, for example if it used a different codec.
+  Previously the new references were written under the old metadata, so reads silently
+  returned wrong values.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Documentation
 
