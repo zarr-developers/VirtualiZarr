@@ -14,7 +14,7 @@ from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
 )
-from virtualizarr.tests.utils import manifest_store_from_hdf_url
+from virtualizarr.tests.utils import manifest_store_from_hdf_url, open_hdf5
 
 
 @requires_hdf5plugin
@@ -133,12 +133,8 @@ class TestDatasetToManifestArray:
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         cf_fill_value_hdf5_url = f"file://{cf_fill_value_hdf5_file}"
-        with h5py.File(cf_fill_value_hdf5_file) as f:
+        with open_hdf5(cf_fill_value_hdf5_file) as f:
             dtype = f["data"].dtype
-        # A pytest.xfail traceback would keep `f` alive in a reference cycle, and
-        # h5py objects freed by the cyclic GC on another thread can deadlock on
-        # h5py's global lock (e.g. during kerchunk's SingleHdf5ToZarr.translate).
-        del f
         if dtype.kind in "S":
             pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
         if dtype.names:
