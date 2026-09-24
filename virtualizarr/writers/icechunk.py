@@ -7,10 +7,11 @@ import numpy as np
 import xarray as xr
 from xarray.backends.zarr import ZarrStore as XarrayZarrStore
 from xarray.backends.zarr import encode_zarr_attr_value
-from zarr import Array, Group, open_group
+from zarr import Array, Group, create_array, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
 from zarr.core.sync import sync
+from zarr.storage import MemoryStore
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -91,6 +92,8 @@ def virtual_dataset_to_icechunk(
         - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
         - ``"w"``: create the group, overwriting any existing contents at that path.
         - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+          An existing array of the same name must have the same metadata apart from
+          attributes, otherwise a ``ValueError`` is raised.
         - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
           is given, in which case the existing group is opened.
 
@@ -214,6 +217,8 @@ def virtual_datatree_to_icechunk(
           ``ContainsGroupError`` if it already exists.
         - ``"w"``: create each group, overwriting any existing contents at that path.
         - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+          An existing array of the same name must have the same metadata apart from
+          attributes, otherwise a ``ValueError`` is raised.
     write_inherited_coords
         If ``True``, replicate inherited coordinates on all descendant nodes of the
         tree. Otherwise, only write coordinates at the level at which they are
@@ -568,8 +573,7 @@ def write_virtual_variable_to_icechunk(
     else:
         chunk_offsets = [0 for _ in dims]
         filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
-        arr = group.require_array(
-            name=name,
+        array_kwargs = dict(
             shape=metadata.shape,
             chunks=metadata.chunks,
             shards=metadata.shards,
@@ -580,6 +584,10 @@ def write_virtual_variable_to_icechunk(
             dimension_names=var.dims,
             fill_value=metadata.fill_value,
         )
+        existing = group.get(name)
+        if isinstance(existing, Array):
+            _check_existing_array_matches(existing, array_kwargs)
+        arr = group.require_array(name=name, **array_kwargs)
 
         update_attributes(arr, var.attrs, encoding=var.encoding)
 
@@ -591,6 +599,33 @@ def write_virtual_variable_to_icechunk(
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
+
+
+def _check_existing_array_matches(existing: Array, array_kwargs: dict) -> None:
+    """
+    Raise if an existing array has different metadata, apart from attributes, than ``array_kwargs`` would create.
+
+    Raises
+    ------
+    ValueError
+        If any metadata differs. zarr's ``require_array`` would keep the stored
+        metadata, so the new refs would be decoded with the wrong codecs or read under
+        the wrong dimension names.
+    """
+    # build the requested metadata through zarr so it is normalized the same way as the stored metadata
+    requested = create_array(MemoryStore(), **array_kwargs).metadata.to_dict()
+    stored = existing.metadata.to_dict()
+    differing = sorted(
+        key
+        for key in requested.keys() | stored.keys()
+        if key != "attributes" and requested.get(key) != stored.get(key)
+    )
+    if differing:
+        raise ValueError(
+            f"Array {existing.path!r} already exists with different "
+            f"{', '.join(differing)}. Writing new references under the stored metadata "
+            "would decode them incorrectly; use mode='w' to replace the group instead."
+        )
 
 
 def write_manifest_to_icechunk(
