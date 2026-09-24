@@ -75,8 +75,8 @@ goes19_store = S3Store.from_url(
 
 ## 2. Building the time series
 
-A time series that spans the handover needs at least one file from each side of it.
 This example uses two files, taken at 12:00 UTC on 6 April and 8 April 2025, but the same code works for any number of files.
+These files are chosen as examples of spanning the handover between the two data sources.
 
 ```python exec="on" session="registry" source="above"
 goes16_url = (
