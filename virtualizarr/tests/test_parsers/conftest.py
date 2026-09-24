@@ -11,6 +11,8 @@ from packaging.version import Version
 from xarray.tests.test_dataset import create_test_data
 from xarray.util.print_versions import netcdf_and_hdf5_versions
 
+from virtualizarr.tests.utils import open_hdf5
+
 try:
     import hdf5plugin  # type: ignore
 except ModuleNotFoundError:
@@ -161,12 +163,16 @@ def string_attributes_hdf5_url(tmpdir):
 @pytest.fixture
 def bytes_attributes_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/bytes_attributes.nc"
-    f = h5py.File(filepath, "w")
-    data = np.random.random((10, 10))
-    f.create_dataset(name="data", data=data, chunks=None)
-    f["data"].attrs["character_array"] = np.array([b"2", b"0", b"4", b"2"], dtype="|S1")
-    f["data"].attrs["array"] = np.array([b"first", b"second"], dtype="|S6")
-    f["data"].attrs["array_2d"] = np.array([[b"a", b"b"], [b"c", b"d"]], dtype="|S1")
+    with open_hdf5(filepath, "w") as f:
+        data = np.random.random((10, 10))
+        f.create_dataset(name="data", data=data, chunks=None)
+        f["data"].attrs["character_array"] = np.array(
+            [b"2", b"0", b"4", b"2"], dtype="|S1"
+        )
+        f["data"].attrs["array"] = np.array([b"first", b"second"], dtype="|S6")
+        f["data"].attrs["array_2d"] = np.array(
+            [[b"a", b"b"], [b"c", b"d"]], dtype="|S1"
+        )
     return f"file://{filepath}"
 
 
