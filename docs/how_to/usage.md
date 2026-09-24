@@ -471,6 +471,71 @@ print(snapshot_id)
 
 See the [Icechunk documentation](https://icechunk.io/en/latest/virtual/) for more details.
 
+#### Writing to Icechunk without xarray
+
+A parser returns a [ManifestStore][virtualizarr.manifests.ManifestStore], which you can write to Icechunk directly with [ManifestStore.to_icechunk][virtualizarr.manifests.ManifestStore.to_icechunk], without converting it to a virtual dataset first.
+Every array and group is written with exactly the dimension names, attributes, codecs and fill values the parser produced.
+
+This is how to write files whose structure is valid Zarr but doesn't fit [xarray's data model](../explanation/data_structures.md#how-the-zarr-and-xarray-data-models-differ), such as:
+
+- arrays with no dimension names;
+- sibling arrays that share a dimension name at different lengths, like the levels of a multiscale image pyramid;
+- a subgroup that reuses one of its parent's dimension names at a different length.
+
+```python exec="on" session="usage" source="material-block" result="code"
+manifest_store = HDFParser()(url=url, registry=registry)
+
+session = repo.writable_session("main")
+manifest_store.to_icechunk(session.store, group="without_xarray")
+snapshot_id = session.commit("Wrote the file without going via xarray")
+print(snapshot_id)
+```
+
+Loading an array copies its data into Icechunk, so reading it no longer touches the archival file.
+This is helpful for small arrays that are read often, such as coordinates, especially when they are split into one chunk per archival file and would be better stored as a few larger chunks.
+Chunks the parser inlined, such as small chunks from Kerchunk references, are already written to Icechunk as native chunks, so reading them never touches the archival file.
+
+To load an array, copy it out of the `ManifestStore` with [zarr.from_array][], passing `overwrite=True` to replace the virtual array.
+The copy has the same chunks, codecs and dimension names as the source:
+
+```python exec="on" session="usage" source="material-block" result="code"
+import zarr
+
+session = repo.writable_session("main")
+
+lat_source = zarr.open_array(manifest_store, path="lat", mode="r", zarr_format=3)
+lat = zarr.from_array(
+    session.store, name="without_xarray/lat", data=lat_source, overwrite=True
+)
+print("source:", lat_source.chunks, lat_source.compressors)
+print("copy:  ", lat.chunks, lat.compressors)
+```
+
+To update the chunking, codecs or any other metadata, pass new values to `from_array`, such as `chunks=` or `compressors=`.
+This copy of `lon` splits the file's single chunk of 1440 values into four chunks of 360, and uses Zstandard instead of the file's shuffle and zlib:
+
+```python exec="on" session="usage" source="material-block" result="code"
+lon_source = zarr.open_array(manifest_store, path="lon", mode="r", zarr_format=3)
+lon = zarr.from_array(
+    session.store,
+    name="without_xarray/lon",
+    data=lon_source,
+    chunks=(360,),
+    compressors=zarr.codecs.ZstdCodec(),
+    overwrite=True,
+)
+print("source:", lon_source.chunks, lon_source.compressors)
+print("copy:  ", lon.chunks, lon.compressors)
+
+snapshot_id = session.commit("Loaded lat and lon")
+```
+
+Merging chunks works the same way: to load a coordinate stored as one chunk per file into a single chunk, pass its full length as `chunks=`.
+
+!!! important
+    `zarr.from_array` copies the fill value and attributes only from zarr 3.4 onwards.
+    With older versions, pass them yourself, as in `fill_value=lat_source.fill_value, attributes=lat_source.attrs.asdict()`.
+
 ### Writing to Kerchunk's format and reading data via fsspec
 
 The [kerchunk library](https://github.com/fsspec/kerchunk) has its own [specification](https://fsspec.github.io/kerchunk/spec.html) for serializing virtual datasets as a JSON file or Parquet directory.

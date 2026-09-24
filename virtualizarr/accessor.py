@@ -111,6 +111,8 @@ class _VirtualiZarrDatasetAccessor:
             - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
             - ``"w"``: create the group, overwriting any existing contents at that path.
             - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised.
             - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
               is given, in which case the existing group is opened.
 
@@ -381,6 +383,8 @@ class _VirtualiZarrDataTreeAccessor:
               ``ContainsGroupError`` if it already exists.
             - ``"w"``: create each group, overwriting any existing contents at that path.
             - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised.
         write_inherited_coords
             If ``True``, replicate inherited coordinates on all descendant nodes.
             Otherwise, only write coordinates at the level at which they are
