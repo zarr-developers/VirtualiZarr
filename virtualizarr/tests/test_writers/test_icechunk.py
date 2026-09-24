@@ -312,10 +312,12 @@ def test_set_grid_virtual_refs(icechunk_filestore: "IcechunkStore", synthetic_vd
     npt.assert_equal(observed, arr)
 
 
+@pytest.mark.parametrize("via_xarray", [True, False])
 def test_set_inlined_and_virtual_refs(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
     tmp_path: Path,
+    via_xarray: bool,
 ):
     # ManifestArray with shape (2, 2), chunks (1, 2): position (0, .) is inlined
     # with values [1, 2]; position (1, .) is virtual with values [3, 4] read from
@@ -355,9 +357,11 @@ def test_set_inlined_and_virtual_refs(
         storage_transformers=None,
     )
     ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
-    vds = xr.Dataset({"foo": xr.Variable(data=ma, dims=["y", "x"])})
-
-    vds.vz.to_icechunk(icechunk_filestore)
+    if via_xarray:
+        vds = xr.Dataset({"foo": xr.Variable(data=ma, dims=["y", "x"])})
+        vds.vz.to_icechunk(icechunk_filestore)
+    else:
+        ManifestGroup(arrays={"foo": ma}).to_icechunk(icechunk_filestore)
     icechunk_filestore.session.commit("test")
 
     icechunk_readonly_session = icechunk_repo.readonly_session("main")

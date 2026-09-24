@@ -493,6 +493,7 @@ print(snapshot_id)
 
 Loading an array copies its data into Icechunk, so reading it no longer touches the archival file.
 This is helpful for small arrays that are read often, such as coordinates, especially when they are split into one chunk per archival file and would be better stored as a few larger chunks.
+Chunks the parser inlined, such as small chunks from Kerchunk references, are already written to Icechunk as native chunks, so reading them never touches the archival file.
 
 To load an array, copy it out of the `ManifestStore` with [zarr.from_array][], passing `overwrite=True` to replace the virtual array.
 The copy has the same chunks, codecs and dimension names as the source:
