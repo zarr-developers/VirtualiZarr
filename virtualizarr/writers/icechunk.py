@@ -10,7 +10,10 @@ from xarray.backends.zarr import encode_zarr_attr_value
 from zarr import Array, Group, open_group
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
+from zarr.core.metadata import ArrayV3Metadata
+from zarr.core.metadata.io import save_metadata
 from zarr.core.sync import sync
+from zarr.experimental import ChunkGrid
 
 from virtualizarr.codecs import extract_codecs, get_codecs
 from virtualizarr.manifests import ChunkManifest, ManifestArray
@@ -23,6 +26,10 @@ from virtualizarr.manifests.utils import (
     check_same_ndims,
     check_same_shapes_except_axes,
     check_same_shapes_except_on_concat_axis,
+    chunk_grid_sizes,
+    copy_and_replace_metadata,
+    full_chunk_edges,
+    require_rectilinear_chunks_enabled,
 )
 
 if TYPE_CHECKING:
@@ -450,7 +457,10 @@ def num_chunks(
     array,
     axis: int,
 ) -> int:
-    return array.shape[axis] // array.chunks[axis]
+    sizes = chunk_grid_sizes(array.metadata)[axis]
+    if isinstance(sizes, int):
+        return array.shape[axis] // sizes
+    return len(sizes)
 
 
 def resize_array(
@@ -460,7 +470,38 @@ def resize_array(
 ) -> None:
     new_shape = list(arr.shape)
     new_shape[append_axis] += manifest_array.shape[append_axis]
-    arr.resize(tuple(new_shape))
+
+    existing_grid = ChunkGrid.from_metadata(arr.metadata)
+    new_grid = manifest_array.chunk_grid
+    stays_regular = (
+        existing_grid.is_regular
+        and new_grid.is_regular
+        and existing_grid.chunk_shape[append_axis] == new_grid.chunk_shape[append_axis]
+    )
+    if stays_regular:
+        arr.resize(tuple(new_shape))
+        return
+
+    # The append axis's chunk sizes genuinely differ (or one side is already
+    # rectilinear), so the merged result needs a rectilinear chunk grid - exactly
+    # like concatenate(), but updating an existing on-disk array's metadata instead
+    # of building a fresh in-memory one. zarr's own Array.resize() only ever adds a
+    # single new edge covering the whole size increase, which would be wrong here if
+    # manifest_array itself has more than one chunk along this axis, so the merged
+    # edges are computed and written explicitly instead.
+    require_rectilinear_chunks_enabled(f"Appending along axis {append_axis}")
+
+    old_edges = full_chunk_edges(arr.metadata)
+    new_edges = full_chunk_edges(manifest_array.metadata)
+    merged_chunks = list(old_edges)
+    merged_chunks[append_axis] = old_edges[append_axis] + new_edges[append_axis]
+
+    new_metadata = copy_and_replace_metadata(
+        old_metadata=cast(ArrayV3Metadata, arr.metadata),
+        new_shape=new_shape,
+        new_chunks=merged_chunks,
+    )
+    sync(save_metadata(arr.store_path, new_metadata))
 
 
 def get_axis(
@@ -481,13 +522,27 @@ def check_compatible_arrays(
     arrays: List[Union[ManifestArray, Array]] = [ma, existing_array]
     check_same_dtypes([arr.dtype for arr in arrays])
     check_same_codecs([get_codecs(arr) for arr in arrays])
-    check_same_chunk_shapes([arr.metadata.chunks for arr in arrays])
     check_same_ndims([ma.ndim, existing_array.ndim])
+
+    # Check shapes before chunk shapes, so a genuine shape mismatch is reported as
+    # such rather than as a chunk-shape one. This matters for a region write in
+    # particular: ma there is deliberately a much smaller tile than existing_array
+    # (the full destination array), and their shapes are never expected to match.
     arr_shapes = [ma.shape, existing_array.shape]
     if append_axis is not None:
         check_same_shapes_except_on_concat_axis(arr_shapes, append_axis)
     if except_axes is not None:
         check_same_shapes_except_axes(arr_shapes, except_axes)
+
+    # Compare declared (not shape-expanded) chunk sizes: ma and existing_array can
+    # have very different shapes for a region write, so a shape-dependent form like
+    # full_chunk_edges would flag the same declared chunk size as a mismatch purely
+    # because it truncates differently at each array's own boundary. Chunk sizes are
+    # allowed to differ along the append axis - that's what lets resize_array()
+    # promote the result to a rectilinear chunk grid.
+    check_same_chunk_shapes(
+        [chunk_grid_sizes(arr.metadata) for arr in arrays], exclude_axis=append_axis
+    )
 
 
 def write_virtual_variable_to_icechunk(
@@ -510,8 +565,10 @@ def write_virtual_variable_to_icechunk(
     if append_dim and append_dim in dims:
         # TODO: MRP - zarr, or icechunk zarr, array assignment to a variable doesn't work to point to the same object
         # for example, if you resize an array, it resizes the array but not the bound variable.
-        if not isinstance(group[name], Array):
+        existing_arr = group[name]
+        if not isinstance(existing_arr, Array):
             raise ValueError("Expected existing array to be a zarr.core.Array")
+
         append_axis = get_axis(dims, append_dim)
 
         # check if arrays can be concatenated
@@ -539,6 +596,19 @@ def write_virtual_variable_to_icechunk(
             raise ValueError(
                 f"Expected {name!r} to be a zarr.core.Array, got {type(existing_array)}"
             )
+
+        # Region alignment is checked against a single chunk_size per axis, which has
+        # no equivalent for a rectilinear axis's irregular chunk boundaries.
+        if (
+            not ma.chunk_grid.is_regular
+            or not ChunkGrid.from_metadata(existing_array.metadata).is_regular
+        ):
+            raise NotImplementedError(
+                f"Cannot write variable {name!r} to icechunk region {region!r}: "
+                "region writes are not yet supported for arrays with a rectilinear "
+                "(variable-length) chunk grid."
+            )
+
         check_compatible_arrays(
             ma,
             existing_array,
@@ -568,10 +638,19 @@ def write_virtual_variable_to_icechunk(
     else:
         chunk_offsets = [0 for _ in dims]
         filters, serializer, compressors = extract_codecs(metadata.inner_codecs)
+        try:
+            # For a sharded array, ArrayV3Metadata.chunks is the *inner* chunk shape
+            # (from the sharding codec) - the shape create_array expects for `chunks`
+            # alongside `shards`. chunk_grid_sizes gives the *outer*/shard shape
+            # instead (the manifest's unit), which is wrong here, so only fall back to
+            # it where .chunks itself doesn't apply (a rectilinear chunk grid).
+            chunks = metadata.chunks
+        except NotImplementedError:
+            chunks = chunk_grid_sizes(metadata)
         arr = group.require_array(
             name=name,
             shape=metadata.shape,
-            chunks=metadata.chunks,
+            chunks=chunks,
             shards=metadata.shards,
             dtype=metadata.data_type.to_native_dtype(),
             filters=filters,

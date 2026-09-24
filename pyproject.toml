@@ -27,7 +27,7 @@ dependencies = [
     "numcodecs>=0.15.1",
     "ujson",
     "packaging",
-    "zarr>=3.1.6",  # earlier versions mis-list nested group contents, silently dropping arrays (zarr-python#3657)
+    "zarr>=3.2.1",  # first release exposing zarr.experimental.ChunkGrid, used for regular and rectilinear chunk grid handling
     "obstore>=0.7.0",
     "obspec_utils>=0.9.0",
 ]
@@ -139,6 +139,7 @@ dev = [
     "s3fs",
     "lithops",
     "dask",
+    "tifffile>=2026.2.16,<2027"
 ]
 
 [project.urls]
@@ -187,6 +188,11 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+[tool.pixi.feature.rectilinear.pypi-dependencies]
+zarr = { git = "https://github.com/zarr-developers/zarr-python.git", branch = "main" }
+xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "poc/unified-zarr-chunk-grid" }
+virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "poc/unified-chunk-grid" }
+
 # `pip` is needed by the Upstream CI job to overlay dev versions from
 # ci/upstream-overrides.txt on top of the pixi-resolved env. See issue #995.
 [tool.pixi.feature.upstream-overlay.dependencies]
@@ -199,7 +205,7 @@ install-upstream-overrides = { cmd = "pip install --upgrade --no-deps -r ci/upst
 xarray = "==2025.6.0"
 numpy = "==2.1.0"
 numcodecs = "==0.15.1"
-zarr = "==3.1.6"
+zarr = "==3.2.1"
 obstore = "==0.7.0"
 icechunk = "==2.0.3"
 
@@ -227,6 +233,7 @@ test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechu
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "fits", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
+rectilinear = ["dev", "test", "tiff", "hdf5-lib", "rectilinear", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
 

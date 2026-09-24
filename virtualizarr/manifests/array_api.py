@@ -2,8 +2,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
-
-from virtualizarr.utils import determine_chunk_grid_shape
+from zarr.experimental import ChunkGrid
 
 from .manifest import MISSING_CHUNK_PATH, ChunkManifest
 from .utils import (
@@ -12,8 +11,11 @@ from .utils import (
     check_same_ndims,
     check_same_shapes,
     check_same_shapes_except_on_concat_axis,
+    chunk_grid_sizes,
     copy_and_replace_metadata,
+    full_chunk_edges,
     manifest_chunk_shape,
+    require_rectilinear_chunks_enabled,
 )
 
 if TYPE_CHECKING:
@@ -97,6 +99,23 @@ def where(condition, x, y, /):
     )
 
 
+def _chunk_sizes(
+    arr: "ManifestArray",
+) -> tuple[int, ...] | tuple[tuple[int, ...], ...]:
+    """
+    Per-axis chunk size(s) of a ManifestArray.
+
+    For a regular grid this is a tuple of ints (e.g. ``(30, 50)``); for a rectilinear
+    grid it's a tuple of per-axis chunk-edge tuples (e.g. ``((10, 20, 30), (50, 50))``).
+
+    Deliberately not exposed as ``ManifestArray.chunks`` - xarray's ``is_chunked_array``
+    duck-types on ``hasattr(x, "chunks")`` and would misclassify a virtual array as a
+    computable dask-like array (see #1016).
+    """
+    grid = arr.chunk_grid
+    return grid.chunk_shape if grid.is_regular else grid.chunk_sizes
+
+
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
@@ -127,9 +146,6 @@ def concatenate(
     elif not isinstance(axis, int):
         raise TypeError()
 
-    # ensure dtypes, shapes, codecs etc. are consistent
-    check_combinable_zarr_arrays(arrays)
-
     check_same_ndims([arr.ndim for arr in arrays])
 
     # Ensure we handle axis being passed as a negative integer
@@ -137,9 +153,19 @@ def concatenate(
     if axis < 0:
         axis = axis % first_arr.ndim
 
+    # Check shapes are consistent before chunk shapes: a mismatched array shape on a
+    # non-concat axis can also change that axis's boundary-truncated chunk edges,
+    # which would otherwise surface as a confusing "needs a rectilinear chunk grid"
+    # error instead of the more direct "differing shapes" one.
     arr_shapes = [arr.shape for arr in arrays]
-    arr_chunks = [manifest_chunk_shape(arr.metadata) for arr in arrays]
     check_same_shapes_except_on_concat_axis(arr_shapes, axis)
+
+    # ensure dtypes, codecs and chunk shapes are consistent (chunk sizes along the
+    # concat axis itself are allowed to differ - that's what a rectilinear chunk
+    # grid is for)
+    check_combinable_zarr_arrays(arrays, exclude_axis=axis)
+
+    arr_chunks = [chunk_grid_sizes(arr.metadata) for arr in arrays]
     check_no_partial_chunks_on_concat_axis(arr_shapes, arr_chunks, axis)
 
     # find what new array shape must be
@@ -153,8 +179,28 @@ def concatenate(
         [arr.manifest for arr in arrays], axis=axis
     )
 
+    # The result stays a regular grid only if every input is itself regular and they
+    # all declare the same chunk size along the concat axis. Otherwise the concat
+    # axis's real per-chunk edges (which may already differ, or may only differ once
+    # merged) have to be spelled out explicitly, promoting the result to a rectilinear
+    # chunk grid.
+    stays_regular = all(arr.chunk_grid.is_regular for arr in arrays) and (
+        len({arr.chunk_grid.chunk_shape[axis] for arr in arrays}) == 1
+    )
+
+    new_chunks = None
+    if not stays_regular:
+        require_rectilinear_chunks_enabled(
+            f"Concatenating these arrays along axis {axis}"
+        )
+        new_chunks = list(full_chunk_edges(first_arr.metadata))
+        concat_edges: tuple[int, ...] = ()
+        for arr in arrays:
+            concat_edges = concat_edges + full_chunk_edges(arr.metadata)[axis]
+        new_chunks[axis] = concat_edges
+
     new_metadata = copy_and_replace_metadata(
-        old_metadata=first_arr.metadata, new_shape=new_shape
+        old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
     )
 
     return ManifestArray(chunkmanifest=concatenated_manifest, metadata=new_metadata)
@@ -199,10 +245,17 @@ def stack(
     # do stacking of entries in manifest
     stacked_manifest = _stack_manifests([arr.manifest for arr in arrays], axis=axis)
 
-    # chunk shape has changed because a length-1 axis has been inserted
-    old_chunks = manifest_chunk_shape(first_arr.metadata)
+    # chunk shape has changed because a new axis has been inserted, with one
+    # length-1 chunk per stacked array
+    old_chunks = _chunk_sizes(first_arr)
     new_chunks = list(old_chunks)
-    new_chunks.insert(axis, 1)
+    # For rectilinear grids, each element is a sequence of edges rather than a
+    # single chunk size, so the new axis needs one size-1 edge per stacked array
+    if not first_arr.chunk_grid.is_regular:
+        require_rectilinear_chunks_enabled("Stacking these arrays")
+        new_chunks.insert(axis, (1,) * length_along_new_stacked_axis)
+    else:
+        new_chunks.insert(axis, 1)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=first_arr.metadata, new_shape=new_shape, new_chunks=new_chunks
@@ -238,22 +291,21 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
 
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    old_chunk_shape = manifest_chunk_shape(x.metadata)
+    # broadcast_to only applies to regular chunk grids
+    old_chunk_shape = x.chunk_grid.chunk_shape
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
     )
-
-    # find new chunk grid shape by dividing new array shape by new chunk shape
-    new_chunk_grid_shape = determine_chunk_grid_shape(new_shape, new_chunk_shape)
-
-    # do broadcasting of entries in manifest
-    broadcasted_manifest = _broadcast_manifest(x.manifest, shape=new_chunk_grid_shape)
 
     new_metadata = copy_and_replace_metadata(
         old_metadata=x.metadata,
         new_shape=list(new_shape),
         new_chunks=list(new_chunk_shape),
     )
+    new_chunk_grid_shape = ChunkGrid.from_metadata(new_metadata).grid_shape
+
+    # do broadcasting of entries in manifest
+    broadcasted_manifest = _broadcast_manifest(x.manifest, shape=new_chunk_grid_shape)
 
     return ManifestArray(chunkmanifest=broadcasted_manifest, metadata=new_metadata)
 

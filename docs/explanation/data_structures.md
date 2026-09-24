@@ -231,6 +231,57 @@ This concatenation property is what allows us to combine the data from multiple 
 
     Implementing this feature will require a more abstract and general notion of concatenation, see [GH issue #5](https://github.com/zarr-developers/VirtualiZarr/issues/5). See the [FAQ](faq.md#can-my-specific-data-be-virtualized) for other restrictions on what data can be virtualized.
 
+### Rectilinear chunk grids
+
+By default a Zarr array's chunk grid is **regular** - every chunk along a given axis has the same declared size (except the final chunk, which may be smaller).
+`ManifestArray` also supports **rectilinear** (variable-length) chunk grids, where the chunk sizes along an axis are an explicit list rather than a single uniform value.
+This is what allows concatenating archival files that were chunked differently along the concatenation axis, relaxing one of the [restrictions on what data can be virtualized](faq.md#can-my-specific-data-be-virtualized).
+
+Rectilinear chunk grids are an experimental Zarr feature, so support for them is opt-in. Enable it with:
+
+```python
+import zarr
+
+zarr.config.set({"array.rectilinear_chunks": True})
+```
+
+or the `ZARR_ARRAY__RECTILINEAR_CHUNKS` environment variable, before concatenating or stacking any `ManifestArray`s whose chunk sizes might not match exactly.
+
+The `ManifestArray.chunk_grid` property exposes the chunk grid directly, regardless of whether it's regular or rectilinear:
+
+```python
+marr.chunk_grid.is_regular
+```
+
+```
+True
+```
+
+Concatenating or stacking `ManifestArray`s whose chunk sizes along the join axis differ automatically produces a rectilinear result, once the feature above is enabled:
+
+```python
+import numpy as np
+
+# marr_10s is chunked in blocks of 10 along axis 0; marr_15s in blocks of 15
+concatenated = np.concatenate([marr_10s, marr_15s], axis=0)
+concatenated.chunk_grid.chunk_sizes
+```
+
+```
+((10, 15),)
+```
+
+If rectilinear chunk grids are not enabled, the same call raises a `ValueError`, rather than silently producing metadata that most Zarr tooling can't yet read.
+
+!!! warning
+    Rectilinear chunk grid support is still limited. Concatenation, stacking, and appending are supported, and the result can be written to an [Icechunk](https://icechunk.io/) store. But **region writes** to a rectilinear-chunked array are not yet implemented - region alignment is checked against a single chunk size per axis, which has no equivalent for irregular chunk boundaries.
+
+    Note also that some formats (including Zarr and Icechunk stores) could in principle already be rectilinear on disk, but VirtualiZarr can't read those back yet either.
+
+Note that reading such stores back with Xarray requires the latest version of Xarray (v2026.09.0).
+
+### Loading values
+
 Remember that you cannot load values from a `ManifestArray` directly.
 
 ```python
