@@ -14,7 +14,7 @@ from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
 )
-from virtualizarr.tests.utils import manifest_store_from_hdf_url
+from virtualizarr.tests.utils import manifest_store_from_hdf_url, open_hdf5
 
 
 @requires_hdf5plugin
@@ -140,11 +140,11 @@ class TestDatasetToManifestArray:
 
     def test_cf_fill_value(self, cf_fill_value_hdf5_file):
         cf_fill_value_hdf5_url = f"file://{cf_fill_value_hdf5_file}"
-        f = h5py.File(cf_fill_value_hdf5_file)
-        ds = f["data"]
-        if ds.dtype.kind in "S":
+        with open_hdf5(cf_fill_value_hdf5_file) as f:
+            dtype = f["data"].dtype
+        if dtype.kind in "S":
             pytest.xfail("Investigate fixed-length binary encoding in Zarr v3")
-        if ds.dtype.names:
+        if dtype.names:
             pytest.xfail("To fix, structured dtype fill value encoding for Zarr parser")
         manifest_store = manifest_store_from_hdf_url(cf_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
