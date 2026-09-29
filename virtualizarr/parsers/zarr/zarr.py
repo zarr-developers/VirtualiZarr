@@ -112,7 +112,9 @@ class ZarrParser:
 
         # Compute the store root URI by stripping the relative path from the full URI
         rel_path = str(store_relative_path)
-        store_root_uri = uri.removesuffix(rel_path).rstrip("/") if rel_path else uri
+        # Trailing slashes are left for join_url to handle, so that a root like
+        # "file:///" is not truncated to "file:"
+        store_root_uri = uri.removesuffix(rel_path) if rel_path else uri
 
         # Combine the store-relative path with optional group to get the full
         # path within the object store to the zarr group
@@ -352,6 +354,6 @@ async def build_1d_chunk_mapping(
     stripped_keys = np.strings.replace(all_paths, array_chunks_prefix, "", 1)
 
     # construct full URIs for each chunk
-    full_paths = np.strings.add(store_base_uri + "/", all_paths)
+    full_paths = np.strings.add(join_url(store_base_uri, ""), all_paths)
 
     return stripped_keys, full_paths, all_sizes

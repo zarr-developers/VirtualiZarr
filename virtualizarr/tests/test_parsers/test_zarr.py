@@ -202,6 +202,22 @@ def test_join_url_empty_base():
     assert result == "some/key"
 
 
+@pytest.mark.parametrize(
+    "base, key, expected",
+    [
+        ("s3://bucket/store.zarr", "a/c/0", "s3://bucket/store.zarr/a/c/0"),
+        ("s3://bucket/store.zarr/", "/a/c/0", "s3://bucket/store.zarr/a/c/0"),
+        ("file:///", "tmp/store.zarr/a/c/0", "file:///tmp/store.zarr/a/c/0"),
+        ("file:///", "", "file:///"),
+        ("s3://", "bucket/a/c/0", "s3://bucket/a/c/0"),
+        ("/tmp/store.zarr/", "a/c/0", "/tmp/store.zarr/a/c/0"),
+    ],
+)
+def test_join_url_preserves_scheme_root(base, key, expected):
+    """A bare scheme root like "file:///" must not be truncated to "file:"."""
+    assert join_url(base, key) == expected
+
+
 def test_unsupported_zarr_format():
     """Test that unsupported zarr format raises ValueError."""
     with pytest.raises(ValueError):
@@ -592,6 +608,23 @@ def test_parser_scalar_roundtrip_matches_xarray(tmpdir, zarr_format):
             manifeststore, engine="zarr", consolidated=False, zarr_format=3
         ) as actual:
             xr.testing.assert_identical(actual, expected)
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_parser_with_registry_rooted_at_filesystem_root(tmpdir, zarr_format):
+    """Regression test: a registry rooted at "file:///" made the parser emit
+    manifest paths as "file:/..." instead of "file:///...", so Icechunk's virtual
+    chunk container prefix never matched."""
+    filepath = f"{tmpdir}/test.zarr"
+    ds = xr.Dataset({"a": ("x", np.arange(4))}).chunk({"x": 2})
+    ds.to_zarr(filepath, zarr_format=zarr_format)
+
+    registry = ObjectStoreRegistry({"file:///": LocalStore(prefix="/")})
+    manifeststore = ZarrParser()(url=filepath, registry=registry)
+
+    manifest = manifeststore._group.arrays["a"].manifest
+    for entry in manifest.dict().values():
+        assert entry["path"].startswith(f"file://{filepath}/a/")
 
 
 def test_run_async_without_running_loop():

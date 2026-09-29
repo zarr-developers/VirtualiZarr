@@ -1,5 +1,7 @@
 import numpy as np
+import obstore as obs
 import pytest
+import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from conftest import (
@@ -7,7 +9,12 @@ from conftest import (
     ZLIB_CODEC,
     sharding_codec,
 )
-from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests import (
+    ChunkManifest,
+    ManifestArray,
+    ManifestGroup,
+    ManifestStore,
+)
 from virtualizarr.manifests.indexing import SubChunkIndexingError
 
 
@@ -489,6 +496,127 @@ class TestConcat:
         assert codec_dict["name"] == "numcodecs.zlib"
         assert codec_dict["configuration"] == {"level": 1}
         assert result.metadata.fill_value == metadata.fill_value
+
+    def test_concat_partial_chunk_on_last_input_succeeds(self, array_v3_metadata):
+        # a trailing partial chunk on the *last* input is just ordinary regular-grid
+        # boundary truncation of the concatenated result - it must not be rejected
+        metadata_full = array_v3_metadata(shape=(200,), chunks=(200,))
+        metadata_short = array_v3_metadata(shape=(150,), chunks=(200,))
+        marr1 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/a.nc", "offset": 0, "length": 800}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/b.nc", "offset": 0, "length": 800}}
+            ),
+        )
+        marr3 = ManifestArray(
+            metadata=metadata_short,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/c.nc", "offset": 0, "length": 600}}
+            ),
+        )
+
+        result = np.concatenate([marr1, marr2, marr3], axis=0)
+
+        assert result.shape == (550,)
+        assert result.metadata.chunks == (200,)
+
+    def test_concat_partial_chunk_before_last_input_still_raises(
+        self, array_v3_metadata
+    ):
+        # a partial chunk anywhere *except* the last input would leave a short
+        # chunk with more data appended after it - not representable without
+        # rewriting bytes
+        metadata_full = array_v3_metadata(shape=(200,), chunks=(200,))
+        metadata_short = array_v3_metadata(shape=(150,), chunks=(200,))
+        marr_short = ManifestArray(
+            metadata=metadata_short,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/a.nc", "offset": 0, "length": 600}}
+            ),
+        )
+        marr_full = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": "/b.nc", "offset": 0, "length": 800}}
+            ),
+        )
+
+        with pytest.raises(
+            ValueError, match="Cannot concatenate arrays with partial chunks"
+        ):
+            np.concatenate([marr_short, marr_full], axis=0)
+
+    def test_concat_partial_chunk_on_last_input_reads_back_correctly(
+        self, array_v3_metadata, tmp_path, local_registry
+    ):
+        # the concatenated result stays a plain regular chunk grid (see
+        # test_concat_partial_chunk_on_last_input_stays_regular), so it must be
+        # readable through the ordinary ManifestStore + xarray path - no
+        # rectilinear/variable-length chunk support needed on either side
+        arr1 = np.arange(200, dtype="<i8")
+        arr2 = np.arange(200, 400, dtype="<i8")
+        arr3 = np.arange(400, 550, dtype="<i8")  # 150 elements: a short last input
+
+        # A regular chunk grid's boundary chunk is still stored at its full declared
+        # chunk_shape on disk - that's how real formats like HDF5 lay out a chunked
+        # dataset whose shape isn't a multiple of its chunk size, and it's what lets
+        # zarr's bytes codec decode the chunk at all (it always reshapes to the full
+        # declared chunk_shape). The array's declared *shape* of 150 is what then
+        # truncates off the trailing padding when the values are read.
+        arr3_padded = np.concatenate([arr3, np.zeros(50, dtype=arr3.dtype)])
+
+        store = obs.store.LocalStore()
+        filepath1 = str(tmp_path / "a")
+        filepath2 = str(tmp_path / "b")
+        filepath3 = str(tmp_path / "c")
+        obs.put(store, filepath1, arr1.tobytes())
+        obs.put(store, filepath2, arr2.tobytes())
+        obs.put(store, filepath3, arr3_padded.tobytes())
+
+        metadata_full = array_v3_metadata(
+            shape=(200,), chunks=(200,), data_type=arr1.dtype, dimension_names=("x",)
+        )
+        metadata_short = array_v3_metadata(
+            shape=(150,), chunks=(200,), data_type=arr1.dtype, dimension_names=("x",)
+        )
+        marr1 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": filepath1, "offset": 0, "length": arr1.nbytes}}
+            ),
+        )
+        marr2 = ManifestArray(
+            metadata=metadata_full,
+            chunkmanifest=ChunkManifest(
+                entries={"0": {"path": filepath2, "offset": 0, "length": arr2.nbytes}}
+            ),
+        )
+        marr3 = ManifestArray(
+            metadata=metadata_short,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    "0": {
+                        "path": filepath3,
+                        "offset": 0,
+                        "length": arr3_padded.nbytes,
+                    }
+                }
+            ),
+        )
+
+        result = np.concatenate([marr1, marr2, marr3], axis=0)
+
+        manifest_store = ManifestStore(
+            group=ManifestGroup(arrays={"v": result}), registry=local_registry
+        )
+        with xr.open_zarr(manifest_store, consolidated=False, zarr_format=3) as ds:
+            np.testing.assert_equal(ds["v"].values, np.concatenate([arr1, arr2, arr3]))
 
 
 class TestConcatInlined:

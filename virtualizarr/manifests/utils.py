@@ -286,9 +286,20 @@ def _remove_elements_at_positions(
 def check_no_partial_chunks_on_concat_axis(
     shapes: list[tuple[int, ...]], chunks: list[tuple[int, ...]], axis: int
 ):
-    """Check that there are no partial chunks along the concatenation axis"""
+    """Check that there are no partial chunks before the last input on the
+    concatenation axis.
+
+    A partial (boundary-truncated) chunk is only ever valid on the very last
+    input - that's just the ordinary regular-grid case of a shorter trailing
+    chunk. On any earlier input it would leave a short chunk with more data
+    appended after it, which a regular chunk grid can't represent without
+    rewriting bytes.
+    """
+    last_index = len(shapes) - 1
     # loop over the arrays to be concatenated
     for i, (shape, chunk_shape) in enumerate(zip(shapes, chunks)):
+        if i == last_index:
+            continue
         if shape[axis] % chunk_shape[axis] > 0:
             raise ValueError(
                 "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "

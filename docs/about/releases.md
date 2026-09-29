@@ -8,6 +8,23 @@
 
 ### Bug fixes
 
+- Concatenating regularly-chunked arrays no longer fails just because the *last* input
+  has a shorter trailing chunk than its declared chunk size - a common pattern when
+  combining several regularly-chunked files, scenes, or tiles of differing lengths. A
+  partial chunk on any earlier input is still rejected, since that would leave a short
+  chunk with more data appended after it, which a regular chunk grid can't represent
+  without rewriting bytes.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ZarrParser` no longer emits manifest paths as `file:/...` when the registry's store is
+  rooted at the filesystem root (`file:///`). The store root URI was stripped of every
+  trailing slash, mangling the scheme so Icechunk's virtual chunk container prefix never
+  matched. By [Tom Nicholas](https://github.com/TomNicholas).
+- Writing to Icechunk with `mode="a"` now raises a `ValueError` if an array of the same
+  name already exists with different metadata, for example if it used a different codec.
+  Previously the new references were written under the old metadata, so reads silently
+  returned wrong values.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Documentation
 
 ### Internal changes
