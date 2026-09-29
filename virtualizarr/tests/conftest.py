@@ -11,13 +11,15 @@ def container():
     client = docker.from_env()
     port = 9000
     minio_container = client.containers.run(
-        "quay.io/minio/minio",
+        # MinIO no longer publishes images to quay.io or Docker Hub, so use
+        # Chainguard's build from source instead
+        "cgr.dev/chainguard/minio",
         "server /data",
         detach=True,
         ports={f"{port}/tcp": port},
         environment={
-            "MINIO_ACCESS_KEY": "minioadmin",
-            "MINIO_SECRET_KEY": "minioadmin",
+            "MINIO_ROOT_USER": "minioadmin",
+            "MINIO_ROOT_PASSWORD": "minioadmin",
         },
     )
     time.sleep(3)  # give it time to boot
