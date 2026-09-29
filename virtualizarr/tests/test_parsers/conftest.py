@@ -95,6 +95,22 @@ def chunked_hdf5_url(tmpdir):
 
 
 @pytest.fixture
+def chunk_dense_hdf5_url(tmpdir):
+    # A chunk-dense dataset written in the "expensive" layout: an unlimited
+    # (extendable) dimension + libver="earliest" forces a scattered v1 B-tree
+    # chunk index, and gzip makes chunks variable-length (so a real index is
+    # required). Building a manifest through a fixed-block reader over-reads this
+    # index by ~1-2 orders of magnitude; the local native fast path avoids it.
+    filepath = f"{tmpdir}/chunk_dense.h5"
+    with h5py.File(filepath, "w", libver="earliest") as f:
+        data = (np.random.default_rng(0).standard_normal(400_000) * 100).astype("int64")
+        f.create_dataset(
+            "x", data=data, chunks=(1_000,), maxshape=(None,), compression="gzip"
+        )
+    return f"file://{filepath}"
+
+
+@pytest.fixture
 def single_dimension_scale_hdf5_url(tmpdir):
     filepath = f"{tmpdir}/single_dimension_scale.nc"
     f = h5py.File(filepath, "w")
