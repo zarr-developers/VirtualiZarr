@@ -1,12 +1,19 @@
+import numpy as np
 import pytest
+import xarray as xr
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import S3Store
+from obstore.store import LocalStore, S3Store
 from xarray import Dataset, DataTree
 
 from virtualizarr import open_virtual_dataset, open_virtual_datatree
-from virtualizarr.tests import requires_network, requires_tiff
+from virtualizarr.tests import requires_network, requires_tiff, requires_tifffile
 
 virtual_tiff = pytest.importorskip("virtual_tiff")
+
+# Partial trailing strips are unreleased in virtual-tiff (virtual-zarr/virtual-tiff#87),
+# and its dev versions sort below the latest release, so detect the feature directly.
+# TODO: replace with a minimum version check once virtual-tiff#87 is released.
+has_tiff_partial_strips = hasattr(virtual_tiff.parser, "_has_unified_chunk_grid")
 
 
 @requires_tiff
@@ -40,3 +47,63 @@ def test_virtual_tiff_dataset() -> None:
         var = vds["0"].variable
         assert var.sizes == {"y": 10980, "x": 10980}
         assert var.dtype == "<u2"
+
+
+@requires_tiff
+@requires_tifffile
+@pytest.mark.skipif(
+    not has_tiff_partial_strips,
+    reason="requires virtual-tiff with partial trailing strip support",
+)
+def test_concat_rectilinear_tiff_datasets(tmp_path) -> None:
+    """Test concatenating two virtual TIFF datasets with rectilinear chunk grids.
+
+    Creates stripped TIFFs where image_height is not evenly divisible by rows_per_strip,
+    producing rectilinear chunks, then verifies they can be concatenated.
+    """
+    import tifffile
+
+    # Create two stripped TIFFs where image_height (100) is not evenly divisible
+    # by rows_per_strip (30), creating rectilinear chunks: [[30, 30, 30, 10], [50]]
+    shape = (100, 50)
+    rows_per_strip = 30
+
+    filepath1 = tmp_path / "test1.tif"
+    filepath2 = tmp_path / "test2.tif"
+
+    tifffile.imwrite(
+        str(filepath1), np.ones(shape, dtype=np.uint8), rowsperstrip=rows_per_strip
+    )
+    tifffile.imwrite(
+        str(filepath2), np.ones(shape, dtype=np.uint8) * 2, rowsperstrip=rows_per_strip
+    )
+
+    parser = virtual_tiff.VirtualTIFF(ifd=0)
+    registry = ObjectStoreRegistry({"file://": LocalStore()})
+
+    with (
+        open_virtual_dataset(
+            url=f"file://{filepath1}", parser=parser, registry=registry
+        ) as vds1,
+        open_virtual_dataset(
+            url=f"file://{filepath2}", parser=parser, registry=registry
+        ) as vds2,
+    ):
+        # Verify both datasets have the expected shape
+        assert vds1["0"].sizes == {"y": 100, "x": 50}
+        assert vds2["0"].sizes == {"y": 100, "x": 50}
+
+        # Verify both datasets have rectilinear chunk grids
+        assert vds1["0"].variable.data.chunk_grid.is_regular is False
+        assert vds2["0"].variable.data.chunk_grid.is_regular is False
+
+        # concatenate along the rectilinear axis, merging chunk edges (concatenating
+        # along a new dimension would need indexing, not yet supported for rectilinear)
+        combined = xr.concat([vds1, vds2], dim="y", coords="minimal", compat="override")
+
+        assert isinstance(combined, Dataset)
+        assert combined["0"].sizes == {"y": 200, "x": 50}
+        assert combined["0"].data.chunk_grid.chunk_sizes == (
+            (30, 30, 30, 10, 30, 30, 30, 10),
+            (50,),
+        )
