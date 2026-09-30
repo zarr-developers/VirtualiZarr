@@ -15,7 +15,6 @@ from virtualizarr.manifests.array_api import (
 from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.utils import ChunkKeySeparator
-from virtualizarr.utils import determine_chunk_grid_shape
 
 
 class ManifestArray:
@@ -323,9 +322,7 @@ class ManifestArray:
         new_metadata = dataclasses.replace(self.metadata, fill_value=fill_value)
         empty_manifest = ChunkManifest(
             entries={},
-            shape=determine_chunk_grid_shape(
-                self.shape, utils.manifest_chunk_shape(self.metadata)
-            ),
+            shape=ChunkGrid.from_metadata(self.metadata).grid_shape,
         )
         return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
 

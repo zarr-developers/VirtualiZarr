@@ -11,7 +11,8 @@
   This is gated behind zarr-python's own experimental `array.rectilinear_chunks` config flag;
   with it disabled, the same operations raise a clear error explaining how to enable it.
   Appending is supported too, promoting an existing array to rectilinear where the appended
-  chunk sizes differ; region writes to a rectilinear array are not yet supported.
+  chunk sizes differ. Indexing a rectilinear array (including via Xarray's `isel`, `expand_dims`,
+  or concatenating along a new dimension) and region writes to it are not yet supported.
   See [Rectilinear chunk grids](../explanation/data_structures.md#rectilinear-chunk-grids) for details.
   Note that reading such stores back requires the latest version of Xarray (v2026.09.0).
   By [Max Jones](https://github.com/maxrjones) and [Tom Nicholas](https://github.com/TomNicholas).

@@ -462,8 +462,6 @@ class TestChunkGrid:
 
 class TestBroadcastRectilinear:
     def test_broadcast_to_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
-        # broadcast_to only supports regular chunk grids (a chunk's element count can
-        # only change by adding length-1 axes, which doesn't hold for a rectilinear grid)
         metadata = array_v3_metadata_rectilinear(
             shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
         )
@@ -472,7 +470,9 @@ class TestBroadcastRectilinear:
             chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
         )
 
-        with pytest.raises(ValueError, match="only available for regular chunk grids"):
+        with pytest.raises(
+            NotImplementedError, match="Broadcasting is not yet supported"
+        ):
             np.broadcast_to(marr, shape=(2, 60, 50))
 
 
@@ -1352,9 +1352,7 @@ class TestWithFillValueOnly:
         assert result.metadata.to_dict() == marr.metadata.to_dict()
         assert result.manifest.dict() == {}
 
-    def test_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
-        # documents a known gap: with_fill_value_only goes through
-        # manifest_chunk_shape, which assumes a regular chunk grid
+    def test_rectilinear_array(self, array_v3_metadata_rectilinear):
         metadata = array_v3_metadata_rectilinear(
             shape=(60, 50), chunk_shapes=((10, 20, 30), (50,))
         )
@@ -1363,8 +1361,11 @@ class TestWithFillValueOnly:
             chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
         )
 
-        with pytest.raises(AttributeError):
-            marr.with_fill_value_only(0)
+        result = marr.with_fill_value_only(0)
+
+        assert result.chunk_grid.chunk_sizes == ((10, 20, 30), (50,))
+        assert result.manifest.shape_chunk_grid == (3, 1)
+        assert result.manifest.dict() == {}
 
 
 def test_refuse_combine(array_v3_metadata):
@@ -1594,9 +1595,14 @@ class TestIndexing:
 
 
 class TestIndexingRectilinear:
-    def test_getitem_on_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
-        # documents a known gap: indexing goes through manifest_chunk_shape,
-        # which assumes a regular chunk grid
+    @pytest.mark.parametrize(
+        "indexer", [slice(0, 10), slice(None), (None, ...), 0, np.array([0, 1])]
+    )
+    def test_getitem_on_rectilinear_array_raises(
+        self, array_v3_metadata_rectilinear, indexer
+    ):
+        # even no-op and new-axis indexers raise, as xarray's expand_dims and concat
+        # along a new dimension index with them
         metadata = array_v3_metadata_rectilinear(
             shape=(60,), chunk_shapes=((10, 20, 30),)
         )
@@ -1609,8 +1615,20 @@ class TestIndexingRectilinear:
         )
         marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
-        with pytest.raises(AttributeError):
-            marr[0:10]
+        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
+            marr[indexer]
+
+    def test_where_on_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60,), chunk_shapes=((10, 20, 30),)
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(entries={}, shape=(3,)),
+        )
+
+        with pytest.raises(NotImplementedError, match="np.where is not yet supported"):
+            np.where(np.ones(60, dtype=bool), marr, 0)
 
 
 class TestSubChunkSlicingUncompressed:

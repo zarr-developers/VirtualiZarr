@@ -553,6 +553,24 @@ def require_rectilinear_chunks_enabled(context: str) -> None:
         )
 
 
+def require_regular_chunk_grid(marr: "ManifestArray", operation: str) -> None:
+    """
+    Raise a clear error if `marr` has a rectilinear chunk grid, which `operation` doesn't support yet.
+
+    Raises
+    ------
+    NotImplementedError
+        If `marr` has a rectilinear chunk grid.
+    """
+    if not marr.chunk_grid.is_regular:
+        raise NotImplementedError(
+            f"{operation} is not yet supported for a virtual array with a rectilinear "
+            f"(variable-length) chunk grid, such as one produced by concatenating "
+            f"arrays with different chunk sizes. Got chunk sizes "
+            f"{marr.chunk_grid.chunk_sizes}."
+        )
+
+
 def _realign_inner_chunk_shape(
     old_chunks: tuple[int, ...],
     new_chunks: tuple[int, ...],

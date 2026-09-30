@@ -355,6 +355,33 @@ class TestConcatRectilinear:
         assert marr.chunk_grid.chunk_sizes == ((10, 10, 15),)
         assert combined_vds.sizes == {"x": 35}
 
+    def test_indexing_rectilinear_result_raises_clear_error(self, array_v3_metadata):
+        # combining along x gives a rectilinear grid; anything that then indexes it,
+        # including concatenating along a new dimension, must fail clearly
+        metadata1 = array_v3_metadata(chunks=(10,), shape=(20,))
+        manifest1 = ChunkManifest(
+            entries={
+                "0": {"path": "/foo.nc", "offset": 0, "length": 40},
+                "1": {"path": "/foo.nc", "offset": 40, "length": 40},
+            }
+        )
+        ds1 = xr.Dataset(
+            {"a": (["x"], ManifestArray(metadata=metadata1, chunkmanifest=manifest1))}
+        )
+        metadata2 = array_v3_metadata(chunks=(15,), shape=(15,))
+        manifest2 = ChunkManifest(
+            entries={"0": {"path": "/foo.nc", "offset": 80, "length": 60}}
+        )
+        ds2 = xr.Dataset(
+            {"a": (["x"], ManifestArray(metadata=metadata2, chunkmanifest=manifest2))}
+        )
+        combined = xr.concat([ds1, ds2], dim="x")
+
+        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
+            combined.isel(x=slice(0, 10))
+        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
+            xr.concat([combined, combined], dim="t")
+
 
 @requires_hdf5plugin
 @requires_imagecodecs

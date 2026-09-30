@@ -16,6 +16,7 @@ from .utils import (
     full_chunk_edges,
     manifest_chunk_shape,
     require_rectilinear_chunks_enabled,
+    require_regular_chunk_grid,
 )
 
 if TYPE_CHECKING:
@@ -88,6 +89,7 @@ def where(condition, x, y, /):
     from virtualizarr.manifests.array import ManifestArray
 
     if isinstance(x, ManifestArray) and np.isscalar(y):
+        require_regular_chunk_grid(x, "np.where")
         cond = np.asarray(condition, dtype=bool)
         if cond.shape == x.shape and np.array_equal(~cond, _missing_element_mask(x)):
             return x
@@ -289,9 +291,10 @@ def broadcast_to(x: "ManifestArray", /, shape: tuple[int, ...]) -> "ManifestArra
             f"array of shape {x.shape} cannot be broadcast to shape {new_shape}"
         )
 
+    require_regular_chunk_grid(x, "Broadcasting")
+
     # new chunk_shape is old chunk_shape with singleton dimensions prepended
     # (chunk shape can never change by more than adding length-1 axes because each chunk represents a fixed number of array elements)
-    # broadcast_to only applies to regular chunk grids
     old_chunk_shape = x.chunk_grid.chunk_shape
     new_chunk_shape = _prepend_singleton_dimensions(
         old_chunk_shape, ndim=len(new_shape)
