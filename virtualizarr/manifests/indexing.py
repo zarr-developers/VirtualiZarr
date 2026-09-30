@@ -10,6 +10,7 @@ from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.reindex import chunk_map_from_indexer, reindex_axis
 from virtualizarr.manifests.utils import (
     copy_and_replace_metadata,
+    full_chunk_edges,
     manifest_chunk_shape,
     require_regular_chunk_grid,
 )
@@ -35,7 +36,6 @@ if TYPE_CHECKING:
 
 def index(marr: "ManifestArray", indexer: T_Indexer) -> "ManifestArray":
     """Index into a ManifestArray"""
-    require_regular_chunk_grid(marr, "Indexing")
     indexer_tuple = check_and_sanitize_indexer_type(indexer)
     indexer_without_ellipsis = check_shape_and_maybe_replace_ellipsis(
         indexer_tuple, marr.ndim
@@ -200,6 +200,7 @@ def _apply_reindex(
     full-axis slice (the shape xarray's reindex/alignment produces); combining
     reindexing with chunk subsetting in a single call is not supported.
     """
+    require_regular_chunk_grid(marr, "Reindexing")
     result = marr
     for axis, raw_indexer_1d in enumerate(indexers):
         indexer_1d = _collapse_outer_indexer(raw_indexer_1d, axis)
@@ -271,6 +272,9 @@ def apply_selection(
             raise TypeError(f"Invalid indexer type: {indexer_1d}")
         narrowed_indexers.append(indexer_1d)
 
+    if not marr.chunk_grid.is_regular:
+        return _apply_rectilinear_selection(marr, narrowed_indexers)
+
     sub_chunk_axis = _uncompressed_sub_chunk_axis(marr.metadata)
 
     new_shape: list[int] = []
@@ -334,21 +338,122 @@ def apply_selection(
     new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
     if sub_chunk_byte_adjust is not None:
         new_manifest = _shift_manifest_byte_ranges(new_manifest, *sub_chunk_byte_adjust)
-    old_dimension_names = marr.metadata.dimension_names
-    # zarr's dimension_names is tuple[str | None, ...] but copy_and_replace_metadata's
-    # type hint says Iterable[str]; the runtime handles None entries fine, so cast through.
-    new_dimension_names: Any
-    if old_dimension_names is None:
-        new_dimension_names = "default"  # sentinel: leave as None
-    else:
-        new_dimension_names = tuple(old_dimension_names[a] for a in kept_axes)
     new_metadata = copy_and_replace_metadata(
         marr.metadata,
         new_shape=new_shape,
         new_chunks=new_chunks,
-        new_dimension_names=new_dimension_names,
+        new_dimension_names=_kept_dimension_names(marr, kept_axes),
     )
     return ManifestArray(metadata=new_metadata, chunkmanifest=new_manifest)
+
+
+def _kept_dimension_names(marr: "ManifestArray", kept_axes: list[int]) -> Any:
+    old_dimension_names = marr.metadata.dimension_names
+    # zarr's dimension_names is tuple[str | None, ...] but copy_and_replace_metadata's
+    # type hint says Iterable[str]; the runtime handles None entries fine, so cast through.
+    if old_dimension_names is None:
+        return "default"  # sentinel: leave as None
+    return tuple(old_dimension_names[a] for a in kept_axes)
+
+
+def _apply_rectilinear_selection(
+    marr: "ManifestArray", indexers: list[int | slice]
+) -> "ManifestArray":
+    """
+    Apply chunk-aligned subsetting to an array with a rectilinear chunk grid.
+
+    Like the regular-grid path, but each axis's chunk boundaries come from its explicit
+    chunk edges. Sub-chunk slicing is not supported, as a byte-range adjustment would
+    differ between chunks of different sizes.
+    """
+    from virtualizarr.manifests.array import ManifestArray
+
+    new_shape: list[int] = []
+    new_edges: list[tuple[int, ...]] = []
+    chunk_grid_selectors: list[int | slice] = []
+    kept_axes: list[int] = []
+    for axis, (axis_length, edges, indexer_1d) in enumerate(
+        zip(marr.shape, full_chunk_edges(marr.metadata), indexers, strict=True)
+    ):
+        chunk_grid_selector, new_axis_length = _compute_rectilinear_selection_1d(
+            indexer_1d, axis_length=axis_length, edges=edges
+        )
+        chunk_grid_selectors.append(chunk_grid_selector)
+        if isinstance(chunk_grid_selector, slice):
+            new_shape.append(new_axis_length)
+            # zarr needs at least one chunk edge per axis, even an empty one
+            new_edges.append(edges[chunk_grid_selector] or edges[:1])
+            kept_axes.append(axis)
+
+    chunk_grid_selectors_tuple = tuple(chunk_grid_selectors)
+    if all(
+        isinstance(cgs, slice) and cgs == slice(0, dim, 1)
+        for cgs, dim in zip(chunk_grid_selectors_tuple, marr.manifest.shape_chunk_grid)
+    ):
+        return marr
+
+    new_manifest = _subset_manifest(marr.manifest, chunk_grid_selectors_tuple)
+    new_metadata = copy_and_replace_metadata(
+        marr.metadata,
+        new_shape=new_shape,
+        new_chunks=_regular_chunk_shape(new_edges) or new_edges,
+        new_dimension_names=_kept_dimension_names(marr, kept_axes),
+    )
+    return ManifestArray(metadata=new_metadata, chunkmanifest=new_manifest)
+
+
+def _regular_chunk_shape(edges: list[tuple[int, ...]]) -> list[int] | None:
+    """
+    The regular chunk shape these per-axis chunk edges describe, or None if they need a
+    rectilinear grid.
+
+    Every edge along an axis must be equal. A shorter final edge doesn't qualify: a
+    regular grid's boundary chunk is stored at the full chunk length and cropped on
+    read, whereas a rectilinear chunk is stored at exactly its edge length.
+    """
+    chunk_shape = []
+    for axis_edges in edges:
+        if len(set(axis_edges)) != 1:
+            return None
+        chunk_shape.append(axis_edges[0])
+    return chunk_shape
+
+
+def _compute_rectilinear_selection_1d(
+    indexer_1d: int | slice, axis_length: int, edges: tuple[int, ...]
+) -> tuple[int | slice, int]:
+    """
+    Translate a 1D array-space indexer into a chunk-grid selector plus the new axis
+    length, for an axis with explicit chunk edges.
+
+    Raises SubChunkIndexingError if the selection would require splitting individual chunks.
+    """
+    boundaries = np.concatenate([[0], np.cumsum(edges)])
+    if isinstance(indexer_1d, int):
+        i = indexer_1d + axis_length if indexer_1d < 0 else indexer_1d
+        if not (0 <= i < axis_length):
+            raise IndexError(
+                f"index {indexer_1d} is out of bounds for axis with size {axis_length}"
+            )
+        start, stop, step = i, i + 1, 1
+    else:
+        start, stop, step = indexer_1d.indices(axis_length)
+        # an empty slice selects no chunks, wherever it starts
+        if step == 1 and start >= stop:
+            return slice(0, 0, 1), 0
+
+    chunk_start, chunk_stop = np.searchsorted(boundaries, [start, stop])
+    if step != 1 or boundaries[chunk_start] != start or boundaries[chunk_stop] != stop:
+        raise SubChunkIndexingError(
+            f"Cannot index ManifestArray axis of length {axis_length} and chunk lengths "
+            f"{edges} with {indexer_1d!r}: selection would split individual chunks, "
+            "which a ManifestArray cannot do without loading the underlying data."
+        )
+
+    if isinstance(indexer_1d, int):
+        # only reachable if the chunk holding i has length 1, so i drops a whole chunk-grid axis
+        return int(chunk_start), 1
+    return slice(int(chunk_start), int(chunk_stop), 1), stop - start
 
 
 def _compute_chunk_aligned_selection_1d(

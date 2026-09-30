@@ -90,7 +90,6 @@ def where(condition, x, y, /):
     from virtualizarr.manifests.array import ManifestArray
 
     if isinstance(x, ManifestArray) and np.isscalar(y):
-        require_regular_chunk_grid(x, "np.where")
         cond = np.asarray(condition, dtype=bool)
         if cond.shape == x.shape and np.array_equal(~cond, _missing_element_mask(x)):
             return x
@@ -122,9 +121,9 @@ def _chunk_sizes(
 def _missing_element_mask(marr: "ManifestArray") -> np.ndarray:
     """Boolean element-mask (shape == marr.shape), True at missing (null) chunks."""
     mask = marr.manifest._paths == MISSING_CHUNK_PATH
-    for axis, chunk_size in enumerate(manifest_chunk_shape(marr.metadata)):
-        mask = np.repeat(mask, chunk_size, axis=axis)
-    return mask[tuple(slice(0, length) for length in marr.shape)]
+    for axis, edges in enumerate(full_chunk_edges(marr.metadata)):
+        mask = np.repeat(mask, edges, axis=axis)
+    return mask
 
 
 @implements(np.concatenate)
