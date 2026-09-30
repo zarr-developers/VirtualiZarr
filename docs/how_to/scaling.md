@@ -101,12 +101,16 @@ It is the default executor.
 
 One way to parallelize creating virtual references from a single machine is to use multiple threads.
 For this you can use the [`ThreadPoolExecutor`][concurrent.futures.ThreadPoolExecutor] class from the [`concurrent.futures`][] module in the python standard library.
-You simply pass the executor class directly via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
+Instantiate it with the desired settings and pass the instance via the `parallel` kwarg to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset].
+The executor remains owned by the caller, so it can be reused for multiple calls.
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
 
-combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel=ThreadPoolExecutor)
+with ThreadPoolExecutor(max_workers=2) as executor:
+    combined_vds = vz.open_virtual_mfdataset(
+        urls, registry=registry, parallel=executor
+    )
 ```
 
 This can work well when virtualizing files in remote object storage because it parallelizes the issuing of HTTP GET requests for each file.
@@ -147,6 +151,7 @@ combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel='lith
 You can also define your own executor to run in some other way, for example on a different serverless platform such as [Modal](https://modal.com).
 
 Your custom executor must inherit from the [`concurrent.futures.Executor`][] ABC, and must implement the `.map` method.
+Pass an instance, rather than the executor class, so that you can configure and reuse it.
 
 ```python
 from concurrent.futures import Executor
@@ -159,7 +164,10 @@ class CustomExecutor(Executor):
     ) -> Iterator:
         ...
 
-combined_vds = vz.open_virtual_mfdataset(urls, registry=registry, parallel=CustomExecutor)
+with CustomExecutor() as executor:
+    combined_vds = vz.open_virtual_mfdataset(
+        urls, registry=registry, parallel=executor
+    )
 ```
 
 ## Memory usage
