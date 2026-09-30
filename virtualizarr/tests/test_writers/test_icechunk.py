@@ -1,3 +1,4 @@
+import io
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from zarr.errors import ContainsGroupError
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers.zarr import ZarrParser
+from virtualizarr.tests import requires_minio
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
@@ -557,6 +559,13 @@ def test_checksum(
     # Fail if anything but None or a datetime is passed to last_updated_at
     with pytest.raises(TypeError):
         vds.vz.to_icechunk(icechunk_filestore, last_updated_at="not a datetime")  # type: ignore
+    with pytest.raises(TypeError):
+        vds.vz.to_icechunk(icechunk_filestore, etag=123)  # type: ignore
+    # The two checksums are mutually exclusive
+    with pytest.raises(ValueError, match="not both"):
+        vds.vz.to_icechunk(
+            icechunk_filestore, last_updated_at=datetime.now(timezone.utc), etag="x"
+        )
 
     root_group = zarr.group(store=icechunk_filestore)
     pressure_array = root_group["pressure"]
@@ -585,6 +594,123 @@ def test_checksum(
         pressure_array = root_group["pressure"]
         assert isinstance(pressure_array, zarr.Array)
         npt.assert_equal(pressure_array, arr)
+
+
+def test_etag_checksum(
+    icechunk_filestore: "IcechunkStore",
+    tmpdir: Path,
+    array_v3_metadata,
+):
+    from icechunk import IcechunkError
+
+    netcdf_path = tmpdir / "test.nc"
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4) * 2
+    var = xr.Variable(data=arr, dims=["x", "y"])
+    ds = xr.Dataset({"foo": var})
+    ds.to_netcdf(netcdf_path)
+
+    manifest = ChunkManifest(
+        {"0.0": {"path": str(netcdf_path), "offset": 6144, "length": 48}}
+    )
+    metadata = array_v3_metadata(
+        shape=(3, 4),
+        chunks=(3, 4),
+        codecs=None,
+    )
+    ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+    vds = xr.Dataset({"pressure": xr.Variable(data=ma, dims=["x", "y"])})
+
+    # An etag that doesn't match the object must fail loudly at read time
+    # (If-Match), instead of serving bytes that may not match the manifest.
+    vds.vz.to_icechunk(icechunk_filestore, etag="etag-that-cannot-match")
+
+    root_group = zarr.group(store=icechunk_filestore)
+    with pytest.raises(IcechunkError):
+        pressure_array = root_group["pressure"]
+        assert isinstance(pressure_array, zarr.Array)
+        npt.assert_equal(pressure_array, arr)
+
+    # The object's real etag matches: icechunk compares the stored value
+    # with one layer of RFC 9110 quotes stripped, and object_store's local
+    # backend implements If-Match, so the matching case holds on a local
+    # filesystem too (verified on icechunk 2.0.3 and 2.1.1, with the etag
+    # quoted or not). test_etag_checksum_minio exercises the real S3
+    # protocol (412 Precondition Failed) end to end.
+    etag = obs.head(LocalStore(prefix=str(tmpdir)), "test.nc")["e_tag"]
+    assert etag
+    vds.vz.to_icechunk(icechunk_filestore, mode="w", etag=etag)
+    npt.assert_equal(zarr.group(store=icechunk_filestore)["pressure"], arr)
+
+
+@requires_minio
+def test_etag_checksum_minio(
+    minio_bucket,
+    tmp_path: Path,
+    array_v3_metadata,
+):
+    """End-to-end If-Match over the S3 protocol, including the matching-etag
+    case that test_etag_checksum cannot cover on a local filesystem."""
+    from icechunk import IcechunkError
+
+    arr = np.arange(12, dtype=np.dtype("int32")).reshape(3, 4)
+    data = arr.tobytes()
+    etag = (
+        minio_bucket["client"]
+        .put_object(
+            minio_bucket["bucket"], "etag/chunk.bin", io.BytesIO(data), len(data)
+        )
+        .etag
+    )
+
+    url_prefix = f"s3://{minio_bucket['bucket']}/"
+    config = icechunk.RepositoryConfig.default()
+    config.set_virtual_chunk_container(
+        icechunk.VirtualChunkContainer(
+            url_prefix=url_prefix,
+            store=icechunk.s3_store(
+                region="us-east-1",
+                endpoint_url=minio_bucket["endpoint"],
+                allow_http=True,
+                s3_compatible=True,
+                force_path_style=True,
+            ),
+        )
+    )
+    repo = icechunk.Repository.create(
+        storage=icechunk.Storage.new_local_filesystem(str(tmp_path)),
+        config=config,
+        authorize_virtual_chunk_access={
+            url_prefix: icechunk.s3_credentials(
+                access_key_id=minio_bucket["username"],
+                secret_access_key=minio_bucket["password"],
+            )
+        },
+    )
+    store = repo.writable_session("main").store
+
+    manifest = ChunkManifest(
+        {
+            "0.0": {
+                "path": f"{url_prefix}etag/chunk.bin",
+                "offset": 0,
+                "length": len(data),
+            }
+        }
+    )
+    metadata = array_v3_metadata(shape=(3, 4), chunks=(3, 4), codecs=None)
+    ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+    vds = xr.Dataset({"pressure": xr.Variable(data=ma, dims=["x", "y"])})
+
+    # A non-matching etag fails loudly at read time: MinIO answers the
+    # conditional GET with 412 Precondition Failed.
+    vds.vz.to_icechunk(store, etag="etag-that-cannot-match")
+    root_group = zarr.group(store=store)
+    with pytest.raises(IcechunkError):
+        npt.assert_equal(root_group["pressure"], arr)
+
+    # The object's real etag matches, so the read succeeds.
+    vds.vz.to_icechunk(store, mode="w", etag=etag)
+    npt.assert_equal(zarr.group(store=store)["pressure"], arr)
 
 
 def test_roundtrip_coords(
