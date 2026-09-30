@@ -342,8 +342,9 @@ def check_no_partial_chunks_on_concat_axis(
     A partial (boundary-truncated) chunk is only ever valid on the very last
     input - that's just the ordinary regular-grid case of a shorter trailing
     chunk. On any earlier input it would leave a short chunk with more data
-    appended after it, which a regular chunk grid can't represent without
-    rewriting bytes.
+    appended after it. A rectilinear grid can't represent that either: the stored
+    chunk still decodes to the full chunk length, not the shorter length its slot
+    in the grid would have, so it can't be fixed without rewriting bytes.
     """
     last_index = len(shapes) - 1
     # loop over the arrays to be concatenated
@@ -355,9 +356,10 @@ def check_no_partial_chunks_on_concat_axis(
             continue
         if shape[axis] % chunk_shape[axis] > 0:
             raise ValueError(
-                "Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. "
+                "Cannot concatenate arrays with partial chunks except on the last input. "
                 f"Concat input {i} has array length {shape[axis]} along the concatenation axis which is not "
-                f"evenly divisible by chunk length {chunk_shape[axis]}."
+                f"evenly divisible by chunk length {chunk_shape[axis]}. Its last chunk is stored at the full "
+                "chunk length, so more data can't follow it without rewriting bytes."
             )
 
 

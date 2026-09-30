@@ -1410,7 +1410,7 @@ def test_refuse_combine(array_v3_metadata):
     marr = ManifestArray(metadata=metadata_variable_chunk, chunkmanifest=chunkmanifest2)
     with pytest.raises(
         ValueError,
-        match="Cannot concatenate arrays with partial chunks because only regular chunk grids are currently supported. Concat input 0 has array length 5 along the concatenation axis which is not evenly divisible by chunk length 4.",
+        match="Cannot concatenate arrays with partial chunks except on the last input. Concat input 0 has array length 5 along the concatenation axis which is not evenly divisible by chunk length 4.",
     ):
         np.concatenate([marr, marr], axis=0)
 
