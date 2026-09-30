@@ -139,7 +139,6 @@ dev = [
     "s3fs",
     "lithops",
     "dask",
-    "tifffile>=2026.2.16,<2027"
 ]
 
 [project.urls]
@@ -188,10 +187,6 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
-# Rectilinear TIFF strips need unreleased virtual-tiff (virtual-zarr/virtual-tiff#87).
-[tool.pixi.feature.rectilinear.pypi-dependencies]
-virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "poc/unified-chunk-grid" }
-
 # `pip` is needed by the Upstream CI job to overlay dev versions from
 # ci/upstream-overrides.txt on top of the pixi-resolved env. See issue #995.
 [tool.pixi.feature.upstream-overlay.dependencies]
@@ -232,7 +227,6 @@ test-py314 = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechu
 minio = ["dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "hdf5-lib", "py314", "zarr", "minio"]
 minimum-versions = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "tiff", "grib", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "zarr","minimum-versions", "py312"]
 upstream = ["dev", "test", "hdf", "hdf5-lib", "netcdf3", "fits", "icechunk-dev", "upstream-overlay", "zarr", "py313"]
-rectilinear = ["dev", "test", "tiff", "hdf5-lib", "rectilinear", "py313"]
 all = ["dev", "test", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib", "zarr", "all_parsers", "all_writers", "py313"]
 docs = ["docs", "dev", "remote", "hdf", "netcdf3", "fits", "hdf4", "icechunk", "kerchunk", "kerchunk_parquet", "hdf5-lib", "tiff", "grib","zarr", "py313"]
 
