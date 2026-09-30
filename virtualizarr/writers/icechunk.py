@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union, cast
@@ -98,6 +99,8 @@ def virtual_dataset_to_icechunk(
         - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
         - ``"w"``: create the group, overwriting any existing contents at that path.
         - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+          An existing array of the same name must have the same metadata apart from
+          attributes, otherwise a ``ValueError`` is raised.
         - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
           is given, in which case the existing group is opened.
 
@@ -221,6 +224,8 @@ def virtual_datatree_to_icechunk(
           ``ContainsGroupError`` if it already exists.
         - ``"w"``: create each group, overwriting any existing contents at that path.
         - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+          An existing array of the same name must have the same metadata apart from
+          attributes, otherwise a ``ValueError`` is raised.
     write_inherited_coords
         If ``True``, replicate inherited coordinates on all descendant nodes of the
         tree. Otherwise, only write coordinates at the level at which they are
@@ -647,8 +652,7 @@ def write_virtual_variable_to_icechunk(
             chunks = metadata.chunks
         except NotImplementedError:
             chunks = chunk_grid_sizes(metadata)
-        arr = group.require_array(
-            name=name,
+        array_kwargs = dict(
             shape=metadata.shape,
             chunks=chunks,
             shards=metadata.shards,
@@ -659,6 +663,10 @@ def write_virtual_variable_to_icechunk(
             dimension_names=var.dims,
             fill_value=metadata.fill_value,
         )
+        existing = group.get(name)
+        if isinstance(existing, Array):
+            _check_existing_array_matches(existing, metadata, dims)
+        arr = group.require_array(name=name, **array_kwargs)
 
         update_attributes(arr, var.attrs, encoding=var.encoding)
 
@@ -670,6 +678,40 @@ def write_virtual_variable_to_icechunk(
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
     )
+
+
+def _check_existing_array_matches(
+    existing: Array, metadata: ArrayV3Metadata, dimension_names: list[str]
+) -> None:
+    """
+    Raise if an existing array has different metadata, apart from attributes, than ``metadata``.
+
+    Raises
+    ------
+    ValueError
+        If any metadata differs. zarr's ``require_array`` would keep the stored
+        metadata, so the new refs would be decoded with the wrong codecs or read under
+        the wrong dimension names.
+    """
+    # Compare the JSON form rather than the dataclasses: before zarr 3.3.0 the generated
+    # __eq__ treats two NaN fill values as unequal (zarr-python#2929), whereas to_dict
+    # serializes NaN to the string "NaN".
+    # TODO: compare the metadata objects directly once zarr>=3.3.0 is the minimum version.
+    requested = dataclasses.replace(
+        metadata, attributes={}, dimension_names=tuple(dimension_names)
+    ).to_dict()
+    stored = dataclasses.replace(existing.metadata, attributes={}).to_dict()
+    differing = sorted(
+        key
+        for key in requested.keys() | stored.keys()
+        if requested.get(key) != stored.get(key)
+    )
+    if differing:
+        raise ValueError(
+            f"Array {existing.path!r} already exists with different "
+            f"{', '.join(differing)}. Writing new references under the stored metadata "
+            "would decode them incorrectly; use mode='w' to replace the group instead."
+        )
 
 
 def write_manifest_to_icechunk(
