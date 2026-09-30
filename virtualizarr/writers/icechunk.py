@@ -129,6 +129,10 @@ def virtual_dataset_to_icechunk(
         atomically with each byte-range fetch. Mutually exclusive with
         ``last_updated_at``.
 
+        When not provided, chunks whose source object has an ETag recorded in the
+        manifest ([ChunkManifest.etags][virtualizarr.manifests.ChunkManifest.etags])
+        are checked against that ETag instead, and the rest use ``last_updated_at``.
+
     Raises
     ------
     ValueError
@@ -250,6 +254,10 @@ def virtual_datatree_to_icechunk(
         catches modifications that preserve the modification time, and it is checked
         atomically with each byte-range fetch. Mutually exclusive with
         ``last_updated_at``.
+
+        When not provided, chunks whose source object has an ETag recorded in the
+        manifest ([ChunkManifest.etags][virtualizarr.manifests.ChunkManifest.etags])
+        are checked against that ETag instead, and the rest use ``last_updated_at``.
     **kwargs
         Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
@@ -686,6 +694,11 @@ def write_manifest_to_icechunk(
     else:
         key_prefix = f"{group.name}/{arr_name}"
 
+    # Chunks whose source object has a recorded ETag are checked against it,
+    # unless the caller chose one ETag for everything. A last_updated_at only
+    # covers the chunks that have no recorded ETag.
+    etags = manifest._etags if etag is None else {}
+
     if last_updated_at is None:
         # Icechunk rounds timestamps to the nearest second, but filesystems have higher precision,
         # so we need to add a buffer, so that if you immediately read data back from this icechunk store,
@@ -715,22 +728,38 @@ def write_manifest_to_icechunk(
     else:
         virtual_paths = paths_flat
 
-    # Cheap numpy-level check so we can skip the .tolist() allocation and the
-    # Python->Rust call entirely when no position holds a real virtual ref
-    # (e.g. an all-inlined or all-missing manifest).
-    if (virtual_paths != "").any():
+    def set_refs(locations: np.ndarray, checksum: datetime | str) -> None:
         # Pass flat per-chunk arrays (or a list) to Rust in one call, avoiding Python-side
         # per-chunk dict construction. Empty paths are skipped on the Rust side.
         store.set_virtual_refs_arr(
             array_path=key_prefix,
             chunk_grid_shape=manifest.shape_chunk_grid,
-            locations=virtual_paths.tolist(),
+            locations=locations.tolist(),
             offsets=manifest._offsets.flatten(),
             lengths=manifest._lengths.flatten(),
             validate_containers=False,
             arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
             checksum=checksum,
         )
+
+    # The Rust call takes one checksum, so write each ETag's chunks in their own
+    # call (one per source object) with every other location blanked out, then
+    # everything left with the caller's checksum.
+    remaining = virtual_paths
+    paths_by_etag: dict[str, list[str]] = {}
+    for path, path_etag in etags.items():
+        paths_by_etag.setdefault(path_etag, []).append(path)
+    for path_etag, paths in paths_by_etag.items():
+        mask = np.isin(remaining, paths)
+        if mask.any():
+            set_refs(np.where(mask, remaining, ""), path_etag)
+            remaining = np.where(mask, "", remaining)
+
+    # Cheap numpy-level check so we can skip the .tolist() allocation and the
+    # Python->Rust call entirely when no position holds a real virtual ref
+    # (e.g. an all-inlined or all-missing manifest).
+    if (remaining != "").any():
+        set_refs(remaining, checksum)
 
 
 async def write_inlined_chunks_as_native(

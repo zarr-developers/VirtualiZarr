@@ -5,7 +5,7 @@ import numpy as np
 
 from virtualizarr.utils import determine_chunk_grid_shape
 
-from .manifest import MISSING_CHUNK_PATH, ChunkManifest
+from .manifest import MISSING_CHUNK_PATH, ChunkManifest, merge_etags
 from .utils import (
     check_combinable_zarr_arrays,
     check_no_partial_chunks_on_concat_axis,
@@ -283,6 +283,7 @@ def _concat_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifes
         lengths=concatenated_lengths,
         validate_paths=False,
         inlined=concatenated_inlined if concatenated_inlined else None,
+        etags=merge_etags(m._etags for m in manifests),
     )
 
 
@@ -309,6 +310,7 @@ def _stack_manifests(manifests: list[ChunkManifest], axis: int) -> ChunkManifest
         lengths=stacked_lengths,
         validate_paths=False,
         inlined=stacked_inlined if stacked_inlined else None,
+        etags=merge_etags(m._etags for m in manifests),
     )
 
 
@@ -345,6 +347,7 @@ def _broadcast_manifest(
         lengths=broadcasted_lengths,
         validate_paths=False,
         inlined=broadcasted_inlined if broadcasted_inlined else None,
+        etags=manifest._etags,
     )
 
 

@@ -713,6 +713,84 @@ def test_etag_checksum_minio(
     npt.assert_equal(zarr.group(store=store)["pressure"], arr)
 
 
+def test_manifest_etags_write_one_call_per_object():
+    """The Rust call takes one checksum, so each ETag's chunks go in their own
+    call with the other locations blanked (icechunk skips empty locations),
+    and chunks without an ETag go last with the timestamp."""
+    from virtualizarr.writers.icechunk import write_manifest_to_icechunk
+
+    class Recorder:
+        def __init__(self):
+            self.calls: list[tuple[list[str], Any]] = []
+
+        def set_virtual_refs_arr(self, *, locations, checksum, **kwargs):
+            self.calls.append((locations, checksum))
+
+    class Root:
+        name = "/"
+
+    a, b, c = "s3://bkt/a.nc", "s3://bkt/b.nc", "s3://bkt/c.nc"
+    manifest = ChunkManifest.from_arrays(
+        paths=np.asarray([a, b, a, c], dtype=np.dtypes.StringDType()),
+        offsets=np.zeros(4, dtype=np.uint64),
+        lengths=np.full(4, 4, dtype=np.uint64),
+        etags={a: '"A"', b: '"B"'},
+    )
+
+    store = Recorder()
+    write_manifest_to_icechunk(store, Root(), "x", manifest, (0,))  # type: ignore[arg-type]
+    (a_locs, a_sum), (b_locs, b_sum), (c_locs, c_sum) = store.calls
+    assert (a_locs, a_sum) == ([a, "", a, ""], '"A"')
+    assert (b_locs, b_sum) == (["", b, "", ""], '"B"')
+    assert c_locs == ["", "", "", c] and isinstance(c_sum, datetime)
+
+    # A last_updated_at only covers the chunks without a recorded ETag.
+    store = Recorder()
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    write_manifest_to_icechunk(  # type: ignore[arg-type]
+        store, Root(), "x", manifest, (0,), last_updated_at=t
+    )
+    assert store.calls[2] == (["", "", "", c], t)
+
+    # An explicit etag applies to every chunk, overriding manifest ETags.
+    store = Recorder()
+    write_manifest_to_icechunk(store, Root(), "x", manifest, (0,), etag='"E"')  # type: ignore[arg-type]
+    assert store.calls == [([a, b, a, c], '"E"')]
+
+
+def test_manifest_etags_checked_per_object_at_read_time(
+    icechunk_filestore: "IcechunkStore",
+    tmp_path: Path,
+    array_v3_metadata,
+):
+    """Only the chunk whose object's recorded ETag no longer matches fails;
+    the chunk from an object with no recorded ETag reads normally."""
+    from icechunk import IcechunkError
+
+    arr = np.arange(8, dtype=np.dtype("int32")).reshape(2, 4)
+    stale, fresh = tmp_path / "stale.bin", tmp_path / "fresh.bin"
+    stale.write_bytes(arr[0].tobytes())
+    fresh.write_bytes(arr[1].tobytes())
+
+    manifest = ChunkManifest(
+        {
+            "0.0": {"path": str(stale), "offset": 0, "length": 16},
+            "1.0": {"path": str(fresh), "offset": 0, "length": 16},
+        },
+        etags={str(stale): '"etag-that-cannot-match"'},
+    )
+    metadata = array_v3_metadata(shape=(2, 4), chunks=(1, 4), codecs=None)
+    ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+    xr.Dataset({"x": xr.Variable(data=ma, dims=["y", "z"])}).vz.to_icechunk(
+        icechunk_filestore
+    )
+
+    x = zarr.open_array(icechunk_filestore, path="x")
+    npt.assert_equal(x[1], arr[1])
+    with pytest.raises(IcechunkError):
+        x[0]
+
+
 def test_roundtrip_coords(
     manifest_array, icechunk_filestore: "IcechunkStore", icechunk_repo: "Repository"
 ):

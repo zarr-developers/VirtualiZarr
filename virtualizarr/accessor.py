@@ -140,6 +140,10 @@ class _VirtualiZarrDatasetAccessor:
             ETag of the source object, when all virtual chunks refer to the same
             object; icechunk then checks at read time that the object's ETag still
             matches. Mutually exclusive with ``last_updated_at``.
+            When ``etag`` is not provided, chunks whose source object has an ETag
+            recorded in the manifest
+            ([ChunkManifest.etags][virtualizarr.manifests.ChunkManifest.etags]) are
+            checked against that ETag instead, and the rest use ``last_updated_at``.
 
         Raises
         ------
@@ -412,6 +416,10 @@ class _VirtualiZarrDataTreeAccessor:
             ETag of the source object, when all virtual chunks refer to the same
             object; icechunk then checks at read time that the object's ETag still
             matches. Mutually exclusive with ``last_updated_at``.
+            When ``etag`` is not provided, chunks whose source object has an ETag
+            recorded in the manifest
+            ([ChunkManifest.etags][virtualizarr.manifests.ChunkManifest.etags]) are
+            checked against that ETag instead, and the rest use ``last_updated_at``.
         **kwargs
             Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 

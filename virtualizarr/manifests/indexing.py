@@ -487,6 +487,7 @@ def _subset_manifest(
         lengths=new_lengths,
         inlined=new_inlined,
         validate_paths=False,
+        etags=manifest._etags,
     )
 
 
@@ -570,4 +571,5 @@ def _shift_manifest_byte_ranges(
         lengths=new_lengths,
         inlined=dict(manifest._inlined),
         validate_paths=False,
+        etags=manifest._etags,
     )

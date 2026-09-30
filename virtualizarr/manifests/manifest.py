@@ -7,9 +7,11 @@ from collections.abc import (
     Iterable,
     Iterator,
     KeysView,
+    Mapping,
     ValuesView,
 )
 from pathlib import PosixPath
+from types import MappingProxyType
 from typing import Any, NewType, NotRequired, TypedDict, cast
 from urllib.parse import urlparse
 
@@ -161,6 +163,37 @@ def validate_byte_range(*, offset: Any, length: Any) -> None:
 ChunkDict = NewType("ChunkDict", dict[ChunkKey, ChunkEntry])
 
 
+def _normalize_etags(
+    etags: Mapping[str, str] | None, *, validate_paths: bool = True
+) -> dict[str, str]:
+    """Key ETags by the same normalized URI the manifest's paths use."""
+    if not etags:
+        return {}
+    if not validate_paths:
+        return dict(etags)
+    return {validate_and_normalize_path_to_uri(p): e for p, e in etags.items()}
+
+
+def merge_etags(etag_maps: Iterable[Mapping[str, str]]) -> dict[str, str]:
+    """
+    Union path -> ETag mappings, e.g. of manifests being combined.
+
+    Raises if one path carries two different ETags: the manifests were built
+    from different revisions of the same object, so their references cannot
+    all be valid at once.
+    """
+    merged: dict[str, str] = {}
+    for etags in etag_maps:
+        for path, etag in etags.items():
+            if merged.setdefault(path, etag) != etag:
+                raise ValueError(
+                    f"Cannot combine manifests referencing {path!r} at two "
+                    f"different ETags ({merged[path]!r} and {etag!r}): they were "
+                    "built from different revisions of the same object."
+                )
+    return merged
+
+
 class ChunkManifest:
     """
     In-memory representation of a single Zarr chunk manifest.
@@ -184,18 +217,24 @@ class ChunkManifest:
 
     Validation is done when this object is instantiated, and this class is immutable,
     so it's not possible to have a ChunkManifest object that does not represent a valid grid of chunks.
+
+    A manifest may also record the ETag of each source object it references (see
+    ``etags``), which writers can use to check at read time that the object has not
+    changed since the references were generated.
     """
 
     _paths: np.ndarray[Any, np.dtypes.StringDType]
     _offsets: np.ndarray[Any, np.dtype[np.uint64]]
     _lengths: np.ndarray[Any, np.dtype[np.uint64]]
     _inlined: dict[tuple[int, ...], bytes]
+    _etags: dict[str, str]
 
     def __init__(
         self,
         entries: dict,
         shape: tuple[int, ...] | None = None,
         separator: ChunkKeySeparator = ".",
+        etags: Mapping[str, str] | None = None,
     ) -> None:
         """
         Create a ChunkManifest from a dictionary mapping zarr chunk keys to byte ranges.
@@ -221,6 +260,9 @@ class ChunkManifest:
         separator
             The chunk key separator, as specified by the array's chunk_key_encoding
             metadata. Either "." (default/v2 encoding) or "/" (default encoding).
+        etags
+            Optional mapping from source object path to that object's ETag, as
+            observed when the references were generated. See ``etags``.
         """
         if shape is None and not entries:
             raise ValueError("need a chunk grid shape if no chunks given")
@@ -278,6 +320,7 @@ class ChunkManifest:
         self._offsets = offsets
         self._lengths = lengths
         self._inlined = inlined
+        self._etags = _normalize_etags(etags)
 
     @classmethod
     def from_arrays(
@@ -288,6 +331,7 @@ class ChunkManifest:
         lengths: np.ndarray[Any, np.dtype[np.uint64]],
         validate_paths: bool = True,
         inlined: dict[tuple[int, ...], bytes] | None = None,
+        etags: Mapping[str, str] | None = None,
     ) -> "ChunkManifest":
         """
         Create manifest directly from numpy arrays containing the path and byte range information.
@@ -309,6 +353,9 @@ class ChunkManifest:
         inlined
             Dictionary mapping chunk grid indices to raw bytes for inlined (in-memory) chunks.
             Paths at these indices should be ``INLINED_CHUNK_PATH``.
+        etags
+            Optional mapping from source object path to that object's ETag, as
+            observed when the references were generated. See ``etags``.
         """
 
         # check types
@@ -359,8 +406,22 @@ class ChunkManifest:
         obj._offsets = offsets
         obj._lengths = lengths
         obj._inlined = inlined if inlined is not None else {}
+        obj._etags = _normalize_etags(etags, validate_paths=validate_paths)
 
         return obj
+
+    @property
+    def etags(self) -> Mapping[str, str]:
+        """
+        Source object path -> ETag observed when the references were generated.
+
+        Writers that support it (e.g. `to_icechunk`) store each chunk's ETag as a
+        checksum, so reading a reference after its object has changed fails
+        instead of returning bytes that no longer match the manifest. Paths with
+        no entry carry no ETag. May include paths the manifest no longer
+        references (e.g. after indexing), which is harmless.
+        """
+        return MappingProxyType(self._etags)
 
     @property
     def ndim_chunk_grid(self) -> int:
@@ -491,7 +552,14 @@ class ChunkManifest:
         offsets_equal = (self._offsets == other._offsets).all()
         lengths_equal = (self._lengths == other._lengths).all()
         inlined_equal = self._inlined == other._inlined
-        return paths_equal and offsets_equal and lengths_equal and inlined_equal
+        etags_equal = self._etags == other._etags
+        return (
+            paths_equal
+            and offsets_equal
+            and lengths_equal
+            and inlined_equal
+            and etags_equal
+        )
 
     def get_entry(self, indices: tuple[int, ...]) -> ChunkEntry | None:
         """Look up a chunk entry by grid indices. Returns None for missing chunks (empty path)."""
@@ -583,13 +651,21 @@ class ChunkManifest:
         """
         if isinstance(new, str):
             renamed_paths = np.full_like(self._paths, fill_value=new)
+            rename_fn: Callable[[str], str] = lambda _: new  # noqa: E731
         elif callable(new):
             vectorized_rename_fn = np.vectorize(new, otypes=[np.dtypes.StringDType()])  # type: ignore[attr-defined]
             renamed_paths = vectorized_rename_fn(self._paths)
+            rename_fn = new
         else:
             raise TypeError(
                 f"Argument 'new' must be either a string or a callable that accepts and returns strings, but got type {type(new)}"
             )
+
+        # A renamed path is assumed to name the same object, so its ETag follows
+        # it; if that assumption is wrong, reads fail loudly rather than silently.
+        renamed_etags = merge_etags(
+            {rename_fn(path): etag} for path, etag in self._etags.items()
+        )
 
         return self.from_arrays(
             paths=renamed_paths,
@@ -597,6 +673,7 @@ class ChunkManifest:
             lengths=self._lengths,
             validate_paths=True,
             inlined=dict(self._inlined),
+            etags=renamed_etags,
         )
 
 

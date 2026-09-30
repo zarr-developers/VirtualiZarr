@@ -11,6 +11,13 @@
   catches modifications that preserve the modification time, and the check is
   atomic with each byte-range fetch, so a stale reference always fails loudly
   instead of serving bytes that no longer match the manifest.
+- `ChunkManifest` can record the ETag of each source object it references
+  (`ChunkManifest.etags`, set via the `etags` argument of `ChunkManifest()` and
+  `ChunkManifest.from_arrays()`). Concatenating, stacking, broadcasting, indexing and
+  renaming carry the ETags along, and combining two manifests that record different
+  ETags for the same object raises. When `etag` is not given, `to_icechunk`
+  checks each chunk against its object's recorded ETag, so a virtual dataset combined
+  from many files gets per-file ETag checksums.
 
 ### Breaking changes
 

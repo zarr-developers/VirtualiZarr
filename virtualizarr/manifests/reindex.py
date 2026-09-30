@@ -138,6 +138,7 @@ def reindex_axis(
         lengths=new_lengths,
         validate_paths=False,
         inlined=new_inlined if new_inlined else None,
+        etags=manifest._etags,
     )
 
     new_shape = list(marr.shape)

@@ -568,3 +568,74 @@ class TestInlinedChunks:
         assert entry["data"] == b"\x01\x02\x03"
         assert entry["path"] == "__inlined__"
         assert entry["length"] == 3
+
+
+class TestEtags:
+    @staticmethod
+    def _manifest(path: str, etag: str | None = None) -> ChunkManifest:
+        return ChunkManifest(
+            {"0": {"path": path, "offset": 0, "length": 4}},
+            etags={path: etag} if etag else None,
+        )
+
+    def test_keys_are_normalized_like_paths(self):
+        manifest = self._manifest("/local/foo.nc", '"abc"')
+        assert dict(manifest.etags) == {"file:///local/foo.nc": '"abc"'}
+
+    def test_from_arrays_normalizes_keys(self):
+        manifest = ChunkManifest.from_arrays(
+            paths=np.asarray(["/local/foo.nc"], dtype=np.dtypes.StringDType()),
+            offsets=np.asarray([0], dtype=np.uint64),
+            lengths=np.asarray([4], dtype=np.uint64),
+            etags={"/local/foo.nc": '"abc"'},
+        )
+        assert dict(manifest.etags) == {"file:///local/foo.nc": '"abc"'}
+
+    def test_read_only(self):
+        with pytest.raises(TypeError):
+            self._manifest("s3://b/a.nc", '"a"').etags["s3://b/x.nc"] = '"x"'  # type: ignore[index]
+
+    def test_default_empty(self):
+        assert dict(self._manifest("s3://b/a.nc").etags) == {}
+
+    def test_equality_considers_etags(self):
+        assert self._manifest("s3://b/a.nc", '"a"') == self._manifest(
+            "s3://b/a.nc", '"a"'
+        )
+        assert self._manifest("s3://b/a.nc", '"a"') != self._manifest(
+            "s3://b/a.nc", '"b"'
+        )
+
+    def test_concat_and_stack_merge(self):
+        from virtualizarr.manifests.array_api import (
+            _concat_manifests,
+            _stack_manifests,
+        )
+
+        a = self._manifest("s3://b/a.nc", '"a"')
+        b = self._manifest("s3://b/b.nc", '"b"')
+        expected = {"s3://b/a.nc": '"a"', "s3://b/b.nc": '"b"'}
+        assert dict(_concat_manifests([a, b], axis=0).etags) == expected
+        assert dict(_stack_manifests([a, b], axis=0).etags) == expected
+
+    def test_combining_two_revisions_of_one_object_raises(self):
+        from virtualizarr.manifests.array_api import _concat_manifests
+
+        old = self._manifest("s3://b/a.nc", '"old"')
+        new = self._manifest("s3://b/a.nc", '"new"')
+        with pytest.raises(ValueError, match="different revisions"):
+            _concat_manifests([old, new], axis=0)
+
+    def test_broadcast_and_subset_carry_etags(self):
+        from virtualizarr.manifests.array_api import _broadcast_manifest
+        from virtualizarr.manifests.indexing import _subset_manifest
+
+        a = self._manifest("s3://b/a.nc", '"a"')
+        assert dict(_broadcast_manifest(a, shape=(2, 1)).etags) == dict(a.etags)
+        assert dict(_subset_manifest(a, (slice(0, 1),)).etags) == dict(a.etags)
+
+    def test_rename_paths_renames_keys(self):
+        a = self._manifest("s3://b/a.nc", '"a"')
+        renamed = a.rename_paths(lambda p: p.replace("s3://b/", "s3://c/"))
+        assert dict(renamed.etags) == {"s3://c/a.nc": '"a"'}
+        assert dict(a.rename_paths("s3://d/x.nc").etags) == {"s3://d/x.nc": '"a"'}
