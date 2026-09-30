@@ -188,9 +188,8 @@ h5netcdf = ">=1.5.0,<2"
 [tool.pixi.feature.icechunk-dev.dependencies]
 rust = "*"
 
+# Rectilinear TIFF strips need unreleased virtual-tiff (virtual-zarr/virtual-tiff#87).
 [tool.pixi.feature.rectilinear.pypi-dependencies]
-zarr = { git = "https://github.com/zarr-developers/zarr-python.git", branch = "main" }
-xarray = { git = "https://github.com/maxrjones/xarray.git", branch = "poc/unified-zarr-chunk-grid" }
 virtual-tiff = { git = "https://github.com/virtual-zarr/virtual-tiff.git", branch = "poc/unified-chunk-grid" }
 
 # `pip` is needed by the Upstream CI job to overlay dev versions from
