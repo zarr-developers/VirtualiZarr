@@ -21,6 +21,7 @@ from zarr.experimental import ChunkGrid
 from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.parsers.zarr import ZarrParser
+from virtualizarr.tests import requires_xarray_rectilinear
 from virtualizarr.tests.utils import PYTEST_TMP_DIRECTORY_URL_PREFIX
 
 icechunk = pytest.importorskip("icechunk")
@@ -473,6 +474,7 @@ def test_region_write_rectilinear_array_raises_not_implemented(
         vds.vz.to_icechunk(region_session.store, region={"x": slice(0, 6)})
 
 
+@requires_xarray_rectilinear
 def test_read_rectilinear_virtual_refs_with_xarray(synthetic_vds_rectilinear_grid):
     """
     Round-trip a rectilinear-chunked virtual dataset through an in-memory
