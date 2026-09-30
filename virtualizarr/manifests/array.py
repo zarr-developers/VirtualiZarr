@@ -1,10 +1,11 @@
 import dataclasses
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Union, cast
+from typing import Any, Callable, Union, cast
 
 import numpy as np
 import xarray as xr
 from zarr.core.metadata.v3 import ArrayV3Metadata
+from zarr.experimental import ChunkGrid
 
 import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
@@ -14,17 +15,6 @@ from virtualizarr.manifests.array_api import (
 from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
 from virtualizarr.manifests.utils import ChunkKeySeparator
-from virtualizarr.utils import determine_chunk_grid_shape
-
-if TYPE_CHECKING:
-    from zarr.core.metadata.v3 import RegularChunkGridMetadata
-else:
-    try:
-        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
-    except ImportError:
-        from zarr.core.metadata.v3 import (
-            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
-        )
 
 
 class ManifestArray:
@@ -62,11 +52,6 @@ class ManifestArray:
             # try unpacking the dict
             _metadata = ArrayV3Metadata(**metadata)
 
-        if not isinstance(_metadata.chunk_grid, RegularChunkGridMetadata):
-            raise NotImplementedError(
-                f"Only RegularChunkGrid is currently supported for chunk size, but got type {type(_metadata.chunk_grid)}"
-            )
-
         if isinstance(chunkmanifest, ChunkManifest):
             _chunkmanifest = chunkmanifest
         elif isinstance(chunkmanifest, dict):
@@ -93,6 +78,11 @@ class ManifestArray:
     @property
     def metadata(self) -> ArrayV3Metadata:
         return self._metadata
+
+    @property
+    def chunk_grid(self) -> ChunkGrid:
+        """Behavioral chunk grid bound to this array's shape."""
+        return ChunkGrid.from_metadata(self._metadata)
 
     @property
     def dtype(self) -> np.dtype:
@@ -332,9 +322,7 @@ class ManifestArray:
         new_metadata = dataclasses.replace(self.metadata, fill_value=fill_value)
         empty_manifest = ChunkManifest(
             entries={},
-            shape=determine_chunk_grid_shape(
-                self.shape, utils.manifest_chunk_shape(self.metadata)
-            ),
+            shape=ChunkGrid.from_metadata(self.metadata).grid_shape,
         )
         return ManifestArray(metadata=new_metadata, chunkmanifest=empty_manifest)
 

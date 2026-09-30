@@ -11,6 +11,7 @@ from virtualizarr.manifests.reindex import chunk_map_from_indexer, reindex_axis
 from virtualizarr.manifests.utils import (
     copy_and_replace_metadata,
     manifest_chunk_shape,
+    require_regular_chunk_grid,
 )
 
 # indexer with only basic selectors, no new axes or ellipsis
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
 def index(marr: "ManifestArray", indexer: T_Indexer) -> "ManifestArray":
     """Index into a ManifestArray"""
+    require_regular_chunk_grid(marr, "Indexing")
     indexer_tuple = check_and_sanitize_indexer_type(indexer)
     indexer_without_ellipsis = check_shape_and_maybe_replace_ellipsis(
         indexer_tuple, marr.ndim
