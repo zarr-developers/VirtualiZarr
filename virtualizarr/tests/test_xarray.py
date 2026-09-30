@@ -355,9 +355,9 @@ class TestConcatRectilinear:
         assert marr.chunk_grid.chunk_sizes == ((10, 10, 15),)
         assert combined_vds.sizes == {"x": 35}
 
-    def test_indexing_rectilinear_result_raises_clear_error(self, array_v3_metadata):
-        # combining along x gives a rectilinear grid; anything that then indexes it,
-        # including concatenating along a new dimension, must fail clearly
+    def test_index_and_concat_rectilinear_result_along_new_dim(self, array_v3_metadata):
+        # combining along x gives a rectilinear grid; xarray indexes it under the hood
+        # to concatenate along a new dimension, e.g. when combining along x then time
         metadata1 = array_v3_metadata(chunks=(10,), shape=(20,))
         manifest1 = ChunkManifest(
             entries={
@@ -377,10 +377,13 @@ class TestConcatRectilinear:
         )
         combined = xr.concat([ds1, ds2], dim="x")
 
-        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
-            combined.isel(x=slice(0, 10))
-        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
-            xr.concat([combined, combined], dim="t")
+        subset = combined.isel(x=slice(0, 20))["a"].data
+        assert subset.shape == (20,)
+        assert subset.chunk_grid.is_regular is True
+
+        stacked = xr.concat([combined, combined], dim="t")["a"].data
+        assert stacked.shape == (2, 35)
+        assert stacked.chunk_grid.chunk_sizes == ((1, 1), (10, 10, 15))
 
 
 @requires_hdf5plugin

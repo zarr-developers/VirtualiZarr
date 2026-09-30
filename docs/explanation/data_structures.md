@@ -276,7 +276,7 @@ If rectilinear chunk grids are not enabled, the same call raises a `ValueError`,
 !!! warning
     Rectilinear chunk grid support is still limited. Concatenation, stacking, and appending are supported, and the result can be written to an [Icechunk](https://icechunk.io/) store. But:
 
-    - **Indexing** a rectilinear-chunked array is not yet implemented, and raises a `NotImplementedError`. That includes Xarray operations that index under the hood, such as `isel`, `expand_dims`, and concatenating the result along a *new* dimension (so combining along a second dimension after the one that produced the rectilinear grid does not work yet).
+    - **Indexing** a rectilinear-chunked array only supports selections that fall on chunk boundaries (including Xarray's `isel`, `expand_dims`, and concatenating along a new dimension). Slicing within a chunk, reindexing/alignment, and broadcasting raise an error.
     - **Region writes** to a rectilinear-chunked array are not yet implemented - region alignment is checked against a single chunk size per axis, which has no equivalent for irregular chunk boundaries.
 
     Note also that some formats (including Zarr and Icechunk stores) could in principle already be rectilinear on disk, but VirtualiZarr can't read those back yet either.
