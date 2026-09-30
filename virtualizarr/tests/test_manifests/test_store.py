@@ -563,6 +563,29 @@ class TestToVirtualXarray:
             manifest_store.to_virtual_dataset(loadable_variables=["data"])
         assert not [w for w in record if "loadable_variables" in str(w.message)]
 
+    def test_no_warning_for_rectilinear_chunks(self, array_v3_metadata_rectilinear):
+        # a parser may return a rectilinear grid, which has no single chunk shape to
+        # compare against the array shape
+        metadata = array_v3_metadata_rectilinear(
+            shape=(5,), chunk_shapes=((2, 3),), dimension_names=["x"]
+        )
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "file:///foo.nc", "offset": 0, "length": 8},
+                "1": {"path": "file:///foo.nc", "offset": 8, "length": 12},
+            }
+        )
+        rectilinear = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+        registry = ObjectStoreRegistry({"file://": MemoryStore()})
+        manifest_group = ManifestGroup(arrays={"data": rectilinear}, attributes={})
+        manifest_store = ManifestStore(manifest_group, registry=registry)
+
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            vds = manifest_store.to_virtual_dataset(loadable_variables=[])
+        assert not [w for w in record if "loadable_variables" in str(w.message)]
+        assert vds["data"].data.chunk_grid.is_regular is False
+
     def test_no_warning_for_regular_chunks(self, manifest_array):
         registry = ObjectStoreRegistry({"file://": MemoryStore()})
         regular = manifest_array(

@@ -14,12 +14,14 @@ import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
 from xarray.core.variable import Variable
+from zarr.core.metadata.v3 import ArrayV3Metadata
+from zarr.dtype import parse_data_type
 
 # Local imports
+from virtualizarr.codecs import convert_to_codec_pipeline
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 from virtualizarr.manifests.manifest import join
 from virtualizarr.manifests.utils import create_v3_array_metadata
-from virtualizarr.utils import ceildiv
 
 
 # Pytest configuration
@@ -165,10 +167,9 @@ def _generate_chunk_entries(
     dict
         Mapping of chunk keys to entry dictionaries
     """
-    chunk_grid_shape = tuple(
-        ceildiv(axis_length, chunk_length)
-        for axis_length, chunk_length in zip(shape, chunks)
-    )
+    from zarr.experimental import ChunkGrid
+
+    chunk_grid_shape = ChunkGrid.from_sizes(shape, chunks).grid_shape
 
     if chunk_grid_shape == ():
         return {"0": entry_generator((0,), (), itemsize)}
@@ -449,6 +450,51 @@ def manifest_array(array_v3_metadata):
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
 
     return _manifest_array
+
+
+@pytest.fixture
+def array_v3_metadata_rectilinear():
+    """
+    Create V3 array metadata with a rectilinear (variable-length) chunk grid.
+
+    Unlike ``array_v3_metadata``, ``chunk_shapes`` gives explicit per-axis chunk-edge
+    lengths (one sequence per axis, e.g. ``((10, 20, 30), (50, 50))``) rather than a
+    single chunk shape - every axis must be spelled out this way, even a uniformly
+    chunked one, because zarr's rectilinear chunk grid has no per-axis "regular" shorthand.
+    ``create_v3_array_metadata`` only builds regular chunk grids, so this constructs
+    ``ArrayV3Metadata`` directly instead of reusing it.
+    """
+
+    def _create_metadata(
+        shape: tuple = (5, 5),
+        chunk_shapes: tuple = ((2, 2, 1), (5,)),
+        data_type: np.dtype = np.dtype("int32"),
+        codecs: list[dict] | None = None,
+        fill_value: int | float | None = None,
+        attributes: dict | None = None,
+        dimension_names: Iterable[str] | None = None,
+    ):
+        codecs = codecs or [{"configuration": {"endian": "little"}, "name": "bytes"}]
+        zdtype = parse_data_type(data_type, zarr_format=3)
+        return ArrayV3Metadata(
+            shape=shape,
+            data_type=zdtype,
+            chunk_grid={
+                "name": "rectilinear",
+                "configuration": {
+                    "kind": "inline",
+                    "chunk_shapes": [list(edges) for edges in chunk_shapes],
+                },
+            },
+            chunk_key_encoding={"name": "default"},
+            fill_value=zdtype.default_scalar() if fill_value is None else fill_value,
+            codecs=convert_to_codec_pipeline(codecs=codecs, dtype=data_type),
+            attributes=attributes or {},
+            dimension_names=dimension_names,
+            storage_transformers=None,
+        )
+
+    return _create_metadata
 
 
 @pytest.fixture
