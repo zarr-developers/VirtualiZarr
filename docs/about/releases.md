@@ -4,6 +4,12 @@
 
 ### New Features
 
+- `to_kerchunk` can write references that hold Zarr format 3 metadata, with `zarr_format=3`
+  for the `json` and `dict` formats, and `KerchunkJSONParser` reads them back. The default
+  is still Zarr format 2, since kerchunk's xarray backend only opens format 2 references.
+  ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
+  By [Ben Dichter](https://github.com/bendichter).
+
 ### Breaking changes
 
 ### Bug fixes

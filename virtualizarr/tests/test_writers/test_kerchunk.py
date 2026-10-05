@@ -300,6 +300,165 @@ class TestAccessor:
         }
 
 
+@requires_kerchunk
+class TestAccessorZarrV3:
+    """Kerchunk references that hold Zarr format 3 metadata (``zarr_format=3``)."""
+
+    def test_accessor_to_kerchunk_dict(self, array_v3_metadata):
+        import ujson
+
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(2, 3),
+                data_type=np.dtype("<i8"),
+                chunks=(2, 3),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr, {"units": "K"})}, attrs={"title": "t"})
+
+        refs = ds.vz.to_kerchunk(format="dict", zarr_format=3)
+
+        assert refs["version"] == 1
+        # one zarr.json per node and the default Zarr format 3 chunk keys
+        assert set(refs["refs"]) == {"zarr.json", "a/zarr.json", "a/c/0/0"}
+        assert refs["refs"]["a/c/0/0"] == ["/test.nc", 6144, 48]
+        assert ujson.loads(refs["refs"]["zarr.json"]) == {
+            "zarr_format": 3,
+            "node_type": "group",
+            "attributes": {"title": "t"},
+        }
+        array_metadata = ujson.loads(refs["refs"]["a/zarr.json"])
+        assert array_metadata["zarr_format"] == 3
+        assert array_metadata["node_type"] == "array"
+        assert array_metadata["shape"] == [2, 3]
+        assert array_metadata["data_type"] == "int64"
+        assert array_metadata["chunk_grid"]["configuration"]["chunk_shape"] == [2, 3]
+        # dimension names and attributes are part of the array metadata
+        assert array_metadata["dimension_names"] == ["x", "y"]
+        assert array_metadata["attributes"] == {"units": "K"}
+
+    def test_default_is_zarr_format_2(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(shape=(2, 3), chunks=(2, 3), codecs=[]),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        assert ds.vz.to_kerchunk(format="dict") == ds.vz.to_kerchunk(
+            format="dict", zarr_format=2
+        )
+        assert ".zgroup" in ds.vz.to_kerchunk(format="dict")["refs"]
+
+    def test_loaded_variables(self, array_v3_metadata):
+        import base64
+
+        import ujson
+
+        manifest = ChunkManifest(
+            entries={"0": dict(path="file:///test.nc", offset=6144, length=24)}
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(3,), data_type=np.dtype("<i8"), chunks=(3,), codecs=[]
+            ),
+        )
+        x = np.array([10.0, 20.0, 30.0])
+        scalar = np.float32(2.5)
+        ds = Dataset({"a": (["x"], arr), "s": ((), scalar)}, coords={"x": ("x", x)})
+
+        refs = ds.vz.to_kerchunk(format="dict", zarr_format=3)["refs"]
+
+        # a loaded variable is one inlined chunk, and a scalar's chunk key is "c"
+        assert refs["x/c/0"] == "base64:" + base64.b64encode(x.tobytes()).decode()
+        assert refs["s/c"] == "base64:" + base64.b64encode(scalar.tobytes()).decode()
+        x_metadata = ujson.loads(refs["x/zarr.json"])
+        assert x_metadata["shape"] == [3]
+        assert x_metadata["dimension_names"] == ["x"]
+        assert x_metadata["codecs"] == [
+            {"name": "bytes", "configuration": {"endian": "little"}}
+        ]
+        # xarray reads the _FillValue attribute of a Zarr format 3 array in its encoded form
+        assert x_metadata["attributes"]["_FillValue"] == "AAAAAAAA+H8="
+        assert ujson.loads(refs["s/zarr.json"])["shape"] == []
+
+    def test_write_inlined_chunks_roundtrip(self, tmp_path, array_v3_metadata):
+        # As for Zarr format 2: write a manifest with inlined and virtual chunks to
+        # JSON and re-parse it with KerchunkJSONParser.
+        inlined = b"\x01\x02\x03\x04\x05\x06\x07\x08"
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {"path": "", "offset": 0, "length": 8, "data": inlined},
+                "0.1": {"path": "file:///foo.nc", "offset": 100, "length": 8},
+            }
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(
+                shape=(1, 2),
+                data_type=np.dtype("<i4"),
+                chunks=(1, 1),
+                codecs=[],
+                fill_value=None,
+            ),
+        )
+        ds = Dataset({"a": (["x", "y"], arr, {"units": "K"})}, attrs={"title": "t"})
+
+        filepath = tmp_path / "refs.json"
+        ds.vz.to_kerchunk(filepath, format="json", zarr_format=3)
+
+        registry = ObjectStoreRegistry({"file://": LocalStore()})
+        manifeststore = KerchunkJSONParser()(f"file://{filepath}", registry=registry)
+        roundtripped = manifeststore._group._members["a"]
+        assert roundtripped.manifest._inlined == {(0, 0): inlined}
+        assert roundtripped.manifest.dict()["0.1"] == {
+            "path": "file:///foo.nc",
+            "offset": 100,
+            "length": 8,
+        }
+        assert roundtripped.metadata.dimension_names == ("x", "y")
+        assert roundtripped.metadata.attributes == {"units": "K"}
+        assert manifeststore._group.metadata.attributes == {"title": "t"}
+
+    @requires_fastparquet
+    def test_parquet_not_supported(self, tmp_path, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(shape=(2, 3), chunks=(2, 3), codecs=[]),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        with pytest.raises(NotImplementedError, match="Zarr format 2"):
+            ds.vz.to_kerchunk(
+                tmp_path / "refs.parquet", format="parquet", zarr_format=3
+            )
+
+    def test_invalid_zarr_format(self, array_v3_metadata):
+        manifest = ChunkManifest(
+            entries={"0.0": dict(path="file:///test.nc", offset=6144, length=48)}
+        )
+        arr = ManifestArray(
+            chunkmanifest=manifest,
+            metadata=array_v3_metadata(shape=(2, 3), chunks=(2, 3), codecs=[]),
+        )
+        ds = Dataset({"a": (["x", "y"], arr)})
+
+        with pytest.raises(ValueError, match="zarr_format must be 2 or 3"):
+            ds.vz.to_kerchunk(format="dict", zarr_format=4)
+
+
 @pytest.mark.parametrize(
     ["dtype", "endian", "expected_dtype_char"],
     [("i8", "little", "<"), ("i8", "big", ">"), ("i1", None, "|")],
