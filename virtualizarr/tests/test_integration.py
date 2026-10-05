@@ -126,6 +126,32 @@ def roundtrip_as_kerchunk_json(vds: xr.Dataset, tmpdir, **kwargs):
     return xr.open_dataset(f"{tmpdir}/refs.json", engine="kerchunk", **kwargs)
 
 
+def roundtrip_as_kerchunk_dict_zarr_v3(vds: xr.Dataset, tmpdir, **kwargs):
+    from kerchunk.utils import refs_as_store
+
+    # write those references to an in-memory kerchunk-formatted references dictionary, with Zarr format 3 metadata
+    ds_refs = vds.vz.to_kerchunk(format="dict", zarr_format=3)
+
+    # kerchunk's xarray backend only opens Zarr format 2 references, so open the reference filesystem as a zarr store
+    return xr.open_zarr(
+        refs_as_store(ds_refs), zarr_format=3, consolidated=False, **kwargs
+    )
+
+
+def roundtrip_as_kerchunk_json_zarr_v3(vds: xr.Dataset, tmpdir, **kwargs):
+    from kerchunk.utils import refs_as_store
+
+    # write those references to disk as kerchunk references format, with Zarr format 3 metadata
+    vds.vz.to_kerchunk(f"{tmpdir}/refs.json", format="json", zarr_format=3)
+
+    return xr.open_zarr(
+        refs_as_store(f"{tmpdir}/refs.json"),
+        zarr_format=3,
+        consolidated=False,
+        **kwargs,
+    )
+
+
 def roundtrip_as_kerchunk_parquet(vds: xr.Dataset, tmpdir, **kwargs):
     # write those references to disk as kerchunk references format
     vds.vz.to_kerchunk(f"{tmpdir}/refs.parquet", format="parquet")
@@ -184,7 +210,12 @@ def roundtrip_as_in_memory_icechunk(
     "roundtrip_func",
     [
         *(
-            [roundtrip_as_kerchunk_dict, roundtrip_as_kerchunk_json]
+            [
+                roundtrip_as_kerchunk_dict,
+                roundtrip_as_kerchunk_json,
+                roundtrip_as_kerchunk_dict_zarr_v3,
+                roundtrip_as_kerchunk_json_zarr_v3,
+            ]
             if has_kerchunk
             else []
         ),
@@ -344,7 +375,12 @@ class TestRoundtrip:
     def test_datetime64_dtype_fill_value(
         self, tmpdir, roundtrip_func, array_v3_metadata
     ):
-        if roundtrip_func == roundtrip_as_in_memory_icechunk:
+        if roundtrip_func in (
+            roundtrip_as_in_memory_icechunk,
+            roundtrip_as_kerchunk_dict_zarr_v3,
+            roundtrip_as_kerchunk_json_zarr_v3,
+        ):
+            # applies whenever xarray reads Zarr format 3 metadata
             pytest.xfail(reason="xarray can't decode the ns datetime fill_value")
 
         chunks_dict = {

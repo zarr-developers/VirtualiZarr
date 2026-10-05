@@ -488,6 +488,24 @@ combined_ds = xr.open_dataset('output/combined.json', engine="kerchunk")
 print(combined_ds)
 ```
 
+Kerchunk's specification does not depend on the Zarr format of the metadata it holds.
+By default the references hold Zarr format 2 metadata (`.zgroup`, `.zarray` and `.zattrs` keys).
+Pass `zarr_format=3` to write Zarr format 3 metadata instead, as one `zarr.json` key per group and array:
+
+```python
+combined_vds.vz.to_kerchunk('output/combined_v3.json', format='json', zarr_format=3)
+```
+
+Kerchunk's xarray backend only opens Zarr format 2 references, so open these as a zarr store over the reference filesystem:
+
+```python
+from kerchunk.utils import refs_as_store
+
+combined_ds = xr.open_zarr(refs_as_store('output/combined_v3.json'), zarr_format=3, consolidated=False)
+```
+
+Zarr format 3 metadata is available for the `json` and `dict` formats, not for `parquet`.
+
 In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes.
 This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.
 
