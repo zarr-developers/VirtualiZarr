@@ -1,8 +1,11 @@
 import warnings
 
-import h5py  # type: ignore
 import numcodecs
 import numpy as np
+import pytest
+
+# Only needed to write this module's HDF5 test files; skips the module when absent.
+h5py = pytest.importorskip("h5py")
 
 try:
     import imagecodecs  # noqa

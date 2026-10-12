@@ -22,9 +22,11 @@ from virtualizarr.manifests.indexing import SubChunkIndexingError
 from virtualizarr.parsers import HDFParser
 from virtualizarr.tests import (
     requires_dask,
+    requires_h5py,
     requires_hdf5plugin,
     requires_imagecodecs,
     requires_lithops,
+    requires_netcdf4,
     requires_network,
     slow_test,
 )
@@ -231,6 +233,7 @@ class TestConcat:
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestCombine:
+    @requires_h5py
     def test_combine_by_coords(
         self, netcdf4_files_factory: Callable[[], tuple[str, str]], local_registry
     ):
@@ -258,6 +261,7 @@ class TestCombine:
                 combined_vds.xindexes["time"].to_pandas_index().is_monotonic_increasing
             )
 
+    @requires_h5py
     def test_2d_combine_by_coords(
         self,
         netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
@@ -305,6 +309,7 @@ class TestCombine:
                 combined_vds.xindexes["lat"].to_pandas_index().is_monotonic_decreasing
             )
 
+    @requires_h5py
     def test_2d_combine_nested(
         self,
         netcdf4_files_factory_2d: Callable[[], tuple[str, str, str, str]],
@@ -356,6 +361,7 @@ class TestCombine:
                 combined_vds.xindexes["lat"].to_pandas_index().is_monotonic_decreasing
             )
 
+    @requires_h5py
     @pytest.mark.xfail(reason="Not yet implemented, see issue #18")
     def test_combine_by_coords_keeping_manifestarrays(
         self, netcdf4_files_factory: Callable[[], tuple[str, str]], local_registry
@@ -378,6 +384,7 @@ class TestCombine:
 
 
 class TestRenamePaths:
+    @requires_h5py
     def test_old_accessor(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -392,6 +399,7 @@ class TestRenamePaths:
                     == "s3://bucket/air.nc"
                 )
 
+    @requires_h5py
     def test_rename_to_str(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -405,6 +413,7 @@ class TestRenamePaths:
                 == "s3://bucket/air.nc"
             )
 
+    @requires_h5py
     def test_rename_using_function(self, netcdf4_file, local_registry):
         def local_to_s3_url(old_local_path: str) -> str:
             from pathlib import Path
@@ -425,6 +434,7 @@ class TestRenamePaths:
                 == "s3://bucket/air.nc"
             )
 
+    @requires_h5py
     def test_invalid_type(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -433,6 +443,7 @@ class TestRenamePaths:
             with pytest.raises(TypeError):
                 vds.vz.rename_paths(["file1.nc", "file2.nc"])
 
+    @requires_h5py
     @requires_hdf5plugin
     @requires_imagecodecs
     def test_mixture_of_manifestarrays_and_numpy_arrays(
@@ -453,6 +464,7 @@ class TestRenamePaths:
             assert isinstance(renamed_vds["lat"].data, np.ndarray)
 
 
+@requires_h5py
 @requires_hdf5plugin
 @requires_imagecodecs
 def test_nbytes(simple_netcdf4, local_registry):
@@ -478,6 +490,7 @@ def test_nbytes(simple_netcdf4, local_registry):
 
 
 class TestOpenVirtualDatasetIndexes:
+    @requires_h5py
     @requires_hdf5plugin
     @requires_imagecodecs
     def test_create_default_indexes_for_loadable_variables(
@@ -515,8 +528,10 @@ def index_mappings_equal(indexes1: Mapping[str, Index], indexes2: Mapping[str, I
     return True
 
 
+@requires_h5py
 @requires_hdf5plugin
 @requires_imagecodecs
+@requires_netcdf4
 def test_cftime_index(tmp_path: Path, local_registry):
     """Ensure a virtual dataset contains the same indexes as an Xarray dataset"""
     # Note: Test was created to debug: https://github.com/zarr-developers/VirtualiZarr/issues/168
@@ -549,6 +564,7 @@ def test_cftime_index(tmp_path: Path, local_registry):
 
 
 class TestOpenVirtualDatasetAttrs:
+    @requires_h5py
     def test_drop_array_dimensions(self, netcdf4_file, local_registry):
         parser = HDFParser()
         # regression test for GH issue #150
@@ -559,6 +575,7 @@ class TestOpenVirtualDatasetAttrs:
         )
         assert "_ARRAY_DIMENSIONS" not in vds["air"].attrs
 
+    @requires_h5py
     def test_coordinate_variable_attrs_preserved(self, netcdf4_file, local_registry):
         # regression test for GH issue #155
         parser = HDFParser()
@@ -574,6 +591,7 @@ class TestOpenVirtualDatasetAttrs:
                 "axis": "Y",
             }
 
+    @requires_h5py
     def test_source_url_stored_in_encoding(self, netcdf4_file, local_registry):
         # mirrors xarray.open_dataset behaviour of populating ds.encoding["source"]
         parser = HDFParser()
@@ -586,6 +604,7 @@ class TestOpenVirtualDatasetAttrs:
 
 
 class TestDetermineCoords:
+    @requires_h5py
     def test_infer_one_dimensional_coords(self, netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -595,6 +614,7 @@ class TestDetermineCoords:
         ) as vds:
             assert set(vds.coords) == {"time", "lat", "lon"}
 
+    @requires_h5py
     def test_var_attr_coords(self, netcdf4_file_with_2d_coords, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -617,6 +637,7 @@ class TestDetermineCoords:
 
 @requires_network
 class TestReadRemote:
+    @requires_h5py
     @slow_test
     @pytest.mark.parametrize(
         "indexes",
@@ -646,6 +667,7 @@ class TestReadRemote:
             for name in ["time", "lat", "lon"]:
                 assert isinstance(vds[name].data, np.ndarray)
 
+    @requires_h5py
     @slow_test
     def test_virtualizarr_vs_local_nisar(self):
         # Open group directly from locally cached file with xarray
@@ -680,6 +702,7 @@ class TestReadRemote:
 
 
 class TestOpenVirtualDatasetHDFGroup:
+    @requires_h5py
     def test_open_empty_group(self, empty_netcdf4_file, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -691,6 +714,7 @@ class TestOpenVirtualDatasetHDFGroup:
             expected = Dataset()
             xrt.assert_identical(vds, expected)
 
+    @requires_h5py
     def test_open_subgroup(
         self, netcdf4_file_with_data_in_multiple_groups, local_registry
     ):
@@ -704,6 +728,7 @@ class TestOpenVirtualDatasetHDFGroup:
             assert isinstance(vds["bar"].data, ManifestArray)
             assert vds["bar"].shape == (2,)
 
+    @requires_h5py
     def test_open_virtual_datatree_raises(
         self, netcdf4_file_with_data_in_multiple_groups, local_registry
     ):
@@ -717,6 +742,7 @@ class TestOpenVirtualDatasetHDFGroup:
                 parser=parser,
             )
 
+    @requires_h5py
     def test_open_virtual_datatree(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
@@ -740,6 +766,7 @@ class TestOpenVirtualDatasetHDFGroup:
             assert vdt["/subgroup2"]["bar"].shape == (2,)
             assert vdt["/subgroup2"]["x"].shape == (2,)
 
+    @requires_h5py
     def test_open_virtual_datatree_no_vars_loaded(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
@@ -764,6 +791,7 @@ class TestOpenVirtualDatasetHDFGroup:
             assert vdt["/subgroup2"]["bar"].shape == (2,)
             assert vdt["/subgroup2"]["x"].shape == (2,)
 
+    @requires_h5py
     def test_open_virtual_datatree_all_vars_loaded(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
@@ -778,6 +806,7 @@ class TestOpenVirtualDatasetHDFGroup:
                 loadable_variables=["foo", "bar"],
             )
 
+    @requires_h5py
     def test_open_virtual_datatree_drop_vars(
         self, netcdf4_file_with_data_in_sibling_groups, local_registry
     ):
@@ -789,6 +818,7 @@ class TestOpenVirtualDatasetHDFGroup:
                 drop_variables=["foo"],
             )
 
+    @requires_h5py
     @pytest.mark.parametrize("group", ["", None])
     def test_open_root_group(
         self, netcdf4_file_with_data_in_multiple_groups, group, local_registry
@@ -807,6 +837,7 @@ class TestOpenVirtualDatasetHDFGroup:
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestLoadVirtualDataset:
+    @requires_h5py
     @pytest.mark.parametrize(
         "loadable_variables, expected_loadable_variables",
         [
@@ -856,6 +887,7 @@ class TestLoadVirtualDataset:
                 if name in actual_loadable_variables:
                     xrt.assert_identical(vds.variables[name], ds.variables[name])
 
+    @requires_h5py
     def test_group_kwarg_not_a_group(self, hdf5_groups_file, local_registry):
         parser = HDFParser(group="doesnt_exist")
         with pytest.raises(ValueError, match="not an HDF Group"):
@@ -866,6 +898,7 @@ class TestLoadVirtualDataset:
             ):
                 pass
 
+    @requires_h5py
     def test_group_kwarg(self, hdf5_groups_file, local_registry):
         parser = HDFParser(group="test/group")
         vars_to_load = ["air", "time"]
@@ -882,6 +915,7 @@ class TestLoadVirtualDataset:
                 if name in vars_to_load:
                     xrt.assert_identical(vds.variables[name], full_ds.variables[name])
 
+    @requires_h5py
     def test_open_dataset_with_empty(self, hdf5_empty, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -890,6 +924,7 @@ class TestLoadVirtualDataset:
             assert vds.empty.dims == ()
             assert vds.empty.attrs == {"empty": "true"}
 
+    @requires_h5py
     def test_open_dataset_with_scalar(self, hdf5_scalar, local_registry):
         parser = HDFParser()
         with open_virtual_dataset(
@@ -915,6 +950,7 @@ preprocess_func = functools.partial(
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestOpenVirtualMFDataset:
+    @requires_h5py
     @pytest.mark.parametrize("invalid_parallel_kwarg", ["ray", Dataset])
     def test_invalid_parallel_kwarg(
         self, netcdf4_files_factory, invalid_parallel_kwarg, local_registry
@@ -931,6 +967,7 @@ class TestOpenVirtualMFDataset:
                 parallel=invalid_parallel_kwarg,
             )
 
+    @requires_h5py
     @pytest.mark.parametrize(
         "parallel",
         [
@@ -1003,6 +1040,7 @@ class TestOpenVirtualMFDataset:
             xrt.assert_identical(combined_vds, expected_vds)
 
 
+@requires_h5py
 def test_drop_variables(netcdf4_file, local_registry):
     parser = HDFParser()
     with open_virtual_dataset(
@@ -1165,6 +1203,7 @@ class TestIsel:
         assert sorted(seen_refs) == [0, 100, 200, 300]
 
 
+@requires_h5py
 @requires_hdf5plugin
 @requires_imagecodecs
 def test_nrefs(simple_netcdf4, local_registry):
