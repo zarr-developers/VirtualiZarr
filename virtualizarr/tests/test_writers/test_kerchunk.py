@@ -8,6 +8,7 @@ from xarray import Dataset
 from zarr.core.metadata.v2 import ArrayV2Metadata
 
 from virtualizarr.manifests import ChunkManifest, ManifestArray
+from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers import KerchunkJSONParser, KerchunkParquetParser
 from virtualizarr.tests import requires_fastparquet, requires_kerchunk
 from virtualizarr.utils import convert_v3_to_v2_metadata, kerchunk_refs_as_json
@@ -508,6 +509,49 @@ def test_convert_v3_to_v2_metadata(
     assert filters_config["dtype"] == expected_delta_dtype
     assert filters_config["astype"] == expected_delta_dtype
     assert v2_metadata.attributes == {}
+
+
+def _vlen_string_metadata(shape, chunks):
+    return create_v3_array_metadata(
+        shape=shape,
+        chunk_shape=chunks,
+        data_type=np.dtypes.StringDType(),
+        fill_value="",
+        codecs=[{"name": "vlen-utf8"}],
+    )
+
+
+def test_convert_v3_to_v2_metadata_vlen_string():
+    # Zarr v2 has no array-bytes codec; a variable-length string array names its
+    # object codec as the first filter instead, and can't be read without it.
+    v2_metadata = convert_v3_to_v2_metadata(_vlen_string_metadata((4,), (2,)))
+    assert v2_metadata.filters
+    assert v2_metadata.filters[0].get_config() == {"id": "vlen-utf8"}
+
+
+def test_write_inlined_vlen_string_chunks_readable():
+    import fsspec
+    import zarr
+    from numcodecs.vlen import VLenUTF8
+
+    values = np.array(["a", "bb", "ccc", "é"], dtype=object)
+    codec = VLenUTF8()
+    manifest = ChunkManifest(
+        entries={
+            str(i): {"path": "", "offset": 0, "length": 0, "data": data}
+            for i, data in enumerate(
+                [codec.encode(values[:2].copy()), codec.encode(values[2:].copy())]
+            )
+        }
+    )
+    arr = ManifestArray(
+        chunkmanifest=manifest, metadata=_vlen_string_metadata((4,), (2,))
+    )
+    refs = Dataset({"a": (["x"], arr)}).vz.to_kerchunk(format="dict")
+
+    fs = fsspec.filesystem("reference", fo=refs)
+    zarr_arr = zarr.open_array(fs.get_mapper("a"), mode="r", zarr_format=2)
+    np.testing.assert_array_equal(zarr_arr[:], values.astype(str))
 
 
 def test_codec_endian_normalizes_enum_and_str():
