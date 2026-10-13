@@ -343,7 +343,6 @@ class TestObjectReferences:
         assert "links_and_references" not in str(error.value)
 
 
-
 @pytest.fixture
 def links_hdf5_url(tmp_path) -> str:
     with h5py.File(tmp_path / "other.h5", "w") as other:
@@ -398,12 +397,16 @@ class TestLinks:
         assert sorted(group.arrays) == ["values"]
         directory = links_hdf5_url.rpartition("/")[0]
         assert group.metadata.attributes["links_references"]["links"] == {
-            "raw": {"ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}},
+            "raw": {
+                "ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}
+            },
             "values_again": {"ref": {"node": "values"}},
         }
 
     def test_drop_variables_applies_to_links(self, links_hdf5_url):
-        store = _parse(links_hdf5_url, links_and_references=True, drop_variables=["raw"])
+        store = _parse(
+            links_hdf5_url, links_and_references=True, drop_variables=["raw"]
+        )
         links = store._group.metadata.attributes["links_references"]["links"]
         assert "raw" not in links
 
@@ -415,6 +418,77 @@ class TestLinks:
             "ref": {"node": "../../devices/probe"}
         }
         np.testing.assert_array_equal(root["values"][...], np.arange(3.0))
+
+
+@pytest.fixture
+def reference_attributes_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "reference_attributes.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        table = f.create_group("general/extracellular_ephys/electrodes")
+        f["values"].attrs["table"] = table.ref
+        f["values"].attrs["many"] = np.array(
+            [table.ref, f["values"].ref, h5py.Reference()], dtype=h5py.ref_dtype
+        )
+        f["values"].attrs["units"] = "volts"
+        g = f.create_group("general/devices/probe")
+        g.attrs["source"] = f["values"].ref
+        g["alias"] = h5py.SoftLink("/values")
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestReferenceAttributes:
+    def test_unchanged_by_default(self, reference_attributes_hdf5_url):
+        attributes = (
+            _parse(reference_attributes_hdf5_url)
+            ._group.arrays["values"]
+            .metadata.attributes
+        )
+        assert isinstance(attributes["table"], h5py.Reference)
+
+    def test_ref_objects(self, reference_attributes_hdf5_url):
+        group = _parse(reference_attributes_hdf5_url, links_and_references=True)._group
+        attributes = group.arrays["values"].metadata.attributes
+        assert attributes["table"] == {
+            "ref": {"node": "../general/extracellular_ephys/electrodes"}
+        }
+        assert attributes["many"] == [
+            {"ref": {"node": "../general/extracellular_ephys/electrodes"}},
+            {"ref": {"node": "."}},
+            None,
+        ]
+        assert attributes["units"] == "volts"
+        assert attributes["zarr_conventions"] == [REF_CONVENTION]
+
+    def test_group_with_links_registers_ref_once(self, reference_attributes_hdf5_url):
+        group = _parse(reference_attributes_hdf5_url, links_and_references=True)._group
+        probe = group.groups["general"].groups["devices"].groups["probe"]
+        attributes = probe.metadata.attributes
+        assert attributes["source"] == {"ref": {"node": "../../../values"}}
+        assert attributes["links_references"] == {
+            "links": {"alias": {"ref": {"node": "../../../values"}}}
+        }
+        assert sorted(c["name"] for c in attributes["zarr_conventions"]) == [
+            "links_references",
+            "ref",
+        ]
+
+    def test_read_through_zarr(self, reference_attributes_hdf5_url):
+        store = _parse(reference_attributes_hdf5_url, links_and_references=True)
+        values = zarr.open_group(store, mode="r", zarr_format=3)["values"]
+        assert values.attrs["table"] == {
+            "ref": {"node": "../general/extracellular_ephys/electrodes"}
+        }
+
+    def test_netcdf_dimension_attributes_stay_hidden(
+        self, chunked_dimensions_netcdf4_url
+    ):
+        store = _parse(chunked_dimensions_netcdf4_url, links_and_references=True)
+        for marr in store._group.arrays.values():
+            assert "DIMENSION_LIST" not in marr.metadata.attributes
+            assert "REFERENCE_LIST" not in marr.metadata.attributes
 
 
 @pytest.mark.parametrize(

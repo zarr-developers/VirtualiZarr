@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import math
 from pathlib import Path
 from typing import (
@@ -60,6 +61,14 @@ _LINKS_AND_REFERENCES_HINT = (
 )
 
 
+def _add_conventions(attrs: dict, *conventions: dict) -> None:
+    """Register conventions in a node's zarr_conventions attribute, each once."""
+    registered = list(attrs.get("zarr_conventions", []))
+    uuids = {entry.get("uuid") for entry in registered if isinstance(entry, dict)}
+    registered += [dict(c) for c in conventions if c["uuid"] not in uuids]
+    attrs["zarr_conventions"] = registered
+
+
 def _get_fill_value(dataset: H5Dataset):
     """
     Extract the fill value from an h5py dataset, handling string/bytes dtypes
@@ -110,7 +119,7 @@ def _construct_manifest_array(
     """
     chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
-    attrs = _extract_attrs(dataset)
+    attrs = _extract_attrs(dataset, links_and_references)
     dtype = dataset.dtype
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
@@ -172,8 +181,7 @@ def _construct_manifest_array(
     if object_reference and links_and_references:
         # A null reference is the empty string
         fill_value = ""
-        conventions = list(attrs.get("zarr_conventions", []))
-        attrs["zarr_conventions"] = [*conventions, dict(LINKS_REFERENCES_CONVENTION)]
+        _add_conventions(attrs, LINKS_REFERENCES_CONVENTION)
         attrs["links_references"] = {"references": True}
     else:
         fill_value = _get_fill_value(dataset)
@@ -305,20 +313,17 @@ def _construct_manifest_group(
                     links_and_references=links_and_references,
                     _seen=seen,
                 )
-        attributes = _extract_attrs(g)
+        attributes = _extract_attrs(g, links_and_references)
         if links:
-            conventions = list(attributes.get("zarr_conventions", []))
-            attributes["zarr_conventions"] = [
-                *conventions,
-                dict(LINKS_REFERENCES_CONVENTION),
-                dict(REF_CONVENTION),
-            ]
+            _add_conventions(attributes, LINKS_REFERENCES_CONVENTION, REF_CONVENTION)
             attributes["links_references"] = {"links": links}
 
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
 
 
-def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dict | None:
+def _link_target(
+    g, key: str, group_name: str, filepath: str, seen: dict
+) -> dict | None:
     """
     Return the ref object for a member of a group that is a link, or None for one that is not.
 
@@ -339,7 +344,12 @@ def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dic
         # resolved against the node that holds it, so the path is kept as written
         return {"ref": {"node": link.path}}
     if isinstance(link, h5py.ExternalLink):
-        return {"ref": {"uri": _resolve_external(filepath, link.filename), "node": "/" + link.path.lstrip("/")}}
+        return {
+            "ref": {
+                "uri": _resolve_external(filepath, link.filename),
+                "node": "/" + link.path.lstrip("/"),
+            }
+        }
     item = g[key]
     if item.id in seen:
         return {"ref": {"node": posixpath.relpath(seen[item.id], start=group_name)}}
@@ -360,7 +370,9 @@ def _resolve_external(filepath: str, filename: str) -> str:
     if not sep:
         return posixpath.normpath(posixpath.join(base, filename))
     root, slash, path = rest.partition("/")
-    return f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    return (
+        f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    )
 
 
 class HDFParser:
@@ -608,11 +620,11 @@ def _inlined_vlen_string_manifest(
     )
 
 
-def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.ndarray]:
+def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
     """
-    Return a function that reads a region of an object reference dataset as paths.
+    Return a function that turns an object reference held by dataset into a path.
 
-    Each path is the target's path relative to the dataset, as a ``ref``
+    The path is the target's path relative to the dataset, as a ``ref``
     convention ``node`` within a store is, and a null reference is the empty
     string. Many references usually share a few targets, and the ``name`` of an
     object opened by reference makes HDF5 search the file, so each target's
@@ -631,6 +643,13 @@ def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.nda
         if target.id not in paths:
             paths[target.id] = posixpath.relpath(target.name, start=start)
         return paths[target.id]
+
+    return path
+
+
+def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.ndarray]:
+    """Return a function that reads a region of an object reference dataset as paths."""
+    path = _reference_path(dataset)
 
     def read(region: tuple[slice, ...]) -> np.ndarray:
         values = np.asarray(dataset[region], dtype=object)
@@ -685,7 +704,12 @@ def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
     return [dim.removeprefix(group).removeprefix("/") for dim in dims]
 
 
-def _extract_attrs(h5obj: H5Dataset | H5Group):
+def _ref_object(reference, path: Callable) -> dict | None:
+    """A ref convention object for an object reference, or None for a null one."""
+    return {"ref": {"node": path(reference)}} if reference else None
+
+
+def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = False):
     """
     Extract attributes from an HDF5 group or dataset.
 
@@ -693,7 +717,13 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
     ----------
     h5obj
         An h5py group or dataset.
+    links_and_references
+        Write an attribute that holds an object reference, or an array of them,
+        as ref convention objects whose node is the target's path relative to
+        h5obj; a null reference is None.
     """
+    import h5py
+
     _HIDDEN_ATTRS = {
         "REFERENCE_LIST",
         "CLASS",
@@ -705,9 +735,29 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
         "_NCProperties",
     }
     attrs = {}
+    path = _reference_path(h5obj) if links_and_references else None
+
     for n, v in h5obj.attrs.items():
         if n in _HIDDEN_ATTRS:
             continue
+        if path is not None:
+            if isinstance(v, h5py.Reference) and not isinstance(
+                v, h5py.RegionReference
+            ):
+                attrs[n] = _ref_object(v, path)
+                _add_conventions(attrs, REF_CONVENTION)
+                continue
+            if (
+                isinstance(v, np.ndarray)
+                and v.dtype.kind == "O"
+                and v.size
+                and all(isinstance(x, h5py.Reference) for x in v.flat)
+            ):
+                attrs[n] = np.vectorize(
+                    functools.partial(_ref_object, path=path), otypes=[object]
+                )(v).tolist()
+                _add_conventions(attrs, REF_CONVENTION)
+                continue
         if n == "_FillValue":
             v = v
         # Fix some attribute values to avoid JSON encoding exceptions...

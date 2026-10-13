@@ -4,6 +4,13 @@
 
 ### New Features
 
+- With `HDFParser(links_and_references=True)`, HDF5 **object reference attributes** become `ref` objects,
+  `{"ref": {"node": ...}}` with the target's path relative to the node, instead of `h5py.Reference` objects that
+  can't be written to JSON. An array of references becomes a list, with `null` for a null reference, and the
+  [`ref` convention](https://github.com/R-CF/zarr_convention_ref) is registered in `zarr_conventions`. Region
+  references are left as they were. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - With `HDFParser(links_and_references=True)`, HDF5 **links** are recorded instead of copied. A soft link, an external
   link, or a second name of an object with more than one hard link is stored in the attributes of its group as
   `"links_references": {"links": {name: {"ref": {"node": ...}}}}`, following the draft
