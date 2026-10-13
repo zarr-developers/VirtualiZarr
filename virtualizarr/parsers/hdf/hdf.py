@@ -318,7 +318,9 @@ def _construct_manifest_group(
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
 
 
-def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dict | None:
+def _link_target(
+    g, key: str, group_name: str, filepath: str, seen: dict
+) -> dict | None:
     """
     Return the ref object for a member of a group that is a link, or None for one that is not.
 
@@ -339,7 +341,12 @@ def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dic
         # resolved against the node that holds it, so the path is kept as written
         return {"ref": {"node": link.path}}
     if isinstance(link, h5py.ExternalLink):
-        return {"ref": {"uri": _resolve_external(filepath, link.filename), "node": "/" + link.path.lstrip("/")}}
+        return {
+            "ref": {
+                "uri": _resolve_external(filepath, link.filename),
+                "node": "/" + link.path.lstrip("/"),
+            }
+        }
     item = g[key]
     if item.id in seen:
         return {"ref": {"node": posixpath.relpath(seen[item.id], start=group_name)}}
@@ -360,7 +367,9 @@ def _resolve_external(filepath: str, filename: str) -> str:
     if not sep:
         return posixpath.normpath(posixpath.join(base, filename))
     root, slash, path = rest.partition("/")
-    return f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    return (
+        f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    )
 
 
 class HDFParser:

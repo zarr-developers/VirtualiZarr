@@ -343,7 +343,6 @@ class TestObjectReferences:
         assert "links_and_references" not in str(error.value)
 
 
-
 @pytest.fixture
 def links_hdf5_url(tmp_path) -> str:
     with h5py.File(tmp_path / "other.h5", "w") as other:
@@ -398,12 +397,16 @@ class TestLinks:
         assert sorted(group.arrays) == ["values"]
         directory = links_hdf5_url.rpartition("/")[0]
         assert group.metadata.attributes["links_references"]["links"] == {
-            "raw": {"ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}},
+            "raw": {
+                "ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}
+            },
             "values_again": {"ref": {"node": "values"}},
         }
 
     def test_drop_variables_applies_to_links(self, links_hdf5_url):
-        store = _parse(links_hdf5_url, links_and_references=True, drop_variables=["raw"])
+        store = _parse(
+            links_hdf5_url, links_and_references=True, drop_variables=["raw"]
+        )
         links = store._group.metadata.attributes["links_references"]["links"]
         assert "raw" not in links
 
