@@ -45,6 +45,15 @@ LINKS_REFERENCES_CONVENTION = {
 }
 """The Links and Object References convention, a draft, used with ``links_and_references=True``."""
 
+REF_CONVENTION = {
+    "uuid": "d89b30cf-ed8c-43d5-9a16-b492f0cd8786",
+    "schema_url": "https://raw.githubusercontent.com/R-CF/zarr_convention_ref/refs/tags/v2.0.0/schema.json",
+    "spec_url": "https://github.com/R-CF/zarr_convention_ref/blob/v2.0.0/README.md",
+    "name": "ref",
+    "description": "External Reference Convention",
+}
+"""The ref convention, whose objects identify the targets of links."""
+
 _LINKS_AND_REFERENCES_HINT = (
     "To store object references as the paths of their targets, following the draft Links and "
     "Object References convention, pass HDFParser(links_and_references=True)."
@@ -244,9 +253,15 @@ def _construct_manifest_group(
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     links_and_references: bool = False,
+    _seen: dict | None = None,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
+
+    With ``links_and_references``, soft and external links, and second names of
+    objects with more than one hard link, are recorded in the group's attributes
+    following the draft Links and Object References convention, instead of being
+    copied.
     """
     import h5py
 
@@ -262,28 +277,90 @@ def _construct_manifest_group(
         non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
         group_name = str(g.name)  # NOTE: this will always include leading "/"
-        arrays = {
-            key: _construct_manifest_array(
-                filepath, dataset, group_name, links_and_references
-            )
-            for key in g.keys()
-            if key not in drop_variables
-            if isinstance(dataset := g[key], h5py.Dataset)
-        }
-        groups = {
-            key: _construct_manifest_group(
-                filepath,
-                reader,
-                group=str(Path(group) / key) if group is not None else key,
-                links_and_references=links_and_references,
-            )
-            for key in g.keys()
-            if key not in drop_variables
-            if isinstance(g[key], h5py.Group)
-        }
+        # The objects already stored, so that a second hard link to one is a link
+        seen = {} if _seen is None else _seen
+        if links_and_references:
+            seen.setdefault(g.id, group_name)
+        arrays = {}
+        groups = {}
+        links = {}
+        for key in g.keys():
+            if key in drop_variables:
+                continue
+            if links_and_references:
+                link = _link_target(g, key, group_name, filepath, seen)
+                if link is not None:
+                    links[key] = link
+                    continue
+            item = g[key]
+            if isinstance(item, h5py.Dataset):
+                arrays[key] = _construct_manifest_array(
+                    filepath, item, group_name, links_and_references
+                )
+            elif isinstance(item, h5py.Group):
+                groups[key] = _construct_manifest_group(
+                    filepath,
+                    reader,
+                    group=str(Path(group) / key) if group is not None else key,
+                    links_and_references=links_and_references,
+                    _seen=seen,
+                )
         attributes = _extract_attrs(g)
+        if links:
+            conventions = list(attributes.get("zarr_conventions", []))
+            attributes["zarr_conventions"] = [
+                *conventions,
+                dict(LINKS_REFERENCES_CONVENTION),
+                dict(REF_CONVENTION),
+            ]
+            attributes["links_references"] = {"links": links}
 
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
+
+
+def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dict | None:
+    """
+    Return the ref object for a member of a group that is a link, or None for one that is not.
+
+    A soft link's target is relative to the group, as a ref convention node is,
+    and may not exist; a relative soft link keeps its path as written. An external link's file is resolved against the file
+    being parsed. A member reached by a hard link whose object is already stored
+    under another name is a link to that name.
+    """
+    import posixpath
+
+    import h5py
+
+    link = g.get(key, getlink=True)
+    if isinstance(link, h5py.SoftLink):
+        if link.path.startswith("/"):
+            return {"ref": {"node": posixpath.relpath(link.path, start=group_name)}}
+        # HDF5 resolves a relative soft link against its group, as a ref node is
+        # resolved against the node that holds it, so the path is kept as written
+        return {"ref": {"node": link.path}}
+    if isinstance(link, h5py.ExternalLink):
+        return {"ref": {"uri": _resolve_external(filepath, link.filename), "node": "/" + link.path.lstrip("/")}}
+    item = g[key]
+    if item.id in seen:
+        return {"ref": {"node": posixpath.relpath(seen[item.id], start=group_name)}}
+    seen[item.id] = item.name
+    return None
+
+
+def _resolve_external(filepath: str, filename: str) -> str:
+    """The location of an external link's file: as given if absolute, otherwise next to the file being parsed."""
+    import posixpath
+
+    if "://" in filename:
+        return filename
+    if filename.startswith("/"):
+        return f"file://{filename}"
+    base, _, _ = filepath.rpartition("/")
+    scheme, sep, rest = base.partition("://")
+    if not sep:
+        return posixpath.normpath(posixpath.join(base, filename))
+    root, slash, path = rest.partition("/")
+    return f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
 
 
 class HDFParser:
@@ -307,8 +384,12 @@ class HDFParser:
         convention](https://github.com/catalystneuro/zarr-links-references): each
         path is relative to the array, a null reference is the empty string, and
         the array is marked with ``"links_references": {"references": true}``.
+        Soft and external links, and second names of objects with more than one
+        hard link, are recorded in the attributes of the group that holds them
+        as ``"links_references": {"links": {name: {"ref": {"node": ...}}}}``,
+        with a ``uri`` for an external link, instead of being copied.
         Off by default, while the convention is settled; a dataset of object
-        references then raises ``NotImplementedError``.
+        references then raises ``NotImplementedError``, and links are copied.
     """
 
     def __init__(
@@ -655,7 +736,8 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
     dimension_names = []
     non_coordinate_dimension_variables = []
     for name, obj in group.items():
-        if "_Netcdf4Dimid" in obj.attrs:
+        # obj is None for a soft link whose target doesn't exist
+        if obj is not None and "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
         if type(obj) is h5py.Dataset:

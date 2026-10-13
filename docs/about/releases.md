@@ -4,6 +4,15 @@
 
 ### New Features
 
+- With `HDFParser(links_and_references=True)`, HDF5 **links** are recorded instead of copied. A soft link, an external
+  link, or a second name of an object with more than one hard link is stored in the attributes of its group as
+  `"links_references": {"links": {name: {"ref": {"node": ...}}}}`, following the draft
+  [Links and Object References convention](https://github.com/catalystneuro/zarr-links-references) and the
+  [`ref` convention](https://github.com/R-CF/zarr_convention_ref). An external link's file becomes an absolute `uri`,
+  and a soft link whose target doesn't exist is recorded rather than failing the parse. Without the flag, links are
+  copied as before. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - `HDFParser(links_and_references=True)` reads datasets of HDF5 **object references**, which used to raise
   `NotImplementedError`. Each reference is resolved at parse time to the path of its target, relative to the array,
   and stored as an inlined string chunk, following the draft

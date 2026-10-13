@@ -10,7 +10,7 @@ from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION
+from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION, REF_CONVENTION
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -341,6 +341,96 @@ class TestObjectReferences:
         with pytest.raises(NotImplementedError) as error:
             _parse(f"file://{filepath}", links_and_references=True)
         assert "links_and_references" not in str(error.value)
+
+
+
+@pytest.fixture
+def links_hdf5_url(tmp_path) -> str:
+    with h5py.File(tmp_path / "other.h5", "w") as other:
+        other["acquisition/raw"] = np.arange(4)
+    filepath = str(tmp_path / "links.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        f.create_group("general/devices/probe")
+        g = f.create_group("general/extracellular_ephys/g")
+        g["device"] = h5py.SoftLink("/general/devices/probe")
+        g["data"] = h5py.SoftLink("/values")
+        g.create_group("child")["inner"] = np.arange(2)
+        g["inner_alias"] = h5py.SoftLink("child/inner")  # relative to g
+        g["dangling"] = h5py.SoftLink("/nowhere")
+        f["raw"] = h5py.ExternalLink("other.h5", "/acquisition/raw")
+        f["values_again"] = f["values"]  # a second hard link
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestLinks:
+    def test_links_are_copied_by_default(self, tmp_path):
+        filepath = str(tmp_path / "soft.h5")
+        with h5py.File(filepath, "w") as f:
+            f["values"] = np.arange(3.0)
+            f["alias"] = h5py.SoftLink("/values")
+        group = _parse(f"file://{filepath}")._group
+        assert sorted(group.arrays) == ["alias", "values"]
+        assert "links_references" not in group.metadata.attributes
+
+    def test_links_are_recorded(self, links_hdf5_url):
+        group = _parse(links_hdf5_url, links_and_references=True)._group
+        g = group.groups["general"].groups["extracellular_ephys"].groups["g"]
+        assert sorted(g.arrays) == []
+        assert sorted(g.groups) == ["child"]
+        assert g.metadata.attributes["links_references"] == {
+            "links": {
+                "device": {"ref": {"node": "../../devices/probe"}},
+                "data": {"ref": {"node": "../../../values"}},
+                "inner_alias": {"ref": {"node": "child/inner"}},
+                "dangling": {"ref": {"node": "../../../nowhere"}},
+            }
+        }
+        assert g.metadata.attributes["zarr_conventions"] == [
+            LINKS_REFERENCES_CONVENTION,
+            REF_CONVENTION,
+        ]
+
+    def test_external_and_hard_links(self, links_hdf5_url):
+        group = _parse(links_hdf5_url, links_and_references=True)._group
+        assert sorted(group.arrays) == ["values"]
+        directory = links_hdf5_url.rpartition("/")[0]
+        assert group.metadata.attributes["links_references"]["links"] == {
+            "raw": {"ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}},
+            "values_again": {"ref": {"node": "values"}},
+        }
+
+    def test_drop_variables_applies_to_links(self, links_hdf5_url):
+        store = _parse(links_hdf5_url, links_and_references=True, drop_variables=["raw"])
+        links = store._group.metadata.attributes["links_references"]["links"]
+        assert "raw" not in links
+
+    def test_links_read_through_zarr(self, links_hdf5_url):
+        store = _parse(links_hdf5_url, links_and_references=True)
+        root = zarr.open_group(store, mode="r", zarr_format=3)
+        attrs = root["general/extracellular_ephys/g"].attrs
+        assert attrs["links_references"]["links"]["device"] == {
+            "ref": {"node": "../../devices/probe"}
+        }
+        np.testing.assert_array_equal(root["values"][...], np.arange(3.0))
+
+
+@pytest.mark.parametrize(
+    "filepath, filename, expected",
+    [
+        ("file:///data/a.h5", "b.h5", "file:///data/b.h5"),
+        ("file:///data/x/a.h5", "../b.h5", "file:///data/b.h5"),
+        ("s3://bucket/dir/a.nwb", "sub/b.nwb", "s3://bucket/dir/sub/b.nwb"),
+        ("s3://bucket/dir/a.nwb", "/abs/b.nwb", "file:///abs/b.nwb"),
+        ("file:///data/a.h5", "https://example.org/b.h5", "https://example.org/b.h5"),
+    ],
+)
+def test_resolve_external(filepath, filename, expected):
+    from virtualizarr.parsers.hdf.hdf import _resolve_external
+
+    assert _resolve_external(filepath, filename) == expected
 
 
 @requires_hdf5plugin
