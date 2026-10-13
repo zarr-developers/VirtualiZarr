@@ -11,6 +11,11 @@
   also emits the `vlen-utf8` filter that Zarr v2 needs to read it. Closes
   [#1120](https://github.com/zarr-developers/VirtualiZarr/issues/1120).
   By [Ben Dichter](https://github.com/bendichter).
+- `to_kerchunk` can write references that hold Zarr format 3 metadata, with `zarr_format=3`
+  for the `json` and `dict` formats, and `KerchunkJSONParser` reads them back. The default
+  is still Zarr format 2, since kerchunk's xarray backend only opens format 2 references.
+  ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
+  By [Ben Dichter](https://github.com/bendichter).
 
 ### Breaking changes
 
@@ -36,6 +41,9 @@
 ### Documentation
 
 ### Internal changes
+
+- Made `test_manifest_repr` independent of the zarr version, since zarr 3.4 added `extra_fields` to the repr of `GroupMetadata`.
+  By [Ben Dichter](https://github.com/bendichter).
 
 ## v2.7.3 (7th August 2026)
 
