@@ -27,6 +27,10 @@
 
 ### Documentation
 
+- Document how to concatenate along a scalar (non-dimension) coordinate, e.g. one timestep per file, in the usage docs. The coordinate must be passed in `loadable_variables` so xarray can build an index for the new dimension.
+  ([#1015](https://github.com/zarr-developers/VirtualiZarr/pull/1015)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Internal changes
 
 ## v2.7.3 (7th August 2026)
