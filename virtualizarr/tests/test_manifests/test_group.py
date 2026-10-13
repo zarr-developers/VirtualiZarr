@@ -69,12 +69,14 @@ class TestManifestGroup:
     def test_manifest_repr(self, manifest_array):
         marr = manifest_array(shape=(5, 2), chunks=(5, 2))
         manifest_group = ManifestGroup(arrays={"foo": marr}, attributes={})
+        # zarr's GroupMetadata repr changes between versions (zarr 3.4 added extra_fields),
+        # so take it from zarr itself rather than writing it out
         expected_repr = textwrap.dedent(
-            """
+            f"""
             ManifestGroup(
-                arrays={'foo': ManifestArray<shape=(5, 2), dtype=int32, chunks=(5, 2)>},
-                groups={},
-                metadata=GroupMetadata(attributes={}, zarr_format=3, consolidated_metadata=None, node_type='group'),
+                arrays={{'foo': ManifestArray<shape=(5, 2), dtype=int32, chunks=(5, 2)>}},
+                groups={{}},
+                metadata={manifest_group.metadata!r},
             )
             """
         )
