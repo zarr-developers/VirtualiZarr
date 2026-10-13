@@ -122,6 +122,43 @@ class TestConvertToCodecPipeline:
         result = convert_to_codec_pipeline(dtype=dtype, codecs=input_codecs)
         assert result == expected_pipeline
 
+    @pytest.mark.parametrize(
+        "dtype,expected_endian",
+        [
+            # Plain dtypes: numpy reports the byte order on the dtype itself.
+            (np.dtype(">i4"), "big"),
+            (np.dtype("<i4"), "little"),
+            # Structured dtypes: numpy reports byteorder "|" on the dtype whatever its
+            # fields say, so the byte order has to be read off the fields.
+            (np.dtype([("flux", ">f4"), ("ivar", ">f4")]), "big"),
+            (np.dtype([("flux", "<f4"), ("ivar", "<f4")]), "little"),
+            # Fields that carry no byte order (single-byte, strings) are not evidence of
+            # little-endian storage -- they are ignored.
+            (np.dtype([("flux", ">f4"), ("name", "S8")]), "big"),
+            (np.dtype([("flux", ">f4"), ("flag", "i1")]), "big"),
+            (np.dtype([("flag", "i1"), ("name", "S8")]), "little"),
+            # A subarray field hides its byte order behind ``.base``.
+            (np.dtype([("flux", ">f4", (3,))]), "big"),
+            # A nested struct hides it another level down.
+            (np.dtype([("coadd", [("flux", ">f4")])]), "big"),
+        ],
+    )
+    def test_byte_order_is_read_from_struct_fields(self, dtype, expected_endian):
+        """The bytes codec's endian must describe the *stored* byte order.
+
+        A FITS binary table arrives as a big-endian structured dtype; picking the codec from
+        ``dtype.byteorder`` (which is "|" for any struct) silently stored it as little-endian.
+        """
+        result = convert_to_codec_pipeline(dtype=dtype, codecs=None)
+        assert result.array_bytes_codec == BytesCodec(endian=expected_endian)
+
+    def test_mixed_byte_order_struct_raises(self):
+        """Zarr v3 gives an array a single bytes codec, so one array cannot store both."""
+        with pytest.raises(ValueError, match="single byte order"):
+            convert_to_codec_pipeline(
+                dtype=np.dtype([("big", ">f4"), ("little", "<f4")]), codecs=None
+            )
+
 
 class TestExtractCodecs:
     """Test the extract_codecs function."""

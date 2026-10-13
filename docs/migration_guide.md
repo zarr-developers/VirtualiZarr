@@ -153,4 +153,4 @@ Note how the Xarray dataset contains loadable Dask arrays rather than manifest a
 The V2 API means that you can use VirtualiZarr's data structure and xarray's functionality merging and combining datasets
 completely independently from the VirtualiZarr library! [Virtual-Tiff](https://github.com/virtual-zarr/virtual-tiff) and
 the [hrrr-parser](https://github.com/virtual-zarr/hrrr-parser) are examples of this pattern. Read some instructions
-on how to write a parser in the [Custom Parsers](custom_parsers.md) page.
+on how to write a parser in the [Custom Parsers](explanation/custom_parsers.md) page.

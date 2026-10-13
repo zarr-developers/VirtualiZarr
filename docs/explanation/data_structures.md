@@ -24,7 +24,7 @@ A single chunk manifest can store references to any number of chunks, spread acr
 
 Note there is no need for the files the chunk manifest refers to to be local, or even to be currently accessible to your code (but you will need to be able to access them when you intend to read the actual chunk data!).
 
-The virtual dataset we created in the [usage guide](usage.md) above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
+The virtual dataset we created in the [usage guide](../how_to/usage.md) above contains multiple chunk manifests stored in-memory, which we can see by pulling one out as a python dictionary.
 
 ```python
 marr = vds['air'].data
@@ -271,7 +271,7 @@ This is what the virtual datasets we created in the usage guide represent - all 
 Any `ManifestGroup` (or single-group `ManifestStore`) can be converted to a virtual dataset.
 
 The reason for having this alternate representation is that then problem of combining many archival files into one virtual Zarr store therefore becomes just a matter of opening each file using `open_virtual_dataset` and using [xarray's various combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html) to combine them into one aggregate virtual dataset.
-See the [usage guide on combining virtual datasets](usage.md#combining-virtual-datasets) for more information.
+See the [usage guide on combining virtual datasets](../how_to/usage.md#combining-virtual-datasets) for more information.
 
 !!! note
     In theory we could then invert the mapping to convert the virtual xarray Dataset back to a `ManifestStore` before persisting to the Icechunk/Kerchunk formats, but we don't currently do that, mainly because it makes handling loaded variables more complex.

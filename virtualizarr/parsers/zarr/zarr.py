@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
-import math
-from collections.abc import Coroutine, Iterable
-from enum import Enum
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import Any, cast
 
 import numpy as np
 import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
-from zarr.api.asynchronous import open_group as open_group_async
-from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+from zarr.core.metadata import ArrayV3Metadata
 from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
@@ -26,89 +21,17 @@ from virtualizarr.manifests.manifest import (
     validate_and_normalize_path_to_uri,
 )
 from virtualizarr.manifests.utils import ChunkKeySeparator
+from virtualizarr.parsers.utils import construct_manifest_group_tree
+from virtualizarr.parsers.zarr.common import (
+    ObstoreStore,
+    RegularChunkGridMetadata,
+    ZarrFormat,
+    _run_async,
+    chunk_entries_to_manifest,
+    join_url,
+    parse_array_layout,
+)
 from virtualizarr.utils import determine_chunk_grid_shape
-
-if TYPE_CHECKING:
-    from zarr.core.metadata.v3 import RegularChunkGridMetadata
-else:
-    try:
-        from zarr.core.metadata.v3 import RegularChunkGridMetadata  # zarr-python>3.1.6
-    except ImportError:
-        from zarr.core.metadata.v3 import (
-            RegularChunkGrid as RegularChunkGridMetadata,  # zarr-python<=3.1.6
-        )
-
-# obstore doesn't export a public base type for stores, so we use Any for now.
-ObstoreStore = Any
-
-T = TypeVar("T")
-
-
-def _run_async(coro: Coroutine[Any, Any, T]) -> T:
-    """Run a coroutine, handling the case where an event loop is already running.
-
-    In environments like Jupyter notebooks, an event loop is already running,
-    so ``asyncio.run()`` raises ``RuntimeError``. In that case we run the
-    coroutine in a separate thread with its own event loop.
-    """
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        # No running loop – the simple path.
-        return asyncio.run(coro)
-
-    # A loop is already running (e.g. Jupyter).  Execute in a worker thread.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(asyncio.run, coro)
-        return future.result()
-
-
-class ZarrFormat(Enum):
-    """
-    Encode all differences between on-disk Zarr formats here.
-
-    Note that we still only need to support the zarr-python v3 API,
-    so this enum is only concerned with differences in the native format spec between versions.
-    """
-
-    V2 = 2
-    V3 = 3
-
-    @property
-    def metadata_key_names(self) -> tuple[str, ...]:
-        match self:
-            case ZarrFormat.V2:
-                return (".zarray", ".zattrs", ".zgroup", ".zmetadata")
-            case ZarrFormat.V3:
-                return ("zarr.json",)
-
-    @property
-    def scalar_chunk_key_name(self) -> str:
-        match self:
-            case ZarrFormat.V2:
-                return "0"
-            case ZarrFormat.V3:
-                return "c"
-
-    @property
-    def chunks_dir_prefix(self) -> str:
-        match self:
-            case ZarrFormat.V2:
-                return ""
-            case ZarrFormat.V3:
-                return "c/"
-
-
-def join_url(base: str, key: str) -> str:
-    """Join a base URL (like s3://bucket/store.zarr) with an object key.
-
-    Ensures we don't accidentally produce double slashes (after the scheme)
-    and that the returned string is scheme-friendly.
-    """
-    if not base:
-        return key
-    # strip trailing slash from base and leading slash from key to avoid '//' in middle
-    return base.rstrip("/") + "/" + key.lstrip("/")
 
 
 class ZarrParser:
@@ -189,7 +112,9 @@ class ZarrParser:
 
         # Compute the store root URI by stripping the relative path from the full URI
         rel_path = str(store_relative_path)
-        store_root_uri = uri.removesuffix(rel_path).rstrip("/") if rel_path else uri
+        # Trailing slashes are left for join_url to handle, so that a root like
+        # "file:///" is not truncated to "file:"
+        store_root_uri = uri.removesuffix(rel_path) if rel_path else uri
 
         # Combine the store-relative path with optional group to get the full
         # path within the object store to the zarr group
@@ -216,50 +141,21 @@ async def construct_manifest_group(
     skip_variables: str | Iterable[str] | None = None,
     group: str | None = None,
 ) -> ManifestGroup:
-    """Construct a ManifestGroup from a zarr group."""
-    zarr_group = await open_group_async(store=store, path=group, mode="r")
-
-    zarr_array_keys = [key async for key in zarr_group.array_keys()]
-    _skip_variables = [] if skip_variables is None else list(skip_variables)
-
-    zarr_arrays = await asyncio.gather(
-        *[
-            zarr_group.getitem(var)
-            for var in zarr_array_keys
-            if var not in _skip_variables
-        ]
+    """Construct a ManifestGroup from a zarr group, recursing into subgroups."""
+    return await construct_manifest_group_tree(
+        store,
+        build_manifest_array=lambda array: construct_manifest_array(array, path),
+        group=group,
+        skip_variables=skip_variables,
     )
-
-    manifest_arrays = await asyncio.gather(
-        *[construct_manifest_array(array, path) for array in zarr_arrays]  # type: ignore[arg-type]
-    )
-
-    manifest_dict = {
-        array.basename: result for array, result in zip(zarr_arrays, manifest_arrays)
-    }
-
-    return ManifestGroup(manifest_dict, attributes=zarr_group.attrs)
 
 
 async def construct_manifest_array(
     zarr_array: zarr.AsyncArray[Any], path: str
 ) -> ManifestArray:
     """Construct a ManifestArray from a zarr array."""
-    array_v3_metadata = metadata_as_v3(zarr_array.metadata)
-
-    if not isinstance(array_v3_metadata.chunk_grid, RegularChunkGridMetadata):
-        raise NotImplementedError(
-            f"Only RegularChunkGrid is supported, but array {zarr_array.path} "
-            f"uses {type(array_v3_metadata.chunk_grid).__name__}."
-        )
-
-    # The on-disk format determines how chunks are stored (e.g. V2 has no c/ prefix),
-    # which differs from the always-V3 metadata we use internally.
-    on_disk_zarr_format = ZarrFormat(zarr_array.metadata.zarr_format)
-    on_disk_separator: ChunkKeySeparator = (
-        zarr_array.metadata.chunk_key_encoding.separator
-        if on_disk_zarr_format == ZarrFormat.V3
-        else "."
+    array_v3_metadata, on_disk_zarr_format, on_disk_separator, _ = parse_array_layout(
+        zarr_array
     )
 
     obs_store = cast(ObjectStore, zarr_array.store).store
@@ -273,60 +169,6 @@ async def construct_manifest_array(
     )
 
     return ManifestArray(metadata=array_v3_metadata, chunkmanifest=chunk_manifest)
-
-
-def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
-    """Convert metadata to V3 format with normalized chunk_key_encoding."""
-
-    if isinstance(metadata, ArrayV2Metadata):
-        v3_dict = _convert_v2_to_v3_dict(metadata)
-    else:
-        v3_dict = metadata.to_dict()
-
-    # Normalize chunk_key_encoding to DefaultChunkKeyEncoding with "." separator.
-    # The ManifestStore expects dot-separated keys (e.g. "0.0.0"), so we enforce
-    # this regardless of what the on-disk store uses.
-    v3_dict["chunk_key_encoding"] = {"name": "default", "separator": "."}
-    return ArrayV3Metadata.from_dict(v3_dict)
-
-
-def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
-    """Convert V2 metadata to a V3 dict, handling fill_value, dimensions, and attributes."""
-
-    try:
-        from zarr.core.dtype import parse_dtype
-        from zarr.metadata.migrate_v3 import _convert_array_metadata
-    except (ImportError, AttributeError):
-        raise ImportError(
-            f"Zarr-Python>=3.1.3 is required for parsing Zarr V2 into Zarr V3. "
-            f"Found Zarr version '{zarr.__version__}'"
-        )
-
-    # V3 requires a non-None fill_value, but V2 allows it. If missing, set to the
-    # dtype's default (e.g. 0 for int) before converting. We roundtrip through a dict
-    # because ArrayV2Metadata is immutable.
-    if metadata.fill_value is None:
-        v2_dict = metadata.to_dict()
-        v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
-        fill_value = v2_dtype.default_scalar()
-        v2_dict["fill_value"] = v2_dtype.to_json_scalar(fill_value, zarr_format=2)
-        metadata = ArrayV2Metadata.from_dict(v2_dict)
-
-    v3_dict = _convert_array_metadata(metadata).to_dict()
-
-    # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
-    # to V3's dimension_names, so we do it manually.
-    attrs = cast(dict, v3_dict.get("attributes", {}))
-    dim_names = attrs.get("_ARRAY_DIMENSIONS")
-    if v3_dict.get("dimension_names") is None and dim_names is not None:
-        v3_dict["dimension_names"] = dim_names
-
-    # _ARRAY_DIMENSIONS is a V2 convention that gets promoted to dimension_names in V3,
-    # so remove it from attributes to avoid duplication.
-    if "_ARRAY_DIMENSIONS" in attrs:
-        del attrs["_ARRAY_DIMENSIONS"]
-
-    return v3_dict
 
 
 async def build_chunk_manifest(
@@ -369,7 +211,6 @@ async def build_chunk_manifest(
     chunk_grid_shape = determine_chunk_grid_shape(
         metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
     )
-    total_size = math.prod(chunk_grid_shape)
 
     # Handle scalar arrays
     if metadata.shape == ():
@@ -380,8 +221,10 @@ async def build_chunk_manifest(
         try:
             head = await obstore.head_async(obs_store, store_key)
         except (FileNotFoundError, obstore.exceptions.NotFoundError):
-            # technically I think the zarr spec allows for the possibility that the scalar chunk is uninitialized
-            return ChunkManifest({})
+            # The zarr spec allows the scalar chunk to be uninitialized (e.g. CF
+            # grid-mapping / CRS variables carry only attributes). An empty
+            # manifest still needs its (empty) chunk grid shape.
+            return ChunkManifest({}, shape=chunk_grid_shape)
 
         size = head["size"]
         full_path = join_url(store_base_uri, store_key)
@@ -395,46 +238,38 @@ async def build_chunk_manifest(
             }
         )
 
-    # Build 1d array of all initialized chunk paths and their lengths
-    nonscalar_chunks_prefix = join_url(
-        array_path, on_disk_zarr_format.chunks_dir_prefix
-    )
+    # Build 1d array of all initialized chunk paths and their lengths.
+    # Listing the array's own directory (rather than the chunk key prefix) keeps this
+    # correct when that prefix isn't a whole path component, e.g. "air/c." for a V3
+    # array whose chunk key separator is "." — see chunks_prefix.
     stripped_keys, full_paths, all_lengths = await build_1d_chunk_mapping(
-        obs_store, store_base_uri, nonscalar_chunks_prefix, on_disk_zarr_format
+        obs_store,
+        store_base_uri,
+        join_url(array_path, ""),
+        join_url(array_path, on_disk_zarr_format.chunks_prefix(on_disk_separator)),
+        on_disk_zarr_format,
+        on_disk_separator,
+        len(metadata.shape),
     )
 
-    if len(stripped_keys) == 0:
-        # No initialized chunks found, so manifest is empty, and we can exit early.
-        return ChunkManifest({}, shape=chunk_grid_shape)
-
-    # split "0.0.0" style keys into per-dimension integer coords
-    # TODO replace np.char.split with np.strings.split once it exists
-    split_keys = np.char.split(stripped_keys, sep=on_disk_separator)
-    coords = np.array(
-        [[int(c) for c in key] for key in split_keys], dtype=np.int64
-    ).T  # shape: (ndim, nchunks)
-    flat_positions = np.ravel_multi_index(coords, chunk_grid_shape)
-
-    # scatter listed chunks into dense flat arrays (empty string / 0 = missing)
-    dense_paths = np.full(total_size, "", dtype=np.dtypes.StringDType())
-    dense_lengths = np.zeros(total_size, dtype=np.uint64)
-    dense_offsets = np.zeros(total_size, dtype=np.uint64)
-
-    dense_paths[flat_positions] = full_paths
-    dense_lengths[flat_positions] = all_lengths
-
-    return ChunkManifest.from_arrays(
-        paths=dense_paths.reshape(chunk_grid_shape),
-        offsets=dense_offsets.reshape(chunk_grid_shape),
-        lengths=dense_lengths.reshape(chunk_grid_shape),
+    return chunk_entries_to_manifest(
+        stripped_keys,
+        full_paths,
+        np.zeros(len(stripped_keys), dtype=np.uint64),
+        all_lengths,
+        separator=on_disk_separator,
+        chunk_grid_shape=chunk_grid_shape,
     )
 
 
 async def build_1d_chunk_mapping(
     obs_store: ObstoreStore,
     store_base_uri: str,
+    list_prefix: str,
     array_chunks_prefix: str,
     zarr_format: ZarrFormat,
+    chunk_key_separator: str,
+    ndim: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Build chunk mapping by listing the object store with obstore.
@@ -448,10 +283,20 @@ async def build_1d_chunk_mapping(
         The obstore ObjectStore to list.
     store_base_uri
         The base URI of the store (e.g. "s3://bucket/store.zarr"), used to construct full chunk paths.
+    list_prefix
+        Store-relative path prefix to list (e.g. "air/"). obstore matches a list prefix
+        one whole path component at a time, so this must end at a "/" boundary even when
+        ``array_chunks_prefix`` doesn't.
     array_chunks_prefix
-        Store-relative prefix to list and strip from chunk keys (e.g. "air/c/").
+        Store-relative prefix that every chunk key starts with, and which is stripped to
+        get the chunk's coordinates (e.g. "air/c/", "air/c.", or "air/").
     zarr_format
         The zarr format version.
+    chunk_key_separator
+        The chunk key separator used on disk (e.g. ``"."`` or ``"/"``).
+    ndim
+        Number of dimensions of the array, i.e. how many coordinate components a
+        genuine chunk key has.
 
     Returns
     -------
@@ -459,7 +304,7 @@ async def build_1d_chunk_mapping(
     """
     path_batches: list[np.ndarray] = []
     size_batches: list[np.ndarray] = []
-    stream = obs_store.list_async(prefix=array_chunks_prefix, return_arrow=True)
+    stream = obs_store.list_async(prefix=list_prefix, return_arrow=True)
     async for batch in stream:
         # Immediately convert to numpy arrays - we can still do efficient manipulations, and don't need any extra arrow dependencies.
         # Note: The .astype is only needed because .to_numpy converts to a numpy object array of python `str` objects, which is inefficient.
@@ -468,12 +313,26 @@ async def build_1d_chunk_mapping(
         sizes_np = batch.column("size").to_numpy()
 
         # filter out metadata and directory keys, leaving only valid chunk keys
-        # (assumes that there are no other objects inside this directory)
         is_metadata = np.zeros(len(paths_np), dtype=bool)
         for suffix in zarr_format.metadata_key_names:
             is_metadata |= np.strings.endswith(paths_np, suffix)
         is_directory = np.strings.endswith(paths_np, "/")
-        chunk_keys_mask = ~(is_metadata | is_directory)
+
+        # Zero-byte "directory marker" objects (created by e.g. `aws s3 sync`, `s3fs`,
+        # or `boto3.put_object(Key=prefix + "/")`) are keyed with a trailing slash, but
+        # obstore's client-side path parsing strips that slash before the listed path
+        # reaches here, so `is_directory` above can never catch them. Rather than
+        # matching markers by name, keep only keys shaped like a genuine chunk key:
+        # a literal descendant of the prefix with exactly one coordinate component per
+        # dimension. A marker for the chunks directory itself ends up one character
+        # shorter than the prefix, and a marker for a nested chunk subdirectory (only
+        # possible when the separator is "/") ends up short a component, so both fail.
+        is_descendant = np.strings.startswith(paths_np, array_chunks_prefix)
+        relative_keys = np.strings.replace(paths_np, array_chunks_prefix, "", 1)
+        n_components = np.strings.count(relative_keys, chunk_key_separator) + 1
+        has_chunk_key_shape = is_descendant & (n_components == ndim)
+
+        chunk_keys_mask = ~(is_metadata | is_directory) & has_chunk_key_shape
 
         path_batches.append(paths_np[chunk_keys_mask])
         size_batches.append(sizes_np[chunk_keys_mask])
@@ -495,6 +354,6 @@ async def build_1d_chunk_mapping(
     stripped_keys = np.strings.replace(all_paths, array_chunks_prefix, "", 1)
 
     # construct full URIs for each chunk
-    full_paths = np.strings.add(store_base_uri + "/", all_paths)
+    full_paths = np.strings.add(join_url(store_base_uri, ""), all_paths)
 
     return stripped_keys, full_paths, all_sizes

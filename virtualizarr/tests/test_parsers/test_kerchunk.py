@@ -81,7 +81,7 @@ def test_dataset_from_df_refs(refs_file_factory, local_registry):
         assert isinstance(vda.data, ManifestArray)
         assert vda.dims == ("x", "y")
         assert vda.shape == (2, 3)
-        assert vda.chunks == (2, 3)
+        assert vda.data.metadata.chunks == (2, 3)
         assert vda.dtype == np.dtype("<i8")
         assert vda.attrs == {"value": "1"}
 
@@ -139,7 +139,7 @@ def test_empty_chunk_manifest(refs_file_factory, local_registry):
         assert "a" in vds.variables
         assert isinstance(vds["a"].data, ManifestArray)
         assert vds["a"].sizes == {"x": 100, "y": 200}
-        assert vds["a"].chunksizes == {"x": 50, "y": 100}
+        assert vds["a"].data.metadata.chunks == (50, 100)
 
 
 def test_null_chunk_reference_treated_as_missing():
@@ -577,5 +577,34 @@ def test_parse_dict_via_memorystore(array_v3_metadata):
     # TODO this might be easier if `ManifestStore/Group` had __eq__ methods?
     actual_marr = manifeststore._group._members["a"]
     assert (actual_marr == expected_marr).all()
+
+
+def test_from_kerchunk_refs_structured_dtype():
+    """A FITS BinTableHDU (e.g. an SDSS spectrum) is emitted by kerchunk as a
+    structured dtype: its fields arrive as JSON *lists* (``["flux", ">f4"]``) and
+    its ``fill_value`` as base64-encoded raw bytes. Both need coercing before they
+    reach ``np.dtype`` / zarr-v3, which previously raised ``TypeError``."""
+    import base64
+
+    from virtualizarr.parsers.kerchunk.translator import from_kerchunk_refs
+
+    fields = [["flux", ">f4"], ["mask", ">i4"]]
+    itemsize = np.dtype([tuple(f) for f in fields]).itemsize
+    zarray = {
+        "dtype": fields,
+        "fill_value": base64.b64encode(b"\x00" * itemsize).decode(),
+        "zarr_format": 2,
+        "filters": None,
+        "compressor": None,
+        "chunks": [10],
+        "shape": [10],
+        "dimension_names": ["x"],
+    }
+
+    metadata = from_kerchunk_refs(zarray, {"value": "1"})
+
+    assert metadata.data_type.to_native_dtype().names == ("flux", "mask")
+    # the base64 fill decodes to the structured zero, not the raw string
+    assert metadata.fill_value == np.zeros((), metadata.data_type.to_native_dtype())[()]
 
     # TODO assert that manifeststore.to_kerchunk_refs() roundtrips, once we have that method

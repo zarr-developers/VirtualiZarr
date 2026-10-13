@@ -565,7 +565,7 @@ def test_parse_variable(netcdf4_file):
     assert var.metadata.dtype.to_native_dtype() == "int16"
     assert var.metadata.dimension_names == ("time", "lat", "lon")
     assert var.shape == (2920, 25, 53)
-    assert var.chunks == (2920, 25, 53)
+    assert var.metadata.chunks == (2920, 25, 53)
     # _FillValue is encoded for array dtype
     assert var.metadata.attributes["scale_factor"] == 0.01
     assert (

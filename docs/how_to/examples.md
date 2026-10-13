@@ -15,6 +15,10 @@ This notebook accompanies the [_Old format, no problem!: Cloud-optimizing the GO
 
 1. [Ingesting the GOES-16 archive](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/goes-16-ingest.ipynb) - End-to-end notebook building the virtual store from the netCDF archive.
 
+### ITS_LIVE glacier-velocity mosaic
+
+1. [Mosaicking ITS_LIVE granules into a virtual cube](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V2/its_live.ipynb) - Aligns granules that share a global grid but cover different regions using native xarray `concat(..., join="outer")`, stacks them along `time`, and writes the sparse virtual cube to Icechunk.
+
 ## V1 Examples
 
 !!! note
@@ -24,3 +28,7 @@ This notebook accompanies the [_Old format, no problem!: Cloud-optimizing the GO
 2. [Parallel reference generation using Coiled Functions](https://github.com/zarr-developers/VirtualiZarr/blob/main/examples/V1/coiled/terraclimate.ipynb)
 3. [Serverless parallel reference generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/virtualizarr-with-lithops)
 4. [MUR SST Virtual and Zarr Icechunk Store Generation using Lithops](https://github.com/zarr-developers/VirtualiZarr/tree/main/examples/V1/mursst-icechunk-with-lithops)
+
+## Next steps
+
+Several of these examples virtualize large archives. To learn how to generate many virtual references in parallel, see [Scaling](scaling.md).

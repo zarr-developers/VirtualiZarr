@@ -66,7 +66,10 @@ def _xarray_subset():
     return ds.isel(time=slice(0, 10), lat=slice(0, 90), lon=slice(0, 180))
 
 
-@pytest.fixture(params=[2, 3])
+# params supplied indirectly by tests via the `zarr_versions` parametrize
+# decorator (see test_zarr.py); defining params here too would be a duplicate
+# parametrization, which pytest>=9.1 rejects.
+@pytest.fixture
 def zarr_store(tmpdir, request):
     ds = _xarray_subset()
     filepath = f"{tmpdir}/air.zarr"
@@ -123,6 +126,21 @@ BLOSC_CODEC = {
 ZLIB_CODEC = {"name": "numcodecs.zlib", "configuration": {"level": 1}}
 
 
+def sharding_codec(
+    inner_chunk_shape: tuple[int, ...], inner_codecs: list[dict] | None = None
+) -> dict:
+    """A `sharding_indexed` codec config splitting each shard into `inner_chunk_shape` chunks."""
+    return {
+        "name": "sharding_indexed",
+        "configuration": {
+            "chunk_shape": inner_chunk_shape,
+            "codecs": inner_codecs or [ARRAYBYTES_CODEC],
+            "index_codecs": [ARRAYBYTES_CODEC, {"name": "crc32c"}],
+            "index_location": "end",
+        },
+    }
+
+
 # Helper functions
 def _generate_chunk_entries(
     shape: tuple[int, ...],
@@ -153,7 +171,7 @@ def _generate_chunk_entries(
     )
 
     if chunk_grid_shape == ():
-        return {"0": entry_generator((0,), (0,), itemsize)}
+        return {"0": entry_generator((0,), (), itemsize)}
 
     all_possible_combos = itertools.product(
         *[range(length) for length in chunk_grid_shape]
