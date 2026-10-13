@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import warnings
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -21,6 +20,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
+from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
@@ -95,16 +95,11 @@ def _construct_manifest_array(
     # Discriminate against other object-kind HDF5 dtypes (vlen arrays, object/
     # region references) that would silently be coerced to StringDType and
     # produce garbage downstream — those aren't supported yet, so fail loudly.
-    if h5py.check_vlen_dtype(dtype) in (str, bytes):
-        warnings.warn(
-            f"Variable {dataset.name!r} is an HDF5 variable-length string "
-            f"dataset. Its metadata will be virtualized, but its chunks store "
-            f"references into the HDF5 global heap rather than the string data "
-            f"itself, so reading this variable through the resulting virtual "
-            f"store will fail. Consider excluding it via drop_variables.",
-            UserWarning,
-            stacklevel=2,
-        )
+    # The chunks of a variable-length string dataset hold pointers into the HDF5
+    # global heap rather than the strings, so they can't be referenced. Its
+    # strings are read at parse time and stored as inlined chunks instead.
+    vlen_string = h5py.check_vlen_dtype(dtype) in (str, bytes)
+    if vlen_string:
         dtype = np.dtypes.StringDType()
     elif dtype.kind == "O":
         raise NotImplementedError(
@@ -129,7 +124,16 @@ def _construct_manifest_array(
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
-    codec_configs = [zarr_codec_config_to_v3(codec.get_config()) for codec in codecs]
+    if vlen_string:
+        # The HDF5 filters compress the heap pointers, not the strings; the
+        # inlined chunks are encoded with vlen-utf8 alone, which
+        # create_v3_array_metadata adds for a string dtype.
+        codec_configs = []
+        chunks = _vlen_string_chunk_shape(dataset)
+    else:
+        codec_configs = [
+            zarr_codec_config_to_v3(codec.get_config()) for codec in codecs
+        ]
 
     fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
@@ -142,7 +146,12 @@ def _construct_manifest_array(
         dimension_names=dims,
         attributes=attrs,
     )
-    manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
+    if vlen_string:
+        manifest = _inlined_vlen_string_manifest(
+            dataset, chunks=chunks, fill_value=fill_value
+        )
+    else:
+        manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
 
@@ -383,6 +392,80 @@ def _dataset_chunk_manifest(
                 lengths=lengths,
             )
     return chunk_manifest
+
+
+def _vlen_string_chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
+    """
+    Chunk shape for a variable-length string dataset, whose chunks are inlined.
+
+    The HDF5 chunk shape is kept, but trimmed to the array shape: an inlined
+    chunk is re-encoded, so unlike a referenced chunk (see ``_chunk_shape``)
+    trimming it is always safe.
+    """
+    shape = dataset.shape
+    chunks = dataset.chunks if dataset.chunks is not None else shape
+    return tuple(max(min(c, s), 1) for c, s in zip(chunks, shape))
+
+
+def _inlined_vlen_string_manifest(
+    dataset: H5Dataset,
+    *,
+    chunks: tuple[int, ...],
+    fill_value: str | None,
+) -> ChunkManifest:
+    """
+    Read an HDF5 variable-length string dataset into inlined chunks.
+
+    Each chunk is read with h5py and encoded the way the zarr ``vlen-utf8`` codec
+    encodes it. An edge chunk is padded to the full chunk shape with the fill
+    value, as zarr does when writing. A dataset with no allocated storage gets an
+    empty manifest, so it reads as the fill value.
+
+    Parameters
+    ----------
+    dataset
+        An h5py variable-length string dataset, of either character set.
+    chunks
+        The chunk shape, as returned by ``_vlen_string_chunk_shape``.
+    fill_value
+        The array's fill value.
+
+    Returns
+    -------
+    ChunkManifest
+        A manifest in which every chunk is inlined.
+    """
+    from numcodecs.vlen import VLenUTF8
+
+    shape = dataset.shape
+    if dataset.size == 0 or dataset.id.get_storage_size() == 0:
+        return ChunkManifest(entries={}, shape=shape)
+
+    codec = VLenUTF8()
+    strings = dataset.asstr()
+    pad = "" if fill_value is None else fill_value
+    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
+    inlined: dict[tuple[int, ...], bytes] = {}
+    for index in np.ndindex(grid_shape):
+        region = tuple(
+            slice(i * c, min((i + 1) * c, s)) for i, c, s in zip(index, chunks, shape)
+        )
+        values = np.asarray(strings[region], dtype=object)
+        chunk = np.full(chunks, pad, dtype=object)
+        # the trailing Ellipsis makes a 0-d assignment copy the element rather
+        # than store the 0-d array itself as an object
+        chunk[tuple(slice(0, n) for n in values.shape) + (...,)] = values
+        inlined[index] = codec.encode(np.ascontiguousarray(chunk))
+
+    lengths = np.zeros(grid_shape, dtype=np.uint64)
+    for index, data in inlined.items():
+        lengths[index] = len(data)
+    return ChunkManifest.from_arrays(
+        paths=np.full(grid_shape, INLINED_CHUNK_PATH, dtype=np.dtypes.StringDType()),  # type: ignore
+        offsets=np.zeros(grid_shape, dtype=np.uint64),
+        lengths=lengths,
+        inlined=inlined,
+    )
 
 
 def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:

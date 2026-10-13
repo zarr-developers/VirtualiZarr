@@ -13,6 +13,18 @@
   and CDF-2 (64-bit offset). CDF-5 files, and the unsigned and 64-bit integer types only
   CDF-5 can represent, could not be virtualized before because scipy cannot read them.
   By [Tom Nicholas](https://github.com/TomNicholas).
+- `HDFParser` now reads **variable-length string** datasets. Their chunks hold pointers into the HDF5 global heap
+  rather than the strings, so the strings are read at parse time and stored as inlined chunks encoded with
+  `vlen-utf8`. They can be loaded with `loadable_variables` and written to Icechunk and kerchunk, and the
+  parse-time warning that they could not be read is gone. Writing a variable-length string array to kerchunk now
+  also emits the `vlen-utf8` filter that Zarr v2 needs to read it. Closes
+  [#1120](https://github.com/zarr-developers/VirtualiZarr/issues/1120).
+  By [Ben Dichter](https://github.com/bendichter).
+- `to_kerchunk` can write references that hold Zarr format 3 metadata, with `zarr_format=3`
+  for the `json` and `dict` formats, and `KerchunkJSONParser` reads them back. The default
+  is still Zarr format 2, since kerchunk's xarray backend only opens format 2 references.
+  ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
+  By [Ben Dichter](https://github.com/bendichter).
 
 ### Breaking changes
 
@@ -33,10 +45,29 @@
   convention where `fill_value` and `attrs["_FillValue"]` were conflated. Closes
   [#982](https://github.com/zarr-developers/VirtualiZarr/issues/982).
   By [Tom Nicholas](https://github.com/TomNicholas).
+- Concatenating regularly-chunked arrays no longer fails just because the *last* input
+  has a shorter trailing chunk than its declared chunk size - a common pattern when
+  combining several regularly-chunked files, scenes, or tiles of differing lengths. A
+  partial chunk on any earlier input is still rejected, since that would leave a short
+  chunk with more data appended after it, which a regular chunk grid can't represent
+  without rewriting bytes.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `ZarrParser` no longer emits manifest paths as `file:/...` when the registry's store is
+  rooted at the filesystem root (`file:///`). The store root URI was stripped of every
+  trailing slash, mangling the scheme so Icechunk's virtual chunk container prefix never
+  matched. By [Tom Nicholas](https://github.com/TomNicholas).
+- Writing to Icechunk with `mode="a"` now raises a `ValueError` if an array of the same
+  name already exists with different metadata, for example if it used a different codec.
+  Previously the new references were written under the old metadata, so reads silently
+  returned wrong values.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Documentation
 
 ### Internal changes
+
+- Made `test_manifest_repr` independent of the zarr version, since zarr 3.4 added `extra_fields` to the repr of `GroupMetadata`.
+  By [Ben Dichter](https://github.com/bendichter).
 
 ## v2.7.3 (7th August 2026)
 
