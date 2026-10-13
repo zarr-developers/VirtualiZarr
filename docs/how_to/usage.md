@@ -345,6 +345,28 @@ combined_vds = open_virtual_mfdataset(
 
 We passed `combine='nested'` to specify that we want the datasets to be combined in the order they appear, using `xr.combine_nested` under the hood.
 
+!!! warning "Concatenating along a scalar coordinate"
+    The examples above concatenate along `time`, which is already a *dimension* in each file (so each file holds many timesteps). Concatenating along an existing dimension just stacks the virtual references end-to-end and requires no in-memory data.
+
+    A common alternative layout stores **one timestep per file**, so that `time` is a *scalar* (0-dimensional) coordinate rather than a dimension. To combine these, xarray must promote that scalar to a new dimension and build an index for it, which requires the coordinate's values in memory. Because `time` is left virtual by default (the automatic loading only covers 1D dimension coordinates), the combine will fail unless you load it explicitly:
+
+    ```python
+    combined_vds = open_virtual_mfdataset(
+        urls,
+        registry=registry,
+        parser=parser,
+        combine="nested",
+        concat_dim="time",
+        loadable_variables=["time"],  # load the scalar concat coordinate into memory
+        coords="minimal",
+        compat="override",
+    )
+    ```
+
+    Note that passing `loadable_variables` *replaces* the default set, so the other dimension coordinates (e.g. `lat`/`lon`) are no longer loaded automatically. The `coords="minimal"` and `compat="override"` arguments (see the note above) stop xarray from trying to load those still-virtual coordinates in order to compare them. Alternatively, list every coordinate you want in memory, e.g. `loadable_variables=["time", "lat", "lon"]`.
+
+    More generally, any coordinate you concatenate along that is *not already a dimension* in each source must be listed in `loadable_variables`.
+
 ### Ordering by coordinate values
 
 If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!

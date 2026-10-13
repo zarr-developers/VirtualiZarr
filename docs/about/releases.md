@@ -64,6 +64,10 @@
 
 ### Documentation
 
+- Document how to concatenate along a scalar (non-dimension) coordinate, e.g. one timestep per file, in the usage docs. The coordinate must be passed in `loadable_variables` so xarray can build an index for the new dimension.
+  ([#1015](https://github.com/zarr-developers/VirtualiZarr/pull/1015)).
+  By [Max Jones](https://github.com/maxrjones).
+
 ### Internal changes
 
 - Made `test_manifest_repr` independent of the zarr version, since zarr 3.4 added `extra_fields` to the repr of `GroupMetadata`.
