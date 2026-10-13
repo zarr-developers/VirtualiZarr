@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 LINKS_REFERENCES_CONVENTION = {
     "uuid": "93624424-4c95-4eda-b86a-f1880206739f",
-    "spec_url": "https://github.com/bendichter/zarr-links-references/blob/main/README.md",
+    "spec_url": "https://github.com/catalystneuro/zarr-links-references/blob/main/README.md",
     "name": "links_references",
     "description": "Links and object references between nodes of Zarr hierarchies",
 }
@@ -304,7 +304,7 @@ class HDFParser:
     links_and_references
         Store datasets of HDF5 object references as the paths of their targets,
         following the draft [Links and Object References
-        convention](https://github.com/bendichter/zarr-links-references): each
+        convention](https://github.com/catalystneuro/zarr-links-references): each
         path is relative to the array, a null reference is the empty string, and
         the array is marked with ``"links_references": {"references": true}``.
         Off by default, while the convention is settled; a dataset of object
