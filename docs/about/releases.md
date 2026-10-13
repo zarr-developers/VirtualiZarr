@@ -4,6 +4,14 @@
 
 ### New Features
 
+- `HDFParser` reads **compound datasets with variable-length string or object reference fields**, which used to
+  raise a `ValueError` (#1104). They are read at parse time into a `struct` with fixed-length unicode fields, each as
+  wide as its longest value, and stored as inlined chunks. String fields always work; reference fields need
+  `links_and_references=True`, hold the paths of their targets, and are listed in
+  `"links_references": {"references": [...]}`. Part of
+  [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - `HDFParser(links_and_references=True)` reads datasets of HDF5 **object references**, which used to raise
   `NotImplementedError`. Each reference is resolved at parse time to the path of its target, relative to the array,
   and stored as an inlined string chunk, following the draft
