@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Iterable,
 )
 
@@ -36,6 +37,20 @@ if TYPE_CHECKING:
     from h5py import Group as H5Group
 
 
+LINKS_REFERENCES_CONVENTION = {
+    "uuid": "93624424-4c95-4eda-b86a-f1880206739f",
+    "spec_url": "https://github.com/bendichter/zarr-links-references/blob/main/README.md",
+    "name": "links_references",
+    "description": "Links and object references between nodes of Zarr hierarchies",
+}
+"""The Links and Object References convention, a draft, used with ``links_and_references=True``."""
+
+_LINKS_AND_REFERENCES_HINT = (
+    "To store object references as the paths of their targets, following the draft Links and "
+    "Object References convention, pass HDFParser(links_and_references=True)."
+)
+
+
 def _get_fill_value(dataset: H5Dataset):
     """
     Extract the fill value from an h5py dataset, handling string/bytes dtypes
@@ -63,6 +78,7 @@ def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
     group: str,
+    links_and_references: bool = False,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -75,6 +91,9 @@ def _construct_manifest_array(
         An h5py dataset.
     group
         Name of the group containing this h5py.Dataset.
+    links_and_references
+        Store a dataset of object references as the paths of their targets,
+        following the draft Links and Object References convention.
 
     Returns
     -------
@@ -99,7 +118,11 @@ def _construct_manifest_array(
     # global heap rather than the strings, so they can't be referenced. Its
     # strings are read at parse time and stored as inlined chunks instead.
     vlen_string = h5py.check_vlen_dtype(dtype) in (str, bytes)
-    if vlen_string:
+    # An object reference is an address in the HDF5 file, so it can't be
+    # referenced either. With links_and_references, each is resolved at parse
+    # time to its target's path and stored as an inlined string chunk.
+    object_reference = h5py.check_ref_dtype(dtype) is h5py.Reference
+    if vlen_string or (object_reference and links_and_references):
         dtype = np.dtypes.StringDType()
     elif dtype.kind == "O":
         raise NotImplementedError(
@@ -108,6 +131,7 @@ def _construct_manifest_array(
             f"(`h5py.vlen_dtype`) and object/region references "
             f"(`h5py.ref_dtype`, `h5py.regionref_dtype`) as numpy object dtype; "
             f"please open an issue if your file needs one of these."
+            + (f" {_LINKS_AND_REFERENCES_HINT}" if object_reference else "")
         )
 
     # Temporarily disable use CF->Codecs - TODO re-enable in subsequent PR.
@@ -124,9 +148,10 @@ def _construct_manifest_array(
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
 
-    if vlen_string:
-        # The HDF5 filters compress the heap pointers, not the strings; the
-        # inlined chunks are encoded with vlen-utf8 alone, which
+    inlined_strings = vlen_string or (object_reference and links_and_references)
+    if inlined_strings:
+        # The HDF5 filters compress heap pointers or addresses, not the strings;
+        # the inlined chunks are encoded with vlen-utf8 alone, which
         # create_v3_array_metadata adds for a string dtype.
         codec_configs = []
         chunks = _vlen_string_chunk_shape(dataset)
@@ -135,7 +160,14 @@ def _construct_manifest_array(
             zarr_codec_config_to_v3(codec.get_config()) for codec in codecs
         ]
 
-    fill_value = _get_fill_value(dataset)
+    if object_reference and links_and_references:
+        # A null reference is the empty string
+        fill_value = ""
+        conventions = list(attrs.get("zarr_conventions", []))
+        attrs["zarr_conventions"] = [*conventions, dict(LINKS_REFERENCES_CONVENTION)]
+        attrs["links_references"] = {"references": True}
+    else:
+        fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
     metadata = create_v3_array_metadata(
         shape=dataset.shape,
@@ -146,9 +178,12 @@ def _construct_manifest_array(
         dimension_names=dims,
         attributes=attrs,
     )
-    if vlen_string:
+    if inlined_strings:
         manifest = _inlined_vlen_string_manifest(
-            dataset, chunks=chunks, fill_value=fill_value
+            dataset,
+            chunks=chunks,
+            fill_value=fill_value,
+            read=_reference_paths(dataset) if object_reference else None,
         )
     else:
         manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
@@ -208,6 +243,7 @@ def _construct_manifest_group(
     *,
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
+    links_and_references: bool = False,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
@@ -227,7 +263,9 @@ def _construct_manifest_group(
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
         group_name = str(g.name)  # NOTE: this will always include leading "/"
         arrays = {
-            key: _construct_manifest_array(filepath, dataset, group_name)
+            key: _construct_manifest_array(
+                filepath, dataset, group_name, links_and_references
+            )
             for key in g.keys()
             if key not in drop_variables
             if isinstance(dataset := g[key], h5py.Dataset)
@@ -237,6 +275,7 @@ def _construct_manifest_group(
                 filepath,
                 reader,
                 group=str(Path(group) / key) if group is not None else key,
+                links_and_references=links_and_references,
             )
             for key in g.keys()
             if key not in drop_variables
@@ -262,6 +301,14 @@ class HDFParser:
         Must return an object implementing the
         [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
         Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+    links_and_references
+        Store datasets of HDF5 object references as the paths of their targets,
+        following the draft [Links and Object References
+        convention](https://github.com/bendichter/zarr-links-references): each
+        path is relative to the array, a null reference is the empty string, and
+        the array is marked with ``"links_references": {"references": true}``.
+        Off by default, while the convention is settled; a dataset of object
+        references then raises ``NotImplementedError``.
     """
 
     def __init__(
@@ -269,10 +316,12 @@ class HDFParser:
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
+        links_and_references: bool = False,
     ):
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
+        self.links_and_references = links_and_references
 
     def __call__(
         self,
@@ -302,6 +351,7 @@ class HDFParser:
             reader=reader,
             group=self.group,
             drop_variables=self.drop_variables,
+            links_and_references=self.links_and_references,
         )
         # Convert to a manifest store
         return ManifestStore(registry=registry, group=manifest_group)
@@ -412,6 +462,7 @@ def _inlined_vlen_string_manifest(
     *,
     chunks: tuple[int, ...],
     fill_value: str | None,
+    read: Callable[[tuple[slice, ...]], np.ndarray] | None = None,
 ) -> ChunkManifest:
     """
     Read an HDF5 variable-length string dataset into inlined chunks.
@@ -429,6 +480,9 @@ def _inlined_vlen_string_manifest(
         The chunk shape, as returned by ``_vlen_string_chunk_shape``.
     fill_value
         The array's fill value.
+    read
+        Returns the strings of a region of the dataset. Defaults to reading the
+        dataset's own strings.
 
     Returns
     -------
@@ -442,7 +496,12 @@ def _inlined_vlen_string_manifest(
         return ChunkManifest(entries={}, shape=shape)
 
     codec = VLenUTF8()
-    strings = dataset.asstr()
+    if read is None:
+        strings = dataset.asstr()
+
+        def read(region: tuple[slice, ...]) -> np.ndarray:
+            return strings[region]
+
     pad = "" if fill_value is None else fill_value
     grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
     inlined: dict[tuple[int, ...], bytes] = {}
@@ -450,7 +509,7 @@ def _inlined_vlen_string_manifest(
         region = tuple(
             slice(i * c, min((i + 1) * c, s)) for i, c, s in zip(index, chunks, shape)
         )
-        values = np.asarray(strings[region], dtype=object)
+        values = np.asarray(read(region), dtype=object)
         chunk = np.full(chunks, pad, dtype=object)
         # the trailing Ellipsis makes a 0-d assignment copy the element rather
         # than store the 0-d array itself as an object
@@ -466,6 +525,37 @@ def _inlined_vlen_string_manifest(
         lengths=lengths,
         inlined=inlined,
     )
+
+
+def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.ndarray]:
+    """
+    Return a function that reads a region of an object reference dataset as paths.
+
+    Each path is the target's path relative to the dataset, as a ``ref``
+    convention ``node`` within a store is, and a null reference is the empty
+    string. Many references usually share a few targets, and the ``name`` of an
+    object opened by reference makes HDF5 search the file, so each target's
+    path is found once.
+    """
+    import posixpath
+
+    file = dataset.file
+    start = dataset.name
+    paths: dict = {}
+
+    def path(reference) -> str:
+        if not reference:
+            return ""
+        target = file[reference]
+        if target.id not in paths:
+            paths[target.id] = posixpath.relpath(target.name, start=start)
+        return paths[target.id]
+
+    def read(region: tuple[slice, ...]) -> np.ndarray:
+        values = np.asarray(dataset[region], dtype=object)
+        return np.vectorize(path, otypes=[object])(values) if values.size else values
+
+    return read
 
 
 def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:

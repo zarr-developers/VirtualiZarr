@@ -10,6 +10,7 @@ from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
+from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -247,6 +248,99 @@ class TestDatasetToManifestArray:
         manifest_store = manifest_store_from_hdf_url(cf_array_fill_value_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert not isinstance(metadata.attributes["_FillValue"], np.ndarray)
+
+
+def _parse(url, **kwargs):
+    registry = ObjectStoreRegistry()
+    registry.register(url, from_url("file:///"))
+    return HDFParser(**kwargs)(url=url, registry=registry)
+
+
+@pytest.fixture
+def object_references_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "object_references.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        f.create_group("devices/probe")
+        electrodes = f.create_group("general/extracellular_ephys/electrodes")
+        electrodes.create_dataset(
+            "group",
+            data=[f["devices/probe"].ref] * 5 + [h5py.Reference(), f["values"].ref],
+            dtype=h5py.ref_dtype,
+            chunks=(3,),
+        )
+        f.create_dataset("scalar", data=f["values"].ref, dtype=h5py.ref_dtype)
+        f.create_dataset(
+            "grid",
+            data=np.array([[f["values"].ref, f["devices/probe"].ref]] * 2),
+            dtype=h5py.ref_dtype,
+        )
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestObjectReferences:
+    def test_off_by_default(self, object_references_hdf5_url):
+        with pytest.raises(NotImplementedError, match="links_and_references=True"):
+            _parse(object_references_hdf5_url)
+
+    def test_paths_relative_to_the_array(self, object_references_hdf5_url):
+        store = _parse(object_references_hdf5_url, links_and_references=True)
+        root = zarr.open_group(store, mode="r", zarr_format=3)
+        arr = root["general/extracellular_ephys/electrodes/group"]
+        # ".." is the array's parent group, as in the ref convention
+        assert arr[...].tolist() == ["../../../../devices/probe"] * 5 + [
+            "",
+            "../../../../values",
+        ]
+        assert root["scalar"][()] == "../values"
+        assert root["grid"][...].tolist() == [["../values", "../devices/probe"]] * 2
+
+    def test_marked_with_the_convention(self, object_references_hdf5_url):
+        store = _parse(object_references_hdf5_url, links_and_references=True)
+        marr = store._group["general"]["extracellular_ephys"]["electrodes"].arrays[
+            "group"
+        ]
+        attributes = marr.metadata.attributes
+        assert attributes["links_references"] == {"references": True}
+        assert attributes["zarr_conventions"] == [LINKS_REFERENCES_CONVENTION]
+        assert marr.metadata.fill_value == ""
+        assert len(marr.manifest._inlined) == 3  # 7 references in chunks of 3
+
+    def test_each_target_name_is_found_once(
+        self, object_references_hdf5_url, monkeypatch
+    ):
+        """The name of an object opened by reference makes HDF5 search the file."""
+        from virtualizarr.parsers.hdf.hdf import _reference_paths
+
+        path = object_references_hdf5_url.removeprefix("file://")
+        with h5py.File(path, "r") as f:
+            read = _reference_paths(f["general/extracellular_ephys/electrodes/group"])
+            calls = []
+            name = h5py.Group.name
+
+            def counting(self):
+                calls.append(1)
+                return name.fget(self)
+
+            monkeypatch.setattr(h5py.Group, "name", property(counting))
+            assert (
+                read((slice(0, 7),)).tolist()[:5] == ["../../../../devices/probe"] * 5
+            )
+        # /devices/probe is the target of five references, and its name is found once
+        assert len(calls) == 1
+
+    def test_region_references_still_raise(self, tmp_path):
+        filepath = str(tmp_path / "region_references.h5")
+        with h5py.File(filepath, "w") as f:
+            f["values"] = np.arange(3.0)
+            f.create_dataset(
+                "regions", data=[f["values"].regionref[0:2]], dtype=h5py.regionref_dtype
+            )
+        with pytest.raises(NotImplementedError) as error:
+            _parse(f"file://{filepath}", links_and_references=True)
+        assert "links_and_references" not in str(error.value)
 
 
 @requires_hdf5plugin

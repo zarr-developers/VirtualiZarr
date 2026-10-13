@@ -4,6 +4,14 @@
 
 ### New Features
 
+- `HDFParser(links_and_references=True)` reads datasets of HDF5 **object references**, which used to raise
+  `NotImplementedError`. Each reference is resolved at parse time to the path of its target, relative to the array,
+  and stored as an inlined string chunk, following the draft
+  [Links and Object References convention](https://github.com/bendichter/zarr-links-references). The flag is off by
+  default while the convention is settled, and the error now mentions it. Part of
+  [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - `NetCDF3Parser` now reads the netCDF3 header itself instead of going through
   `kerchunk.netCDF3.NetCDF3ToZarr`, so virtualizing a netCDF3 file no longer requires
   `kerchunk` or `scipy`. It reads the header through the `ObjectStoreRegistry` like every
