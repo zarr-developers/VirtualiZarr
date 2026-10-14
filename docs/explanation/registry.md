@@ -1,6 +1,6 @@
 # The object store registry
 
-This page explains the `registry` argument that [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] requires.
+This page explains the `registry` argument that every [parser][virtualizarr.parsers.typing.Parser] takes, and that [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] passes on to the parser.
 
 Virtualizing a file doesn't copy its chunk data, but VirtualiZarr still has to read metadata (and optionally specific chunk data) from the file in order to virtualize it.
 
@@ -10,7 +10,7 @@ Virtualizing a file doesn't copy its chunk data, but VirtualiZarr still has to r
 Both steps need an object that can do the I/O, fetching just the byte ranges they need from wherever the file lives, whether that's S3, an HTTP server, or your own disk.
 VirtualiZarr uses an [obstore](https://developmentseed.org/obstore/latest/) [`ObjectStore`][obstore.store.ObjectStore] object for this, called a store on the rest of this page.
 
-The URL of the file(s) is not enough on it's own to perform the I/O. You also need to provide three settings.
+The URL of the file(s) is not enough on its own to perform the I/O. You also need to provide three settings.
 
 - **The service.** `s3://` URLs are also used for S3-compatible services such as Cloudflare R2 or a Ceph cluster, which need a custom endpoint (see the R2 and CEPH tabs in the [usage guide](../how_to/usage.md#opening-files-as-virtual-datasets)).
 - **The region.** Each S3 bucket lives in one AWS region, and the store needs to know which.
@@ -20,7 +20,7 @@ A store only works for a single bucket or host. If your files are spread across 
 
 That mapping is the job of the [`ObjectStoreRegistry`][obspec_utils.registry.ObjectStoreRegistry].
 
-`open_virtual_dataset` always takes a registry, even when you only use a single store it must be passed in inside of a registry. Similarlly even though local files don't require bucket config or credentials they get read via a `LocalStore` and must be passed in via a `ObjectStoreRegistry({"file:///": LocalStore()})`.
+A parser always takes a registry, even when you only use a single store, and so does `open_virtual_dataset`, which passes it to the parser. Similarly, local files don't need bucket config or credentials, but they are still read through a `LocalStore`, passed in as `ObjectStoreRegistry({"file:///": LocalStore()})`.
 
 ## Example on Two Buckets
 
@@ -67,7 +67,8 @@ goes19_url = (
 )
 ```
 
-With the file URLs and the stores set up all that remains is to construct the registry and pass it to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset], which opens both files and joins them along time.
+With the file URLs and the stores set up, all that remains is to put both stores in a registry and pass it with a parser to [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset], which opens both files and joins them along time.
+The registry goes to the parser, which asks it for the store that matches each URL, so one parser can read files from both buckets.
 
 ```python exec="on" session="registry" source="above" result="code"
 registry = ObjectStoreRegistry(
@@ -107,14 +108,15 @@ See [Writing to an Icechunk Store](../how_to/usage.md#writing-to-an-icechunk-sto
 
 ### "Could not find an ObjectStore matching the url"
 
-This error means the parser or the loading step asked the registry for a store for a URL, and no registry key was a prefix of it.
+This error means no registry key is a prefix of the URL being looked up.
+
 The registry matches the scheme and bucket (or host) exactly, then picks the longest registered path that is a prefix of the URL.
 The URL in the message is the one that failed.
 Compare it with your registry keys, checking each of these.
 
 - **Scheme.** `https://my-bucket.s3.amazonaws.com/...` and `s3://my-bucket/...` refer to the same object but need different keys.
 - **Bucket or host.** Must match exactly.
-- **Path.** For local files, the key must be a `file://` prefix of the file's absolute path (see [Local files](#local-files)).
+- **Path.** For local files, the key must be a `file://` prefix of the file's absolute path.
 
 `registry.resolve(url)` raises the same error, so you can check a registry against a URL before opening anything.
 
