@@ -1,6 +1,8 @@
 # Release notes
 
-## v2.7.4 (unreleased)
+## v2.8.0 (14th October 2026)
+
+Moves the FITS and netCDF3 parsers onto VirtualiZarr's own native readers, so neither needs `kerchunk` any more — `FITSParser` now exposes every data HDU and reads ASCII tables, and `NetCDF3Parser` supports CDF-5 — with several breaking changes as a result (`reader_options` removed from both, the `netcdf3` extra removed, and zero-length chunk references now rejected). `HDFParser` gains support for variable-length strings, compound datasets, and (opt-in) HDF5 links and object references, `to_kerchunk` can write Zarr format 3 metadata, and `open_virtual_mfdataset` accepts configured executor instances.
 
 ### New Features
 
