@@ -127,6 +127,7 @@ Makes virtualizing `.zarr.zip` archives dramatically cheaper — building a zipp
   wherever that meaning was intended.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+
 ## v2.7.2 (5th August 2026)
 
 Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unzipping them, lazy support for xarray's `reindex`/`align`/`concat` over virtual arrays, and `nbytes_virtual` on `ManifestGroup`/`ManifestStore`. Also fixes a batch of `ZarrParser` chunk-key bugs (custom separators, S3 directory markers, Zarr V2 `dimension_separator="/"`), zero-length arrays in `ChunkManifest` and `HDF4Parser`, string-dtype fill values in the HDF5 parser, and big-endian structured dtypes in the bytes codec. The docs gain a *"Can my file format be virtualized?"* FAQ entry, illustrated by a diagram of how file formats relate to cloud object storage.
@@ -228,12 +229,12 @@ Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unz
   constraints in *"Can my specific data be virtualized?"*.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+
 ## v2.7.1 (15th July 2026)
 
 Adds a `nrefs` accessor for counting virtual chunk references, a `mode` parameter on `vz.to_icechunk` for controlling how a pre-existing group is handled, and an `HDF4Parser` for reading HDF4 files. Also fixes several scalar-array and Kerchunk-reference edge cases in the `ZarrParser`, `IcechunkParser`, and Kerchunk translator (including FITS structured dtypes), and fixes writing a virtual `DataTree` with `region`/`append_dim` into existing groups.
 
 ### New Features
-
 - Added [VirtualiZarrDatasetAccessor.nrefs][virtualizarr.accessor.VirtualiZarrDatasetAccessor.nrefs] — a method that returns the total number of virtual chunk references in the dataset, ignoring non-virtual variables. Closes #573.
 - `vds.vz.to_icechunk` and `vdt.vz.to_icechunk` now accept a `mode` parameter controlling how a pre-existing group at the target path is handled: `"w-"` (create, error if the group exists — the previous and still-default behaviour), `"w"` (overwrite existing contents), or `"a"` (open the existing group and add/update variables in it). `mode="a"` enables e.g. splitting a large virtual dataset across commits by variable. Closes #1001.
   By [Aaron Spring](https://github.com/aaronspring).
@@ -243,7 +244,6 @@ Adds a `nrefs` accessor for counting virtual chunk references, a `mode` paramete
 ### Breaking changes
 
 ### Bug fixes
-
 - Fix parsing kerchunk references that use a **structured (record) dtype**, as produced for a FITS `BinTableHDU` (e.g. an SDSS spectrum). Such references round-trip the dtype through JSON as a list of `[name, format]` lists and encode the `fill_value` as base64 raw bytes; `from_kerchunk_refs` now coerces the field specs back to tuples before `np.dtype` and decodes the base64 `fill_value` into a structured scalar, instead of raising `TypeError`.
   By [David Stuebe](https://github.com/emfdavid).
 
@@ -451,7 +451,6 @@ Adds support for sharded Zarr V3 arrays, and includes several other bug fixes.
 ### Breaking changes
 
 ### Bug fixes
-
 - Fix handling of scalar Zarr V3 arrays with `None` `dimension_names`.
   ([#897](https://github.com/zarr-developers/VirtualiZarr/pull/897)).
   By [Lars Buntemeyer](https://github.com/larsbuntemeyer).
@@ -903,7 +902,7 @@ It also fixes a number of bugs, adds minor features, changes the default reader 
   ([#18](https://github.com/zarr-developers/VirtualiZarr/issues/18), [#357](https://github.com/zarr-developers/VirtualiZarr/pull/357), [#358](https://github.com/zarr-developers/VirtualiZarr/pull/358)) By [Tom Nicholas](https://github.com/TomNicholas).
 - The `append_dim` and `last_updated_at` parameters of the
   `VirtualiZarrDatasetAccessor.to_icechunk` method are now keyword-only parameters,
-  rather than positional or keyword. This change is breaking *only* where arguments for
+  rather than positional or keyword. This change is breaking _only_ where arguments for
   these parameters are currently given positionally. ([#341](https://github.com/zarr-developers/VirtualiZarr/issues/341)) By
   [Chuck Daniels](https://github.com/chuckwondo).
 - The default backend for netCDF4 and HDF5 is now the custom `HDFVirtualBackend` replacing
