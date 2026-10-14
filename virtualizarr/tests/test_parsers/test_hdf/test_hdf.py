@@ -350,6 +350,98 @@ class TestObjectReferences:
         assert "links_and_references" not in str(error.value)
 
 
+@pytest.fixture
+def compound_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "compound.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        with_references = np.dtype(
+            [
+                ("idx_start", "<i4"),
+                ("count", "<i4"),
+                ("label", h5py.string_dtype()),
+                ("timeseries", h5py.ref_dtype),
+            ]
+        )
+        f.create_dataset(
+            "rows",
+            data=np.array(
+                [
+                    (0, 3, "é one", f["values"].ref),
+                    (3, 2, "two", h5py.Reference()),
+                    (5, 1, "", f["values"].ref),
+                ],
+                dtype=with_references,
+            ),
+            chunks=(2,),
+        )
+        strings_only = np.dtype([("id", "<i8"), ("name", h5py.string_dtype())])
+        f.create_dataset(
+            "names", data=np.array([(1, "a"), (2, "bcd")], dtype=strings_only)
+        )
+        f.create_dataset(
+            "scalar", data=np.array((7, "seven"), dtype=strings_only), shape=()
+        )
+        numeric = np.dtype([("a", "<i4"), ("b", "<f8")])
+        f.create_dataset("numeric", data=np.array([(1, 2.0), (3, 4.0)], dtype=numeric))
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestCompoundObjectFields:
+    def test_reference_fields_need_the_flag(self, compound_hdf5_url):
+        with pytest.raises(NotImplementedError, match="links_and_references=True"):
+            _parse(compound_hdf5_url)
+
+    def test_strings_and_references(self, compound_hdf5_url):
+        store = _parse(compound_hdf5_url, links_and_references=True)
+        rows = zarr.open_group(store, mode="r", zarr_format=3)["rows"]
+        assert rows.dtype == np.dtype(
+            [
+                ("idx_start", "<i4"),
+                ("count", "<i4"),
+                ("label", "<U5"),
+                ("timeseries", "<U9"),
+            ]
+        )
+        assert rows[...].tolist() == [
+            (0, 3, "é one", "../values"),
+            (3, 2, "two", ""),
+            (5, 1, "", "../values"),
+        ]
+        marr = store._group.arrays["rows"]
+        attributes = marr.metadata.attributes
+        assert attributes["links_references"] == {"references": ["timeseries"]}
+        assert attributes["zarr_conventions"] == [LINKS_REFERENCES_CONVENTION]
+        assert len(marr.manifest._inlined) == 2  # 3 rows in chunks of 2
+
+    def test_string_fields_without_the_flag(self, tmp_path):
+        filepath = str(tmp_path / "names.h5")
+        with h5py.File(filepath, "w") as f:
+            dtype = np.dtype([("id", "<i8"), ("name", h5py.string_dtype())])
+            f.create_dataset(
+                "names", data=np.array([(1, "a"), (2, "bcd")], dtype=dtype)
+            )
+            f.create_dataset(
+                "scalar", data=np.array((7, "seven"), dtype=dtype), shape=()
+            )
+        store = _parse(f"file://{filepath}")
+        root = zarr.open_group(store, mode="r", zarr_format=3)
+        assert root["names"][...].tolist() == [(1, "a"), (2, "bcd")]
+        assert root["scalar"][()].tolist() == (7, "seven")
+        assert (
+            "links_references" not in store._group.arrays["names"].metadata.attributes
+        )
+
+    def test_numeric_compound_is_still_referenced(self, compound_hdf5_url):
+        store = _parse(compound_hdf5_url, links_and_references=True)
+        marr = store._group.arrays["numeric"]
+        assert not marr.manifest._inlined
+        numeric = zarr.open_group(store, mode="r", zarr_format=3)["numeric"]
+        assert numeric[...].tolist() == [(1, 2.0), (3, 4.0)]
+
+
 @requires_hdf5plugin
 @requires_imagecodecs
 class TestExtractAttributes:
