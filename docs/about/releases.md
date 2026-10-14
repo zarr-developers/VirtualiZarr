@@ -70,6 +70,11 @@
   returned wrong values.
   By [Ian Hunt-Isaak](https://github.com/ianhi).
 
+- `HDFParser` no longer fails on HDF5 files with attributes stored as arrays of
+  fixed-length byte strings. Such an attribute is now read as a list of `str`, one per
+  element, keeping the array's shape.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Documentation
 
 - Document how to concatenate along a scalar (non-dimension) coordinate, e.g. one timestep per file, in the usage docs. The coordinate must be passed in `loadable_variables` so xarray can build an index for the new dimension.
