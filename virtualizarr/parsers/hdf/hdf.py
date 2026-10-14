@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import math
 import posixpath
 from pathlib import Path, PurePosixPath
@@ -61,6 +62,14 @@ _LINKS_AND_REFERENCES_HINT = (
 )
 
 
+def _add_conventions(attrs: dict, *conventions: dict) -> None:
+    """Register conventions in a node's zarr_conventions attribute, each once."""
+    registered = list(attrs.get("zarr_conventions", []))
+    uuids = {entry.get("uuid") for entry in registered if isinstance(entry, dict)}
+    registered += [dict(c) for c in conventions if c["uuid"] not in uuids]
+    attrs["zarr_conventions"] = registered
+
+
 def _get_fill_value(dataset: H5Dataset):
     """
     Extract the fill value from an h5py dataset, handling string/bytes dtypes
@@ -111,7 +120,7 @@ def _construct_manifest_array(
     """
     chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
-    attrs = _extract_attrs(dataset)
+    attrs = _extract_attrs(dataset, links_and_references)
     dtype = dataset.dtype
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
@@ -184,8 +193,7 @@ def _construct_manifest_array(
     if object_reference and links_and_references:
         # A null reference is the empty string
         fill_value = ""
-        conventions = list(attrs.get("zarr_conventions", []))
-        attrs["zarr_conventions"] = [*conventions, dict(LINKS_REFERENCES_CONVENTION)]
+        _add_conventions(attrs, LINKS_REFERENCES_CONVENTION)
         attrs["links_references"] = {"references": True}
     elif compound is not None:
         fill_value = None  # zeros and empty strings
@@ -328,14 +336,9 @@ def _construct_manifest_group(
                     links_and_references=links_and_references,
                     _seen=seen,
                 )
-        attributes = _extract_attrs(g)
+        attributes = _extract_attrs(g, links_and_references)
         if links:
-            conventions = list(attributes.get("zarr_conventions", []))
-            attributes["zarr_conventions"] = [
-                *conventions,
-                dict(LINKS_REFERENCES_CONVENTION),
-                dict(REF_CONVENTION),
-            ]
+            _add_conventions(attributes, LINKS_REFERENCES_CONVENTION, REF_CONVENTION)
             attributes["links_references"] = {"links": links}
 
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
@@ -433,7 +436,11 @@ class HDFParser:
         Soft and external links, and second names of objects with more than one
         hard link, are recorded in the attributes of the group that holds them
         as ``"links_references": {"links": {name: {"ref": {"node": ...}}}}``,
-        with a ``uri`` for an external link, instead of being copied.
+        with a ``uri`` for an external link, instead of being copied. An
+        attribute that holds an object reference, or several, becomes a ref
+        convention object, or a list of them, whose path is relative to the
+        node that has the attribute.
+        See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
     """
@@ -531,8 +538,12 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        num_chunks = dsid.get_num_chunks()
-        if num_chunks == 0:
+        if callable(getattr(dsid, "chunk_iter", None)):
+            chunk_infos: list = []
+            dsid.chunk_iter(chunk_infos.append)
+        else:
+            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
+        if not chunk_infos:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
             grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
@@ -556,12 +567,8 @@ def _dataset_chunk_manifest(
                 offsets[key] = blob.byte_offset
                 lengths[key] = trimmed_length if trimmed else blob.size
 
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
-            else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+            for chunk_info in chunk_infos:
+                add_chunk_info(chunk_info)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
@@ -836,7 +843,12 @@ def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
     return [dim.removeprefix(group).removeprefix("/") for dim in dims]
 
 
-def _extract_attrs(h5obj: H5Dataset | H5Group):
+def _ref_object(reference, path: Callable) -> dict | None:
+    """A ref convention object for an object reference, or None for a null one."""
+    return {"ref": {"node": path(reference)}} if reference else None
+
+
+def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = False):
     """
     Extract attributes from an HDF5 group or dataset.
 
@@ -844,7 +856,13 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
     ----------
     h5obj
         An h5py group or dataset.
+    links_and_references
+        Write an attribute that holds an object reference, or an array of them,
+        as ref convention objects whose node is the target's path relative to
+        h5obj; a null reference is None.
     """
+    import h5py
+
     _HIDDEN_ATTRS = {
         "REFERENCE_LIST",
         "CLASS",
@@ -856,9 +874,29 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
         "_NCProperties",
     }
     attrs = {}
+    path = _reference_path(h5obj) if links_and_references else None
+
     for n, v in h5obj.attrs.items():
         if n in _HIDDEN_ATTRS:
             continue
+        if path is not None:
+            if isinstance(v, h5py.Reference) and not isinstance(
+                v, h5py.RegionReference
+            ):
+                attrs[n] = _ref_object(v, path)
+                _add_conventions(attrs, REF_CONVENTION)
+                continue
+            if (
+                isinstance(v, np.ndarray)
+                and v.dtype.kind == "O"
+                and v.size
+                and all(isinstance(x, h5py.Reference) for x in v.flat)
+            ):
+                attrs[n] = np.vectorize(
+                    functools.partial(_ref_object, path=path), otypes=[object]
+                )(v).tolist()
+                _add_conventions(attrs, REF_CONVENTION)
+                continue
         if n == "_FillValue":
             v = v
         # Fix some attribute values to avoid JSON encoding exceptions...
@@ -891,8 +929,14 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if obj is not None and "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
-        if type(obj) is h5py.Dataset:
-            if obj.id.get_storage_size() == 0 and name in dimension_names:
+        if type(obj) is h5py.Dataset and name in dimension_names:
+            # chunk_iter stops at the first callback that returns non-None, so
+            # this reads only the path to the first chunk, not the whole index.
+            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+                stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
+            else:
+                stores_no_data = obj.id.get_storage_size() == 0
+            if stores_no_data:
                 non_coordinate_dimension_variables.append(name)
 
     return non_coordinate_dimension_variables

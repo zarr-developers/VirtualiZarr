@@ -4,6 +4,13 @@
 
 ### New Features
 
+- With `HDFParser(links_and_references=True)`, HDF5 **object reference attributes** become `ref` objects,
+  `{"ref": {"node": ...}}` with the target's path relative to the node, instead of `h5py.Reference` objects that
+  can't be written to JSON. An array of references becomes a list, with `null` for a null reference, and the
+  [`ref` convention](https://github.com/R-CF/zarr_convention_ref) is registered in `zarr_conventions`. Region
+  references are left as they were. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - With `HDFParser(links_and_references=True)`, HDF5 **links** are recorded instead of copied. A soft link, an external
   link, or a second name of an object with more than one hard link is stored in the attributes of its group as
   `"links_references": {"links": {name: {"ref": {"node": ...}}}}`, following the draft
@@ -57,6 +64,12 @@
   is still Zarr format 2, since kerchunk's xarray backend only opens format 2 references.
   ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
   By [Ben Dichter](https://github.com/bendichter).
+
+### Performance
+
+- `HDFParser` now reads each chunked dataset's chunk index once instead of three times, cutting the requests needed
+  to build a manifest by about two-thirds for files whose chunk index is larger than HDF5's metadata cache.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Breaking changes
 
@@ -133,6 +146,10 @@
 
 ### Documentation
 
+- New explanation page, [The object store registry](../explanation/registry.md), covering why
+  `open_virtual_dataset` needs a registry, which steps read through it, and how to set one up
+  for cloud and local files. The Local tab in the usage guide now registers `"file:///"`, so
+  it works for more than one file. ([#1105](https://github.com/zarr-developers/VirtualiZarr/pull/1105)) By [Ian Hunt-Isaak](https://github.com/ianhi).
 - Document how to concatenate along a scalar (non-dimension) coordinate, e.g. one timestep per file, in the usage docs. The coordinate must be passed in `loadable_variables` so xarray can build an index for the new dimension.
   ([#1015](https://github.com/zarr-developers/VirtualiZarr/pull/1015)).
   By [Max Jones](https://github.com/maxrjones).
