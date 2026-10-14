@@ -140,6 +140,12 @@ def _construct_manifest_array(
     # referenced either. With links_and_references, each is resolved at parse
     # time to its target's path and stored as an inlined string chunk.
     object_reference = h5py.check_ref_dtype(dtype) is h5py.Reference
+    # A compound dataset with a variable-length string or object reference field
+    # is read at parse time into a struct with fixed-length string fields.
+    compound = None
+    if dtype.names is not None and any(dtype[name].kind == "O" for name in dtype.names):
+        compound, reference_fields = _read_compound(dataset, links_and_references)
+        dtype = compound.dtype
     if vlen_string or (object_reference and links_and_references):
         dtype = np.dtypes.StringDType()
     elif dtype.kind == "O":
@@ -171,6 +177,11 @@ def _construct_manifest_array(
         # The HDF5 filters compress heap pointers or addresses, not the strings;
         # the inlined chunks are encoded with vlen-utf8 alone, which
         # create_v3_array_metadata adds for a string dtype.
+        codec_configs: list[dict] = []
+        chunks = _vlen_string_chunk_shape(dataset)
+    elif compound is not None:
+        # The HDF5 filters compress heap pointers or addresses; the inlined
+        # chunks are packed little-endian structs, encoded with bytes alone.
         codec_configs = []
         chunks = _vlen_string_chunk_shape(dataset)
     else:
@@ -183,6 +194,15 @@ def _construct_manifest_array(
         fill_value = ""
         _add_conventions(attrs, LINKS_REFERENCES_CONVENTION)
         attrs["links_references"] = {"references": True}
+    elif compound is not None:
+        fill_value = None  # zeros and empty strings
+        if reference_fields:
+            conventions = list(attrs.get("zarr_conventions", []))
+            attrs["zarr_conventions"] = [
+                *conventions,
+                dict(LINKS_REFERENCES_CONVENTION),
+            ]
+            attrs["links_references"] = {"references": reference_fields}
     else:
         fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
@@ -202,6 +222,8 @@ def _construct_manifest_array(
             fill_value=fill_value,
             read=_reference_paths(dataset) if object_reference else None,
         )
+    elif compound is not None:
+        manifest = _inlined_array_manifest(compound, chunks=chunks)
     else:
         manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -675,6 +697,106 @@ def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.nda
     return read
 
 
+def _read_compound(
+    dataset: H5Dataset, links_and_references: bool
+) -> tuple[np.ndarray, list[str]]:
+    """
+    Read a compound dataset that has variable-length string or object reference fields.
+
+    Each such field becomes a fixed-length unicode field, as wide as its longest
+    value, and every other field is kept, little-endian. A reference field holds
+    the paths of its targets, as an object reference dataset does with
+    ``links_and_references``.
+
+    Returns
+    -------
+    values
+        The dataset's values as a packed structured array.
+    reference_fields
+        The names of the fields that hold object references.
+    """
+    import h5py
+
+    raw = dataset[()] if dataset.shape == () else dataset[...]
+    fields: list[tuple[str, np.dtype]] = []
+    columns: dict[str, np.ndarray] = {}
+    reference_fields: list[str] = []
+    for name in raw.dtype.names:
+        field_dtype = raw.dtype[name]
+        if field_dtype.kind != "O":
+            if field_dtype.names is not None or field_dtype.subdtype is not None:
+                columns[name] = np.asarray(raw[name])
+                fields.append((name, field_dtype))
+            else:
+                columns[name] = np.asarray(
+                    raw[name], dtype=field_dtype.newbyteorder("<")
+                )
+                fields.append((name, columns[name].dtype))
+            continue
+        if h5py.check_vlen_dtype(field_dtype) in (str, bytes):
+            values = [
+                value.decode("utf-8") if isinstance(value, bytes) else value
+                for value in np.asarray(raw[name], dtype=object).ravel()
+            ]
+        elif h5py.check_ref_dtype(field_dtype) is h5py.Reference:
+            if not links_and_references:
+                raise NotImplementedError(
+                    f"Field {name!r} of compound dataset {dataset.name!r} holds HDF5 "
+                    f"object references. {_LINKS_AND_REFERENCES_HINT}"
+                )
+            path = _reference_path(dataset)
+            values = [
+                path(value) for value in np.asarray(raw[name], dtype=object).ravel()
+            ]
+            reference_fields.append(name)
+        else:
+            raise NotImplementedError(
+                f"Field {name!r} of compound dataset {dataset.name!r} has HDF5 object "
+                f"dtype {field_dtype!r}, which is not yet supported by HDFParser."
+            )
+        width = max([len(value) for value in values] + [1])
+        columns[name] = np.array(values, dtype=f"<U{width}").reshape(raw.shape)
+        fields.append((name, columns[name].dtype))
+
+    packed = np.zeros(raw.shape, dtype=np.dtype(fields))
+    for name, column in columns.items():
+        packed[name] = column
+    return packed, reference_fields
+
+
+def _inlined_array_manifest(
+    values: np.ndarray, *, chunks: tuple[int, ...]
+) -> ChunkManifest:
+    """
+    Store an array read at parse time as inlined chunks, encoded with the bytes codec.
+
+    An edge chunk is padded to the full chunk shape with zeros, as zarr does when
+    writing.
+    """
+    shape = values.shape
+    if values.size == 0:
+        return ChunkManifest(entries={}, shape=shape)
+    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
+    inlined: dict[tuple[int, ...], bytes] = {}
+    for index in np.ndindex(grid_shape):
+        region = tuple(
+            slice(i * c, min((i + 1) * c, s)) for i, c, s in zip(index, chunks, shape)
+        )
+        chunk = np.zeros(chunks, dtype=values.dtype)
+        part = values[region]
+        chunk[tuple(slice(0, n) for n in part.shape) + (...,)] = part
+        inlined[index] = np.ascontiguousarray(chunk).tobytes()
+    lengths = np.zeros(grid_shape, dtype=np.uint64)
+    for index, data in inlined.items():
+        lengths[index] = len(data)
+    return ChunkManifest.from_arrays(
+        paths=np.full(grid_shape, INLINED_CHUNK_PATH, dtype=np.dtypes.StringDType()),  # type: ignore
+        offsets=np.zeros(grid_shape, dtype=np.uint64),
+        lengths=lengths,
+        inlined=inlined,
+    )
+
+
 def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
     """
     Get a list of dimension scale names attached to input HDF5 dataset.
@@ -782,7 +904,7 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
             v = v.decode("utf-8") or " "
         elif isinstance(v, (np.ndarray, np.number, np.bool_)):
             if v.dtype.kind == "S":
-                v = v.astype(str)
+                v = np.strings.decode(np.asarray(v), "utf-8").tolist()
             elif v.size == 1:
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
