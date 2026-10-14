@@ -2,7 +2,7 @@
 
 HDF5 files can connect their objects in ways that Zarr has no built-in equivalent for:
 
-- **Object references**: a value that points at another group or dataset. They can be stored as a dataset, as an attribute, or as a field of a compound dataset. For example, a recording can point at the table that describes its electrodes.
+- **Object references**: a value that points at another group or dataset. They can be stored as a dataset, as an attribute, or as a field of a compound dataset.
 - **Soft links**: a second name for an object, given as a path, which may or may not exist.
 - **External links**: a name that points at an object in another HDF5 file.
 - **Hard links**: one object stored under more than one name.
@@ -27,7 +27,7 @@ The flag is off by default while the Links and Object References convention is s
 
 ## An example file
 
-This file has each kind of connection. It holds a recording and a table of electrodes, and has an external link to a raw file.
+This file has each kind of connection. It holds an array of measurements and a table of the sites they were taken at, and has an external link to another file.
 
 ```python exec="on" session="hdf5_links" source="above"
 import tempfile
@@ -38,24 +38,24 @@ import numpy as np
 
 directory = Path(tempfile.mkdtemp())
 
-with h5py.File(directory / "raw.h5", "w") as f:
-    f["acquisition/voltage"] = np.zeros((100, 4), dtype="int16")
+with h5py.File(directory / "source.h5", "w") as f:
+    f["readings/values"] = np.zeros((100, 4), dtype="int16")
 
-with h5py.File(directory / "session.h5", "w") as f:
-    electrodes = f.create_group("general/electrodes")
-    electrodes["location"] = ["CA1", "CA1", "CA3"]
-    f["recording"] = np.arange(3.0)
+with h5py.File(directory / "file.h5", "w") as f:
+    sites = f.create_group("metadata/sites")
+    sites["name"] = ["A", "B", "C"]
+    f["measurements"] = np.arange(3.0)
 
     # An object reference in an attribute
-    f["recording"].attrs["electrodes"] = electrodes.ref
+    f["measurements"].attrs["sites"] = sites.ref
     # A dataset of object references, with a null reference at the end
     f["sources"] = np.array(
-        [electrodes.ref, f["recording"].ref, h5py.Reference()], dtype=h5py.ref_dtype
+        [sites.ref, f["measurements"].ref, h5py.Reference()], dtype=h5py.ref_dtype
     )
     # A soft link, an external link, and a second hard link
-    f["processed/recording"] = h5py.SoftLink("/recording")
-    f["processed/raw"] = h5py.ExternalLink("raw.h5", "/acquisition")
-    f["probe/electrodes"] = electrodes
+    f["derived/measurements"] = h5py.SoftLink("/measurements")
+    f["derived/source"] = h5py.ExternalLink("source.h5", "/readings")
+    f["views/sites"] = sites
 ```
 
 Without the flag, the file can't be parsed. Leaving out the group with the external link, the dataset of references still raises an error:
@@ -66,11 +66,11 @@ from obstore.store import LocalStore
 
 from virtualizarr.parsers import HDFParser
 
-url = f"file://{directory}/session.h5"
+url = f"file://{directory}/file.h5"
 registry = ObjectStoreRegistry({url: LocalStore(prefix=directory)})
 
 try:
-    HDFParser(drop_variables=["processed"])(url=url, registry=registry)
+    HDFParser(drop_variables=["derived"])(url=url, registry=registry)
 except NotImplementedError as error:
     print(error)
 ```
@@ -93,8 +93,8 @@ root = zarr.open_group(store, mode="r", zarr_format=3)
 A group's links are recorded in its attributes under `"links_references"`, and are not copied:
 
 ```python exec="on" session="hdf5_links" source="above" result="code"
-print(json.dumps(root["processed"].attrs["links_references"], indent=2))
-print(sorted(root["processed"].keys()))
+print(json.dumps(root["derived"].attrs["links_references"], indent=2))
+print(sorted(root["derived"].keys()))
 ```
 
 Each link is a `ref` object:
@@ -107,13 +107,13 @@ A soft link's target doesn't have to exist. A link whose target is missing is st
 When an object has more than one hard link, its data is stored under the first name the parser reaches. Each other name becomes a link to that one:
 
 ```python exec="on" session="hdf5_links" source="above" result="code"
-print(json.dumps(root["probe"].attrs["links_references"], indent=2))
+print(json.dumps(root["views"].attrs["links_references"], indent=2))
 ```
 
 The group also lists the conventions it follows in `zarr_conventions`:
 
 ```python exec="on" session="hdf5_links" source="above" result="code"
-print([convention["name"] for convention in root["processed"].attrs["zarr_conventions"]])
+print([convention["name"] for convention in root["derived"].attrs["zarr_conventions"]])
 ```
 
 ### Datasets of object references
@@ -132,7 +132,7 @@ The paths are found when the file is parsed, and stored with the rest of the met
 An attribute that holds an object reference becomes a `ref` object. Its path is relative to the array or group that has the attribute. An attribute that holds several references becomes a list of `ref` objects, with `null` for a null reference.
 
 ```python exec="on" session="hdf5_links" source="above" result="code"
-print(root["recording"].attrs["electrodes"])
+print(root["measurements"].attrs["sites"])
 ```
 
 Region references, which point at part of a dataset, are not converted.
@@ -154,13 +154,13 @@ def resolve(holder: str, node: str) -> str:
     return posixpath.normpath(posixpath.join("/", holder, node))
 
 
-link = root["processed"].attrs["links_references"]["links"]["recording"]["ref"]
-print(resolve("processed", link["node"]))
-print(root[resolve("processed", link["node"])][:])
+link = root["derived"].attrs["links_references"]["links"]["measurements"]["ref"]
+print(resolve("derived", link["node"]))
+print(root[resolve("derived", link["node"])][:])
 
-reference = root["recording"].attrs["electrodes"]["ref"]
-print(resolve("recording", reference["node"]))
-print(root[resolve("recording", reference["node"])]["location"][:])
+reference = root["measurements"].attrs["sites"]["ref"]
+print(resolve("measurements", reference["node"]))
+print(root[resolve("measurements", reference["node"])]["name"][:])
 ```
 
 For a link with a `uri`, open the file at that `uri` first, then look up the absolute `node` path in it.
