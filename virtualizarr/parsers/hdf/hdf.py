@@ -280,7 +280,7 @@ def _construct_manifest_group(
         # The objects already stored, so that a second hard link to one is a link
         seen = {} if _seen is None else _seen
         if links_and_references:
-            seen.setdefault(g.id, group_name)
+            seen.setdefault(_object_address(g), group_name)
         arrays = {}
         groups = {}
         links = {}
@@ -318,7 +318,9 @@ def _construct_manifest_group(
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
 
 
-def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dict | None:
+def _link_target(
+    g, key: str, group_name: str, filepath: str, seen: dict
+) -> dict | None:
     """
     Return the ref object for a member of a group that is a link, or None for one that is not.
 
@@ -339,12 +341,30 @@ def _link_target(g, key: str, group_name: str, filepath: str, seen: dict) -> dic
         # resolved against the node that holds it, so the path is kept as written
         return {"ref": {"node": link.path}}
     if isinstance(link, h5py.ExternalLink):
-        return {"ref": {"uri": _resolve_external(filepath, link.filename), "node": "/" + link.path.lstrip("/")}}
+        return {
+            "ref": {
+                "uri": _resolve_external(filepath, link.filename),
+                "node": "/" + link.path.lstrip("/"),
+            }
+        }
     item = g[key]
-    if item.id in seen:
-        return {"ref": {"node": posixpath.relpath(seen[item.id], start=group_name)}}
-    seen[item.id] = item.name
+    address = _object_address(item)
+    if address in seen:
+        return {"ref": {"node": posixpath.relpath(seen[address], start=group_name)}}
+    seen[address] = item.name
     return None
+
+
+def _object_address(obj) -> int:
+    """
+    The address of an object in its file, which is the same for every name of it.
+
+    The file is opened again for each group, and an object's ObjectID differs
+    between two openings of a file-like reader, so ObjectIDs can't be compared.
+    """
+    import h5py
+
+    return h5py.h5o.get_info(obj.id).addr
 
 
 def _resolve_external(filepath: str, filename: str) -> str:
@@ -360,7 +380,9 @@ def _resolve_external(filepath: str, filename: str) -> str:
     if not sep:
         return posixpath.normpath(posixpath.join(base, filename))
     root, slash, path = rest.partition("/")
-    return f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    return (
+        f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    )
 
 
 class HDFParser:

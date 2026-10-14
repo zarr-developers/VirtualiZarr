@@ -343,7 +343,6 @@ class TestObjectReferences:
         assert "links_and_references" not in str(error.value)
 
 
-
 @pytest.fixture
 def links_hdf5_url(tmp_path) -> str:
     with h5py.File(tmp_path / "other.h5", "w") as other:
@@ -398,12 +397,33 @@ class TestLinks:
         assert sorted(group.arrays) == ["values"]
         directory = links_hdf5_url.rpartition("/")[0]
         assert group.metadata.attributes["links_references"]["links"] == {
-            "raw": {"ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}},
+            "raw": {
+                "ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}
+            },
             "values_again": {"ref": {"node": "values"}},
         }
 
+    def test_hard_links_in_other_groups(self, tmp_path):
+        filepath = str(tmp_path / "hard.h5")
+        with h5py.File(filepath, "w") as f:
+            electrodes = f.create_group("general/electrodes")
+            electrodes["location"] = np.arange(2)
+            f["probe/electrodes"] = electrodes
+            f["electrodes"] = electrodes
+        group = _parse(f"file://{filepath}", links_and_references=True)._group
+        # The group is stored under the first of its names, /electrodes
+        assert sorted(group.groups["electrodes"].arrays) == ["location"]
+        for name in ["general", "probe"]:
+            member = group.groups[name]
+            assert sorted(member.groups) == []
+            assert member.metadata.attributes["links_references"]["links"] == {
+                "electrodes": {"ref": {"node": "../electrodes"}}
+            }
+
     def test_drop_variables_applies_to_links(self, links_hdf5_url):
-        store = _parse(links_hdf5_url, links_and_references=True, drop_variables=["raw"])
+        store = _parse(
+            links_hdf5_url, links_and_references=True, drop_variables=["raw"]
+        )
         links = store._group.metadata.attributes["links_references"]["links"]
         assert "raw" not in links
 
