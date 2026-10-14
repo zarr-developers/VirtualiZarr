@@ -10,9 +10,10 @@ from typing import (
 )
 
 import numpy as np
-from obspec_utils.protocols import ReadableFile
-from obspec_utils.readers import BlockStoreReader
+from obspec_utils.protocols import ReadableFile, ReadableStore
+from obspec_utils.readers import BlockStoreReader, BufferedStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 
 from virtualizarr.codecs import zarr_codec_config_to_v3
 from virtualizarr.manifests import (
@@ -269,6 +270,15 @@ def _chunk_shape(dataset: H5Dataset) -> tuple[int, ...]:
     return dataset.chunks
 
 
+def _default_reader_factory(store: ReadableStore, path: str) -> ReadableFile:
+    if isinstance(store, LocalStore):
+        # The OS page cache already reads ahead on local disks. Any read-ahead in
+        # the reader just fetches bytes HDF5 never asked for, which on a
+        # chunk-dense file's index can add up to more than the whole file.
+        return BufferedStoreReader(store, path, buffer_size=1)
+    return BlockStoreReader(store, path)
+
+
 def _construct_manifest_group(
     filepath: str,
     reader: ReadableFile,
@@ -423,7 +433,9 @@ class HDFParser:
         A callable that creates a file-like reader from a store and path.
         Must return an object implementing the
         [ReadableFile][obspec_utils.protocols.ReadableFile] protocol.
-        Default is [BlockStoreReader][obspec_utils.readers.BlockStoreReader].
+        The default uses [BufferedStoreReader][obspec_utils.readers.BufferedStoreReader]
+        with no read-ahead for an obstore ``LocalStore``, and
+        [BlockStoreReader][obspec_utils.readers.BlockStoreReader] for any other store.
     links_and_references
         Store datasets of HDF5 object references as the paths of their targets,
         following the draft [Links and Object References
@@ -442,7 +454,7 @@ class HDFParser:
         self,
         group: str | None = None,
         drop_variables: Iterable[str] | None = None,
-        reader_factory: ReaderFactory = BlockStoreReader,
+        reader_factory: ReaderFactory = _default_reader_factory,
         links_and_references: bool = False,
     ):
         self.group = group

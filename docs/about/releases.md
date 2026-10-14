@@ -58,6 +58,11 @@
   ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
   By [Ben Dichter](https://github.com/bendichter).
 
+### Performance
+
+- `HDFParser` reads local files with no read-ahead by default, so building a manifest for a chunk-dense file (e.g. a sparse single-cell `.h5ad`) no longer reads more than the whole file. Remote files still use `BlockStoreReader`.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
 - `FITSParser` no longer accepts `reader_options`. It reads through the `ObjectStoreRegistry`
