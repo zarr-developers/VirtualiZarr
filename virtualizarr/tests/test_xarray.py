@@ -12,6 +12,7 @@ from obspec_utils.registry import ObjectStoreRegistry
 from xarray import Dataset, open_dataset, open_datatree
 from xarray.core.indexes import Index
 
+import virtualizarr.xarray as virtualizarr_xarray
 from virtualizarr import (
     open_virtual_dataset,
     open_virtual_datatree,
@@ -910,6 +911,30 @@ preprocess_func = functools.partial(
     xr.Dataset.rename_vars,
     air="nair",
 )
+
+
+def test_executor_instance_remains_usable(monkeypatch, local_registry):
+    def fake_open_virtual_dataset(url, registry, parser):
+        return xr.Dataset({"value": xr.DataArray(Path(url).name)})
+
+    monkeypatch.setattr(
+        virtualizarr_xarray,
+        "open_virtual_dataset",
+        fake_open_virtual_dataset,
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        combined = open_virtual_mfdataset(
+            ["first.nc", "second.nc"],
+            registry=local_registry,
+            parser=object(),
+            combine="nested",
+            concat_dim="source",
+            parallel=executor,
+        )
+
+        assert combined["value"].values.tolist() == ["first.nc", "second.nc"]
+        assert executor.submit(abs, -1).result() == 1
 
 
 @requires_hdf5plugin

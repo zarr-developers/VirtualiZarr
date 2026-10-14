@@ -4,6 +4,12 @@
 
 ### New Features
 
+- [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] now accepts an
+  instantiated [`concurrent.futures.Executor`][] through the `parallel` kwarg, allowing
+  callers to configure and reuse an executor. Executor classes remain supported
+  temporarily with a deprecation warning. Caller-supplied instances are not shut
+  down by VirtualiZarr. Closes
+  [#801](https://github.com/zarr-developers/VirtualiZarr/issues/801).
 - With `HDFParser(links_and_references=True)`, HDF5 **object reference attributes** become `ref` objects,
   `{"ref": {"node": ...}}` with the target's path relative to the node, instead of `h5py.Reference` objects that
   can't be written to JSON. An array of references becomes a list, with `null` for a null reference, and the

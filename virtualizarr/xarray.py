@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from concurrent.futures import Executor
+from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
 from typing import (
@@ -273,7 +274,7 @@ def open_virtual_mfdataset(
     data_vars: Literal["all", "minimal", "different"] | list[str] = "all",
     coords="different",
     combine: Literal["by_coords", "nested"] = "by_coords",
-    parallel: Literal["dask", "lithops", False] | type[Executor] = False,
+    parallel: Literal["dask", "lithops", False] | type[Executor] | Executor = False,
     join: "JoinOptions" = "outer",
     attrs_file: str | os.PathLike | None = None,
     combine_attrs: "CombineAttrsOptions" = "override",
@@ -310,10 +311,13 @@ def open_virtual_mfdataset(
         Same as in [xarray.open_mfdataset][]
     combine
         Same as in [xarray.open_mfdataset][]
-    parallel : "dask", "lithops", False, or type of subclass of [concurrent.futures.Executor][]
+    parallel : "dask", "lithops", False, or class or instance of [concurrent.futures.Executor][]
         Specify whether the open and preprocess steps of this function will be
         performed in parallel using [lithops][], `dask.delayed`, or any executor compatible
         with the [concurrent.futures][] interface, or in serial.
+        Passing an executor class is deprecated; pass an instance to configure it,
+        for example `ThreadPoolExecutor(max_workers=2)`. Caller-supplied executor
+        instances are not shut down by this function.
         Default is False, which will execute these steps in serial.
     join
         Same as in [xarray.open_mfdataset][]
@@ -373,9 +377,14 @@ def open_virtual_mfdataset(
 
     open_vds = partial(open_virtual_dataset, registry=registry, parser=parser, **kwargs)
     mapper = open_vds if preprocess is None else compose(preprocess, open_vds)
-    make_executor = get_executor(parallel=parallel)
+    executor_or_factory = get_executor(parallel=parallel)
+    executor_context = (
+        nullcontext(executor_or_factory)
+        if isinstance(executor_or_factory, Executor)
+        else executor_or_factory()
+    )
 
-    with make_executor() as exec:
+    with executor_context as exec:
         # Wait for all the workers to finish, and send their resulting virtual
         # datasets back to the client for concatenation there.
         virtual_datasets = list(exec.map(mapper, paths1d))
