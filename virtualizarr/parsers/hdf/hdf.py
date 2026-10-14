@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import functools
 import math
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -354,14 +355,12 @@ def _link_target(
     being parsed. A member reached by a hard link whose object is already stored
     under another name is a link to that name.
     """
-    import posixpath
-
     import h5py
 
     link = g.get(key, getlink=True)
     if isinstance(link, h5py.SoftLink):
         if link.path.startswith("/"):
-            return {"ref": {"node": posixpath.relpath(link.path, start=group_name)}}
+            return {"ref": {"node": _relative_path(link.path, group_name)}}
         # HDF5 resolves a relative soft link against its group, as a ref node is
         # resolved against the node that holds it, so the path is kept as written
         return {"ref": {"node": link.path}}
@@ -375,9 +374,14 @@ def _link_target(
     item = g[key]
     address = _object_address(item)
     if address in seen:
-        return {"ref": {"node": posixpath.relpath(seen[address], start=group_name)}}
+        return {"ref": {"node": _relative_path(seen[address], group_name)}}
     seen[address] = item.name
     return None
+
+
+def _relative_path(path: str, start: str) -> str:
+    """The path from the HDF5 node ``start`` to ``path``, which are always posix paths."""
+    return str(PurePosixPath(path).relative_to(start, walk_up=True))
 
 
 def _object_address(obj) -> int:
@@ -394,8 +398,6 @@ def _object_address(obj) -> int:
 
 def _resolve_external(filepath: str, filename: str) -> str:
     """The location of an external link's file: as given if absolute, otherwise next to the file being parsed."""
-    import posixpath
-
     if "://" in filename:
         return filename
     if filename.startswith("/"):
@@ -536,8 +538,12 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        num_chunks = dsid.get_num_chunks()
-        if num_chunks == 0:
+        if callable(getattr(dsid, "chunk_iter", None)):
+            chunk_infos: list = []
+            dsid.chunk_iter(chunk_infos.append)
+        else:
+            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
+        if not chunk_infos:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
             grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
@@ -561,12 +567,8 @@ def _dataset_chunk_manifest(
                 offsets[key] = blob.byte_offset
                 lengths[key] = trimmed_length if trimmed else blob.size
 
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
-            else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+            for chunk_info in chunk_infos:
+                add_chunk_info(chunk_info)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
@@ -669,8 +671,6 @@ def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
     object opened by reference makes HDF5 search the file, so each target's
     path is found once.
     """
-    import posixpath
-
     file = dataset.file
     start = dataset.name
     paths: dict = {}
@@ -680,7 +680,7 @@ def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
             return ""
         target = file[reference]
         if target.id not in paths:
-            paths[target.id] = posixpath.relpath(target.name, start=start)
+            paths[target.id] = _relative_path(target.name, start)
         return paths[target.id]
 
     return path
@@ -929,8 +929,14 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if obj is not None and "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
-        if type(obj) is h5py.Dataset:
-            if obj.id.get_storage_size() == 0 and name in dimension_names:
+        if type(obj) is h5py.Dataset and name in dimension_names:
+            # chunk_iter stops at the first callback that returns non-None, so
+            # this reads only the path to the first chunk, not the whole index.
+            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+                stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
+            else:
+                stores_no_data = obj.id.get_storage_size() == 0
+            if stores_no_data:
                 non_coordinate_dimension_variables.append(name)
 
     return non_coordinate_dimension_variables
