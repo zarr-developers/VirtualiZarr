@@ -4,6 +4,22 @@
 
 ### New Features
 
+- With `HDFParser(links_and_references=True)`, HDF5 **object reference attributes** become `ref` objects,
+  `{"ref": {"node": ...}}` with the target's path relative to the node, instead of `h5py.Reference` objects that
+  can't be written to JSON. An array of references becomes a list, with `null` for a null reference, and the
+  [`ref` convention](https://github.com/R-CF/zarr_convention_ref) is registered in `zarr_conventions`. Region
+  references are left as they were. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
+- With `HDFParser(links_and_references=True)`, HDF5 **links** are recorded instead of copied. A soft link, an external
+  link, or a second name of an object with more than one hard link is stored in the attributes of its group as
+  `"links_references": {"links": {name: {"ref": {"node": ...}}}}`, following the draft
+  [Links and Object References convention](https://github.com/catalystneuro/zarr-links-references) and the
+  [`ref` convention](https://github.com/R-CF/zarr_convention_ref). An external link's file becomes an absolute `uri`,
+  and a soft link whose target doesn't exist is recorded rather than failing the parse. Without the flag, links are
+  copied as before. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - `HDFParser` reads **compound datasets with variable-length string or object reference fields**, which used to
   raise a `ValueError` (#1104). They are read at parse time into a `struct` with fixed-length unicode fields, each as
   wide as its longest value, and stored as inlined chunks. String fields always work; reference fields need
@@ -11,7 +27,6 @@
   `"links_references": {"references": [...]}`. Part of
   [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
   By [Ben Dichter](https://github.com/bendichter).
-
 - `HDFParser(links_and_references=True)` reads datasets of HDF5 **object references**, which used to raise
   `NotImplementedError`. Each reference is resolved at parse time to the path of its target, relative to the array,
   and stored as an inlined string chunk, following the draft
@@ -19,7 +34,6 @@
   default while the convention is settled, and the error now mentions it. Part of
   [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
   By [Ben Dichter](https://github.com/bendichter).
-
 - `NetCDF3Parser` now reads the netCDF3 header itself instead of going through
   `kerchunk.netCDF3.NetCDF3ToZarr`, so virtualizing a netCDF3 file no longer requires
   `kerchunk` or `scipy`. It reads the header through the `ObjectStoreRegistry` like every
@@ -36,6 +50,15 @@
   also emits the `vlen-utf8` filter that Zarr v2 needs to read it. Closes
   [#1120](https://github.com/zarr-developers/VirtualiZarr/issues/1120).
   By [Ben Dichter](https://github.com/bendichter).
+- `FITSParser` now reads FITS files natively and no longer depends on kerchunk — the `fits`
+  extra installs only `astropy`. It also exposes *every* data HDU in a file rather than just
+  the first, and reads ASCII tables (`TABLE` HDUs), which previously failed because no codec
+  was registered to decode them.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now maps an integer image's `BLANK` keyword to a `_FillValue` attribute, so
+  undefined pixels are masked on read. The sentinel is scaled alongside the data when `BSCALE`
+  or `BZERO` is present.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - `to_kerchunk` can write references that hold Zarr format 3 metadata, with `zarr_format=3`
   for the `json` and `dict` formats, and `KerchunkJSONParser` reads them back. The default
   is still Zarr format 2, since kerchunk's xarray backend only opens format 2 references.
@@ -44,6 +67,19 @@
 
 ### Breaking changes
 
+- `FITSParser` no longer accepts `reader_options`. It reads through the `ObjectStoreRegistry`
+  it is given rather than through fsspec, so fsspec-specific `storage_options` no longer apply;
+  configure credentials on the store you register instead.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now returns one array per data HDU instead of only the first, and names each
+  HDU's axes after that HDU (`SCI_y`, `SCI_x`) rather than using a shared `y`/`x`. Separate
+  HDUs routinely disagree about the length of a given axis, which a shared name cannot express.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- `FITSParser` now raises on binary table (`BINTABLE`) HDUs, which it previously accepted and
+  returned byte-swapped values for. A binary table's columns form a big-endian structured dtype,
+  and the Zarr v3 `struct` data type cannot record its fields' byte order. Pass `skip_variables`
+  to exclude such HDUs.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - `NetCDF3Parser` no longer accepts a `reader_options` argument. It configured kerchunk's
   fsspec backend, which the parser no longer uses; storage configuration belongs to the
   `ObjectStoreRegistry` passed to the parser. By [Tom Nicholas](https://github.com/TomNicholas).
@@ -52,21 +88,41 @@
   resolves — install plain `virtualizarr` instead. It previously pulled in `kerchunk`,
   `scipy` and `virtualizarr[remote]` (`fsspec`, `requests`, `aiohttp`, `s3fs`), none of
   which the parser uses any more. By [Tom Nicholas](https://github.com/TomNicholas).
+- Creating a `ChunkManifest` (and so a `ManifestArray`) containing a zero-length chunk reference
+  now raises `ValueError`. A chunk must decode to the full chunk shape, so no valid chunk is ever
+  zero bytes long, and such a reference can only fail at read time - after it has been written to
+  a store. Applies to virtual and inlined references alike, via every constructor
+  (`ChunkManifest`, `ChunkManifest.from_arrays`, `ChunkEntry.with_validation`).
+  A chunk which simply isn't stored - as in a sparse array - should be given the empty path
+  instead, which reads back as the array's `fill_value` and fetches nothing.
+  This catches bugs like [virtual-tiff#108](https://github.com/virtual-zarr/virtual-tiff/issues/108),
+  where sparse GeoTIFF tiles (`offset = 0, byteCount = 0`) became references that committed
+  successfully to Icechunk and only failed on read. Closes
+  [#1088](https://github.com/zarr-developers/VirtualiZarr/issues/1088).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
 
-- The netCDF3 parser now preserves the `_FillValue` attribute, so sentinel values decode to
-  NaN instead of surviving into the loaded data. The kerchunk backend it previously used
-  explicitly excludes `_FillValue` from the attributes it copies, following a Zarr V2
-  convention where `fill_value` and `attrs["_FillValue"]` were conflated. Closes
-  [#982](https://github.com/zarr-developers/VirtualiZarr/issues/982).
-  By [Tom Nicholas](https://github.com/TomNicholas).
 - Concatenating regularly-chunked arrays no longer fails just because the *last* input
   has a shorter trailing chunk than its declared chunk size - a common pattern when
   combining several regularly-chunked files, scenes, or tiles of differing lengths. A
   partial chunk on any earlier input is still rejected, since that would leave a short
   chunk with more data appended after it, which a regular chunk grid can't represent
   without rewriting bytes.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Scaled FITS images are now decoded correctly. `BSCALE` was previously passed straight to
+  `FixedScaleOffset`, which divides rather than multiplies on decode, so every scaled image
+  came back scaled by `1/BSCALE` instead of `BSCALE`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- FITS ASCII table columns are now located by `TBCOL`, and parsed allowing Fortran `D` exponents
+  and blank (undefined) fields. The previous approach assumed columns tiled the row with a
+  one-byte separator between them, which is not how the format works.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- The netCDF3 parser now preserves the `_FillValue` attribute, so sentinel values decode to
+  NaN instead of surviving into the loaded data. The kerchunk backend it previously used
+  explicitly excludes `_FillValue` from the attributes it copies, following a Zarr V2
+  convention where `fill_value` and `attrs["_FillValue"]` were conflated. Closes
+  [#982](https://github.com/zarr-developers/VirtualiZarr/issues/982).
   By [Tom Nicholas](https://github.com/TomNicholas).
 - `ZarrParser` no longer emits manifest paths as `file:/...` when the registry's store is
   rooted at the filesystem root (`file:///`). The store root URI was stripped of every
@@ -77,7 +133,6 @@
   Previously the new references were written under the old metadata, so reads silently
   returned wrong values.
   By [Ian Hunt-Isaak](https://github.com/ianhi).
-
 - `HDFParser` no longer fails on HDF5 files with attributes stored as arrays of
   fixed-length byte strings. Such an attribute is now read as a list of `str`, one per
   element, keeping the array's shape.
