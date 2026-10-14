@@ -52,32 +52,33 @@ hdf = [
 
 zarr = ["arro3-core"]
 
+fits = [
+    "virtualizarr[remote]",
+    "astropy",
+]
+
 # NOTE: there is deliberately no `netcdf3` extra. The netCDF3 parser reads the file
 # header itself and needs nothing beyond the core dependencies.
 
-# kerchunk-based parsers
-fits = [
-    "virtualizarr[remote]",
-    "kerchunk>=0.2.8",
-    "astropy",
+tiff = [
+    "virtual-tiff",
+]
+
+# GRIB1/GRIB2 parser, provided by the (Rust-backed) gribberish package.
+grib = [
+    "gribberish>=1.3.0",
+]
+
+# parsers which use kerchunk or related dependencies
+kerchunk_parquet = [
+   "virtualizarr[remote]",
+   "fastparquet",
 ]
 hdf4 = [
     "virtualizarr[remote]",
     "kerchunk>=0.2.8",
 ]
-tiff = [
-    "virtual-tiff",
-]
-# GRIB1/GRIB2 parser, provided by the (Rust-backed) gribberish package.
-grib = [
-    "gribberish>=1.3.0",
-]
-kerchunk_parquet = [
-   "virtualizarr[remote]",
-   "fastparquet",
-]
 
-# kerchunk
 all_parsers = [
     "virtualizarr[hdf]",
     "virtualizarr[fits]",
@@ -260,6 +261,7 @@ show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = [
+    "astropy.*",
     "docker",
     "fsspec.*",
     "gribberish.*",

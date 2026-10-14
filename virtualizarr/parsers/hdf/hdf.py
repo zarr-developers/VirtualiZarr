@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -44,6 +45,15 @@ LINKS_REFERENCES_CONVENTION = {
     "description": "Links and object references between nodes of Zarr hierarchies",
 }
 """The Links and Object References convention, a draft, used with ``links_and_references=True``."""
+
+REF_CONVENTION = {
+    "uuid": "d89b30cf-ed8c-43d5-9a16-b492f0cd8786",
+    "schema_url": "https://raw.githubusercontent.com/R-CF/zarr_convention_ref/refs/tags/v2.0.0/schema.json",
+    "spec_url": "https://github.com/R-CF/zarr_convention_ref/blob/v2.0.0/README.md",
+    "name": "ref",
+    "description": "External Reference Convention",
+}
+"""The ref convention, whose objects identify the targets of links."""
 
 _LINKS_AND_REFERENCES_HINT = (
     "To store object references as the paths of their targets, following the draft Links and "
@@ -122,6 +132,12 @@ def _construct_manifest_array(
     # referenced either. With links_and_references, each is resolved at parse
     # time to its target's path and stored as an inlined string chunk.
     object_reference = h5py.check_ref_dtype(dtype) is h5py.Reference
+    # A compound dataset with a variable-length string or object reference field
+    # is read at parse time into a struct with fixed-length string fields.
+    compound = None
+    if dtype.names is not None and any(dtype[name].kind == "O" for name in dtype.names):
+        compound, reference_fields = _read_compound(dataset, links_and_references)
+        dtype = compound.dtype
     if vlen_string or (object_reference and links_and_references):
         dtype = np.dtypes.StringDType()
     elif dtype.kind == "O":
@@ -153,6 +169,11 @@ def _construct_manifest_array(
         # The HDF5 filters compress heap pointers or addresses, not the strings;
         # the inlined chunks are encoded with vlen-utf8 alone, which
         # create_v3_array_metadata adds for a string dtype.
+        codec_configs: list[dict] = []
+        chunks = _vlen_string_chunk_shape(dataset)
+    elif compound is not None:
+        # The HDF5 filters compress heap pointers or addresses; the inlined
+        # chunks are packed little-endian structs, encoded with bytes alone.
         codec_configs = []
         chunks = _vlen_string_chunk_shape(dataset)
     else:
@@ -166,6 +187,15 @@ def _construct_manifest_array(
         conventions = list(attrs.get("zarr_conventions", []))
         attrs["zarr_conventions"] = [*conventions, dict(LINKS_REFERENCES_CONVENTION)]
         attrs["links_references"] = {"references": True}
+    elif compound is not None:
+        fill_value = None  # zeros and empty strings
+        if reference_fields:
+            conventions = list(attrs.get("zarr_conventions", []))
+            attrs["zarr_conventions"] = [
+                *conventions,
+                dict(LINKS_REFERENCES_CONVENTION),
+            ]
+            attrs["links_references"] = {"references": reference_fields}
     else:
         fill_value = _get_fill_value(dataset)
     dims = tuple(_dataset_dims(dataset, group=group))
@@ -185,6 +215,8 @@ def _construct_manifest_array(
             fill_value=fill_value,
             read=_reference_paths(dataset) if object_reference else None,
         )
+    elif compound is not None:
+        manifest = _inlined_array_manifest(compound, chunks=chunks)
     else:
         manifest = _dataset_chunk_manifest(filepath, dataset, chunks=chunks)
     return ManifestArray(metadata=metadata, chunkmanifest=manifest)
@@ -244,9 +276,15 @@ def _construct_manifest_group(
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     links_and_references: bool = False,
+    _seen: dict | None = None,
 ) -> ManifestGroup:
     """
     Construct a virtual Group from a HDF dataset.
+
+    With ``links_and_references``, soft and external links, and second names of
+    objects with more than one hard link, are recorded in the group's attributes
+    following the draft Links and Object References convention, instead of being
+    copied.
     """
     import h5py
 
@@ -262,28 +300,113 @@ def _construct_manifest_group(
         non_coordinate_dimension_vars = _find_non_coord_dimension_vars(group=g)
         drop_variables = set(drop_variables or ()) | set(non_coordinate_dimension_vars)
         group_name = str(g.name)  # NOTE: this will always include leading "/"
-        arrays = {
-            key: _construct_manifest_array(
-                filepath, dataset, group_name, links_and_references
-            )
-            for key in g.keys()
-            if key not in drop_variables
-            if isinstance(dataset := g[key], h5py.Dataset)
-        }
-        groups = {
-            key: _construct_manifest_group(
-                filepath,
-                reader,
-                group=str(Path(group) / key) if group is not None else key,
-                links_and_references=links_and_references,
-            )
-            for key in g.keys()
-            if key not in drop_variables
-            if isinstance(g[key], h5py.Group)
-        }
+        # The objects already stored, so that a second hard link to one is a link
+        seen = {} if _seen is None else _seen
+        if links_and_references:
+            seen.setdefault(_object_address(g), group_name)
+        arrays = {}
+        groups = {}
+        links = {}
+        for key in g.keys():
+            if key in drop_variables:
+                continue
+            if links_and_references:
+                link = _link_target(g, key, group_name, filepath, seen)
+                if link is not None:
+                    links[key] = link
+                    continue
+            item = g[key]
+            if isinstance(item, h5py.Dataset):
+                arrays[key] = _construct_manifest_array(
+                    filepath, item, group_name, links_and_references
+                )
+            elif isinstance(item, h5py.Group):
+                groups[key] = _construct_manifest_group(
+                    filepath,
+                    reader,
+                    group=str(Path(group) / key) if group is not None else key,
+                    links_and_references=links_and_references,
+                    _seen=seen,
+                )
         attributes = _extract_attrs(g)
+        if links:
+            conventions = list(attributes.get("zarr_conventions", []))
+            attributes["zarr_conventions"] = [
+                *conventions,
+                dict(LINKS_REFERENCES_CONVENTION),
+                dict(REF_CONVENTION),
+            ]
+            attributes["links_references"] = {"links": links}
 
     return ManifestGroup(arrays=arrays, groups=groups, attributes=attributes)
+
+
+def _link_target(
+    g, key: str, group_name: str, filepath: str, seen: dict
+) -> dict | None:
+    """
+    Return the ref object for a member of a group that is a link, or None for one that is not.
+
+    A soft link's target is relative to the group, as a ref convention node is,
+    and may not exist; a relative soft link keeps its path as written. An external link's file is resolved against the file
+    being parsed. A member reached by a hard link whose object is already stored
+    under another name is a link to that name.
+    """
+    import h5py
+
+    link = g.get(key, getlink=True)
+    if isinstance(link, h5py.SoftLink):
+        if link.path.startswith("/"):
+            return {"ref": {"node": _relative_path(link.path, group_name)}}
+        # HDF5 resolves a relative soft link against its group, as a ref node is
+        # resolved against the node that holds it, so the path is kept as written
+        return {"ref": {"node": link.path}}
+    if isinstance(link, h5py.ExternalLink):
+        return {
+            "ref": {
+                "uri": _resolve_external(filepath, link.filename),
+                "node": "/" + link.path.lstrip("/"),
+            }
+        }
+    item = g[key]
+    address = _object_address(item)
+    if address in seen:
+        return {"ref": {"node": _relative_path(seen[address], group_name)}}
+    seen[address] = item.name
+    return None
+
+
+def _relative_path(path: str, start: str) -> str:
+    """The path from the HDF5 node ``start`` to ``path``, which are always posix paths."""
+    return str(PurePosixPath(path).relative_to(start, walk_up=True))
+
+
+def _object_address(obj) -> int:
+    """
+    The address of an object in its file, which is the same for every name of it.
+
+    The file is opened again for each group, and an object's ObjectID differs
+    between two openings of a file-like reader, so ObjectIDs can't be compared.
+    """
+    import h5py
+
+    return h5py.h5o.get_info(obj.id).addr
+
+
+def _resolve_external(filepath: str, filename: str) -> str:
+    """The location of an external link's file: as given if absolute, otherwise next to the file being parsed."""
+    if "://" in filename:
+        return filename
+    if filename.startswith("/"):
+        return f"file://{filename}"
+    base, _, _ = filepath.rpartition("/")
+    scheme, sep, rest = base.partition("://")
+    if not sep:
+        return posixpath.normpath(posixpath.join(base, filename))
+    root, slash, path = rest.partition("/")
+    return (
+        f"{scheme}://{root}{slash}{posixpath.normpath(posixpath.join(path, filename))}"
+    )
 
 
 class HDFParser:
@@ -307,8 +430,12 @@ class HDFParser:
         convention](https://github.com/catalystneuro/zarr-links-references): each
         path is relative to the array, a null reference is the empty string, and
         the array is marked with ``"links_references": {"references": true}``.
+        Soft and external links, and second names of objects with more than one
+        hard link, are recorded in the attributes of the group that holds them
+        as ``"links_references": {"links": {name: {"ref": {"node": ...}}}}``,
+        with a ``uri`` for an external link, instead of being copied.
         Off by default, while the convention is settled; a dataset of object
-        references then raises ``NotImplementedError``.
+        references then raises ``NotImplementedError``, and links are copied.
     """
 
     def __init__(
@@ -527,18 +654,16 @@ def _inlined_vlen_string_manifest(
     )
 
 
-def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.ndarray]:
+def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
     """
-    Return a function that reads a region of an object reference dataset as paths.
+    Return a function that turns an object reference held by dataset into a path.
 
-    Each path is the target's path relative to the dataset, as a ``ref``
+    The path is the target's path relative to the dataset, as a ``ref``
     convention ``node`` within a store is, and a null reference is the empty
     string. Many references usually share a few targets, and the ``name`` of an
     object opened by reference makes HDF5 search the file, so each target's
     path is found once.
     """
-    import posixpath
-
     file = dataset.file
     start = dataset.name
     paths: dict = {}
@@ -548,14 +673,121 @@ def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.nda
             return ""
         target = file[reference]
         if target.id not in paths:
-            paths[target.id] = posixpath.relpath(target.name, start=start)
+            paths[target.id] = _relative_path(target.name, start)
         return paths[target.id]
+
+    return path
+
+
+def _reference_paths(dataset: H5Dataset) -> Callable[[tuple[slice, ...]], np.ndarray]:
+    """Return a function that reads a region of an object reference dataset as paths."""
+    path = _reference_path(dataset)
 
     def read(region: tuple[slice, ...]) -> np.ndarray:
         values = np.asarray(dataset[region], dtype=object)
         return np.vectorize(path, otypes=[object])(values) if values.size else values
 
     return read
+
+
+def _read_compound(
+    dataset: H5Dataset, links_and_references: bool
+) -> tuple[np.ndarray, list[str]]:
+    """
+    Read a compound dataset that has variable-length string or object reference fields.
+
+    Each such field becomes a fixed-length unicode field, as wide as its longest
+    value, and every other field is kept, little-endian. A reference field holds
+    the paths of its targets, as an object reference dataset does with
+    ``links_and_references``.
+
+    Returns
+    -------
+    values
+        The dataset's values as a packed structured array.
+    reference_fields
+        The names of the fields that hold object references.
+    """
+    import h5py
+
+    raw = dataset[()] if dataset.shape == () else dataset[...]
+    fields: list[tuple[str, np.dtype]] = []
+    columns: dict[str, np.ndarray] = {}
+    reference_fields: list[str] = []
+    for name in raw.dtype.names:
+        field_dtype = raw.dtype[name]
+        if field_dtype.kind != "O":
+            if field_dtype.names is not None or field_dtype.subdtype is not None:
+                columns[name] = np.asarray(raw[name])
+                fields.append((name, field_dtype))
+            else:
+                columns[name] = np.asarray(
+                    raw[name], dtype=field_dtype.newbyteorder("<")
+                )
+                fields.append((name, columns[name].dtype))
+            continue
+        if h5py.check_vlen_dtype(field_dtype) in (str, bytes):
+            values = [
+                value.decode("utf-8") if isinstance(value, bytes) else value
+                for value in np.asarray(raw[name], dtype=object).ravel()
+            ]
+        elif h5py.check_ref_dtype(field_dtype) is h5py.Reference:
+            if not links_and_references:
+                raise NotImplementedError(
+                    f"Field {name!r} of compound dataset {dataset.name!r} holds HDF5 "
+                    f"object references. {_LINKS_AND_REFERENCES_HINT}"
+                )
+            path = _reference_path(dataset)
+            values = [
+                path(value) for value in np.asarray(raw[name], dtype=object).ravel()
+            ]
+            reference_fields.append(name)
+        else:
+            raise NotImplementedError(
+                f"Field {name!r} of compound dataset {dataset.name!r} has HDF5 object "
+                f"dtype {field_dtype!r}, which is not yet supported by HDFParser."
+            )
+        width = max([len(value) for value in values] + [1])
+        columns[name] = np.array(values, dtype=f"<U{width}").reshape(raw.shape)
+        fields.append((name, columns[name].dtype))
+
+    packed = np.zeros(raw.shape, dtype=np.dtype(fields))
+    for name, column in columns.items():
+        packed[name] = column
+    return packed, reference_fields
+
+
+def _inlined_array_manifest(
+    values: np.ndarray, *, chunks: tuple[int, ...]
+) -> ChunkManifest:
+    """
+    Store an array read at parse time as inlined chunks, encoded with the bytes codec.
+
+    An edge chunk is padded to the full chunk shape with zeros, as zarr does when
+    writing.
+    """
+    shape = values.shape
+    if values.size == 0:
+        return ChunkManifest(entries={}, shape=shape)
+    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
+    inlined: dict[tuple[int, ...], bytes] = {}
+    for index in np.ndindex(grid_shape):
+        region = tuple(
+            slice(i * c, min((i + 1) * c, s)) for i, c, s in zip(index, chunks, shape)
+        )
+        chunk = np.zeros(chunks, dtype=values.dtype)
+        part = values[region]
+        chunk[tuple(slice(0, n) for n in part.shape) + (...,)] = part
+        inlined[index] = np.ascontiguousarray(chunk).tobytes()
+    lengths = np.zeros(grid_shape, dtype=np.uint64)
+    for index, data in inlined.items():
+        lengths[index] = len(data)
+    return ChunkManifest.from_arrays(
+        paths=np.full(grid_shape, INLINED_CHUNK_PATH, dtype=np.dtypes.StringDType()),  # type: ignore
+        offsets=np.zeros(grid_shape, dtype=np.uint64),
+        lengths=lengths,
+        inlined=inlined,
+    )
 
 
 def _dataset_dims(dataset: H5Dataset, group: str = "/") -> list[str]:
@@ -634,7 +866,7 @@ def _extract_attrs(h5obj: H5Dataset | H5Group):
             v = v.decode("utf-8") or " "
         elif isinstance(v, (np.ndarray, np.number, np.bool_)):
             if v.dtype.kind == "S":
-                v = v.astype(str)
+                v = np.strings.decode(np.asarray(v), "utf-8").tolist()
             elif v.size == 1:
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
@@ -655,7 +887,8 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
     dimension_names = []
     non_coordinate_dimension_variables = []
     for name, obj in group.items():
-        if "_Netcdf4Dimid" in obj.attrs:
+        # obj is None for a soft link whose target doesn't exist
+        if obj is not None and "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
         if type(obj) is h5py.Dataset:
