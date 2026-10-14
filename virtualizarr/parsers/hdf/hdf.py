@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -351,14 +352,12 @@ def _link_target(
     being parsed. A member reached by a hard link whose object is already stored
     under another name is a link to that name.
     """
-    import posixpath
-
     import h5py
 
     link = g.get(key, getlink=True)
     if isinstance(link, h5py.SoftLink):
         if link.path.startswith("/"):
-            return {"ref": {"node": posixpath.relpath(link.path, start=group_name)}}
+            return {"ref": {"node": _relative_path(link.path, group_name)}}
         # HDF5 resolves a relative soft link against its group, as a ref node is
         # resolved against the node that holds it, so the path is kept as written
         return {"ref": {"node": link.path}}
@@ -372,9 +371,14 @@ def _link_target(
     item = g[key]
     address = _object_address(item)
     if address in seen:
-        return {"ref": {"node": posixpath.relpath(seen[address], start=group_name)}}
+        return {"ref": {"node": _relative_path(seen[address], group_name)}}
     seen[address] = item.name
     return None
+
+
+def _relative_path(path: str, start: str) -> str:
+    """The path from the HDF5 node ``start`` to ``path``, which are always posix paths."""
+    return str(PurePosixPath(path).relative_to(start, walk_up=True))
 
 
 def _object_address(obj) -> int:
@@ -391,8 +395,6 @@ def _object_address(obj) -> int:
 
 def _resolve_external(filepath: str, filename: str) -> str:
     """The location of an external link's file: as given if absolute, otherwise next to the file being parsed."""
-    import posixpath
-
     if "://" in filename:
         return filename
     if filename.startswith("/"):
@@ -662,8 +664,6 @@ def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
     object opened by reference makes HDF5 search the file, so each target's
     path is found once.
     """
-    import posixpath
-
     file = dataset.file
     start = dataset.name
     paths: dict = {}
@@ -673,7 +673,7 @@ def _reference_path(dataset: H5Dataset) -> Callable[[object], str]:
             return ""
         target = file[reference]
         if target.id not in paths:
-            paths[target.id] = posixpath.relpath(target.name, start=start)
+            paths[target.id] = _relative_path(target.name, start)
         return paths[target.id]
 
     return path
