@@ -34,6 +34,12 @@
   ([#768](https://github.com/zarr-developers/VirtualiZarr/issues/768)).
   By [Ben Dichter](https://github.com/bendichter).
 
+### Performance
+
+- `HDFParser` now reads each chunked dataset's chunk index once instead of three times, cutting the requests needed
+  to build a manifest by about two-thirds for files whose chunk index is larger than HDF5's metadata cache.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
 - `NetCDF3Parser` no longer accepts a `reader_options` argument. It configured kerchunk's

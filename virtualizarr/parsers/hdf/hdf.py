@@ -658,8 +658,14 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
-        if type(obj) is h5py.Dataset:
-            if obj.id.get_storage_size() == 0 and name in dimension_names:
+        if type(obj) is h5py.Dataset and name in dimension_names:
+            # chunk_iter stops at the first callback that returns non-None, so
+            # this reads only the path to the first chunk, not the whole index.
+            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+                stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
+            else:
+                stores_no_data = obj.id.get_storage_size() == 0
+            if stores_no_data:
                 non_coordinate_dimension_variables.append(name)
 
     return non_coordinate_dimension_variables
