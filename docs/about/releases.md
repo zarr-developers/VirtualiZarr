@@ -13,6 +13,14 @@
   copied as before. Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
   By [Ben Dichter](https://github.com/bendichter).
 
+- `HDFParser` reads **compound datasets with variable-length string or object reference fields**, which used to
+  raise a `ValueError` (#1104). They are read at parse time into a `struct` with fixed-length unicode fields, each as
+  wide as its longest value, and stored as inlined chunks. String fields always work; reference fields need
+  `links_and_references=True`, hold the paths of their targets, and are listed in
+  `"links_references": {"references": [...]}`. Part of
+  [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124).
+  By [Ben Dichter](https://github.com/bendichter).
+
 - `HDFParser(links_and_references=True)` reads datasets of HDF5 **object references**, which used to raise
   `NotImplementedError`. Each reference is resolved at parse time to the path of its target, relative to the array,
   and stored as an inlined string chunk, following the draft
@@ -53,6 +61,18 @@
   resolves — install plain `virtualizarr` instead. It previously pulled in `kerchunk`,
   `scipy` and `virtualizarr[remote]` (`fsspec`, `requests`, `aiohttp`, `s3fs`), none of
   which the parser uses any more. By [Tom Nicholas](https://github.com/TomNicholas).
+- Creating a `ChunkManifest` (and so a `ManifestArray`) containing a zero-length chunk reference
+  now raises `ValueError`. A chunk must decode to the full chunk shape, so no valid chunk is ever
+  zero bytes long, and such a reference can only fail at read time - after it has been written to
+  a store. Applies to virtual and inlined references alike, via every constructor
+  (`ChunkManifest`, `ChunkManifest.from_arrays`, `ChunkEntry.with_validation`).
+  A chunk which simply isn't stored - as in a sparse array - should be given the empty path
+  instead, which reads back as the array's `fill_value` and fetches nothing.
+  This catches bugs like [virtual-tiff#108](https://github.com/virtual-zarr/virtual-tiff/issues/108),
+  where sparse GeoTIFF tiles (`offset = 0, byteCount = 0`) became references that committed
+  successfully to Icechunk and only failed on read. Closes
+  [#1088](https://github.com/zarr-developers/VirtualiZarr/issues/1088).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Bug fixes
 
@@ -77,6 +97,11 @@
   name already exists with different metadata, for example if it used a different codec.
   Previously the new references were written under the old metadata, so reads silently
   returned wrong values.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
+- `HDFParser` no longer fails on HDF5 files with attributes stored as arrays of
+  fixed-length byte strings. Such an attribute is now read as a list of `str`, one per
+  element, keeping the array's shape.
   By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Documentation
