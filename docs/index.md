@@ -38,7 +38,10 @@ import obstore
 
 from obspec_utils.registry import ObjectStoreRegistry
 
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr import (
+    open_virtual_dataset,
+    open_virtual_mfdataset,
+)
 from virtualizarr.parsers import HDFParser
 ```
 
@@ -49,7 +52,9 @@ specification yet -- let's suppress those.
 import warnings
 warnings.filterwarnings(
   "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
+  message=(
+    "Numcodecs codecs are not in the Zarr version 3 specification*"
+  ),
   category=UserWarning
 )
 ```
@@ -60,16 +65,25 @@ import xarray as xr
 xr.set_options(display_style="html")
 ```
 
-We can use Obstore's [`obstore.store.from_url`][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch data from the specified URLs.
+We can use Obstore's [`obstore.store.from_url`][obstore.store.from_url] convenience method to create an [ObjectStore][obstore.store.ObjectStore] that can fetch the data needed to virtualize the file.
+The store holds the settings for connecting to the bucket, such as its cloud region and credentials.
+This bucket is public and in `us-west-2`, so we set the region and skip signing requests.
 
 ```python exec="on" source="above" session="homepage"
 bucket = "s3://nex-gddp-cmip6"
-path = "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
-store = obstore.store.from_url(bucket, region="us-west-2", skip_signature=True)
+path = (
+    "NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
+    "tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_2015_v2.0.nc"
+)
+store = obstore.store.from_url(
+    bucket, region="us-west-2", skip_signature=True
+)
 ```
 
-We also need to create an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] that
-maps the URL structure to the ObjectStore.
+A virtual dataset can pull from several sources, such as different buckets, different clouds, or HTTPS websites, and each source needs its own store.
+An [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] organizes those stores for VirtualiZarr by mapping each URL prefix to the store that serves it.
+Here there is only one source, so the registry maps the bucket to our store.
+See [The object store registry](explanation/registry.md) for more on why it's needed.
 
 ```python exec="on" source="above" session="homepage"
 registry = ObjectStoreRegistry({bucket: store})
@@ -99,8 +113,14 @@ VirtualiZarr's other top-level function is [virtualizarr.open_virtual_mfdataset]
 a single virtual dataset, similar to how [xarray.open_mfdataset][] opens multiple data files as a single dataset.
 
 ```python exec="on" source="above" session="homepage" result="code"
-urls = [f"s3://nex-gddp-cmip6/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc" for year in range(2015, 2017)]
-vds = open_virtual_mfdataset(urls, parser = parser, registry = registry)
+urls = [
+    f"{bucket}/NEX-GDDP-CMIP6/ACCESS-CM2/ssp126/r1i1p1f1/tasmax/"
+    f"tasmax_day_ACCESS-CM2_ssp126_r1i1p1f1_gn_{year}_v2.0.nc"
+    for year in range(2015, 2017)
+]
+vds = open_virtual_mfdataset(
+    urls, parser=parser, registry=registry
+)
 print(vds)
 ```
 

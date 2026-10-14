@@ -146,6 +146,10 @@
 
 ### Documentation
 
+- New explanation page, [The object store registry](../explanation/registry.md), covering why
+  `open_virtual_dataset` needs a registry, which steps read through it, and how to set one up
+  for cloud and local files. The Local tab in the usage guide now registers `"file:///"`, so
+  it works for more than one file. ([#1105](https://github.com/zarr-developers/VirtualiZarr/pull/1105)) By [Ian Hunt-Isaak](https://github.com/ianhi).
 - Document how to concatenate along a scalar (non-dimension) coordinate, e.g. one timestep per file, in the usage docs. The coordinate must be passed in `loadable_variables` so xarray can build an index for the new dimension.
   ([#1015](https://github.com/zarr-developers/VirtualiZarr/pull/1015)).
   By [Max Jones](https://github.com/maxrjones).
