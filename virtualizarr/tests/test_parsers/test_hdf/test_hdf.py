@@ -5,12 +5,17 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from obspec_utils.readers import BlockStoreReader, BufferedStoreReader
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import from_url
+from obstore.store import LocalStore, MemoryStore, from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION, REF_CONVENTION
+from virtualizarr.parsers.hdf.hdf import (
+    LINKS_REFERENCES_CONVENTION,
+    REF_CONVENTION,
+    _default_reader_factory,
+)
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -690,3 +695,21 @@ def test_fillvalue_runtime_error():
 
     result = _get_fill_value(dataset)
     assert result == np.ma.default_fill_value(dtype)
+
+
+def test_default_reader_factory_skips_read_ahead_for_local_files():
+    reader = _default_reader_factory(LocalStore(), "a.h5")
+    assert isinstance(reader, BufferedStoreReader)
+    assert reader._buffer_size == 1
+    assert isinstance(_default_reader_factory(MemoryStore(), "a.h5"), BlockStoreReader)
+
+
+def test_default_reader_matches_block_reader(chunk_dense_hdf5_url, local_registry):
+    default = HDFParser()(url=chunk_dense_hdf5_url, registry=local_registry)
+    block = HDFParser(reader_factory=BlockStoreReader)(
+        url=chunk_dense_hdf5_url, registry=local_registry
+    )
+    default_arr = default._group.arrays["x"]
+    block_arr = block._group.arrays["x"]
+    assert default_arr.metadata == block_arr.metadata
+    assert default_arr.manifest.dict() == block_arr.manifest.dict()
