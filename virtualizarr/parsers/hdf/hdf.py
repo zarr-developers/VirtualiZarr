@@ -412,7 +412,11 @@ class HDFParser:
         Soft and external links, and second names of objects with more than one
         hard link, are recorded in the attributes of the group that holds them
         as ``"links_references": {"links": {name: {"ref": {"node": ...}}}}``,
-        with a ``uri`` for an external link, instead of being copied.
+        with a ``uri`` for an external link, instead of being copied. An
+        attribute that holds an object reference, or several, becomes a ref
+        convention object, or a list of them, whose path is relative to the
+        node that has the attribute.
+        See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
     """

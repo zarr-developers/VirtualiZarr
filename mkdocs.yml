@@ -25,6 +25,7 @@ nav:
     - "how_to/examples.md"
     - "how_to/validation.md"
     - "how_to/scaling.md"
+    - "how_to/hdf5_links_references.md"
   - Explanation:
     - "explanation/data_structures.md"
     - "explanation/custom_parsers.md"
