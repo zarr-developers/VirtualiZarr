@@ -532,7 +532,7 @@ def _dataset_chunk_manifest(
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
         if callable(getattr(dsid, "chunk_iter", None)):
-            chunk_infos = []
+            chunk_infos: list = []
             dsid.chunk_iter(chunk_infos.append)
         else:
             chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
