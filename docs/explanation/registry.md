@@ -2,7 +2,7 @@
 
 This page explains the `registry` argument that [`open_virtual_dataset`][virtualizarr.open_virtual_dataset] requires.
 
-Virtualizing a file doesn't copy its data, but VirtualiZarr still has to read from the file in order to virtualize it, and again whenever you load data from it.
+Virtualizing a file doesn't copy its chunk data, but VirtualiZarr still has to read metadata (and optionally specific chunk data) from the file in order to virtualize it.
 
 - **Building the virtual dataset.** The parser reads the file's header and chunk index to find where each chunk lives. Some parsers also fetch the bytes of certain chunks and store them inline in the virtual dataset.
 - **Loading data.** After parsing, a separate loading step fetches the bytes of any variable you load.
