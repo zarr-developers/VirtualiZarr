@@ -78,7 +78,10 @@ def test_envi_interleave_schemes_match_reference(fixture: Path) -> None:
         [var_name] = list(vds.data_vars)
         manifest_store = parser(url, registry)
         with xr.open_dataset(
-            manifest_store, engine="zarr", zarr_format=3, consolidated=False
+            manifest_store,  # type: ignore[arg-type]
+            engine="zarr",
+            zarr_format=3,
+            consolidated=False,
         ) as actual:
             expected = _read_reference_array(fixture.with_suffix(".hdr"), fixture)
             np.testing.assert_array_equal(actual[var_name].to_numpy(), expected)
@@ -89,7 +92,10 @@ def test_envi_big_endian() -> None:
     parser = ENVIParser()
     manifest_store = parser(url, registry)
     with xr.open_dataset(
-        manifest_store, engine="zarr", zarr_format=3, consolidated=False
+        manifest_store,  # type: ignore[arg-type]
+        engine="zarr",
+        zarr_format=3,
+        consolidated=False,
     ) as actual:
         [var_name] = list(actual.data_vars)
         expected = _read_reference_array(AEA.with_suffix(".hdr"), AEA)
@@ -102,7 +108,10 @@ def test_envi_gzip_compressed() -> None:
     parser = ENVIParser()
     manifest_store = parser(url, registry)
     with xr.open_dataset(
-        manifest_store, engine="zarr", zarr_format=3, consolidated=False
+        manifest_store,  # type: ignore[arg-type]
+        engine="zarr",
+        zarr_format=3,
+        consolidated=False,
     ) as actual:
         [var_name] = list(actual.data_vars)
         expected = _read_reference_array(
@@ -140,7 +149,10 @@ def test_envi_chunking_reads_match_reference(
     parser = ENVIParser(split_chunks_along_outer_axis=split_chunks_along_outer_axis)
     manifest_store = parser(url, registry)
     with xr.open_dataset(
-        manifest_store, engine="zarr", zarr_format=3, consolidated=False
+        manifest_store,  # type: ignore[arg-type]
+        engine="zarr",
+        zarr_format=3,
+        consolidated=False,
     ) as actual:
         [var_name] = list(actual.data_vars)
         expected = _read_reference_array(BSQ.with_suffix(".hdr"), BSQ)
