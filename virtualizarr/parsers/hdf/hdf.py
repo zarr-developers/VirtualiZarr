@@ -534,8 +534,12 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        num_chunks = dsid.get_num_chunks()
-        if num_chunks == 0:
+        if callable(getattr(dsid, "chunk_iter", None)):
+            chunk_infos: list = []
+            dsid.chunk_iter(chunk_infos.append)
+        else:
+            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
+        if not chunk_infos:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
             grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
@@ -559,12 +563,8 @@ def _dataset_chunk_manifest(
                 offsets[key] = blob.byte_offset
                 lengths[key] = trimmed_length if trimmed else blob.size
 
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
-            else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+            for chunk_info in chunk_infos:
+                add_chunk_info(chunk_info)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
@@ -925,8 +925,14 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if obj is not None and "_Netcdf4Dimid" in obj.attrs:
             dimension_names.append(name)
     for name, obj in group.items():
-        if type(obj) is h5py.Dataset:
-            if obj.id.get_storage_size() == 0 and name in dimension_names:
+        if type(obj) is h5py.Dataset and name in dimension_names:
+            # chunk_iter stops at the first callback that returns non-None, so
+            # this reads only the path to the first chunk, not the whole index.
+            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+                stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
+            else:
+                stores_no_data = obj.id.get_storage_size() == 0
+            if stores_no_data:
                 non_coordinate_dimension_variables.append(name)
 
     return non_coordinate_dimension_variables
