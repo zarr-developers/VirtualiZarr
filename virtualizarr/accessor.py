@@ -111,6 +111,8 @@ class _VirtualiZarrDatasetAccessor:
             - ``"w-"``: create the group, raising a ``ContainsGroupError`` if it already exists.
             - ``"w"``: create the group, overwriting any existing contents at that path.
             - ``"a"``: open the group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised.
             - ``None`` (default): equivalent to ``"w-"``, unless ``append_dim`` or ``region``
               is given, in which case the existing group is opened.
 
@@ -153,11 +155,21 @@ class _VirtualiZarrDatasetAccessor:
 
     @overload
     def to_kerchunk(
-        self, filepath: None, format: Literal["dict"]
+        self,
+        filepath: None,
+        format: Literal["dict"],
+        *,
+        zarr_format: Literal[2, 3] = 2,
     ) -> KerchunkStoreRefs: ...
 
     @overload
-    def to_kerchunk(self, filepath: str | Path, format: Literal["json"]) -> None: ...
+    def to_kerchunk(
+        self,
+        filepath: str | Path,
+        format: Literal["json"],
+        *,
+        zarr_format: Literal[2, 3] = 2,
+    ) -> None: ...
 
     @overload
     def to_kerchunk(
@@ -175,6 +187,8 @@ class _VirtualiZarrDatasetAccessor:
         format: Literal["dict", "json", "parquet"] = "dict",
         record_size: int = 100_000,
         categorical_threshold: int = 10,
+        *,
+        zarr_format: Literal[2, 3] = 2,
     ) -> KerchunkStoreRefs | None:
         """
         Serialize all virtualized arrays in this xarray dataset into the kerchunk references format.
@@ -193,12 +207,22 @@ class _VirtualiZarrDatasetAccessor:
             Encode urls as pandas.Categorical to reduce memory footprint if the ratio
             of the number of unique urls to total number of refs for each variable
             is greater than or equal to this number (default 10). Only available when `format` is 'parquet'.
+        zarr_format
+            The Zarr format of the metadata in the references (default 2). Format 2 writes
+            `.zgroup`, `.zarray` and `.zattrs` keys. Format 3 writes `zarr.json` keys and chunk
+            keys such as `c/0/0`, and is available when `format` is 'dict' or 'json'.
 
         References
         ----------
         https://fsspec.github.io/kerchunk/spec.html
         """
-        refs = dataset_to_kerchunk_refs(self.ds)
+        if zarr_format == 3 and format == "parquet":
+            raise NotImplementedError(
+                "Kerchunk parquet references can only hold Zarr format 2 metadata; "
+                "use format='json' or format='dict' with zarr_format=3"
+            )
+
+        refs = dataset_to_kerchunk_refs(self.ds, zarr_format=zarr_format)
 
         if format == "dict":
             return refs
@@ -381,6 +405,8 @@ class _VirtualiZarrDataTreeAccessor:
               ``ContainsGroupError`` if it already exists.
             - ``"w"``: create each group, overwriting any existing contents at that path.
             - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised.
         write_inherited_coords
             If ``True``, replicate inherited coordinates on all descendant nodes.
             Otherwise, only write coordinates at the level at which they are

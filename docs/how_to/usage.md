@@ -8,6 +8,8 @@ VirtualiZarr is for creating and manipulating "virtual" references to pre-existi
 
 The first step to virtualizing data is to create an [ObjectStore][obstore.store.ObjectStore] instance
 that can access your data. Available ObjectStores are described in the [obstore docs](https://developmentseed.org/obstore/latest/getting-started/#constructing-a-store).
+You then register the store in an [ObjectStoreRegistry][obspec_utils.registry.ObjectStoreRegistry] under the URL prefix it serves, so VirtualiZarr knows which store to use for each URL.
+See [The object store registry](../explanation/registry.md) for why this is needed and how to set it up for local files.
 
 
 !!! note
@@ -160,25 +162,12 @@ that can access your data. Available ObjectStores are described in the [obstore 
 
     from pathlib import Path
 
-    store_path = Path.cwd()
-    file_path = str(store_path / "data.nc")
-    file_url = f"file://{file_path}"
+    file_path = str(Path.cwd() / "data.nc")
+    url = file_path
 
-    store = LocalStore(prefix=store_path)
-    registry = ObjectStoreRegistry({file_url: store})
+    registry = ObjectStoreRegistry({"file:///": LocalStore()})
 
     ```
-
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3 specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
-)
-```
 
 We can open a virtual representation of this file using [virtualizarr.open_virtual_dataset][]. VirtualiZarr has various
 "parsers" that understand different file formats. You must supply a parser, and as all netCDF4 files are HDF5 files,
@@ -345,6 +334,28 @@ combined_vds = open_virtual_mfdataset(
 
 We passed `combine='nested'` to specify that we want the datasets to be combined in the order they appear, using `xr.combine_nested` under the hood.
 
+!!! warning "Concatenating along a scalar coordinate"
+    The examples above concatenate along `time`, which is already a *dimension* in each file (so each file holds many timesteps). Concatenating along an existing dimension just stacks the virtual references end-to-end and requires no in-memory data.
+
+    A common alternative layout stores **one timestep per file**, so that `time` is a *scalar* (0-dimensional) coordinate rather than a dimension. To combine these, xarray must promote that scalar to a new dimension and build an index for it, which requires the coordinate's values in memory. Because `time` is left virtual by default (the automatic loading only covers 1D dimension coordinates), the combine will fail unless you load it explicitly:
+
+    ```python
+    combined_vds = open_virtual_mfdataset(
+        urls,
+        registry=registry,
+        parser=parser,
+        combine="nested",
+        concat_dim="time",
+        loadable_variables=["time"],  # load the scalar concat coordinate into memory
+        coords="minimal",
+        compat="override",
+    )
+    ```
+
+    Note that passing `loadable_variables` *replaces* the default set, so the other dimension coordinates (e.g. `lat`/`lon`) are no longer loaded automatically. The `coords="minimal"` and `compat="override"` arguments (see the note above) stop xarray from trying to load those still-virtual coordinates in order to compare them. Alternatively, list every coordinate you want in memory, e.g. `loadable_variables=["time", "lat", "lon"]`.
+
+    More generally, any coordinate you concatenate along that is *not already a dimension* in each source must be listed in `loadable_variables`.
+
 ### Ordering by coordinate values
 
 If you're happy to load 1D dimension coordinates into memory, you can use their values to do the ordering for you!
@@ -487,6 +498,24 @@ These zarr-like references can now be interpreted by [fsspec](https://github.com
 combined_ds = xr.open_dataset('output/combined.json', engine="kerchunk")
 print(combined_ds)
 ```
+
+Kerchunk's specification does not depend on the Zarr format of the metadata it holds.
+By default the references hold Zarr format 2 metadata (`.zgroup`, `.zarray` and `.zattrs` keys).
+Pass `zarr_format=3` to write Zarr format 3 metadata instead, as one `zarr.json` key per group and array:
+
+```python
+combined_vds.vz.to_kerchunk('output/combined_v3.json', format='json', zarr_format=3)
+```
+
+Kerchunk's xarray backend only opens Zarr format 2 references, so open these as a zarr store over the reference filesystem:
+
+```python
+from kerchunk.utils import refs_as_store
+
+combined_ds = xr.open_zarr(refs_as_store('output/combined_v3.json'), zarr_format=3, consolidated=False)
+```
+
+Zarr format 3 metadata is available for the `json` and `dict` formats, not for `parquet`.
 
 In-memory ("loadable") variables backed by numpy arrays can also be written out to kerchunk reference files, with the values serialized as bytes.
 This is equivalent to kerchunk's concept of "inlining", but done on a per-array basis using the `loadable_variables` kwarg rather than a per-chunk basis using kerchunk's `inline_threshold` kwarg.

@@ -519,6 +519,223 @@ def test_skip_variables(refs_file_factory, skip_variables, local_registry):
         assert all(var not in vds for var in skip_variables)
 
 
+def gen_ds_refs_zarr_v3(
+    arrays: dict[str, dict[str, Any]] | None = None,
+    chunks: dict[str, list[str | int] | str] | None = None,
+    prefix: str = "",
+):
+    """Kerchunk references holding Zarr format 3 metadata for a group at ``prefix``."""
+
+    def array_metadata(**overrides):
+        metadata = {
+            "zarr_format": 3,
+            "node_type": "array",
+            "shape": [2, 3],
+            "data_type": "int64",
+            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [2, 3]}},
+            "chunk_key_encoding": {
+                "name": "default",
+                "configuration": {"separator": "/"},
+            },
+            "fill_value": 0,
+            "codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
+            "attributes": {"value": "1"},
+            "dimension_names": ["x", "y"],
+        }
+        return {**metadata, **overrides}
+
+    if arrays is None:
+        arrays = {"a": {}}
+    if chunks is None:
+        chunks = {"a/c/0/0": ["/test1.nc", 6144, 48]}
+
+    group_metadata = {
+        "zarr_format": 3,
+        "node_type": "group",
+        "attributes": {"title": "t"},
+    }
+    refs: dict[str, Any] = {f"{prefix}zarr.json": ujson.dumps(group_metadata)}
+    for name, overrides in arrays.items():
+        refs[f"{prefix}{name}/zarr.json"] = ujson.dumps(array_metadata(**overrides))
+    refs.update({f"{prefix}{key}": value for key, value in chunks.items()})
+    return {"version": 1, "refs": refs}
+
+
+class TestZarrV3Refs:
+    """Kerchunk references that hold Zarr format 3 metadata under ``zarr.json`` keys."""
+
+    def test_manifestgroup(self):
+        from virtualizarr.parsers.kerchunk.translator import (
+            manifestgroup_from_kerchunk_refs,
+        )
+
+        group = manifestgroup_from_kerchunk_refs(gen_ds_refs_zarr_v3())
+
+        assert group.metadata.attributes == {"title": "t"}
+        assert list(group.arrays) == ["a"]
+        marr = group.arrays["a"]
+        assert marr.shape == (2, 3)
+        assert marr.dtype == np.dtype("int64")
+        assert marr.metadata.dimension_names == ("x", "y")
+        assert marr.metadata.attributes == {"value": "1"}
+        assert marr.manifest.dict() == {
+            "0.0": {"path": "file:///test1.nc", "offset": 6144, "length": 48}
+        }
+
+    @pytest.mark.parametrize(
+        ["chunk_key_encoding", "chunk_keys"],
+        [
+            (
+                {"name": "default", "configuration": {"separator": "/"}},
+                ["c/0/0", "c/1/0"],
+            ),
+            (
+                {"name": "default", "configuration": {"separator": "."}},
+                ["c.0.0", "c.1.0"],
+            ),
+            ({"name": "v2", "configuration": {"separator": "."}}, ["0.0", "1.0"]),
+            ({"name": "v2", "configuration": {"separator": "/"}}, ["0/0", "1/0"]),
+        ],
+    )
+    def test_chunk_key_encodings(self, chunk_key_encoding, chunk_keys):
+        from virtualizarr.parsers.kerchunk.translator import (
+            manifestgroup_from_kerchunk_refs,
+        )
+
+        refs = gen_ds_refs_zarr_v3(
+            arrays={
+                "a": {
+                    "shape": [4, 3],
+                    "chunk_key_encoding": chunk_key_encoding,
+                }
+            },
+            chunks={
+                f"a/{chunk_keys[0]}": ["/test1.nc", 100, 48],
+                f"a/{chunk_keys[1]}": ["/test1.nc", 148, 48],
+            },
+        )
+
+        marr = manifestgroup_from_kerchunk_refs(refs).arrays["a"]
+
+        assert marr.manifest.dict() == {
+            "0.0": {"path": "file:///test1.nc", "offset": 100, "length": 48},
+            "1.0": {"path": "file:///test1.nc", "offset": 148, "length": 48},
+        }
+
+    def test_scalar_and_empty_arrays(self):
+        from virtualizarr.parsers.kerchunk.translator import (
+            manifestgroup_from_kerchunk_refs,
+        )
+
+        scalar = {
+            "shape": [],
+            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": []}},
+            "dimension_names": [],
+        }
+        refs = gen_ds_refs_zarr_v3(
+            arrays={"s": scalar, "empty": {}},
+            chunks={"s/c": ["/test1.nc", 6144, 8]},
+        )
+
+        group = manifestgroup_from_kerchunk_refs(refs)
+
+        assert group.arrays["s"].shape == ()
+        assert group.arrays["s"].manifest.shape_chunk_grid == ()
+        assert list(group.arrays["s"].manifest.dict().values()) == [
+            {"path": "file:///test1.nc", "offset": 6144, "length": 8}
+        ]
+        # an array with no chunk references has an empty manifest
+        assert group.arrays["empty"].manifest.dict() == {}
+        assert group.arrays["empty"].manifest.shape_chunk_grid == (1, 1)
+
+    def test_group_and_skip_variables(self):
+        from virtualizarr.parsers.kerchunk.translator import (
+            manifestgroup_from_kerchunk_refs,
+        )
+
+        refs = gen_ds_refs_zarr_v3(
+            arrays={"a": {}, "b": {}},
+            chunks={
+                "a/c/0/0": ["/test1.nc", 6144, 48],
+                "b/c/0/0": ["/test1.nc", 6192, 48],
+            },
+            prefix="sub/",
+        )
+        refs["refs"]["zarr.json"] = '{"zarr_format":3,"node_type":"group"}'
+
+        # the root group holds no arrays of its own
+        assert list(manifestgroup_from_kerchunk_refs(refs).arrays) == []
+        for group_name in ("sub", "/sub/"):
+            group = manifestgroup_from_kerchunk_refs(refs, group=group_name)
+            assert sorted(group.arrays) == ["a", "b"]
+            assert group.metadata.attributes == {"title": "t"}
+        skipped = manifestgroup_from_kerchunk_refs(
+            refs, group="sub", skip_variables=["a"]
+        )
+        assert list(skipped.arrays) == ["b"]
+        with pytest.raises(ValueError, match='Group "missing/" not found'):
+            manifestgroup_from_kerchunk_refs(refs, group="missing")
+
+    def test_metadata_as_dictionaries(self):
+        # references built in memory may hold the metadata as dictionaries, not JSON text
+        from virtualizarr.parsers.kerchunk.translator import (
+            manifestgroup_from_kerchunk_refs,
+        )
+
+        refs = gen_ds_refs_zarr_v3()
+        refs["refs"] = {
+            key: ujson.loads(value) if key.endswith("zarr.json") else value
+            for key, value in refs["refs"].items()
+        }
+
+        assert list(manifestgroup_from_kerchunk_refs(refs).arrays) == ["a"]
+
+    @requires_kerchunk
+    def test_load_manifest(
+        self, tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_registry
+    ):
+        ref_filepath = tmp_path / "ref.json"
+        netcdf4_virtual_dataset.vz.to_kerchunk(
+            ref_filepath, format="json", zarr_format=3
+        )
+
+        manifest_store = KerchunkJSONParser()(
+            url=f"file://{ref_filepath.as_posix()}", registry=local_registry
+        )
+        with (
+            xr.open_dataset(
+                netcdf4_file,
+            ) as ds,
+            xr.open_dataset(
+                manifest_store,
+                engine="zarr",
+                consolidated=False,
+                zarr_format=3,
+            ).load() as manifest_ds,
+        ):
+            xrt.assert_identical(ds, manifest_ds)
+
+    @requires_kerchunk
+    def test_virtual_dataset_roundtrip(self, tmp_path, netcdf4_file, local_registry):
+        from virtualizarr.parsers import HDFParser
+
+        ref_filepath = tmp_path / "ref.json"
+        with open_virtual_dataset(
+            url=netcdf4_file,
+            registry=local_registry,
+            parser=HDFParser(),
+            loadable_variables=[],
+        ) as vds:
+            vds.vz.to_kerchunk(ref_filepath, format="json", zarr_format=3)
+            with open_virtual_dataset(
+                url=f"file://{ref_filepath.as_posix()}",
+                registry=local_registry,
+                parser=KerchunkJSONParser(),
+                loadable_variables=[],
+            ) as roundtripped:
+                xrt.assert_identical(roundtripped, vds)
+
+
 @requires_kerchunk
 def test_load_manifest(tmp_path, netcdf4_file, netcdf4_virtual_dataset, local_registry):
     refs = netcdf4_virtual_dataset.vz.to_kerchunk(format="dict")

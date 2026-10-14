@@ -226,6 +226,25 @@ def test_write_datatree_to_existing_groups_with_mode_a(
         np.testing.assert_equal(ds["bar"].data, arr * 2)
 
 
+def test_mode_a_raises_when_an_existing_array_has_different_codecs(
+    icechunk_filestore: "IcechunkStore", synthetic_vds, compressed_synthetic_vds
+):
+    synthetic_vds[0].vz.to_icechunk(icechunk_filestore)
+
+    with pytest.raises(ValueError, match="with different codecs\\."):
+        compressed_synthetic_vds[0].vz.to_icechunk(icechunk_filestore, mode="a")
+
+
+def test_mode_a_raises_when_an_existing_array_has_different_dimension_names(
+    icechunk_filestore: "IcechunkStore", synthetic_vds
+):
+    vds, _ = synthetic_vds
+    vds.vz.to_icechunk(icechunk_filestore)
+
+    with pytest.raises(ValueError, match="with different dimension_names\\."):
+        vds.rename({"x": "t"}).vz.to_icechunk(icechunk_filestore, mode="a")
+
+
 def test_set_single_virtual_ref_without_encoding(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",

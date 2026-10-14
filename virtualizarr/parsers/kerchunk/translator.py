@@ -18,7 +18,7 @@ from virtualizarr.manifests import (
     ManifestArray,
     ManifestGroup,
 )
-from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey
+from virtualizarr.manifests.manifest import ChunkEntry, ChunkKey, join
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.types.kerchunk import (
     KerchunkArrRefs,
@@ -125,6 +125,11 @@ def manifestgroup_from_kerchunk_refs(
     ManifestGroup
         ManifestGroup representation of the virtual chunk references.
     """
+    if _is_zarr_v3_refs(refs):
+        return _manifestgroup_from_zarr_v3_refs(
+            refs, group=group, fs_root=fs_root, skip_variables=skip_variables
+        )
+
     # both group=None and group='' mean to read root group
     if group:
         refs = extract_group(refs, group)
@@ -144,6 +149,99 @@ def manifestgroup_from_kerchunk_refs(
 
     manifestgroup = ManifestGroup(arrays=marrs, attributes=attributes)
     return manifestgroup
+
+
+def _is_zarr_v3_refs(refs: KerchunkStoreRefs) -> bool:
+    """Whether these references hold Zarr format 3 metadata, which is stored under ``zarr.json`` keys."""
+    return any(
+        key == "zarr.json" or key.endswith("/zarr.json") for key in refs["refs"].keys()
+    )
+
+
+def _decode_json_ref(value: str | bytes | dict) -> dict:
+    """Kerchunk stores metadata as JSON text, but references built in memory may hold dictionaries."""
+    return value if isinstance(value, dict) else ujson.loads(value)
+
+
+def _manifestgroup_from_zarr_v3_refs(
+    refs: KerchunkStoreRefs,
+    group: str | None = None,
+    fs_root: str | None = None,
+    skip_variables: Iterable[str] | None = None,
+) -> ManifestGroup:
+    """
+    Construct a ManifestGroup from kerchunk references that hold Zarr format 3 metadata.
+
+    Each group and array is described by one ``zarr.json`` reference, and chunk keys
+    follow the array's chunk key encoding (``c/0/0`` by default).
+    """
+    store_refs = refs["refs"]
+    prefix = f"{group.strip('/')}/" if group and group.strip("/") else ""
+
+    group_metadata_key = f"{prefix}zarr.json"
+    group_metadata = (
+        _decode_json_ref(store_refs[group_metadata_key])
+        if group_metadata_key in store_refs
+        else None
+    )
+    if group_metadata is None or group_metadata.get("node_type") != "group":
+        found_groups = [
+            key.removesuffix("zarr.json")
+            for key, value in store_refs.items()
+            if (key == "zarr.json" or key.endswith("/zarr.json"))
+            and _decode_json_ref(value).get("node_type") == "group"
+        ]
+        raise ValueError(f'Group "{prefix}" not found in {found_groups}')
+
+    skip = set(skip_variables or ())
+    marrs = {}
+    for key, value in store_refs.items():
+        # only arrays directly inside this group, i.e. "<prefix><name>/zarr.json"
+        name, _, rest = key.removeprefix(prefix).partition("/")
+        if not key.startswith(prefix) or rest != "zarr.json" or name in skip:
+            continue
+        array_metadata = _decode_json_ref(value)
+        if array_metadata.get("node_type") != "array":
+            continue
+        metadata = ArrayV3Metadata.from_dict(array_metadata)
+
+        array_prefix = f"{prefix}{name}/"
+        chunk_dict = {
+            # the manifest of a scalar array has a single entry, which kerchunk keys "0"
+            join(
+                _decode_chunk_key(metadata, chunk_key.removeprefix(array_prefix))
+                or (0,)
+            ): chunk_ref
+            for chunk_key, chunk_ref in store_refs.items()
+            if chunk_key.startswith(array_prefix) and chunk_key != key
+        }
+        marrs[name] = _manifestarray_from_chunk_dict(
+            chunk_dict, metadata, fs_root=fs_root
+        )
+
+    return ManifestGroup(arrays=marrs, attributes=group_metadata.get("attributes", {}))
+
+
+def _decode_chunk_key(metadata: ArrayV3Metadata, chunk_key: str) -> tuple[int, ...]:
+    """The grid indices of a chunk key, following the array's chunk key encoding."""
+    encoding = metadata.chunk_key_encoding.to_dict()
+    separator = cast(dict, encoding.get("configuration", {})).get("separator")
+    if encoding["name"] == "default":
+        separator = separator or "/"
+        if chunk_key == "c":
+            return ()
+        indices = chunk_key.removeprefix(f"c{separator}")
+    else:
+        separator = separator or "."
+        indices = chunk_key
+    if len(metadata.shape) == 0:
+        return ()
+    try:
+        return tuple(int(index) for index in indices.split(separator))
+    except ValueError as e:
+        raise ValueError(
+            f"Could not interpret {chunk_key!r} as a chunk key with the chunk key encoding {encoding}"
+        ) from e
 
 
 def extract_group(vds_refs: KerchunkStoreRefs, group: str) -> KerchunkStoreRefs:
@@ -197,6 +295,15 @@ def manifestarray_from_kerchunk_refs(
     # TODO probably need to update internals of this to use ArrayV3Metadata more neatly
     chunk_dict, metadata, zattrs = parse_array_refs(arr_refs)
     # we want to remove the _ARRAY_DIMENSIONS from the final variables' .attrs
+    return _manifestarray_from_chunk_dict(chunk_dict, metadata, fs_root=fs_root)
+
+
+def _manifestarray_from_chunk_dict(
+    chunk_dict: dict,
+    metadata: ArrayV3Metadata,
+    fs_root: str | None = None,
+) -> ManifestArray:
+    """Create a single ManifestArray from an array's metadata and its chunk references, keyed like ``"0.0"``."""
     if chunk_dict:
         chunk_grid_shape = determine_chunk_grid_shape(
             metadata.shape,

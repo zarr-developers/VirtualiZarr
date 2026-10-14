@@ -1,7 +1,7 @@
 # Custom parsers
 
 This page explains how to write a custom parser for VirtualiZarr, to extract chunk references from an archival data format not already supported by the main package.
-This is advanced material intended for 3rd-party developers, and assumes you have read the page on [Data Structures](data_structures.md).
+This is advanced material intended for 3rd-party developers, and assumes you have read the pages on [Data Structures](data_structures.md) and [the object store registry](registry.md).
 
 !!! note
     "Parsers" were previously known variously as "readers" or "backends" in older versions of VirtualiZarr.
@@ -214,7 +214,8 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
     2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
     3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
 
-    Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, HDF4, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
+    Nevertheless this approach is still used by VirtualiZarr internally for the HDF4 file format parser.
+    The netCDF3 and HDF5 parsers were originally written this way too, but have since been reimplemented natively.
 
 ## Fill values
 

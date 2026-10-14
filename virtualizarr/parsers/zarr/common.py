@@ -104,8 +104,14 @@ def join_url(base: str, key: str) -> str:
     """
     if not base:
         return key
+    key = key.lstrip("/")
+    _, sep, rest = base.partition("://")
+    if sep and not rest.strip("/"):
+        # base is a bare scheme root such as "file:///"; its slashes are URI syntax,
+        # not a trailing directory separator, so they must be kept intact
+        return base + key
     # strip trailing slash from base and leading slash from key to avoid '//' in middle
-    return base.rstrip("/") + "/" + key.lstrip("/")
+    return base.rstrip("/") + "/" + key
 
 
 def metadata_as_v3(metadata: ArrayV3Metadata | ArrayV2Metadata) -> ArrayV3Metadata:
