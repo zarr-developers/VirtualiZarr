@@ -2,10 +2,17 @@
 
 ## v2.8.0 (14th October 2026)
 
-The FITS and netCDF3 parsers have been reimplemented without an external dependency on `kerchunk` — `FITSParser` now exposes every data HDU and reads ASCII tables, and `NetCDF3Parser` supports CDF-5. As a result both parsers no longer accept `reader_options`, and the `netcdf3` extra is removed. Separately, zero-length chunk references are now rejected everywhere, by every `ChunkManifest` constructor. `HDFParser` is faster, reading each chunked dataset's chunk index once instead of three times, and gains support for variable-length strings, compound datasets, and (opt-in) HDF5 links and object references. `to_kerchunk` can write Zarr format 3 metadata, and `open_virtual_mfdataset` accepts configured executor instances.
+The FITS and netCDF3 parsers have been reimplemented without an external dependency on `kerchunk` — `FITSParser` now exposes every data HDU and reads ASCII tables, and `NetCDF3Parser` supports CDF-5. As a result both parsers no longer accept `reader_options`, and the `netcdf3` extra is removed. Separately, zero-length chunk references are now rejected everywhere, by every `ChunkManifest` constructor. A prototype `ENVIParser` reads ENVI raster files. `HDFParser` is faster, reading each chunked dataset's chunk index once instead of three times, and gains support for variable-length strings, compound datasets, and (opt-in) HDF5 links and object references. `to_kerchunk` can write Zarr format 3 metadata, and `open_virtual_mfdataset` accepts configured executor instances.
 
 ### New Features
 
+- Added a prototype `ENVIParser`, which reads ENVI raster files (flat binary data with a companion `.hdr` text
+  header). It supports BSQ, BIL and BIP interleave, all ENVI numeric dtypes, both byte orders, and whole-file gzip
+  compression. By default (`split_chunks_along_outer_axis=True`) it splits the data into one chunk per band (BSQ) or
+  line (BIL/BIP), so partial reads don't fetch the whole file; gzip-compressed files are always a single chunk. It
+  raises on header options it can't represent without rearranging bytes, such as non-"ENVI Standard" file types,
+  framed layouts, or a data file whose size doesn't match the header.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - [`open_virtual_mfdataset`][virtualizarr.open_virtual_mfdataset] now accepts an
   instantiated [`concurrent.futures.Executor`][] through the `parallel` kwarg, allowing
   callers to configure and reuse an executor. Executor classes remain supported
@@ -154,6 +161,20 @@ The FITS and netCDF3 parsers have been reimplemented without an external depende
 
 ### Documentation
 
+- New how-to guide, [HDF5 links and object references](../how_to/hdf5_links_references.md), for the
+  `links_and_references` option of `HDFParser`, and the `HDFParser` docstring now describes reference attributes.
+  Part of [#1124](https://github.com/zarr-developers/VirtualiZarr/issues/1124). By [Ben Dichter](https://github.com/bendichter).
+- Expanded the documentation homepage and removed a no-longer-needed warning suppression from the usage guide.
+  ([#1106](https://github.com/zarr-developers/VirtualiZarr/pull/1106)) By [Ian Hunt-Isaak](https://github.com/ianhi).
+- The README and documentation homepage now note kerchunk's maintenance status.
+  ([#1131](https://github.com/zarr-developers/VirtualiZarr/pull/1131)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Updated the scalability section of the FAQ with a performance comparison, and with Icechunk's ability to handle
+  over 7 billion virtual chunk references.
+  ([#1085](https://github.com/zarr-developers/VirtualiZarr/pull/1085)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Added `.bzip2` to the format tiers diagram.
+  ([#1083](https://github.com/zarr-developers/VirtualiZarr/pull/1083)) By [Tom Nicholas](https://github.com/TomNicholas).
+- Updated the PyPI development status to Production/Stable.
+  ([#1084](https://github.com/zarr-developers/VirtualiZarr/pull/1084)) By [Tom Nicholas](https://github.com/TomNicholas).
 - New explanation page, [The object store registry](../explanation/registry.md), covering why
   `open_virtual_dataset` needs a registry, which steps read through it, and how to set one up
   for cloud and local files. The Local tab in the usage guide now registers `"file:///"`, so
@@ -164,6 +185,11 @@ The FITS and netCDF3 parsers have been reimplemented without an external depende
 
 ### Internal changes
 
+- Tests now use the Chainguard MinIO image (`cgr.dev/chainguard/minio`), since MinIO no longer publishes images to
+  quay.io or Docker Hub, and use the non-deprecated `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` variables. Closes
+  [#1110](https://github.com/zarr-developers/VirtualiZarr/issues/1110). By [Tom Nicholas](https://github.com/TomNicholas).
+- Fixed an intermittent test deadlock caused by an `h5py.File` leaked from `test_cf_fill_value`, using a new
+  `open_hdf5` test helper. ([#1107](https://github.com/zarr-developers/VirtualiZarr/pull/1107)) By [Ian Hunt-Isaak](https://github.com/ianhi).
 - Made `test_manifest_repr` independent of the zarr version, since zarr 3.4 added `extra_fields` to the repr of `GroupMetadata`.
   By [Ben Dichter](https://github.com/bendichter).
 
