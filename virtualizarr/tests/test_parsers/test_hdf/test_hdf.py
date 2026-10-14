@@ -403,6 +403,23 @@ class TestLinks:
             "values_again": {"ref": {"node": "values"}},
         }
 
+    def test_hard_links_in_other_groups(self, tmp_path):
+        filepath = str(tmp_path / "hard.h5")
+        with h5py.File(filepath, "w") as f:
+            electrodes = f.create_group("general/electrodes")
+            electrodes["location"] = np.arange(2)
+            f["probe/electrodes"] = electrodes
+            f["electrodes"] = electrodes
+        group = _parse(f"file://{filepath}", links_and_references=True)._group
+        # The group is stored under the first of its names, /electrodes
+        assert sorted(group.groups["electrodes"].arrays) == ["location"]
+        for name in ["general", "probe"]:
+            member = group.groups[name]
+            assert sorted(member.groups) == []
+            assert member.metadata.attributes["links_references"]["links"] == {
+                "electrodes": {"ref": {"node": "../electrodes"}}
+            }
+
     def test_drop_variables_applies_to_links(self, links_hdf5_url):
         store = _parse(
             links_hdf5_url, links_and_references=True, drop_variables=["raw"]
