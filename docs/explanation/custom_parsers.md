@@ -214,7 +214,8 @@ You can therefore use a function which returns in-memory kerchunk JSON reference
     2. The Kerchunk package in general has a number of known bugs, often stemming from a lack of clear internal abstractions and specification,
     3. This lack of data model enforcement means that the dictionaries returned by different Kerchunk parsers sometimes follow inconsistent schemas ([for example](https://github.com/fsspec/kerchunk/issues/561)).
 
-    Nevertheless this approach is used by VirtualiZarr internally, at least for the FITS, netCDF3, HDF4, and the (since-deprecated-and-removed original implementation of the) HDF5 file format parsers.
+    Nevertheless this approach is still used by VirtualiZarr internally for the FITS and HDF4 file format parsers.
+    The netCDF3 and HDF5 parsers were originally written this way too, but have since been reimplemented natively.
 
 ## Fill values
 

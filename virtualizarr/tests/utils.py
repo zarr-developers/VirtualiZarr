@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import weakref
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -14,6 +17,25 @@ from virtualizarr.parsers import HDFParser
 # The realpath call is there to resolve any symbolic links, such as from /var/ to /private/var/ on MacOS, as Icechunk needs the entire URL prefix without symlinks.
 # Icechunk also needs the final / to create VirtualChunkContainers.
 PYTEST_TMP_DIRECTORY_URL_PREFIX = f"file://{os.path.realpath(tempfile.gettempdir())}/"
+
+
+@contextmanager
+def open_hdf5(path: str | Path, mode: str = "r") -> Iterator:
+    """Open an HDF5 file with h5py, yielding a weak proxy to the file.
+
+    The proxy stops working once the block exits, so the caller's name does not
+    keep the file alive afterwards. That matters when a test then raises (e.g.
+    ``pytest.xfail``): the traceback keeps the test's frame alive in a reference
+    cycle, and h5py objects left for the cyclic garbage collector can be freed on
+    a thread that deadlocks against h5py's global lock (e.g. zarr's IO thread
+    during kerchunk's ``SingleHdf5ToZarr.translate``). Child objects such as
+    datasets are not proxied, so read what you need inside the block instead of
+    binding them to names.
+    """
+    import h5py
+
+    with h5py.File(path, mode) as f:
+        yield weakref.proxy(f)
 
 
 def obstore_local(url: str) -> ObjectStore:
