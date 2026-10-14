@@ -404,8 +404,12 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        num_chunks = dsid.get_num_chunks()
-        if num_chunks == 0:
+        if callable(getattr(dsid, "chunk_iter", None)):
+            chunk_infos = []
+            dsid.chunk_iter(chunk_infos.append)
+        else:
+            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
+        if not chunk_infos:
             chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
         else:
             grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
@@ -429,12 +433,8 @@ def _dataset_chunk_manifest(
                 offsets[key] = blob.byte_offset
                 lengths[key] = trimmed_length if trimmed else blob.size
 
-            has_chunk_iter = callable(getattr(dsid, "chunk_iter", None))
-            if has_chunk_iter:
-                dsid.chunk_iter(add_chunk_info)
-            else:
-                for index in range(num_chunks):
-                    add_chunk_info(dsid.get_chunk_info(index))
+            for chunk_info in chunk_infos:
+                add_chunk_info(chunk_info)
 
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=paths,  # type: ignore
