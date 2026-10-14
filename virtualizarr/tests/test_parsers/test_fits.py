@@ -13,9 +13,7 @@ pytestmark = requires_astropy
 
 
 def _registry(url: str) -> ObjectStoreRegistry:
-    registry = ObjectStoreRegistry()
-    registry.register(url, obstore_local(url=url))
-    return registry
+    return ObjectStoreRegistry({url: obstore_local(url=url)})
 
 
 @pytest.fixture
