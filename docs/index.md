@@ -1,6 +1,14 @@
 # VirtualiZarr
 
-**Create virtual Zarr stores for cloud-friendly access to archival data, using familiar xarray syntax.**
+**Create virtual Zarr stores for cloud-friendly access to netCDF, HDF5, GRIB, TIFF and other formats, using familiar Xarray syntax.**
+
+VirtualiZarr does three things.
+
+1. **Assembles many files into a hypercube**, combining them into one dataset and checking that the result is valid Zarr.
+2. **Reads files on the fly** as though they were Zarr, using zarr-python or Xarray.
+3. **Persists the result to Icechunk**, so anyone can open it with Zarr or Xarray from then on.
+
+See [How it works](#how-it-works) for more on each.
 
 The best way to distribute large scientific datasets is via the Cloud, in [Cloud-Optimized formats](https://guide.cloudnativegeo.org/) [^1]. But often this data is stuck in archival pre-Cloud file formats such as netCDF.
 
@@ -19,6 +27,26 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 * [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger store using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html),
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
+
+## How it works
+
+### Assembling a hypercube
+
+A parser reads each file and maps it onto Zarr: its arrays, its metadata, and where every chunk lives.
+VirtualiZarr has parsers for [many formats](explanation/faq.md#can-my-file-format-be-virtualized).
+You then combine the files into one dataset using [Xarray's combining logic](how_to/usage.md#combining-virtual-datasets), which matches variables and dimensions by name and checks that the files line up.
+On top of that, VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
+
+### Reading on the fly
+
+Some files are already cloud-optimized, such as cloud-optimized GeoTIFFs, so they don't need rewriting, but your tools may only work with Zarr.
+When VirtualiZarr parses a file, it creates a Zarr store that reads from that file, so zarr-python and Xarray can load its data directly, without persisting anything first (see [Reading data from the `ManifestStore`](explanation/custom_parsers.md#reading-data-from-the-manifeststore)).
+
+### Persisting to Icechunk
+
+Writing the combined dataset to [Icechunk](https://icechunk.io/) lets you, or anyone else, reopen it later with zarr-python, without VirtualiZarr or Xarray in the read path.
+Xarray users can open it with [xarray.open_zarr][].
+The work of parsing and assembling the dataset only has to happen once, and every later read benefits from it (see [Writing to an Icechunk Store](how_to/usage.md#writing-to-an-icechunk-store)).
 
 ## Inspired by Kerchunk
 
@@ -40,18 +68,6 @@ from obspec_utils.registry import ObjectStoreRegistry
 
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 from virtualizarr.parsers import HDFParser
-```
-
-Zarr can emit a lot of warnings about Numcodecs not being including in the Zarr version 3
-specification yet -- let's suppress those.
-
-```python exec="on" source="above" session="homepage"
-import warnings
-warnings.filterwarnings(
-  "ignore",
-  message="Numcodecs codecs are not in the Zarr version 3 specification*",
-  category=UserWarning
-)
 ```
 
 ```python exec="on" session="homepage"
