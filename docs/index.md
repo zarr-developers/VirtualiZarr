@@ -8,7 +8,7 @@ VirtualiZarr does three things.
     - **Parsing** maps each file onto Zarr: its arrays, its metadata, and where every chunk lives.
     - **Combining** merges the parsed files into one dataset and checks that the result is valid Zarr.
 2. **Reads files on the fly** as though they were Zarr, using zarr-python or Xarray.
-3. **Persists the result to Icechunk**, so anyone can open it with Zarr or Xarray from then on.
+3. **Persists the result to Icechunk**, so anyone can open it using only Zarr and Icechunk from then on, without installing VirtualiZarr.
 
 See [How it works](#how-it-works) for more on each.
 
