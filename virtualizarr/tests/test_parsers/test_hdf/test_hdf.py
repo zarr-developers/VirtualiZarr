@@ -10,7 +10,7 @@ from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION
+from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION, REF_CONVENTION
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -126,6 +126,13 @@ class TestDatasetToManifestArray:
         manifest_store = manifest_store_from_hdf_url(string_attributes_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
         assert metadata.attributes["attribute_name"] == "attribute_name"
+
+    def test_bytes_array_attributes(self, bytes_attributes_hdf5_url):
+        manifest_store = manifest_store_from_hdf_url(bytes_attributes_hdf5_url)
+        attributes = manifest_store._group.arrays["data"].metadata.attributes
+        assert attributes["character_array"] == ["2", "0", "4", "2"]
+        assert attributes["array"] == ["first", "second"]
+        assert attributes["array_2d"] == [["a", "b"], ["c", "d"]]
 
     def test_scalar_fill_value(self, scalar_fill_value_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(scalar_fill_value_hdf5_url)
@@ -341,6 +348,208 @@ class TestObjectReferences:
         with pytest.raises(NotImplementedError) as error:
             _parse(f"file://{filepath}", links_and_references=True)
         assert "links_and_references" not in str(error.value)
+
+
+@pytest.fixture
+def links_hdf5_url(tmp_path) -> str:
+    with h5py.File(tmp_path / "other.h5", "w") as other:
+        other["acquisition/raw"] = np.arange(4)
+    filepath = str(tmp_path / "links.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        f.create_group("general/devices/probe")
+        g = f.create_group("general/extracellular_ephys/g")
+        g["device"] = h5py.SoftLink("/general/devices/probe")
+        g["data"] = h5py.SoftLink("/values")
+        g.create_group("child")["inner"] = np.arange(2)
+        g["inner_alias"] = h5py.SoftLink("child/inner")  # relative to g
+        g["dangling"] = h5py.SoftLink("/nowhere")
+        f["raw"] = h5py.ExternalLink("other.h5", "/acquisition/raw")
+        f["values_again"] = f["values"]  # a second hard link
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def compound_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "compound.h5")
+    with h5py.File(filepath, "w") as f:
+        f["values"] = np.arange(3.0)
+        with_references = np.dtype(
+            [
+                ("idx_start", "<i4"),
+                ("count", "<i4"),
+                ("label", h5py.string_dtype()),
+                ("timeseries", h5py.ref_dtype),
+            ]
+        )
+        f.create_dataset(
+            "rows",
+            data=np.array(
+                [
+                    (0, 3, "é one", f["values"].ref),
+                    (3, 2, "two", h5py.Reference()),
+                    (5, 1, "", f["values"].ref),
+                ],
+                dtype=with_references,
+            ),
+            chunks=(2,),
+        )
+        strings_only = np.dtype([("id", "<i8"), ("name", h5py.string_dtype())])
+        f.create_dataset(
+            "names", data=np.array([(1, "a"), (2, "bcd")], dtype=strings_only)
+        )
+        f.create_dataset(
+            "scalar", data=np.array((7, "seven"), dtype=strings_only), shape=()
+        )
+        numeric = np.dtype([("a", "<i4"), ("b", "<f8")])
+        f.create_dataset("numeric", data=np.array([(1, 2.0), (3, 4.0)], dtype=numeric))
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestLinks:
+    def test_links_are_copied_by_default(self, tmp_path):
+        filepath = str(tmp_path / "soft.h5")
+        with h5py.File(filepath, "w") as f:
+            f["values"] = np.arange(3.0)
+            f["alias"] = h5py.SoftLink("/values")
+        group = _parse(f"file://{filepath}")._group
+        assert sorted(group.arrays) == ["alias", "values"]
+        assert "links_references" not in group.metadata.attributes
+
+    def test_links_are_recorded(self, links_hdf5_url):
+        group = _parse(links_hdf5_url, links_and_references=True)._group
+        g = group.groups["general"].groups["extracellular_ephys"].groups["g"]
+        assert sorted(g.arrays) == []
+        assert sorted(g.groups) == ["child"]
+        assert g.metadata.attributes["links_references"] == {
+            "links": {
+                "device": {"ref": {"node": "../../devices/probe"}},
+                "data": {"ref": {"node": "../../../values"}},
+                "inner_alias": {"ref": {"node": "child/inner"}},
+                "dangling": {"ref": {"node": "../../../nowhere"}},
+            }
+        }
+        assert g.metadata.attributes["zarr_conventions"] == [
+            LINKS_REFERENCES_CONVENTION,
+            REF_CONVENTION,
+        ]
+
+    def test_external_and_hard_links(self, links_hdf5_url):
+        group = _parse(links_hdf5_url, links_and_references=True)._group
+        assert sorted(group.arrays) == ["values"]
+        directory = links_hdf5_url.rpartition("/")[0]
+        assert group.metadata.attributes["links_references"]["links"] == {
+            "raw": {
+                "ref": {"uri": f"{directory}/other.h5", "node": "/acquisition/raw"}
+            },
+            "values_again": {"ref": {"node": "values"}},
+        }
+
+    def test_hard_links_in_other_groups(self, tmp_path):
+        filepath = str(tmp_path / "hard.h5")
+        with h5py.File(filepath, "w") as f:
+            electrodes = f.create_group("general/electrodes")
+            electrodes["location"] = np.arange(2)
+            f["probe/electrodes"] = electrodes
+            f["electrodes"] = electrodes
+        group = _parse(f"file://{filepath}", links_and_references=True)._group
+        # The group is stored under the first of its names, /electrodes
+        assert sorted(group.groups["electrodes"].arrays) == ["location"]
+        for name in ["general", "probe"]:
+            member = group.groups[name]
+            assert sorted(member.groups) == []
+            assert member.metadata.attributes["links_references"]["links"] == {
+                "electrodes": {"ref": {"node": "../electrodes"}}
+            }
+
+    def test_drop_variables_applies_to_links(self, links_hdf5_url):
+        store = _parse(
+            links_hdf5_url, links_and_references=True, drop_variables=["raw"]
+        )
+        links = store._group.metadata.attributes["links_references"]["links"]
+        assert "raw" not in links
+
+    def test_links_read_through_zarr(self, links_hdf5_url):
+        store = _parse(links_hdf5_url, links_and_references=True)
+        root = zarr.open_group(store, mode="r", zarr_format=3)
+        attrs = root["general/extracellular_ephys/g"].attrs
+        assert attrs["links_references"]["links"]["device"] == {
+            "ref": {"node": "../../devices/probe"}
+        }
+        np.testing.assert_array_equal(root["values"][...], np.arange(3.0))
+
+
+@pytest.mark.parametrize(
+    "filepath, filename, expected",
+    [
+        ("file:///data/a.h5", "b.h5", "file:///data/b.h5"),
+        ("file:///data/x/a.h5", "../b.h5", "file:///data/b.h5"),
+        ("s3://bucket/dir/a.nwb", "sub/b.nwb", "s3://bucket/dir/sub/b.nwb"),
+        ("s3://bucket/dir/a.nwb", "/abs/b.nwb", "file:///abs/b.nwb"),
+        ("file:///data/a.h5", "https://example.org/b.h5", "https://example.org/b.h5"),
+    ],
+)
+def test_resolve_external(filepath, filename, expected):
+    from virtualizarr.parsers.hdf.hdf import _resolve_external
+
+    assert _resolve_external(filepath, filename) == expected
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestCompoundObjectFields:
+    def test_reference_fields_need_the_flag(self, compound_hdf5_url):
+        with pytest.raises(NotImplementedError, match="links_and_references=True"):
+            _parse(compound_hdf5_url)
+
+    def test_strings_and_references(self, compound_hdf5_url):
+        store = _parse(compound_hdf5_url, links_and_references=True)
+        rows = zarr.open_group(store, mode="r", zarr_format=3)["rows"]
+        assert rows.dtype == np.dtype(
+            [
+                ("idx_start", "<i4"),
+                ("count", "<i4"),
+                ("label", "<U5"),
+                ("timeseries", "<U9"),
+            ]
+        )
+        assert rows[...].tolist() == [
+            (0, 3, "é one", "../values"),
+            (3, 2, "two", ""),
+            (5, 1, "", "../values"),
+        ]
+        marr = store._group.arrays["rows"]
+        attributes = marr.metadata.attributes
+        assert attributes["links_references"] == {"references": ["timeseries"]}
+        assert attributes["zarr_conventions"] == [LINKS_REFERENCES_CONVENTION]
+        assert len(marr.manifest._inlined) == 2  # 3 rows in chunks of 2
+
+    def test_string_fields_without_the_flag(self, tmp_path):
+        filepath = str(tmp_path / "names.h5")
+        with h5py.File(filepath, "w") as f:
+            dtype = np.dtype([("id", "<i8"), ("name", h5py.string_dtype())])
+            f.create_dataset(
+                "names", data=np.array([(1, "a"), (2, "bcd")], dtype=dtype)
+            )
+            f.create_dataset(
+                "scalar", data=np.array((7, "seven"), dtype=dtype), shape=()
+            )
+        store = _parse(f"file://{filepath}")
+        root = zarr.open_group(store, mode="r", zarr_format=3)
+        assert root["names"][...].tolist() == [(1, "a"), (2, "bcd")]
+        assert root["scalar"][()].tolist() == (7, "seven")
+        assert (
+            "links_references" not in store._group.arrays["names"].metadata.attributes
+        )
+
+    def test_numeric_compound_is_still_referenced(self, compound_hdf5_url):
+        store = _parse(compound_hdf5_url, links_and_references=True)
+        marr = store._group.arrays["numeric"]
+        assert not marr.manifest._inlined
+        numeric = zarr.open_group(store, mode="r", zarr_format=3)["numeric"]
+        assert numeric[...].tolist() == [(1, 2.0), (3, 4.0)]
 
 
 @requires_hdf5plugin
