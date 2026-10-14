@@ -3,7 +3,8 @@ from __future__ import annotations
 import warnings
 from collections.abc import AsyncGenerator, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Optional, TypeAlias
 from urllib.parse import urlparse
 
 from obspec_utils.registry import ObjectStoreRegistry
@@ -22,6 +23,7 @@ from virtualizarr.manifests.group import ManifestGroup
 from virtualizarr.manifests.utils import manifest_chunk_shape, parse_manifest_index
 
 if TYPE_CHECKING:
+    from icechunk import IcechunkStore  # type: ignore[import-not-found]
     from obstore.store import (
         ObjectStore,
     )
@@ -354,6 +356,76 @@ class ManifestStore(Store):
         )
         _warn_about_oversized_virtual_chunks(vds)
         return vds
+
+    def to_icechunk(
+        self,
+        store: "IcechunkStore",
+        *,
+        group: Optional[str] = None,
+        mode: Optional[Literal["w", "w-", "a"]] = None,
+        validate_containers: bool = True,
+        last_updated_at: Optional[datetime] = None,
+    ) -> None:
+        """
+        Write the contents of this store to an Icechunk store, without going via xarray.
+
+        Each array and group is written with the Zarr metadata it holds (dimension names,
+        attributes, codecs and fill value). This can write structures an xarray Dataset
+        can't hold, such as arrays without dimension names, or sibling arrays that share a
+        dimension name at different lengths.
+
+        Both `icechunk` and `zarr` (v3) must be installed.
+
+        Parameters
+        ----------
+        store
+            Store to write to, which must not be read-only.
+        group
+            Path to the group in which to write this store's root group, defaulting to the
+            root group.
+        mode
+            How to handle pre-existing groups at the target paths:
+
+            - ``"w-"`` or ``None`` (default): create each group, raising a
+              ``ContainsGroupError`` if it already exists.
+            - ``"w"``: create each group, overwriting any existing contents at that path.
+            - ``"a"``: open each group if it exists (keeping existing arrays), otherwise create it.
+              An existing array of the same name must have the same metadata apart from
+              attributes, otherwise a ``ValueError`` is raised. Every array is checked
+              before any is written, so on this error nothing is written. The new
+              references are written over the existing ones.
+        validate_containers
+            If ``True``, raise if any virtual chunks refer to locations that don't
+            match any existing virtual chunk container set on this Icechunk repository.
+
+            It is not generally recommended to set this to ``False``, because it can lead to
+            confusing runtime results and errors when reading data back.
+        last_updated_at
+            The time at which the virtual references were last updated. When specified, if
+            any of the virtual chunks written in this session are modified in storage after
+            this time, icechunk will raise an error at runtime when trying to read the
+            virtual chunk. When not specified, icechunk will not check for modifications to
+            the virtual chunks at runtime.
+
+        Raises
+        ------
+        ValueError
+            If the store is read-only, ``mode`` is invalid, a virtual chunk refers to a
+            location without a virtual chunk container (when ``validate_containers`` is set),
+            or ``mode="a"`` would write over an existing array with different metadata.
+        TypeError
+            If an argument has the wrong type.
+        zarr.errors.ContainsGroupError
+            If a group already exists and ``mode`` is ``"w-"`` or ``None``, or if
+            ``mode="a"`` and a group exists where an array would be written.
+        """
+        self._group.to_icechunk(
+            store,
+            group=group,
+            mode=mode,
+            validate_containers=validate_containers,
+            last_updated_at=last_updated_at,
+        )
 
     def to_virtual_datatree(
         self,
