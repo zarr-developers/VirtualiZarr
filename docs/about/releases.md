@@ -8,6 +8,10 @@
 
 ### Bug fixes
 
+- `HDFParser` gives an HDF5 dataset with no stored chunks a chunk grid of the right shape, rather than one chunk per
+  element. Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Documentation
 
 ### Internal changes

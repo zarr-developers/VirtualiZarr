@@ -29,7 +29,7 @@ from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import soft_import
+from virtualizarr.utils import determine_chunk_grid_shape, soft_import
 
 h5py = soft_import("h5py", "reading hdf files", strict=False)
 
@@ -518,9 +518,10 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
+    grid_shape = determine_chunk_grid_shape(dataset.shape, chunks)
     if dataset.chunks is None:
         if dsid.get_offset() is None:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+            chunk_manifest = ChunkManifest(entries={}, shape=grid_shape)
         elif dataset.shape == ():
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
@@ -544,9 +545,8 @@ def _dataset_chunk_manifest(
         else:
             chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
         if not chunk_infos:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+            chunk_manifest = ChunkManifest(entries={}, shape=grid_shape)
         else:
-            grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
             paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
             offsets = np.empty(grid_shape, dtype=np.uint64)
             lengths = np.empty(grid_shape, dtype=np.uint64)
@@ -626,8 +626,9 @@ def _inlined_vlen_string_manifest(
     from numcodecs.vlen import VLenUTF8
 
     shape = dataset.shape
+    grid_shape = determine_chunk_grid_shape(shape, chunks)
     if dataset.size == 0 or dataset.id.get_storage_size() == 0:
-        return ChunkManifest(entries={}, shape=shape)
+        return ChunkManifest(entries={}, shape=grid_shape)
 
     codec = VLenUTF8()
     if read is None:
@@ -637,7 +638,6 @@ def _inlined_vlen_string_manifest(
             return strings[region]
 
     pad = "" if fill_value is None else fill_value
-    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
     inlined: dict[tuple[int, ...], bytes] = {}
     for index in np.ndindex(grid_shape):
         region = tuple(
@@ -774,9 +774,9 @@ def _inlined_array_manifest(
     writing.
     """
     shape = values.shape
+    grid_shape = determine_chunk_grid_shape(shape, chunks)
     if values.size == 0:
-        return ChunkManifest(entries={}, shape=shape)
-    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
+        return ChunkManifest(entries={}, shape=grid_shape)
     inlined: dict[tuple[int, ...], bytes] = {}
     for index in np.ndindex(grid_shape):
         region = tuple(
