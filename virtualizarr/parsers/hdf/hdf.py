@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import math
+import operator
 import posixpath
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -23,13 +24,17 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
+from virtualizarr.manifests.manifest import (
+    INLINED_CHUNK_PATH,
+    MISSING_CHUNK_PATH,
+    validate_and_normalize_path_to_uri,
+)
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
-from virtualizarr.utils import soft_import
+from virtualizarr.utils import determine_chunk_grid_shape, soft_import
 
 h5py = soft_import("h5py", "reading hdf files", strict=False)
 
@@ -296,6 +301,12 @@ def _construct_manifest_group(
     """
     import h5py
 
+    if not hasattr(h5py.h5d.DatasetID, "chunk_iter"):
+        raise RuntimeError(
+            "HDFParser needs h5py >= 3.13, whose HDF5 provides H5Dchunk_iter, but "
+            f"h5py {h5py.version.version} uses HDF5 {h5py.version.hdf5_version}."
+        )
+
     with h5py.File(reader, mode="r") as f:
         if not isinstance(g := f.get(group or "/"), h5py.Group):
             raise ValueError(f"Group {group!r} is not an HDF Group")
@@ -518,9 +529,10 @@ def _dataset_chunk_manifest(
         A Virtualizarr ChunkManifest
     """
     dsid = dataset.id
+    grid_shape = determine_chunk_grid_shape(dataset.shape, chunks)
     if dataset.chunks is None:
         if dsid.get_offset() is None:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
+            chunk_manifest = ChunkManifest(entries={}, shape=grid_shape)
         elif dataset.shape == ():
             chunk_manifest = ChunkManifest.from_arrays(
                 paths=np.array(filepath, dtype=np.dtypes.StringDType),  # type: ignore
@@ -538,43 +550,35 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        if callable(getattr(dsid, "chunk_iter", None)):
-            chunk_infos: list = []
-            dsid.chunk_iter(chunk_infos.append)
-        else:
-            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
-        if not chunk_infos:
-            chunk_manifest = ChunkManifest(entries={}, shape=dataset.shape)
-        else:
-            grid_shape = tuple(math.ceil(a / b) for a, b in zip(dataset.shape, chunks))
-            paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
-            offsets = np.empty(grid_shape, dtype=np.uint64)
-            lengths = np.empty(grid_shape, dtype=np.uint64)
+        paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
+        offsets = np.zeros(grid_shape, dtype=np.uint64)
+        lengths = np.zeros(grid_shape, dtype=np.uint64)
 
-            # When an oversized chunk has been trimmed the stored chunk holds
-            # more bytes than the in-bounds region, so use the trimmed chunk's
-            # byte size (valid because the trimmed region is a contiguous prefix
-            # of an unfiltered chunk - see _chunk_shape) rather than blob.size.
-            trimmed = chunks != dataset.chunks
-            trimmed_length = math.prod(chunks) * dataset.dtype.itemsize
+        def add_chunk_info(blob):
+            key = tuple(map(operator.floordiv, blob.chunk_offset, chunks))
+            offsets[key] = blob.byte_offset
+            lengths[key] = blob.size
 
-            def get_key(blob):
-                return tuple(a // b for a, b in zip(blob.chunk_offset, chunks))
+        dsid.chunk_iter(add_chunk_info)
 
-            def add_chunk_info(blob):
-                key = get_key(blob)
-                paths[key] = filepath
-                offsets[key] = blob.byte_offset
-                lengths[key] = trimmed_length if trimmed else blob.size
+        # When an oversized chunk has been trimmed the stored chunk holds
+        # more bytes than the in-bounds region, so use the trimmed chunk's
+        # byte size. `chunks` comes from _chunk_shape, which only trims an
+        # unfiltered chunk along its leading dimension, so the in-bounds region
+        # is a contiguous prefix of each stored chunk. Every chunk has the same
+        # trimmed shape, so they all get the same length.
+        if chunks != dataset.chunks:
+            lengths[lengths != 0] = math.prod(chunks) * dataset.dtype.itemsize
 
-            for chunk_info in chunk_infos:
-                add_chunk_info(chunk_info)
-
-            chunk_manifest = ChunkManifest.from_arrays(
-                paths=paths,  # type: ignore
-                offsets=offsets,
-                lengths=lengths,
-            )
+        # Every chunk here is in the same file, so its path only needs validating once.
+        paths[...] = validate_and_normalize_path_to_uri(filepath)
+        paths[lengths == 0] = MISSING_CHUNK_PATH
+        chunk_manifest = ChunkManifest.from_arrays(
+            paths=paths,  # type: ignore
+            offsets=offsets,
+            lengths=lengths,
+            validate_paths=False,
+        )
     return chunk_manifest
 
 
@@ -626,8 +630,9 @@ def _inlined_vlen_string_manifest(
     from numcodecs.vlen import VLenUTF8
 
     shape = dataset.shape
+    grid_shape = determine_chunk_grid_shape(shape, chunks)
     if dataset.size == 0 or dataset.id.get_storage_size() == 0:
-        return ChunkManifest(entries={}, shape=shape)
+        return ChunkManifest(entries={}, shape=grid_shape)
 
     codec = VLenUTF8()
     if read is None:
@@ -637,7 +642,6 @@ def _inlined_vlen_string_manifest(
             return strings[region]
 
     pad = "" if fill_value is None else fill_value
-    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
     inlined: dict[tuple[int, ...], bytes] = {}
     for index in np.ndindex(grid_shape):
         region = tuple(
@@ -774,9 +778,9 @@ def _inlined_array_manifest(
     writing.
     """
     shape = values.shape
+    grid_shape = determine_chunk_grid_shape(shape, chunks)
     if values.size == 0:
-        return ChunkManifest(entries={}, shape=shape)
-    grid_shape = tuple(math.ceil(s / c) for s, c in zip(shape, chunks))
+        return ChunkManifest(entries={}, shape=grid_shape)
     inlined: dict[tuple[int, ...], bytes] = {}
     for index in np.ndindex(grid_shape):
         region = tuple(
@@ -932,7 +936,7 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if type(obj) is h5py.Dataset and name in dimension_names:
             # chunk_iter stops at the first callback that returns non-None, so
             # this reads only the path to the first chunk, not the whole index.
-            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+            if obj.chunks is not None:
                 stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
             else:
                 stores_no_data = obj.id.get_storage_size() == 0

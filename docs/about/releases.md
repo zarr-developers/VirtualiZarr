@@ -4,9 +4,23 @@
 
 ### New Features
 
+### Performance
+
+- `HDFParser` builds chunk manifests faster and with less memory: it no longer keeps a Python object per chunk, and
+  validates a dataset's file path once instead of once per chunk. Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
+- `HDFParser` now requires h5py >= 3.13, and raises a `RuntimeError` if h5py was built against an HDF5 without
+  `chunk_iter`.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Bug fixes
+
+- `HDFParser` gives an HDF5 dataset with no stored chunks a chunk grid of the right shape, rather than one chunk per
+  element. Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Documentation
 
