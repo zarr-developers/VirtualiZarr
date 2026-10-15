@@ -296,6 +296,12 @@ def _construct_manifest_group(
     """
     import h5py
 
+    if not hasattr(h5py.h5d.DatasetID, "chunk_iter"):
+        raise RuntimeError(
+            "HDFParser needs h5py >= 3.13, whose HDF5 provides H5Dchunk_iter, but "
+            f"h5py {h5py.version.version} uses HDF5 {h5py.version.hdf5_version}."
+        )
+
     with h5py.File(reader, mode="r") as f:
         if not isinstance(g := f.get(group or "/"), h5py.Group):
             raise ValueError(f"Group {group!r} is not an HDF Group")
@@ -539,11 +545,8 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        if callable(getattr(dsid, "chunk_iter", None)):
-            chunk_infos: list = []
-            dsid.chunk_iter(chunk_infos.append)
-        else:
-            chunk_infos = [dsid.get_chunk_info(i) for i in range(dsid.get_num_chunks())]
+        chunk_infos: list = []
+        dsid.chunk_iter(chunk_infos.append)
         if not chunk_infos:
             chunk_manifest = ChunkManifest(entries={}, shape=grid_shape)
         else:
@@ -932,7 +935,7 @@ def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
         if type(obj) is h5py.Dataset and name in dimension_names:
             # chunk_iter stops at the first callback that returns non-None, so
             # this reads only the path to the first chunk, not the whole index.
-            if obj.chunks is not None and callable(getattr(obj.id, "chunk_iter", None)):
+            if obj.chunks is not None:
                 stores_no_data = obj.id.chunk_iter(lambda chunk: True) is None
             else:
                 stores_no_data = obj.id.get_storage_size() == 0

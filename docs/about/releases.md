@@ -6,6 +6,10 @@
 
 ### Breaking changes
 
+- `HDFParser` now requires h5py >= 3.13, and raises a `RuntimeError` if h5py was built against an HDF5 without
+  `chunk_iter`.
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Bug fixes
 
 - `HDFParser` gives an HDF5 dataset with no stored chunks a chunk grid of the right shape, rather than one chunk per
