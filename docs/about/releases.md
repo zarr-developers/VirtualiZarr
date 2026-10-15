@@ -4,6 +4,12 @@
 
 ### New Features
 
+### Performance
+
+- `HDFParser` no longer keeps a Python object per chunk while building a manifest, which lowers its peak memory.
+  Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
+  By [Ian Hunt-Isaak](https://github.com/ianhi).
+
 ### Breaking changes
 
 - `HDFParser` now requires h5py >= 3.13, and raises a `RuntimeError` if h5py was built against an HDF5 without

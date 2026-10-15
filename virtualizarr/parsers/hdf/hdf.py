@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import math
+import operator
 import posixpath
 from pathlib import Path, PurePosixPath
 from typing import (
@@ -23,7 +24,7 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
+from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH, MISSING_CHUNK_PATH
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
@@ -545,39 +546,33 @@ def _dataset_chunk_manifest(
             chunk_entries = {chunk_key: chunk_entry}
             chunk_manifest = ChunkManifest(entries=chunk_entries)
     else:
-        chunk_infos: list = []
-        dsid.chunk_iter(chunk_infos.append)
-        if not chunk_infos:
-            chunk_manifest = ChunkManifest(entries={}, shape=grid_shape)
-        else:
-            paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
-            offsets = np.empty(grid_shape, dtype=np.uint64)
-            lengths = np.empty(grid_shape, dtype=np.uint64)
+        paths = np.empty(grid_shape, dtype=np.dtypes.StringDType)
+        offsets = np.zeros(grid_shape, dtype=np.uint64)
+        lengths = np.zeros(grid_shape, dtype=np.uint64)
 
-            # When an oversized chunk has been trimmed the stored chunk holds
-            # more bytes than the in-bounds region, so use the trimmed chunk's
-            # byte size (valid because the trimmed region is a contiguous prefix
-            # of an unfiltered chunk - see _chunk_shape) rather than blob.size.
-            trimmed = chunks != dataset.chunks
-            trimmed_length = math.prod(chunks) * dataset.dtype.itemsize
+        def add_chunk_info(blob):
+            key = tuple(map(operator.floordiv, blob.chunk_offset, chunks))
+            offsets[key] = blob.byte_offset
+            lengths[key] = blob.size
 
-            def get_key(blob):
-                return tuple(a // b for a, b in zip(blob.chunk_offset, chunks))
+        dsid.chunk_iter(add_chunk_info)
 
-            def add_chunk_info(blob):
-                key = get_key(blob)
-                paths[key] = filepath
-                offsets[key] = blob.byte_offset
-                lengths[key] = trimmed_length if trimmed else blob.size
+        # When an oversized chunk has been trimmed the stored chunk holds
+        # more bytes than the in-bounds region, so use the trimmed chunk's
+        # byte size. `chunks` comes from _chunk_shape, which only trims an
+        # unfiltered chunk along its leading dimension, so the in-bounds region
+        # is a contiguous prefix of each stored chunk. Every chunk has the same
+        # trimmed shape, so they all get the same length.
+        if chunks != dataset.chunks:
+            lengths[lengths != 0] = math.prod(chunks) * dataset.dtype.itemsize
 
-            for chunk_info in chunk_infos:
-                add_chunk_info(chunk_info)
-
-            chunk_manifest = ChunkManifest.from_arrays(
-                paths=paths,  # type: ignore
-                offsets=offsets,
-                lengths=lengths,
-            )
+        paths[...] = filepath
+        paths[lengths == 0] = MISSING_CHUNK_PATH
+        chunk_manifest = ChunkManifest.from_arrays(
+            paths=paths,  # type: ignore
+            offsets=offsets,
+            lengths=lengths,
+        )
     return chunk_manifest
 
 
