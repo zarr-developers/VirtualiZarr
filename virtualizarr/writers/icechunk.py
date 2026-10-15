@@ -72,7 +72,8 @@ def virtual_dataset_to_icechunk(
     append_dim: Optional[str] = None,
     region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
     validate_containers: bool = True,
-    last_updated_at: Optional[datetime] = None,
+    last_updated_at: datetime | None = None,
+    etag: str | None = None,
 ) -> None:
     """
     Write an virtual xarray dataset to an Icechunk store.
@@ -119,7 +120,14 @@ def virtual_dataset_to_icechunk(
         of the virtual chunks written in this session are modified in storage after this
         time, icechunk will raise an error at runtime when trying to read the virtual
         chunk. When not specified, icechunk will not check for modifications to the
-        virtual chunks at runtime.
+        virtual chunks at runtime. Mutually exclusive with ``etag``.
+    etag
+        The ETag of the source object, when every virtual chunk written in this
+        session refers to the same object. Icechunk then verifies at read time that
+        the object's ETag still matches (``If-Match``). Unlike a timestamp this also
+        catches modifications that preserve the modification time, and it is checked
+        atomically with each byte-range fetch. Mutually exclusive with
+        ``last_updated_at``.
 
     Raises
     ------
@@ -157,11 +165,7 @@ def virtual_dataset_to_icechunk(
             f" but got type {type(last_updated_at)}"
         )
 
-    if not isinstance(last_updated_at, (type(None), datetime)):
-        raise TypeError(
-            "last_updated_at: expected type Optional[datetime],"
-            f" but got type {type(last_updated_at)}"
-        )
+    _validate_checksum_args(last_updated_at, etag)
 
     if store.read_only:
         raise ValueError("supplied store is read-only")
@@ -187,6 +191,7 @@ def virtual_dataset_to_icechunk(
         append_dim=append_dim,
         region=region,
         last_updated_at=last_updated_at,
+        etag=etag,
     )
 
 
@@ -198,6 +203,7 @@ def virtual_datatree_to_icechunk(
     write_inherited_coords: bool = False,
     validate_containers: bool = True,
     last_updated_at: datetime | None = None,
+    etag: str | None = None,
     **kwargs,
 ) -> None:
     """
@@ -236,7 +242,14 @@ def virtual_datatree_to_icechunk(
         of the virtual chunks written in this session are modified in storage after this
         time, icechunk will raise an error at runtime when trying to read the virtual
         chunk. When not specified, icechunk will not check for modifications to the
-        virtual chunks at runtime.
+        virtual chunks at runtime. Mutually exclusive with ``etag``.
+    etag
+        The ETag of the source object, when every virtual chunk written in this
+        session refers to the same object. Icechunk then verifies at read time that
+        the object's ETag still matches (``If-Match``). Unlike a timestamp this also
+        catches modifications that preserve the modification time, and it is checked
+        atomically with each byte-range fetch. Mutually exclusive with
+        ``last_updated_at``.
     **kwargs
         Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
@@ -262,11 +275,7 @@ def virtual_datatree_to_icechunk(
         mode, append_dim=kwargs.get("append_dim"), region=kwargs.get("region")
     )
 
-    if not isinstance(last_updated_at, (type(None), datetime)):
-        raise TypeError(
-            "last_updated_at: expected type datetime,"
-            f" but got type {type(last_updated_at)}"
-        )
+    _validate_checksum_args(last_updated_at, etag)
 
     if store.read_only:
         raise ValueError("supplied store is read-only")
@@ -300,7 +309,23 @@ def virtual_datatree_to_icechunk(
             store=store,
             group=group,
             last_updated_at=last_updated_at,
+            etag=etag,
             **kwargs,
+        )
+
+
+def _validate_checksum_args(last_updated_at: datetime | None, etag: str | None) -> None:
+    if not isinstance(last_updated_at, (type(None), datetime)):
+        raise TypeError(
+            "last_updated_at: expected type Optional[datetime],"
+            f" but got type {type(last_updated_at)}"
+        )
+    if not isinstance(etag, (type(None), str)):
+        raise TypeError(f"etag: expected type Optional[str], but got type {type(etag)}")
+    if last_updated_at is not None and etag is not None:
+        raise ValueError(
+            "pass either last_updated_at or etag, not both: icechunk stores one"
+            " checksum per virtual chunk"
         )
 
 
@@ -351,7 +376,8 @@ def write_virtual_dataset_to_icechunk_group(
     group: Group,
     append_dim: Optional[str] = None,
     region: Optional[Literal["auto"] | Mapping[str, Literal["auto"] | slice]] = None,
-    last_updated_at: Optional[datetime] = None,
+    last_updated_at: datetime | None = None,
+    etag: str | None = None,
 ) -> None:
     if region is not None:
         vds, region = validate_and_autodetect_region(group, vds, region)
@@ -397,6 +423,7 @@ def write_virtual_dataset_to_icechunk_group(
             append_dim=append_dim,
             region=region,
             last_updated_at=last_updated_at,
+            etag=etag,
         )
 
     # finish by writing group-level attributes
@@ -503,7 +530,8 @@ def write_virtual_variable_to_icechunk(
     var: xr.Variable,
     append_dim: Optional[str] = None,
     region: Optional[Mapping[str, slice]] = None,
-    last_updated_at: Optional[datetime] = None,
+    last_updated_at: datetime | None = None,
+    etag: str | None = None,
 ) -> None:
     """Write a single virtual variable into an icechunk store"""
 
@@ -599,6 +627,7 @@ def write_virtual_variable_to_icechunk(
         manifest=ma.manifest,
         chunk_index_offsets=tuple(chunk_offsets),
         last_updated_at=last_updated_at,
+        etag=etag,
     )
 
 
@@ -642,7 +671,8 @@ def write_manifest_to_icechunk(
     arr_name: str,
     manifest: ChunkManifest,
     chunk_index_offsets: tuple[int, ...],
-    last_updated_at: Optional[datetime] = None,
+    last_updated_at: datetime | None = None,
+    etag: str | None = None,
 ) -> None:
     """
     Write all the chunks (virtual and/or inlined) for one array manifest at once.
@@ -663,6 +693,7 @@ def write_manifest_to_icechunk(
         # you don't get an IcechunkError warning you that your referenced chunk has changed.
         # In practice this should only really come up in synthetic examples, e.g. tests and docs.
         last_updated_at = datetime.now(timezone.utc) + timedelta(seconds=1)
+    checksum: datetime | str = last_updated_at if etag is None else etag
 
     paths_flat = manifest._paths.flatten()
 
@@ -698,7 +729,7 @@ def write_manifest_to_icechunk(
             lengths=manifest._lengths.flatten(),
             validate_containers=False,
             arr_offset=chunk_index_offsets if any(chunk_index_offsets) else None,
-            checksum=last_updated_at,
+            checksum=checksum,
         )
 
 

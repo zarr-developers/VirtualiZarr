@@ -4,6 +4,14 @@
 
 ### New Features
 
+- `to_icechunk` gains an `etag` keyword, mutually exclusive with `last_updated_at`:
+  the ETag of the source object, for virtual datasets whose chunks all refer to a
+  single object. Icechunk stores it as an etag checksum and verifies at read time
+  that the object's ETag still matches (`If-Match`). Unlike a timestamp this also
+  catches modifications that preserve the modification time, and the check is
+  atomic with each byte-range fetch, so a stale reference always fails loudly
+  instead of serving bytes that no longer match the manifest.
+
 ### Breaking changes
 
 ### Bug fixes
