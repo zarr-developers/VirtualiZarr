@@ -6,8 +6,8 @@
 
 ### Performance
 
-- `HDFParser` no longer keeps a Python object per chunk while building a manifest, which lowers its peak memory.
-  Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
+- `HDFParser` builds chunk manifests faster and with less memory: it no longer keeps a Python object per chunk, and
+  validates a dataset's file path once instead of once per chunk. Fixes [#1132](https://github.com/zarr-developers/VirtualiZarr/issues/1132).
   By [Ian Hunt-Isaak](https://github.com/ianhi).
 
 ### Breaking changes

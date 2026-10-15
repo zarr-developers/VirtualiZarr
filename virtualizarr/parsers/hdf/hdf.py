@@ -24,7 +24,11 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH, MISSING_CHUNK_PATH
+from virtualizarr.manifests.manifest import (
+    INLINED_CHUNK_PATH,
+    MISSING_CHUNK_PATH,
+    validate_and_normalize_path_to_uri,
+)
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
 from virtualizarr.parsers.typing import ReaderFactory
@@ -566,12 +570,14 @@ def _dataset_chunk_manifest(
         if chunks != dataset.chunks:
             lengths[lengths != 0] = math.prod(chunks) * dataset.dtype.itemsize
 
-        paths[...] = filepath
+        # Every chunk here is in the same file, so its path only needs validating once.
+        paths[...] = validate_and_normalize_path_to_uri(filepath)
         paths[lengths == 0] = MISSING_CHUNK_PATH
         chunk_manifest = ChunkManifest.from_arrays(
             paths=paths,  # type: ignore
             offsets=offsets,
             lengths=lengths,
+            validate_paths=False,
         )
     return chunk_manifest
 
