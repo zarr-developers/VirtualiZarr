@@ -1595,40 +1595,154 @@ class TestIndexing:
 
 
 class TestIndexingRectilinear:
-    @pytest.mark.parametrize(
-        "indexer", [slice(0, 10), slice(None), (None, ...), 0, np.array([0, 1])]
-    )
-    def test_getitem_on_rectilinear_array_raises(
-        self, array_v3_metadata_rectilinear, indexer
-    ):
-        # even no-op and new-axis indexers raise, as xarray's expand_dims and concat
-        # along a new dimension index with them
+    @pytest.fixture
+    def marr(self, array_v3_metadata_rectilinear):
+        # one 1D array chunked (10, 20, 30), each chunk at its own offset
         metadata = array_v3_metadata_rectilinear(
             shape=(60,), chunk_shapes=((10, 20, 30),)
         )
         manifest = ChunkManifest(
             entries={
-                "0": {"path": "/a.nc", "offset": 0, "length": 100},
-                "1": {"path": "/a.nc", "offset": 100, "length": 100},
-                "2": {"path": "/a.nc", "offset": 200, "length": 100},
+                "0": {"path": "file:///a.nc", "offset": 0, "length": 100},
+                "1": {"path": "file:///a.nc", "offset": 100, "length": 100},
+                "2": {"path": "file:///a.nc", "offset": 200, "length": 100},
             }
         )
-        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        return ManifestArray(metadata=metadata, chunkmanifest=manifest)
 
-        with pytest.raises(NotImplementedError, match="Indexing is not yet supported"):
+    @pytest.mark.parametrize("indexer", [slice(None), slice(0, 60), ...])
+    def test_full_selection_is_a_no_op(self, marr, indexer):
+        assert marr[indexer] is marr
+
+    def test_chunk_aligned_slice(self, marr):
+        result = marr[10:60]
+
+        assert result.shape == (50,)
+        assert result.chunk_grid.chunk_sizes == ((20, 30),)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 100, "length": 100},
+            "1": {"path": "file:///a.nc", "offset": 200, "length": 100},
+        }
+
+    def test_slice_leaving_equal_chunks_becomes_regular(
+        self, array_v3_metadata_rectilinear
+    ):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(40,), chunk_shapes=((20, 10, 10),)
+        )
+        marr = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries={}, shape=(3,))
+        )
+
+        result = marr[20:40]
+
+        assert result.shape == (20,)
+        assert result.metadata.chunk_grid.to_dict()["name"] == "regular"
+        assert result.metadata.chunks == (10,)
+
+    def test_slice_leaving_shorter_last_chunk_stays_rectilinear(
+        self, array_v3_metadata_rectilinear
+    ):
+        # a regular grid would expect the short last chunk to be stored padded to
+        # full length, but it's stored at exactly 5 elements
+        metadata = array_v3_metadata_rectilinear(
+            shape=(45,), chunk_shapes=((20, 10, 10, 5),)
+        )
+        marr = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries={}, shape=(4,))
+        )
+
+        result = marr[20:45]
+
+        assert result.metadata.chunk_grid.to_dict()["name"] == "rectilinear"
+        assert result.chunk_grid.chunk_sizes == ((10, 10, 5),)
+
+    def test_new_axis(self, marr):
+        result = marr[None, ...]
+
+        assert result.shape == (1, 60)
+        assert result.chunk_grid.chunk_sizes == ((1,), (10, 20, 30))
+
+    def test_empty_slice(self, marr):
+        result = marr[10:10]
+
+        assert result.shape == (0,)
+        assert result.manifest.dict() == {}
+
+    def test_slice_along_both_axes(self, array_v3_metadata_rectilinear):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(60, 50), chunk_shapes=((10, 20, 30), (20, 30))
+        )
+        entries = {
+            f"{i}.{j}": {
+                "path": "file:///a.nc",
+                "offset": 100 * (2 * i + j),
+                "length": 100,
+            }
+            for i in range(3)
+            for j in range(2)
+        }
+        marr = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=entries)
+        )
+
+        result = marr[10:30, 20:50]
+
+        assert result.shape == (20, 30)
+        assert result.manifest.dict() == {
+            "0.0": {"path": "file:///a.nc", "offset": 300, "length": 100}
+        }
+
+    def test_int_on_length_1_chunk_drops_axis(self, array_v3_metadata_rectilinear):
+        metadata = array_v3_metadata_rectilinear(
+            shape=(6, 4), chunk_shapes=((1, 2, 3), (4,))
+        )
+        entries = {
+            f"{i}.0": {"path": "file:///a.nc", "offset": 100 * i, "length": 100}
+            for i in range(3)
+        }
+        marr = ManifestArray(
+            metadata=metadata, chunkmanifest=ChunkManifest(entries=entries)
+        )
+
+        result = marr[0, :]
+
+        assert result.shape == (4,)
+        assert result.manifest.dict() == {
+            "0": {"path": "file:///a.nc", "offset": 0, "length": 100}
+        }
+
+    @pytest.mark.parametrize(
+        "indexer", [0, slice(0, 5), slice(5, 60), slice(0, 60, 2), 15]
+    )
+    def test_selection_splitting_chunks_raises(self, marr, indexer):
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[indexer]
 
-    def test_where_on_rectilinear_array_raises(self, array_v3_metadata_rectilinear):
+    def test_reindex_raises(self, marr):
+        with pytest.raises(
+            NotImplementedError, match="Reindexing is not yet supported"
+        ):
+            marr[np.array([0, 1])]
+
+    def test_where_returns_array_with_matching_missing_chunks(
+        self, array_v3_metadata_rectilinear
+    ):
         metadata = array_v3_metadata_rectilinear(
             shape=(60,), chunk_shapes=((10, 20, 30),)
         )
-        marr = ManifestArray(
-            metadata=metadata,
-            chunkmanifest=ChunkManifest(entries={}, shape=(3,)),
+        # chunk 1 is missing, so reads back as fill_value
+        manifest = ChunkManifest(
+            entries={
+                "0": {"path": "file:///a.nc", "offset": 0, "length": 100},
+                "2": {"path": "file:///a.nc", "offset": 200, "length": 100},
+            }
         )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+        present = np.ones(60, dtype=bool)
+        present[10:30] = False
 
-        with pytest.raises(NotImplementedError, match="np.where is not yet supported"):
-            np.where(np.ones(60, dtype=bool), marr, 0)
+        assert np.where(present, marr, 0) is marr
 
 
 class TestSubChunkSlicingUncompressed:
