@@ -10,7 +10,11 @@ from obstore.store import from_url
 
 from virtualizarr import open_virtual_dataset
 from virtualizarr.parsers import HDFParser
-from virtualizarr.parsers.hdf.hdf import LINKS_REFERENCES_CONVENTION, REF_CONVENTION
+from virtualizarr.parsers.hdf.hdf import (
+    BYTES_ATTRIBUTES_CONVENTION,
+    LINKS_REFERENCES_CONVENTION,
+    REF_CONVENTION,
+)
 from virtualizarr.tests import (
     requires_hdf5plugin,
     requires_imagecodecs,
@@ -761,3 +765,84 @@ def test_fillvalue_runtime_error():
 
     result = _get_fill_value(dataset)
     assert result == np.ma.default_fill_value(dtype)
+
+
+@pytest.fixture
+def non_utf8_attributes_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "bytes_attributes.h5")
+    with h5py.File(filepath, "w") as f:
+        f.attrs["latin1"] = np.bytes_(b"\xe9t\xe9")
+        f.attrs["mixed"] = np.array([b"\xff", b"ok"])
+        f.attrs["opaque"] = np.void(b"\x00\xff\x10")
+        f.attrs["opaque_array"] = np.array([np.void(b"\x01\x02"), np.void(b"\x03\x04")])
+        f.attrs["looks_encoded"] = "base64:AAAA"
+        f.attrs["text"] = np.bytes_(b"hello")
+        f["data"] = np.arange(3)
+        f["data"].attrs["looks_encoded"] = "base64:AAAA"
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestBytesAttributes:
+    def test_error_by_default(self, non_utf8_attributes_hdf5_url):
+        with pytest.raises(ValueError, match="encode_bytes_attributes=True") as error:
+            _parse(non_utf8_attributes_hdf5_url)
+        assert "'latin1'" in str(error.value)
+
+    def test_opaque_error_by_default(self, tmp_path):
+        filepath = str(tmp_path / "opaque.h5")
+        with h5py.File(filepath, "w") as f:
+            f.attrs["opaque"] = np.void(b"\x00\xff")
+        with pytest.raises(ValueError, match="opaque data"):
+            _parse(f"file://{filepath}")
+
+    def test_encoded(self, non_utf8_attributes_hdf5_url):
+        group = _parse(
+            non_utf8_attributes_hdf5_url, encode_bytes_attributes=True
+        )._group
+        attrs = group.metadata.attributes
+        assert attrs["latin1"] == "base64:6XTp"
+        assert attrs["mixed"] == ["base64:/w==", "ok"]
+        assert attrs["opaque"] == "base64:AP8Q"
+        assert attrs["opaque_array"] == ["base64:AQI=", "base64:AwQ="]
+        # On a node that registers the convention, a string that looks encoded is escaped
+        assert attrs["looks_encoded"] == "_str_base64:AAAA"
+        assert attrs["text"] == "hello"
+        assert attrs["zarr_conventions"] == [BYTES_ATTRIBUTES_CONVENTION]
+
+    def test_nodes_without_bytes_are_unchanged(self, non_utf8_attributes_hdf5_url):
+        group = _parse(
+            non_utf8_attributes_hdf5_url, encode_bytes_attributes=True
+        )._group
+        attrs = group.arrays["data"].metadata.attributes
+        assert attrs == {"looks_encoded": "base64:AAAA"}
+
+    def test_text_is_unchanged(self, tmp_path):
+        filepath = str(tmp_path / "text.h5")
+        with h5py.File(filepath, "w") as f:
+            f.attrs["text"] = np.bytes_(b"hello")
+            f.attrs["texts"] = np.array([b"a", b"b"])
+        for encode in (False, True):
+            attrs = _parse(
+                f"file://{filepath}", encode_bytes_attributes=encode
+            )._group.metadata.attributes
+            assert attrs == {"text": "hello", "texts": ["a", "b"]}
+
+    def test_with_ref_convention(self, tmp_path):
+        filepath = str(tmp_path / "both.h5")
+        with h5py.File(filepath, "w") as f:
+            f["values"] = np.arange(3.0)
+            f.attrs["source"] = f["values"].ref
+            f.attrs["digest"] = np.void(b"\xde\xad")
+        attrs = _parse(
+            f"file://{filepath}",
+            encode_bytes_attributes=True,
+            links_and_references=True,
+        )._group.metadata.attributes
+        assert attrs["source"] == {"ref": {"node": "values"}}
+        assert attrs["digest"] == "base64:3q0="
+        assert [c["name"] for c in attrs["zarr_conventions"]] == [
+            "ref",
+            "bytes-attributes",
+        ]

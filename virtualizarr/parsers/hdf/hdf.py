@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import base64
 import functools
 import math
 import posixpath
+import re
 from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Iterable,
 )
@@ -56,6 +59,22 @@ REF_CONVENTION = {
 }
 """The ref convention, whose objects identify the targets of links."""
 
+BYTES_ATTRIBUTES_CONVENTION = {
+    "uuid": "2de6770a-9c00-4432-9e84-dd9e1dfed441",
+    "schema_url": "https://raw.githubusercontent.com/catalystneuro/zarr-bytes-attributes/refs/tags/v1/schema.json",
+    "spec_url": "https://github.com/catalystneuro/zarr-bytes-attributes/blob/v1/README.md",
+    "name": "bytes-attributes",
+    "description": "Bytes in attributes are written as base64 strings",
+}
+"""The Bytes Attributes convention, a draft, used with ``encode_bytes_attributes=True``."""
+
+_BYTES_ATTRIBUTES_HINT = (
+    "To store it as a base64 string, following the draft Bytes Attributes convention, "
+    "pass HDFParser(encode_bytes_attributes=True)."
+)
+# A string that the Bytes Attributes convention escapes: any "_str_" prefixes, then "base64:"
+_BASE64_LIKE = re.compile(r"(?:_str_)*base64:.*", re.DOTALL)
+
 _LINKS_AND_REFERENCES_HINT = (
     "To store object references as the paths of their targets, following the draft Links and "
     "Object References convention, pass HDFParser(links_and_references=True)."
@@ -98,6 +117,7 @@ def _construct_manifest_array(
     dataset: H5Dataset,
     group: str,
     links_and_references: bool = False,
+    encode_bytes_attributes: bool = False,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -113,6 +133,9 @@ def _construct_manifest_array(
     links_and_references
         Store a dataset of object references as the paths of their targets,
         following the draft Links and Object References convention.
+    encode_bytes_attributes
+        Store attributes that hold bytes that aren't text as base64 strings; see
+        `_extract_attrs`.
 
     Returns
     -------
@@ -120,7 +143,9 @@ def _construct_manifest_array(
     """
     chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
-    attrs = _extract_attrs(dataset, links_and_references)
+    attrs = _extract_attrs(
+        dataset, links_and_references, encode_bytes_attributes=encode_bytes_attributes
+    )
     dtype = dataset.dtype
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
@@ -284,6 +309,7 @@ def _construct_manifest_group(
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     links_and_references: bool = False,
+    encode_bytes_attributes: bool = False,
     _seen: dict | None = None,
 ) -> ManifestGroup:
     """
@@ -326,7 +352,11 @@ def _construct_manifest_group(
             item = g[key]
             if isinstance(item, h5py.Dataset):
                 arrays[key] = _construct_manifest_array(
-                    filepath, item, group_name, links_and_references
+                    filepath,
+                    item,
+                    group_name,
+                    links_and_references,
+                    encode_bytes_attributes,
                 )
             elif isinstance(item, h5py.Group):
                 groups[key] = _construct_manifest_group(
@@ -334,9 +364,12 @@ def _construct_manifest_group(
                     reader,
                     group=str(Path(group) / key) if group is not None else key,
                     links_and_references=links_and_references,
+                    encode_bytes_attributes=encode_bytes_attributes,
                     _seen=seen,
                 )
-        attributes = _extract_attrs(g, links_and_references)
+        attributes = _extract_attrs(
+            g, links_and_references, encode_bytes_attributes=encode_bytes_attributes
+        )
         if links:
             _add_conventions(attributes, LINKS_REFERENCES_CONVENTION, REF_CONVENTION)
             attributes["links_references"] = {"links": links}
@@ -443,6 +476,15 @@ class HDFParser:
         See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
+    encode_bytes_attributes
+        Store an attribute that holds bytes that aren't valid UTF-8, or opaque
+        data, as a string: ``base64:`` followed by the bytes in base64,
+        following the draft [Bytes Attributes
+        convention](https://github.com/catalystneuro/zarr-bytes-attributes),
+        which the array or group then registers. On such a node, a string that
+        already begins with ``base64:`` is written with the prefix ``_str_``, so
+        that every value reads back as it was. Off by default, while the
+        convention is settled; such an attribute then raises ``ValueError``.
     """
 
     def __init__(
@@ -451,11 +493,13 @@ class HDFParser:
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
         links_and_references: bool = False,
+        encode_bytes_attributes: bool = False,
     ):
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
         self.links_and_references = links_and_references
+        self.encode_bytes_attributes = encode_bytes_attributes
 
     def __call__(
         self,
@@ -486,6 +530,7 @@ class HDFParser:
             group=self.group,
             drop_variables=self.drop_variables,
             links_and_references=self.links_and_references,
+            encode_bytes_attributes=self.encode_bytes_attributes,
         )
         # Convert to a manifest store
         return ManifestStore(registry=registry, group=manifest_group)
@@ -848,7 +893,12 @@ def _ref_object(reference, path: Callable) -> dict | None:
     return {"ref": {"node": path(reference)}} if reference else None
 
 
-def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = False):
+def _extract_attrs(
+    h5obj: H5Dataset | H5Group,
+    links_and_references: bool = False,
+    *,
+    encode_bytes_attributes: bool = False,
+):
     """
     Extract attributes from an HDF5 group or dataset.
 
@@ -860,6 +910,10 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
         Write an attribute that holds an object reference, or an array of them,
         as ref convention objects whose node is the target's path relative to
         h5obj; a null reference is None.
+    encode_bytes_attributes
+        Write an attribute that holds bytes that aren't valid UTF-8, or opaque
+        data, following the Bytes Attributes convention. Otherwise such an
+        attribute raises ValueError.
     """
     import h5py
 
@@ -899,12 +953,26 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
                 continue
         if n == "_FillValue":
             v = v
+        where = f"Attribute {n!r} of {h5obj.name!r}"
         # Fix some attribute values to avoid JSON encoding exceptions...
         if isinstance(v, bytes):
-            v = v.decode("utf-8") or " "
+            v = _text_or_bytes(v, encode_bytes_attributes, where) or " "
+        elif isinstance(v, (np.void, np.ndarray)) and _is_opaque(v.dtype):
+            if not encode_bytes_attributes:
+                raise ValueError(f"{where} holds opaque data. {_BYTES_ATTRIBUTES_HINT}")
+            v = (
+                v.tobytes()
+                if isinstance(v, np.void)
+                else _object_list(v, lambda x: bytes(x.tobytes()))
+            )
         elif isinstance(v, (np.ndarray, np.number, np.bool_)):
             if v.dtype.kind == "S":
-                v = np.strings.decode(np.asarray(v), "utf-8").tolist()
+                try:
+                    v = np.strings.decode(np.asarray(v), "utf-8").tolist()
+                except UnicodeDecodeError:
+                    v = _object_list(
+                        v, lambda x: _text_or_bytes(x, encode_bytes_attributes, where)
+                    )
             elif v.size == 1:
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
@@ -916,7 +984,61 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
         if v == "DIMENSION_SCALE":
             continue
         attrs[n] = v
+    if encode_bytes_attributes and _has_bytes(attrs):
+        attrs = {
+            key: value if key == "zarr_conventions" else _encode_bytes(value)
+            for key, value in attrs.items()
+        }
+        _add_conventions(attrs, BYTES_ATTRIBUTES_CONVENTION)
     return attrs
+
+
+def _text_or_bytes(value: bytes, encode: bool, where: str) -> str | bytes:
+    """Bytes as text if they are valid UTF-8; otherwise the bytes, or ValueError if they can't be encoded."""
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError:
+        if encode:
+            return value
+        raise ValueError(
+            f"{where} holds bytes that aren't valid UTF-8. {_BYTES_ATTRIBUTES_HINT}"
+        ) from None
+
+
+def _is_opaque(dtype: np.dtype) -> bool:
+    """Whether a dtype holds HDF5 opaque data: raw bytes, with no fields."""
+    return dtype.kind == "V" and dtype.fields is None and dtype.subdtype is None
+
+
+def _object_list(array: np.ndarray, convert: Callable) -> list:
+    """An array as nested lists, with convert applied to each element."""
+    out = np.empty(array.shape, dtype=object)
+    for index, element in np.ndenumerate(array):
+        out[index] = convert(element)
+    return out.tolist()
+
+
+def _has_bytes(value: Any) -> bool:
+    if isinstance(value, bytes):
+        return True
+    if isinstance(value, list):
+        return any(_has_bytes(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_bytes(item) for item in value.values())
+    return False
+
+
+def _encode_bytes(value: Any) -> Any:
+    """A value as the Bytes Attributes convention writes it: bytes as base64 strings, with base64-like strings escaped."""
+    if isinstance(value, bytes):
+        return "base64:" + base64.b64encode(value).decode("ascii")
+    if isinstance(value, str):
+        return "_str_" + value if _BASE64_LIKE.fullmatch(value) else value
+    if isinstance(value, list):
+        return [_encode_bytes(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _encode_bytes(item) for key, item in value.items()}
+    return value
 
 
 def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
