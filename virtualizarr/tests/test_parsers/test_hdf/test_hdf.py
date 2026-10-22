@@ -761,3 +761,79 @@ def test_fillvalue_runtime_error():
 
     result = _get_fill_value(dataset)
     assert result == np.ma.default_fill_value(dtype)
+
+
+@pytest.fixture
+def one_element_attributes_hdf5_url(tmp_path) -> str:
+    filepath = str(tmp_path / "one_element.h5")
+    with h5py.File(filepath, "w") as f:
+        f.attrs["scalar"] = 0
+        f.attrs["one_int"] = np.array([0])
+        f.attrs["one_str"] = np.array(["a"], dtype=h5py.string_dtype())
+        f.attrs["one_bytes"] = np.array([b"a"])
+        f.attrs["two_strs"] = np.array(["a", "b"], dtype=h5py.string_dtype())
+        f["data"] = np.arange(3.0)
+        f["data"].attrs["colnames"] = np.array(["x"], dtype=h5py.string_dtype())
+        f["data"].attrs["_FillValue"] = np.array([np.nan])
+    return f"file://{filepath}"
+
+
+@pytest.fixture
+def netcdf4_attributes_url(tmp_path) -> str:
+    pytest.importorskip("netCDF4")
+    filepath = str(tmp_path / "attributes.nc")
+    ds = xr.Dataset(
+        {"t": ("x", np.arange(3.0), {"scale": 2.0, "units": "m", "valid": [1, 2]})},
+        attrs={"version": 1},
+    )
+    ds.to_netcdf(filepath, engine="netcdf4")
+    return f"file://{filepath}"
+
+
+@requires_hdf5plugin
+@requires_imagecodecs
+class TestOneElementAttributes:
+    def test_kept_as_lists_outside_netcdf(self, one_element_attributes_hdf5_url):
+        group = _parse(one_element_attributes_hdf5_url)._group
+        attrs = group.metadata.attributes
+        assert attrs["scalar"] == 0
+        assert attrs["one_int"] == [0]
+        assert attrs["one_str"] == ["a"]
+        assert attrs["one_bytes"] == ["a"]
+        assert attrs["two_strs"] == ["a", "b"]
+        data = group.arrays["data"].metadata
+        assert data.attributes["colnames"] == ["x"]
+        # _FillValue is a scalar whatever the setting
+        assert not isinstance(data.attributes["_FillValue"], list)
+
+    def test_squeezed_in_netcdf4(self, netcdf4_attributes_url):
+        group = _parse(netcdf4_attributes_url)._group
+        assert group.metadata.attributes["version"] == 1
+        attrs = group.arrays["t"].metadata.attributes
+        assert attrs["scale"] == 2.0
+        assert attrs["units"] == "m"
+        assert attrs["valid"] == [1, 2]
+
+    def test_netcdf4_without_ncproperties(self, tmp_path):
+        # netCDF-C before 4.4.1 didn't write _NCProperties
+        filepath = str(tmp_path / "old.nc")
+        with h5py.File(filepath, "w") as f:
+            f["x"] = np.arange(3.0)
+            f["x"].attrs["_Netcdf4Dimid"] = np.array([0])
+            f["x"].attrs["scale"] = np.array([2.0])
+        attrs = _parse(f"file://{filepath}")._group.arrays["x"].metadata.attributes
+        assert attrs["scale"] == 2.0
+
+    def test_squeeze_everywhere(self, one_element_attributes_hdf5_url):
+        group = _parse(one_element_attributes_hdf5_url, squeeze_attributes=True)._group
+        attrs = group.metadata.attributes
+        assert attrs["one_int"] == 0
+        assert attrs["one_str"] == "a"
+        assert group.arrays["data"].metadata.attributes["colnames"] == "x"
+
+    def test_squeeze_nowhere(self, netcdf4_attributes_url):
+        group = _parse(netcdf4_attributes_url, squeeze_attributes=False)._group
+        assert group.metadata.attributes["version"] == [1]
+        attrs = group.arrays["t"].metadata.attributes
+        assert attrs["scale"] == [2.0]
+        assert attrs["units"] == "m"  # a scalar attribute stays a scalar
