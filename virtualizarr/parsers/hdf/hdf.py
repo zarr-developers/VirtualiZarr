@@ -98,7 +98,8 @@ def _construct_manifest_array(
     dataset: H5Dataset,
     group: str,
     links_and_references: bool = False,
-    squeeze_attributes: bool | None = None,
+    *,
+    squeeze_attributes: bool,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -338,7 +339,11 @@ def _construct_manifest_group(
             item = g[key]
             if isinstance(item, h5py.Dataset):
                 arrays[key] = _construct_manifest_array(
-                    filepath, item, group_name, links_and_references, squeeze
+                    filepath,
+                    item,
+                    group_name,
+                    links_and_references,
+                    squeeze_attributes=squeeze,
                 )
             elif isinstance(item, h5py.Group):
                 groups[key] = _construct_manifest_group(
@@ -877,7 +882,7 @@ def _extract_attrs(
     h5obj: H5Dataset | H5Group,
     links_and_references: bool = False,
     *,
-    squeeze_attributes: bool | None = None,
+    squeeze_attributes: bool,
 ):
     """
     Extract attributes from an HDF5 group or dataset.
@@ -893,8 +898,7 @@ def _extract_attrs(
     squeeze_attributes
         Write an attribute that is an array of one element as a scalar, as
         netCDF-4 means by one. Otherwise it is a list of one, and only a
-        scalar attribute is a scalar. None means True for an object in a
-        netCDF-4 file and False otherwise.
+        scalar attribute is a scalar.
     """
     import h5py
 
@@ -910,9 +914,6 @@ def _extract_attrs(
     }
     attrs = {}
     path = _reference_path(h5obj) if links_and_references else None
-    squeeze = (
-        _is_netcdf4(h5obj.file) if squeeze_attributes is None else squeeze_attributes
-    )
 
     for n, v in h5obj.attrs.items():
         if n in _HIDDEN_ATTRS:
@@ -944,7 +945,9 @@ def _extract_attrs(
             if v.dtype.kind == "S":
                 v = np.strings.decode(np.asarray(v), "utf-8").tolist()
             # _FillValue is the array's fill value, so always a scalar
-            elif v.size == 1 and (v.ndim == 0 or squeeze or n == "_FillValue"):
+            elif v.size == 1 and (
+                v.ndim == 0 or squeeze_attributes or n == "_FillValue"
+            ):
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
                     v = v.tolist()
