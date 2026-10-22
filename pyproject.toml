@@ -44,7 +44,7 @@ remote = [
 
 # non-kerchunk-based parsers
 hdf = [
-    "h5py",
+    "h5py>=3.13",
     "hdf5plugin",
     "imagecodecs",
     "imagecodecs-numcodecs==2024.6.1",

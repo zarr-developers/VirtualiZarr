@@ -40,6 +40,36 @@ class TestDatasetChunkManifest:
         manifest_store = manifest_store_from_hdf_url(chunked_hdf5_url)
         assert manifest_store._group.arrays["data"].manifest.shape_chunk_grid == (2, 2)
 
+    @pytest.mark.parametrize(
+        "kwargs, expected_grid",
+        [
+            pytest.param(
+                dict(shape=(10, 4), chunks=(5, 4), dtype="f4"), (2, 1), id="chunked"
+            ),
+            pytest.param(dict(shape=(10, 4), dtype="f4"), (1, 1), id="contiguous"),
+            pytest.param(
+                dict(shape=(10, 4), chunks=(5, 4), dtype=h5py.string_dtype()),
+                (2, 1),
+                id="vlen-string",
+            ),
+            pytest.param(
+                dict(
+                    shape=(0, 4),
+                    dtype=np.dtype([("a", "i4"), ("b", h5py.string_dtype())]),
+                ),
+                (0, 1),
+                id="empty-compound",
+            ),
+        ],
+    )
+    def test_unwritten(self, tmp_path, kwargs, expected_grid):
+        filepath = str(tmp_path / "unwritten.h5")
+        with h5py.File(filepath, "w") as f:
+            f.create_dataset("data", **kwargs)
+        manifest_store = manifest_store_from_hdf_url(f"file://{filepath}")
+        manifest = manifest_store._group.arrays["data"].manifest
+        assert manifest.shape_chunk_grid == expected_grid
+
     def test_chunked_roundtrip(self, chunked_roundtrip_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(chunked_roundtrip_hdf5_url)
         assert manifest_store._group.arrays["var2"].manifest.shape_chunk_grid == (2, 8)
