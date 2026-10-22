@@ -4,6 +4,12 @@
 
 ### New Features
 
+- `HDFParser` reads the chunk index of each chunked dataset ahead, a level at a time, fetching the nodes of a level in
+  parallel with the store's `get_ranges`, instead of one request per node as h5py walks it. On remote files whose
+  datasets have many chunks this made parsing 4-14x faster in our tests, and the result is unchanged. Pass `read_ahead=False` to
+  turn it off. ([#1140](https://github.com/zarr-developers/VirtualiZarr/issues/1140)).
+  By [Ben Dichter](https://github.com/bendichter).
+
 ### Breaking changes
 
 ### Bug fixes
