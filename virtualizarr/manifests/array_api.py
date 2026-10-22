@@ -2,6 +2,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Union, cast
 
 import numpy as np
+from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from virtualizarr.utils import determine_chunk_grid_shape
 
@@ -216,6 +217,92 @@ def expand_dims(x: "ManifestArray", /, *, axis: int = 0) -> "ManifestArray":
     """Expands the shape of an array by inserting a new axis (dimension) of size one at the position specified by axis."""
     # this is just a special case of stacking
     return stack([x], axis=axis)
+
+
+@implements(np.transpose)
+def transpose(
+    x: "ManifestArray", /, axes: tuple[int, ...] | None = None
+) -> "ManifestArray":
+    """
+    Permute the axes of a ManifestArray, without reading or moving any data.
+
+    The chunk manifest is reordered so that each chunk keeps its byte range under
+    its new chunk key. A chunk's bytes are in the order of the axes along which the
+    chunk is longer than one element, so if the transpose keeps those axes in the
+    same relative order, nothing else changes. Otherwise a ``transpose`` codec is
+    added (or an existing one updated) so that readers put each chunk's elements in
+    the new order after decoding it. Readers decode such an array a whole chunk at a
+    time.
+
+    The signature of this function is array API compliant (``permute_dims``), so that
+    it can be called by `xarray.Variable.transpose`.
+    """
+    from .array import ManifestArray
+
+    ndim = x.ndim
+    if axes is None:
+        axes = tuple(reversed(range(ndim)))
+    axes = tuple(_normalize_axis(a, ndim) for a in axes)
+    if sorted(axes) != list(range(ndim)):
+        raise ValueError(f"axes {axes} don't match an array with {ndim} dimensions")
+    if axes == tuple(range(ndim)):
+        return x
+
+    metadata = cast(dict[str, Any], x.metadata.to_dict())
+    codecs: list[dict[str, Any]] = [dict(c) for c in metadata["codecs"]]
+    if any(codec.get("name") == "sharding_indexed" for codec in codecs):
+        raise NotImplementedError(
+            "Transposing a sharded ManifestArray is not supported"
+        )
+
+    # The stored order of each chunk's elements, as the old axes: an existing
+    # transpose codec's order, or else the axes as they are
+    stored: tuple[int, ...] = tuple(range(ndim))
+    if codecs and codecs[0].get("name") == "transpose":
+        stored = tuple(codecs.pop(0)["configuration"]["order"])
+    # The codec order that gives the stored order from the new axes
+    order = tuple(axes.index(a) for a in stored)
+    new_chunks = [manifest_chunk_shape(x.metadata)[a] for a in axes]
+    # Axes along which a chunk is one element long don't affect where its bytes are
+    if [o for o in order if new_chunks[o] > 1] != sorted(
+        o for o in order if new_chunks[o] > 1
+    ):
+        codecs.insert(0, {"name": "transpose", "configuration": {"order": list(order)}})
+
+    dimension_names = metadata.get("dimension_names")
+    metadata["shape"] = [x.shape[a] for a in axes]
+    metadata["chunk_grid"] = {
+        "name": "regular",
+        "configuration": {"chunk_shape": new_chunks},
+    }
+    metadata["codecs"] = codecs
+    if dimension_names is not None:
+        metadata["dimension_names"] = [dimension_names[a] for a in axes]
+    new_metadata = ArrayV3Metadata.from_dict(metadata)
+
+    manifest = x.manifest
+    new_manifest = ChunkManifest.from_arrays(
+        paths=np.transpose(manifest._paths, axes),
+        offsets=np.transpose(manifest._offsets, axes),
+        lengths=np.transpose(manifest._lengths, axes),
+        validate_paths=False,
+        inlined={
+            tuple(key[a] for a in axes): data for key, data in manifest._inlined.items()
+        },
+    )
+    return ManifestArray(chunkmanifest=new_manifest, metadata=new_metadata)
+
+
+if hasattr(np, "permute_dims"):  # numpy >= 2.0
+    implements(np.permute_dims)(transpose)
+
+
+def _normalize_axis(axis: int, ndim: int) -> int:
+    if not -ndim <= axis < ndim:
+        raise ValueError(
+            f"axis {axis} is out of bounds for an array with {ndim} dimensions"
+        )
+    return axis % ndim
 
 
 @implements(np.broadcast_to)

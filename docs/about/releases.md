@@ -4,6 +4,14 @@
 
 ### New Features
 
+- `ManifestArray` can be transposed, with `.transpose()`, `.T`, `np.transpose` or `np.permute_dims`, so
+  `vds.transpose(...)` works on virtual datasets. No data is read: the chunk manifest is reordered, and a `transpose`
+  codec is added only when a chunk extends along axes whose order changes. An existing `transpose` codec, as on
+  Fortran-ordered arrays, is combined with the new order, and dropped if they cancel.
+  ([#163](https://github.com/zarr-developers/VirtualiZarr/issues/163),
+  [#872](https://github.com/zarr-developers/VirtualiZarr/issues/872)).
+  By [Ben Dichter](https://github.com/bendichter).
+
 ### Breaking changes
 
 ### Bug fixes
