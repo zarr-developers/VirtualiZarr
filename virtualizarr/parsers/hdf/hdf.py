@@ -98,7 +98,7 @@ def _construct_manifest_array(
     dataset: H5Dataset,
     group: str,
     links_and_references: bool = False,
-    squeeze_attributes: bool = True,
+    squeeze_attributes: bool | None = None,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -115,7 +115,8 @@ def _construct_manifest_array(
         Store a dataset of object references as the paths of their targets,
         following the draft Links and Object References convention.
     squeeze_attributes
-        Write an attribute that is an array of one element as a scalar.
+        Write an attribute that is an array of one element as a scalar; see
+        `_extract_attrs`.
 
     Returns
     -------
@@ -123,7 +124,9 @@ def _construct_manifest_array(
     """
     chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
-    attrs = _extract_attrs(dataset, links_and_references, squeeze=squeeze_attributes)
+    attrs = _extract_attrs(
+        dataset, links_and_references, squeeze_attributes=squeeze_attributes
+    )
     dtype = dataset.dtype
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
@@ -346,7 +349,7 @@ def _construct_manifest_group(
                     squeeze_attributes=squeeze,
                     _seen=seen,
                 )
-        attributes = _extract_attrs(g, links_and_references, squeeze=squeeze)
+        attributes = _extract_attrs(g, links_and_references, squeeze_attributes=squeeze)
         if links:
             _add_conventions(attributes, LINKS_REFERENCES_CONVENTION, REF_CONVENTION)
             attributes["links_references"] = {"links": links}
@@ -874,7 +877,7 @@ def _extract_attrs(
     h5obj: H5Dataset | H5Group,
     links_and_references: bool = False,
     *,
-    squeeze: bool = True,
+    squeeze_attributes: bool | None = None,
 ):
     """
     Extract attributes from an HDF5 group or dataset.
@@ -887,10 +890,11 @@ def _extract_attrs(
         Write an attribute that holds an object reference, or an array of them,
         as ref convention objects whose node is the target's path relative to
         h5obj; a null reference is None.
-    squeeze
+    squeeze_attributes
         Write an attribute that is an array of one element as a scalar, as
         netCDF-4 means by one. Otherwise it is a list of one, and only a
-        scalar attribute is a scalar.
+        scalar attribute is a scalar. None means True for an object in a
+        netCDF-4 file and False otherwise.
     """
     import h5py
 
@@ -906,6 +910,9 @@ def _extract_attrs(
     }
     attrs = {}
     path = _reference_path(h5obj) if links_and_references else None
+    squeeze = (
+        _is_netcdf4(h5obj.file) if squeeze_attributes is None else squeeze_attributes
+    )
 
     for n, v in h5obj.attrs.items():
         if n in _HIDDEN_ATTRS:
