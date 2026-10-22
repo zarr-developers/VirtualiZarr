@@ -10,6 +10,7 @@ import virtualizarr.manifests.utils as utils
 from virtualizarr.manifests.array_api import (
     MANIFESTARRAY_HANDLED_ARRAY_FUNCTIONS,
     _isnan,
+    transpose,
 )
 from virtualizarr.manifests.indexing import T_Indexer, index
 from virtualizarr.manifests.manifest import ChunkManifest
@@ -215,6 +216,20 @@ class ManifestArray:
                     )
                 else:
                     raise RuntimeWarning("Should not be possible to get here")
+
+    def transpose(self, *axes: int) -> "ManifestArray":
+        """
+        Permute the axes of the array, like `numpy.ndarray.transpose`, without reading any data.
+
+        See [transpose][virtualizarr.manifests.array_api.transpose].
+        """
+        if len(axes) == 1 and not isinstance(axes[0], int):
+            axes = tuple(axes[0])
+        return transpose(self, axes or None)
+
+    @property
+    def T(self) -> "ManifestArray":
+        return self.transpose()
 
     def astype(self, dtype: np.dtype, /, *, copy: bool = True) -> "ManifestArray":
         """Cannot change the dtype, but needed because xarray will call this even when it's a no-op."""

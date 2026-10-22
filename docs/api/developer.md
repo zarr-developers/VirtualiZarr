@@ -28,6 +28,7 @@ VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limite
 ::: virtualizarr.manifests.array_api.stack
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
+::: virtualizarr.manifests.array_api.transpose
 
 ## Parallelization
 
