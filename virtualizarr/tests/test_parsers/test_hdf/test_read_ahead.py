@@ -34,7 +34,9 @@ class CountingStore:
 def _write_in_pieces(filepath, *, userblock_size=0):
     """A file whose datasets were written a chunk at a time, so their chunk indexes are spread through it."""
     with h5py.File(filepath, "w", userblock_size=userblock_size) as f:
-        one = f.create_dataset("one", shape=(0,), maxshape=(None,), chunks=(4,), dtype="i4")
+        one = f.create_dataset(
+            "one", shape=(0,), maxshape=(None,), chunks=(4,), dtype="i4"
+        )
         two = f.create_dataset(
             "two", shape=(0, 6), maxshape=(None, 6), chunks=(2, 3), dtype="f8"
         )

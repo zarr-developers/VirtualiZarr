@@ -25,7 +25,9 @@ from typing import Any
 _SIGNATURE = b"TREE"
 _CHUNK_NODE = 1  # node type of a B-tree that indexes the chunks of a dataset
 _OFFSET_SIZE = 8
-_HEADER_SIZE = 8 + 2 * _OFFSET_SIZE  # signature, type, level, entries used, two siblings
+_HEADER_SIZE = (
+    8 + 2 * _OFFSET_SIZE
+)  # signature, type, level, entries used, two siblings
 _MAX_DIMENSIONS = 32
 # Where a node's addresses are counted from: the start of the file, or the end
 # of a userblock before it, whose size is a power of two from 512 bytes
@@ -65,7 +67,9 @@ def parse_chunk_index_node(node: bytes, file_size: int) -> tuple[int, list[int]]
             at = _HEADER_SIZE + i * (key_size + _OFFSET_SIZE)
             if int.from_bytes(node[at + key_size - 8 : at + key_size], "little") != 0:
                 break
-            child = int.from_bytes(node[at + key_size : at + key_size + _OFFSET_SIZE], "little")
+            child = int.from_bytes(
+                node[at + key_size : at + key_size + _OFFSET_SIZE], "little"
+            )
             if not 0 < child < file_size:
                 break
             children.append(child)
