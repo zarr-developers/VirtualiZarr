@@ -399,8 +399,9 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
     Such chunks arise for variables along an unlimited dimension whose oversized
     chunk could not be trimmed (e.g. because it is compressed). They read and
     write as virtual references fine, but cannot be concatenated with other
-    virtual datasets - the oversized final chunk prevents forming a regular
-    chunk grid - so point the user at loading them instead. Variables that were
+    virtual datasets - the oversized chunk decodes to more data than the array
+    holds - so point the user at loading them instead. Rectilinear grids list
+    every chunk's size explicitly, so they are skipped. Variables that were
     loaded (no longer backed by a ManifestArray) are unaffected and not warned
     about.
     """
@@ -408,6 +409,8 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
         name
         for name, var in vds.variables.items()
         if isinstance(var.data, ManifestArray)
+        # a rectilinear grid has no single chunk shape to compare
+        and var.data.chunk_grid.is_regular
         and any(
             c > s
             for c, s in zip(manifest_chunk_shape(var.data.metadata), var.data.shape)
@@ -419,7 +422,7 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
             "shape, which typically happens for variables along an unlimited "
             "dimension. They read and write as virtual references correctly, but "
             "cannot be concatenated with other virtual datasets because the "
-            "oversized chunk prevents forming a regular chunk grid. Pass them to "
+            "oversized chunk decodes to more data than the array holds. Pass them to "
             "loadable_variables to load them as in-memory arrays if you need to "
             "concatenate them.",
             UserWarning,
