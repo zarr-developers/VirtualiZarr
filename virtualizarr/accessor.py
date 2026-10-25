@@ -80,6 +80,7 @@ class _VirtualiZarrDatasetAccessor:
         region: Literal["auto"] | Mapping[str, Literal["auto"] | slice] | None = None,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
+        etag: str | None = None,
     ) -> None:
         """
         Write an xarray dataset to an Icechunk store.
@@ -134,6 +135,11 @@ class _VirtualiZarrDatasetAccessor:
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation. When not provided, the current time is used.
+            Mutually exclusive with ``etag``.
+        etag
+            ETag of the source object, when all virtual chunks refer to the same
+            object; icechunk then checks at read time that the object's ETag still
+            matches. Mutually exclusive with ``last_updated_at``.
 
         Raises
         ------
@@ -151,6 +157,7 @@ class _VirtualiZarrDatasetAccessor:
             region=region,
             validate_containers=validate_containers,
             last_updated_at=last_updated_at,
+            etag=etag,
         )
 
     @overload
@@ -377,6 +384,7 @@ class _VirtualiZarrDataTreeAccessor:
         write_inherited_coords: bool = False,
         validate_containers: bool = True,
         last_updated_at: datetime | None = None,
+        etag: str | None = None,
         **kwargs,
     ) -> None:
         """
@@ -421,6 +429,11 @@ class _VirtualiZarrDataTreeAccessor:
         last_updated_at
             Datetime to use as a checksum for any virtual chunks written to the store
             with this operation.  When not provided, no check is performed.
+            Mutually exclusive with ``etag``.
+        etag
+            ETag of the source object, when all virtual chunks refer to the same
+            object; icechunk then checks at read time that the object's ETag still
+            matches. Mutually exclusive with ``last_updated_at``.
         **kwargs
             Additional keyword arguments to be passed to ``xarray.Dataset.vz.to_icechunk``.
 
@@ -450,6 +463,7 @@ class _VirtualiZarrDataTreeAccessor:
             write_inherited_coords=write_inherited_coords,
             validate_containers=validate_containers,
             last_updated_at=last_updated_at,
+            etag=etag,
             **kwargs,
         )
 
