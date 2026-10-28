@@ -336,11 +336,12 @@ class _VirtualiZarrDatasetAccessor:
         >>> vds.vz.nrefs()  # doctest: +SKIP
         42
         """
-        return sum(
-            len(var._data.manifest)
-            for var in self.ds.variables.values()
-            if isinstance(var._data, ManifestArray)
-        )
+        total = 0
+        for var in self.ds.variables.values():
+            data = var._data
+            if isinstance(data, ManifestArray):
+                total += len(data.manifest)
+        return total
 
 
 @xr.register_dataset_accessor("vz")
