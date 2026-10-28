@@ -34,7 +34,7 @@ def warn_if_not_virtual(cls_name: Literal["Dataset", "DataTree"]):
                 case "DataTree":
                     all_vars = all_datatree_variables(self.dt)
 
-            if not any(isinstance(var.data, ManifestArray) for var in all_vars):
+            if not any(isinstance(var._data, ManifestArray) for var in all_vars):
                 warnings.warn(
                     f"Attempting to write an entirely non-virtual {cls_name} to a virtual references format - i.e. your `xarray.{cls_name}` contains zero `ManifestArray` objects. "
                     "This is almost certainly not intended, as the entire data contents will be duplicated rather than referenced. "
@@ -315,8 +315,8 @@ class _VirtualiZarrDatasetAccessor:
         In-memory (loadable) variables are included in the total using xarray's normal ``.nbytes`` method.
         """
         return sum(
-            var.data.nbytes_virtual
-            if isinstance(var.data, ManifestArray)
+            var._data.nbytes_virtual
+            if isinstance(var._data, ManifestArray)
             else var.nbytes
             for var in self.ds.variables.values()
         )
@@ -337,9 +337,9 @@ class _VirtualiZarrDatasetAccessor:
         42
         """
         return sum(
-            len(var.data.manifest)
+            len(var._data.manifest)
             for var in self.ds.variables.values()
-            if isinstance(var.data, ManifestArray)
+            if isinstance(var._data, ManifestArray)
         )
 
 

@@ -529,6 +529,41 @@ class TestToVirtualXarray:
             assert var.data.metadata.dimension_names is None
             assert var.attrs == {}
 
+    def test_loadable_variables_stay_lazy(self, manifest_array, monkeypatch):
+        # building the dataset must not read chunks of lazily-indexed loadable variables
+        marr = manifest_array(
+            shape=(5,), chunks=(1,), dimension_names=["x"], codecs=None
+        )
+        store = MemoryStore()
+        for path in {v["path"] for v in marr.manifest.values()}:
+            obs.put(
+                store,
+                path.split("/")[-1],
+                np.ones(marr.metadata.chunks, dtype=marr.dtype).tobytes(),
+            )
+        registry = ObjectStoreRegistry({"file://": store})
+        manifest_store = ManifestStore(
+            ManifestGroup(arrays={"data": marr}, attributes={}), registry=registry
+        )
+
+        chunk_reads = []
+        original_get = ManifestStore.get
+
+        async def counting_get(self, key, *args, **kwargs):
+            if key.startswith("data/c"):
+                chunk_reads.append(key)
+            return await original_get(self, key, *args, **kwargs)
+
+        monkeypatch.setattr(ManifestStore, "get", counting_get)
+
+        vds = manifest_store.to_virtual_dataset(loadable_variables=["data"])
+        vds.vz.nbytes
+        vds.vz.nrefs()
+        assert chunk_reads == []
+
+        vds["data"][:1].values
+        assert len(chunk_reads) == 1
+
     def _store_with_oversized_chunk(self, manifest_array, store):
         # a (non-coordinate) variable whose chunk is larger than its shape, e.g.
         # as produced for a variable along an unlimited dimension - see issue #803
