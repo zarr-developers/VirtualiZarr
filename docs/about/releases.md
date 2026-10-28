@@ -8,6 +8,12 @@
 
 ### Bug fixes
 
+- Variables passed as `loadable_variables` are no longer read in full while building the virtual dataset.
+  Internal checks for `ManifestArray`s now avoid `Variable.data`, so these variables stay lazily indexed until accessed.
+  Closes [#1148](https://github.com/zarr-developers/VirtualiZarr/issues/1148),
+  fixed in [#1151](https://github.com/zarr-developers/VirtualiZarr/pull/1151).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Documentation
 
 ### Internal changes
