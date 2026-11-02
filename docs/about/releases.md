@@ -4,6 +4,13 @@
 
 ### New Features
 
+- `HDFParser(encode_bytes_attributes=True)` reads attributes that hold bytes that aren't valid UTF-8, or opaque data,
+  which used to make the whole parse fail with `UnicodeDecodeError` or `TypeError`. They are written as `base64:`
+  strings following the draft [Bytes Attributes convention](https://github.com/catalystneuro/zarr-bytes-attributes),
+  which the node registers. Without the option, such an attribute raises a `ValueError` that names it and mentions
+  the option. ([#1143](https://github.com/zarr-developers/VirtualiZarr/issues/1143)).
+  By [Ben Dichter](https://github.com/bendichter).
+
 ### Breaking changes
 
 ### Bug fixes
