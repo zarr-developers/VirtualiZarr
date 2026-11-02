@@ -6,6 +6,14 @@
 
 ### Breaking changes
 
+- `HDFParser` keeps an attribute that is an array of one element as a list of one, except in netCDF-4 files.
+  It used to make every such attribute a scalar, which netCDF-4 needs, because it writes an attribute with one value
+  that way. In other HDF5 files the two are different, and a list of one name, for example, became a string. A scalar
+  attribute and `_FillValue` are scalars as before. `HDFParser(squeeze_attributes=True)` restores the old behaviour,
+  and `squeeze_attributes=False` keeps lists in netCDF-4 files too.
+  ([#1139](https://github.com/zarr-developers/VirtualiZarr/issues/1139)).
+  By [Ben Dichter](https://github.com/bendichter).
+
 ### Bug fixes
 
 ### Documentation
