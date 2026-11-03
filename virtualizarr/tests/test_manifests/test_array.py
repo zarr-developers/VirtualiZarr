@@ -1446,6 +1446,39 @@ class TestSubChunkSlicingUncompressed:
         }
         assert sliced.manifest.dict() == expected
 
+    def test_axis_0_slice_of_inlined_chunk(self, array_v3_metadata):
+        # Inlined chunks of an uncompressed array hold raw bytes, so they are
+        # trimmed to the same sub-range as the virtual chunk references.
+        metadata = array_v3_metadata(
+            shape=(4, 4),
+            chunks=(4, 2),
+            data_type=np.dtype("float64"),
+            codecs=[self.BYTES_CODEC],
+        )
+        inlined_chunk = np.arange(8, dtype="<f8").reshape(4, 2)
+        manifest = ChunkManifest(
+            entries={
+                "0.0": {
+                    "path": "",
+                    "offset": 0,
+                    "length": inlined_chunk.nbytes,
+                    "data": inlined_chunk.tobytes(),
+                },
+                "0.1": {"path": "/foo.nc", "offset": 1000, "length": 64},
+            }
+        )
+        marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
+
+        sliced = marr[1:3, :]
+
+        assert sliced.shape == (2, 4)
+        assert sliced.manifest._inlined == {(0, 0): inlined_chunk[1:3].tobytes()}
+        assert sliced.manifest.dict()["0.1"] == {
+            "path": "file:///foo.nc",
+            "offset": 1000 + 16,
+            "length": 32,
+        }
+
     @pytest.mark.parametrize(
         "indexer, reason",
         [
