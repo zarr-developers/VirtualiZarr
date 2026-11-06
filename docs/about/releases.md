@@ -16,6 +16,11 @@
 
 ### Bug fixes
 
+- Variables passed as `loadable_variables` are no longer read in full while building the virtual dataset.
+  Internal checks for `ManifestArray`s now avoid `Variable.data`, so these variables stay lazily indexed until accessed.
+  Closes [#1148](https://github.com/zarr-developers/VirtualiZarr/issues/1148),
+  fixed in [#1151](https://github.com/zarr-developers/VirtualiZarr/pull/1151).
+  By [Tom Nicholas](https://github.com/TomNicholas).
 - Slicing an uncompressed virtual array within a single chunk now trims inlined chunks to the selected
   rows, as it already did for virtual chunk references. Previously the inlined chunk kept all of its
   bytes, so reading the sliced array failed with *"cannot reshape array"*.
