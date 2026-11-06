@@ -47,7 +47,7 @@ See the [Icechunk format specification](https://icechunk.io/en/latest/reference/
 Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
 
 Note that this diagram deliberately covers only array formats.
-Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
+Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and virtualizing them as Zarr would need features that don't exist yet (e.g. Parquet pages hold varying numbers of rows, and dictionary-encoded pages cannot be decoded from a single contiguous byte range).
 
 ```python exec="true" html="true"
 import pathlib
