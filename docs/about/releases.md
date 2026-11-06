@@ -16,6 +16,12 @@
 
 ### Bug fixes
 
+- Slicing an uncompressed virtual array within a single chunk now trims inlined chunks to the selected
+  rows, as it already did for virtual chunk references. Previously the inlined chunk kept all of its
+  bytes, so reading the sliced array failed with *"cannot reshape array"*.
+  Closes [#1153](https://github.com/zarr-developers/VirtualiZarr/issues/1153).
+  By [Raphael Fakhri](https://github.com/RaphaelFakhri).
+
 ### Documentation
 
 ### Internal changes
