@@ -408,12 +408,13 @@ def _warn_about_oversized_virtual_chunks(vds: "xr.Dataset") -> None:
     oversized = [
         name
         for name, var in vds.variables.items()
-        if isinstance(var.data, ManifestArray)
+        # use `_data` rather than `.data`, which would load lazily-indexed variables
+        if isinstance(var._data, ManifestArray)
         # a rectilinear grid has no single chunk shape to compare
-        and var.data.chunk_grid.is_regular
+        and var._data.chunk_grid.is_regular
         and any(
             c > s
-            for c, s in zip(manifest_chunk_shape(var.data.metadata), var.data.shape)
+            for c, s in zip(manifest_chunk_shape(var._data.metadata), var._data.shape)
         )
     ]
     if oversized:

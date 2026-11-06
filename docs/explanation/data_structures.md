@@ -277,6 +277,7 @@ If rectilinear chunk grids are not enabled, the same call raises a `ValueError`,
     Rectilinear chunk grid support is still limited. Concatenation, stacking, and appending are supported, and the result can be written to an [Icechunk](https://icechunk.io/) store. But:
 
     - **Indexing** a rectilinear-chunked array is not yet implemented, and raises a `NotImplementedError`. That includes Xarray operations that index under the hood, such as `isel`, `expand_dims`, and concatenating the result along a *new* dimension (so combining along a second dimension after the one that produced the rectilinear grid does not work yet).
+    - **Transposing** a rectilinear-chunked array is not yet implemented either.
     - **Region writes** to a rectilinear-chunked array are not yet implemented - region alignment is checked against a single chunk size per axis, which has no equivalent for irregular chunk boundaries.
 
     Note also that some formats (including Zarr and Icechunk stores) could in principle already be rectilinear on disk, but VirtualiZarr can't read those back yet either.
@@ -303,6 +304,9 @@ The whole point is to manipulate references to the data without actually loading
     As a special case, an **uncompressed** array supports slicing _within_ a single source chunk along its largest-stride storage axis — the result is a new chunk reference with a bumped byte offset and a smaller length, no data loaded. This works for `[BytesCodec]` arrays (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` arrays (the axis is `order[0]` — e.g. the last axis for F-order). Useful for picking out a row from a multi-row chunk produced by a parser like the netCDF3 one.
     Arbitrary fancy indexing (e.g. with a boolean mask or integer array) is not supported, since it would generally require loading data.
 
+!!! note
+    You can also transpose a `ManifestArray`, or a virtual dataset with `vds.transpose(...)`, without loading data. The chunk manifest is reordered so each chunk keeps its byte range under its new key. If a chunk extends along more than one of the axes that change order, a `transpose` codec is added so readers reorder each chunk's elements after decoding it, and they then read that array a whole chunk at a time. When the axes a chunk extends along keep their order, as for an array stored one row per chunk, nothing else changes. Sharded arrays can't be transposed yet. Zarr V2 metadata has no `transpose` codec, so to write such an array to kerchunk references use `zarr_format=3`.
+
 ## Zarr Groups
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, group-level metadata and metadata on each array.
@@ -315,6 +319,8 @@ A `ManifestGroup` is a dedicated class that contains multiple `ManifestArray`, p
 It is designed to act similar to a Zarr group, such that a named collection of one or more `ManifestGroup` objects can be combined together to form a `ManifestStore`.
 
 The `ManifestStore` (and `ManifestGroup`) classes are only used during `open_virtual_dataset`, to simplify the creation of virtual references and loading of variables from archival file formats.
+A `ManifestStore` fetches chunk bytes through the [object store registry](registry.md) it was created with.
+
 You should therefore probably only use `ManifestStore` or `ManifestGroup` directly if you're planning to [write your own custom parser](custom_parsers.md) for an unsupported archival file format.
 
 ## "Virtual" Xarray Datasets

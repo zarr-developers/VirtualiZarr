@@ -15,6 +15,8 @@ See the page on data structures for more information.
 
 ## Registry
 
+See [The object store registry](../explanation/registry.md) for what the registry does and why it's needed.
+
 !!! note
     `virtualizarr.registry.ObjectStoreRegistry` has been deprecated. Please use [obspec_utils.registry.ObjectStoreRegistry][] instead.
 
@@ -26,6 +28,7 @@ VirtualiZarr's [virtualizarr.manifests.ManifestArray][] objects support a limite
 ::: virtualizarr.manifests.array_api.stack
 ::: virtualizarr.manifests.array_api.expand_dims
 ::: virtualizarr.manifests.array_api.broadcast_to
+::: virtualizarr.manifests.array_api.transpose
 
 ## Parallelization
 

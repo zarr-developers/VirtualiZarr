@@ -19,6 +19,7 @@ from typing import (
 )
 
 from zarr.abc.codec import ArrayBytesCodec
+from zarr.codecs import VLenUTF8Codec
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.dtype import data_type_registry
 
@@ -135,6 +136,10 @@ def convert_v3_to_v2_metadata(
         for codec in v3_metadata.codecs
         if not isinstance(codec, ArrayBytesCodec)
     ]
+    # Zarr v2 has no array-bytes codec. A variable-length string array instead
+    # names its object codec as the first filter, without which it can't be read.
+    if any(isinstance(codec, VLenUTF8Codec) for codec in v3_metadata.codecs):
+        v2_codecs.insert(0, {"id": "vlen-utf8"})
     # TODO: Remove convert_v3_to_v2_metadata and always encode V3 metadata.
     # This logic is based on the (default) Bytes codec's endian property,
     # but other codec pipelines could store endianness elsewhere.
