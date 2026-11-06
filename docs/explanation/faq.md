@@ -20,6 +20,10 @@ Some reasons are:
 
 ### Can my file format be virtualized?
 
+!!! tip
+
+    For a list of the formats that already have a parser, see [Supported file formats](../supported_formats.md).
+
 Not all file formats can be virtualized.
 Some have an internal layout which prevents efficient cloud-optimized access to their data.
 
@@ -193,7 +197,7 @@ manifest_store = IcechunkParser().parse_session(
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
 
-There are a lot of archival file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples).
+There are a lot of archival file formats which could potentially be represented as virtual zarr references (see [Supported file formats](../supported_formats.md) and [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) for some examples).
 VirtualiZarr ships with some parsers for common formats (e.g. netCDF/HDF5), but you may want to write your own parser for some other file format.
 
 For guidance on how to write a custom parser for a new file format see the page on [Custom Parsers](custom_parsers.md)
