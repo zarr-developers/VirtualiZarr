@@ -101,8 +101,8 @@ def synthetic_vds_rectilinear_grid(tmpdir: Path, array_v3_metadata_rectilinear):
         dimension_names=("x",),
     )
     ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
-    foo = xr.Variable(data=ma, dims=["x"])
-    vds = xr.Dataset({"foo": foo})
+    # as a parser's output would, so dimension names live only on the xarray variable
+    vds = xr.Dataset({"foo": ma.to_virtual_variable()})
     return vds, arr
 
 

@@ -510,6 +510,48 @@ def test_read_rectilinear_virtual_refs_with_xarray(synthetic_vds_rectilinear_gri
         np.testing.assert_equal(ds["foo"].values, arr)
 
 
+@requires_xarray_rectilinear
+@pytest.mark.parametrize(
+    "transform, expected",
+    [
+        # chunk-aligned subsets of the (2, 1, 3) chunks
+        (lambda vds: vds.isel(x=slice(2, 6)), lambda arr: arr[2:6]),
+        (lambda vds: vds.isel(x=slice(0, 3)), lambda arr: arr[0:3]),
+        # concatenating along a new dimension indexes each input to add the axis
+        (
+            lambda vds: xr.concat([vds, vds], dim="t"),
+            lambda arr: np.stack([arr, arr]),
+        ),
+    ],
+    ids=["isel-tail", "isel-head", "concat-new-dim"],
+)
+def test_read_indexed_rectilinear_virtual_refs_with_xarray(
+    synthetic_vds_rectilinear_grid, transform, expected
+):
+    vds, arr = synthetic_vds_rectilinear_grid
+
+    storage = icechunk.Storage.new_in_memory()
+    config = icechunk.RepositoryConfig.default()
+    container = icechunk.VirtualChunkContainer(
+        url_prefix=PYTEST_TMP_DIRECTORY_URL_PREFIX,
+        store=icechunk.local_filesystem_store(PYTEST_TMP_DIRECTORY_URL_PREFIX),
+    )
+    config.set_virtual_chunk_container(container)
+    repo = icechunk.Repository.create(
+        storage=storage,
+        config=config,
+        authorize_virtual_chunk_access={PYTEST_TMP_DIRECTORY_URL_PREFIX: None},
+    )
+
+    session = repo.writable_session("main")
+    transform(vds).vz.to_icechunk(session.store)
+    session.commit("write indexed rectilinear array")
+
+    ro_session = repo.readonly_session("main")
+    with xr.open_zarr(ro_session.store, consolidated=False, zarr_format=3) as ds:
+        np.testing.assert_equal(ds["foo"].values, expected(arr))
+
+
 def test_set_inlined_and_virtual_refs(
     icechunk_filestore: "IcechunkStore",
     icechunk_repo: "Repository",
