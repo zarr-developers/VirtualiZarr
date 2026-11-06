@@ -31,6 +31,7 @@ from virtualizarr.tests import (
     requires_imagecodecs,
     requires_minio,
     requires_obstore,
+    requires_xarray_rectilinear,
 )
 
 if TYPE_CHECKING:
@@ -598,6 +599,7 @@ class TestToVirtualXarray:
             manifest_store.to_virtual_dataset(loadable_variables=["data"])
         assert not [w for w in record if "loadable_variables" in str(w.message)]
 
+    @requires_xarray_rectilinear
     def test_no_warning_for_rectilinear_chunks(self, array_v3_metadata_rectilinear):
         # a parser may return a rectilinear grid, which has no single chunk shape to
         # compare against the array shape
