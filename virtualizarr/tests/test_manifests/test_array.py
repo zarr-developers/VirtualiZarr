@@ -1,7 +1,10 @@
+import itertools
+
 import numpy as np
 import obstore as obs
 import pytest
 import xarray as xr
+import zarr
 from zarr.core.metadata.v3 import ArrayV3Metadata
 
 from conftest import (
@@ -1583,3 +1586,193 @@ def test_to_virtual_variable_preserves_inlined(array_v3_metadata):
     marr = ManifestArray(metadata=metadata, chunkmanifest=manifest)
     vv = marr.to_virtual_variable()
     assert vv.data.manifest._inlined == {(0,): b"aaaa", (1,): b"bbbb"}
+
+
+def _chunked_on_disk(tmp_path, data, chunks, metadata_factory, codecs=None):
+    """A ManifestArray over a raw file holding data's chunks one after another, each in C order."""
+    filepath = str(tmp_path / "chunks.bin")
+    grid = [range(0, n, c) for n, c in zip(data.shape, chunks)]
+    entries = {}
+    with open(filepath, "wb") as f:
+        for starts in itertools.product(*grid):
+            block = data[tuple(slice(s, s + c) for s, c in zip(starts, chunks))]
+            # pad a partial edge chunk to the full chunk shape, as zarr expects
+            full = np.zeros(chunks, dtype=data.dtype)
+            full[tuple(slice(0, n) for n in block.shape)] = block
+            key = ".".join(str(s // c) for s, c in zip(starts, chunks))
+            entries[key] = {"path": filepath, "offset": f.tell(), "length": full.nbytes}
+            f.write(full.tobytes())
+    metadata = metadata_factory(
+        shape=data.shape,
+        chunks=chunks,
+        data_type=data.dtype,
+        dimension_names=[f"d{i}" for i in range(data.ndim)],
+        codecs=codecs,
+    )
+    return ManifestArray(
+        metadata=metadata, chunkmanifest=ChunkManifest(entries=entries)
+    )
+
+
+def _read(marr, registry):
+    store = ManifestStore(group=ManifestGroup(arrays={"v": marr}), registry=registry)
+    return zarr.open_array(store, path="v", mode="r", zarr_format=3)[...]
+
+
+def _transpose_codecs(marr):
+    return [c for c in marr.metadata.to_dict()["codecs"] if c["name"] == "transpose"]
+
+
+class TestTranspose:
+    @pytest.mark.parametrize(
+        "shape, chunks",
+        [
+            ((4, 6), (4, 6)),
+            ((4, 6), (1, 6)),
+            ((4, 6), (2, 3)),
+            ((5, 7), (2, 3)),
+            ((3, 4, 5), (3, 4, 5)),
+            ((3, 4, 5), (1, 4, 5)),
+            ((3, 4, 5), (3, 1, 5)),
+            ((2, 3, 4), (1, 3, 2)),
+        ],
+    )
+    def test_values(self, tmp_path, array_v3_metadata, local_registry, shape, chunks):
+        data = np.arange(np.prod(shape), dtype="int32").reshape(shape)
+        marr = _chunked_on_disk(tmp_path, data, chunks, array_v3_metadata)
+        for axes in itertools.permutations(range(len(shape))):
+            transposed = marr.transpose(axes)
+            assert transposed.shape == tuple(shape[a] for a in axes)
+            assert transposed.metadata.dimension_names == tuple(f"d{a}" for a in axes)
+            np.testing.assert_array_equal(
+                _read(transposed, local_registry), np.transpose(data, axes)
+            )
+
+    @pytest.mark.parametrize(
+        "chunks, axes, needs_codec",
+        [
+            # one chunk: the bytes are in the old order, so a codec is needed
+            ((4, 6), (1, 0), True),
+            # a chunk is one row: only the chunk keys change
+            ((1, 6), (1, 0), False),
+            ((3, 1, 5), (1, 0, 2), False),
+            # the axes a chunk extends along keep their order
+            ((1, 4, 5), (1, 2, 0), False),
+            ((1, 4, 5), (0, 2, 1), True),
+        ],
+    )
+    def test_codec_only_when_needed(self, array_v3_metadata, chunks, axes, needs_codec):
+        shape = tuple(c * 2 if c > 1 else 3 for c in chunks)
+        metadata = array_v3_metadata(shape=shape[: len(chunks)], chunks=chunks)
+        grid = tuple(-(-n // c) for n, c in zip(metadata.shape, chunks))
+        n = int(np.prod(grid))
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest.from_arrays(
+                paths=np.full(grid, "file:///foo.bin", dtype=np.dtypes.StringDType()),
+                offsets=np.arange(n, dtype="uint64").reshape(grid) * 100,
+                lengths=np.full(grid, 100, dtype="uint64"),
+            ),
+        )
+        transposed = marr.transpose(axes)
+        assert bool(_transpose_codecs(transposed)) == needs_codec
+        # each chunk keeps its byte range under its new key
+        np.testing.assert_array_equal(
+            transposed.manifest._offsets, np.transpose(marr.manifest._offsets, axes)
+        )
+
+    def test_transposing_back_removes_the_codec(
+        self, tmp_path, array_v3_metadata, local_registry
+    ):
+        data = np.arange(24, dtype="int32").reshape(2, 3, 4)
+        marr = _chunked_on_disk(tmp_path, data, (2, 3, 4), array_v3_metadata)
+        once = marr.transpose((2, 0, 1))
+        assert _transpose_codecs(once)
+        twice = once.transpose((1, 2, 0))
+        assert not _transpose_codecs(twice)
+        assert twice.metadata == marr.metadata
+        np.testing.assert_array_equal(_read(twice, local_registry), data)
+
+    def test_existing_transpose_codec(
+        self, tmp_path, array_v3_metadata, local_registry
+    ):
+        # Fortran-ordered chunks, as an HDF5 or Zarr v2 array with order "F" has
+        data = np.arange(24, dtype="int32").reshape(4, 6)
+        filepath = str(tmp_path / "fortran.bin")
+        with open(filepath, "wb") as f:
+            f.write(np.asfortranarray(data).tobytes(order="F"))
+        metadata = array_v3_metadata(
+            shape=(4, 6),
+            chunks=(4, 6),
+            data_type=data.dtype,
+            codecs=[
+                {"name": "transpose", "configuration": {"order": [1, 0]}},
+                ARRAYBYTES_CODEC,
+            ],
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": filepath, "offset": 0, "length": data.nbytes}}
+            ),
+        )
+        np.testing.assert_array_equal(_read(marr, local_registry), data)
+        transposed = marr.T
+        # the two transposes cancel, so the chunk is read as it is stored
+        assert not _transpose_codecs(transposed)
+        np.testing.assert_array_equal(_read(transposed, local_registry), data.T)
+
+    def test_inlined_chunks(self, array_v3_metadata, local_registry):
+        data = np.arange(6, dtype="int32").reshape(2, 3)
+        metadata = array_v3_metadata(shape=(2, 3), chunks=(1, 3), data_type=data.dtype)
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={
+                    f"{i}.0": {
+                        "path": "",
+                        "offset": 0,
+                        "length": data[i].nbytes,
+                        "data": data[i].tobytes(),
+                    }
+                    for i in range(2)
+                }
+            ),
+        )
+        transposed = marr.transpose()
+        assert set(transposed.manifest._inlined) == {(0, 0), (0, 1)}
+        np.testing.assert_array_equal(_read(transposed, local_registry), data.T)
+
+    def test_numpy_and_xarray(self, manifest_array):
+        marr = manifest_array(shape=(4, 6), chunks=(1, 6))
+        assert np.transpose(marr).shape == (6, 4)
+        assert marr.T.shape == (6, 4)
+        assert marr.transpose(1, 0).shape == (6, 4)
+        if hasattr(np, "permute_dims"):
+            assert np.permute_dims(marr, (1, 0)).shape == (6, 4)
+        var = xr.Variable(("t", "c"), marr)
+        assert var.transpose("c", "t").shape == (6, 4)
+
+    def test_identity_returns_the_same_array(self, manifest_array):
+        marr = manifest_array(shape=(4, 6), chunks=(1, 6))
+        assert marr.transpose(0, 1) is marr
+
+    def test_bad_axes(self, manifest_array):
+        marr = manifest_array(shape=(4, 6), chunks=(1, 6))
+        with pytest.raises(ValueError):
+            marr.transpose(0, 0)
+        with pytest.raises(ValueError):
+            marr.transpose(0, 2)
+
+    def test_sharded(self, array_v3_metadata):
+        metadata = array_v3_metadata(
+            shape=(4, 6), chunks=(4, 6), codecs=[sharding_codec((2, 3))]
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(
+                entries={"0.0": {"path": "file:///foo", "offset": 0, "length": 100}}
+            ),
+        )
+        with pytest.raises(NotImplementedError, match="sharded"):
+            marr.transpose()

@@ -249,6 +249,9 @@ The whole point is to manipulate references to the data without actually loading
     As a special case, an **uncompressed** array supports slicing _within_ a single source chunk along its largest-stride storage axis — the result is a new chunk reference with a bumped byte offset and a smaller length, no data loaded. This works for `[BytesCodec]` arrays (C-order; the axis is axis 0) and `[TransposeCodec(order=...), BytesCodec]` arrays (the axis is `order[0]` — e.g. the last axis for F-order). Useful for picking out a row from a multi-row chunk produced by a parser like the netCDF3 one.
     Arbitrary fancy indexing (e.g. with a boolean mask or integer array) is not supported, since it would generally require loading data.
 
+!!! note
+    You can also transpose a `ManifestArray`, or a virtual dataset with `vds.transpose(...)`, without loading data. The chunk manifest is reordered so each chunk keeps its byte range under its new key. If a chunk extends along more than one of the axes that change order, a `transpose` codec is added so readers reorder each chunk's elements after decoding it, and they then read that array a whole chunk at a time. When the axes a chunk extends along keep their order, as for an array stored one row per chunk, nothing else changes. Sharded arrays can't be transposed yet. Zarr V2 metadata has no `transpose` codec, so to write such an array to kerchunk references use `zarr_format=3`.
+
 ## Zarr Groups
 
 The full Zarr model (for a single group) includes multiple arrays, array names, named dimensions, group-level metadata and metadata on each array.
