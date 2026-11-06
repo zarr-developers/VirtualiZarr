@@ -18,6 +18,7 @@ exclude_docs: |
 
 nav:
   - "index.md"
+  - "supported_formats.md"
   - Getting started:
     - "getting_started/installation.md"
   - How-to guides:
@@ -44,6 +45,7 @@ nav:
       - api/parsers/zarr.md
       - api/parsers/zip.md
       - api/parsers/dmrpp.md
+      - api/parsers/envi.md
       - api/parsers/tiff.md
       - api/parsers/grib.md
     - api/serialization.md
