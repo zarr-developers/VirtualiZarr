@@ -44,3 +44,7 @@ has_tiff, requires_tiff = _importorskip("virtual_tiff")
 has_arro3, requires_arro3 = _importorskip("arro3.core")
 # The GribberishParser is new in gribberish 1.0.0.
 has_grib, requires_grib = _importorskip("gribberish", minversion="1.0.0")
+# Reading rectilinear chunk grids is new in xarray 2026.9.0.
+has_xarray_rectilinear, requires_xarray_rectilinear = _importorskip(
+    "xarray", minversion="2026.9.0"
+)

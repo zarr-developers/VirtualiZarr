@@ -77,6 +77,36 @@ def synthetic_vds(tmpdir: Path):
 
 
 @pytest.fixture()
+def synthetic_vds_rectilinear_grid(tmpdir: Path, array_v3_metadata_rectilinear):
+    """A 1D virtual dataset with a rectilinear (variable-length) chunk grid: three
+    chunks of sizes 2, 1, 3 covering a 6-element array."""
+    filepath = f"{tmpdir}/data_chunk"
+    store = obstore.store.LocalStore()
+    arr = np.arange(6, dtype="<i8")
+    itemsize = arr.dtype.itemsize
+    obstore.put(store, filepath, arr.tobytes())
+
+    manifest = ChunkManifest(
+        {
+            "0": {"path": filepath, "offset": 0, "length": 2 * itemsize},
+            "1": {"path": filepath, "offset": 2 * itemsize, "length": 1 * itemsize},
+            "2": {"path": filepath, "offset": 3 * itemsize, "length": 3 * itemsize},
+        }
+    )
+    metadata = array_v3_metadata_rectilinear(
+        shape=(6,),
+        chunk_shapes=((2, 1, 3),),
+        data_type=arr.dtype,
+        codecs=[{"configuration": {"endian": "little"}, "name": "bytes"}],
+        dimension_names=("x",),
+    )
+    ma = ManifestArray(chunkmanifest=manifest, metadata=metadata)
+    foo = xr.Variable(data=ma, dims=["x"])
+    vds = xr.Dataset({"foo": foo})
+    return vds, arr
+
+
+@pytest.fixture()
 def synthetic_vds_grid(tmpdir: Path):
     filepath = f"{tmpdir}/data_chunk"
     store = obstore.store.LocalStore()
