@@ -461,6 +461,19 @@ class TestChunkGrid:
         assert grid.is_regular is False
         assert grid.chunk_sizes == ((2, 2, 1), (5,))
 
+    def test_repr_rectilinear(self, array_v3_metadata_rectilinear):
+        # zarr reprs every array while opening a group, so this must not raise
+        metadata = array_v3_metadata_rectilinear(
+            shape=(5, 5), chunk_shapes=((2, 2, 1), (5,))
+        )
+        marr = ManifestArray(
+            metadata=metadata,
+            chunkmanifest=ChunkManifest(entries={}, shape=(3, 1)),
+        )
+        assert repr(marr) == (
+            "ManifestArray<shape=(5, 5), dtype=int32, chunks=((2, 2, 1), (5,))>"
+        )
+
 
 class TestBroadcastRectilinear:
     def test_broadcast_to_rectilinear_array_raises(self, array_v3_metadata_rectilinear):

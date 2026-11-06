@@ -108,7 +108,12 @@ class ManifestArray:
         return int(np.prod(self.shape))
 
     def __repr__(self) -> str:
-        return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={self.metadata.chunks}>"
+        chunks = (
+            self.metadata.chunks
+            if self.chunk_grid.is_regular
+            else self.chunk_grid.chunk_sizes
+        )
+        return f"ManifestArray<shape={self.shape}, dtype={self.dtype}, chunks={chunks}>"
 
     @property
     def nbytes_virtual(self) -> int:
