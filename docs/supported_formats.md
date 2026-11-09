@@ -16,11 +16,18 @@ The table below lists each format under the name you probably know it by, so you
 
 - **Parser**: the class to pass as `open_virtual_dataset(..., parser=...)`.
 - **Package**: where the parser comes from, with the `pip install` extra if there is one.
-- **VZ team?**: ✅ if a member of the [VirtualiZarr core team](https://github.com/orgs/zarr-developers/teams/virtualizarr-core-devs) maintains the parser.
+- **VZ team?**: ✅ if a member of the [VirtualiZarr core team](https://github.com/orgs/zarr-developers/teams/virtualizarr-core-devs) maintains the parser. ❌ means we can't vouch for its correctness (see the warning below).
 - **Codecs needed to read**: what anyone *reading* the virtual store must have installed to decode chunks, beyond zarr-python. "None" means only codecs from the core Zarr V3 spec. `numcodecs` codecs are available in zarr-python, but readers in other languages may not support them. A named package means its codecs must be installed and registered wherever the data is read, and readers in other languages may not support them.
 - **Domains**: the fields where the format is most common.
 
 ## ✅ Formats with a parser
+
+!!! warning "Check the output of parsers marked ❌"
+
+    Parsers marked ❌ in the **VZ team?** column are maintained outside the VirtualiZarr team.
+    We haven't reviewed them, so we can't vouch for their correctness.
+    A parser bug can produce wrong chunk references that still open without errors and then return incorrect data.
+    Before relying on one of these parsers, check its output carefully, for example by comparing values read through the virtual store with values read from the original file by a trusted library.
 
 | Format | Extensions | Parser | Package | VZ team? | Codecs needed to read | Domains | Notes |
 | --- | --- | --- | --- | :---: | --- | --- | --- |
