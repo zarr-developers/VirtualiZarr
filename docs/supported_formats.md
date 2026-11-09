@@ -22,6 +22,12 @@ The table below lists each format under the name you probably know it by, so you
 
 ## ✅ Formats with a parser
 
+!!! note "Parsing one file doesn't mean your whole dataset can be virtualized"
+
+    A parser for your format means each file can be virtualized on its own.
+    Combining many files into one virtual dataset also needs the files to be consistent with each other, for example in chunk shapes, codecs and CF encoding attributes.
+    See [Can my specific data be virtualized?](explanation/faq.md#can-my-specific-data-be-virtualized) for the full list of requirements.
+
 !!! warning "Check the output of parsers marked ❌"
 
     Parsers marked ❌ in the **VZ team?** column are maintained outside the VirtualiZarr team.
