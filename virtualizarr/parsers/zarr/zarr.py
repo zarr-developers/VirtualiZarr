@@ -9,6 +9,7 @@ import obstore
 import zarr
 from obspec_utils.registry import ObjectStoreRegistry
 from zarr.core.metadata import ArrayV3Metadata
+from zarr.experimental import ChunkGrid
 from zarr.storage import ObjectStore
 
 from virtualizarr.manifests import (
@@ -24,14 +25,12 @@ from virtualizarr.manifests.utils import ChunkKeySeparator
 from virtualizarr.parsers.utils import construct_manifest_group_tree
 from virtualizarr.parsers.zarr.common import (
     ObstoreStore,
-    RegularChunkGridMetadata,
     ZarrFormat,
     _run_async,
     chunk_entries_to_manifest,
     join_url,
     parse_array_layout,
 )
-from virtualizarr.utils import determine_chunk_grid_shape
 
 
 class ZarrParser:
@@ -205,12 +204,9 @@ async def build_chunk_manifest(
     missing, Zarr will return the fill_value for those regions when the array is read.
     """
 
-    # For sharded arrays, chunk_grid.chunk_shape is the shard shape (not the inner
-    # chunk shape, which lives inside the ShardingCodec config). So this grid describes
-    # the number of shard files on disk, which is exactly what we want for the manifest.
-    chunk_grid_shape = determine_chunk_grid_shape(
-        metadata.shape, cast(RegularChunkGridMetadata, metadata.chunk_grid).chunk_shape
-    )
+    # For sharded arrays, grid_shape reflects the number of shard files on disk,
+    # which is exactly what we want for the manifest.
+    chunk_grid_shape = ChunkGrid.from_metadata(metadata).grid_shape
 
     # Handle scalar arrays
     if metadata.shape == ():
