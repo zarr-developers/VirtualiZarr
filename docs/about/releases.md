@@ -29,6 +29,9 @@
 
 ### Documentation
 
+- New [Supported file formats](../supported_formats.md) page listing every file format VirtualiZarr can read, including formats that are another format underneath (e.g. `.h5ad` is HDF5). It links to each format's parser and package, and gives domain tags and caveats. Also adds an API reference page for `ENVIParser`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
+
 ### Internal changes
 
 ## v2.8.0 (14th October 2026)

@@ -31,6 +31,7 @@ nav:
     - "explanation/registry.md"
     - "explanation/custom_parsers.md"
     - "explanation/faq.md"
+  - "supported_formats.md"
   - API Reference:
     - api/virtualizarr.md
     - Parsers:
@@ -44,6 +45,7 @@ nav:
       - api/parsers/zarr.md
       - api/parsers/zip.md
       - api/parsers/dmrpp.md
+      - api/parsers/envi.md
       - api/parsers/tiff.md
       - api/parsers/grib.md
     - api/serialization.md

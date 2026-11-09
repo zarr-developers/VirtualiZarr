@@ -40,3 +40,25 @@ h6 {
   font-size: 0.75rem;
   font-weight: bold;
 }
+
+/* Domain tags on the supported formats page */
+.md-typeset .fmt-tag {
+  display: inline-block;
+  padding: 0 0.45em;
+  margin: 0.1em 0;
+  border-radius: 0.6em;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: var(--md-default-fg-color);
+  background-color: var(--fmt-tag-color, rgba(128, 128, 128, 0.15));
+  border: 1px solid var(--fmt-tag-border, rgba(128, 128, 128, 0.4));
+}
+
+/* Domain tag colours, grouped by field. Translucent so they work in light and dark mode. */
+.md-typeset .fmt-earth   { --fmt-tag-color: rgba(46, 160, 67, 0.16);   --fmt-tag-border: rgba(46, 160, 67, 0.5); }
+.md-typeset .fmt-water   { --fmt-tag-color: rgba(31, 136, 229, 0.16);  --fmt-tag-border: rgba(31, 136, 229, 0.5); }
+.md-typeset .fmt-physics { --fmt-tag-color: rgba(130, 80, 223, 0.16);  --fmt-tag-border: rgba(130, 80, 223, 0.5); }
+.md-typeset .fmt-life    { --fmt-tag-color: rgba(219, 61, 140, 0.16);  --fmt-tag-border: rgba(219, 61, 140, 0.5); }
+.md-typeset .fmt-media   { --fmt-tag-color: rgba(240, 136, 30, 0.18);  --fmt-tag-border: rgba(240, 136, 30, 0.55); }
+.md-typeset .fmt-defence { --fmt-tag-color: rgba(120, 130, 60, 0.2);   --fmt-tag-border: rgba(120, 130, 60, 0.55); }
+.md-typeset .fmt-data    { --fmt-tag-color: rgba(128, 128, 128, 0.15); --fmt-tag-border: rgba(128, 128, 128, 0.45); }
