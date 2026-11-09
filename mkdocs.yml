@@ -18,7 +18,6 @@ exclude_docs: |
 
 nav:
   - "index.md"
-  - "supported_formats.md"
   - Getting started:
     - "getting_started/installation.md"
   - How-to guides:
@@ -32,6 +31,7 @@ nav:
     - "explanation/registry.md"
     - "explanation/custom_parsers.md"
     - "explanation/faq.md"
+  - "supported_formats.md"
   - API Reference:
     - api/virtualizarr.md
     - Parsers:
