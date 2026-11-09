@@ -75,15 +75,25 @@ Contributions are welcome: comment on the linked issue, or [write your own parse
 | Format | Extensions | Domains | Notes |
 | --- | --- | --- | --- |
 | DICOM | `.dcm` | <span class="fmt-tag fmt-life">🩻 medical imaging</span> | Widespread, but complicated ([#218](https://github.com/zarr-developers/VirtualiZarr/issues/218)). A frame split into several fragments would need a codec that strips the item tags between them. |
+| Heidelberg OCT | `.vol` | <span class="fmt-tag fmt-life">🩻 medical imaging</span> | A header and a scanning-laser image, then fixed-size records, each a header followed by one float32 B-scan. One chunk per B-scan. |
 | Hugging Face safetensors | `.safetensors` | <span class="fmt-tag fmt-data">🤖 machine learning</span> | Uncompressed, with all metadata at the start of the file ([#367](https://github.com/zarr-developers/VirtualiZarr/issues/367)). |
+| IBL compressed electrophysiology (mtscomp) | `.cbin` with `.ch` | <span class="fmt-tag fmt-life">🧠 neuroscience</span> | Compressed in independent chunks, whose offsets are listed in the `.ch` file. Needs an mtscomp codec. |
+| Leica LIF | `.lif` | <span class="fmt-tag fmt-life">🔬 microscopy</span> | Raw image data in memory blocks, located by an XML header. |
 | MATLAB (pre-v7.3) | `.mat` | <span class="fmt-tag fmt-data">📦 general</span> | See [#1122](https://github.com/zarr-developers/VirtualiZarr/issues/1122). For v7.3 files, use `HDFParser` (see above). |
+| MRC (cryo-EM and cryo-ET) | `.mrc`, `.map`, `.rec` | <span class="fmt-tag fmt-life">🔬 microscopy</span> | A header followed by raw voxels. Only the slowest axis gives one contiguous byte range per chunk, so chunks are whole planes. `.mrc.gz` is gzipped as a whole file (see below). |
 | NASA CDF | `.cdf` | <span class="fmt-tag fmt-physics">☀️ space physics</span> | Not to be confused with netCDF. |
 | NIfTI | `.nii` | <span class="fmt-tag fmt-life">🩻 medical imaging</span> | Uncompressed `.nii` should be simple. `.nii.gz` is gzipped as a whole file (see below). |
+| Nikon ND2 | `.nd2` | <span class="fmt-tag fmt-life">🔬 microscopy</span> | Uncompressed frames, and lossless frames (plain zlib after an 8-byte header). Channels are interleaved within each frame, so a chunk spans every channel. A `transpose` codec can present them as a separate axis. |
+| NRRD | `.nrrd`, `.nhdr` with `.raw` | <span class="fmt-tag fmt-life">🩻 medical imaging</span> | A text header followed by raw data, or pointing to a separate data file. Only `raw` encoding: `gzip` encoding compresses the whole data block. |
 | NumPy | `.npy`, `.npz` | <span class="fmt-tag fmt-data">📦 general</span> | `.npy` is a header followed by raw bytes. `.npz` is a zip of `.npy` files. |
 | Open-Meteo OM files | `.om` | <span class="fmt-tag fmt-water">🌦️ weather & climate</span> | See [open-meteo/om-file-format#24](https://github.com/open-meteo/om-file-format/issues/24). |
 | PDS4 | `.xml` with `.img`, `.dat` | <span class="fmt-tag fmt-physics">🪐 planetary science</span> | An XML label describing raw binary data. |
+| PLINK binary genotypes | `.bed` with `.bim`, `.fam` | <span class="fmt-tag fmt-life">🧬 genomics</span> | Not the BED text format. Three magic bytes, then a fixed-size block of 2-bit genotypes per variant: a `uint8` array of shape (variants, ceil(samples / 4)). |
+| PNG | `.png` | <span class="fmt-tag fmt-data">📦 general</span> | Each image is one compressed stream, so each file can only be a single chunk. Works well for collections of many small images. |
 | RPN / FST | `.fst` | <span class="fmt-tag fmt-water">🌦️ weather & climate</span> | Environment and Climate Change Canada's model output format. |
 | SAFE | `.SAFE` (directory) | <span class="fmt-tag fmt-earth">🛰️ remote sensing</span> | Copernicus Sentinel product packaging. The JPEG 2000 and GeoTIFF files inside each have a parser, but nothing yet reads a product as a whole. |
+| SpikeGLX | `.bin` with `.meta` | <span class="fmt-tag fmt-life">🧠 neuroscience</span> | Raw interleaved int16 samples, described by a text `.meta` file. |
+| Zeiss CZI | `.czi` | <span class="fmt-tag fmt-life">🔬 microscopy</span> | One chunk per subblock. Uncompressed and plain zstd subblocks work (skip zstd's 1-byte header). JPEG-XR and zstd with hi-lo byte shuffle don't have Zarr codecs. Mosaic tiles overlap, so they need their own axis rather than being stitched. |
 
 ## 🚧 Formats we can't support yet
 
@@ -107,7 +117,11 @@ See [Can my file format be virtualized?](explanation/faq.md#can-my-file-format-b
 | Format | Domains | Why not |
 | --- | --- | --- |
 | Any whole-file-compressed file (e.g. `.nc.gz`, `.h5.bz2`, `.nii.gz`) | <span class="fmt-tag fmt-data">📦 general</span> | Compressing the whole file mixes up the bytes of every chunk. Decompress first, or (for small files) treat the whole file as one chunk. |
+| BAM, CRAM | <span class="fmt-tag fmt-life">🧬 genomics</span> | Variable-length records in block-compressed streams, so there is no array to reference. Convert instead. |
+| BED text, tabix-indexed files | <span class="fmt-tag fmt-life">🧬 genomics</span> | Text records with no array structure. |
+| bigWig, bigBed | <span class="fmt-tag fmt-life">🧬 genomics</span> | The compressed blocks are easy to locate, but every record stores its own genomic start and end. Position is data rather than an index, so files don't share a chunk grid. Converting to a position-indexed array is much faster to query. |
 | CSV | <span class="fmt-tag fmt-data">📦 general</span> | A text format: every read needs expensive parsing, and rows don't map onto fixed-size chunks ([#200](https://github.com/zarr-developers/VirtualiZarr/issues/200)). |
+| Electron event representation (EER) | <span class="fmt-tag fmt-life">🔬 microscopy</span> | Entropy-coded electron events, so chunk boundaries aren't at computable byte offsets. |
 | Furuno, Sigmet/IRIS, NEXRAD Level II | <span class="fmt-tag fmt-water">📡 weather radar</span> | Variables are interleaved in small blocks within each record, so one chunk would be thousands of tiny byte ranges ([#218](https://github.com/zarr-developers/VirtualiZarr/issues/218)). |
 | GDAL Virtual Raster (`.vrt`) | <span class="fmt-tag fmt-earth">🗺️ geospatial</span> | A VRT can resample, reproject and mosaic its source rasters on the fly, which plain byte-range references can't express ([#166](https://github.com/zarr-developers/VirtualiZarr/issues/166)). Virtualize the underlying GeoTIFFs instead. |
 | VCF | <span class="fmt-tag fmt-life">🧬 genomics</span> | A text format with interleaved columns. Convert it to Zarr with [bio2zarr](https://github.com/sgkit-dev/bio2zarr) instead. |
