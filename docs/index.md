@@ -25,7 +25,7 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 ## Features
 
 * Create virtual references pointing to bytes inside a archival file with [`open_virtual_dataset`](https://virtualizarr.readthedocs.io/en/latest/usage.html#opening-files-as-virtual-datasets),
-* Supports a [range of archival file formats](https://virtualizarr.readthedocs.io/en/latest/faq.html#how-do-virtualizarr-and-kerchunk-compare), including netCDF4 and HDF5,
+* Supports a [range of archival file formats](supported_formats.md), including netCDF4 and HDF5,
 * [Combine data from multiple files](https://virtualizarr.readthedocs.io/en/latest/usage.html#combining-virtual-datasets) into one larger store using [xarray's combining functions](https://docs.xarray.dev/en/stable/user-guide/combining.html), such as [`xarray.concat`](https://docs.xarray.dev/en/stable/generated/xarray.concat.html),
 * Commit the virtual references to storage either using the [Kerchunk references](https://fsspec.github.io/kerchunk/spec.html) specification or the [Icechunk](https://icechunk.io/) transactional storage engine.
 * Users access the virtual dataset using [`xarray.open_dataset`](https://docs.xarray.dev/en/stable/generated/xarray.open_dataset.html#xarray.open_dataset).
@@ -35,7 +35,7 @@ VirtualiZarr aims to make the creation of cloud-optimized virtualized zarr data 
 ### Assembling a hypercube
 
 A parser reads each file and maps it onto Zarr: its arrays, its metadata, and where every chunk lives.
-VirtualiZarr has parsers for [many formats](explanation/faq.md#can-my-file-format-be-virtualized).
+VirtualiZarr has parsers for [many formats](supported_formats.md).
 You then combine the files into one dataset using [Xarray's combining logic](how_to/usage.md#combining-virtual-datasets), which matches variables and dimensions by name and checks that the files line up.
 On top of that, VirtualiZarr refuses combinations that Zarr can't represent, such as files with different codecs, data types or chunk shapes, rather than producing references that would read back wrong.
 

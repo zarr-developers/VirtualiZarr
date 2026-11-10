@@ -234,6 +234,10 @@ docs = ["docs", "dev", "remote", "hdf", "fits", "hdf4", "icechunk", "kerchunk", 
 
 [tool.pixi.dependencies]
 pytest = "*"
+# botocore (needed by s3fs, through aiobotocore) requires python-dateutil<3.0.0. Without
+# this, conda installs python-dateutil 3, no botocore fits, and the PyPI solve backtracks
+# to s3fs 0.3.5, which fails to build.
+python-dateutil = "<3"
 
 # Define commands to run within the docs environment
 [tool.pixi.feature.docs.tasks]

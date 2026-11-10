@@ -4,6 +4,13 @@
 
 ### New Features
 
+- `ManifestArray` can be transposed, with `.transpose()`, `.T`, `np.transpose` or `np.permute_dims`, so
+  `vds.transpose(...)` works on virtual datasets. No data is read: the chunk manifest is reordered, and a `transpose`
+  codec is added only when a chunk extends along axes whose order changes. An existing `transpose` codec, as on
+  Fortran-ordered arrays, is combined with the new order, and dropped if they cancel.
+  ([#163](https://github.com/zarr-developers/VirtualiZarr/issues/163),
+  [#872](https://github.com/zarr-developers/VirtualiZarr/issues/872)).
+  By [Ben Dichter](https://github.com/bendichter).
 - `HDFParser(encode_bytes_attributes=True)` reads attributes that hold bytes that aren't valid UTF-8, or opaque data,
   which used to make the whole parse fail with `UnicodeDecodeError` or `TypeError`. They are written as `base64:`
   strings following the draft [Bytes Attributes convention](https://github.com/catalystneuro/zarr-bytes-attributes),
@@ -15,7 +22,21 @@
 
 ### Bug fixes
 
+- Variables passed as `loadable_variables` are no longer read in full while building the virtual dataset.
+  Internal checks for `ManifestArray`s now avoid `Variable.data`, so these variables stay lazily indexed until accessed.
+  Closes [#1148](https://github.com/zarr-developers/VirtualiZarr/issues/1148),
+  fixed in [#1151](https://github.com/zarr-developers/VirtualiZarr/pull/1151).
+  By [Tom Nicholas](https://github.com/TomNicholas).
+- Slicing an uncompressed virtual array within a single chunk now trims inlined chunks to the selected
+  rows, as it already did for virtual chunk references. Previously the inlined chunk kept all of its
+  bytes, so reading the sliced array failed with *"cannot reshape array"*.
+  Closes [#1153](https://github.com/zarr-developers/VirtualiZarr/issues/1153).
+  By [Raphael Fakhri](https://github.com/RaphaelFakhri).
+
 ### Documentation
+
+- New [Supported file formats](../supported_formats.md) page listing every file format VirtualiZarr can read, including formats that are another format underneath (e.g. `.h5ad` is HDF5). It links to each format's parser and package, and gives domain tags and caveats. Also adds an API reference page for `ENVIParser`.
+  By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
 
