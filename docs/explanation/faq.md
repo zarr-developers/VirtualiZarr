@@ -20,6 +20,10 @@ Some reasons are:
 
 ### Can my file format be virtualized?
 
+!!! tip
+
+    For a list of the formats that already have a parser, see [Supported file formats](../supported_formats.md).
+
 Not all file formats can be virtualized.
 Some have an internal layout which prevents efficient cloud-optimized access to their data.
 
@@ -43,7 +47,7 @@ See the [Icechunk format specification](https://icechunk.io/en/latest/reference/
 Overall, we end up with a hierarchy of cloud suitability for array formats, where any format that can be considered "cloud-optimized" or "cloud-native" is also inherently virtualizable.
 
 Note that this diagram deliberately covers only array formats.
-Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and their internal encodings mean they are generally not virtualizable as Zarr anyway (e.g. dictionary-encoded Parquet pages cannot be decoded from a single contiguous byte range).
+Tabular formats such as Parquet and Iceberg are cloud-optimized by design (Iceberg is arguably Cloud-Native and Transactional), but they represent a different data model, and virtualizing them as Zarr would need features that don't exist yet (e.g. Parquet pages hold varying numbers of rows, and dictionary-encoded pages cannot be decoded from a single contiguous byte range).
 
 ```python exec="true" html="true"
 import pathlib
@@ -193,7 +197,7 @@ manifest_store = IcechunkParser().parse_session(
 
 Yes, and it can be done as a 3rd-party extension, without needing to contribute to this repository.
 
-There are a lot of archival file formats which could potentially be represented as virtual zarr references (see [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) listing some examples).
+There are a lot of archival file formats which could potentially be represented as virtual zarr references (see [Supported file formats](../supported_formats.md) and [this issue](https://github.com/zarr-developers/VirtualiZarr/issues/218) for some examples).
 VirtualiZarr ships with some parsers for common formats (e.g. netCDF/HDF5), but you may want to write your own parser for some other file format.
 
 For guidance on how to write a custom parser for a new file format see the page on [Custom Parsers](custom_parsers.md)

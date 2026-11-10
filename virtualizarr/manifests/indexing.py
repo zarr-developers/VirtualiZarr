@@ -562,12 +562,16 @@ def _shift_manifest_byte_ranges(
         "np.ndarray[Any, np.dtype[np.uint64]]",
         np.full_like(manifest._lengths, np.uint64(new_length)),
     )
-    # paths and any inlined-chunk dict carry through unchanged: inlined chunks aren't
-    # involved here (this path is only taken for uncompressed virtual references).
+    # Inlined chunks hold the same uncompressed bytes in memory, so take the same
+    # sub-range of each of them.
+    new_inlined = {
+        idx: data[offset_delta : offset_delta + new_length]
+        for idx, data in manifest._inlined.items()
+    }
     return ChunkManifest.from_arrays(
         paths=manifest._paths,
         offsets=new_offsets,
         lengths=new_lengths,
-        inlined=dict(manifest._inlined),
+        inlined=new_inlined,
         validate_paths=False,
     )
