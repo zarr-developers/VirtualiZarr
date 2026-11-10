@@ -26,6 +26,7 @@ from virtualizarr.manifests import (
 from virtualizarr.manifests.manifest import INLINED_CHUNK_PATH
 from virtualizarr.manifests.utils import create_v3_array_metadata
 from virtualizarr.parsers.hdf.filters import codecs_from_dataset
+from virtualizarr.parsers.hdf.read_ahead import ChunkIndexReadAhead
 from virtualizarr.parsers.typing import ReaderFactory
 from virtualizarr.parsers.utils import encode_cf_fill_value
 from virtualizarr.types import ChunkKey
@@ -443,6 +444,13 @@ class HDFParser:
         See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
+    read_ahead
+        Read the chunk index of each chunked dataset ahead, a level at a time,
+        with the nodes of a level fetched in parallel, instead of one node per
+        request as h5py walks it. On an object store this makes files whose
+        datasets have many chunks much faster to parse, and it doesn't change
+        the result. Used when the store has ``get_ranges`` and ``head``.
+        See [ChunkIndexReadAhead][virtualizarr.parsers.hdf.read_ahead.ChunkIndexReadAhead].
     """
 
     def __init__(
@@ -451,11 +459,13 @@ class HDFParser:
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
         links_and_references: bool = False,
+        read_ahead: bool = True,
     ):
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
         self.links_and_references = links_and_references
+        self.read_ahead = read_ahead
 
     def __call__(
         self,
@@ -480,6 +490,8 @@ class HDFParser:
         """
         store, path_in_store = registry.resolve(url)
         reader = self.reader_factory(store, path_in_store)
+        if self.read_ahead and hasattr(store, "get_ranges") and hasattr(store, "head"):
+            reader = ChunkIndexReadAhead(reader, store, path_in_store)
         manifest_group = _construct_manifest_group(
             filepath=url,
             reader=reader,
