@@ -61,8 +61,8 @@ REF_CONVENTION = {
 
 BYTES_ATTRIBUTES_CONVENTION = {
     "uuid": "2de6770a-9c00-4432-9e84-dd9e1dfed441",
-    "schema_url": "https://raw.githubusercontent.com/catalystneuro/zarr-bytes-attributes/refs/tags/v1/schema.json",
-    "spec_url": "https://github.com/catalystneuro/zarr-bytes-attributes/blob/v1/README.md",
+    "schema_url": "https://raw.githubusercontent.com/hdmf-dev/zarr-bytes-attributes/refs/tags/v1/schema.json",
+    "spec_url": "https://github.com/hdmf-dev/zarr-bytes-attributes/blob/v1/README.md",
     "name": "bytes-attributes",
     "description": "Bytes in attributes are written as base64 strings",
 }
@@ -480,7 +480,7 @@ class HDFParser:
         Store an attribute that holds bytes that aren't valid UTF-8, or opaque
         data, as a string: ``base64:`` followed by the bytes in base64,
         following the draft [Bytes Attributes
-        convention](https://github.com/catalystneuro/zarr-bytes-attributes),
+        convention](https://github.com/hdmf-dev/zarr-bytes-attributes),
         which the array or group then registers. On such a node, a string that
         already begins with ``base64:`` is written with the prefix ``_str_``, so
         that every value reads back as it was. Off by default, while the
