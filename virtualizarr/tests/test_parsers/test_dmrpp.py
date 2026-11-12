@@ -2,7 +2,9 @@ import pytest
 import requests
 import xarray as xr
 from obspec_utils.registry import ObjectStoreRegistry
+from obstore.store import LocalStore
 
+from virtualizarr.manifests import ManifestStore
 from virtualizarr.parsers import DMRPPParser, HDFParser
 from virtualizarr.tests import requires_network, requires_pydap, slow_test
 from virtualizarr.tests.utils import obstore_local, obstore_s3
@@ -66,6 +68,73 @@ def test_NASA_dmrpp_load(data_url, dmrpp_url):
         manifest_store, engine="zarr", consolidated=False, zarr_format=3
     ) as ds:
         assert ds.load()
+
+
+def local_registry() -> ObjectStoreRegistry:
+    return ObjectStoreRegistry({"file://": LocalStore()})
+
+
+@requires_pydap
+def test_dmrpp_parser_local(dmrpp_simple_url):
+    """DMRPPParser reads a local DMR++ file through the registry."""
+    manifest_store = DMRPPParser()(url=dmrpp_simple_url, registry=local_registry())
+
+    assert isinstance(manifest_store, ManifestStore)
+    temperature = manifest_store._group.arrays["temperature"]
+    assert temperature.shape == (25, 53)
+    assert temperature.metadata.attributes["units"] == "K"
+
+    # Chunk references point at the data file next to the .dmrpp file.
+    expected_path = dmrpp_simple_url.removesuffix(".dmrpp")
+    assert temperature.manifest.dict() == {
+        "0.0": {"path": expected_path, "offset": 100, "length": 5300}
+    }
+
+
+@requires_pydap
+def test_dmrpp_parser_skip_variables(dmrpp_grouped_url):
+    """The skip_variables argument is passed through to pydap."""
+    registry = local_registry()
+
+    manifest_store = DMRPPParser()(url=dmrpp_grouped_url, registry=registry)
+    assert "x" in manifest_store._group.arrays
+
+    manifest_store = DMRPPParser(skip_variables=["x"])(
+        url=dmrpp_grouped_url, registry=registry
+    )
+    assert "x" not in manifest_store._group.arrays
+
+
+@requires_pydap
+@pytest.mark.parametrize(
+    "group, expected_vars",
+    [
+        (None, {"x"}),
+        ("/", {"x"}),
+        ("obs", {"pressure"}),
+        ("/obs", {"pressure"}),
+    ],
+)
+def test_dmrpp_parser_group(dmrpp_grouped_url, group, expected_vars):
+    """The group argument selects which DMR++ group becomes the ManifestStore root."""
+    manifest_store = DMRPPParser(group=group)(
+        url=dmrpp_grouped_url, registry=local_registry()
+    )
+    assert set(manifest_store._group.arrays) == expected_vars
+
+
+@requires_pydap
+def test_dmrpp_open_virtual_dataset_local(dmrpp_grouped_url):
+    """DMRPPParser works through the public open_virtual_dataset API."""
+    with open_virtual_dataset(
+        url=dmrpp_grouped_url,
+        registry=local_registry(),
+        parser=DMRPPParser(group="obs"),
+        loadable_variables=[],
+    ) as vds:
+        assert set(vds.data_vars) | set(vds.coords) == {"pressure"}
+        assert vds["pressure"].shape == (3,)
+        assert vds["pressure"].attrs["units"] == "hPa"
 
 
 @requires_pydap
