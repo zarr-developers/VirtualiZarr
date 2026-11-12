@@ -33,7 +33,8 @@
   By [Tom Nicholas](https://github.com/TomNicholas).
 
 ### Internal changes
-
+  - `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one  must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 ## v2.8.0 (14th October 2026)
 
 The FITS and netCDF3 parsers have been reimplemented without an external dependency on `kerchunk` — `FITSParser` now exposes every data HDU and reads ASCII tables, and `NetCDF3Parser` supports CDF-5. As a result both parsers no longer accept `reader_options`, and the `netcdf3` extra is removed. Separately, zero-length chunk references are now rejected everywhere, by every `ChunkManifest` constructor. A prototype `ENVIParser` reads ENVI raster files. `HDFParser` is faster, reading each chunked dataset's chunk index once instead of three times, and gains support for variable-length strings, compound datasets, and (opt-in) HDF5 links and object references. `to_kerchunk` can write Zarr format 3 metadata, and `open_virtual_mfdataset` accepts configured executor instances.
@@ -371,6 +372,10 @@ Adds a `ZippedZarrParser` for virtualizing `.zarr.zip` archives without ever unz
   constraints in *"Can my specific data be virtualized?"*.
   By [Tom Nicholas](https://github.com/TomNicholas).
 
+  ### Internal Changes
+  - `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=3.5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one
+  must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
 
 ## v2.7.1 (15th July 2026)
 
@@ -676,6 +681,7 @@ Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders 
   By [UserNobody14](https://github.com/UserNobody14).
 - Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
   By [Max Jones](https://github.com/maxrjones).
+
 
 ### Documentation
 

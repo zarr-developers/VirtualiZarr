@@ -648,3 +648,50 @@ def dmrpp_xml_with_missing_attrib():
         </Dataset>
         """
     )
+
+
+@pytest.fixture()
+def dmrpp_xml_grouped():
+    """Return a DMR++ XML string with a root variable and one nested group."""
+    return textwrap.dedent(
+        """\
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="1.0" name="grouped.nc" dmrpp:href="OPeNDAP_DMRpp_DATA_ACCESS_URL" dmrpp:version="3.21.1-451">
+            <Dimension name="x" size="4"/>
+            <Int32 name="x">
+                <Dim name="/x"/>
+                <dmrpp:chunks byteOrder="LE">
+                    <dmrpp:chunk offset="50" nBytes="16"/>
+                </dmrpp:chunks>
+            </Int32>
+            <Group name="obs">
+                <Dimension name="t" size="3"/>
+                <Float64 name="pressure">
+                    <Dim name="/obs/t"/>
+                    <Attribute name="units" type="String">
+                        <Value>hPa</Value>
+                    </Attribute>
+                    <dmrpp:chunks byteOrder="LE">
+                        <dmrpp:chunk offset="200" nBytes="24"/>
+                    </dmrpp:chunks>
+                </Float64>
+            </Group>
+        </Dataset>
+        """
+    )
+
+
+@pytest.fixture()
+def dmrpp_simple_url(tmp_path: Path, dmrpp_xml_simple) -> str:
+    """Write ``dmrpp_xml_simple`` to a local ``.dmrpp`` file and return its URL."""
+    filepath = tmp_path / "simple.nc.dmrpp"
+    filepath.write_text(dmrpp_xml_simple)
+    return f"file://{filepath}"
+
+
+@pytest.fixture()
+def dmrpp_grouped_url(tmp_path: Path, dmrpp_xml_grouped) -> str:
+    """Write ``dmrpp_xml_grouped`` to a local ``.dmrpp`` file and return its URL."""
+    filepath = tmp_path / "grouped.nc.dmrpp"
+    filepath.write_text(dmrpp_xml_grouped)
+    return f"file://{filepath}"
