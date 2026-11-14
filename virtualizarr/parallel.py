@@ -6,12 +6,9 @@ from functools import partial
 from typing import (
     Any,
     Callable,
-    Generic,
     Iterable,
     Iterator,
     Literal,
-    ParamSpec,
-    TypeVar,
 )
 
 __all__ = [
@@ -24,11 +21,6 @@ __all__ = [
 # TODO this entire module could ideally be upstreamed into xarray as part of https://github.com/pydata/xarray/pull/9932
 # TODO the DaskDelayedExecutor class could ideally be upstreamed into dask
 # TODO lithops should just not require a special wrapper class, see https://github.com/lithops-cloud/lithops/issues/1427
-
-
-P = ParamSpec("P")
-# Type variable for return type
-T = TypeVar("T")
 
 
 def get_executor(
@@ -258,7 +250,7 @@ class LithopsEagerFunctionExecutor(Executor):
     See https://github.com/lithops-cloud/lithops/issues/1427.
     """
 
-    class compatible_callable(Generic[P, T]):
+    class compatible_callable[**P, T]:
         """Wraps a callable to make it fully compatible with Lithops.
 
         This wrapper deals with 2 oddities in Lithops:
