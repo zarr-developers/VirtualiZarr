@@ -85,7 +85,9 @@ class SerialExecutor(Executor):
         # Track submitted futures to maintain interface compatibility
         self._futures: list[Future] = []
 
-    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
+    def submit[T](
+        self, fn: Callable[..., T], /, *args: Any, **kwargs: Any
+    ) -> Future[T]:
         """
         Submit a callable to be executed.
 
@@ -122,7 +124,7 @@ class SerialExecutor(Executor):
 
         return future
 
-    def map(
+    def map[T](
         self,
         fn: Callable[..., T],
         *iterables: Iterable[Any],
@@ -166,7 +168,9 @@ class DaskDelayedExecutor(Executor):
         # Track submitted futures
         self._futures: list[Future] = []
 
-    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
+    def submit[T](
+        self, fn: Callable[..., T], /, *args: Any, **kwargs: Any
+    ) -> Future[T]:
         """
         Submit a task to be computed with [dask.delayed][dask.delayed.delayed].
 
@@ -206,7 +210,7 @@ class DaskDelayedExecutor(Executor):
 
         return future
 
-    def map(
+    def map[T](
         self,
         fn: Callable[..., T],
         *iterables: Iterable[Any],
@@ -291,7 +295,9 @@ class LithopsEagerFunctionExecutor(Executor):
         # Track submitted futures
         self._futures: list[Future] = []
 
-    def submit(self, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> Future[T]:
+    def submit[T](
+        self, fn: Callable[..., T], /, *args: Any, **kwargs: Any
+    ) -> Future[T]:
         """
         Submit a task to be computed using lithops.
 
@@ -339,7 +345,7 @@ class LithopsEagerFunctionExecutor(Executor):
 
         return future
 
-    def map(
+    def map[T](
         self,
         fn: Callable[..., T],
         *iterables: Iterable[Any],
