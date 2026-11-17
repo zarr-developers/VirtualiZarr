@@ -78,7 +78,7 @@ jobs:
           python -c "import virtualizarr; print(virtualizarr.__version__)"
       - name: Publish package to TestPyPI
         if: github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
           # verbose: true
@@ -98,4 +98,4 @@ jobs:
           name: releases
           path: dist
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.3
