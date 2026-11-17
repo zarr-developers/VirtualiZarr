@@ -1,0 +1,15 @@
+---
+version: 2
+updates:
+  # Dependabot also regenerates the matching entries in
+  # .github/workflows/actions.lock when it bumps an action.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 7
