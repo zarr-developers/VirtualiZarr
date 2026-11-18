@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'zarr-developers/VirtualiZarr'
     steps:
-      - uses: actions/checkout@v4.4.0
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@v6.3.0
+      - uses: actions/setup-python@v7.1.0
         name: Install Python
         with:
           python-version: '3.13'
@@ -46,7 +46,7 @@ jobs:
           else
             echo "✅ Looks good"
           fi
-      - uses: actions/upload-artifact@v5.0.0
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: releases
           path: dist
@@ -60,11 +60,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/setup-python@v6.3.0
+      - uses: actions/setup-python@v7.1.0
         name: Install Python
         with:
           python-version: '3.13'
-      - uses: actions/download-artifact@v5.0.0
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: releases
           path: dist
@@ -94,7 +94,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v5.0.0
+      - uses: actions/download-artifact@v8.0.2
         with:
           name: releases
           path: dist
