@@ -18,7 +18,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.indexing import SubChunkIndexingError
+from virtualizarr.manifests.indexing import (
+    SubChunkIndexingError,
+    _uncompressed_sub_chunk_axis,
+)
 
 
 class TestInit:
@@ -1678,6 +1681,27 @@ class TestSubChunkSlicingUncompressed:
         )
         with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[:, :, 1:2, :]
+
+    def test_all_chunk_lengths_1_falls_back_to_first_storage_axis(
+        self, array_v3_metadata
+    ):
+        # With chunk length 1 everywhere there is nothing to split within a chunk, so the
+        # first axis in storage order is returned and slicing is just chunk-aligned.
+        marr = self._uncompressed_marr(array_v3_metadata, shape=(4, 3), chunks=(1, 1))
+        assert _uncompressed_sub_chunk_axis(marr.metadata) == 0
+
+        f_order = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=(4, 3),
+            chunks=(1, 1),
+            codecs=self.F_ORDER_2D_CODECS,
+        )
+        assert _uncompressed_sub_chunk_axis(f_order.metadata) == 1
+
+        sliced = marr[1:3, :]
+        assert sliced.shape == (2, 3)
+        assert sliced.metadata.chunks == (1, 1)
+        assert sliced.manifest.dict()["0.0"]["offset"] == 1000 + 3 * 8
 
 
 def test_to_xarray(array_v3_metadata):
