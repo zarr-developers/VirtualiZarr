@@ -95,6 +95,17 @@ pre-commit run --all-files
 
 If you would like to skip the failing checks and push the code for further discussion, use the `--no-verify` option with `git commit`.
 
+#### GitHub Actions workflows
+
+The actions used by the workflows in `.github/workflows/` are pinned to commits in the lockfile `.github/workflows/actions.lock`, which GitHub Actions enforces when a workflow runs. Dependabot keeps the lockfile current when it updates an action. If you add a workflow or change a `uses:` line by hand, regenerate the lockfile with the [`gh actions-lock`](https://github.com/github/gh-actions-lock) extension for the GitHub CLI and commit the result:
+
+```
+gh extension install github/gh-actions-lock
+gh actions-lock
+```
+
+Changes to the workflows and to `.github/dependabot.yml` are also checked by [zizmor](https://docs.zizmor.sh/).
+
 #### Private functions
 
 `VirtualiZarr` uses the following convention for private functions:

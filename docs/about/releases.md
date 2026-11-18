@@ -34,6 +34,13 @@
 
 ### Internal changes
 
+- The actions used by the GitHub Actions workflows, and the actions those use, are now pinned to commits in a
+  [workflow lockfile](https://docs.github.com/actions/concepts/security/workflow-dependency-lockfiles)
+  (`.github/workflows/actions.lock`), and Dependabot is configured to keep them current. A new workflow runs
+  [zizmor](https://docs.zizmor.sh/) on changes to the workflows and the Dependabot config, the test workflows now use
+  a read-only token by default, and no workflow leaves checkout credentials on disk.
+  By [Max Jones](https://github.com/maxrjones).
+
 ## v2.8.0 (14th October 2026)
 
 The FITS and netCDF3 parsers have been reimplemented without an external dependency on `kerchunk` — `FITSParser` now exposes every data HDU and reads ASCII tables, and `NetCDF3Parser` supports CDF-5. As a result both parsers no longer accept `reader_options`, and the `netcdf3` extra is removed. Separately, zero-length chunk references are now rejected everywhere, by every `ChunkManifest` constructor. A prototype `ENVIParser` reads ENVI raster files. `HDFParser` is faster, reading each chunked dataset's chunk index once instead of three times, and gains support for variable-length strings, compound datasets, and (opt-in) HDF5 links and object references. `to_kerchunk` can write Zarr format 3 metadata, and `open_virtual_mfdataset` accepts configured executor instances.
