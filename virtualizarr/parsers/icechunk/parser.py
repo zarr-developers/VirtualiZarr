@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 from collections.abc import Coroutine, Iterable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -33,8 +33,6 @@ if TYPE_CHECKING:
 
 
 _DEFAULT_BATCH_SIZE: int = 100_000
-
-T = TypeVar("T")
 
 
 def _require_icechunk_with_array_chunk_iterator() -> None:
@@ -67,7 +65,7 @@ def _require_icechunk_with_array_chunk_iterator() -> None:
         )
 
 
-def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+def _run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     """Run an async coroutine from sync code, even when a loop is already running."""
     try:
         asyncio.get_running_loop()

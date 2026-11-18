@@ -7,7 +7,7 @@ import concurrent.futures
 import math
 from collections.abc import Coroutine, Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import zarr
@@ -30,10 +30,8 @@ else:
 # obstore doesn't export a public base type for stores, so we use Any for now.
 ObstoreStore = Any
 
-T = TypeVar("T")
 
-
-def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+def _run_async[T](coro: Coroutine[Any, Any, T]) -> T:
     """Run a coroutine, handling the case where an event loop is already running.
 
     In environments like Jupyter notebooks, an event loop is already running,

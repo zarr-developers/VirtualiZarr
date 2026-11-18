@@ -8,13 +8,10 @@ from collections.abc import Callable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     Iterable,
     Mapping,
     Optional,
-    ParamSpec,
     Sequence,
-    TypeVar,
     Union,
 )
 
@@ -29,9 +26,6 @@ from virtualizarr.types.kerchunk import KerchunkStoreRefs
 # taken from zarr.core.common
 JSON = str | int | float | Mapping[str, "JSON"] | Sequence["JSON"] | None
 
-_P = ParamSpec("_P")
-_T = TypeVar("_T")
-_U = TypeVar("_U")
 
 if TYPE_CHECKING:
     import fsspec.core
@@ -188,7 +182,7 @@ def kerchunk_refs_as_json(refs: KerchunkStoreRefs) -> JSON:
     return normalized_result
 
 
-class compose(Generic[_P, _T, _U]):
+class compose[**P, T, U]:
     """Callable that is the functional composition of 2 other callables.
 
     Adheres to the mathematical notion of function composition where
@@ -215,9 +209,9 @@ class compose(Generic[_P, _T, _U]):
     42
     """
 
-    def __init__(self, f: Callable[[_T], _U], g: Callable[_P, _T]) -> None:
+    def __init__(self, f: Callable[[T], U], g: Callable[P, T]) -> None:
         self._f = f
         self._g = g
 
-    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _U:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> U:
         return self._f(self._g(*args, **kwargs))
