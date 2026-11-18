@@ -500,22 +500,34 @@ def _uncompressed_sub_chunk_axis(metadata: ArrayV3Metadata) -> int | None:
     i.e., no compression, no value transforms, no checksums. The eligible codec stacks
     are:
 
-    - ``[BytesCodec]`` — C-order layout; the axis with the largest byte stride is axis 0.
+    - ``[BytesCodec]`` — C-order layout; storage order is ``(0, 1, ..., n-1)``.
     - ``[TransposeCodec(order=perm), BytesCodec]`` — stored layout is the logical array
-      permuted by ``perm``; the axis with the largest byte stride in storage is logical
-      axis ``perm[0]``. For the F-order case ``perm = (n-1, n-2, ..., 0)`` this picks out
-      the last axis.
+      permuted by ``perm``, so storage order is ``perm``. For the F-order case
+      ``perm = (n-1, n-2, ..., 0)``.
+
+    The eligible axis is the first axis in storage order whose chunk length is greater
+    than 1. Axes that come earlier in storage order all have chunk length 1, so they do
+    not affect byte order within a chunk, and a slice along the eligible axis is a
+    single contiguous byte range. If every chunk length is 1 there is nothing to slice
+    within a chunk, and the first axis in storage order is returned.
     """
     codecs = metadata.codecs
     if len(codecs) == 1 and isinstance(codecs[0], BytesCodec):
-        return 0
-    if (
+        storage_order: tuple[int, ...] = tuple(range(len(metadata.shape)))
+    elif (
         len(codecs) == 2
         and isinstance(codecs[0], TransposeCodec)
         and isinstance(codecs[1], BytesCodec)
     ):
-        return int(codecs[0].order[0])
-    return None
+        storage_order = tuple(int(a) for a in codecs[0].order)
+    else:
+        return None
+
+    chunk_shape = manifest_chunk_shape(metadata)
+    for axis in storage_order:
+        if chunk_shape[axis] > 1:
+            return axis
+    return storage_order[0] if storage_order else None
 
 
 def _is_sub_chunk_slice(
@@ -551,7 +563,7 @@ def _shift_manifest_byte_ranges(
     Return a new ``ChunkManifest`` whose virtual chunk references point to a uniform
     sub-range of each original chunk: ``offset += offset_delta`` and ``length = new_length``.
 
-    Used by the uncompressed-axis-0 sub-chunk path, where every surviving chunk shares the
+    Used by the uncompressed sub-chunk path, where every surviving chunk shares the
     same byte layout and therefore the same byte adjustment.
     """
     new_offsets = cast(
