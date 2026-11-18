@@ -2,6 +2,7 @@
 
 # Standard library imports
 import itertools
+import textwrap
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, Mapping, Optional
 
@@ -475,15 +476,6 @@ def hdf5_empty(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def hdf5_missing_value(tmp_path: Path) -> str:
-    """Create an empty HDF5 file."""
-    filepath = tmp_path / "compact_lowlevel.h5"
-    with h5py.File(filepath, "w") as f:
-        f.create_dataset("my_dataset", shape=(10,), dtype="int64")
-    return str(filepath)
-
-
-@pytest.fixture
 def hdf5_scalar(tmp_path: Path) -> str:
     """Create an HDF5 file with a scalar dataset."""
     filepath = tmp_path / "scalar.nc"
@@ -561,6 +553,39 @@ def manifest_array(array_v3_metadata):
         return ManifestArray(chunkmanifest=chunkmanifest, metadata=metadata)
 
     return _manifest_array
+
+
+@pytest.fixture
+def inlinevalue_dmrpp():
+    """Create a DMR++ file with an inline value."""
+    dmrpp_content = textwrap.dedent("""\
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<Dataset xmlns="http://xml.opendap.org/ns/DAP/4.0#" xmlns:dmrpp="http://xml.opendap.org/dap/dmrpp/1.0.0#" dapVersion="4.0" dmrVersion="2.0" name="compact_lowlevel.h5" dmrpp:href="data/dmrpp/compact_lowlevel.h5" dmrpp:version="3.21.1">
+    <Int64 name="my_dataset">
+        <Dim size="10"/>
+        <dmrpp:chunks fillValue="0"/>
+        <dmrpp:compact>AAAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAUAAAAAAAAABgAAAAAAAAAHAAAAAAAAAAgAAAAAAAAACQAAAAAAAAA=</dmrpp:compact>
+    </Int64>
+    <Attribute name="build_dmrpp_metadata" type="Container">
+        <Attribute name="created" type="String">
+            <Value>2026-02-17T22:11:14Z</Value>
+        </Attribute>
+        <Attribute name="build_dmrpp" type="String">
+            <Value>3.21.1</Value>
+        </Attribute>
+        <Attribute name="bes" type="String">
+            <Value>3.21.1</Value>
+        </Attribute>
+        <Attribute name="libdap" type="String">
+            <Value>libdap-3.21.1</Value>
+        </Attribute>
+        <Attribute name="invocation" type="String">
+            <Value>build_dmrpp -f /Users/myang6/work/opendap/hyrax-2016/bes/modules/hdf5_handler/data/src/compact_lowlevel.h5 -r compact_lowlevel.h5.dmr -u OPeNDAP_DMRpp_DATA_ACCESS_URL -M</Value>
+        </Attribute>
+    </Attribute>
+</Dataset>
+    """)
+    return dmrpp_content
 
 
 @pytest.fixture

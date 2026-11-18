@@ -1,5 +1,4 @@
 import pytest
-import requests
 import xarray as xr
 from obspec_utils.registry import ObjectStoreRegistry
 from obstore.store import LocalStore
@@ -200,19 +199,19 @@ def test_dmrpp_missing_attrib_validation(dmrpp_xml_with_missing_attrib):
 
 @requires_network
 @requires_pydap
-def test_inlinevalue():
+def test_inlinevalue(inlinevalue_dmrpp):
     """
     Test that inline values can be parsed into manifest
     """
     expected_bytes = b"AAAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAUAAAAAAAAABgAAAAAAAAAHAAAAAAAAAAgAAAAAAAAACQAAAAAAAAA="
 
-    dmrpp_file = (
-        "http://test.opendap.org/opendap/data/dmrpp/compact_lowlevel.h5.dmrpp.file"
-    )
-    session = requests.Session()
-    dmrpp = session.get(dmrpp_file).content.decode()
+    # dmrpp_file = (
+    #     "http://test.opendap.org/opendap/data/dmrpp/compact_lowlevel.h5.dmrpp.file"
+    # )
+    # session = requests.Session()
+    # dmrpp = session.get(dmrpp_file).content.decode()
     parser = DMRParser(
-        dmrpp, object_store=obstore_local(url="file:///compact_lowlevel.h5")
+        inlinevalue_dmrpp, object_store=obstore_local(url="file:///compact_lowlevel.h5")
     )
     ms = parser.parse_dataset()
     vds = ms.to_virtual_dataset()

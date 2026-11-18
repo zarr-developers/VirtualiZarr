@@ -5,8 +5,6 @@ from obspec_utils.registry import ObjectStoreRegistry
 from virtualizarr.manifests import ManifestStore
 from virtualizarr.utils import soft_import
 
-pydap = soft_import("pydap", "parsing dmrpp references", strict=False)
-
 
 class DMRPPParser:
     """Create a [ManifestStore][virtualizarr.manifests.ManifestStore] from a DMR++ file.
@@ -48,7 +46,7 @@ class DMRPPParser:
         ManifestStore
             A ManifestStore that provides a Zarr representation of the data source referenced by the DMR++ file.
         """
-
+        soft_import("pydap", "parsing DMR++ references (install `virtualizarr[pydap]`)")
         from pydap.virtualizarr.parser import DMRParser
 
         parser = DMRParser(
