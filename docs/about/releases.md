@@ -16,6 +16,13 @@
 
 ### Bug fixes
 
+- A dataset whose `_FillValue` attribute holds a vector, as the NASA VIIRS land products
+  write, is virtualized with those values in `missing_value` instead. CF requires
+  `_FillValue` to be a scalar, and the parse previously failed to encode the attribute;
+  xarray masks the same values from `missing_value` on read.
+  Closes [#1165](https://github.com/zarr-developers/VirtualiZarr/issues/1165),
+  fixed in [#1170](https://github.com/zarr-developers/VirtualiZarr/pull/1170).
+  By [rise11hx-cmyk](https://github.com/rise11hx-cmyk).
 - Variables passed as `loadable_variables` are no longer read in full while building the virtual dataset.
   Internal checks for `ManifestArray`s now avoid `Variable.data`, so these variables stay lazily indexed until accessed.
   Closes [#1148](https://github.com/zarr-developers/VirtualiZarr/issues/1148),
