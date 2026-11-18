@@ -93,6 +93,32 @@ def _get_fill_value(dataset: H5Dataset):
         return raw
 
 
+def _normalise_vector_fill_value(attrs: dict) -> None:
+    """Move a vector `_FillValue` to `missing_value`.
+
+    CF requires `_FillValue` to be a scalar, while `missing_value` may hold a
+    vector, so files such as the NASA VIIRS land products, which write a range
+    of fill codes to `_FillValue`, cannot keep it there. Moving the values
+    keeps them masked on read instead of failing to encode the attribute.
+    """
+    fill_value = attrs.get("_FillValue")
+    if not isinstance(fill_value, (list, tuple)):
+        return
+    missing_value = attrs.get("missing_value")
+    if missing_value is None:
+        attrs["missing_value"] = list(fill_value)
+    else:
+        existing = (
+            list(missing_value)
+            if isinstance(missing_value, (list, tuple))
+            else [missing_value]
+        )
+        attrs["missing_value"] = existing + [
+            value for value in fill_value if value not in existing
+        ]
+    del attrs["_FillValue"]
+
+
 def _construct_manifest_array(
     filepath: str,
     dataset: H5Dataset,
@@ -169,6 +195,7 @@ def _construct_manifest_array(
     # else:
     # dtype = dataset.dtype
 
+    _normalise_vector_fill_value(attrs)
     if "_FillValue" in attrs and dtype.kind not in ("S", "U", "O", "T"):
         encoded_cf_fill_value = encode_cf_fill_value(attrs["_FillValue"], dtype)
         attrs["_FillValue"] = encoded_cf_fill_value
@@ -443,6 +470,10 @@ class HDFParser:
         See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
+
+    A ``_FillValue`` attribute that holds several values, which CF does not allow,
+    is written as ``missing_value``, which may hold a vector, so the values are
+    still masked on read.
     """
 
     def __init__(

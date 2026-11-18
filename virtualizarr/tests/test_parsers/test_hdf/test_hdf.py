@@ -151,6 +151,30 @@ class TestDatasetToManifestArray:
         metadata = manifest_store._group.arrays["data"].metadata
         assert "_FillValue" in metadata.attributes
 
+    def test_vector_fill_value_moved_to_missing_value(self, tmp_path):
+        # CF allows a vector missing_value but only a scalar _FillValue; NASA VIIRS
+        # land products write a range of fill codes to _FillValue.
+        filepath = tmp_path / "vector_fill_value.h5"
+        with open_hdf5(filepath, "w") as f:
+            data = f.create_dataset(
+                "data",
+                data=np.array([[249, 255], [1, 2]], dtype="uint8"),
+                chunks=(1, 2),
+            )
+            data.attrs["_FillValue"] = np.array([249, 255], dtype="uint8")
+
+        manifest_store = manifest_store_from_hdf_url(f"file://{filepath}")
+        metadata = manifest_store._group.arrays["data"].metadata
+        assert "_FillValue" not in metadata.attributes
+        assert metadata.attributes["missing_value"] == [249, 255]
+
+        with xr.open_zarr(
+            manifest_store, zarr_format=3, consolidated=False
+        ).load() as ds:
+            values = ds["data"].to_numpy()
+            assert np.isnan(values[0]).all()
+            np.testing.assert_array_equal(values[1], np.array([1, 2]))
+
     def test_string_dtype_fill_value(self, string_dtype_hdf5_url):
         manifest_store = manifest_store_from_hdf_url(string_dtype_hdf5_url)
         metadata = manifest_store._group.arrays["data"].metadata
