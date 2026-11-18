@@ -1,0 +1,19 @@
+[project]
+name = "ccmp-recipes"
+version = "0.1.0"
+description = "VirtualiZarr + Icechunk recipes for CCMP wind data from NASA Earthdata"
+requires-python = ">=3.12"
+dependencies = [
+    "zarr>=3.1.0",
+    "xarray>=2025.1.2",
+    "earthaccess>=0.12.0",
+    "virtualizarr>=2.4.0",
+    "obstore>=0.8.0",
+    "obspec-utils>=0.9.0",
+    "icechunk>=1.1.2",
+    "h5py",
+    "dask[complete]",
+    "matplotlib",
+    "ipykernel",
+    "ipywidgets>=8.1.8",
+]
