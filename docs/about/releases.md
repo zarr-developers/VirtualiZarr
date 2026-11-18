@@ -26,6 +26,11 @@
   bytes, so reading the sliced array failed with *"cannot reshape array"*.
   Closes [#1153](https://github.com/zarr-developers/VirtualiZarr/issues/1153).
   By [Raphael Fakhri](https://github.com/RaphaelFakhri).
+- Sub-chunk slicing of uncompressed arrays now applies along the first axis, in storage order, whose chunk length
+  is greater than 1, rather than only axis 0. Arrays with one time step per chunk, such as NetCDF-3 files with a
+  `(1, level, y, x)` chunk, can now be sliced along `level` without loading data.
+  Closes [#1167](https://github.com/zarr-developers/VirtualiZarr/issues/1167).
+  By [Rich Signell](https://github.com/rsignell).
 
 ### Documentation
 

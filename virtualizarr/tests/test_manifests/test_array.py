@@ -18,7 +18,10 @@ from virtualizarr.manifests import (
     ManifestGroup,
     ManifestStore,
 )
-from virtualizarr.manifests.indexing import SubChunkIndexingError
+from virtualizarr.manifests.indexing import (
+    SubChunkIndexingError,
+    _uncompressed_sub_chunk_axis,
+)
 
 
 class TestInit:
@@ -1582,6 +1585,123 @@ class TestSubChunkSlicingUncompressed:
         )
         with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
             marr[1:3, :]
+
+    # Leading axes with chunk length 1 don't affect byte order within a chunk, so the
+    # eligible axis is the first axis *in storage order* with chunk length > 1. E.g. one
+    # time step per chunk, then a (level, y, x) block.
+
+    @pytest.mark.parametrize(
+        "shape, chunks, indexer, expected_shape, expected_chunks, expected_entries",
+        [
+            # level stride = 3 * 4 * 8 = 96 bytes; chunk = 5 * 96 = 480 bytes
+            (
+                (1, 5, 3, 4),
+                (1, 5, 3, 4),
+                np.s_[:, 0:1, :, :],
+                (1, 1, 3, 4),
+                (1, 1, 3, 4),
+                {"0.0.0.0": {"offset": 1000, "length": 96}},
+            ),
+            (
+                (1, 5, 3, 4),
+                (1, 5, 3, 4),
+                np.s_[:, 2:5, :, :],
+                (1, 3, 3, 4),
+                (1, 3, 3, 4),
+                {"0.0.0.0": {"offset": 1000 + 2 * 96, "length": 3 * 96}},
+            ),
+            # several time chunks, each sliced the same way
+            (
+                (2, 5, 3, 4),
+                (1, 5, 3, 4),
+                np.s_[:, 4:5, :, :],
+                (2, 1, 3, 4),
+                (1, 1, 3, 4),
+                {
+                    "0.0.0.0": {"offset": 1000 + 4 * 96, "length": 96},
+                    "1.0.0.0": {"offset": 1000 + 480 + 4 * 96, "length": 96},
+                },
+            ),
+        ],
+    )
+    def test_sub_chunk_first_axis_with_chunk_length_gt_1(
+        self,
+        array_v3_metadata,
+        shape,
+        chunks,
+        indexer,
+        expected_shape,
+        expected_chunks,
+        expected_entries,
+    ):
+        marr = self._uncompressed_marr(array_v3_metadata, shape=shape, chunks=chunks)
+
+        sliced = marr[indexer]
+
+        assert sliced.shape == expected_shape
+        assert sliced.metadata.chunks == expected_chunks
+        expected = {
+            k: {"path": "file:///foo.nc", **v} for k, v in expected_entries.items()
+        }
+        assert sliced.manifest.dict() == expected
+
+    def test_sub_chunk_leading_axis_with_chunk_length_1_is_skipped_in_f_order(
+        self, array_v3_metadata
+    ):
+        # F-order storage order is (2, 1, 0). Axis 2 has chunk length 1, so the first
+        # axis in storage order with chunk length > 1 is axis 1.
+        marr = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=(3, 5, 1),
+            chunks=(3, 5, 1),
+            codecs=[
+                {"name": "transpose", "configuration": {"order": [2, 1, 0]}},
+                self.BYTES_CODEC,
+            ],
+        )
+
+        sliced = marr[:, 1:3, :]
+
+        # axis-1 stride in storage = 3 * 8 = 24 bytes
+        assert sliced.shape == (3, 2, 1)
+        assert sliced.manifest.dict() == {
+            "0.0.0": {
+                "path": "file:///foo.nc",
+                "offset": 1000 + 24,
+                "length": 2 * 24,
+            }
+        }
+
+    def test_sub_chunk_later_axis_still_raises_after_first_nontrivial_axis(
+        self, array_v3_metadata
+    ):
+        # Axis 1 is the eligible axis; axis 2 has interleaved bytes and still can't be sliced.
+        marr = self._uncompressed_marr(
+            array_v3_metadata, shape=(1, 5, 3, 4), chunks=(1, 5, 3, 4)
+        )
+        with pytest.raises(SubChunkIndexingError, match="split individual chunks"):
+            marr[:, :, 1:2, :]
+
+    def test_all_chunk_lengths_1_falls_back_to_first_storage_axis(
+        self, array_v3_metadata
+    ):
+        # With chunk length 1 everywhere there is nothing to split within a chunk, so the
+        # first axis in storage order is returned and slicing is just chunk-aligned.
+        marr = self._uncompressed_marr(array_v3_metadata, shape=(4, 3), chunks=(1, 1))
+        assert _uncompressed_sub_chunk_axis(marr.metadata) == 0
+
+        f_order = self._uncompressed_marr(
+            array_v3_metadata,
+            shape=(4, 3),
+            chunks=(1, 1),
+            codecs=self.F_ORDER_2D_CODECS,
+        )
+        assert _uncompressed_sub_chunk_axis(f_order.metadata) == 1
+
+        sliced = marr[1:3, :]
+        assert sliced.shape == (2, 3)
+        assert sliced.metadata.chunks == (1, 1)
+        assert sliced.manifest.dict()["0.0"]["offset"] == 1000 + 3 * 8
 
 
 def test_to_xarray(array_v3_metadata):
