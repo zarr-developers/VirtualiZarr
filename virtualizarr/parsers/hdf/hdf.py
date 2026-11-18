@@ -98,6 +98,8 @@ def _construct_manifest_array(
     dataset: H5Dataset,
     group: str,
     links_and_references: bool = False,
+    *,
+    squeeze_attributes: bool,
 ) -> ManifestArray:
     """
     Construct a ManifestArray from an h5py dataset
@@ -113,6 +115,9 @@ def _construct_manifest_array(
     links_and_references
         Store a dataset of object references as the paths of their targets,
         following the draft Links and Object References convention.
+    squeeze_attributes
+        Write an attribute that is an array of one element as a scalar; see
+        `_extract_attrs`.
 
     Returns
     -------
@@ -120,7 +125,9 @@ def _construct_manifest_array(
     """
     chunks = _chunk_shape(dataset)
     codecs = codecs_from_dataset(dataset)
-    attrs = _extract_attrs(dataset, links_and_references)
+    attrs = _extract_attrs(
+        dataset, links_and_references, squeeze_attributes=squeeze_attributes
+    )
     dtype = dataset.dtype
 
     # HDF5 variable-length strings use numpy object dtype, which zarr v3 cannot
@@ -284,6 +291,7 @@ def _construct_manifest_group(
     group: str | None = None,
     drop_variables: Iterable[str] | None = None,
     links_and_references: bool = False,
+    squeeze_attributes: bool | None = None,
     _seen: dict | None = None,
 ) -> ManifestGroup:
     """
@@ -293,12 +301,17 @@ def _construct_manifest_group(
     objects with more than one hard link, are recorded in the group's attributes
     following the draft Links and Object References convention, instead of being
     copied.
+
+    An attribute that is an array of one element is written as a scalar if
+    ``squeeze_attributes`` is True, or if it is None and the file is a netCDF-4
+    file.
     """
     import h5py
 
     with h5py.File(reader, mode="r") as f:
         if not isinstance(g := f.get(group or "/"), h5py.Group):
             raise ValueError(f"Group {group!r} is not an HDF Group")
+        squeeze = _is_netcdf4(f) if squeeze_attributes is None else squeeze_attributes
 
         # Several of our test fixtures which use xr.tutorial data have
         # non coord dimensions serialized using big endian dtypes which are not
@@ -326,7 +339,11 @@ def _construct_manifest_group(
             item = g[key]
             if isinstance(item, h5py.Dataset):
                 arrays[key] = _construct_manifest_array(
-                    filepath, item, group_name, links_and_references
+                    filepath,
+                    item,
+                    group_name,
+                    links_and_references,
+                    squeeze_attributes=squeeze,
                 )
             elif isinstance(item, h5py.Group):
                 groups[key] = _construct_manifest_group(
@@ -334,9 +351,10 @@ def _construct_manifest_group(
                     reader,
                     group=str(Path(group) / key) if group is not None else key,
                     links_and_references=links_and_references,
+                    squeeze_attributes=squeeze,
                     _seen=seen,
                 )
-        attributes = _extract_attrs(g, links_and_references)
+        attributes = _extract_attrs(g, links_and_references, squeeze_attributes=squeeze)
         if links:
             _add_conventions(attributes, LINKS_REFERENCES_CONVENTION, REF_CONVENTION)
             attributes["links_references"] = {"links": links}
@@ -443,6 +461,15 @@ class HDFParser:
         See [HDF5 links and object references](../../how_to/hdf5_links_references.md).
         Off by default, while the convention is settled; a dataset of object
         references then raises ``NotImplementedError``, and links are copied.
+    squeeze_attributes
+        Whether an attribute that is an array of one element becomes a scalar.
+        netCDF-4 writes an attribute with one value that way, while in other
+        HDF5 files a scalar attribute and an array of one element are
+        different, such as a list of one name. By default (``None``) such
+        arrays become scalars in netCDF-4 files and stay lists in other files.
+        ``True`` makes them scalars in every file, and ``False`` keeps them as
+        lists in every file. A scalar attribute, and the CF ``_FillValue``
+        attribute, are scalars either way.
     """
 
     def __init__(
@@ -451,11 +478,13 @@ class HDFParser:
         drop_variables: Iterable[str] | None = None,
         reader_factory: ReaderFactory = BlockStoreReader,
         links_and_references: bool = False,
+        squeeze_attributes: bool | None = None,
     ):
         self.group = group
         self.drop_variables = drop_variables
         self.reader_factory = reader_factory
         self.links_and_references = links_and_references
+        self.squeeze_attributes = squeeze_attributes
 
     def __call__(
         self,
@@ -486,6 +515,7 @@ class HDFParser:
             group=self.group,
             drop_variables=self.drop_variables,
             links_and_references=self.links_and_references,
+            squeeze_attributes=self.squeeze_attributes,
         )
         # Convert to a manifest store
         return ManifestStore(registry=registry, group=manifest_group)
@@ -848,7 +878,12 @@ def _ref_object(reference, path: Callable) -> dict | None:
     return {"ref": {"node": path(reference)}} if reference else None
 
 
-def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = False):
+def _extract_attrs(
+    h5obj: H5Dataset | H5Group,
+    links_and_references: bool = False,
+    *,
+    squeeze_attributes: bool,
+):
     """
     Extract attributes from an HDF5 group or dataset.
 
@@ -860,6 +895,10 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
         Write an attribute that holds an object reference, or an array of them,
         as ref convention objects whose node is the target's path relative to
         h5obj; a null reference is None.
+    squeeze_attributes
+        Write an attribute that is an array of one element as a scalar, as
+        netCDF-4 means by one. Otherwise it is a list of one, and only a
+        scalar attribute is a scalar.
     """
     import h5py
 
@@ -905,7 +944,10 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
         elif isinstance(v, (np.ndarray, np.number, np.bool_)):
             if v.dtype.kind == "S":
                 v = np.strings.decode(np.asarray(v), "utf-8").tolist()
-            elif v.size == 1:
+            # _FillValue is the array's fill value, so always a scalar
+            elif v.size == 1 and (
+                v.ndim == 0 or squeeze_attributes or n == "_FillValue"
+            ):
                 v = v.flatten()[0]
                 if isinstance(v, (np.ndarray, np.number, np.bool_)):
                     v = v.tolist()
@@ -917,6 +959,19 @@ def _extract_attrs(h5obj: H5Dataset | H5Group, links_and_references: bool = Fals
             continue
         attrs[n] = v
     return attrs
+
+
+def _is_netcdf4(f) -> bool:
+    """
+    Whether an open HDF5 file is a netCDF-4 file.
+
+    netCDF-C writes _NCProperties to the root group, since version 4.4.1.
+    Files written by earlier versions are recognized by a dimension in the
+    root group, which netCDF-C marks with _Netcdf4Dimid.
+    """
+    if "_NCProperties" in f.attrs:
+        return True
+    return any(obj is not None and "_Netcdf4Dimid" in obj.attrs for obj in f.values())
 
 
 def _find_non_coord_dimension_vars(group: H5Group) -> list[str]:
