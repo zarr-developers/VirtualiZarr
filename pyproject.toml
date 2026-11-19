@@ -52,7 +52,7 @@ hdf = [
 
 # dmrpp
 dmrpp = [
-    "pydap>=3.5.10",
+    "pydap @ git+https://github.com/pydap/pydap.git",
 ]
 
 zarr = ["arro3-core"]
