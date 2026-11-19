@@ -14,6 +14,9 @@
 
 ### Breaking changes
 
+  - `DMRPPParser` is now migrated to [pydap](https://github.com/pydap/pydap) (`pydap>=5.10`) (see [pydap#417](https://github.com/pydap/pydap/issues/417)). To use the dmrpp parser one  must install the extra `pip install "virtualizarr[dmrpp]"`.
+  By [Miguel Jimenez-Urias](https://github.com/Mikejmnez)
+
 ### Bug fixes
 
 - Variables passed as `loadable_variables` are no longer read in full while building the virtual dataset.
@@ -683,6 +686,7 @@ Brings `region`-writing support in `.to_icechunk()`, a `ZarrParser` with orders 
   By [UserNobody14](https://github.com/UserNobody14).
 - Fix `ZarrParser` to use public attribute instead of private one ([#916](https://github.com/zarr-developers/VirtualiZarr/pull/916)).
   By [Max Jones](https://github.com/maxrjones).
+
 
 ### Documentation
 
