@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import xarray as xr
 from obspec_utils.registry import ObjectStoreRegistry
@@ -203,17 +204,9 @@ def test_inlinevalue(inlinevalue_dmrpp):
     """
     Test that inline values can be parsed into manifest
     """
-    expected_bytes = b"AAAAAAAAAAABAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAAEAAAAAAAAAAUAAAAAAAAABgAAAAAAAAAHAAAAAAAAAAgAAAAAAAAACQAAAAAAAAA="
-
-    # dmrpp_file = (
-    #     "http://test.opendap.org/opendap/data/dmrpp/compact_lowlevel.h5.dmrpp.file"
-    # )
-    # session = requests.Session()
-    # dmrpp = session.get(dmrpp_file).content.decode()
     parser = DMRParser(
         inlinevalue_dmrpp, object_store=obstore_local(url="file:///compact_lowlevel.h5")
     )
     ms = parser.parse_dataset()
-    vds = ms.to_virtual_dataset()
-    assert "my_dataset" in vds
-    assert ms._group["my_dataset"]._manifest._inlined == {(0, 0): expected_bytes}
+    with xr.open_dataset(ms, engine="zarr", consolidated=False, zarr_format=3) as ds:
+        np.testing.assert_array_equal(ds["my_dataset"].values, np.arange(10))
