@@ -336,6 +336,127 @@ def test_v2_metadata_with_none_fill_value(dtype):
     assert metadata.fill_value is not None
 
 
+@requires_v2_migration
+@pytest.mark.parametrize(
+    "vlen_type,compressor,fill_value,expected_fill,values,order",
+    [
+        pytest.param(
+            "utf8", None, None, "", ["a", "bb", "ccc"], "C", id="vlen-utf8-none-fill"
+        ),
+        pytest.param(
+            "utf8",
+            "blosc",
+            None,
+            "",
+            ["a", "bb", "ccc"],
+            "C",
+            id="vlen-utf8-blosc-none-fill",
+        ),
+        pytest.param(
+            "utf8",
+            "blosc",
+            "missing",
+            "missing",
+            ["a", "bb"],
+            "C",
+            id="vlen-utf8-explicit-fill-sparse",
+        ),
+        pytest.param(
+            "utf8",
+            None,
+            None,
+            "",
+            [["a", "bb", "ccc"], ["dddd", "eeeee", "ffffff"]],
+            "F",
+            id="vlen-utf8-2d-fortran",
+        ),
+        pytest.param(
+            "bytes",
+            None,
+            None,
+            b"",
+            [b"a", b"bb", b"ccc"],
+            "C",
+            id="vlen-bytes-none-fill",
+        ),
+        pytest.param(
+            "bytes",
+            "blosc",
+            None,
+            b"",
+            [b"a", b"bb", b"ccc"],
+            "C",
+            id="vlen-bytes-blosc-none-fill",
+        ),
+    ],
+)
+def test_v2_vlen_array_parser_roundtrip(
+    vlen_type, compressor, fill_value, expected_fill, values, order
+):
+    """Regression test for #1053: Zarr V2 vlen-utf8 / vlen-bytes arrays with fill_value=None."""
+    import numcodecs
+    from zarr.core.dtype import VariableLengthBytes, VariableLengthUTF8
+
+    if vlen_type == "utf8":
+        zarr_dtype = VariableLengthUTF8()
+        vlen_filter = numcodecs.VLenUTF8()
+        expected_codec_name = "vlen-utf8"
+    else:
+        zarr_dtype = VariableLengthBytes()
+        vlen_filter = numcodecs.VLenBytes()
+        expected_codec_name = "vlen-bytes"
+
+    comp = numcodecs.Blosc() if compressor == "blosc" else None
+
+    obs_store = ObsMemoryStore()
+    zstore = ObjectStore(obs_store, read_only=False)
+    root = zarr.open_group(store=zstore, path="store.zarr", mode="w", zarr_format=2)
+
+    if order == "F":
+        shape = (2, 3)
+        chunks = (2, 3)
+        dims = ["x", "y"]
+    elif fill_value == "missing":
+        # 2 chunks, only the first chunk is written so the second exercises fill_value
+        shape = (4,)
+        chunks = (2,)
+        dims = ["x"]
+    else:
+        shape = (len(values),)
+        chunks = (len(values),)
+        dims = ["x"]
+
+    arr = root.create_array(
+        "v",
+        shape=shape,
+        chunks=chunks,
+        dtype=zarr_dtype,
+        filters=[vlen_filter],
+        compressors=comp,
+        order=order,
+        fill_value=fill_value,
+        attributes={"_ARRAY_DIMENSIONS": dims},
+    )
+    if order == "F":
+        arr[:] = np.array(values, dtype=object)
+    else:
+        arr[: len(values)] = values
+
+    registry = ObjectStoreRegistry({"memory://b": obs_store})
+    manifest_store = ZarrParser()(url="memory://b/store.zarr", registry=registry)
+
+    v3_meta = manifest_store._group.arrays["v"].metadata
+    assert v3_meta.fill_value == expected_fill
+    assert any(c.to_dict()["name"] == expected_codec_name for c in v3_meta.codecs)
+
+    actual = zarr.open_array(manifest_store, path="v", mode="r")[:]
+    if order == "F":
+        assert actual.tolist() == values
+    else:
+        expected = list(values) + [expected_fill] * (shape[0] - len(values))
+        assert list(actual) == expected
+
+
 def test_build_chunk_manifest_empty_with_shape():
     """Test build_chunk_manifest when chunk_map is empty but array has shape and chunks."""
     zarr_store = ObjectStore(store=ObsMemoryStore())
