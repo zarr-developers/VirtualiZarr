@@ -133,8 +133,14 @@ def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
     """Convert V2 metadata to a V3 dict, handling fill_value, dimensions, and attributes."""
 
     try:
-        from zarr.core.dtype import parse_dtype
-        from zarr.metadata.migrate_v3 import _convert_array_metadata
+        from zarr.abc.codec import Codec
+        from zarr.codecs import TransposeCodec, VLenBytesCodec, VLenUTF8Codec
+        from zarr.core.chunk_key_encodings import V2ChunkKeyEncoding
+        from zarr.metadata.migrate_v3 import (
+            _convert_array_metadata,
+            _convert_compressor,
+            _convert_filters,
+        )
     except (ImportError, AttributeError):
         raise ImportError(
             f"Zarr-Python>=3.1.3 is required for parsing Zarr V2 into Zarr V3. "
@@ -143,15 +149,61 @@ def _convert_v2_to_v3_dict(metadata: ArrayV2Metadata) -> dict:
 
     # V3 requires a non-None fill_value, but V2 allows it. If missing, set to the
     # dtype's default (e.g. 0 for int) before converting. We roundtrip through a dict
-    # because ArrayV2Metadata is immutable.
+    # because ArrayV2Metadata is immutable. Reuse the already-resolved `metadata.dtype`
+    # rather than re-parsing the raw V2 dtype string, which is ambiguous ("|O") for
+    # variable-length string/bytes arrays.
     if metadata.fill_value is None:
         v2_dict = metadata.to_dict()
-        v2_dtype = parse_dtype(cast(Any, v2_dict["dtype"]), zarr_format=2)
+        v2_dtype = metadata.dtype
         fill_value = v2_dtype.default_scalar()
         v2_dict["fill_value"] = v2_dtype.to_json_scalar(fill_value, zarr_format=2)
         metadata = ArrayV2Metadata.from_dict(v2_dict)
 
-    v3_dict = _convert_array_metadata(metadata).to_dict()
+    # Zarr V2 stores variable-length string/bytes serializers (`vlen-utf8`, `vlen-bytes`)
+    # in `filters`, whereas Zarr V3 uses them as array-to-bytes codecs in place of
+    # `BytesCodec`. zarr-python's `_convert_array_metadata` fails on these filters and
+    # unconditionally appends `BytesCodec`, so handle them directly here.
+    vlen_codecs: dict[str, type[VLenUTF8Codec] | type[VLenBytesCodec]] = {
+        "vlen-utf8": VLenUTF8Codec,
+        "vlen-bytes": VLenBytesCodec,
+    }
+    vlen_codec: Codec | None = None
+    remaining_filters = []
+    if metadata.filters is not None:
+        for flt in metadata.filters:
+            codec_cls = vlen_codecs.get(flt.codec_id)
+            if codec_cls is not None:
+                vlen_codec = codec_cls()
+            else:
+                remaining_filters.append(flt)
+
+    if vlen_codec is not None:
+        codecs: list[Codec] = []
+        if metadata.order == "F":
+            codecs.append(
+                TransposeCodec(order=list(range(len(metadata.shape) - 1, -1, -1)))
+            )
+        if remaining_filters:
+            codecs.extend(_convert_filters(tuple(remaining_filters)))
+        codecs.append(vlen_codec)
+        if metadata.compressor is not None:
+            codecs.append(_convert_compressor(metadata.compressor, metadata.dtype))
+
+        v3_dict = ArrayV3Metadata(
+            shape=metadata.shape,
+            data_type=metadata.dtype,
+            chunk_grid=RegularChunkGridMetadata(chunk_shape=metadata.chunks),
+            chunk_key_encoding=V2ChunkKeyEncoding(
+                separator=metadata.dimension_separator
+            ),
+            fill_value=metadata.fill_value,
+            codecs=codecs,
+            attributes=metadata.attributes,
+            dimension_names=None,
+            storage_transformers=None,
+        ).to_dict()
+    else:
+        v3_dict = _convert_array_metadata(metadata).to_dict()
 
     # _convert_array_metadata doesn't promote V2's _ARRAY_DIMENSIONS attribute
     # to V3's dimension_names, so we do it manually.
