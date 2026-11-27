@@ -503,7 +503,7 @@ target = xr.Dataset(
 target.to_zarr(session.store, mode="w")
 
 # 2. Write the virtual dataset for one source into its slice.
-vds_slice.vz.to_icechunk(session.store, region={"time": slice(start, stop)})
+vds_slice.vz.to_icechunk(session.store, region="auto")
 session.commit("Wrote one time slice")
 ```
 
