@@ -480,6 +480,38 @@ snapshot_id = session.commit("Appended second dataset")
 print(snapshot_id)
 ```
 
+#### Write into an existing region
+
+The `region` argument writes a virtual dataset into slices of arrays that already exist in the store, rather than creating a new group. This is useful when many source files each cover a different part of one larger dataset: the target arrays and their Zarr metadata only need to be created once, and each source can then be written into its own region.
+
+`region` opens the existing group by default, so it cannot be combined with `mode="w"` or `mode="w-"`. The target group and arrays must exist before the first regional write. A simple way to create them is to write a template dataset with the full target shape once, then write each source into its slice:
+
+```python
+import numpy as np
+import xarray as xr
+
+# 1. Create the target arrays with the full extent (here filled with NaN).
+target = xr.Dataset(
+    {
+        "temperature": (
+            ("time", "lat", "lon"),
+            np.full((n_time, n_lat, n_lon), np.nan, dtype="float32"),
+        )
+    },
+    coords={"time": times, "lat": lats, "lon": lons},
+)
+target.to_zarr(session.store, mode="w")
+
+# 2. Write the virtual dataset for one source into its slice.
+vds_slice.vz.to_icechunk(session.store, region={"time": slice(start, stop)})
+session.commit("Wrote one time slice")
+```
+
+`region="auto"` uses the dataset's coordinate labels to locate each array in the existing store. An explicit mapping such as `{"time": slice(start, stop)}` is useful when coordinates are missing or should not be used to infer the destination. Every region must align with the target's chunk boundaries; VirtualiZarr raises an error instead of writing a partial chunk.
+
+!!! note
+    The template in the example is a regular in-memory array, so writing it materializes all of the target chunks. For a large target, use a dask array and `compute=False` (or an empty virtual dataset) to create the metadata without filling every chunk.
+
 See the [Icechunk documentation](https://icechunk.io/en/latest/virtual/) for more details.
 
 ### Writing to Kerchunk's format and reading data via fsspec
